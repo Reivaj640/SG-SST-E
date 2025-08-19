@@ -162,11 +162,13 @@ function createSidebarButtons() {
     button.addEventListener('click', () => {
       if (item.name === "Salir") {
         handleLogout();
-      } else {
-        // Establecer el botón activo visualmente
+      } else if (currentCompany) {
+        // Si hay una empresa seleccionada, mostrar el contenido del módulo
         setActiveSidebarButton(button);
-        // Mostrar el contenido del módulo
         showModuleContent(item.name);
+      } else {
+        // Si no hay empresa, mostrar una alerta personalizada
+        showCustomAlert("Por favor, selecciona una empresa antes de ingresar a un módulo.");
       }
     });
 
@@ -1338,6 +1340,35 @@ function sendMessage(message, chatHistory) {
   
   // Desplazar hacia abajo
   chatHistory.scrollTop = chatHistory.scrollHeight;
+}
+
+// --- Funciones para Diálogo Personalizado ---
+function showCustomAlert(message) {
+  const overlay = document.getElementById('custom-alert-overlay');
+  const messageEl = document.getElementById('custom-alert-message');
+  const closeBtn = document.getElementById('custom-alert-close');
+
+  if (!overlay || !messageEl || !closeBtn) {
+    console.error('Custom alert elements not found!');
+    // Fallback to native alert
+    alert(message);
+    return;
+  }
+
+  messageEl.textContent = message;
+  overlay.style.display = 'flex';
+
+  const closeModal = () => {
+    overlay.style.display = 'none';
+  };
+
+  closeBtn.onclick = closeModal;
+
+  overlay.onclick = (event) => {
+    if (event.target === overlay) {
+      closeModal();
+    }
+  };
 }
 
 // --- Función para formatear la estructura del directorio para el log ---

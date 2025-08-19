@@ -781,3 +781,47 @@ select.form-control {
 #app-footer p {
   margin: 0; /* Eliminar margen del párrafo */
 }
+
+/* Custom Alert Modal */
+#custom-alert-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: none; /* Initially hidden */
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+}
+
+#custom-alert-modal {
+  background-color: var(--widget-bg-color);
+  padding: 30px;
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--box-shadow-lg);
+  text-align: center;
+  max-width: 90%;
+  width: 400px;
+}
+
+#custom-alert-message {
+  margin: 0 0 20px 0;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--text-color);
+}
+
+#custom-alert-close {
+  background-color: var(--light-color); /* Tono gris claro */
+  color: var(--text-color); /* Texto oscuro */
+  min-width: 100px;
+  border: 1px solid var(--border-color); /* Borde gris */
+}
+
+#custom-alert-close:hover {
+  background-color: var(--secondary-color); /* Tono gris medio al pasar el mouse */
+  color: var(--white-color); /* Texto blanco al pasar el mouse */
+  border-color: var(--secondary-color);
+}
