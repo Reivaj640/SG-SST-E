@@ -73,7 +73,7 @@
 }
 
 .company-home-title {
-  color: #007bff;
+  color: var(--heading-color);
   margin-bottom: 20px;
 }
 
@@ -93,7 +93,7 @@
 }
 
 .modules-info h3 {
-  color: #007bff;
+  color: var(--heading-color);
   margin-bottom: 15px;
 }
 
@@ -129,7 +129,7 @@
 }
 
 .module-card .card-title {
-  color: #007bff;
+  color: var(--heading-color);
   margin-bottom: 15px;
   font-size: 1.3rem;
 }

@@ -72,7 +72,7 @@
   --line-height-base: 1.5;
   
   /* Otros */
-  --sidebar-width: 200px; /* Reducido de 250px */
+  --sidebar-width: 180px; /* Reducido de 200px */
   --header-height: 60px;
 }
 
@@ -706,7 +706,7 @@ select.form-control {
 
 #company-name {
   font-weight: var(--font-weight-bold);
-  font-size: var(--font-size-lg);
+  font-size: 1rem; /* Reducido de 1.25rem */
 }
 
 #sidebar-menu {
@@ -732,7 +732,7 @@ select.form-control {
   text-align: center;    /* <-- Centra el texto */
   cursor: pointer;
   transition: all var(--transition-fast);
-  font-size: var(--font-size-sm); /* <-- Reduce el tamaño de la fuente */
+  font-size: 13px; /* Reducido de 0.875rem */
 }
 
 .sidebar-menu-button:hover,
@@ -766,8 +766,18 @@ select.form-control {
 #app-footer {
   background-color: var(--dark-color);
   color: rgba(255, 255, 255, 0.7);
-  padding: var(--spacer-sm);
-  text-align: center;
-  font-size: var(--font-size-sm);
+  padding: var(--spacer-xs) var(--spacer-sm); /* Reducida la altura y añadido padding lateral */
+  font-size: 0.75rem; /* Reducida la fuente */
   flex-shrink: 0;
+}
+
+.footer-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+#app-footer p {
+  margin: 0; /* Eliminar margen del párrafo */
 }
