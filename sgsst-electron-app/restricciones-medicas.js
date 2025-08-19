@@ -71,35 +71,64 @@ class RestriccionesMedicasComponent {
     showVerRemisionesPage() {
         this.container.innerHTML = '';
 
+        // Encabezado estilizado
         const header = document.createElement('div');
         header.className = 'submodule-header';
+        
         const backButton = document.createElement('button');
         backButton.className = 'btn btn-back';
         backButton.innerHTML = '&#8592; Volver';
         backButton.addEventListener('click', () => this.render()); // Vuelve al menú de tarjetas
         header.appendChild(backButton);
+        
         const title = document.createElement('h3');
         title.textContent = 'Ver Remisiones Médicas';
+        title.style.flexGrow = '1';
+        title.style.textAlign = 'center';
         header.appendChild(title);
+        
+        // Botón de abrir documento (inicialmente oculto)
+        const openButton = document.createElement('button');
+        openButton.id = 'open-current-doc-btn';
+        openButton.className = 'btn btn-back';
+        openButton.textContent = 'Abrir';
+        openButton.style.display = 'none';
+        openButton.addEventListener('click', () => {
+            // La lógica para abrir el documento se maneja en previewDocument
+            // Aquí simplemente llamamos a una función que lo haga
+            const currentPreview = document.querySelector('#preview-col iframe') || document.querySelector('#preview-col [data-file-path]');
+            if (currentPreview) {
+                const filePath = currentPreview.getAttribute('data-file-path') || currentPreview.src;
+                if (filePath) {
+                    this.openDocument(filePath);
+                }
+            }
+        });
+        header.appendChild(openButton);
+        
         this.container.appendChild(header);
 
+        // Controles de documento (barra de búsqueda y botón de selección manual)
         const controls = document.createElement('div');
         controls.className = 'document-controls';
         
         const searchInput = document.createElement('input');
         searchInput.type = 'text';
         searchInput.placeholder = 'Buscar por nombre de archivo o empleado...';
-        searchInput.className = 'submodule-select';
+        searchInput.className = 'form-control';
+        searchInput.style.flexGrow = '1';
         searchInput.addEventListener('input', (e) => this.filterAndDisplayFiles(e.target.value));
         controls.appendChild(searchInput);
 
         const manualSelectButton = document.createElement('button');
-        manualSelectButton.className = 'btn';
+        manualSelectButton.className = 'btn btn-secondary'; // Estilo de botón secundario
         manualSelectButton.textContent = 'Seleccionar Manualmente';
         manualSelectButton.addEventListener('click', () => this.handleManualSelect());
         controls.appendChild(manualSelectButton);
+        
         this.container.appendChild(controls);
 
+        // Layout principal para resultados y previsualización
         const mainLayout = document.createElement('div');
         mainLayout.className = 'remisiones-layout';
 
@@ -204,7 +233,23 @@ class RestriccionesMedicasComponent {
         }
     }
 
+    async openDocument(filePath) {
+        try {
+            await window.electronAPI.openPath(filePath);
+        } catch (error) {
+            console.error('Error al abrir el documento:', error);
+            alert('Error al abrir el documento.');
+        }
+    }
+
     previewDocument(filePath) {
+        // Mostrar el botón "Abrir" cuando se previsualiza un documento
+        const openButton = document.getElementById('open-current-doc-btn');
+        if (openButton) {
+            openButton.style.display = 'inline-block';
+            // Guardar la ruta del archivo en un atributo de datos del botón
+            openButton.setAttribute('data-current-file', filePath);
+        }
         const previewCol = document.getElementById('preview-col');
         if (!filePath) {
             previewCol.innerHTML = `<div class="preview-placeholder">Ruta de archivo no válida.</div>`;
@@ -278,28 +323,30 @@ class RestriccionesMedicasComponent {
     }
 }
 
-// Inyectar estilos CSS necesarios para el layout de esta página
+// Inyectar solo los estilos CSS necesarios que no estén cubiertos por styles.css
 const style = document.createElement('style');
 style.textContent = `
     .remisiones-layout {
         display: flex;
-        gap: 16px;
+        gap: var(--spacer);
         flex-grow: 1;
-        height: calc(100vh - 220px); /* Ajustar altura */
+        height: calc(100vh - 250px); /* Ajustar altura considerando el nuevo header y controles */
     }
     .search-results-col {
         flex: 1;
         border: 1px solid var(--border-color);
-        border-radius: var(--border-radius-sm);
-        padding: 8px;
+        border-radius: var(--border-radius-md);
+        padding: var(--spacer-sm);
         overflow-y: auto;
         background-color: var(--widget-bg-color);
+        box-shadow: var(--box-shadow);
     }
     .preview-col {
         flex: 3;
         border: 1px solid var(--border-color);
         border-radius: var(--border-radius-md);
         overflow: hidden;
+        box-shadow: var(--box-shadow);
     }
     .preview-placeholder {
         display: flex;
@@ -307,7 +354,7 @@ style.textContent = `
         justify-content: center;
         height: 100%;
         color: var(--text-light-color);
-        background-color: var(--gray-50);
+        background-color: var(--bg-color); /* Usar el color de fondo estándar */
     }
     .search-results-list {
         list-style: none;
@@ -322,10 +369,15 @@ style.textContent = `
     }
     .search-results-list li:hover {
         background-color: var(--button-hover-bg-color);
+        color: var(--white-color);
         transform: translateX(4px);
     }
     .search-results-list li:last-child {
         border-bottom: none;
+    }
+    /* Ocultar el botón de abrir documento por defecto */
+    #open-current-doc-btn {
+        display: none;
     }
 `;
 document.head.appendChild(style);
