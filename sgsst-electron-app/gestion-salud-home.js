@@ -83,12 +83,20 @@ class GestionSaludHome {
         // Listado de submódulos
         const submodulesContainer = document.createElement('div');
         submodulesContainer.className = 'submodules-container';
-        submodulesContainer.innerHTML = `
-            <h3>Submódulos</h3>
-            <div class="submodules-list">
-                ${this.submodules.map(submodule => this.renderSubmoduleItem(submodule)).join('')}
-            </div>
-        `;
+        
+        const submodulesTitle = document.createElement('h3');
+        submodulesTitle.textContent = 'Submódulos';
+        submodulesContainer.appendChild(submodulesTitle);
+        
+        const submodulesList = document.createElement('div');
+        submodulesList.className = 'submodules-list';
+        
+        this.submodules.forEach(submodule => {
+            const submoduleItem = this.renderSubmoduleItem(submodule);
+            submodulesList.appendChild(submoduleItem);
+        });
+        
+        submodulesContainer.appendChild(submodulesList);
         container.appendChild(submodulesContainer);
     }
     
@@ -103,23 +111,7 @@ class GestionSaludHome {
         return widget;
     }
     
-    renderSubmoduleItem(name) {
-        // Generar datos simulados para el submódulo
-        const lastAccess = this.getRandomLastAccess();       const timeSpent = this.getRandomTimeSpent();    
-        // Escape comillas simples para evitar problemas con el atributo onclick
-        const escapedName = name.replace(/'/g, "\\'");
-        const escapedModule = this.moduleName.replace(/'/g, "'\\");
-            
-        return `
-            <div class="submodule-item">
-                <div class="submodule-info">
-                    <div class="submodule-name">${name}</div>
-                        <div class="submodule-meta">Último acceso: ${lastAccess} | Tiempo: ${timeSpent}</div>
-                    </div>
-                    <button class="btn btn-primary" onclick="showSubmoduleContent(document.querySelector('.main-canvas'), '${escapedModule}', '${escapedName}')">Ingresar</button>
-            </div>
-        `;
-    }
+    renderSubmoduleItem(name) {\n        // Generar datos simulados para el submódulo\n        const lastAccess = this.getRandomLastAccess();\n        const timeSpent = this.getRandomTimeSpent();\n\n        const submoduleItem = document.createElement('div');\n        submoduleItem.className = 'submodule-item';\n\n        const submoduleInfo = document.createElement('div');\n        submoduleInfo.className = 'submodule-info';\n\n        const submoduleName = document.createElement('div');\n        submoduleName.className = 'submodule-name';\n        submoduleName.textContent = name;\n        submoduleInfo.appendChild(submoduleName);\n\n        const submoduleMeta = document.createElement('div');\n        submoduleMeta.className = 'submodule-meta';\n        submoduleMeta.textContent = `Último acceso: ${lastAccess} | Tiempo: ${timeSpent}`;\n        submoduleInfo.appendChild(submoduleMeta);\n\n        const button = document.createElement('button');\n        button.className = 'btn btn-primary';\n        button.textContent = 'Ingresar';\n        // Escape comillas para evitar problemas con el atributo onclick\n        const escapedName = name.replace(/'/g, "\\'");\n        const escapedModule = this.moduleName.replace(/'/g, "\\'");\n        button.addEventListener('click', () => {\n            showSubmoduleContent(document.querySelector('.main-canvas'), escapedModule, escapedName);\n        });\n\n        submoduleItem.appendChild(submoduleInfo);\n        submoduleItem.appendChild(button);\n        \n        return submoduleItem;\n    }
     
     getRandomLastAccess() {
         const days = ['Hace 1 día', 'Hace 2 días', 'Hace 3 días', 'Hace 1 semana', 'Hace 2 semanas'];

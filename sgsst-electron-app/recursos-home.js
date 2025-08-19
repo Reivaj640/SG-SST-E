@@ -128,8 +128,9 @@ class RecursosHome {
 
         submoduleItem.appendChild(submoduleInfo);
         submoduleItem.appendChild(button);
-
+        
         return submoduleItem;
+    }
     }
     
     getRandomLastAccess() {

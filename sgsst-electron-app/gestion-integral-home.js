@@ -79,15 +79,26 @@ class GestionIntegralHome {
         // Listado de submódulos
         const submodulesContainer = document.createElement('div');
         submodulesContainer.className = 'submodules-container';
-        submodulesContainer.innerHTML = `
-            <h3>Submódulos</h3>
-            <div class="submodules-list">
-                ${this.renderSubmoduleItem('2.1.1 Politica del SG-SST', 'Hace 2 días', '15 min')}
-                ${this.renderSubmoduleItem('2.2.1 Objetivos SST', 'Hace 1 semana', '30 min')}
-                ${this.renderSubmoduleItem('2.3.1 Evaluación inicial del SG-SST', 'Hace 3 días', '45 min')}
-                ${this.renderSubmoduleItem('2.4.1 Plan de Trabajo Anual', 'Hace 5 días', '1 hora')}
-            </div>
-        `;
+        
+        const submodulesTitle = document.createElement('h3');
+        submodulesTitle.textContent = 'Submódulos';
+        submodulesContainer.appendChild(submodulesTitle);
+        
+        const submodulesList = document.createElement('div');
+        submodulesList.className = 'submodules-list';
+        
+        const submoduleItems = [
+            this.renderSubmoduleItem('2.1.1 Politica del SG-SST', 'Hace 2 días', '15 min'),
+            this.renderSubmoduleItem('2.2.1 Objetivos SST', 'Hace 1 semana', '30 min'),
+            this.renderSubmoduleItem('2.3.1 Evaluación inicial del SG-SST', 'Hace 3 días', '45 min'),
+            this.renderSubmoduleItem('2.4.1 Plan de Trabajo Anual', 'Hace 5 días', '1 hora')
+        ];
+        
+        submoduleItems.forEach(item => {
+            submodulesList.appendChild(item);
+        });
+        
+        submodulesContainer.appendChild(submodulesList);
         container.appendChild(submodulesContainer);
     }
     
@@ -103,19 +114,36 @@ class GestionIntegralHome {
     }
     
     renderSubmoduleItem(name, lastAccess, timeSpent) {
+        const submoduleItem = document.createElement('div');
+        submoduleItem.className = 'submodule-item';
+
+        const submoduleInfo = document.createElement('div');
+        submoduleInfo.className = 'submodule-info';
+
+        const submoduleName = document.createElement('div');
+        submoduleName.className = 'submodule-name';
+        submoduleName.textContent = name;
+        submoduleInfo.appendChild(submoduleName);
+
+        const submoduleMeta = document.createElement('div');
+        submoduleMeta.className = 'submodule-meta';
+        submoduleMeta.textContent = `Último acceso: ${lastAccess} | Tiempo: ${timeSpent}`;
+        submoduleInfo.appendChild(submoduleMeta);
+
+        const button = document.createElement('button');
+        button.className = 'btn btn-primary';
+        button.textContent = 'Ingresar';
         // Escape comillas para evitar problemas con el atributo onclick
         const escapedName = name.replace(/'/g, "\\'");
         const escapedModule = this.moduleName.replace(/'/g, "\\'");
+        button.addEventListener('click', () => {
+            showSubmoduleContent(document.querySelector('.main-canvas'), escapedModule, escapedName);
+        });
+
+        submoduleItem.appendChild(submoduleInfo);
+        submoduleItem.appendChild(button);
         
-        return `
-            <div class="submodule-item">
-                <div class="submodule-info">
-                    <div class="submodule-name">${name}</div>
-                    <div class="submodule-meta">Último acceso: ${lastAccess} | Tiempo: ${timeSpent}</div>
-                </div>
-                <button class="btn btn-primary" onclick="showSubmoduleContent(document.querySelector('.main-canvas'), '${escapedModule}', '${escapedName}')">Ingresar</button>
-            </div>
-        `;
+        return submoduleItem;
     }
     
     async renderSidebarPanel(container) {
