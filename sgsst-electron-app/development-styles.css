@@ -46,8 +46,8 @@
 }
 
 .company-select-button:hover {
-  background-color: var(--dark-color); /* Fondo gris oscuro */
-  border-color: var(--dark-color);
+  background-color: var(--secondary-color); /* Fondo gris medio */
+  border-color: var(--secondary-color);
   color: var(--white-color); /* Texto blanco */
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Sombra neutra */
