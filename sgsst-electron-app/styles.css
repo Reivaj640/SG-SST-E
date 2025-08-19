@@ -608,6 +608,97 @@ select.form-control {
   height: 100vh;
 }
 
+/* Estilos específicos para el submódulo Responsable del SG */
+.submodule-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--spacer);
+  background-color: var(--widget-bg-color);
+  padding: var(--spacer) var(--spacer);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--box-shadow);
+  min-height: 80px; /* Increased height */
+}
+
+.submodule-header h3 {
+  margin: 0 var(--spacer) 0 0;
+  color: var(--text-color); /* Changed from heading-color to text-color (black) */
+  font-size: 1.5rem;
+  flex-grow: 1;
+  text-align: center;
+}
+
+.btn-back {
+  background-color: var(--light-color);
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
+  font-size: var(--font-size-base);
+  padding: 0.5rem 1rem;
+  margin: 0;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border-radius: var(--border-radius-md);
+}
+
+.btn-back:hover {
+  background-color: var(--secondary-color);
+  border-color: var(--secondary-color);
+  color: var(--white-color);
+  text-decoration: none;
+}
+
+.btn-back:focus {
+  outline: 0;
+  box-shadow: 0 0 0 0.2rem rgba(108, 117, 125, 0.25);
+}
+
+.document-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacer-sm);
+  margin-bottom: var(--spacer);
+  padding: var(--spacer-sm);
+  background-color: var(--widget-bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--box-shadow);
+}
+
+.document-controls .form-control,
+.document-controls .btn {
+  margin: 0;
+}
+
+.document-controls .btn {
+  background-color: var(--success-color);
+  border-color: var(--success-color);
+  color: var(--white-color);
+}
+
+.document-controls .btn:hover {
+  background-color: #218838;
+  border-color: #1e7e34;
+}
+
+.preview-close-btn {
+  background-color: var(--light-color);
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
+  font-size: var(--font-size-base);
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border-radius: var(--border-radius-md);
+}
+
+.preview-close-btn:hover {
+  background-color: var(--secondary-color);
+  border-color: var(--secondary-color);
+  color: var(--white-color);
+  text-decoration: none;
+}
+
 #app-header {
   background-color: var(--white-color);
   border-bottom: 1px solid var(--border-color);

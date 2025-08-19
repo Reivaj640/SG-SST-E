@@ -29,8 +29,22 @@ class ResponsableSgComponent {
         headerContainer.appendChild(backButton);
         
         const title = document.createElement('h3');
-        title.textContent = `Submódulo: ${this.submoduleName}`;
+        title.textContent = `${this.submoduleName}`;
+        title.style.flexGrow = '1';
+        title.style.textAlign = 'center';
         headerContainer.appendChild(title);
+
+        const openButton = document.createElement('button');
+        openButton.id = 'open-current-doc-btn';
+        openButton.className = 'btn btn-back';
+        openButton.textContent = 'Abrir';
+        openButton.style.display = 'none';
+        openButton.addEventListener('click', () => {
+            if (this.currentDocumentPath) {
+                this.openDocument(this.currentDocumentPath);
+            }
+        });
+        headerContainer.appendChild(openButton);
 
         this.container.appendChild(headerContainer);
 
@@ -50,18 +64,6 @@ class ResponsableSgComponent {
         });
         topControls.appendChild(docTypeSelect);
 
-        const openButton = document.createElement('button');
-        openButton.id = 'open-current-doc-btn';
-        openButton.className = 'btn';
-        openButton.textContent = 'Abrir';
-        openButton.style.display = 'none';
-        openButton.addEventListener('click', () => {
-            if (this.currentDocumentPath) {
-                this.openDocument(this.currentDocumentPath);
-            }
-        });
-        topControls.appendChild(openButton);
-        
         this.container.appendChild(topControls);
         
         const documentViewer = document.createElement('div');
@@ -176,7 +178,7 @@ class ResponsableSgComponent {
                 viewer.innerHTML = `
                     <iframe src="${filePath}" width="100%" height="600px" style="border: none;"></iframe>
                     <div style="text-align: center; margin-top: 10px;">
-                        <button id="close-preview-btn" class="btn">Cerrar Previsualización</button>
+                        <button id="close-preview-btn" class="btn preview-close-btn">Cerrar Previsualización</button>
                     </div>`;
             } else if (filePath.toLowerCase().endsWith('.docx')) {
                 viewer.innerHTML = `
@@ -188,7 +190,7 @@ class ResponsableSgComponent {
                     viewer.innerHTML = `
                         <iframe src="${result.pdfPath}" width="100%" height="600px" style="border: none;"></iframe>
                         <div style="text-align: center; margin-top: 10px;">
-                            <button id="close-preview-btn" class="btn">Cerrar Previsualización</button>
+                            <button id="close-preview-btn" class="btn preview-close-btn">Cerrar Previsualización</button>
                         </div>`;
                 } else {
                     viewer.innerHTML = `
@@ -198,8 +200,8 @@ class ResponsableSgComponent {
                             <p>No se pudo convertir el archivo <strong>${fileName}</strong>.</p>
                             <p style="font-size: 0.9em; color: #777;">Error: ${result.error}</p>
                             <div style="margin-top: 30px;">
-                                <button class="btn btn-primary" onclick="window.currentResponsableSgComponent.openDocument(\'${escapedPath}\')">Abrir con aplicación externa</button>
-                                <button id="close-preview-btn" class="btn">Volver</button>
+                                <button class="btn btn-primary" onclick="window.currentResponsableSgComponent.openDocument('${escapedPath}')">Abrir con aplicación externa</button>
+                                <button id="close-preview-btn" class="btn preview-close-btn">Volver</button>
                             </div>
                         </div>`;
                 }
@@ -210,8 +212,8 @@ class ResponsableSgComponent {
                         <h3>Previsualización no disponible</h3>
                         <p>El archivo: <strong>${fileName}</strong> no se puede mostrar directamente.</p>
                         <div style="margin-top: 30px;">
-                            <button class="btn btn-primary" onclick="window.currentResponsableSgComponent.openDocument(\'${escapedPath}\')">Abrir con aplicación externa</button>
-                            <button id="close-preview-btn" class="btn">Volver</button>
+                            <button class="btn btn-primary" onclick="window.currentResponsableSgComponent.openDocument('${escapedPath}')">Abrir con aplicación externa</button>
+                            <button id="close-preview-btn" class="btn preview-close-btn">Volver</button>
                         </div>
                     </div>`;
             }
