@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
+  <title>SG-SST Electron App</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="development-styles.css">
+</head>
+<body>
+  <div id="app">
+    <header id="app-header">
+      <div class="header-content">
+        <div class="logo-container">
+          <img id="header-logo" src="" alt="Logo" style="display:none;">
+          <div id="logo-placeholder" class="logo-placeholder">IMG</div>
+        </div>
+        <h1 id="app-title">Sistema de Gestión de Seguridad y Salud en el Trabajo</h1>
+        <div class="header-buttons">
+          <button id="config-button" class="header-btn">
+            <img id="config-icon" src="assets/ajustes.gif" alt="Configuraciones" style="display:none;">
+            <span id="config-icon-placeholder" class="icon-placeholder">⚙️</span>
+            Configuraciones
+          </button>
+          <button id="llm-button" class="header-btn">
+            <img id="llm-icon" src="assets/medico.png" alt="Chat LLM" style="display:none;">
+            <span id="llm-icon-placeholder" class="icon-placeholder">💬</span>
+            Chat LLM
+          </button>
+        </div>
+      </div>
+    </header>
+    
+    <div class="main-container">
+      <aside id="sidebar">
+        <div id="company-info" class="company-info">
+          <img id="company-logo" src="" alt="Logo Empresa" style="display:none;">
+          <div id="company-logo-placeholder" class="company-logo-placeholder">Logo</div>
+          <span id="company-name">Empresa</span>
+        </div>
+        <nav>
+          <ul id="sidebar-menu"></ul>
+        </nav>
+      </aside>
+      
+      <main id="main-content">
+        <div id="content-area"></div>
+      </main>
+    </div>
+    
+    <footer id="app-footer">
+      <p>© 2025 Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos.</p>
+    </footer>
+  </div>
+  
+  <!-- Cargar los componentes -->
+  <script src="restricciones-medicas.js"></script>
+  <script src="responsable-sg.js"></script>
+  <script src="gestion-integral-home.js"></script>
+  <script src="recursos-home.js"></script>
+  <script src="gestion-salud-home.js"></script>
+  <script src="gestion-peligros-home.js"></script>
+  <script src="gestion-amenazas-home.js"></script>
+  <script src="verificacion-home.js"></script>
+  <script src="mejoramiento-home.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

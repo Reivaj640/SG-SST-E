@@ -2,10 +2,10 @@
   "name": "sgsst-desktop-app",
   "version": "1.0.0",
   "description": "Sistema SG-SST Desktop",
-  "main": "src/main.js",
+  "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "nodemon --exec electron . --watch src/",
+    "dev": "nodemon --exec electron . --watch ./",
     "build": "electron-builder",
     "pack": "electron-builder --dir",
     "dist": "electron-builder"

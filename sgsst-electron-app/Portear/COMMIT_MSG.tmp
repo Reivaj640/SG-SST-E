@@ -1,0 +1,29 @@
+feat: Creación inicial del proyecto App-SG-SST
+
+Se establece la estructura inicial del proyecto de la aplicación de escritorio para el Sistema de Gestión de Seguridad y Salud en el Trabajo (SG-SST).
+
+------------------------------------------------------------------------------------------------------
+           Categoria          |       Descripción del Cambio       |        Tipo de Cambio      
+------------------------------------------------------------------------------------------------------
+        Estructura            | Creación de directorios y archivos |        feature              
+        Interfaz              | Diseño inicial de la UI con        |        feature              
+                              | CustomTKinter                      |                             
+        Funcionalidad         | Lógica básica de la aplicación     |        feature              
+                              | y manejo de ventanas               |                             
+        Documentación         | README inicial y esquema de        |        docs                 
+                              | estructura de documentos           |                             
+        Dependencias          | Lista inicial de requerimientos    |        chore                
+                              | en requirements.txt                |                             
+-----------------------------------------------------------------------------------------------------
+
+Archivos Modificados "Descripción de la modificación"
+
+1. src/App.py: "Archivo principal de la aplicación con la lógica de la interfaz gráfica y manejo de eventos."
+2. src/Mapeo.py: "Módulo para mapear la estructura de directorios de las empresas."
+3. requirements.txt: "Archivo con las dependencias iniciales del proyecto."
+4. docs/document_structure.json: "Define la estructura de la documentación del proyecto."
+5. .gitignore: "Archivo para ignorar archivos y directorios en el control de versiones."
+6. README.md: "Archivo de introducción al proyecto."
+7. typings/*: "Archivos de definición de tipos para ttkbootstrap."
+8. Utils/*: "Recursos gráficos para la interfaz."
+

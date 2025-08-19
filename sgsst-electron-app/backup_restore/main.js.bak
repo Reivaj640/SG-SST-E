@@ -1,0 +1,438 @@
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const path = require('path');
+const fs = require('fs').promises;
+const { exec } = require('child_process');
+const { promisify } = require('util');
+
+const execPromise = promisify(exec);
+
+// Config file path
+const configPath = path.join(app.getPath('userData'), 'config.json');
+
+if (require('electron-squirrel-startup')) {
+  app.quit();
+}
+
+// Función para crear la ventana
+const createWindow = () => {
+  const mainWindow = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+
+  mainWindow.loadFile(path.join(__dirname, 'index.html'));
+  mainWindow.webContents.openDevTools();
+};
+
+// Función para registrar los manejadores IPC
+const registerIPCHandlers = () => {
+  // Handle directory selection
+  ipcMain.handle('select-directory', async () => {
+    console.log('Handling select-directory request');
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory']
+    });
+    
+    if (result.canceled) {
+      console.log('Directory selection canceled');
+      return null;
+    }
+    
+    console.log('Selected directory:', result.filePaths[0]);
+    return result.filePaths[0];
+  });
+
+  // Handle config saving
+  ipcMain.handle('save-config', async (event, config) => {
+    try {
+      console.log('Saving config:', config);
+      await fs.writeFile(configPath, JSON.stringify(config, null, 2));
+      console.log('Config saved successfully');
+      return { success: true };
+    } catch (error) {
+      console.error('Error saving config:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Handle config loading
+  ipcMain.handle('load-config', async () => {
+    try {
+      console.log('Loading config from:', configPath);
+      const data = await fs.readFile(configPath, 'utf8');
+      const config = JSON.parse(data);
+      console.log('Config loaded successfully');
+      return config;
+    } catch (error) {
+      // If file doesn't exist, return empty object
+      if (error.code === 'ENOENT') {
+        console.log('Config file not found, returning empty object');
+        return {};
+      }
+      console.error('Error loading config:', error);
+      return {};
+    }
+  });
+
+  // Handle directory mapping
+  ipcMain.handle('map-directory', async (event, directoryPath) => {
+    try {
+      console.log('Mapping directory:', directoryPath);
+      // Path to the Python mapping script
+      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'map_directory.py');
+      
+      // Check if the Python script exists
+      try {
+        await fs.access(pythonScriptPath);
+      } catch (error) {
+        throw new Error(`Python script not found at: ${pythonScriptPath}`);
+      }
+      
+      // Execute the Python script
+      const command = `python "${pythonScriptPath}" "${directoryPath}"`;
+      console.log(`Executing command: ${command}`);
+      
+      const { stdout, stderr } = await execPromise(command);
+      
+      // Parse the JSON output from the Python script
+      const structure = JSON.parse(stdout);
+      console.log('Directory mapping completed successfully');
+      
+      // Return both the structure and any potential logs/errors from stderr
+      return { success: true, structure: structure, log: stderr || 'Mapeo completado sin errores.' };
+    } catch (error) {
+      console.error('Error mapping directory:', error);
+      throw error;
+    }
+  });
+
+  // Handle reading directory contents
+  ipcMain.handle('read-directory', async (event, directoryPath) => {
+    try {
+      console.log('Reading directory:', directoryPath);
+      const items = await fs.readdir(directoryPath, { withFileTypes: true });
+      
+      const result = [];
+      for (const item of items) {
+        const itemPath = path.join(directoryPath, item.name);
+        const stats = await fs.stat(itemPath);
+        
+        result.push({
+          name: item.name,
+          path: itemPath,
+          isDirectory: item.isDirectory(),
+          size: stats.size,
+          created: stats.birthtime,
+          modified: stats.mtime
+        });
+      }
+      
+      console.log('Directory read successfully');
+      return result;
+    } catch (error) {
+      console.error('Error reading directory:', error);
+      throw error;
+    }
+  });
+
+  // Handle opening a file or folder
+  ipcMain.handle('open-path', async (event, pathToOpen) => {
+    try {
+      console.log('Opening path:', pathToOpen);
+      // Use the appropriate command based on the OS
+      let command;
+      switch (process.platform) {
+        case 'win32':
+          command = `start "" "${pathToOpen}"`;
+          break;
+        case 'darwin':
+          command = `open "${pathToOpen}"`;
+          break;
+        case 'linux':
+          command = `xdg-open "${pathToOpen}"`;
+          break;
+        default:
+          throw new Error(`Unsupported platform: ${process.platform}`);
+      }
+      
+      await execPromise(command);
+      console.log('Path opened successfully');
+      return { success: true };
+    } catch (error) {
+      console.error('Error opening path:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  // Handle finding submodule path
+  ipcMain.handle('find-submodule-path', async (event, companyName, module, submodule) => {
+    try {
+      console.log(`Finding path for company: ${companyName}, module: ${module}, submodule: ${submodule}`);
+
+      // Load the configuration
+      const config = await fs.readFile(configPath, 'utf8').then(JSON.parse).catch(() => ({}));
+
+      // Check if we have company paths for the specified company
+      if (!config.companyPaths || !config.companyPaths[companyName]) {
+        throw new Error(`No configuration or path found for company: ${companyName}`);
+      }
+      
+      // Get the structure for this company
+      const companyStructure = config.companyPaths[companyName];
+      console.log('Company structure:', JSON.stringify(companyStructure, null, 2));
+      
+      if (!companyStructure || !companyStructure.structure) {
+        throw new Error(`No structure found for company: ${companyName}`);
+      }
+      
+      // Extract the code from the submodule name (e.g., "1.1.1 Responsable del SG" -> "1.1.1")
+      const submoduleCode = submodule.match(/^([\d.]+)/);
+      if (!submoduleCode) {
+        throw new Error(`Invalid submodule name format: ${submodule}`);
+      }
+      const code = submoduleCode[1];
+      console.log(`Extracted code: ${code}`);
+      
+      // Search for the path in the structure
+      const foundPath = searchInStructure(companyStructure.structure.structure, code);
+      
+      if (foundPath) {
+        console.log(`Found path: ${foundPath}`);
+        return { success: true, path: foundPath };
+      } else {
+        console.log(`Path not found for code: ${code}`);
+        return { success: false, error: `Path not found for module: ${module}, submodule: ${submodule} (code: ${code})` };
+      }
+    } catch (error) {
+      console.error('Error finding submodule path:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+// Helper function to search for a path in the directory structure
+// The directoryNode is expected to be the object created by the Python script's
+// _map_directory_recursive function. It must have a 'name' (string), 'path' (string),
+// 'files' (array), and 'subdirectories' (object) properties.
+function searchInStructure(directoryNode, code, depth = 0) {
+  // Verificar que directoryNode no sea undefined o null
+  if (!directoryNode) {
+    console.log("Directory node is undefined or null");
+    return null;
+  }
+  
+  const indent = "  ".repeat(depth);
+  console.log(`${indent}Searching in: ${directoryNode.name || 'unnamed directory'}`);
+  
+  // Check files in the current directory
+  const files = directoryNode.files || [];
+  for (const file of files) {
+    if (file && file.name) {
+      console.log(`${indent}  Checking file: ${file.name} (starts with ${code})`);
+      if (file.name.startsWith(code)) {
+        console.log(`${indent}  Found file match: ${file.path}`);
+        return file.path;
+      }
+    }
+  }
+  
+  // Check subdirectories
+  const subdirs = directoryNode.subdirectories || {};
+  for (const [subDirName, subDirNode] of Object.entries(subdirs)) {
+    if (subDirName && subDirNode) {
+      console.log(`${indent}  Checking subdirectory: ${subDirName} (starts with ${code})`);
+      if (subDirName.startsWith(code)) {
+        console.log(`${indent}  Found directory match: ${subDirNode.path}`);
+        return subDirNode.path;
+      }
+      
+      // Recursively search in subdirectory
+      const foundPath = searchInStructure(subDirNode, code, depth + 1);
+      if (foundPath) {
+        return foundPath;
+      }
+    }
+  }
+  
+  return null;
+}
+
+  // Handle DOCX to PDF conversion for preview
+  ipcMain.handle('convert-docx-to-pdf', async (event, docxPath) => {
+    try {
+      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'convert_docx_to_pdf.py');
+      const command = `python "${pythonScriptPath}" "${docxPath}"`;
+      
+      console.log(`Executing DOCX conversion: ${command}`);
+      const { stdout, stderr } = await execPromise(command);
+      
+      if (stderr) {
+        // Si hay un error en stderr, es probable que sea un error JSON de nuestro script
+        console.error('DOCX conversion script error:', stderr);
+        return JSON.parse(stderr);
+      }
+
+      return JSON.parse(stdout);
+
+    } catch (error) {
+      console.error('Error executing DOCX conversion script:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Handle PDF selection for "Enviar Remisiones"
+  ipcMain.handle('select-pdf-file', async () => {
+    console.log('Handling select-pdf-file request');
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: 'PDF Files', extensions: ['pdf'] }]
+    });
+    
+    if (result.canceled) {
+      console.log('PDF file selection canceled');
+      return null;
+    }
+    
+    console.log('Selected PDF file:', result.filePaths[0]);
+    return result.filePaths[0];
+  });
+
+  // Handle "Enviar Remisiones" PDF processing
+  ipcMain.handle('process-remision-pdf', async (event, pdfPath, empresa, companyName, moduleName, submoduleName) => {
+    try {
+      console.log(`Processing remision PDF: ${pdfPath} for empresa: ${empresa}`);
+      
+      // Importar las funciones de utilidad
+      const { 
+        extractTextFromPDF, 
+        extractDataFromText, 
+        validateCriticalData,
+        generateRemision,
+        updateControlFile
+      } = require('./utils/remisionUtils');
+
+      // 1. Extraer texto del PDF
+      console.log('Extracting text from PDF...');
+      const text = await extractTextFromPDF(pdfPath);
+      
+      // 2. Extraer datos del texto
+      console.log('Extracting data from text...');
+      const extractedData = extractDataFromText(text);
+      console.log('Extracted data:', extractedData);
+      
+      // 3. Validar datos críticos
+      console.log('Validating critical data...');
+      validateCriticalData(extractedData);
+      
+      // 4. Encontrar la ruta del submódulo y las rutas relacionadas
+      console.log('Finding submodule path...');
+      const findPathResult = await ipcMain.emit('find-submodule-path', event, companyName, moduleName, submoduleName);
+      // Esto no funcionará directamente, necesitamos una función auxiliar
+      
+      // Como ipcMain.emit no devuelve una promesa, vamos a llamar a la función directamente
+      // Simular la llamada a findSubmodulePath
+      const config = await fs.readFile(configPath, 'utf8').then(JSON.parse).catch(() => ({}));
+      if (!config.companyPaths || !config.companyPaths[companyName]) {
+        throw new Error(`No configuration or path found for company: ${companyName}`);
+      }
+      
+      const companyStructure = config.companyPaths[companyName];
+      if (!companyStructure || !companyStructure.structure) {
+        throw new Error(`No structure found for company: ${companyName}`);
+      }
+      
+      // Extract the code from the submodule name
+      const submoduleCode = submoduleName.match(/^([\d.]+)/);
+      if (!submoduleCode) {
+        throw new Error(`Invalid submodule name format: ${submoduleName}`);
+      }
+      const code = submoduleCode[1];
+      
+      // Search for the path in the structure
+      const foundPath = searchInStructure(companyStructure.structure.structure, code);
+      
+      if (!foundPath) {
+        throw new Error(`Path not found for submodule: ${submoduleName} (code: ${code})`);
+      }
+      
+      const remisionesBasePath = foundPath;
+      const remisionesEpsPath = path.join(remisionesBasePath, "3.1.6.1 Remisiones EPS");
+      const plantillaPath = path.join(remisionesEpsPath, "GI-OD-007 REMISION A EPS.docx");
+      const controlPath = path.join(remisionesEpsPath, "GI-FO-012 CONTROL DE REMISIONES.xlsx");
+      const outputDir = remisionesEpsPath;
+      
+      console.log(`Ruta de plantilla: ${plantillaPath}`);
+      console.log(`Ruta de control: ${controlPath}`);
+      
+      // 5. Generar el documento de remisión
+      console.log('Generating remision document...');
+      const docPath = await generateRemision(extractedData, plantillaPath, outputDir);
+      console.log(`Documento generado: ${docPath}`);
+      
+      // 6. Actualizar el archivo de control
+      console.log('Updating control file...');
+      await updateControlFile(extractedData, controlPath);
+      console.log('Control file updated successfully');
+      
+      return { 
+        success: true, 
+        extractedData, 
+        docPath 
+      };
+      
+    } catch (error) {
+      console.error('Error processing remision PDF:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Handle sending remision by email (placeholder)
+  ipcMain.handle('send-remision-by-email', async (event, docPath, extractedData, empresa) => {
+    try {
+      console.log(`Sending remision by email: ${docPath} for empresa: ${empresa}`);
+      // Aquí iría la lógica para enviar el correo electrónico
+      // Por ahora, solo simulamos el éxito
+      return { success: true, message: "Funcionalidad de envío de email aún no implementada." };
+    } catch (error) {
+      console.error('Error sending remision by email:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Handle sending remision by WhatsApp (placeholder)
+  ipcMain.handle('send-remision-by-whatsapp', async (event, docPath, extractedData, empresa) => {
+    try {
+      console.log(`Preparing to send remision by WhatsApp: ${docPath} for empresa: ${empresa}`);
+      // Aquí iría la lógica para preparar el envío por WhatsApp
+      // Por ahora, solo simulamos el éxito
+      return { success: true, message: "Funcionalidad de envío por WhatsApp aún no implementada." };
+    } catch (error) {
+      console.error('Error preparing remision for WhatsApp:', error);
+      return { success: false, error: error.message };
+    }
+  });
+};
+
+// Registrar los manejadores IPC antes de que la aplicación esté lista
+registerIPCHandlers();
+
+app.on('ready', () => {
+  console.log('App is ready');
+  createWindow();
+});
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
+
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  }
+});

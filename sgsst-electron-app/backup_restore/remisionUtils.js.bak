@@ -1,0 +1,442 @@
+// utils/remisionUtils.js
+
+const path = require('path');
+const fs = require('fs').promises;
+const pdfParse = require('pdf-parse');
+const XLSX = require('xlsx');
+const { Document } = require('docxtemplater');
+const PizZip = require('pizzip');
+
+// Función para extraer texto de un PDF
+async function extractTextFromPDF(pdfPath) {
+    try {
+        const dataBuffer = await fs.readFile(pdfPath);
+        const data = await pdfParse(dataBuffer);
+        return data.text;
+    } catch (error) {
+        console.error("Error al extraer texto del PDF:", error);
+        throw new Error(`No se pudo leer el archivo PDF: ${error.message}`);
+    }
+}
+
+// Función para extraer datos del texto usando expresiones regulares
+function extractDataFromText(text) {
+    // Normalizar texto (puede ser útil si hay problemas de codificación)
+    // const normalizedText = text.normalize('NFC');
+
+    // Definir reglas de extracción con expresiones regulares
+    const extractionRules = {
+        'Nombre Completo': {
+            patterns: [
+                /(?:Nombre\s*Completo|Paciente|Nombre)[:\s]*(.*?)(?:\n|SEXO:|DOCUMENTO|IDENTIFICACI[ÓO]N|$)/i,
+            ],
+            processor: (match) => match ? match[1].trim().toUpperCase() : ""
+        },
+        'No. Identificación': {
+            patterns: [
+                /(?:Documento[:\s]*CC[:\s]*(\d+))/i,
+                /(?:(?:No\.|N[úu]mero)\s*(?:de)?\s*Identificaci[óo]n[:\s]*(?:CC\s*-\s*)?(\d{7,12}))/i,
+                /(?:(?:CC|TI|CE)[:\s-]*(\d{7,12}))/i,
+                /(?:(?:c[ée]dula|documento|identificaci[óo]n)[:\s]*(\d{7,12}))/i,
+            ],
+            processor: (match) => match ? match[1].replace(/[^\d]/g, '') : ""
+        },
+        'Fecha Nac': {
+            patterns: [
+                /Fecha\s*(?:de)?\s*Nac(?:imiento)?[:\s]*([0-9/\-]+)/i,
+            ],
+            processor: (match) => match ? formatDate(match[1].trim()) : ""
+        },
+        'Edad': {
+            patterns: [
+                /Edad[:\s]*(\d+)/i,
+            ],
+            processor: (match) => match && match[1].trim().match(/^\d+$/) ? parseInt(match[1].trim(), 10) : ""
+        },
+        'Sexo': {
+            patterns: [
+                /(?:Sexo|G[ée]nero)[:\s]*([A-Za-zÁ-Úá-ú]+)/i,
+            ],
+            processor: (match) => match ? capitalizeFirst(match[1].trim()) : ""
+        },
+        'Afiliación': {
+            patterns: [
+                /(?:Afiliaci[óo]n|Empresa)[:\s]*(.*?)(?:\n|$)/i,
+            ],
+            processor: (match) => match ? processAfiliacion(match[1].trim()) : ""
+        },
+        'Estado civil': {
+            patterns: [
+                /Estado\s*civil[:\s]*(.*?)(?:\n|$)/i,
+            ],
+            processor: (match) => match ? capitalizeFirst(match[1].trim()) : ""
+        },
+        'Evaluación Ocupacional': {
+            patterns: [
+                /(?:TIPO\s*DE\s*EVALUACI[ÓO]N\s*REALIZADA|Tipo\s*de\s*Examen|Evaluaci[óo]n\s*Ocupacional)[:\s]*([^:\n]+?)(?=\s*Fecha\s*de\s*atenci[óo]n:|$)/i,
+            ],
+            processor: (match) => match ? match[1].trim().toUpperCase() : ""
+        },
+        'Fecha de Atención': {
+            patterns: [
+                /Fecha\s*(?:de)?\s*atenci[óo]n[:\s]*([0-9/\-]+)/i,
+            ],
+            processor: (match) => match ? formatDate(match[1].trim()) : ""
+        },
+        'Cargo': {
+            patterns: [
+                /Cargo[:\s]*([^:\n]+?)(?=\s*Fecha\s*de|$)/i,
+            ],
+            processor: (match) => match ? processCargo(match[1].trim()) : ""
+        },
+        'Exámenes realizados': {
+            patterns: [
+                /EX[ÁA]MENES\s*REALIZADOS[:\s]*(.*?)(?=\s*(?:RECOMENDACIONES|INCLUIR|RESTRICCIONES|MANEJO|$))/i,
+            ],
+            processor: (match) => match ? match[1].trim().replace(/\n/g, ' ').toUpperCase() : ""
+        },
+        'Recomendaciones Laborales': {
+            patterns: [
+                /RECOMENDACIONES\s*LABORALES[:\s]*(.*?)(?=MANEJO\s*EPS\/ARL|\Z)/i,
+            ],
+            processor: (match) => match ? match[1].trim().toUpperCase() : "NINGUNO"
+        },
+        'Incluir SVE': {
+            patterns: [
+                /Incluir\s*SVE[:\s]*([^\n:]+?)(?=\s*(?:RESTRICCIONES|Concepto|$))/i,
+            ],
+            processor: (match) => match && !match[1].trim().startsWith('RESTRICCIONES') ? match[1].trim().toUpperCase() : "NINGUNO"
+        },
+        'Restricciones Laborales': {
+            patterns: [
+                /RESTRICCIONES\s*LABORALES[:\s]*(.*?)(?=\s*(?:Para\s*la\s*revisi[óo]n|INCLUIR|CONCEPTO|[A-ZÁ-Ú]+:|$))/i,
+            ],
+            processor: (match) => match ? match[1].trim().toUpperCase() : "NINGUNO"
+        },
+        'Concepto Medico': {
+            patterns: [
+                /Concepto\s*Medico[:\s]*((?!LEVANTAMIENTO)[^:\n]+)/i,
+            ],
+            processor: (match) => match ? match[1].trim().toUpperCase() : "NINGUNO"
+        },
+        'Concepto Manipulación Alimento': {
+            patterns: [
+                /Concepto\s*(?:Manipulaci[óo]n)?\s*Alimento[:\s]*(.*?)(?:\n|$)/i,
+            ],
+            processor: (match) => match ? match[1].trim().toUpperCase() : "NINGUNO"
+        },
+        'Concepto Altura': {
+            patterns: [
+                /Concepto\s*Altura[:\s]*(.*?)(?:\n|$)/i,
+            ],
+            processor: (match) => match ? match[1].trim().toUpperCase() : "NINGUNO"
+        },
+        'Concepto de trabajo en espacios confinados': {
+            patterns: [
+                /Concepto\s*de\s*trabajo\s*en\s*espacios\s*confinados[:\s]*([^\n:]+?)(?=\s*(?:MOTIVO|$))/i,
+            ],
+            processor: (match) => match && !match[1].trim().startsWith('MOTIVO') ? match[1].trim().toUpperCase() : "NINGUNO"
+        },
+        'Motivo de Restricción': {
+            patterns: [
+                /MOTIVO\s*DE\s*RESTRICCI[OÓ]N[:\s]*(.*?)(?:\nFIRMA|\Z)/i,
+            ],
+            processor: (match) => match ? match[1].trim().toUpperCase() : "NINGUNO"
+        },
+    };
+
+    const data = {};
+    for (const [key, rule] of Object.entries(extractionRules)) {
+        let value = "";
+        for (const pattern of rule.patterns) {
+            const match = text.match(pattern);
+            if (match) {
+                value = rule.processor(match);
+                break; // Salir del bucle de patrones si se encuentra una coincidencia
+            }
+        }
+        data[key] = value;
+    }
+
+    // Post-procesamiento si es necesario
+    if (data['Nombre Completo'] && data['Nombre Completo'].toUpperCase().includes('SEXO:')) {
+        data['Nombre Completo'] = data['Nombre Completo'].split('SEXO:')[0].trim();
+    }
+
+    // Asignar valores por defecto a campos específicos si están vacíos
+    const defaultFields = [
+        'Concepto Altura', 
+        'Concepto de trabajo en espacios confinados', 
+        'Motivo de Restricción', 
+        'Incluir SVE', 
+        'Restricciones Laborales', 
+        'Concepto Manipulación Alimento'
+    ];
+    defaultFields.forEach(field => {
+        if (!data[field]) {
+            data[field] = "NINGUNO";
+        }
+    });
+
+    return data;
+}
+
+// Función auxiliar para formatear fechas
+function formatDate(dateStr) {
+    if (!dateStr) return "";
+    const formats = ['%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%Y/%m/%d'];
+    // Simplificación: asumir un formato común DD/MM/YYYY o similar
+    // Para una implementación más robusta, se necesitaría una librería como moment.js o date-fns
+    // Aquí hacemos una conversión básica
+    const parts = dateStr.split(/[-/]/);
+    if (parts.length === 3) {
+        // Asumir DD/MM/YYYY -> YYYY/MM/DD para almacenamiento
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return dateStr; // Devolver original si no se puede parsear
+}
+
+// Función auxiliar para capitalizar la primera letra
+function capitalizeFirst(str) {
+    if (!str) return "";
+    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+}
+
+// Función auxiliar para procesar afiliación
+function processAfiliacion(value) {
+    if (!value) return "";
+    return value.trim().toUpperCase();
+}
+
+// Función auxiliar para procesar cargo
+function processCargo(value) {
+    if (!value) return "";
+    return value.trim().toUpperCase();
+}
+
+// Función para validar datos críticos
+function validateCriticalData(data) {
+    const requiredFields = {
+        'No. Identificación': "No Identificacion no encontrado",
+        'Fecha de Atención': "Fecha de Atención no encontrada",
+    };
+    const errors = [];
+    for (const [field, message] of Object.entries(requiredFields)) {
+        if (!data[field]) {
+            errors.push(message);
+        }
+    }
+    if (errors.length > 0) {
+        throw new Error(errors.join(", "));
+    }
+}
+
+// Función para generar el documento de remisión
+async function generateRemision(data, templatePath, outputDir) {
+    try {
+        // 1. Leer el contenido del archivo de plantilla
+        const content = await fs.readFile(templatePath, 'binary');
+        
+        // 2. Cargar el contenido en PizZip
+        const zip = new PizZip(content);
+        
+        // 3. Crear una instancia de Docxtemplater
+        const doc = new Document(zip, {
+            paragraphLoop: true,
+            linebreaks: true,
+        });
+
+        // 4. Configurar los datos para la plantilla
+        const context = {
+            fecha: new Date().toLocaleDateString('es-ES'), // Formato DD/MM/YYYY
+            nombre_destinatario: data['Nombre Completo'] || 'N/A',
+            cc: data['No. Identificación'] || 'N/A',
+            cargo: data['Cargo'] || 'N/A',
+            evaluación_ocupacional: data['Evaluación Ocupacional'] || 'N/A',
+            recomendaciones_laborales: data['Recomendaciones Laborales'] || 'N/A'
+            // Puedes agregar más campos aquí si la plantilla los requiere
+        };
+
+        // 5. Renderizar el documento con los datos
+        doc.setData(context);
+        try {
+            doc.render();
+        } catch (error) {
+            throw new Error(`Error al renderizar la plantilla: ${error.message}`);
+        }
+
+        // 6. Generar el buffer del documento
+        const buf = doc.getZip().generate({
+            type: 'nodebuffer',
+            compression: 'DEFLATE',
+        });
+
+        // 7. Crear el nombre del archivo de salida
+        const fsPath = require('path');
+        await fs.mkdir(outputDir, { recursive: true }); // Asegurarse de que el directorio existe
+        const fecha = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        const nombreSanitizado = (data['Nombre Completo'] || 'sin_nombre')
+            .replace(/[<>:"/\\|?*]/g, '_'); // Sanitizar nombre
+        let outputFileName = `GI-OD-007 REMISION A EPS ${nombreSanitizado} ${fecha}.docx`;
+        let outputPath = path.join(outputDir, outputFileName);
+        let counter = 1;
+
+        // Verificar si el archivo ya existe y crear uno con sufijo si es necesario
+        while (await fs.access(outputPath).then(() => true).catch(() => false)) {
+            outputFileName = `GI-OD-007 REMISION A EPS ${nombreSanitizado} ${fecha}_${counter}.docx`;
+            outputPath = path.join(outputDir, outputFileName);
+            counter++;
+        }
+
+        // 8. Escribir el buffer a un archivo
+        await fs.writeFile(outputPath, buf);
+        return outputPath;
+
+    } catch (error) {
+        console.error("Error al generar el documento de remisión:", error);
+        throw new Error(`Error al generar el documento: ${error.message}`);
+    }
+}
+
+// Función para actualizar el archivo de control Excel
+async function updateControlFile(data, controlPath) {
+    try {
+        let workbook;
+        let worksheet;
+        let headerRow = 6; // Fila donde comienzan los encabezados (basado en el código Python)
+
+        // Columnas esperadas del archivo de control
+        const expectedColumns = [
+            "Item", "Nombre Completo", "No. Identificación", "Fecha Nac", "Edad", "Sexo",
+            "Afiliación", "Estado civil", "Evaluación Ocupacional", "Fecha de Atención",
+            "Cargo", "Exámenes realizados", "Recomendaciones Laborales", "Incluir SVE",
+            "Restricciones Laborales", "Concepto medico laboral", "Concepto Medico",
+            "Concepto Manipulación Alimento", "Concepto Altura",
+            "Concepto de trabajo en espacios confinados", "Motivo de Restricción"
+        ];
+
+        // Verificar si el archivo existe
+        try {
+            await fs.access(controlPath);
+            // Si existe, cargarlo
+            workbook = XLSX.readFile(controlPath);
+            const sheetNames = workbook.SheetNames;
+            if (sheetNames.length === 0) {
+                throw new Error("El archivo Excel no contiene hojas.");
+            }
+            worksheet = workbook.Sheets[sheetNames[0]]; // Usar la primera hoja
+        } catch (err) {
+            // Si no existe, crear uno nuevo con encabezados
+            workbook = XLSX.utils.book_new();
+            // Crear una hoja vacía primero
+            worksheet = XLSX.utils.aoa_to_sheet([expectedColumns]);
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Control");
+            // Guardar el libro con encabezados para poder leerlo correctamente después
+            XLSX.writeFile(workbook, controlPath);
+            // Volver a cargarlo
+            workbook = XLSX.readFile(controlPath);
+            worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        }
+
+        // Convertir la hoja a JSON para trabajar con ella, comenzando desde la fila de encabezados
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { range: headerRow, defval: "" });
+        
+        // Encontrar el índice de la columna "Item" (si existe)
+        const headerRowIndex = headerRow; // La fila de encabezados es la 6 (0-based es 5, pero sheet_to_json ya la usa como encabezados)
+        // Para manejar el Item correctamente, necesitamos reconstruir un poco la lógica
+        // Vamos a asumir que los datos comienzan en headerRow + 1 (es decir, fila 7 en Excel)
+
+        // Convertir los datos extraídos a un formato compatible
+        const newRowData = {};
+        expectedColumns.forEach(col => {
+            // Mapear claves de `data` a nombres de columnas de Excel si son diferentes
+            let dataKey = col;
+            // Ajustes menores si las claves no coinciden exactamente
+            if (col === "No. Identificación") dataKey = "No. Identificación";
+            if (col === "Fecha de Atención") dataKey = "Fecha de Atención";
+            if (col === "Evaluación Ocupacional") dataKey = "Evaluación Ocupacional";
+            if (col === "Recomendaciones Laborales") dataKey = "Recomendaciones Laborales";
+            // ... agregar más mapeos si es necesario
+            
+            newRowData[col] = data[dataKey] || "";
+        });
+
+        // Determinar el próximo número de Item
+        let maxItem = 0;
+        if (jsonData.length > 0) {
+            // Buscar el valor máximo de "Item" en los datos existentes
+            const items = jsonData.map(row => parseInt(row["Item"], 10)).filter(item => !isNaN(item));
+            maxItem = items.length > 0 ? Math.max(...items) : 0;
+        }
+        newRowData["Item"] = maxItem + 1;
+
+        // Verificar si ya existe un registro con la misma cédula y fecha
+        const existingRowIndex = jsonData.findIndex(row => 
+            String(row["No. Identificación"]).trim() === String(data["No. Identificación"]).trim() &&
+            String(row["Fecha de Atención"]).trim() === String(data["Fecha de Atención"]).trim()
+        );
+
+        if (existingRowIndex !== -1) {
+            // Si existe, actualizar la fila
+            // Actualizar los valores en jsonData
+            for (const [key, value] of Object.entries(newRowData)) {
+                jsonData[existingRowIndex][key] = value;
+            }
+        } else {
+            // Si no existe, agregar la nueva fila
+            jsonData.push(newRowData);
+        }
+
+        // Convertir los datos actualizados de vuelta a una hoja
+        // Necesitamos incluir las filas anteriores a los encabezados si existen
+        const originalRange = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+        // Crear una nueva hoja que incluya las filas anteriores y los nuevos datos
+        const newWorksheetData = [];
+        
+        // Copiar las filas anteriores a los encabezados (0 a headerRow - 1)
+        for (let R = originalRange.s.r; R < headerRow; R++) {
+            const row = [];
+            for (let C = originalRange.s.c; C <= originalRange.e.c; C++) {
+                const cellAddress = { c: C, r: R };
+                const cellRef = XLSX.utils.encode_cell(cellAddress);
+                if (worksheet[cellRef]) {
+                    row.push(worksheet[cellRef].v);
+                } else {
+                    row.push("");
+                }
+            }
+            newWorksheetData.push(row);
+        }
+        
+        // Agregar la fila de encabezados
+        newWorksheetData.push(expectedColumns);
+        
+        // Agregar las filas de datos actualizados
+        jsonData.forEach(rowObj => {
+            const row = expectedColumns.map(col => rowObj[col] !== undefined ? rowObj[col] : "");
+            newWorksheetData.push(row);
+        });
+
+        // Crear la nueva hoja
+        const newWorksheet = XLSX.utils.aoa_to_sheet(newWorksheetData);
+        
+        // Reemplazar la hoja en el libro
+        workbook.Sheets[workbook.SheetNames[0]] = newWorksheet;
+        
+        // Guardar el libro actualizado
+        XLSX.writeFile(workbook, controlPath);
+
+    } catch (error) {
+        console.error("Error al actualizar el archivo de control:", error);
+        throw new Error(`Error al actualizar el archivo de control: ${error.message}`);
+    }
+}
+
+
+module.exports = {
+    extractTextFromPDF,
+    extractDataFromText,
+    validateCriticalData,
+    generateRemision,
+    updateControlFile
+};
