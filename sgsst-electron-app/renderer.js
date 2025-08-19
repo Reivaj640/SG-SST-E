@@ -306,6 +306,43 @@ function showCompanyHomePage() {
   title.className = 'company-home-title';
   companyHomeDiv.appendChild(title);
   
+  // Sección de métricas clave (inspirada en pantalla.png)
+  const metricsSection = document.createElement('div');
+  metricsSection.className = 'metrics-section';
+  metricsSection.innerHTML = `
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-icon-placeholder"></div>
+        <div class="metric-info">
+          <div class="metric-value">8</div>
+          <div class="metric-label">Módulos</div>
+        </div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-icon-placeholder"></div>
+        <div class="metric-info">
+          <div class="metric-value">24</div>
+          <div class="metric-label">Submódulos</div>
+        </div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-icon-placeholder"></div>
+        <div class="metric-info">
+          <div class="metric-value">15</div>
+          <div class="metric-label">Documentos</div>
+        </div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-icon-placeholder"></div>
+        <div class="metric-info">
+          <div class="metric-value">98%</div>
+          <div class="metric-label">Completado</div>
+        </div>
+      </div>
+    </div>
+  `;
+  companyHomeDiv.appendChild(metricsSection);
+  
   // Mensaje de bienvenida
   const welcomeText = document.createElement('p');
   welcomeText.textContent = `Estás trabajando con los documentos de la empresa ${currentCompany}. Selecciona un módulo del menú lateral para comenzar a gestionar los aspectos del Sistema de Gestión de Seguridad y Salud en el Trabajo.`;
@@ -849,10 +886,21 @@ function createModuleCard(title, description, onClick) {
   const card = document.createElement('div');
   card.className = 'card module-card';
   
+  // Contenedor para el ícono y el título
+  const headerDiv = document.createElement('div');
+  headerDiv.className = 'card-header';
+  
+  // Placeholder para el ícono
+  const iconDiv = document.createElement('div');
+  iconDiv.className = 'card-icon-placeholder';
+  headerDiv.appendChild(iconDiv);
+  
   const cardTitle = document.createElement('h3');
   cardTitle.textContent = title;
   cardTitle.className = 'card-title';
-  card.appendChild(cardTitle);
+  headerDiv.appendChild(cardTitle);
+  
+  card.appendChild(headerDiv);
   
   const cardDescription = document.createElement('p');
   cardDescription.textContent = description;

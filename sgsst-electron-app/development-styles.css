@@ -61,11 +61,11 @@
 
 /* Estilos para el home de la empresa seleccionada */
 .main-canvas {
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  padding: 30px;
-  margin: 20px 0;
+  background-color: var(--widget-bg-color);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--box-shadow);
+  padding: var(--spacer-lg);
+  margin: var(--spacer);
 }
 
 .company-home-content {
@@ -74,22 +74,73 @@
 
 .company-home-title {
   color: var(--heading-color);
-  margin-bottom: 20px;
+  margin-bottom: var(--spacer);
+  font-size: 1.75rem;
 }
 
 .company-home-text {
-  font-size: 1.1rem;
-  color: #6c757d;
-  margin-bottom: 30px;
+  font-size: var(--font-size-base);
+  color: var(--text-light-color);
+  margin-bottom: var(--spacer-lg);
   line-height: 1.6;
+}
+
+/* Estilos para la sección de métricas */
+.metrics-section {
+  margin-bottom: var(--spacer-lg);
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacer);
+  margin-bottom: var(--spacer-lg);
+}
+
+.metric-card {
+  display: flex;
+  align-items: center;
+  padding: var(--spacer);
+  background-color: var(--widget-bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--box-shadow);
+  transition: transform var(--transition-fast);
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+}
+
+.metric-icon-placeholder {
+  width: 40px;
+  height: 40px;
+  background-color: var(--light-color);
+  border-radius: 50%;
+  margin-right: var(--spacer);
+}
+
+.metric-info {
+  text-align: left;
+}
+
+.metric-value {
+  font-size: 1.5rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--primary-color);
+}
+
+.metric-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-light-color);
 }
 
 .modules-info {
   text-align: left;
-  background-color: #f8f9fa;
-  padding: 20px;
-  border-radius: 8px;
-  margin-top: 30px;
+  background-color: var(--light-color);
+  padding: var(--spacer);
+  border-radius: var(--border-radius-md);
+  margin-top: var(--spacer-lg);
 }
 
 .modules-info h3 {
@@ -110,35 +161,59 @@
 .module-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 25px;
-  margin-top: 30px;
+  gap: var(--spacer-lg); /* Aumentar el espacio entre tarjetas */
+  margin-top: var(--spacer-lg);
 }
 
 .module-card {
-  border: 1px solid #dee2e6;
-  border-radius: 8px;
-  padding: 20px;
-  background-color: white;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg); /* Bordes más redondeados */
+  padding: var(--spacer);
+  background-color: var(--widget-bg-color);
+  box-shadow: var(--box-shadow); /* Usar la sombra definida en variables */
+  transition: all var(--transition-normal); /* Usar la transición definida en variables */
 }
 
 .module-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  transform: translateY(-3px); /* Efecto hover más sutil */
+  box-shadow: var(--box-shadow-lg); /* Sombra más pronunciada al hacer hover */
+}
+
+.module-card .card-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--spacer-sm);
+}
+
+.module-card .card-icon-placeholder {
+  width: 30px;
+  height: 30px;
+  background-color: var(--light-color);
+  border-radius: 50%;
+  margin-right: var(--spacer-sm);
 }
 
 .module-card .card-title {
   color: var(--heading-color);
-  margin-bottom: 15px;
-  font-size: 1.3rem;
+  margin-bottom: 0; /* Eliminar el margen inferior ya que está en el contenedor */
+  font-size: 1.25rem;
+  font-weight: var(--font-weight-bold);
 }
 
 .module-card .card-description {
-  color: #6c757d;
-  margin-bottom: 20px;
-  font-size: 1rem;
+  flex-grow: 1;
+  margin-bottom: var(--spacer);
+  color: var(--text-light-color);
+  font-size: var(--font-size-sm);
   line-height: 1.5;
+}
+
+/* Añadir estilo para el botón dentro de las tarjetas */
+.module-card .btn {
+  align-self: flex-start; /* Alinear el botón a la izquierda */
+  margin-top: auto; /* Empujar el botón hacia abajo */
 }
 
 /* Estilos para el selector de submódulos */
