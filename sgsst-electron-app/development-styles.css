@@ -37,25 +37,26 @@
   padding: 15px 20px;
   font-size: 1.1rem;
   font-weight: bold;
-  border: 2px solid #007bff;
-  background-color: white;
-  color: #007bff;
+  border: 2px solid var(--border-color); /* Borde gris claro */
+  background-color: var(--white-color);
+  color: var(--dark-color); /* Texto oscuro */
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
 .company-select-button:hover {
-  background-color: #007bff;
-  color: white;
+  background-color: var(--dark-color); /* Fondo gris oscuro */
+  border-color: var(--dark-color);
+  color: var(--white-color); /* Texto blanco */
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Sombra neutra */
 }
 
 .company-select-button.selected {
-  background-color: #28a745;
-  border-color: #28a745;
-  color: white;
+  background-color: var(--secondary-color); /* Fondo gris medio */
+  border-color: var(--secondary-color);
+  color: var(--white-color);
 }
 
 /* Estilos para el home de la empresa seleccionada */
