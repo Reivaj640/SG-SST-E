@@ -304,6 +304,34 @@ function searchInStructure(directoryNode, code, depth = 0) {
   return null;
 }
 
+  // NUEVA FUNCIÓN PARA PROCESAR PDF DE REMISIÓN
+  ipcMain.handle('process-remision-pdf', async (event, pdfPath) => {
+    try {
+      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'process_pdf_cli.py');
+      const command = `python "${pythonScriptPath}" "${pdfPath}"`;
+      
+      console.log(`Executing PDF processing: ${command}`);
+      const { stdout, stderr } = await execPromise(command);
+      
+      if (stderr) {
+        // Si el script de Python imprime un error, lo capturamos
+        console.error('PDF processing script error:', stderr);
+        // Intentamos parsear el stderr por si es un JSON de error
+        try {
+            return JSON.parse(stderr);
+        } catch (e) {
+            return { success: false, error: stderr };
+        }
+      }
+
+      return JSON.parse(stdout);
+
+    } catch (error) {
+      console.error('Error executing PDF processing script:', error);
+      return { success: false, error: error.message, traceback: error.stack };
+    }
+  });
+
   // Manejar conversión de DOCX a PDF para previsualización
   ipcMain.handle('convert-docx-to-pdf', async (event, docxPath) => {
     try {
@@ -344,19 +372,7 @@ function searchInStructure(directoryNode, code, depth = 0) {
     return result.filePaths[0];
   });
   
-  // Manejar procesamiento de PDF de remisión
-  ipcMain.handle('process-remision-pdf', async (event, pdfPath, empresa, companyName, moduleName, submoduleName) => {
-    try {
-      console.log(`Processing remision PDF: ${pdfPath} for empresa: ${empresa}`);
-      
-      // Aquí iría la lógica para procesar el PDF de remisión
-      // Por ahora, solo simulamos el éxito
-      return { success: true, message: "Funcionalidad de procesamiento de PDF aún no implementada." };
-    } catch (error) {
-      console.error('Error processing remision PDF:', error);
-      return { success: false, error: error.message };
-    }
-  });
+  
   
   // Manejar envío de remisión por email
   ipcMain.handle('send-remision-by-email', async (event, docPath, extractedData, empresa) => {

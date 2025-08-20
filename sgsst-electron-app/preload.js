@@ -38,5 +38,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onIpcMessage: (channel, callback) => ipcRenderer.on(channel, (event, ...args) => callback(...args)),
   
   // Nueva función para remover listeners de mensajes IPC
-  removeIpcMessageListener: (channel, callback) => ipcRenderer.removeListener(channel, callback)
+  removeIpcMessageListener: (channel, callback) => ipcRenderer.removeListener(channel, callback),
+
+  // Procesar PDF de remisión
+  processRemisionPdf: (path) => ipcRenderer.invoke('process-remision-pdf', path)
 });
