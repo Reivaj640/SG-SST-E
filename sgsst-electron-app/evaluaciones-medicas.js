@@ -85,7 +85,7 @@ class EvaluacionesMedicasComponent {
         throw new Error(result.error);
       }
 
-      const files = await window.electronAPI.readDirectory(result.path); // Corregido: listFilesInDirectory -> readDirectory
+      const files = await window.electronAPI.findFilesRecursively(result.path);
       if (files && files.length > 0) {
         this.renderEvaluacionesTable(files, container);
       } else {

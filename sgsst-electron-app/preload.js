@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // Leer contenido de un directorio
   readDirectory: (path) => ipcRenderer.invoke('read-directory', path),
+
+  findFilesRecursively: (path) => ipcRenderer.invoke('find-files-recursively', path),
   
   // Abrir archivo o carpeta
   openPath: (path) => ipcRenderer.invoke('open-path', path),

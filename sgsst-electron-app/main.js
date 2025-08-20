@@ -146,6 +146,43 @@ const registerIPCHandlers = () => {
     }
   });
 
+  // NUEVA FUNCIÓN PARA BÚSQUEDA RECURSIVA
+  ipcMain.handle('find-files-recursively', async (event, basePath) => {
+    console.log('Recursively finding files in:', basePath);
+    const allFiles = [];
+
+    async function walkDir(currentPath) {
+      try {
+        const entries = await fs.readdir(currentPath, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = path.join(currentPath, entry.name);
+          if (entry.isDirectory()) {
+            await walkDir(fullPath);
+          } else {
+            // Opcional: filtrar por extensión, ej. solo PDFs
+            if (path.extname(entry.name).toLowerCase() === '.pdf') {
+              const stats = await fs.stat(fullPath);
+              allFiles.push({
+                name: entry.name,
+                path: fullPath,
+                size: stats.size,
+                mtime: stats.mtime,
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`Error walking directory ${currentPath}:`, error);
+        // Ignorar errores de directorios individuales (ej. permisos) y continuar
+      }
+    }
+
+    await walkDir(basePath);
+    console.log(`Found ${allFiles.length} PDF files recursively.`);
+    return allFiles;
+  });
+  // FIN DE LA NUEVA FUNCIÓN
+
   // Manejar apertura de archivo o carpeta
   ipcMain.handle('open-path', async (event, pathToOpen) => {
     try {
