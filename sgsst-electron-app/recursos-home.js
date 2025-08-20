@@ -131,8 +131,7 @@ class RecursosHome {
         
         return submoduleItem;
     }
-    }
-    
+        
     getRandomLastAccess() {
         const days = ['Hace 1 día', 'Hace 2 días', 'Hace 3 días', 'Hace 1 semana', 'Hace 2 semanas'];
         return days[Math.floor(Math.random() * days.length)];

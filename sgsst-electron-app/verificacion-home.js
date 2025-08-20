@@ -106,7 +106,40 @@ class VerificacionHome {
         return widget;
     }
     
-    renderSubmoduleItem(name) {\n        // Generar datos simulados para el subm\u00f3dulo\n        const lastAccess = this.getRandomLastAccess();\n        const timeSpent = this.getRandomTimeSpent();\n\n        const submoduleItem = document.createElement('div');\n        submoduleItem.className = 'submodule-item';\n\n        const submoduleInfo = document.createElement('div');\n        submoduleInfo.className = 'submodule-info';\n\n        const submoduleName = document.createElement('div');\n        submoduleName.className = 'submodule-name';\n        submoduleName.textContent = name;\n        submoduleInfo.appendChild(submoduleName);\n\n        const submoduleMeta = document.createElement('div');\n        submoduleMeta.className = 'submodule-meta';\n        submoduleMeta.textContent = `\u00daltimo acceso: ${lastAccess} | Tiempo: ${timeSpent}`;\n        submoduleInfo.appendChild(submoduleMeta);\n\n        const button = document.createElement('button');\n        button.className = 'btn btn-primary';\n        button.textContent = 'Ingresar';\n        // Escape comillas para evitar problemas con el atributo onclick\n        const escapedName = name.replace(/'/g, \"\\\\'\");\n        const escapedModule = this.moduleName.replace(/'/g, \"\\\\'\");\n        button.addEventListener('click', () => {\n            showSubmoduleContent(document.querySelector('.main-canvas'), escapedModule, escapedName);\n        });\n\n        submoduleItem.appendChild(submoduleInfo);\n        submoduleItem.appendChild(button);\n        \n        return submoduleItem;\n    }
+    renderSubmoduleItem(name) {
+        // Generar datos simulados para el submódulo
+        const lastAccess = this.getRandomLastAccess();
+        const timeSpent = this.getRandomTimeSpent();
+
+        const submoduleItem = document.createElement('div');
+        submoduleItem.className = 'submodule-item';
+
+        const submoduleInfo = document.createElement('div');
+        submoduleInfo.className = 'submodule-info';
+
+        const submoduleName = document.createElement('div');
+        submoduleName.className = 'submodule-name';
+        submoduleName.textContent = name;
+        submoduleInfo.appendChild(submoduleName);
+
+        const submoduleMeta = document.createElement('div');
+        submoduleMeta.className = 'submodule-meta';
+        submoduleMeta.textContent = `Último acceso: ${lastAccess} | Tiempo: ${timeSpent}`;
+        submoduleInfo.appendChild(submoduleMeta);
+
+        const button = document.createElement('button');
+        button.className = 'btn btn-primary';
+        button.textContent = 'Ingresar';
+        // No es necesario escapar comillas aquí porque estamos usando addEventListener
+        button.addEventListener('click', () => {
+            showSubmoduleContent(document.querySelector('.main-canvas'), this.moduleName, name);
+        });
+
+        submoduleItem.appendChild(submoduleInfo);
+        submoduleItem.appendChild(button);
+        
+        return submoduleItem;
+    }
     
     getRandomLastAccess() {
         const days = ['Hace 1 día', 'Hace 2 días', 'Hace 3 días', 'Hace 1 semana', 'Hace 2 semanas'];

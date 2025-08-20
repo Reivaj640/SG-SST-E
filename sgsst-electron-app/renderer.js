@@ -710,6 +710,30 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         console.error('RestriccionesMedicasComponent not found');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
+    } else if (submoduleName === "3.1.4 Evaluaciones médicas") {
+      console.log("Cargando submódulo: 3.1.4 Evaluaciones médicas");
+      // Crear una instancia del nuevo componente y renderizarlo
+      if (window.EvaluacionesMedicasComponent) {
+        console.log("Componente EvaluacionesMedicasComponent encontrado");
+        const evaluacionesComponent = new window.EvaluacionesMedicasComponent(
+          submoduleContentDiv, 
+          currentCompany, 
+          moduleName, 
+          submoduleName,
+          () => {
+            // Verificar que container.parentElement exista antes de usarlo
+            if (container.parentElement) {
+              showModuleHome(container.parentElement, moduleName);
+            } else {
+              showModuleHome(container, moduleName);
+            }
+          } // Callback para volver al home del módulo
+        );
+        evaluacionesComponent.render();
+      } else {
+        console.error('EvaluacionesMedicasComponent not found');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
     } else if (submoduleName === "3.1.6.1 Control de Remisiones") {
       showControlRemisionesContent(submoduleContentDiv);
     } else if (submoduleName === "1.1.3 Asignación de Recursos") {
@@ -915,16 +939,6 @@ function createModuleCard(title, description, onClick) {
   
   return card;
 }
-
-// --- Comunicación con el Proceso Principal (Main Process) ---
-// Aquí se usaría `window.electronAPI` para enviar y recibir mensajes
-// del proceso principal, que actuaría como intermediario con el backend Python.
-
-// Ejemplo de cómo podría ser:
-// window.electronAPI.sendMessage('message-to-main-process');
-// window.electronAPI.onMessageReply((value) => {
-//   console.log('Respuesta del proceso principal:', value);
-// });
 
 // --- Event Listeners para los botones del header ---
 document.addEventListener('DOMContentLoaded', () => {

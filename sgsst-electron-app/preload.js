@@ -27,5 +27,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   convertDocxToPdf: (path) => ipcRenderer.invoke('convert-docx-to-pdf', path),
   
   // Seleccionar archivo PDF
-  selectPdfFile: () => ipcRenderer.invoke('select-pdf-file')
+  selectPdfFile: () => ipcRenderer.invoke('select-pdf-file'),
+
+  // Nueva función para enviar mensajes IPC al proceso principal
+  sendIpcMessage: (channel, data) => ipcRenderer.send(channel, data),
+  
+  // Nueva función para escuchar mensajes IPC del proceso principal
+  onIpcMessage: (channel, callback) => ipcRenderer.on(channel, (event, ...args) => callback(...args)),
+  
+  // Nueva función para remover listeners de mensajes IPC
+  removeIpcMessageListener: (channel, callback) => ipcRenderer.removeListener(channel, callback)
 });
