@@ -6,14 +6,15 @@ class RestriccionesMedicasComponent {
         this.companyName = companyName;
         this.moduleName = moduleName;
         this.submoduleName = submoduleName;
-        this.onBackToModuleHome = onBackToModuleHome; // Para volver al home del módulo principal
-        this.allFiles = [];
-        this.submodulePath = null;
-        this.extractedData = null; // Para guardar los datos del PDF procesado
-        this.lastGeneratedDoc = null; // Para guardar la ruta del DOCX generado
+        this.onBackToModuleHome = onBackToModuleHome;
+        this.extractedData = null;
+        this.lastGeneratedDoc = null;
+
+        // Estado para el explorador de archivos
+        this.currentPath = null;
+        this.pathHistory = [];
     }
 
-    // El render principal que muestra las 4 tarjetas
     render() {
         this.container.innerHTML = '';
         const backButton = this.createBackButton('&#8592; Volver al Módulo', this.onBackToModuleHome);
@@ -28,51 +29,164 @@ class RestriccionesMedicasComponent {
         const cardsContainer = document.createElement('div');
         cardsContainer.className = 'module-cards';
 
-        cardsContainer.appendChild(this.createModuleCard('Ver Remisiones Médicas', 'Visualizar, buscar y previsualizar el historial de remisiones.', () => this.showVerRemisionesPage()));
-        cardsContainer.appendChild(this.createModuleCard('Enviar Remisiones', 'Crear y enviar nuevas remisiones y recomendaciones.', () => this.showEnviarRemisionPage())); // MODIFICADO
+        cardsContainer.appendChild(this.createModuleCard('Ver Remisiones Médicas', 'Navegar, visualizar y previsualizar el historial de remisiones.', () => this.showVerRemisionesPage()));
+        cardsContainer.appendChild(this.createModuleCard('Enviar Remisiones', 'Crear y enviar nuevas remisiones y recomendaciones.', () => this.showEnviarRemisionPage()));
         cardsContainer.appendChild(this.createModuleCard('Control de Remisiones', 'Realizar seguimiento al estado de las remisiones enviadas.', () => this.showPlaceholder('Control de Remisiones')));
         cardsContainer.appendChild(this.createModuleCard('Próxima Función', 'Una nueva funcionalidad estará disponible aquí pronto.', () => this.showPlaceholder('Próxima Función')));
 
         this.container.appendChild(cardsContainer);
     }
 
-    // --- NUEVA LÓGICA PARA LA SECCIÓN "ENVIAR REMISIONES" ---
+    // --- Lógica para la sección "Ver Remisiones Médicas" (Navegador de Archivos) ---
+
+    showVerRemisionesPage() {
+        this.container.innerHTML = '';
+        this.currentPath = null;
+        this.pathHistory = [];
+
+        const header = this.createHeader('Ver Remisiones Médicas', () => this.render());
+        this.container.appendChild(header);
+
+        const navBar = document.createElement('div');
+        navBar.className = 'file-nav-bar';
+        this.container.appendChild(navBar);
+
+        const mainLayout = document.createElement('div');
+        mainLayout.className = 'remisiones-layout';
+
+        const resultsCol = document.createElement('div');
+        resultsCol.id = 'search-results-col';
+        resultsCol.className = 'search-results-col';
+        mainLayout.appendChild(resultsCol);
+
+        const previewCol = document.createElement('div');
+        previewCol.id = 'preview-col';
+        previewCol.className = 'preview-col';
+        previewCol.innerHTML = `<div class="preview-placeholder">Seleccione un documento para previsualizarlo.</div>`;
+        mainLayout.appendChild(previewCol);
+
+        this.container.appendChild(mainLayout);
+
+        this.navigateToInitialPath();
+    }
+
+    async navigateToInitialPath() {
+        try {
+            const result = await window.electronAPI.findSubmodulePath(this.companyName, this.moduleName, this.submoduleName);
+            if (result.success) {
+                this.navigateToPath(result.path);
+            } else {
+                document.getElementById('search-results-col').innerHTML = `<p>Error al encontrar la ruta inicial: ${result.error}</p>`;
+            }
+        } catch (error) {
+            document.getElementById('search-results-col').innerHTML = `<p>Error crítico al buscar ruta: ${error.message}</p>`;
+        }
+    }
+
+    async navigateToPath(path) {
+        const resultsCol = document.getElementById('search-results-col');
+        resultsCol.innerHTML = `<p>Cargando...</p>`;
+        try {
+            const items = await window.electronAPI.readDirectory(path);
+            this.currentPath = path;
+            this.updateNavBar();
+            this.displayItems(items);
+        } catch (error) {
+            resultsCol.innerHTML = `<p>Error al leer directorio: ${error.message}</p>`;
+        }
+    }
+
+    updateNavBar() {
+        const navBar = this.container.querySelector('.file-nav-bar');
+        navBar.innerHTML = '';
+
+        const upButton = document.createElement('button');
+        upButton.innerHTML = '&#8679; Subir Nivel';
+        upButton.className = 'btn btn-secondary btn-sm';
+        upButton.disabled = this.pathHistory.length === 0;
+        upButton.addEventListener('click', () => {
+            if (this.pathHistory.length > 0) {
+                const parentPath = this.pathHistory.pop();
+                this.navigateToPath(parentPath);
+            }
+        });
+        navBar.appendChild(upButton);
+
+        const breadcrumb = document.createElement('span');
+        breadcrumb.className = 'breadcrumb-display';
+        breadcrumb.textContent = this.currentPath;
+        navBar.appendChild(breadcrumb);
+    }
+
+    displayItems(items) {
+        const resultsCol = document.getElementById('search-results-col');
+        resultsCol.innerHTML = '';
+        const list = document.createElement('ul');
+        list.className = 'search-results-list';
+
+        const allowedExtensions = ['.pdf', '.doc', '.docx'];
+        const folders = items.filter(item => item.isDirectory);
+        const files = items.filter(item => !item.isDirectory && allowedExtensions.includes(item.name.slice(item.name.lastIndexOf('.')).toLowerCase()));
+
+        folders.forEach(folder => {
+            const li = document.createElement('li');
+            li.innerHTML = `📁 ${folder.name}`;
+            li.addEventListener('click', () => {
+                this.pathHistory.push(this.currentPath);
+                this.navigateToPath(folder.path);
+            });
+            list.appendChild(li);
+        });
+
+        files.forEach(file => {
+            const li = document.createElement('li');
+            li.innerHTML = `📄 ${file.name}`;
+            li.addEventListener('click', () => this.previewDocument(file.path));
+            list.appendChild(li);
+        });
+
+        if (list.children.length === 0) {
+            resultsCol.innerHTML = '<p>No hay archivos o carpetas para mostrar.</p>';
+        }
+        resultsCol.appendChild(list);
+    }
+
+    previewDocument(filePath) {
+        const previewCol = document.getElementById('preview-col');
+        const fileName = filePath.split(/[\\/]/).pop().toLowerCase();
+        const fileExtension = fileName.split('.').pop();
+
+        if (fileExtension === 'pdf') {
+            previewCol.innerHTML = `<iframe src="${filePath}" width="100%" height="100%" style="border: none;"></iframe>`;
+        } else {
+            previewCol.innerHTML = `<div class="preview-error"><h3>Previsualización no disponible</h3><p>La previsualización para archivos <strong>.${fileExtension}</strong> no está soportada.</p><button class="btn btn-primary">Abrir con aplicación externa</button></div>`;
+            previewCol.querySelector('button').addEventListener('click', () => window.electronAPI.openPath(filePath));
+        }
+    }
+
+    // --- Lógica para la sección "Enviar Remisiones" ---
 
     showEnviarRemisionPage() {
         this.container.innerHTML = '';
         this.extractedData = null;
         this.lastGeneratedDoc = null;
 
-        // Encabezado
         const header = this.createHeader('Enviar Nueva Remisión', () => this.render());
         this.container.appendChild(header);
 
-        // Contenedor principal
         const mainDiv = document.createElement('div');
         mainDiv.className = 'enviar-remision-container';
 
-        // Columna Izquierda: Selección y Acciones
         const leftCol = document.createElement('div');
         leftCol.className = 'remision-col-control';
-        
-        const fileSelectionBox = this.createFileSelectionBox();
-        leftCol.appendChild(fileSelectionBox);
-
-        const actionsBox = this.createActionsBox();
-        leftCol.appendChild(actionsBox);
-        
+        leftCol.appendChild(this.createFileSelectionBox());
+        leftCol.appendChild(this.createActionsBox());
         mainDiv.appendChild(leftCol);
 
-        // Columna Derecha: Datos extraídos y Log
         const rightCol = document.createElement('div');
         rightCol.className = 'remision-col-data';
-
-        const dataBox = this.createDataDisplayBox();
-        rightCol.appendChild(dataBox);
-
-        const logBox = this.createLogBox();
-        rightCol.appendChild(logBox);
-
+        rightCol.appendChild(this.createDataDisplayBox());
+        rightCol.appendChild(this.createLogBox());
         mainDiv.appendChild(rightCol);
 
         this.container.appendChild(mainDiv);
@@ -82,17 +196,14 @@ class RestriccionesMedicasComponent {
         const box = document.createElement('div');
         box.className = 'widget-box';
         box.innerHTML = '<h4>1. Selección de Archivo</h4>';
-
         const inputGroup = document.createElement('div');
         inputGroup.className = 'input-group';
-        
         const pathInput = document.createElement('input');
         pathInput.type = 'text';
         pathInput.id = 'pdf-path-input';
         pathInput.placeholder = 'Ningún archivo seleccionado...';
         pathInput.disabled = true;
         inputGroup.appendChild(pathInput);
-
         const browseBtn = document.createElement('button');
         browseBtn.textContent = 'Buscar PDF';
         browseBtn.className = 'btn btn-primary';
@@ -113,7 +224,6 @@ class RestriccionesMedicasComponent {
         const box = document.createElement('div');
         box.className = 'widget-box';
         box.innerHTML = '<h4>2. Acciones</h4>';
-
         const generateBtn = document.createElement('button');
         generateBtn.id = 'generate-doc-btn';
         generateBtn.textContent = 'Generar y Guardar';
@@ -121,10 +231,8 @@ class RestriccionesMedicasComponent {
         generateBtn.disabled = true;
         generateBtn.addEventListener('click', () => this.handleGeneration());
         box.appendChild(generateBtn);
-
         const sendBox = document.createElement('div');
         sendBox.className = 'send-buttons-group';
-
         const whatsappBtn = document.createElement('button');
         whatsappBtn.id = 'send-whatsapp-btn';
         whatsappBtn.textContent = 'Enviar por WhatsApp';
@@ -132,7 +240,6 @@ class RestriccionesMedicasComponent {
         whatsappBtn.disabled = true;
         whatsappBtn.addEventListener('click', () => this.showPlaceholder('Enviar por WhatsApp'));
         sendBox.appendChild(whatsappBtn);
-
         const emailBtn = document.createElement('button');
         emailBtn.id = 'send-email-btn';
         emailBtn.textContent = 'Enviar por Correo';
@@ -140,7 +247,6 @@ class RestriccionesMedicasComponent {
         emailBtn.disabled = true;
         emailBtn.addEventListener('click', () => this.showPlaceholder('Enviar por Correo'));
         sendBox.appendChild(emailBtn);
-        
         box.appendChild(sendBox);
         return box;
     }
@@ -149,7 +255,6 @@ class RestriccionesMedicasComponent {
         const box = document.createElement('div');
         box.className = 'widget-box';
         box.innerHTML = '<h4>Datos Extraídos</h4>';
-        
         const dataContainer = document.createElement('div');
         dataContainer.id = 'extracted-data-container';
         dataContainer.className = 'extracted-data-container';
@@ -162,7 +267,6 @@ class RestriccionesMedicasComponent {
         const box = document.createElement('div');
         box.className = 'widget-box';
         box.innerHTML = '<h4>Registro de Actividad</h4>';
-        
         const logText = document.createElement('div');
         logText.id = 'remision-log-text';
         logText.className = 'log-text-area';
@@ -171,18 +275,16 @@ class RestriccionesMedicasComponent {
     }
 
     async processSelectedPdf(filePath) {
-        // Deshabilitar botones mientras se procesa
         document.getElementById('generate-doc-btn').disabled = true;
         document.getElementById('send-whatsapp-btn').disabled = true;
         document.getElementById('send-email-btn').disabled = true;
-
         try {
             const result = await window.electronAPI.processRemisionPdf(filePath);
             if (result.success) {
                 this.extractedData = result.data;
                 this.displayExtractedData(this.extractedData);
-                this.logMessage('Extracción de datos completada exitosamente.');
-                document.getElementById('generate-doc-btn').disabled = false; // Habilitar botón de generar
+                this.logMessage('Extracción de datos completada.');
+                document.getElementById('generate-doc-btn').disabled = false;
             } else {
                 this.logMessage(`Error en la extracción: ${result.error}`, 'error');
             }
@@ -193,33 +295,24 @@ class RestriccionesMedicasComponent {
 
     displayExtractedData(data) {
         const container = document.getElementById('extracted-data-container');
-        container.innerHTML = ''; // Limpiar placeholder
+        container.innerHTML = '';
         const table = document.createElement('table');
         table.className = 'data-table';
-        
         for (const [key, value] of Object.entries(data)) {
             const row = table.insertRow();
-            const cellKey = row.insertCell();
-            cellKey.textContent = key;
-            const cellValue = row.insertCell();
-            
+            row.insertCell().textContent = key;
             const input = document.createElement('input');
             input.type = 'text';
             input.value = value;
             input.className = 'form-control-sm';
-            // Opcional: guardar cambios en el objeto de datos
-            input.addEventListener('change', (e) => {
-                this.extractedData[key] = e.target.value;
-            });
-            cellValue.appendChild(input);
+            input.addEventListener('change', (e) => { this.extractedData[key] = e.target.value; });
+            row.insertCell().appendChild(input);
         }
         container.appendChild(table);
     }
     
     handleGeneration() {
-        this.logMessage('Funcionalidad "Generar y Guardar" pendiente de implementación.');
-        this.logMessage('Esto llamará a los scripts de Python para crear el DOCX y actualizar el Excel.');
-        // Simulación de éxito para habilitar los botones de envío
+        this.logMessage('Funcionalidad "Generar y Guardar" pendiente.');
         this.lastGeneratedDoc = "ruta/simulada/al/documento.docx";
         document.getElementById('send-whatsapp-btn').disabled = false;
         document.getElementById('send-email-btn').disabled = false;
@@ -235,7 +328,7 @@ class RestriccionesMedicasComponent {
         }
     }
 
-    // --- Métodos de Ayuda y Vistas Anteriores (reutilizados y/o sin cambios) ---
+    // --- Métodos de Ayuda --- 
 
     createHeader(titleText, onBack) {
         const header = document.createElement('div');
@@ -257,10 +350,6 @@ class RestriccionesMedicasComponent {
         return backButton;
     }
 
-    // ... (Aquí irían los métodos de la vista "Ver Remisiones": showVerRemisionesPage, loadInitialFiles, etc. que no se han modificado)
-    // Por brevedad, no se repiten aquí, pero en el archivo final estarían presentes.
-    // ...
-
     createModuleCard(title, description, onClick) {
         const card = document.createElement('div');
         card.className = 'card module-card';
@@ -276,9 +365,11 @@ class RestriccionesMedicasComponent {
 
 window.RestriccionesMedicasComponent = RestriccionesMedicasComponent;
 
-// Estilos para la nueva interfaz (se inyectan para mantener todo encapsulado)
+// Estilos para la nueva interfaz
 const style = document.createElement('style');
 style.textContent = `
+    .file-nav-bar { display: flex; align-items: center; gap: 1rem; padding: 0.5rem; background-color: var(--widget-bg-color); border-radius: var(--border-radius-md); margin-bottom: 1rem; }
+    .breadcrumb-display { font-family: monospace; background-color: var(--bg-color); padding: 0.25rem 0.5rem; border-radius: var(--border-radius-sm); }
     .enviar-remision-container { display: flex; gap: 1rem; }
     .remision-col-control { flex: 1; display: flex; flex-direction: column; gap: 1rem; }
     .remision-col-data { flex: 2; display: flex; flex-direction: column; gap: 1rem; }
@@ -295,5 +386,6 @@ style.textContent = `
     .log-text-area { height: 100px; background-color: var(--bg-color); border-radius: var(--border-radius-sm); padding: 0.5rem; overflow-y: auto; font-family: monospace; font-size: 0.8rem; }
     .log-error { color: var(--danger-color); }
     .log-info { color: var(--text-color); }
+    .preview-error { padding: 2rem; text-align: center; }
 `;
 document.head.appendChild(style);
