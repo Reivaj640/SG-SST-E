@@ -440,6 +440,72 @@ function searchInStructure(directoryNode, code, depth = 0) {
       const result = JSON.parse(stdout);
       console.log('Remision generation completed successfully');
       
+      // Si la generación fue exitosa, crear una copia temporal del documento inmediatamente
+      // para evitar problemas con caracteres especiales en rutas futuras
+      if (result.success && result.documentPath) {
+        const docPath = result.documentPath;
+        console.log('Verificando existencia del documento generado:', docPath);
+        
+        try {
+          // Verificar si el archivo existe
+          await fs.access(docPath);
+          console.log('Documento encontrado, creando copia temporal...');
+          
+          // Crear una copia del archivo en una ubicación sin caracteres especiales
+          const tempFileName = `temp_remision_${Date.now()}.docx`;
+          const tempFilePath = path.join(app.getPath('temp'), tempFileName);
+          
+          await fs.copyFile(docPath, tempFilePath);
+          result.documentPath = tempFilePath;
+          result.originalDocumentPath = docPath; // Guardar la ruta original para referencia
+          console.log(`Documento copiado a: ${tempFilePath}`);
+        } catch (accessError) {
+          console.error('Error al acceder al documento generado:', accessError);
+          
+          // Si el archivo no se puede acceder, buscar el archivo más reciente en el directorio de remisiones
+          try {
+            const empresaPaths = {
+              "Temposum": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\2. Temposum Est SAS\\3. Gestión de la Salud\\3.1.6 Restricciones y recomendaciones médicas\\3.1.6.1. Remisiones EPS",
+              "Tempoactiva": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\1. Tempoactiva Est SAS\\3. Gestión de la Salud\\3.1.6 Restricciones y recomendaciones médicas\\3.1.6.1. Remisiones EPS",
+              "Aseplus": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\3. Aseplus\\3. Gestión de la Salud\\3.1.6 Restricciones y recomendaciones médicas\\3.1.6.1. Remisiones EPS",
+              "Asel": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\19. Asel S.A.S\\3. Gestión de la Salud\\3.1.6 Restricciones y recomendaciones médicas\\3.1.6.1. Remisiones EPS"
+            };
+            
+            const remisionesDir = empresaPaths[empresa] || empresaPaths["Temposum"];
+            console.log(`Buscando archivo más reciente en: ${remisionesDir}`);
+            
+            const files = await fs.readdir(remisionesDir);
+            const docxFiles = files.filter(file => file.endsWith('.docx') && file.includes('GI-OD-007 REMISION A EPS'));
+            
+            if (docxFiles.length > 0) {
+              // Ordenar por fecha de modificación (más reciente primero)
+              const fileStats = await Promise.all(docxFiles.map(async (file) => {
+                const filePath = path.join(remisionesDir, file);
+                const stats = await fs.stat(filePath);
+                return { file, filePath, mtime: stats.mtime };
+              }));
+              
+              fileStats.sort((a, b) => b.mtime - a.mtime);
+              const latestFile = fileStats[0];
+              console.log(`Archivo más reciente encontrado: ${latestFile.filePath}`);
+              
+              // Crear una copia temporal del archivo más reciente
+              const tempFileName = `temp_remision_${Date.now()}.docx`;
+              const tempFilePath = path.join(app.getPath('temp'), tempFileName);
+              
+              await fs.copyFile(latestFile.filePath, tempFilePath);
+              result.documentPath = tempFilePath;
+              result.originalDocumentPath = latestFile.filePath;
+              console.log(`Documento copiado a: ${tempFilePath}`);
+            } else {
+              console.error('No se encontraron archivos de remisión en el directorio');
+            }
+          } catch (searchError) {
+            console.error('Error al buscar archivo más reciente:', searchError);
+          }
+        }
+      }
+      
       return result;
     } catch (error) {
       console.error('Error generating remision document:', error);
@@ -452,33 +518,79 @@ function searchInStructure(directoryNode, code, depth = 0) {
     try {
       console.log(`Sending remision by email: ${docPath} for empresa: ${empresa}`);
       
-      // Ruta al script de Python para enviar el correo
-      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'remisiones_v1.0.py');
+      // Siempre copiar el archivo a una ubicación temporal para evitar problemas con caracteres especiales
+      console.log('Creando copia temporal del archivo para evitar problemas con caracteres especiales...');
       
-      // Crear un archivo temporal con los datos
-      const tempDataPath = path.join(app.getPath('temp'), `email_data_${Date.now()}.json`);
-      await fs.writeFile(tempDataPath, JSON.stringify({ 
-        docPath: docPath, 
-        data: extractedData, 
-        empresa: empresa 
-      }));
+      // Crear una copia del archivo en una ubicación sin caracteres especiales
+      const tempFileName = `temp_remision_${Date.now()}.docx`;
+      const tempFilePath = path.join(app.getPath('temp'), tempFileName);
       
-      // Comando para ejecutar el script de Python con los datos
-      const command = `python "${pythonScriptPath}" --send-email "${tempDataPath}"`;
-      
-      console.log(`Executing email sending: ${command}`);
-      const { stdout, stderr } = await execPromise(command);
-      
-      // Eliminar archivo temporal
-      await fs.unlink(tempDataPath);
-      
-      // Parsear la salida JSON del script de Python
-      const result = JSON.parse(stdout);
-      console.log('Email sending completed successfully');
-      
-      return result;
+      try {
+        await fs.copyFile(docPath, tempFilePath);
+        console.log(`Archivo copiado a: ${tempFilePath}`);
+        
+        // Ruta al script de Python para enviar el correo
+        const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'remisiones_v1.0.py');
+        
+        // Crear un archivo temporal con los datos
+        const tempDataPath = path.join(app.getPath('temp'), `email_data_${Date.now()}.json`);
+        const tempData = { 
+          docPath: tempFilePath, 
+          data: extractedData, 
+          empresa: empresa 
+        };
+        
+        console.log('Datos a enviar al script Python:', JSON.stringify(tempData, null, 2));
+        await fs.writeFile(tempDataPath, JSON.stringify(tempData), 'utf-8');
+        
+        // Comando para ejecutar el script de Python con los datos
+        const command = `python "${pythonScriptPath}" --send-email "${tempDataPath}"`;
+        
+        console.log(`Executing email sending: ${command}`);
+        const { stdout, stderr } = await execPromise(command, { encoding: 'utf-8' });
+        
+        console.log('Salida estándar del script Python:', stdout);
+        console.log('Salida de error del script Python:', stderr);
+        
+        // Eliminar archivo temporal
+        try {
+          await fs.unlink(tempFilePath);
+          console.log('Archivo temporal eliminado:', tempFilePath);
+        } catch (unlinkError) {
+          console.error('Error al eliminar archivo temporal:', unlinkError);
+        }
+        
+        // Eliminar archivo de datos temporal
+        await fs.unlink(tempDataPath);
+        
+        // Parsear la salida JSON del script de Python
+        let result;
+        try {
+          result = JSON.parse(stdout);
+        } catch (parseError) {
+          console.error('Error al parsear la salida JSON del script Python:', parseError);
+          console.error('Salida recibida:', stdout);
+          // Si no se puede parsear, devolver el error como texto
+          return { success: false, error: `Error al procesar la respuesta: ${stdout || 'Sin salida'}` };
+        }
+        
+        console.log('Email sending completed successfully');
+        console.log('Resultado del envío:', JSON.stringify(result, null, 2));
+        
+        return result;
+      } catch (copyError) {
+        console.error('Error al copiar el archivo a ubicación temporal:', copyError);
+        return { success: false, error: `Error al copiar el archivo: ${copyError.message}` };
+      }
     } catch (error) {
       console.error('Error sending remision by email:', error);
+      console.error('Stack trace:', error.stack);
+      
+      // Registrar también el stderr si está disponible
+      if (error.stderr) {
+        console.error('Error stderr:', error.stderr);
+      }
+      
       return { success: false, error: error.message };
     }
   });

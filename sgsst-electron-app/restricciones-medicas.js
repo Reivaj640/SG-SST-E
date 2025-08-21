@@ -422,6 +422,16 @@ class RestriccionesMedicasComponent {
 
         try {
             this.logMessage('Preparando envío por correo electrónico...');
+            this.logMessage(`Datos a enviar - Documento: ${this.lastGeneratedDoc}, Empresa: ${this.companyName}`);
+            
+            // Registrar algunos datos clave para depuración
+            const cedula = this.extractedData['No. Identificación'] || 'No disponible';
+            const nombre = this.extractedData['Nombre Completo'] || 'No disponible';
+            const fechaAtencion = this.extractedData['Fecha de Atención'] || 'No disponible';
+            const afiliacion = this.extractedData['Afiliación'] || 'No disponible';
+            
+            this.logMessage(`Datos del trabajador - Cédula: ${cedula}, Nombre: ${nombre}, Fecha: ${fechaAtencion}, Afiliación: ${afiliacion}`, 'info');
+            
             const emailBtn = document.getElementById('send-email-btn');
             emailBtn.disabled = true;
             emailBtn.textContent = 'Enviando...';
@@ -433,15 +443,29 @@ class RestriccionesMedicasComponent {
                 this.companyName
             );
             
+            this.logMessage(`Respuesta del servidor: ${JSON.stringify(result)}`, 'info');
+            
             if (result.success) {
                 this.logMessage('Correo electrónico enviado exitosamente.');
                 alert('Correo electrónico enviado exitosamente.');
             } else {
-                this.logMessage(`Error al enviar correo: ${result.error}`, 'error');
-                alert(`Error al enviar correo: ${result.error}`);
+                // Verificar si el error tiene más detalles
+                let errorMessage = result.error || 'Error desconocido al enviar el correo';
+                if (typeof result === 'string') {
+                    try {
+                        const parsedError = JSON.parse(result);
+                        errorMessage = parsedError.error || parsedError.message || errorMessage;
+                    } catch (e) {
+                        // Si no se puede parsear, usar el mensaje original
+                    }
+                }
+                
+                this.logMessage(`Error al enviar correo: ${errorMessage}`, 'error');
+                alert(`Error al enviar correo: ${errorMessage}`);
             }
         } catch (error) {
             this.logMessage(`Error crítico al enviar correo: ${error.message}`, 'error');
+            this.logMessage(`Stack trace: ${error.stack}`, 'error');
             alert(`Error crítico al enviar correo: ${error.message}`);
         } finally {
             const emailBtn = document.getElementById('send-email-btn');
