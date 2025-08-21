@@ -260,14 +260,14 @@ class RestriccionesMedicasComponent {
         whatsappBtn.textContent = 'Enviar por WhatsApp';
         whatsappBtn.className = 'btn btn-info';
         whatsappBtn.disabled = true;
-        whatsappBtn.addEventListener('click', () => this.showPlaceholder('Enviar por WhatsApp'));
+        whatsappBtn.addEventListener('click', () => this.handleSendWhatsApp());
         sendBox.appendChild(whatsappBtn);
         const emailBtn = document.createElement('button');
         emailBtn.id = 'send-email-btn';
         emailBtn.textContent = 'Enviar por Correo';
         emailBtn.className = 'btn btn-info';
         emailBtn.disabled = true;
-        emailBtn.addEventListener('click', () => this.showPlaceholder('Enviar por Correo'));
+        emailBtn.addEventListener('click', () => this.handleSendEmail());
         sendBox.appendChild(emailBtn);
         box.appendChild(sendBox);
         return box;
@@ -333,11 +333,121 @@ class RestriccionesMedicasComponent {
         container.appendChild(table);
     }
     
-    handleGeneration() {
-        this.logMessage('Funcionalidad "Generar y Guardar" pendiente.');
-        this.lastGeneratedDoc = "ruta/simulada/al/documento.docx";
-        document.getElementById('send-whatsapp-btn').disabled = false;
-        document.getElementById('send-email-btn').disabled = false;
+    async handleGeneration() {
+        if (!this.extractedData) {
+            this.logMessage('No hay datos extraídos para generar el documento.', 'error');
+            return;
+        }
+
+        try {
+            this.logMessage('Generando documento de remisión...');
+            const generateBtn = document.getElementById('generate-doc-btn');
+            generateBtn.disabled = true;
+            generateBtn.textContent = 'Generando...';
+            
+            // Llamar al proceso de Python para generar el documento
+            const result = await window.electronAPI.generateRemisionDocument(
+                this.extractedData,
+                this.companyName
+            );
+            
+            if (result.success) {
+                this.lastGeneratedDoc = result.documentPath;
+                this.logMessage(`Documento generado exitosamente: ${result.documentPath}`);
+                this.logMessage(`Archivo de control actualizado: ${result.controlPath}`);
+                
+                // Habilitar botones de envío
+                document.getElementById('send-whatsapp-btn').disabled = false;
+                document.getElementById('send-email-btn').disabled = false;
+                
+                // Mostrar mensaje de éxito
+                alert('Documento generado exitosamente.');
+            } else {
+                this.logMessage(`Error al generar documento: ${result.error}`, 'error');
+                alert(`Error al generar documento: ${result.error}`);
+            }
+        } catch (error) {
+            this.logMessage(`Error crítico al generar documento: ${error.message}`, 'error');
+            alert(`Error crítico al generar documento: ${error.message}`);
+        } finally {
+            const generateBtn = document.getElementById('generate-doc-btn');
+            generateBtn.disabled = false;
+            generateBtn.textContent = 'Generar y Guardar';
+        }
+    }
+
+    async handleSendWhatsApp() {
+        if (!this.extractedData || !this.lastGeneratedDoc) {
+            this.logMessage('No hay documento generado para enviar.', 'error');
+            alert('No hay documento generado para enviar.');
+            return;
+        }
+
+        try {
+            this.logMessage('Preparando envío por WhatsApp...');
+            const whatsappBtn = document.getElementById('send-whatsapp-btn');
+            whatsappBtn.disabled = true;
+            whatsappBtn.textContent = 'Enviando...';
+            
+            // Llamar al proceso de Python para enviar por WhatsApp
+            const result = await window.electronAPI.sendRemisionByWhatsApp(
+                this.lastGeneratedDoc,
+                this.extractedData,
+                this.companyName
+            );
+            
+            if (result.success) {
+                this.logMessage('Mensaje de WhatsApp preparado. Se abrirá WhatsApp Web.');
+                alert('Se abrirá WhatsApp Web con el mensaje preparado. Por favor, revise y envíe el mensaje.');
+            } else {
+                this.logMessage(`Error al preparar WhatsApp: ${result.error}`, 'error');
+                alert(`Error al preparar WhatsApp: ${result.error}`);
+            }
+        } catch (error) {
+            this.logMessage(`Error crítico al preparar WhatsApp: ${error.message}`, 'error');
+            alert(`Error crítico al preparar WhatsApp: ${error.message}`);
+        } finally {
+            const whatsappBtn = document.getElementById('send-whatsapp-btn');
+            whatsappBtn.disabled = false;
+            whatsappBtn.textContent = 'Enviar por WhatsApp';
+        }
+    }
+
+    async handleSendEmail() {
+        if (!this.extractedData || !this.lastGeneratedDoc) {
+            this.logMessage('No hay documento generado para enviar.', 'error');
+            alert('No hay documento generado para enviar.');
+            return;
+        }
+
+        try {
+            this.logMessage('Preparando envío por correo electrónico...');
+            const emailBtn = document.getElementById('send-email-btn');
+            emailBtn.disabled = true;
+            emailBtn.textContent = 'Enviando...';
+            
+            // Llamar al proceso de Python para enviar por correo
+            const result = await window.electronAPI.sendRemisionByEmail(
+                this.lastGeneratedDoc,
+                this.extractedData,
+                this.companyName
+            );
+            
+            if (result.success) {
+                this.logMessage('Correo electrónico enviado exitosamente.');
+                alert('Correo electrónico enviado exitosamente.');
+            } else {
+                this.logMessage(`Error al enviar correo: ${result.error}`, 'error');
+                alert(`Error al enviar correo: ${result.error}`);
+            }
+        } catch (error) {
+            this.logMessage(`Error crítico al enviar correo: ${error.message}`, 'error');
+            alert(`Error crítico al enviar correo: ${error.message}`);
+        } finally {
+            const emailBtn = document.getElementById('send-email-btn');
+            emailBtn.disabled = false;
+            emailBtn.textContent = 'Enviar por Correo';
+        }
     }
 
     logMessage(message, type = 'info') {
@@ -396,7 +506,7 @@ style.textContent = `
     .remision-col-control { flex: 1; display: flex; flex-direction: column; gap: 1rem; }
     .remision-col-data { flex: 2; display: flex; flex-direction: column; gap: 1rem; }
     .widget-box { background-color: var(--widget-bg-color); border: 1px solid var(--border-color); border-radius: var(--border-radius-md); padding: 1rem; }
-    .widget-box h4 { margin-top: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1rem; }
+    .widget-box h4 { margin-top: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1rem; color: #000000; }
     .input-group { display: flex; gap: 0.5rem; }
     .input-group input { flex-grow: 1; }
     .btn-full { width: 100%; margin-top: 0.5rem; }
@@ -409,5 +519,20 @@ style.textContent = `
     .log-error { color: var(--danger-color); }
     .log-info { color: var(--text-color); }
     .preview-error { padding: 2rem; text-align: center; }
+    /* Estilo para botones con el mismo color que el botón volver */
+    .btn-info { 
+        background-color: #f8f9fa; 
+        color: #212529; 
+        border: 1px solid #dee2e6; 
+    }
+    .btn-info:hover { 
+        background-color: #e2e6ea; 
+        border-color: #dae0e5; 
+    }
+    .btn-info:disabled { 
+        background-color: #e9ecef; 
+        color: #6c757d; 
+        border-color: #dee2e6; 
+    }
 `;
 document.head.appendChild(style);

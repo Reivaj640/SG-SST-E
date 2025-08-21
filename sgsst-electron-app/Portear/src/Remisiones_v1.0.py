@@ -1188,7 +1188,7 @@ Correo: {remitente}"""
     CREDENCIALES = {
         "TEMPOACTIVA": {"email": "tempoactivaestsas@gmail.com", "password": "pxfu wxit wpjf svxd"},
         "TEMPOSUM": {"email": "temposumestsas@gmail.com", "password": "bcfw rzxh ksob ddns"},
-        "ASEPLUS": {"email": "asepluscaribesas@gmail.com", "password": "yudh myrlpalabras clave zjpk eoej"},
+        "ASEPLUS": {"email": "asepluscaribesas@gmail.com", "password": "yudh myrl zjpk eoej"},
         "ASEL": {"email": "asel.contratacion@gmail.com", "password": "kdyh degt juwf tuqd"}
     }
 
@@ -1956,7 +1956,220 @@ class RemisionesApp(ttk.Window):
         except Exception as e:
             logging.error(f"Error al sanitizar texto: {str(e)}")
             return str(text)
+
+def generate_remision_document(data, empresa):
+    """
+    Genera un documento de remisión a partir de los datos extraídos.
+    
+    Args:
+        data (dict): Datos extraídos del PDF
+        empresa (str): Nombre de la empresa
+        
+    Returns:
+        dict: Resultado con la ruta del documento generado y el archivo de control
+    """
+    try:
+        # Crear instancias de las clases necesarias
+        doc_generator = DocumentGenerator()
+        excel_handler = ExcelHandler()
+        
+        # Obtener rutas según la empresa
+        empresa_rutas = Config.get_empresa_paths(empresa)
+        
+        # Generar documento de remisión
+        template_path = empresa_rutas["plantilla"]
+        output_dir = empresa_rutas["remisiones"]
+        
+        doc_path = doc_generator.generate_remision(data, template_path, output_dir)
+        
+        # Actualizar archivo de control
+        control_path = empresa_rutas["control"]
+        excel_path = excel_handler.update_control_file(data, control_path)
+        
+        return {
+            "success": True,
+            "documentPath": doc_path,
+            "controlPath": excel_path
+        }
+    except Exception as e:
+        logging.error(f"Error al generar documento de remisión: {str(e)}")
+        logging.debug(traceback.format_exc())
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+def send_remision_by_email(doc_path, data, empresa):
+    """
+    Envía un documento de remisión por correo electrónico.
+    
+    Args:
+        doc_path (str): Ruta al documento a enviar
+        data (dict): Datos del trabajador
+        empresa (str): Nombre de la empresa
+        
+    Returns:
+        dict: Resultado del envío
+    """
+    try:
+        # Crear instancia de EmailSender
+        email_sender = EmailSender(empresa)
+        
+        # Obtener información de contacto
+        cedula = data.get('No. Identificación', '')
+        nombre = data.get('Nombre Completo', 'Trabajador')
+        fecha_atencion = data.get('Fecha de Atención', '')
+        
+        if not cedula:
+            raise ValueError("No se encontró el número de identificación")
             
+        telefono, email_destino = email_sender.obtener_contacto(cedula)
+        
+        if not email_destino:
+            raise ValueError("No se encontró el correo electrónico para este trabajador")
+            
+        # Enviar correo
+        success = email_sender.enviar_correo(
+            destinatario=email_destino,
+            nombre=nombre,
+            fecha_atencion=fecha_atencion,
+            archivo_adjunto=doc_path
+        )
+        
+        if success:
+            return {
+                "success": True,
+                "message": "Correo enviado exitosamente"
+            }
+        else:
+            return {
+                "success": False,
+                "error": "No se pudo enviar el correo"
+            }
+    except Exception as e:
+        logging.error(f"Error al enviar correo: {str(e)}")
+        logging.debug(traceback.format_exc())
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+def send_remision_by_whatsapp(doc_path, data, empresa):
+    """
+    Prepara el envío de un documento de remisión por WhatsApp.
+    
+    Args:
+        doc_path (str): Ruta al documento a enviar
+        data (dict): Datos del trabajador
+        empresa (str): Nombre de la empresa
+        
+    Returns:
+        dict: Resultado de la preparación
+    """
+    try:
+        # Crear instancia de WhatsAppSender
+        whatsapp_sender = WhatsAppSender()
+        
+        # Obtener información de contacto
+        cedula = data.get('No. Identificación', '')
+        nombre = data.get('Nombre Completo', 'Trabajador')
+        fecha_atencion = data.get('Fecha de Atención', '')
+        afiliacion = data.get('Afiliación', empresa)
+        
+        if not cedula:
+            raise ValueError("No se encontró el número de identificación")
+            
+        # Normalizar el nombre de la empresa para evitar problemas de coincidencia
+        empresa_normalizada = afiliacion.upper().strip()
+        if "TEMPOSUM" in empresa_normalizada:
+            empresa_normalizada = "TEMPOSUM"
+        elif "TEMPOACTIVA" in empresa_normalizada:
+            empresa_normalizada = "TEMPOACTIVA"
+        elif "ASEPLUS" in empresa_normalizada:
+            empresa_normalizada = "ASEPLUS"
+        elif "ASEL" in empresa_normalizada:
+            empresa_normalizada = "ASEL"
+        
+        # Registrar información de depuración
+        logging.info(f"Afiliación original: {afiliacion}")
+        logging.info(f"Empresa normalizada: {empresa_normalizada}")
+            
+        # Usar la función probada _get_contact_info de la clase RemisionesApp
+        # Creamos una instancia temporal solo para acceder a este método
+        app_temp = RemisionesApp()
+        phone, _ = app_temp._get_contact_info(empresa_normalizada, cedula)
+        
+        if not phone or phone == "nan":
+            raise ValueError("No se encontró el número de teléfono")
+            
+        # Construir mensaje
+        mensaje = f"""*Remisión EPS - {afiliacion}*
+
+*Trabajador:* {nombre}
+*Cédula:* {cedula}
+*Fecha de atención:* {fecha_atencion}
+
+Adjunto encontrará su documento de remisión EPS con las recomendaciones médicas.
+
+Por favor:
+1. Revise el documento adjunto ✅
+2. Siga las indicaciones del profesional de salud ✅
+3. Confirme recepción ✅
+
+_Cualquier duda estamos disponibles para resolverla_"""
+        
+        # Enviar mensaje (esto abrirá WhatsApp Web)
+        whatsapp_sender.send_message(
+            phone_number=phone,
+            message=mensaje,
+            file_path=doc_path
+        )
+        
+        return {
+            "success": True,
+            "message": "Se abrirá WhatsApp Web con el mensaje preparado"
+        }
+    except Exception as e:
+        logging.error(f"Error al preparar WhatsApp: {str(e)}")
+        logging.debug(traceback.format_exc())
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
 if __name__ == "__main__":
-    app = RemisionesApp()
-    app.mainloop()
+    import sys
+    import json
+    
+    if len(sys.argv) > 2:
+        command = sys.argv[1]
+        data_file = sys.argv[2]
+        
+        # Cargar datos desde archivo temporal
+        with open(data_file, 'r', encoding='utf-8') as f:
+            temp_data = json.load(f)
+        
+        if command == "--generate-remision":
+            result = generate_remision_document(temp_data['data'], temp_data['empresa'])
+            print(json.dumps(result, ensure_ascii=False))
+        elif command == "--send-email":
+            result = send_remision_by_email(
+                temp_data['docPath'], 
+                temp_data['data'], 
+                temp_data['empresa']
+            )
+            print(json.dumps(result, ensure_ascii=False))
+        elif command == "--send-whatsapp":
+            result = send_remision_by_whatsapp(
+                temp_data['docPath'], 
+                temp_data['data'], 
+                temp_data['empresa']
+            )
+            print(json.dumps(result, ensure_ascii=False))
+        else:
+            print(json.dumps({"success": False, "error": "Comando no reconocido"}))
+    else:
+        # Comportamiento normal de la aplicación GUI
+        app = RemisionesApp()
+        app.mainloop()

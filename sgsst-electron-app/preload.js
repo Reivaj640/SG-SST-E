@@ -41,5 +41,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   removeIpcMessageListener: (channel, callback) => ipcRenderer.removeListener(channel, callback),
 
   // Procesar PDF de remisión
-  processRemisionPdf: (path) => ipcRenderer.invoke('process-remision-pdf', path)
+  processRemisionPdf: (path) => ipcRenderer.invoke('process-remision-pdf', path),
+  
+  // Generar documento de remisión
+  generateRemisionDocument: (extractedData, empresa) => ipcRenderer.invoke('generate-remision-document', extractedData, empresa),
+  
+  // Enviar remisión por WhatsApp
+  sendRemisionByWhatsApp: (docPath, extractedData, empresa) => ipcRenderer.invoke('send-remision-by-whatsapp', docPath, extractedData, empresa),
+  
+  // Enviar remisión por correo electrónico
+  sendRemisionByEmail: (docPath, extractedData, empresa) => ipcRenderer.invoke('send-remision-by-email', docPath, extractedData, empresa)
 });

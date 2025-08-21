@@ -415,13 +415,68 @@ function searchInStructure(directoryNode, code, depth = 0) {
   
   
   
+  // Manejar generación de documento de remisión
+  ipcMain.handle('generate-remision-document', async (event, extractedData, empresa) => {
+    try {
+      console.log(`Generating remision document for empresa: ${empresa}`);
+      
+      // Ruta al script de Python para generar la remisión
+      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'remisiones_v1.0.py');
+      
+      // Crear un archivo temporal con los datos extraídos
+      const tempDataPath = path.join(app.getPath('temp'), `remision_data_${Date.now()}.json`);
+      await fs.writeFile(tempDataPath, JSON.stringify({ data: extractedData, empresa: empresa }));
+      
+      // Comando para ejecutar el script de Python con los datos
+      const command = `python "${pythonScriptPath}" --generate-remision "${tempDataPath}"`;
+      
+      console.log(`Executing remision generation: ${command}`);
+      const { stdout, stderr } = await execPromise(command);
+      
+      // Eliminar archivo temporal
+      await fs.unlink(tempDataPath);
+      
+      // Parsear la salida JSON del script de Python
+      const result = JSON.parse(stdout);
+      console.log('Remision generation completed successfully');
+      
+      return result;
+    } catch (error) {
+      console.error('Error generating remision document:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   // Manejar envío de remisión por email
   ipcMain.handle('send-remision-by-email', async (event, docPath, extractedData, empresa) => {
     try {
       console.log(`Sending remision by email: ${docPath} for empresa: ${empresa}`);
-      // Aquí iría la lógica para enviar el correo electrónico
-      // Por ahora, solo simulamos el éxito
-      return { success: true, message: "Funcionalidad de envío de email aún no implementada." };
+      
+      // Ruta al script de Python para enviar el correo
+      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'remisiones_v1.0.py');
+      
+      // Crear un archivo temporal con los datos
+      const tempDataPath = path.join(app.getPath('temp'), `email_data_${Date.now()}.json`);
+      await fs.writeFile(tempDataPath, JSON.stringify({ 
+        docPath: docPath, 
+        data: extractedData, 
+        empresa: empresa 
+      }));
+      
+      // Comando para ejecutar el script de Python con los datos
+      const command = `python "${pythonScriptPath}" --send-email "${tempDataPath}"`;
+      
+      console.log(`Executing email sending: ${command}`);
+      const { stdout, stderr } = await execPromise(command);
+      
+      // Eliminar archivo temporal
+      await fs.unlink(tempDataPath);
+      
+      // Parsear la salida JSON del script de Python
+      const result = JSON.parse(stdout);
+      console.log('Email sending completed successfully');
+      
+      return result;
     } catch (error) {
       console.error('Error sending remision by email:', error);
       return { success: false, error: error.message };
@@ -432,9 +487,32 @@ function searchInStructure(directoryNode, code, depth = 0) {
   ipcMain.handle('send-remision-by-whatsapp', async (event, docPath, extractedData, empresa) => {
     try {
       console.log(`Preparing to send remision by WhatsApp: ${docPath} for empresa: ${empresa}`);
-      // Aquí iría la lógica para preparar el envío por WhatsApp
-      // Por ahora, solo simulamos el éxito
-      return { success: true, message: "Funcionalidad de envío por WhatsApp aún no implementada." };
+      
+      // Ruta al script de Python para enviar por WhatsApp
+      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'remisiones_v1.0.py');
+      
+      // Crear un archivo temporal con los datos
+      const tempDataPath = path.join(app.getPath('temp'), `whatsapp_data_${Date.now()}.json`);
+      await fs.writeFile(tempDataPath, JSON.stringify({ 
+        docPath: docPath, 
+        data: extractedData, 
+        empresa: empresa 
+      }));
+      
+      // Comando para ejecutar el script de Python con los datos
+      const command = `python "${pythonScriptPath}" --send-whatsapp "${tempDataPath}"`;
+      
+      console.log(`Executing WhatsApp preparation: ${command}`);
+      const { stdout, stderr } = await execPromise(command);
+      
+      // Eliminar archivo temporal
+      await fs.unlink(tempDataPath);
+      
+      // Parsear la salida JSON del script de Python
+      const result = JSON.parse(stdout);
+      console.log('WhatsApp preparation completed successfully');
+      
+      return result;
     } catch (error) {
       console.error('Error preparing remision for WhatsApp:', error);
       return { success: false, error: error.message };
