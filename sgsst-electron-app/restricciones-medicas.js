@@ -151,14 +151,36 @@ class RestriccionesMedicasComponent {
         resultsCol.appendChild(list);
     }
 
-    previewDocument(filePath) {
+    async previewDocument(filePath) {
         const previewCol = document.getElementById('preview-col');
-        const fileName = filePath.split(/[\\/]/).pop().toLowerCase();
-        const fileExtension = fileName.split('.').pop();
+        const fileExtension = filePath.split('.').pop().toLowerCase();
+
+        // Mostrar indicador de carga
+        previewCol.innerHTML = `<div class="preview-placeholder">Cargando previsualización...</div>`;
 
         if (fileExtension === 'pdf') {
+            // Los PDF se cargan directamente
             previewCol.innerHTML = `<iframe src="${filePath}" width="100%" height="100%" style="border: none;"></iframe>`;
+        } else if (fileExtension === 'doc' || fileExtension === 'docx') {
+            // Para DOC y DOCX, llamar a la conversión
+            try {
+                const result = await window.electronAPI.convertDocxToPdf(filePath);
+                if (result.success) {
+                    // Cargar el PDF temporal en el iframe
+                    // Añadimos un timestamp para evitar problemas de caché del iframe
+                    previewCol.innerHTML = `<iframe src="${result.pdf_path}?t=${new Date().getTime()}" width="100%" height="100%" style="border: none;"></iframe>`;
+                } else {
+                    // Mostrar error de conversión
+                    previewCol.innerHTML = `<div class="preview-error"><h3>Error de Conversión</h3><p>${result.error}</p><button class="btn btn-primary">Abrir con aplicación externa</button></div>`;
+                    previewCol.querySelector('button').addEventListener('click', () => window.electronAPI.openPath(filePath));
+                }
+            } catch (error) {
+                // Mostrar error de IPC
+                previewCol.innerHTML = `<div class="preview-error"><h3>Error Inesperado</h3><p>${error.message}</p><button class="btn btn-primary">Abrir con aplicación externa</button></div>`;
+                previewCol.querySelector('button').addEventListener('click', () => window.electronAPI.openPath(filePath));
+            }
         } else {
+            // Para otras extensiones, mostrar mensaje de no soportado
             previewCol.innerHTML = `<div class="preview-error"><h3>Previsualización no disponible</h3><p>La previsualización para archivos <strong>.${fileExtension}</strong> no está soportada.</p><button class="btn btn-primary">Abrir con aplicación externa</button></div>`;
             previewCol.querySelector('button').addEventListener('click', () => window.electronAPI.openPath(filePath));
         }

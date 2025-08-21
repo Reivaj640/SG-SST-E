@@ -241,8 +241,25 @@ const registerIPCHandlers = () => {
       const code = submoduleCode[1];
       console.log(`Extracted code: ${code}`);
       
-      // Buscar la ruta en la estructura
-      const foundPath = searchInStructure(companyStructure.structure.structure, code);
+      // Para el módulo "Recursos", necesitamos buscar primero el módulo y luego el submódulo dentro de él
+      let foundPath = null;
+      if (module === "Recursos") {
+        // Buscar primero el módulo "Recursos"
+        const resourcesModules = ["1. Recursos", "1. Recursos\\\\"]; // Corregido: escapar la barra invertida
+        for (const resourcesName of resourcesModules) {
+          if (companyStructure.structure.structure.subdirectories && 
+              companyStructure.structure.structure.subdirectories[resourcesName]) {
+            // Buscar el submódulo dentro del módulo "Recursos"
+            foundPath = searchInStructure(companyStructure.structure.structure.subdirectories[resourcesName], code);
+            if (foundPath) break;
+          }
+        }
+      }
+      
+      // Si no se encontró en "Recursos" o no es del módulo "Recursos", buscar en la raíz
+      if (!foundPath) {
+        foundPath = searchInStructure(companyStructure.structure.structure, code);
+      }
       
       if (foundPath) {
         console.log(`Found path: ${foundPath}`);
@@ -340,14 +357,38 @@ function searchInStructure(directoryNode, code, depth = 0) {
       
       console.log(`Executing DOCX conversion: ${command}`);
       const { stdout, stderr } = await execPromise(command);
-      
-      if (stderr) {
-        // Si hay un error en stderr, es probable que sea un error JSON de nuestro script
-        console.error('DOCX conversion script error:', stderr);
-        return JSON.parse(stderr);
+
+      // Si stderr contiene nuestro error JSON específico, lo procesamos como error.
+      if (stderr && stderr.includes('"success": false')) {
+        try {
+          const errJsonMatch = stderr.match(/\{.*\}/s);
+          if (errJsonMatch && errJsonMatch[0]) {
+            return JSON.parse(errJsonMatch[0]);
+          }
+          // Fallback si la expresión regular falla
+          throw new Error(`Error en script (no se pudo parsear JSON de error): ${stderr}`);
+        } catch (e) {
+          throw new Error(`Error al procesar error del script: ${stderr}`);
+        }
       }
 
-      return JSON.parse(stdout);
+      // Si stderr solo contenía la barra de progreso, lo ignoramos y confiamos en stdout.
+      if (!stdout) {
+        const errorMessage = stderr ? `El script produjo un error o mensaje inesperado: ${stderr}` : 'El script de conversión no produjo ninguna salida.';
+        throw new Error(errorMessage);
+      }
+
+      // Buscamos el JSON de éxito en stdout.
+      const jsonMatch = stdout.match(/\{.*\}/s);
+      if (jsonMatch && jsonMatch[0]) {
+        try {
+          return JSON.parse(jsonMatch[0]);
+        } catch (e) {
+          throw new Error(`Error al parsear la salida JSON del script: ${e.message}. Salida recibida: ${stdout}`);
+        }
+      }
+      
+      throw new Error(`No se encontró una respuesta JSON válida en la salida del script. Salida recibida: ${stdout}`);
 
     } catch (error) {
       console.error('Error executing DOCX conversion script:', error);

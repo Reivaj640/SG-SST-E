@@ -79,15 +79,20 @@ class ResponsableSgComponent {
             const viewer = document.getElementById('document-viewer');
             if (viewer) viewer.innerHTML = '<p>Buscando documentos del responsable del SG...</p>';
             
+            console.log(`Finding path for: company=${this.companyName}, module=${this.moduleName}, submodule=${this.submoduleName}`);
+            
             const result = await window.electronAPI.findSubmodulePath(this.companyName, this.moduleName, this.submoduleName);
             
             if (result.success) {
                 this.submodulePath = result.path;
+                console.log('Found submodule path:', this.submodulePath);
                 this.updateDocumentDisplay();
             } else {
+                console.error('Error finding submodule path:', result.error);
                 if (viewer) viewer.innerHTML = `<p>Error al encontrar la ruta del submódulo: ${result.error}</p>`;
             }
         } catch (error) {
+            console.error('Error in loadSubmodulePathAndDisplay:', error);
             const viewer = document.getElementById('document-viewer');
             if (viewer) viewer.innerHTML = `<p>Error al cargar los documentos: ${error.message}</p>`;
         }
@@ -107,43 +112,67 @@ class ResponsableSgComponent {
 
         try {
             viewer.innerHTML = '<p>Buscando documentos específicos...</p>';
-            const submoduleStructure = await window.electronAPI.mapDirectory(this.submodulePath);
-
-            if (!submoduleStructure?.structure?.structure) {
-                viewer.innerHTML = '<p>Error: No se pudo obtener la estructura del directorio.</p>';
-                return;
+            
+            // Obtener todos los archivos del submódulo y sus subdirectorios
+            let allFiles = [];
+            
+            // Primero obtener los archivos del directorio principal
+            const items = await window.electronAPI.readDirectory(this.submodulePath);
+            const files = items.filter(item => !item.isDirectory);
+            const subdirectories = items.filter(item => item.isDirectory);
+            
+            // Agregar archivos del directorio principal
+            allFiles = allFiles.concat(files);
+            
+            // Recorrer todos los subdirectorios recursivamente para obtener todos los archivos
+            for (const subdir of subdirectories) {
+                try {
+                    const subDirFiles = await this.getAllFilesRecursively(subdir.path);
+                    allFiles = allFiles.concat(subDirFiles);
+                } catch (error) {
+                    console.error(`Error reading directory ${subdir.path}:`, error);
+                    // Continuar con el siguiente subdirectorio
+                }
             }
-
-            const rootNode = submoduleStructure.structure.structure;
-            const subdirectories = Object.values(rootNode.subdirectories || {});
+            
             let documents = [];
 
             switch (this.currentDocType) {
                 case 'designacion_sst':
+                    // Filtrar documentos de designación SST (que no sean PESV)
+                    documents = allFiles.filter(file => {
+                        const fileName = file.name.toLowerCase();
+                        const isDesignacion = fileName.includes('designacion');
+                        const isSst = isDesignacion && !fileName.includes('pesv');
+                        const isDoc = fileName.endsWith('.docx') || fileName.endsWith('.doc') || fileName.endsWith('.pdf');
+                        return isDesignacion && isSst && isDoc;
+                    });
+                    break;
                 case 'designacion_pesv':
-                    const designacionFolders = subdirectories.filter(dir => dir.name?.toLowerCase().includes('designacio'));
-                    if (designacionFolders.length > 0) {
-                        documents = (designacionFolders[0].files || []).filter(file => {
-                            const fileName = file.name.toLowerCase();
-                            const isSst = fileName.includes('desigancion') && !fileName.includes('pesv');
-                            const isPesv = fileName.includes('desigancion') && fileName.includes('pesv');
-                            const isDoc = fileName.endsWith('.docx') || fileName.endsWith('.doc') || fileName.endsWith('.pdf');
-                            return ((this.currentDocType === 'designacion_sst' && isSst) || (this.currentDocType === 'designacion_pesv' && isPesv)) && isDoc;
-                        });
-                    }
+                    // Filtrar documentos de designación PESV
+                    documents = allFiles.filter(file => {
+                        const fileName = file.name.toLowerCase();
+                        const isDesignacion = fileName.includes('designacion');
+                        const isPesv = isDesignacion && fileName.includes('pesv');
+                        const isDoc = fileName.endsWith('.docx') || fileName.endsWith('.doc') || fileName.endsWith('.pdf');
+                        return isDesignacion && isPesv && isDoc;
+                    });
                     break;
                 case 'licencia':
-                    const licenciaFolders = subdirectories.filter(dir => dir.name?.toLowerCase().includes('licencia'));
-                    if (licenciaFolders.length > 0) {
-                        documents = (licenciaFolders[0].files || []).filter(file => 
-                            file.name.toLowerCase().includes('licencia') && 
-                            (file.name.endsWith('.docx') || file.name.endsWith('.doc') || file.name.endsWith('.pdf'))
-                        );
-                    }
+                    // Filtrar documentos de licencia
+                    documents = allFiles.filter(file => {
+                        const fileName = file.name.toLowerCase();
+                        const isLicencia = fileName.includes('licencia');
+                        const isDoc = fileName.endsWith('.docx') || fileName.endsWith('.doc') || fileName.endsWith('.pdf');
+                        return isLicencia && isDoc;
+                    });
                     break;
             }
 
             if (documents.length > 0) {
+                // Ordenar documentos por fecha de modificación (más recientes primero)
+                documents.sort((a, b) => new Date(b.modified) - new Date(a.modified));
+                
                 const docToPreview = documents[0];
                 this.currentDocumentPath = docToPreview.path;
                 if (openButton) openButton.style.display = 'inline-block';
@@ -155,6 +184,36 @@ class ResponsableSgComponent {
         } catch (error) {
             if (viewer) viewer.innerHTML = `<p>Error al cargar los documentos: ${error.message}</p>`;
         }
+    }
+    
+    // Función auxiliar para obtener todos los archivos recursivamente
+    async getAllFilesRecursively(directoryPath) {
+        let allFiles = [];
+        
+        try {
+            const items = await window.electronAPI.readDirectory(directoryPath);
+            const files = items.filter(item => !item.isDirectory);
+            const subdirectories = items.filter(item => item.isDirectory);
+            
+            // Agregar archivos del directorio actual
+            allFiles = allFiles.concat(files);
+            
+            // Recorrer subdirectorios recursivamente
+            for (const subdir of subdirectories) {
+                try {
+                    const subDirFiles = await this.getAllFilesRecursively(subdir.path);
+                    allFiles = allFiles.concat(subDirFiles);
+                } catch (error) {
+                    console.error(`Error reading subdirectory ${subdir.path}:`, error);
+                    // Continuar con el siguiente subdirectorio
+                }
+            }
+        } catch (error) {
+            console.error(`Error reading directory ${directoryPath}:`, error);
+            throw error;
+        }
+        
+        return allFiles;
     }
     
     async openDocument(filePath) {
@@ -170,29 +229,36 @@ class ResponsableSgComponent {
         const viewer = document.getElementById('document-viewer');
         if (!viewer) return;
 
-        const fileName = filePath.split(/[\\/]/).pop();
-        const escapedPath = filePath.replace(/\\/g, '\\\\');
+        const fileName = filePath.split(/[\/]/).pop();
+        const escapedPath = filePath.replace(/\//g, '\\');
+        const fileExtension = filePath.split('.').pop().toLowerCase();
 
         try {
-            if (filePath.toLowerCase().endsWith('.pdf')) {
+            // Manejar PDF directamente
+            if (fileExtension === 'pdf') {
                 viewer.innerHTML = `
                     <iframe src="${filePath}" width="100%" height="600px" style="border: none;"></iframe>
                     <div style="text-align: center; margin-top: 10px;">
                         <button id="close-preview-btn" class="btn preview-close-btn">Cerrar Previsualización</button>
                     </div>`;
-            } else if (filePath.toLowerCase().endsWith('.docx')) {
+            // Manejar .doc y .docx con el servicio de conversión
+            } else if (fileExtension === 'doc' || fileExtension === 'docx') {
                 viewer.innerHTML = `
                     <div style="text-align: center; padding: 40px;">
                         <p>Convirtiendo documento de Word a PDF para previsualización...</p>
                     </div>`;
+                
                 const result = await window.electronAPI.convertDocxToPdf(filePath);
+                
                 if (result.success) {
+                    // CORRECCIÓN: Usar result.pdf_path y añadir timestamp
                     viewer.innerHTML = `
-                        <iframe src="${result.pdfPath}" width="100%" height="600px" style="border: none;"></iframe>
+                        <iframe src="${result.pdf_path}?t=${new Date().getTime()}" width="100%" height="600px" style="border: none;"></iframe>
                         <div style="text-align: center; margin-top: 10px;">
                             <button id="close-preview-btn" class="btn preview-close-btn">Cerrar Previsualización</button>
                         </div>`;
                 } else {
+                    // Usar la plantilla de error existente
                     viewer.innerHTML = `
                         <div style="text-align: center; padding: 40px; border: 2px dashed #d9534f; margin: 20px; border-radius: 10px; background-color: #f2dede;">
                             <div style="font-size: 4em; margin-bottom: 20px; color: #d9534f;">⚠️</div>
@@ -205,6 +271,7 @@ class ResponsableSgComponent {
                             </div>
                         </div>`;
                 }
+            // Manejar otros archivos no soportados
             } else {
                 viewer.innerHTML = `
                     <div style="text-align: center; padding: 40px; border: 2px dashed #ccc; margin: 20px; border-radius: 10px; background-color: #f9f9f9;">
