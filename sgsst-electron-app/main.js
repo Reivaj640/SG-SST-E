@@ -8,6 +8,15 @@ const { promisify } = require('util');
 
 const execPromise = promisify(exec);
 
+let mainWindow;
+
+// --- Función de Logging Centralizada ---
+function sendLog(message, level = 'INFO') {
+  if (mainWindow) {
+    mainWindow.webContents.send('log-message', message, level);
+  }
+}
+
 // Ruta del archivo de configuración
 const configPath = path.join(app.getPath('userData'), 'config.json');
 
@@ -18,7 +27,7 @@ if (require('electron-squirrel-startup')) {
 
 // Función para crear la ventana principal
 const createWindow = () => {
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 900,
     webPreferences: {
@@ -323,28 +332,52 @@ function searchInStructure(directoryNode, code, depth = 0) {
 
   // NUEVA FUNCIÓN PARA PROCESAR PDF DE REMISIÓN
   ipcMain.handle('process-remision-pdf', async (event, pdfPath) => {
+    sendLog(`IPC: process-remision-pdf recibido para: ${pdfPath}`);
     try {
       const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'process_pdf_cli.py');
       const command = `python "${pythonScriptPath}" "${pdfPath}"`;
       
-      console.log(`Executing PDF processing: ${command}`);
+      sendLog(`Ejecutando script de Python: ${command}`.replace(/\\/g, '/'));
       const { stdout, stderr } = await execPromise(command);
       
       if (stderr) {
-        // Si el script de Python imprime un error, lo capturamos
-        console.error('PDF processing script error:', stderr);
-        // Intentamos parsear el stderr por si es un JSON de error
-        try {
-            return JSON.parse(stderr);
-        } catch (e) {
-            return { success: false, error: stderr };
-        }
+        sendLog(`Error en script de procesamiento de PDF: ${stderr}`, 'ERROR');
       }
 
-      return JSON.parse(stdout);
+      // Procesar el stream de logs y el resultado final
+      let finalResult = null;
+      const lines = stdout.split(/\r?\n/).filter(line => line.trim() !== '');
+      lines.forEach(line => {
+        try {
+          const output = JSON.parse(line);
+          if (output.type === 'log') {
+            sendLog(`[Python] ${output.message}`, output.level);
+          } else if (output.type === 'result') {
+            finalResult = output.payload; // Estandarizado para usar siempre el payload
+          }
+        } catch (e) {
+          sendLog(`No se pudo parsear la línea de salida de Python: ${line}`, 'WARN');
+        }
+      });
+
+      if (finalResult) {
+        // Log del texto completo del PDF si está presente en el resultado
+        if (finalResult.debug_full_text) {
+          sendLog(`Texto extraído del PDF ${path.basename(pdfPath)}:
+---
+INICIO ---
+${finalResult.debug_full_text}
+--- FIN ---`, 'DEBUG');
+          delete finalResult.debug_full_text;
+        }
+        sendLog('Procesamiento de PDF completado exitosamente.');
+        return finalResult;
+      } else {
+        throw new Error("El script de Python no devolvió un resultado final.");
+      }
 
     } catch (error) {
-      console.error('Error executing PDF processing script:', error);
+      sendLog(`Fallo en la ejecución del script de procesamiento de PDF: ${error.message}`, 'ERROR');
       return { success: false, error: error.message, traceback: error.stack };
     }
   });
@@ -417,216 +450,209 @@ function searchInStructure(directoryNode, code, depth = 0) {
   
   // Manejar generación de documento de remisión
   ipcMain.handle('generate-remision-document', async (event, extractedData, empresa) => {
+    sendLog(`IPC: generate-remision-document recibido para empresa: ${empresa}`);
     try {
-      console.log(`Generating remision document for empresa: ${empresa}`);
-      
-      // Ruta al script de Python para generar la remisión
-      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'remisiones_v1.0.py');
-      
-      // Crear un archivo temporal con los datos extraídos
+      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'remision_utils.py');
       const tempDataPath = path.join(app.getPath('temp'), `remision_data_${Date.now()}.json`);
+      
+      sendLog(`Creando archivo de datos temporal: ${tempDataPath}`);
       await fs.writeFile(tempDataPath, JSON.stringify({ data: extractedData, empresa: empresa }));
       
-      // Comando para ejecutar el script de Python con los datos
       const command = `python "${pythonScriptPath}" --generate-remision "${tempDataPath}"`;
       
-      console.log(`Executing remision generation: ${command}`);
+      sendLog(`Ejecutando script de generación de remisión: ${command}`.replace(/\\/g, '/'));
       const { stdout, stderr } = await execPromise(command);
       
-      // Eliminar archivo temporal
       await fs.unlink(tempDataPath);
       
-      // Parsear la salida JSON del script de Python
-      const result = JSON.parse(stdout);
-      console.log('Remision generation completed successfully');
+      if (stderr) {
+        sendLog(`Error en script de generación de remisión: ${stderr}`, 'ERROR');
+      }
+
+      let finalResult = null;
+      const lines = stdout.split(/\r?\n/).filter(line => line.trim() !== '');
+      lines.forEach(line => {
+        try {
+          const output = JSON.parse(line);
+          if (output.type === 'log') {
+            sendLog(`[Python] ${output.message}`, output.level);
+          } else if (output.type === 'result') {
+            finalResult = output.payload;
+          }
+        } catch (e) {
+          sendLog(`No se pudo parsear la línea de salida de Python: ${line}`, 'WARN');
+        }
+      });
+
+      if (!finalResult) {
+        throw new Error("El script de Python no devolvió un resultado final.");
+      }
+
+      sendLog(`Resultado de la generación: ${JSON.stringify(finalResult)}`);
       
-      // Si la generación fue exitosa, crear una copia temporal del documento inmediatamente
-      // para evitar problemas con caracteres especiales en rutas futuras
-      if (result.success && result.documentPath) {
-        const docPath = result.documentPath;
-        console.log('Verificando existencia del documento generado:', docPath);
+      if (finalResult.success && finalResult.documentPath) {
+        const docPath = finalResult.documentPath;
+        try {
+          await fs.access(docPath);
+        } catch (accessError) {
+          // Silencio
+        }
         
         try {
-          // Verificar si el archivo existe
-          await fs.access(docPath);
-          console.log('Documento encontrado, creando copia temporal...');
+          const empresaPaths = {
+            "Temposum": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\2. Temposum Est SAS\\3. Gestión de la Salud\\3.1.6 Restricciones y recomendaciones médicas\\3.1.6.1. Remisiones EPS",
+            "Tempoactiva": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\1. Tempoactiva Est SAS\\3. Gestión de la Salud\\3.1.6 Restricciones y recomendaciones médicas\\3.1.6.1. Remisiones EPS",
+            "Aseplus": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\3. Aseplus\\3. Gestión de la Salud\\3.1.6 Restricciones y recomendaciones médicas\\3.1.6.1. Remisiones EPS",
+            "Asel": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\19. Asel S.A.S\\3. Gestión de la Salud\\3.1.6 Restricciones y recomendaciones médicas\\3.1.6.1. Remisiones EPS"
+          };
           
-          // Crear una copia del archivo en una ubicación sin caracteres especiales
-          const tempFileName = `temp_remision_${Date.now()}.docx`;
-          const tempFilePath = path.join(app.getPath('temp'), tempFileName);
+          const remisionesDir = empresaPaths[empresa] || empresaPaths["Temposum"];
+          const files = await fs.readdir(remisionesDir);
+          const docxFiles = files.filter(file => file.endsWith('.docx') && file.includes('GI-OD-007 REMISION A EPS'));
           
-          await fs.copyFile(docPath, tempFilePath);
-          result.documentPath = tempFilePath;
-          result.originalDocumentPath = docPath; // Guardar la ruta original para referencia
-          console.log(`Documento copiado a: ${tempFilePath}`);
-        } catch (accessError) {
-          console.error('Error al acceder al documento generado:', accessError);
-          
-          // Si el archivo no se puede acceder, buscar el archivo más reciente en el directorio de remisiones
-          try {
-            const empresaPaths = {
-              "Temposum": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\2. Temposum Est SAS\\3. Gestión de la Salud\\3.1.6 Restricciones y recomendaciones médicas\\3.1.6.1. Remisiones EPS",
-              "Tempoactiva": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\1. Tempoactiva Est SAS\\3. Gestión de la Salud\\3.1.6 Restricciones y recomendaciones médicas\\3.1.6.1. Remisiones EPS",
-              "Aseplus": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\3. Aseplus\\3. Gestión de la Salud\\3.1.6 Restricciones y recomendaciones médicas\\3.1.6.1. Remisiones EPS",
-              "Asel": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\19. Asel S.A.S\\3. Gestión de la Salud\\3.1.6 Restricciones y recomendaciones médicas\\3.1.6.1. Remisiones EPS"
-            };
+          if (docxFiles.length > 0) {
+            const fileStats = await Promise.all(docxFiles.map(async (file) => {
+              const filePath = path.join(remisionesDir, file);
+              const stats = await fs.stat(filePath);
+              return { file, filePath, mtime: stats.mtime };
+            }));
             
-            const remisionesDir = empresaPaths[empresa] || empresaPaths["Temposum"];
-            console.log(`Buscando archivo más reciente en: ${remisionesDir}`);
+            fileStats.sort((a, b) => b.mtime - a.mtime);
+            const latestFile = fileStats[0];
             
-            const files = await fs.readdir(remisionesDir);
-            const docxFiles = files.filter(file => file.endsWith('.docx') && file.includes('GI-OD-007 REMISION A EPS'));
+            const tempFileName = `temp_remision_${Date.now()}.docx`;
+            const tempFilePath = path.join(app.getPath('temp'), tempFileName);
             
-            if (docxFiles.length > 0) {
-              // Ordenar por fecha de modificación (más reciente primero)
-              const fileStats = await Promise.all(docxFiles.map(async (file) => {
-                const filePath = path.join(remisionesDir, file);
-                const stats = await fs.stat(filePath);
-                return { file, filePath, mtime: stats.mtime };
-              }));
-              
-              fileStats.sort((a, b) => b.mtime - a.mtime);
-              const latestFile = fileStats[0];
-              console.log(`Archivo más reciente encontrado: ${latestFile.filePath}`);
-              
-              // Crear una copia temporal del archivo más reciente
-              const tempFileName = `temp_remision_${Date.now()}.docx`;
-              const tempFilePath = path.join(app.getPath('temp'), tempFileName);
-              
-              await fs.copyFile(latestFile.filePath, tempFilePath);
-              result.documentPath = tempFilePath;
-              result.originalDocumentPath = latestFile.filePath;
-              console.log(`Documento copiado a: ${tempFilePath}`);
-            } else {
-              console.error('No se encontraron archivos de remisión en el directorio');
-            }
-          } catch (searchError) {
-            console.error('Error al buscar archivo más reciente:', searchError);
+            await fs.copyFile(latestFile.filePath, tempFilePath);
+            finalResult.documentPath = tempFilePath;
+            finalResult.originalDocumentPath = latestFile.filePath;
+            sendLog(`Documento copiado a ruta temporal: ${tempFilePath}`);
+          } else {
+            sendLog('No se encontraron archivos de remisión para la copia de seguridad.', 'WARN');
           }
+        } catch (searchError) {
+          sendLog(`Error buscando el archivo más reciente para la copia: ${searchError.message}`, 'ERROR');
         }
       }
       
-      return result;
+      return finalResult;
     } catch (error) {
-      console.error('Error generating remision document:', error);
+      sendLog(`Fallo en la ejecución del script de generación de remisión: ${error.message}`, 'ERROR');
       return { success: false, error: error.message };
     }
   });
 
   // Manejar envío de remisión por email
   ipcMain.handle('send-remision-by-email', async (event, docPath, extractedData, empresa) => {
+    sendLog(`IPC: send-remision-by-email recibido para: ${docPath}`);
     try {
-      console.log(`Sending remision by email: ${docPath} for empresa: ${empresa}`);
-      
-      // Siempre copiar el archivo a una ubicación temporal para evitar problemas con caracteres especiales
-      console.log('Creando copia temporal del archivo para evitar problemas con caracteres especiales...');
-      
-      // Crear una copia del archivo en una ubicación sin caracteres especiales
+      sendLog('Creando copia temporal del archivo para envío de correo...');
       const tempFileName = `temp_remision_${Date.now()}.docx`;
       const tempFilePath = path.join(app.getPath('temp'), tempFileName);
       
-      try {
-        await fs.copyFile(docPath, tempFilePath);
-        console.log(`Archivo copiado a: ${tempFilePath}`);
-        
-        // Ruta al script de Python para enviar el correo
-        const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'remisiones_v1.0.py');
-        
-        // Crear un archivo temporal con los datos
-        const tempDataPath = path.join(app.getPath('temp'), `email_data_${Date.now()}.json`);
-        const tempData = { 
-          docPath: tempFilePath, 
-          data: extractedData, 
-          empresa: empresa 
-        };
-        
-        console.log('Datos a enviar al script Python:', JSON.stringify(tempData, null, 2));
-        await fs.writeFile(tempDataPath, JSON.stringify(tempData), 'utf-8');
-        
-        // Comando para ejecutar el script de Python con los datos
-        const command = `python "${pythonScriptPath}" --send-email "${tempDataPath}"`;
-        
-        console.log(`Executing email sending: ${command}`);
-        const { stdout, stderr } = await execPromise(command, { encoding: 'utf-8' });
-        
-        console.log('Salida estándar del script Python:', stdout);
-        console.log('Salida de error del script Python:', stderr);
-        
-        // Eliminar archivo temporal
-        try {
-          await fs.unlink(tempFilePath);
-          console.log('Archivo temporal eliminado:', tempFilePath);
-        } catch (unlinkError) {
-          console.error('Error al eliminar archivo temporal:', unlinkError);
-        }
-        
-        // Eliminar archivo de datos temporal
-        await fs.unlink(tempDataPath);
-        
-        // Parsear la salida JSON del script de Python
-        let result;
-        try {
-          result = JSON.parse(stdout);
-        } catch (parseError) {
-          console.error('Error al parsear la salida JSON del script Python:', parseError);
-          console.error('Salida recibida:', stdout);
-          // Si no se puede parsear, devolver el error como texto
-          return { success: false, error: `Error al procesar la respuesta: ${stdout || 'Sin salida'}` };
-        }
-        
-        console.log('Email sending completed successfully');
-        console.log('Resultado del envío:', JSON.stringify(result, null, 2));
-        
-        return result;
-      } catch (copyError) {
-        console.error('Error al copiar el archivo a ubicación temporal:', copyError);
-        return { success: false, error: `Error al copiar el archivo: ${copyError.message}` };
+      await fs.copyFile(docPath, tempFilePath);
+      sendLog(`Archivo copiado a: ${tempFilePath}`);
+      
+      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'remision_utils.py');
+      const tempDataPath = path.join(app.getPath('temp'), `email_data_${Date.now()}.json`);
+      const tempData = { 
+        docPath: tempFilePath, 
+        data: extractedData, 
+        empresa: empresa 
+      };
+      
+      sendLog(`Creando archivo de datos temporal para email: ${tempDataPath}`);
+      await fs.writeFile(tempDataPath, JSON.stringify(tempData), 'utf-8');
+      
+      const command = `python "${pythonScriptPath}" --send-email "${tempDataPath}"`;
+      
+      sendLog(`Ejecutando script de envío de email: ${command.replace(/\\/g, '/')}`);
+      const { stdout, stderr } = await execPromise(command, { encoding: 'utf-8' });
+      
+      await fs.unlink(tempFilePath);
+      await fs.unlink(tempDataPath);
+
+      if (stderr) {
+        sendLog(`Error en script de email (stderr): ${stderr}`, 'ERROR');
       }
+
+      let finalResult = null;
+      const lines = stdout.split(/\r?\n/).filter(line => line.trim() !== '');
+      lines.forEach(line => {
+        try {
+          const output = JSON.parse(line);
+          if (output.type === 'log') {
+            sendLog(`[Python] ${output.message}`, output.level);
+          } else if (output.type === 'result') {
+            finalResult = output.payload;
+          }
+        } catch (e) {
+          sendLog(`No se pudo parsear la línea de salida de Python: ${line}`, 'WARN');
+        }
+      });
+
+      if (finalResult) {
+        sendLog(`Resultado del envío de email: ${JSON.stringify(finalResult)}`);
+        return finalResult;
+      } else {
+        throw new Error("El script de Python no devolvió un resultado final.");
+      }
+
     } catch (error) {
-      console.error('Error sending remision by email:', error);
-      console.error('Stack trace:', error.stack);
-      
-      // Registrar también el stderr si está disponible
-      if (error.stderr) {
-        console.error('Error stderr:', error.stderr);
-      }
-      
+      sendLog(`Fallo en la ejecución del script de email: ${error.message}`, 'ERROR');
       return { success: false, error: error.message };
     }
   });
   
   // Manejar envío de remisión por WhatsApp
   ipcMain.handle('send-remision-by-whatsapp', async (event, docPath, extractedData, empresa) => {
+    sendLog(`IPC: send-remision-by-whatsapp recibido para: ${docPath}`);
     try {
-      console.log(`Preparing to send remision by WhatsApp: ${docPath} for empresa: ${empresa}`);
-      
-      // Ruta al script de Python para enviar por WhatsApp
-      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'remisiones_v1.0.py');
-      
-      // Crear un archivo temporal con los datos
+      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'remision_utils.py');
       const tempDataPath = path.join(app.getPath('temp'), `whatsapp_data_${Date.now()}.json`);
+      
+      sendLog(`Creando archivo de datos temporal para WhatsApp: ${tempDataPath}`);
       await fs.writeFile(tempDataPath, JSON.stringify({ 
         docPath: docPath, 
         data: extractedData, 
         empresa: empresa 
       }));
       
-      // Comando para ejecutar el script de Python con los datos
       const command = `python "${pythonScriptPath}" --send-whatsapp "${tempDataPath}"`;
       
-      console.log(`Executing WhatsApp preparation: ${command}`);
+      sendLog(`Ejecutando script de preparación de WhatsApp: ${command.replace(/\\/g, '/')}`);
       const { stdout, stderr } = await execPromise(command);
       
-      // Eliminar archivo temporal
       await fs.unlink(tempDataPath);
       
-      // Parsear la salida JSON del script de Python
-      const result = JSON.parse(stdout);
-      console.log('WhatsApp preparation completed successfully');
-      
-      return result;
+      if (stderr) {
+        sendLog(`Error en script de WhatsApp: ${stderr}`, 'ERROR');
+      }
+
+      let finalResult = null;
+      const lines = stdout.split(/\r?\n/).filter(line => line.trim() !== '');
+      lines.forEach(line => {
+        try {
+          const output = JSON.parse(line);
+          if (output.type === 'log') {
+            sendLog(`[Python] ${output.message}`, output.level);
+          } else if (output.type === 'result') {
+            finalResult = output.payload;
+          }
+        } catch (e) {
+          sendLog(`No se pudo parsear la línea de salida de Python: ${line}`, 'WARN');
+        }
+      });
+
+      if (finalResult) {
+        sendLog(`Resultado de preparación de WhatsApp: ${JSON.stringify(finalResult)}`);
+        return finalResult;
+      } else {
+        throw new Error("El script de Python no devolvió un resultado final.");
+      }
+
     } catch (error) {
-      console.error('Error preparing remision for WhatsApp:', error);
+      sendLog(`Fallo en la ejecución del script de WhatsApp: ${error.message}`, 'ERROR');
       return { success: false, error: error.message };
     }
   });

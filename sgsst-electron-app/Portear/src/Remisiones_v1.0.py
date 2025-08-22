@@ -32,6 +32,7 @@ from email.header import Header
 from email.utils import formataddr
 import warnings
 from logging.handlers import RotatingFileHandler
+import sys
 
 warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
 
@@ -118,20 +119,20 @@ class Config:
         },
         "ASEL": {
             "base": RUTA_BASE / "2. Trabajo/1. SG-SST/19. Asel S.A.S/3. Gestión de la Salud",
-            "certificados": RUTA_BASE / "/2. Trabajo/1. SG-SST/19. Asel S.A.S/3. Gestión de la Salud/3.1.4 Evaluaciónes médicas/3.1.4.1. Certificados de Aptitud Medica",
-            "remisiones": RUTA_BASE / "/2. Trabajo/1. SG-SST/19. Asel S.A.S/3. Gestión de la Salud/3.1.6 Restricciones y recomendaciones médicas/3.1.6.1. Remisiones EPS",
-            "plantilla": RUTA_BASE / "/2. Trabajo/1. SG-SST/19. Asel S.A.S/3. Gestión de la Salud/3.1.6 Restricciones y recomendaciones médicas/3.1.6.1. Remisiones EPS/GI-OD-007 REMISION A EPS.docx",
-            "control": RUTA_BASE / "/2. Trabajo/1. SG-SST/19. Asel S.A.S/3. Gestión de la Salud/3.1.6 Restricciones y recomendaciones médicas/3.1.6.1. Remisiones EPS/GI-FO-012 CONTROL DE REMISIONES.xlsx"
+            "certificados": RUTA_BASE / "2. Trabajo/1. SG-SST/19. Asel S.A.S/3. Gestión de la Salud/3.1.4 Evaluaciónes médicas/3.1.4.1. Certificados de Aptitud Medica",
+            "remisiones": RUTA_BASE / "2. Trabajo/1. SG-SST/19. Asel S.A.S/3. Gestión de la Salud/3.1.6 Restricciones y recomendaciones médicas/3.1.6.1. Remisiones EPS",
+            "plantilla": RUTA_BASE / "2. Trabajo/1. SG-SST/19. Asel S.A.S/3. Gestión de la Salud/3.1.6 Restricciones y recomendaciones médicas/3.1.6.1. Remisiones EPS/GI-OD-007 REMISION A EPS.docx",
+            "control": RUTA_BASE / "2. Trabajo/1. SG-SST/19. Asel S.A.S/3. Gestión de la Salud/3.1.6 Restricciones y recomendaciones médicas/3.1.6.1. Remisiones EPS/GI-FO-012 CONTROL DE REMISIONES.xlsx"
         }
     }
 
     COLUMNAS_CONTROL = [
-        "Item", "Nombre Completo", "No. Identificación", "Fecha Nac", "Edad", "Sexo",
-        "Afiliación", "Estado civil", "Evaluación Ocupacional", "Fecha de Atención",
-        "Cargo", "Exámenes realizados", "Recomendaciones Laborales", "Incluir SVE",
-        "Restricciones Laborales", "Concepto medico laboral", "Concepto Medico",
-        "Concepto Manipulación Alimento", "Concepto Altura",
-        "Concepto de trabajo en espacios confinados", "Motivo de Restricción"
+        "Item", "Nombre_Completo", "No_Identificacion", "Fecha_Nac", "Edad", "Sexo",
+        "Afiliacion", "Estado_civil", "Evaluacion_Ocupacional", "Fecha_Atencion",
+        "Cargo", "Examenes_realizados", "Recomendaciones_Laborales", "Incluir_SVE",
+        "Restricciones_Laborales", "Concepto_medico_laboral", "Concepto_Medico",
+        "Concepto_Manipulacion_Alimento", "Concepto_Altura",
+        "Concepto_trabajo_en_espacios_confinados", "Motivo_de_Restriccion"
     ]
 
     CACHE_FILE = Path("processed_files_cache.json")
@@ -218,6 +219,12 @@ class PdfProcessor:
                 for page in pdf.pages:
                     page_text = page.extract_text() or ""
                     text += page_text + "\n"
+            
+            # LOG DE DEPURACIÓN: Guardar todo el texto del PDF para análisis
+            logging.info(f"--- INICIO TEXTO COMPLETO PDF: {pdf_path.name} ---")
+            logging.info(text)
+            logging.info(f"--- FIN TEXTO COMPLETO PDF: {pdf_path.name} ---")
+
             logging.debug(f"Texto extraído del PDF {pdf_path.name}:\n{text[:1000]}...")
             text = unicodedata.normalize('NFC', text)
 
@@ -833,14 +840,14 @@ class ExcelHandler:
             control_path = Path(control_path)
             logging.info(f"Actualizando archivo de control: {control_path}")
 
-            if not data.get('No. Identificación') or not data.get('Fecha de Atención'):
+            if not data.get('No_Identificacion') or not data.get('Fecha_Atencion'):
                 error_msg = "Cédula o fecha de atención no válidos en los datos extraídos"
                 logging.error(error_msg)
                 raise ValueError(error_msg)
 
-            data_date = pd.to_datetime(data['Fecha de Atención'], format='%Y/%m/%d', errors='coerce')
+            data_date = pd.to_datetime(data['Fecha_Atencion'], format='%d/%m/%Y', errors='coerce')
             if pd.isna(data_date):
-                error_msg = f"Fecha de atención inválida: {data['Fecha de Atención']}"
+                error_msg = f"Fecha de atención inválida: {data['Fecha_Atencion']}"
                 logging.error(error_msg)
                 raise ValueError(error_msg)
 
@@ -850,11 +857,11 @@ class ExcelHandler:
                 header_row = 6
             else:
                 try:
-                    df = pd.read_excel(control_path, engine='openpyxl', header=6, dtype={'No. Identificación': str})
+                    df = pd.read_excel(control_path, engine='openpyxl', header=6, dtype={'No_Identificacion': str})
                     header_row = 6
                     logging.info(f"Archivo de control leído con encabezados en la fila 7: {control_path}")
                 except ValueError:
-                    df = pd.read_excel(control_path, engine='openpyxl', header=None, dtype={'No. Identificación': str})
+                    df = pd.read_excel(control_path, engine='openpyxl', header=None, dtype={'No_Identificacion': str})
                     header_row = 6
                     df.columns = Config.COLUMNAS_CONTROL
                     df = df.iloc[header_row + 1:].reset_index(drop=True)
@@ -862,61 +869,11 @@ class ExcelHandler:
 
             df = df.dropna(how='all')
             if not df.empty:
-                df['No. Identificación'] = df['No. Identificación'].astype(str).str.replace(r'\\.0$', '', regex=True).str.strip()
-                if 'Fecha de Atención' in df.columns:
-                    df['Fecha de Atención'] = pd.to_datetime(df['Fecha de Atención'], format='%Y/%m/%d', errors='coerce')
-
-            if 'Item' in df.columns and not df['Item'].isnull().all():
-                max_item = df['Item'].dropna().astype(int).max()
-                new_item = max_item + 1
-            else:
-                new_item = 1
-
-            data_id = str(data['No. Identificación']).strip()
-            same_person = (df['No. Identificación'] == data_id) & (df['Fecha de Atención'] == data_date)
-
-            new_row_data = {'Item': new_item}
-            new_row_data.update({col: data.get(col, '') for col in Config.COLUMNAS_CONTROL if col != 'Item'})
-            new_row_data['No. Identificación'] = str(new_row_data['No. Identificación']).replace('.0', '')
-
-            if same_person.any():
-                idx = df[same_person].index[0]
-                for col, value in new_row_data.items():
-                    if col in data and data[col]:
-                        # Cast value to match column dtype
-                        if col == 'Edad' and value:
-                            try:
-                                value = int(value)  # Convert to int for Edad
-                            except (ValueError, TypeError):
-                                value = pd.NA
-                        elif df[col].dtype in ['int64', 'float64'] and value:
-                            try:
-                                value = pd.to_numeric(value, errors='coerce')  # Convert to numeric if column is numeric
-                                if pd.isna(value):
-                                    value = pd.NA
-                            except (ValueError, TypeError):
-                                value = pd.NA
-                        elif df[col].dtype == 'object':
-                            value = str(value)  # Ensure string for object columns
-                        df.loc[idx, col] = value
-                action = "actualizado"
-                row_number = idx + header_row + 2
-            else:
-                new_row = pd.Series(new_row_data)
-                df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-                row_number = len(df) + header_row + 1
-                action = f"añadido en la fila {row_number}"
-
-            with pd.ExcelWriter(control_path, engine='openpyxl') as writer:
-                df.to_excel(writer, index=False, header=True, startrow=header_row)
-                logging.info(f"Archivo de control {action}: {control_path}")
-
-            return str(control_path)
+                df['No_Identificacion'] = df['No_Identificacion'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
 
         except Exception as e:
-            logging.error(f"Error al actualizar archivo de control: {str(e)}")
-            logging.debug(traceback.format_exc())
-            raise
+            logging.error(f"Error al actualizar archivo de control: {e}")
+            raise    
 
 # Clase DocumentGenerator para generar documentos Word
 class DocumentGenerator:
@@ -932,11 +889,11 @@ class DocumentGenerator:
             doc = DocxTemplate(template_path)
             context = {
                 'fecha': datetime.now().strftime('%d/%m/%Y'),
-                'nombre_destinatario': data.get('Nombre Completo', 'N/A'),
-                'cc': data.get('No. Identificación', 'N/A'),
+                'nombre_destinatario': data.get('Nombre_Completo', 'N/A'),
+                'cc': data.get('No_Identificacion', 'N/A'),
                 'cargo': data.get('Cargo', 'N/A'),
-                'evaluación_ocupacional': data.get('Evaluación Ocupacional', 'N/A'),
-                'recomendaciones_laborales': data.get('Recomendaciones Laborales', 'N/A')
+                'evaluacion_ocupacional': data.get('Evaluacion_Ocupacional', 'N/A'),
+                'recomendaciones_laborales': data.get('Recomendaciones_Laborales', 'N/A')
             }
 
             for key, value in context.items():
@@ -1521,6 +1478,13 @@ class RemisionesApp(ttk.Window):
             self.log_message(f"Extrayendo datos de {pdf_path.name}...")
             data = self.pdf_processor.extract_pdf_data(pdf_path)
             
+            # Forzar la afiliación basada en la selección de la GUI
+            # Esto corrige los casos donde el PDF tiene información de la IPS en lugar de la empresa.
+            empresa_seleccionada = self.empresa.get()
+            data["Afiliación"] = empresa_seleccionada
+            logger.info(f"Afiliación forzada a '{empresa_seleccionada}' según la selección en la interfaz.")
+            self.log_message(f"Afiliación establecida a '{empresa_seleccionada}'.")
+
             if self.winfo_exists():
                 try:
                     self._display_extracted_data(data)
@@ -1529,27 +1493,10 @@ class RemisionesApp(ttk.Window):
             
             self.extracted_data = data
 
-            empresa_seleccionada = self.empresa.get()
-            if empresa_seleccionada == "ASEL":
-                data["Afiliación"] = "ASEL"
-                logger.info("Forzando afiliación a ASEL por selección de empresa")
-                self.log_message("Afiliación forzada a 'ASEL' porque la empresa seleccionada es ASEL.")
-
-            empresa_rutas = Config.get_empresa_paths(data.get('Afiliación', ''))
-            if empresa_rutas != Config.RUTAS[self.empresa.get()]:
-                empresa_detectada = next((k for k, v in Config.RUTAS.items() if v == empresa_rutas), self.empresa.get())
-                mensaje = f"Se detectó afiliación a {empresa_detectada}. ¿Desea usar esas rutas?"
-                logger.warning(f"Conflicto de rutas: seleccionada {self.empresa.get()}, detectada {empresa_detectada}")
-                if self.winfo_exists():
-                    try:
-                        if messagebox.askyesno("Cambiar empresa", mensaje):
-                            self.empresa.set(empresa_detectada)
-                            self._update_paths()
-                            template_path = Path(self.template_path.get())
-                            output_dir = Path(self.output_path.get())
-                            empresa_rutas = Config.RUTAS[empresa_detectada]
-                    except Exception as e:
-                        logger.error(f"Error en diálogo de cambio de empresa: {str(e)}", exc_info=True)
+            # La comprobación de conflicto de rutas ya no es necesaria si siempre forzamos la afiliación
+            # empresa_rutas = Config.get_empresa_paths(data.get('Afiliación', ''))
+            # ... (código de conflicto eliminado)
+            empresa_rutas = Config.RUTAS[empresa_seleccionada]
 
             # Punto 3: Generación de documento
             logger.info("Generando documento de remisión")
@@ -1627,84 +1574,77 @@ class RemisionesApp(ttk.Window):
 
     def _get_contact_info(self, empresa, cedula):
         """
-        Busca el teléfono y correo del personal según la empresa y cédula.
-        Para ASEL, busca en el archivo de personal de ASEL (Excel en la carpeta "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa").
-        Para otras empresas, busca en la base de datos correspondiente.
-        Retorna una tupla: (telefono, correo)
+        Busca el teléfono y correo del personal de forma unificada, 
+        seleccionando el archivo Excel correcto según la empresa.
         """
         try:
             cedula = str(cedula).strip()
+            empresa = empresa.upper()
+            self.log_message(f"Iniciando búsqueda de contacto para Cédula: '{cedula}', Empresa: '{empresa}'")
+
             import pandas as pd
+            import os
+            import logging
+            import traceback
+
+            # 1. Determinar la ruta del Excel y el nombre de la hoja
             if empresa in ["TEMPOACTIVA", "TEMPOSUM", "ASEPLUS"]:
                 excel_path = "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\Base de Datos Personal Temporales.xlsx"
                 sheet_name = "COMPLETO"
-                df = pd.read_excel(
-                    excel_path,
-                    sheet_name=sheet_name,
-                    dtype=str
-                )
-                cedula_col = [col for col in df.columns if 'CEDULA' in col.upper()][0]
-                celular_col = [col for col in df.columns if 'CELULAR' in col.upper()][0]
-                correo_col = [col for col in df.columns if any(kw in col.upper() for kw in ['CORREO', 'EMAIL'])][0]
-                row = df[df[cedula_col] == cedula]
-                if not row.empty:
-                    phone = str(row.iloc[0][celular_col]).strip()
-                    email = str(row.iloc[0][correo_col]).strip()
-                    phone = f"+57{phone}" if phone and not phone.startswith('+') else phone
-                    return phone, email
             elif empresa == "ASEL":
                 excel_path = "G:/Mi unidad/2. Trabajo/1. SG-SST/19. Asel S.A.S/Formato - Base de datos personal ASEL.xlsx"
                 sheet_name = "FORMATO"
-                try:
-                    df = pd.read_excel(
-                        excel_path,
-                        sheet_name=sheet_name,
-                        dtype=str
-                    )
-                    self.log_message(f"Se encontraron {len(df.columns)} columnas y {len(df)} filas en el Excel de ASEL")
-                    cedula_cols = [col for col in df.columns if 'CEDULA' in str(col).upper() or 'IDENTIFICACIÓN' in str(col).upper()]
-                    celular_cols = [col for col in df.columns if 'CELULAR' in str(col).upper() or 'TELÉFONO' in str(col).upper() or 'TELEFONO' in str(col).upper()]
-                    correo_cols = [col for col in df.columns if 'CORREO' in str(col).upper() or 'EMAIL' in str(col).upper()]
-                    if cedula_cols and celular_cols:
-                        cedula_col = cedula_cols[0]
-                        celular_col = celular_cols[0]
-                        correo_col = correo_cols[0] if correo_cols else None
-                        row = df[df[cedula_col].astype(str).str.strip() == cedula]
-                        if not row.empty:
-                            phone = str(row.iloc[0][celular_col]).strip()
-                            phone = f"+57{phone}" if phone and not phone.startswith('+') else phone
-                            email = str(row.iloc[0][correo_col]).strip() if correo_col else None
-                            return phone, email
-                    if len(df.columns) >= 25:
-                        cedula_col = df.columns[3]
-                        celular_col = df.columns[24]
-                        row = df[df[cedula_col].astype(str).str.strip() == cedula]
-                        if not row.empty:
-                            phone = str(row.iloc[0][celular_col]).strip()
-                            phone = f"+57{phone}" if phone and not phone.startswith('+') else phone
-                            return phone, None
-                    self.log_message(f"No se encontró información para la cédula {cedula} en ASEL")
-                    return None, None
-                except Exception as e:
-                    self.log_message(f"Error al procesar Excel de ASEL: {str(e)}", error=True)
-                    try:
-                        df = pd.read_excel(
-                            excel_path,
-                            sheet_name=sheet_name,
-                            usecols=[3, 24],
-                            dtype=str
-                        )
-                        df.columns = ['CEDULA', 'CELULAR']
-                        row = df[df['CEDULA'].astype(str).str.strip() == cedula]
-                        if not row.empty:
-                            phone = str(row.iloc[0]['CELULAR']).strip()
-                            phone = f"+57{phone}" if phone and not phone.startswith('+') else phone
-                            return phone, None
-                    except Exception as sub_e:
-                        self.log_message(f"Error alternativo para ASEL: {str(sub_e)}", error=True)
-            return None, None
+            else:
+                self.log_message(f"Empresa '{empresa}' no reconocida para búsqueda de contactos.", error=True)
+                return None, None
+
+            self.log_message(f"Usando archivo: {excel_path}, Hoja: {sheet_name}")
+
+            # 2. Leer el archivo Excel
+            if not os.path.exists(excel_path):
+                self.log_message(f"El archivo Excel no existe en la ruta: {excel_path}", error=True)
+                return None, None
+
+            df = pd.read_excel(excel_path, sheet_name=sheet_name, dtype=str)
+
+            # 3. Encontrar columnas de forma segura y estandarizada
+            cedula_col = next((col for col in df.columns if 'CEDULA' in str(col).upper() or 'IDENTIFICACIÓN' in str(col).upper()), None)
+            celular_col = next((col for col in df.columns if 'CELULAR' in str(col).upper() or 'TELÉFONO' in str(col).upper()), None)
+            email_col = next((col for col in df.columns if 'CORREO' in str(col).upper() or 'EMAIL' in str(col).upper()), None)
+
+            if not cedula_col:
+                self.log_message(f"No se encontró la columna de Cédula/Identificación en '{excel_path}'", error=True)
+                return None, None
+            if not celular_col:
+                self.log_message(f"No se encontró la columna de Celular/Teléfono en '{excel_path}'", error=True)
+                return None, None
+
+            self.log_message(f"Columnas a usar -> Cédula: '{cedula_col}', Celular: '{celular_col}', Email: '{email_col or 'No encontrada'}'")
+
+            # 4. Buscar la fila y extraer los datos
+            # Limpiar la columna de cédulas en el dataframe para una comparación más robusta
+            df[cedula_col] = df[cedula_col].astype(str).str.strip()
+            row = df[df[cedula_col] == cedula]
+
+            if not row.empty:
+                self.log_message(f"Cédula '{cedula}' encontrada en la fila de índice {row.index[0]}.")
+                phone = str(row.iloc[0][celular_col]).strip()
+                email = str(row.iloc[0][email_col]).strip() if email_col and pd.notna(row.iloc[0][email_col]) else None
+
+                if not phone or phone.lower() == 'nan':
+                    self.log_message(f"Teléfono no encontrado para la cédula {cedula}, pero se encontró el email: {email or 'Ninguno'}", error=True)
+                    return None, email
+                
+                phone = f"+57{phone}" if phone and not phone.startswith('+') else phone
+                self.log_message(f"Contacto encontrado -> Teléfono: {phone}, Email: {email or 'Ninguno'}")
+                return phone, email
+            else:
+                self.log_message(f"Cédula '{cedula}' NO encontrada en el archivo '{excel_path}'", error=True)
+                return None, None
+
         except Exception as e:
-            self.log_message(f"Error al obtener contacto: {str(e)}", error=True)
+            self.log_message(f"Error crítico al obtener contacto: {str(e)}", error=True)
+            logging.error(traceback.format_exc()) # Log completo para depuración
             return None, None
 
     def _send_whatsapp(self):
@@ -1960,31 +1900,26 @@ class RemisionesApp(ttk.Window):
 def generate_remision_document(data, empresa):
     """
     Genera un documento de remisión a partir de los datos extraídos.
-    
-    Args:
-        data (dict): Datos extraídos del PDF
-        empresa (str): Nombre de la empresa
-        
-    Returns:
-        dict: Resultado con la ruta del documento generado y el archivo de control
     """
     try:
-        # Crear instancias de las clases necesarias
+        log(f"Iniciando generación de documento para la empresa: {empresa}")
         doc_generator = DocumentGenerator()
         excel_handler = ExcelHandler()
         
-        # Obtener rutas según la empresa
         empresa_rutas = Config.get_empresa_paths(empresa)
+        log(f"Rutas obtenidas para {empresa}: {empresa_rutas}")
         
-        # Generar documento de remisión
         template_path = empresa_rutas["plantilla"]
         output_dir = empresa_rutas["remisiones"]
         
+        log(f"Usando plantilla: {template_path}")
         doc_path = doc_generator.generate_remision(data, template_path, output_dir)
+        log(f"Documento de remisión generado en: {doc_path}")
         
-        # Actualizar archivo de control
         control_path = empresa_rutas["control"]
+        log(f"Actualizando archivo de control: {control_path}")
         excel_path = excel_handler.update_control_file(data, control_path)
+        log(f"Archivo de control actualizado en: {excel_path}")
         
         return {
             "success": True,
@@ -1992,8 +1927,7 @@ def generate_remision_document(data, empresa):
             "controlPath": excel_path
         }
     except Exception as e:
-        logging.error(f"Error al generar documento de remisión: {str(e)}")
-        logging.debug(traceback.format_exc())
+        log(f"Error al generar documento de remisión: {str(e)}", level='ERROR')
         return {
             "success": False,
             "error": str(e)
@@ -2002,33 +1936,25 @@ def generate_remision_document(data, empresa):
 def send_remision_by_email(doc_path, data, empresa):
     """
     Envía un documento de remisión por correo electrónico.
-    
-    Args:
-        doc_path (str): Ruta al documento a enviar
-        data (dict): Datos del trabajador
-        empresa (str): Nombre de la empresa
-        
-    Returns:
-        dict: Resultado del envío
     """
     try:
-        # Crear instancia de EmailSender
+        log(f"Iniciando envío de email para la empresa {empresa} con el documento {doc_path}")
         email_sender = EmailSender(empresa)
         
-        # Obtener información de contacto
-        cedula = data.get('No. Identificación', '')
-        nombre = data.get('Nombre Completo', 'Trabajador')
-        fecha_atencion = data.get('Fecha de Atención', '')
+        cedula = data.get('No_Identificacion', '')
+        nombre = data.get('Nombre_Completo', 'Trabajador')
+        fecha_atencion = data.get('Fecha_Atencion', '')
         
         if not cedula:
-            raise ValueError("No se encontró el número de identificación")
+            raise ValueError("No se encontró el número de identificación en los datos para el email")
             
+        log(f"Buscando contacto de email para la cédula: {cedula}")
         telefono, email_destino = email_sender.obtener_contacto(cedula)
         
         if not email_destino:
-            raise ValueError("No se encontró el correo electrónico para este trabajador")
-            
-        # Enviar correo
+            raise ValueError(f"No se encontró el correo electrónico para la cédula {cedula}")
+        
+        log(f"Contacto de email encontrado: {email_destino}. Procediendo a enviar.")
         success = email_sender.enviar_correo(
             destinatario=email_destino,
             nombre=nombre,
@@ -2037,72 +1963,42 @@ def send_remision_by_email(doc_path, data, empresa):
         )
         
         if success:
-            return {
-                "success": True,
-                "message": "Correo enviado exitosamente"
-            }
+            log("Correo enviado exitosamente.")
+            return {"success": True, "message": "Correo enviado exitosamente"}
         else:
-            return {
-                "success": False,
-                "error": "No se pudo enviar el correo"
-            }
+            raise RuntimeError("La función enviar_correo de EmailSender retornó False.")
+
     except Exception as e:
-        logging.error(f"Error al enviar correo: {str(e)}")
-        logging.debug(traceback.format_exc())
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        log(f"Error al enviar correo: {str(e)}", level='ERROR')
+        return {"success": False, "error": str(e)}
 
 def send_remision_by_whatsapp(doc_path, data, empresa):
     """
     Prepara el envío de un documento de remisión por WhatsApp.
-    
-    Args:
-        doc_path (str): Ruta al documento a enviar
-        data (dict): Datos del trabajador
-        empresa (str): Nombre de la empresa
-        
-    Returns:
-        dict: Resultado de la preparación
     """
     try:
-        # Crear instancia de WhatsAppSender
+        log(f"Iniciando preparación de WhatsApp para la empresa {empresa} con el documento {doc_path}")
         whatsapp_sender = WhatsAppSender()
         
-        # Obtener información de contacto
-        cedula = data.get('No. Identificación', '')
-        nombre = data.get('Nombre Completo', 'Trabajador')
-        fecha_atencion = data.get('Fecha de Atención', '')
-        afiliacion = data.get('Afiliación', empresa)
+        cedula = data.get('No_Identificacion', '')
+        nombre = data.get('Nombre_Completo', 'Trabajador')
+        fecha_atencion = data.get('Fecha_Atencion', '')
+        afiliacion = data.get('Afiliacion', empresa)
         
         if not cedula:
-            raise ValueError("No se encontró el número de identificación")
-            
-        # Normalizar el nombre de la empresa para evitar problemas de coincidencia
+            raise ValueError("No se encontró el número de identificación en los datos para WhatsApp")
+
         empresa_normalizada = afiliacion.upper().strip()
-        if "TEMPOSUM" in empresa_normalizada:
-            empresa_normalizada = "TEMPOSUM"
-        elif "TEMPOACTIVA" in empresa_normalizada:
-            empresa_normalizada = "TEMPOACTIVA"
-        elif "ASEPLUS" in empresa_normalizada:
-            empresa_normalizada = "ASEPLUS"
-        elif "ASEL" in empresa_normalizada:
-            empresa_normalizada = "ASEL"
+        log(f"Buscando contacto de WhatsApp para la cédula: {cedula} en la empresa normalizada: {empresa_normalizada}")
         
-        # Registrar información de depuración
-        logging.info(f"Afiliación original: {afiliacion}")
-        logging.info(f"Empresa normalizada: {empresa_normalizada}")
-            
-        # Usar la función probada _get_contact_info de la clase RemisionesApp
-        # Creamos una instancia temporal solo para acceder a este método
-        app_temp = RemisionesApp()
-        phone, _ = app_temp._get_contact_info(empresa_normalizada, cedula)
+        # Usar la clase EmailSender para obtener el contacto, ya que centraliza la lógica
+        contact_finder = EmailSender(empresa_normalizada)
+        phone, _ = contact_finder.obtener_contacto(cedula)
         
         if not phone or phone == "nan":
-            raise ValueError("No se encontró el número de teléfono")
+            raise ValueError(f"No se encontró el número de teléfono para la cédula {cedula}")
             
-        # Construir mensaje
+        log(f"Teléfono encontrado: {phone}. Construyendo mensaje.")
         mensaje = f"""*Remisión EPS - {afiliacion}*
 
 *Trabajador:* {nombre}
@@ -2118,58 +2014,3804 @@ Por favor:
 
 _Cualquier duda estamos disponibles para resolverla_"""
         
-        # Enviar mensaje (esto abrirá WhatsApp Web)
         whatsapp_sender.send_message(
             phone_number=phone,
             message=mensaje,
             file_path=doc_path
         )
         
+        log("Se ha abierto la URL de WhatsApp y la carpeta del archivo.")
         return {
             "success": True,
             "message": "Se abrirá WhatsApp Web con el mensaje preparado"
         }
     except Exception as e:
-        logging.error(f"Error al preparar WhatsApp: {str(e)}")
-        logging.debug(traceback.format_exc())
+        log(f"Error al preparar WhatsApp: {str(e)}", level='ERROR')
         return {
             "success": False,
             "error": str(e)
         }
 
 
+def log(message, level='INFO'):
+    """Envía un log estructurado a stdout y también al logger de archivo."""
+    # Imprimir para que Electron lo capture
+    print(json.dumps({'type': 'log', 'level': level, 'message': message}))
+    # Registrar en el archivo de log de Python
+    if level == 'ERROR':
+        logger.error(message)
+    elif level == 'WARN':
+        logger.warning(message)
+    else:
+        logger.info(message)
+
+if __name__ == "__main__":
+
+    # Redirigir el logger de Python a stdout para que Electron lo capture todo
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    # Descomentar para depuración detallada
+    # logger.addHandler(stream_handler)
+
+    if len(sys.argv) > 2:
+        command = sys.argv[1]
+        data_file = sys.argv[2]
+        result = {}
+
+        try:
+            log(f"Comando '{command}' recibido con el archivo de datos: {data_file}")
+            with open(data_file, 'r', encoding='utf-8') as f:
+                temp_data = json.load(f)
+
+            if command == "--generate-remision":
+                result = generate_remision_document(temp_data['data'], temp_data['empresa'])
+            elif command == "--send-email":
+                result = send_remision_by_email(
+                    temp_data['docPath'],
+                    temp_data['data'],
+                    temp_data['empresa']
+                )
+            elif command == "--send-whatsapp":
+                result = send_remision_by_whatsapp(
+                    temp_data['docPath'],
+                    temp_data['data'],
+                    temp_data['empresa']
+                )
+            else:
+                result = {"success": False, "error": "Comando no reconocido"}
+
+        except Exception as e:
+            log(f"Error crítico en la ejecución del script: {str(e)}", level='ERROR')
+            result = {"success": False, "error": str(e), "traceback": traceback.format_exc()}
+
+        # Imprimir el resultado final
+        final_output = {'type': 'result', 'payload': result}
+        print(json.dumps(final_output, ensure_ascii=False))
+
+    else:
+        # Comportamiento normal de la aplicación GUI
+        log("Iniciando en modo de interfaz gráfica (GUI).")
+        app = RemisionesApp()
+        app.mainloop()
+
+
+# Clase DocumentGenerator para generar documentos Word
+class DocumentGenerator:
+    def generate_remision(self, data, template_path, output_dir):
+        try:
+            template_path = Path(template_path)
+            if not template_path.exists():
+                raise FileNotFoundError(f"Plantilla no encontrada: {template_path}")
+
+            if template_path.suffix.lower() not in ['.doc', '.docx']:
+                raise ValueError(f"La plantilla debe ser un archivo .doc o .docx: {template_path}")
+
+            doc = DocxTemplate(template_path)
+            context = {
+                'fecha': datetime.now().strftime('%d/%m/%Y'),
+                'nombre_destinatario': data.get('Nombre_Completo', 'N/A'),
+                'cc': data.get('No_Identificacion', 'N/A'),
+                'cargo': data.get('Cargo', 'N/A'),
+                'evaluacion_ocupacional': data.get('Evaluacion_Ocupacional', 'N/A'),
+                'recomendaciones_laborales': data.get('Recomendaciones_Laborales', 'N/A')
+            }
+
+            for key, value in context.items():
+                if value == 'N/A' and key in ['nombre_destinatario', 'cc', 'evaluación_ocupacional', 'recomendaciones_laborales']:
+                    context[key] = "Información no disponible"
+
+            doc.render(context)
+
+            output_dir = Path(output_dir)
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            fecha = datetime.now().strftime('%Y%m%d')
+            nombre_sanitizado = self._sanitize_filename(data.get('Nombre Completo', 'sin_nombre'))
+            output_path = output_dir / f"GI-OD-007 REMISION A EPS {nombre_sanitizado} {fecha}.docx"
+
+            counter = 1
+            while output_path.exists():
+                output_path = output_dir / f"GI-OD-007 REMISION A EPS {nombre_sanitizado} {fecha}_{counter}.docx"
+                counter += 1
+
+            doc.save(output_path)
+            logging.info(f"Documento creado: {output_path}")
+            return str(output_path)
+
+        except Exception as e:
+            logging.error(f"Error en generate_remision: {str(e)}")
+            logging.debug(traceback.format_exc())
+            raise
+
+    def _sanitize_filename(self, filename):
+        if not filename:
+            return "sin_nombre"
+        valid_filename = re.sub(r'[<>:"/\\\\|?*]', '_', filename)
+        valid_filename = valid_filename.replace(' ', '_')
+        valid_filename = ''.join(c for c in unicodedata.normalize('NFD', valid_filename)
+                                 if unicodedata.category(c) != 'Mn')
+        return valid_filename
+
+# Clase CacheManager para gestionar caché
+class CacheManager:
+    def __init__(self, cache_file=None):
+        self.cache_file = cache_file or Config.CACHE_FILE
+        self._load_cache()
+
+    def _load_cache(self):
+        try:
+            cache_path = Path(self.cache_file)
+            if cache_path.exists():
+                with open(cache_path, "r", encoding="utf-8") as f:
+                    self.cache = json.load(f)
+                logging.info(f"Caché cargada desde {self.cache_file}")
+            else:
+                self.cache = {}
+                logging.info("Caché inicializada (nueva, archivo no encontrado)")
+        except Exception as e:
+            logging.error(f"Error al cargar caché: {str(e)}")
+            self.cache = {}
+
+    def _save_cache(self):
+        try:
+            with open(self.cache_file, "w") as f:
+                json.dump(self.cache, f, indent=2)
+            logging.info(f"Caché guardada en {self.cache_file}")
+        except Exception as e:
+            logging.error(f"Error al guardar caché: {str(e)}")
+
+    def check_cache(self, pdf_path):
+        pdf_hash = self._get_file_hash(pdf_path)
+        if pdf_hash in self.cache:
+            logging.info(f"Archivo encontrado en caché: {pdf_path}")
+            return self.cache[pdf_hash]
+        logging.info(f"Archivo no encontrado en caché: {pdf_path}")
+        return None
+
+    def update_cache(self, pdf_path, output_paths):
+        pdf_hash = self._get_file_hash(pdf_path)
+        self.cache[pdf_hash] = output_paths
+        self._save_cache()
+        logging.info(f"Caché actualizada para {pdf_path}")
+
+    def _get_file_hash(self, file_path):
+        try:
+            import hashlib
+            file_path = Path(file_path)
+            stats = file_path.stat()
+            unique_id = f"{file_path}|{stats.st_size}|{stats.st_mtime}"
+            with open(file_path, "rb") as f:
+                file_hash = hashlib.md5(f.read()).hexdigest()
+            return f"{file_hash}|{unique_id}"
+        except Exception as e:
+            logging.error(f"Error al generar hash para {file_path}: {str(e)}")
+            return str(file_path)
+
+    def remove_from_cache(self, pdf_path):
+        pdf_hash = self._get_file_hash(pdf_path)
+        if pdf_hash in self.cache:
+            del self.cache[pdf_hash]
+            self._save_cache()
+            logging.info(f"Archivo {pdf_path} eliminado del caché")
+
+class WhatsAppSender:
+    def send_message(self, phone_number, message, file_path=None):
+        try:
+            # Copiar el mensaje al portapapeles
+            pyperclip.copy(message)
+            logging.info("Mensaje copiado al portapapeles.")
+
+            # Codificar el mensaje para URL
+            encoded_message = quote(message)
+            url = f"https://api.whatsapp.com/send?phone={phone_number}&text={encoded_message}" #si quieres que se abra en el navegador cambia api a web.
+            
+            webbrowser.open(url)
+
+                        # Abrir el archivo en el navegador para facilitar el adjunto
+            if file_path and Path(file_path).exists():
+                os.startfile(file_path)
+
+                # 2. Abrir carpeta contenedora del archivo automáticamente
+                folder_path = os.path.dirname(file_path)
+                os.startfile(folder_path)  # Windows
+                # Para Linux/Mac: os.system(f'open "{folder_path}"')
+
+            logging.info(f"Mensaje de WhatsApp enviado a y carpeta de archivo abierto para {phone_number}")
+        except Exception as e:
+            logging.error(f"Error al enviar WhatsApp: {str(e)}")
+            raise
+
+# Clase EmailSender para enviar correos electrónicos
+
+class EmailSender:
+    """Clase para enviar correos electrónicos con plantillas personalizadas y adjuntos."""
+    
+    # Plantillas de email por tipo de empresa
+    PLANTILLAS = {
+        "TEMPOACTIVA": {
+            "asunto": "Seguimiento a Recomendaciones Médicas Laborales",
+            "cuerpo": """Estimado/a {nombre},
+Conforme al resultado del examen médico ocupacional realizado el día {fecha}, te compartimos la carta de remisiones médicas, en la cual se detallan recomendaciones específicas relacionadas con tu estado de salud y tu actividad laboral.
+
+📎 Adjunto encontrarás el documento oficial con las recomendaciones.
+
+Te solicitamos por favor:
+
+✅ Leer atentamente las recomendaciones.  
+✅ Confirmar la recepción de este mensaje y del documento.  
+✅ Informarnos si ya estás realizando los controles médicos indicados (si aplica).   
+
+Estas recomendaciones serán tenidas en cuenta por el área de Seguridad y Salud en el Trabajo para realizar el seguimiento correspondiente y tomar las acciones necesarias en el marco del Sistema de Gestión SST, tal como lo establece la Resolución 0312 de 2019 y el Decreto 1072 de 2015.
+
+Tu salud es una prioridad para nosotros, y el cumplimiento de estas recomendaciones ayuda a prevenir posibles afectaciones laborales.
+
+Si tienes alguna duda, estamos atentos para aclararla.
+
+Saludos cordiales,
+Atentamente,
+Equipo {empresa}
+Correo: {remitente}"""
+        },
+        "TEMPOSUM": {
+            "asunto": "Seguimiento a Recomendaciones Médicas Laborales",
+            "cuerpo": """Estimado/a {nombre},
+Conforme al resultado del examen médico ocupacional realizado el día {fecha}, te compartimos la carta de remisiones médicas, en la cual se detallan recomendaciones específicas relacionadas con tu estado de salud y tu actividad laboral.
+
+📎 Adjunto encontrarás el documento oficial con las recomendaciones.
+
+Te solicitamos por favor:
+
+✅ Leer atentamente las recomendaciones.  
+✅ Confirmar la recepción de este mensaje y del documento.  
+✅ Informarnos si ya estás realizando los controles médicos indicados (si aplica).   
+
+Estas recomendaciones serán tenidas en cuenta por el área de Seguridad y Salud en el Trabajo para realizar el seguimiento correspondiente y tomar las acciones necesarias en el marco del Sistema de Gestión SST, tal como lo establece la Resolución 0312 de 2019 y el Decreto 1072 de 2015.
+
+Tu salud es una prioridad para nosotros, y el cumplimiento de estas recomendaciones ayuda a prevenir posibles afectaciones laborales.
+
+Si tienes alguna duda, estamos atentos para aclararla.
+
+Saludos cordiales,
+Atentamente,
+Equipo {empresa}
+Correo: {remitente}"""
+        },
+        "ASEPLUS": {
+            "asunto": "Seguimiento a Recomendaciones Médicas Laborales",
+            "cuerpo": """Estimado/a {nombre},
+Conforme al resultado del examen médico ocupacional realizado el día {fecha}, te compartimos la carta de remisiones médicas, en la cual se detallan recomendaciones específicas relacionadas con tu estado de salud y tu actividad laboral.
+
+📎 Adjunto encontrarás el documento oficial con las recomendaciones.
+
+Te solicitamos por favor:
+
+✅ Leer atentamente las recomendaciones.  
+✅ Confirmar la recepción de este mensaje y del documento.  
+✅ Informarnos si ya estás realizando los controles médicos indicados (si aplica).   
+
+Estas recomendaciones serán tenidas en cuenta por el área de Seguridad y Salud en el Trabajo para realizar el seguimiento correspondiente y tomar las acciones necesarias en el marco del Sistema de Gestión SST, tal como lo establece la Resolución 0312 de 2019 y el Decreto 1072 de 2015.
+
+Tu salud es una prioridad para nosotros, y el cumplimiento de estas recomendaciones ayuda a prevenir posibles afectaciones laborales.
+
+Si tienes alguna duda, estamos atentos para aclararla.
+
+Saludos cordiales,
+Atentamente,
+Equipo {empresa}
+Correo: {remitente}"""
+        },
+        "ASEL": {
+            "asunto": "Seguimiento a Recomendaciones Médicas Laborales",
+            "cuerpo": """Estimado/a {nombre},
+Conforme al resultado del examen médico ocupacional realizado el día {fecha}, te compartimos la carta de remisiones médicas, en la cual se detallan recomendaciones específicas relacionadas con tu estado de salud y tu actividad laboral.
+
+📎 Adjunto encontrarás el documento oficial con las recomendaciones.
+
+Te solicitamos por favor:
+
+✅ Leer atentamente las recomendaciones.  
+✅ Confirmar la recepción de este mensaje y del documento.  
+✅ Informarnos si ya estás realizando los controles médicos indicados (si aplica).   
+
+Estas recomendaciones serán tenidas en cuenta por el área de Seguridad y Salud en el Trabajo para realizar el seguimiento correspondiente y tomar las acciones necesarias en el marco del Sistema de Gestión SST, tal como lo establece la Resolución 0312 de 2019 y el Decreto 1072 de 2015.
+
+Tu salud es una prioridad para nosotros, y el cumplimiento de estas recomendaciones ayuda a prevenir posibles afectaciones laborales.
+
+Si tienes alguna duda, estamos atentos para aclararla.
+
+Atentamente,
+Equipo ASEL
+Correo: {remitente}"""
+        },
+        "DEFAULT": {
+            "asunto": "Documento de Remisión EPS",
+            "cuerpo": """Estimado/a {nombre},
+Adjunto encontrarás tu documento de remisión EPS.
+Atentamente,
+Equipo {empresa}
+Correo: {remitente}"""
+        }
+    }
+
+    # Rutas a las bases de datos de personal
+    BASES_DATOS = {
+        "TEMPOACTIVA": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\Base de Datos Personal Temporales.xlsx",
+        "TEMPOSUM": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\Base de Datos Personal Temporales.xlsx",
+        "ASEPLUS": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\Base de Datos Personal Temporales.xlsx",
+        "ASEL": "G:/Mi unidad/2. Trabajo/1. SG-SST/19. Asel S.A.S/Formato - Base de datos personal ASEL.xlsx"
+    }
+
+    # Credenciales de correo por empresa
+    CREDENCIALES = {
+        "TEMPOACTIVA": {"email": "tempoactivaestsas@gmail.com", "password": "pxfu wxit wpjf svxd"},
+        "TEMPOSUM": {"email": "temposumestsas@gmail.com", "password": "bcfw rzxh ksob ddns"},
+        "ASEPLUS": {"email": "asepluscaribesas@gmail.com", "password": "yudh myrl zjpk eoej"},
+        "ASEL": {"email": "asel.contratacion@gmail.com", "password": "kdyh degt juwf tuqd"}
+    }
+
+    def __init__(self, empresa):
+        """
+        Inicializa el enviador de correos para una empresa específica.
+        
+        Args:
+            empresa (str): Nombre de la empresa (TEMPOACTIVA, TEMPOSUM, etc.)
+        """
+        self.empresa = empresa.upper()
+        self.credenciales = self.CREDENCIALES.get(self.empresa)
+        self.plantilla = self.PLANTILLAS.get(self.empresa, self.PLANTILLAS["DEFAULT"])
+        self.base_datos = self.BASES_DATOS.get(self.empresa)
+        
+        if not self.credenciales:
+            raise ValueError(f"No hay credenciales configuradas para {self.empresa}")
+        
+        self.logger = logging.getLogger("EmailSender")
+
+    def obtener_contacto(self, cedula):
+        """
+        Obtiene la información de contacto de un trabajador desde la base de datos.
+        
+        Args:
+            cedula (str): Número de identificación del trabajador
+            
+        Returns:
+            tuple: (telefono, email) o (None, None) si no se encuentra
+        """
+        try:
+            if not self.base_datos or not Path(self.base_datos).exists():
+                self.logger.warning(f"Base de datos no encontrada: {self.base_datos}")
+                return None, None
+                
+            df = pd.read_excel(
+                self.base_datos,
+                sheet_name="FORMATO" if self.empresa == "ASEL" else "COMPLETO",
+                dtype=str
+            )
+            
+            # Buscar columnas relevantes
+            col_cedula = next((col for col in df.columns if 'CEDULA' in col.upper() or 'IDENTIFICACIÓN' in col.upper()), None)
+            col_celular = next((col for col in df.columns if 'CELULAR' in col.upper() or 'TELÉFONO' in col.upper()), None)
+            col_email = next((col for col in df.columns if 'CORREO' in col.upper() or 'EMAIL' in col.upper()), None)
+            
+            if not col_cedula or not col_celular:
+                self.logger.error("Columnas críticas no encontradas en la base de datos")
+                return None, None
+                
+            # Buscar el registro
+            registro = df[df[col_cedula].astype(str).str.strip() == str(cedula).strip()]
+            
+            if not registro.empty:
+                telefono = registro.iloc[0][col_celular]
+                email = registro.iloc[0][col_email] if col_email else None
+                return telefono, email
+                
+            return None, None
+        except Exception as e:
+            self.logger.error(f"Error al obtener contacto: {str(e)}")
+            return None, None
+
+    def enviar_correo(self, destinatario, nombre, fecha_atencion, archivo_adjunto):
+        """
+        Envía un correo electrónico con un documento adjunto.
+        
+        Args:
+            destinatario (str): Correo electrónico del destinatario
+            nombre (str): Nombre del trabajador
+            fecha_atencion (str): Fecha de atención médica
+            archivo_adjunto (str): Ruta al archivo a adjuntar
+            
+        Returns:
+            bool: True si el envío fue exitoso, False en caso contrario
+        """
+        try:
+            # Validación básica de parámetros
+            if not all([destinatario, nombre, fecha_atencion, archivo_adjunto]):
+                raise ValueError("Faltan parámetros requeridos para enviar el correo")
+                
+            if not Path(archivo_adjunto).exists():
+                raise FileNotFoundError(f"Archivo adjunto no encontrado: {archivo_adjunto}")
+
+            # Construir mensaje personalizado
+            asunto = self.plantilla["asunto"]
+            cuerpo = self.plantilla["cuerpo"].format(
+                nombre=nombre,
+                fecha=fecha_atencion,
+                empresa=self.empresa,
+                remitente=self.credenciales["email"]
+            )
+
+            # Configurar mensaje MIME
+            msg = MIMEMultipart()
+            # Encode both the empresa name and email address to handle non-ASCII characters
+            encoded_empresa = Header(self.empresa, 'utf-8').encode()
+            email_address = self.credenciales["email"].encode('ascii', errors='ignore').decode('ascii')
+            msg['From'] = formataddr((encoded_empresa, email_address))
+            msg['To'] = destinatario
+            msg['Subject'] = Header(asunto, 'utf-8').encode()
+            msg.attach(MIMEText(cuerpo, 'plain', 'utf-8'))
+
+            # Adjuntar documento
+            with open(archivo_adjunto, "rb") as adjunto:
+                parte = MIMEBase('application', 'octet-stream')
+                parte.set_payload(adjunto.read())
+                encoders.encode_base64(parte)
+                nombre_archivo = os.path.basename(archivo_adjunto)
+                parte.add_header(
+                    'Content-Disposition',
+                    f'attachment; filename="{Header(nombre_archivo, "utf-8").encode()}"'
+                )
+                msg.attach(parte)
+
+            # Enviar correo usando SMTP
+            with smtplib.SMTP('smtp.gmail.com', 587) as servidor:
+                servidor.starttls()
+                servidor.login(self.credenciales["email"], self.credenciales["password"])
+                servidor.send_message(msg)
+                
+            self.logger.info(f"Correo enviado exitosamente a {destinatario}")
+            return True
+            
+        except smtplib.SMTPAuthenticationError:
+            self.logger.error("Error de autenticación: Credenciales inválidas")
+            return False
+        except smtplib.SMTPException as e:
+            self.logger.error(f"Error SMTP: {str(e)}")
+            return False
+        except Exception as e:
+            self.logger.error(f"Error inesperado: {str(e)}\n{traceback.format_exc()}")
+            return False
+
+# Clase principal de la aplicación
+class RemisionesApp(ttk.Window):
+    
+        
+    def __init__(self):
+        super().__init__(themename="flatly")
+        self.title("Sistema de Gestión de Remisiones EPS")
+        self.geometry("800x650")
+        
+        Config.load_from_file()
+        self.pdf_processor = PdfProcessor()
+        self.excel_handler = ExcelHandler()
+        self.doc_generator = DocumentGenerator()
+        self.cache_manager = CacheManager()
+        self.whatsapp_sender = WhatsAppSender()
+        # ELIMINADO: self.email_sender = ... 
+
+        self.pdf_path = StringVar()
+        self.template_path = StringVar(value=str(Config.RUTAS["TEMPOACTIVA"]["plantilla"]))
+        self.output_path = StringVar(value=str(Config.RUTAS["TEMPOACTIVA"]["remisiones"]))
+        self.processing = BooleanVar(value=False)
+        self.extracted_data = {}
+        self.empresa = StringVar(value="TEMPOACTIVA")
+        self.last_generated_doc = None
+
+        self._create_widgets()
+        self.stats = {"processed": 0, "errors": 0, "cached": 0}
+
+    def _create_widgets(self):
+        main_frame = ttk.Frame(self)
+        main_frame.grid(row=0, column=0, sticky=NSEW, padx=10, pady=10)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+
+        main_frame.grid_rowconfigure(0, weight=0)
+        main_frame.grid_rowconfigure(1, weight=0)
+        main_frame.grid_rowconfigure(2, weight=3)
+        main_frame.grid_rowconfigure(3, weight=1)
+        main_frame.grid_rowconfigure(4, weight=0)
+        main_frame.grid_columnconfigure(0, weight=1)
+
+        header_frame = ttk.Frame(main_frame)
+        header_frame.grid(row=0, column=0, sticky=EW, pady=5)
+        ttk.Label(header_frame, text="SISTEMA DE GESTIÓN DE REMISIONES EPS",
+                  font=("TkDefaultFont", 16, "bold")).pack(side=LEFT, padx=5)
+
+        file_frame = ttk.LabelFrame(main_frame, text="Selección de Archivos")
+        file_frame.grid(row=1, column=0, sticky=EW, pady=5)
+
+        pdf_row = ttk.Frame(file_frame)
+        pdf_row.pack(fill=X, pady=3)
+        ttk.Label(pdf_row, text="Archivo PDF:").pack(side=LEFT, padx=5)
+        ttk.Entry(pdf_row, textvariable=self.pdf_path, width=64).pack(side=LEFT, padx=5, fill=X, expand=YES)
+        ttk.Button(pdf_row, text="Buscar", command=self._browse_pdf).pack(side=LEFT, padx=5)
+        ttk.Button(pdf_row, text="Procesar", command=self._process_pdf, bootstyle=SUCCESS).pack(side=LEFT, padx=5)
+
+        template_row = ttk.Frame(file_frame)
+        template_row.pack(fill=X, pady=3)
+        ttk.Label(template_row, text="Plantilla:").pack(side=LEFT, padx=5)
+        ttk.Entry(template_row, textvariable=self.template_path, width=64).pack(side=LEFT, padx=5, fill=X, expand=YES)
+        ttk.Button(template_row, text="Buscar", command=self._browse_template).pack(side=LEFT, padx=5)
+
+        output_row = ttk.Frame(file_frame)
+        output_row.pack(fill=X, pady=3)
+        ttk.Label(output_row, text="Carpeta de salida:").pack(side=LEFT, padx=5)
+        ttk.Entry(output_row, textvariable=self.output_path, width=64).pack(side=LEFT, padx=5, fill=X, expand=YES)
+        ttk.Button(output_row, text="Buscar", command=self._browse_output).pack(side=LEFT, padx=5)
+
+        empresa_row = ttk.Frame(file_frame)
+        empresa_row.pack(fill=X, pady=3)
+        ttk.Label(empresa_row, text="Empresa:").pack(side=LEFT, padx=5)
+        empresa_combo = ttk.Combobox(empresa_row, textvariable=self.empresa,
+                                     values=list(Config.RUTAS.keys()), state="readonly")
+        empresa_combo.pack(side=LEFT, padx=5)
+        empresa_combo.bind('<<ComboboxSelected>>', self._update_paths)
+
+        send_buttons_row = ttk.Frame(file_frame)
+        send_buttons_row.pack(fill=X, pady=3)
+        self.send_whatsapp_btn = ttk.Button(send_buttons_row, text="Enviar por WhatsApp",
+                                            command=self._send_whatsapp, state=DISABLED, bootstyle=INFO)
+        self.send_whatsapp_btn.pack(side=LEFT, padx=5)
+        self.send_email_btn = ttk.Button(send_buttons_row, text="Enviar por Correo",
+                                         command=self._send_email, state=DISABLED, bootstyle=INFO)
+        self.send_email_btn.pack(side=LEFT, padx=5)
+
+        data_frame = ttk.LabelFrame(main_frame, text="Datos Extraídos")
+        data_frame.grid(row=2, column=0, sticky=NSEW, pady=5)
+        self.scrolled_frame = ScrolledFrame(data_frame, autohide=False)
+        self.scrolled_frame.pack(fill=BOTH, expand=YES, padx=5, pady=5)
+        self.scrolled_frame.container.config(height=200)
+
+        self.data_widgets = {}
+
+        results_frame = ttk.LabelFrame(main_frame, text="Resultados")
+        results_frame.grid(row=3, column=0, sticky=NSEW, pady=5)
+        self.results_text = ttk.Text(results_frame, height=4, width=64, wrap=WORD)
+        self.results_text.pack(fill=BOTH, expand=YES, padx=5, pady=3)
+
+        status_frame = ttk.Frame(main_frame)
+        status_frame.grid(row=5, column=0, sticky=EW, pady=5)
+        self.status_label = ttk.Label(status_frame, text="Listo")
+        self.status_label.pack(side=LEFT, padx=5)
+
+        batch_frame = ttk.LabelFrame(main_frame, text="Procesamiento en Lote")
+        batch_frame.grid(row=4, column=0, sticky=EW, pady=3)
+        ttk.Button(batch_frame, text="Procesar Carpeta",
+                   command=self._batch_process,
+                   bootstyle=WARNING).pack(padx=5, pady=3)
+
+    def _update_paths(self, event=None):
+        empresa = self.empresa.get()
+        if empresa in Config.RUTAS:
+            rutas = Config.RUTAS[empresa]
+            self.template_path.set(str(rutas["plantilla"]))
+            self.output_path.set(str(rutas["remisiones"]))
+            self.log_message(f"Rutas actualizadas para {empresa}")
+
+    def _browse_pdf(self):
+        file = filedialog.askopenfilename(
+            title="Seleccionar PDF",
+            filetypes=[("Archivos PDF", "*.pdf")]
+        )
+        if file:
+            self.cache_manager.remove_from_cache(file)
+            self.pdf_path.set(file)
+            self.log_message(f"Archivo seleccionado: {file}")
+            self._clear_displayed_data()
+            self.send_whatsapp_btn.config(state=DISABLED)
+            self.send_email_btn.config(state=DISABLED)
+
+    def _browse_template(self):
+        file = filedialog.askopenfilename(
+            title="Seleccionar Plantilla",
+            filetypes=[("Archivos Word", "*.doc;*.docx")]
+        )
+        if file:
+            self.template_path.set(file)
+            self.log_message(f"Plantilla seleccionada: {file}")
+
+    def _browse_output(self):
+        folder = filedialog.askdirectory(
+            title="Seleccionar Carpeta de Salida"
+        )
+        if folder:
+            self.output_path.set(folder)
+            self.log_message(f"Carpeta de salida: {folder}")
+
+    def _process_pdf(self):
+        if not self.pdf_path.get():
+            if self.winfo_exists():
+                try:
+                    messagebox.showerror("Error", "Por favor seleccione un archivo PDF")
+                except Exception:
+                    pass
+            return
+        self.processing.set(True)
+        if self.winfo_exists():
+            try:
+                self.status_label.config(text="Procesando...")
+                self.update_idletasks()
+            except Exception:
+                pass
+        threading.Thread(target=self._process_pdf_thread, daemon=True).start()
+
+    def _process_pdf_thread(self):
+        try:
+            pdf_path = Path(self.pdf_path.get())
+            template_path = Path(self.template_path.get())
+            output_dir = Path(self.output_path.get())
+
+            # Punto 1: Inicio del procesamiento
+            logger.debug(f"Iniciando procesamiento de PDF: {pdf_path}")
+            
+            cached_result = self.cache_manager.check_cache(pdf_path)
+            if cached_result:
+                logger.info(f"Archivo encontrado en caché: {pdf_path.name}")
+                self.log_message(f"Archivo ya procesado: {pdf_path.name}")
+                self.log_message(f"Documento: {cached_result['remision']}")
+                self.log_message(f"Control: {cached_result['control']}")
+                self.stats["cached"] += 1
+                self.last_generated_doc = cached_result['remision']
+                if self.winfo_exists():
+                    try:
+                        self.send_whatsapp_btn.config(state=NORMAL)
+                        self.send_email_btn.config(state=NORMAL)
+                        if not hasattr(self, '_cache_msg_shown'):
+                            self._cache_msg_shown = True
+                            if messagebox.askyesno("Archivo en caché", "¿Desea abrir el documento de remisión generado?"):
+                                pass
+                    except Exception as e:
+                        logger.error(f"Error en interfaz de caché: {str(e)}", exc_info=True)
+                return
+
+            # Punto 2: Antes de extraer datos
+            logger.debug(f"Extrayendo datos de {pdf_path.name}")
+            self.log_message(f"Extrayendo datos de {pdf_path.name}...")
+            data = self.pdf_processor.extract_pdf_data(pdf_path)
+            
+            # Forzar la afiliación basada en la selección de la GUI
+            # Esto corrige los casos donde el PDF tiene información de la IPS en lugar de la empresa.
+            empresa_seleccionada = self.empresa.get()
+            data["Afiliación"] = empresa_seleccionada
+            logger.info(f"Afiliación forzada a '{empresa_seleccionada}' según la selección en la interfaz.")
+            self.log_message(f"Afiliación establecida a '{empresa_seleccionada}'.")
+
+            if self.winfo_exists():
+                try:
+                    self._display_extracted_data(data)
+                except Exception as e:
+                    logger.error(f"Error al mostrar datos extraídos: {str(e)}", exc_info=True)
+            
+            self.extracted_data = data
+
+            # La comprobación de conflicto de rutas ya no es necesaria si siempre forzamos la afiliación
+            # empresa_rutas = Config.get_empresa_paths(data.get('Afiliación', ''))
+            # ... (código de conflicto eliminado)
+            empresa_rutas = Config.RUTAS[empresa_seleccionada]
+
+            # Punto 3: Generación de documento
+            logger.info("Generando documento de remisión")
+            self.log_message("Generando documento de remisión...")
+            doc_path = self.doc_generator.generate_remision(data, template_path, output_dir)
+
+            control_path = empresa_rutas["control"]
+            logger.info("Actualizando archivo de control")
+            self.log_message("Actualizando archivo de control...")
+            excel_path = self.excel_handler.update_control_file(data, control_path)
+
+            self.cache_manager.update_cache(pdf_path, {
+                "remision": doc_path,
+                "control": excel_path
+            })
+            logger.debug(f"Cache actualizado para {pdf_path.name}")
+
+            # Punto 4: Proceso completado
+            logger.info(f"Proceso completado. Documento: {doc_path}, Control: {excel_path}")
+            self.log_message("¡Proceso completado exitosamente!")
+            self.log_message(f"Documento generado: {doc_path}")
+            self.log_message(f"Archivo de control actualizado: {excel_path}")
+            self.stats["processed"] += 1
+            self.last_generated_doc = doc_path
+            
+            if self.winfo_exists():
+                try:
+                    self.send_whatsapp_btn.config(state=NORMAL)
+                    self.send_email_btn.config(state=NORMAL)
+                    if not hasattr(self, '_done_msg_shown'):
+                        self._done_msg_shown = True
+                        if messagebox.askyesno("Proceso completado", "¿Desea abrir el documento de remisión generado?"):
+                            pass
+                except Exception as e:
+                    logger.error(f"Error en interfaz post-proceso: {str(e)}", exc_info=True)
+
+        except PermissionError as e:
+            error_msg = str(e)
+            logger.critical(f"Error de permisos: {error_msg}")
+            self.log_message(error_msg, error=True)
+            if self.winfo_exists():
+                try:
+                    messagebox.showerror("Error", error_msg)
+                except Exception:
+                    pass
+            self.stats["errors"] += 1
+        except ValueError as e:
+            error_msg = str(e)
+            logger.error(f"Error de valor: {error_msg}")
+            self.log_message(error_msg, error=True)
+            if self.winfo_exists():
+                try:
+                    messagebox.showerror("Error", error_msg)
+                except Exception:
+                    pass
+            self.stats["errors"] += 1
+        except Exception as e:
+            error_msg = f"Error inesperado al procesar el archivo: {str(e)}\n{traceback.format_exc()}"
+            logger.critical(f"Error inesperado: {error_msg}", exc_info=True)
+            self.log_message(error_msg, error=True)
+            if self.winfo_exists():
+                try:
+                    messagebox.showerror("Error", f"Error inesperado: {str(e)}")
+                except Exception:
+                    pass
+            self.stats["errors"] += 1
+        finally:
+            self.processing.set(False)
+            logger.debug("Proceso finalizado, reiniciando estado")
+            if self.winfo_exists():
+                try:
+                    self.status_label.config(text="Listo")
+                except Exception:
+                    pass
+
+    def _get_contact_info(self, empresa, cedula):
+        """
+        Busca el teléfono y correo del personal de forma unificada, 
+        seleccionando el archivo Excel correcto según la empresa.
+        """
+        try:
+            cedula = str(cedula).strip()
+            empresa = empresa.upper()
+            self.log_message(f"Iniciando búsqueda de contacto para Cédula: '{cedula}', Empresa: '{empresa}'")
+
+            import pandas as pd
+            import os
+            import logging
+            import traceback
+
+            # 1. Determinar la ruta del Excel y el nombre de la hoja
+            if empresa in ["TEMPOACTIVA", "TEMPOSUM", "ASEPLUS"]:
+                excel_path = "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\Base de Datos Personal Temporales.xlsx"
+                sheet_name = "COMPLETO"
+            elif empresa == "ASEL":
+                excel_path = "G:/Mi unidad/2. Trabajo/1. SG-SST/19. Asel S.A.S/Formato - Base de datos personal ASEL.xlsx"
+                sheet_name = "FORMATO"
+            else:
+                self.log_message(f"Empresa '{empresa}' no reconocida para búsqueda de contactos.", error=True)
+                return None, None
+
+            self.log_message(f"Usando archivo: {excel_path}, Hoja: {sheet_name}")
+
+            # 2. Leer el archivo Excel
+            if not os.path.exists(excel_path):
+                self.log_message(f"El archivo Excel no existe en la ruta: {excel_path}", error=True)
+                return None, None
+
+            df = pd.read_excel(excel_path, sheet_name=sheet_name, dtype=str)
+
+            # 3. Encontrar columnas de forma segura y estandarizada
+            cedula_col = next((col for col in df.columns if 'CEDULA' in str(col).upper() or 'IDENTIFICACIÓN' in str(col).upper()), None)
+            celular_col = next((col for col in df.columns if 'CELULAR' in str(col).upper() or 'TELÉFONO' in str(col).upper()), None)
+            email_col = next((col for col in df.columns if 'CORREO' in str(col).upper() or 'EMAIL' in str(col).upper()), None)
+
+            if not cedula_col:
+                self.log_message(f"No se encontró la columna de Cédula/Identificación en '{excel_path}'", error=True)
+                return None, None
+            if not celular_col:
+                self.log_message(f"No se encontró la columna de Celular/Teléfono en '{excel_path}'", error=True)
+                return None, None
+
+            self.log_message(f"Columnas a usar -> Cédula: '{cedula_col}', Celular: '{celular_col}', Email: '{email_col or 'No encontrada'}'")
+
+            # 4. Buscar la fila y extraer los datos
+            # Limpiar la columna de cédulas en el dataframe para una comparación más robusta
+            df[cedula_col] = df[cedula_col].astype(str).str.strip()
+            row = df[df[cedula_col] == cedula]
+
+            if not row.empty:
+                self.log_message(f"Cédula '{cedula}' encontrada en la fila de índice {row.index[0]}.")
+                phone = str(row.iloc[0][celular_col]).strip()
+                email = str(row.iloc[0][email_col]).strip() if email_col and pd.notna(row.iloc[0][email_col]) else None
+
+                if not phone or phone.lower() == 'nan':
+                    self.log_message(f"Teléfono no encontrado para la cédula {cedula}, pero se encontró el email: {email or 'Ninguno'}", error=True)
+                    return None, email
+                
+                phone = f"+57{phone}" if phone and not phone.startswith('+') else phone
+                self.log_message(f"Contacto encontrado -> Teléfono: {phone}, Email: {email or 'Ninguno'}")
+                return phone, email
+            else:
+                self.log_message(f"Cédula '{cedula}' NO encontrada en el archivo '{excel_path}'", error=True)
+                return None, None
+
+        except Exception as e:
+            self.log_message(f"Error crítico al obtener contacto: {str(e)}", error=True)
+            logging.error(traceback.format_exc()) # Log completo para depuración
+            return None, None
+
+    def _send_whatsapp(self):
+        if not self.last_generated_doc:
+            logger.error("Intento de enviar WhatsApp sin documento generado")
+            messagebox.showerror("Error", "No hay documento generado para enviar")
+            return
+
+        # Obtener datos relevantes
+        cedula = self.extracted_data.get('No. Identificación', 'N/A')
+        nombre = self.extracted_data.get('Nombre Completo', 'Trabajador')
+        fecha_atencion = self.extracted_data.get('Fecha de Atención', 'N/A')
+        afiliacion = self.extracted_data.get('Afiliación', self.empresa.get())
+
+        # Punto 1: Inicio del proceso
+        logger.info(f"Iniciando envío WhatsApp para {nombre} (Cédula: {cedula})")
+
+        # Construir mensaje estructurado
+        mensaje = f"""*Remisión EPS - {afiliacion}*
+
+    *Trabajador:* {nombre}
+    *Cédula:* {cedula}
+    *Fecha de atención:* {fecha_atencion}
+
+    Adjunto encontrará su documento de remisión EPS con las recomendaciones médicas.
+
+    Por favor:
+    1. Revise el documento adjunto ✅
+    2. Siga las indicaciones del profesional de salud ✅
+    3. Confirme recepción ✅
+
+    _Cualquier duda estamos disponibles para resolverla_"""
+
+        try:
+            # Punto 2: Antes de buscar información de contacto
+            logger.debug(f"Buscando contacto para cédula {cedula}")
+            phone, _ = self._get_contact_info(afiliacion, cedula)
+            
+            if not phone or phone == "nan":
+                logger.error(f"No se encontró teléfono para cédula {cedula}")
+                messagebox.showerror("Error", "No se encontró el número de teléfono")
+                return
+
+            # Punto 3: Antes de enviar el mensaje
+            logger.info(f"Preparando envío WhatsApp a {phone} (Documento: {self.last_generated_doc})")
+            
+            self.whatsapp_sender.send_message(
+                phone_number=phone,
+                message=mensaje,
+                file_path=self.last_generated_doc
+            )
+
+            # Punto 4: Envío exitoso
+            logger.info(f"WhatsApp enviado exitosamente a {phone} para {nombre}")
+
+        except Exception as e:
+            # Punto 5: Error en el proceso
+            logger.error(f"Error al enviar WhatsApp a {cedula}: {str(e)}", exc_info=True)
+            messagebox.showerror("Error", f"No se pudo enviar WhatsApp: {str(e)}")
+            self.log_message(f"Error en WhatsApp: {str(e)}", error=True)
+    def _send_email(self):
+        """Envía la remisión por correo electrónico usando la nueva clase EmailSender."""
+        if not self.last_generated_doc:
+            messagebox.showerror("Error", "No hay documento generado para enviar")
+            return
+
+        # Obtener datos relevantes
+        afiliacion = self.extracted_data.get('Afiliación', self.empresa.get())
+        cedula = self.extracted_data.get('No. Identificación', 'N/A')
+        nombre = self.extracted_data.get('Nombre Completo', 'Trabajador')
+        fecha_atencion = self.extracted_data.get('Fecha de Atención', 'N/A')
+
+        if not cedula or cedula == "N/A":
+            messagebox.showerror("Error", "No se encontró el número de identificación")
+            return
+
+        try:
+            # Crear instancia de EmailSender para la afiliación correspondiente
+            email_sender = EmailSender(afiliacion)
+            
+            # Obtener información de contacto del trabajador
+            telefono, email_destino = email_sender.obtener_contacto(cedula)
+            
+            if not email_destino:
+                messagebox.showerror("Error", "No se encontró el correo electrónico para este trabajador")
+                return
+
+            # Enviar el correo con el documento adjunto
+            if email_sender.enviar_correo(
+                destinatario=email_destino,
+                nombre=nombre,
+                fecha_atencion=fecha_atencion,
+                archivo_adjunto=self.last_generated_doc
+            ):
+                messagebox.showinfo("Éxito", "Correo enviado correctamente")
+                self.log_message(f"Correo enviado a {email_destino}")
+            else:
+                messagebox.showerror("Error", "No se pudo enviar el correo. Consulte los logs para más detalles.")
+                
+        except ValueError as e:
+            messagebox.showerror("Error", f"Error de configuración: {str(e)}")
+            self.log_message(f"Error en configuración de correo: {str(e)}", error=True)
+        except Exception as e:
+            messagebox.showerror("Error", f"Error inesperado: {str(e)}")
+            self.log_message(f"Error al enviar correo: {str(e)}", error=True)
+
+    def _display_extracted_data(self, data):
+        for widget in self.data_widgets.values():
+            for w in widget:
+                w.destroy()
+        self.data_widgets = {}
+
+        row = 0
+        for key, value in data.items():
+            if key in ['archivo_origen', 'fecha_procesamiento']:
+                continue
+            label = ttk.Label(self.scrolled_frame, text=f"{key}:", anchor=E)
+            label.grid(row=row, column=0, sticky=E, padx=5, pady=1)
+
+            if key in ['Recomendaciones Laborales', 'Restricciones Laborales', 'Motivo de Restricción']:
+                text = ttk.Text(self.scrolled_frame, height=2, width=50, wrap=WORD)
+                text.insert(END, value)
+                text.grid(row=row, column=1, sticky=W+E, padx=5, pady=1)
+                self.data_widgets[key] = [label, text]
+            else:
+                var = StringVar(value=value)
+                entry = ttk.Entry(self.scrolled_frame, textvariable=var, width=50)
+                entry.grid(row=row, column=1, sticky=W+E, padx=5, pady=1)
+                self.data_widgets[key] = [label, entry, var]
+            row += 1
+
+    def _clear_displayed_data(self):
+        # Solo destruir los widgets (Label, Entry, Text), no las StringVar
+        for widgets in self.data_widgets.values():
+            for widget in widgets:
+                if isinstance(widget, (ttk.Label, ttk.Entry, ttk.Text)):
+                    widget.destroy()
+        self.data_widgets = {}
+        self.results_text.delete(1.0, END)
+
+    def log_message(self, message, error=False):
+        timestamp = datetime.now().strftime('%H:%M:%S')
+        prefix = "[ERROR]" if error else "[INFO]"
+        formatted_message = f"{timestamp} {prefix} {message}\n"
+        
+        # Mostrar en la UI
+        self.results_text.insert(END, formatted_message)
+        self.results_text.see(END)
+        
+        # Usar el logger configurado
+        if error:
+            logger.error(message)
+        else:
+            logger.info(message)
+
+    def _batch_process(self):
+        folder = filedialog.askdirectory(
+            title="Seleccionar Carpeta con PDFs"
+        )
+        if not folder:
+            return
+        pdf_files = list(Path(folder).glob("*.pdf"))
+        if not pdf_files:
+            messagebox.showinfo("Información", "No se encontraron archivos PDF en la carpeta seleccionada")
+            return
+        if not messagebox.askyesno("Confirmar", f"¿Desea procesar {len(pdf_files)} archivos PDF?"):
+            return
+        self.processing.set(True)
+        self.status_label.config(text=f"Procesando lote de {len(pdf_files)} archivos...")
+        threading.Thread(target=self._batch_process_thread,
+                         args=(pdf_files,),
+                         daemon=True).start()
+
+    def _batch_process_thread(self, pdf_files):
+        total = len(pdf_files)
+        processed = 0
+        errors = 0
+        cached = 0
+        self.stats = {"processed": 0, "errors": 0, "cached": 0}
+
+        for i, pdf_path in enumerate(pdf_files):
+            try:
+                self.status_label.config(text=f"Procesando archivo {i+1} de {total}...")
+                self.log_message(f"Procesando {pdf_path.name} ({i+1}/{total})...")
+
+                cached_result = self.cache_manager.check_cache(pdf_path)
+                if cached_result:
+                    self.log_message(f"Archivo ya procesado: {pdf_path.name}")
+                    self.stats["cached"] += 1
+                    cached += 1
+                    continue
+
+                data = self.pdf_processor.extract_pdf_data(pdf_path)
+                empresa_rutas = Config.get_empresa_paths(data.get('Afiliación', ''))
+
+                doc_path = self.doc_generator.generate_remision(
+                    data,
+                    empresa_rutas["plantilla"],
+                    empresa_rutas["remisiones"]
+                )
+
+                excel_path = self.excel_handler.update_control_file(
+                    data,
+                    empresa_rutas["control"]
+                )
+
+                self.cache_manager.update_cache(pdf_path, {
+                    "remision": doc_path,
+                    "control": excel_path
+                })
+
+                self.log_message(f"Completado: {pdf_path.name}")
+                self.stats["processed"] += 1
+                processed += 1
+
+            except Exception as e:
+                error_msg = f"Error al procesar {pdf_path.name}: {str(e)}"
+                self.log_message(error_msg, error=True)
+                self.stats["errors"] += 1
+                errors += 1
+
+        self.status_label.config(text="Lote completado")
+        summary = (f"Procesamiento completado.\n"
+                   f"- Archivos procesados: {processed}\n"
+                   f"- Omitidos (en caché): {cached}\n"
+                   f"- Errores: {errors}\n"
+                   f"- Total: {total}")
+
+        self.log_message(summary)
+        messagebox.showinfo("Procesamiento completado", summary)
+        self.processing.set(False)
+        self.status_label.config(text="Listo")
+
+    def _sanitize_text(self, text):
+        """
+        Asegura que el texto tenga codificación UTF-8 válida.
+        Args:
+            text (str, bytes, any): Texto a sanitizar.
+        Returns:
+            str: Texto asegurado con codificación UTF-8.
+        """
+        try:
+            if isinstance(text, bytes):
+                return text.decode('utf-8', errors='replace')
+            elif isinstance(text, str):
+                return text.encode('utf-8', errors='replace').decode('utf-8')
+            else:
+                return str(text).encode('utf-8', errors='replace').decode('utf-8')
+        except Exception as e:
+            logging.error(f"Error al sanitizar texto: {str(e)}")
+            return str(text)
+
+def generate_remision_document(data, empresa):
+    """
+    Genera un documento de remisión a partir de los datos extraídos.
+    """
+    try:
+        log(f"Iniciando generación de documento para la empresa: {empresa}")
+        doc_generator = DocumentGenerator()
+        excel_handler = ExcelHandler()
+        
+        empresa_rutas = Config.get_empresa_paths(empresa)
+        log(f"Rutas obtenidas para {empresa}: {empresa_rutas}")
+        
+        template_path = empresa_rutas["plantilla"]
+        output_dir = empresa_rutas["remisiones"]
+        
+        log(f"Usando plantilla: {template_path}")
+        doc_path = doc_generator.generate_remision(data, template_path, output_dir)
+        log(f"Documento de remisión generado en: {doc_path}")
+        
+        control_path = empresa_rutas["control"]
+        log(f"Actualizando archivo de control: {control_path}")
+        excel_path = excel_handler.update_control_file(data, control_path)
+        log(f"Archivo de control actualizado en: {excel_path}")
+        
+        return {
+            "success": True,
+            "documentPath": doc_path,
+            "controlPath": excel_path
+        }
+    except Exception as e:
+        log(f"Error al generar documento de remisión: {str(e)}", level='ERROR')
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+def send_remision_by_email(doc_path, data, empresa):
+    """
+    Envía un documento de remisión por correo electrónico.
+    """
+    try:
+        log(f"Iniciando envío de email para la empresa {empresa} con el documento {doc_path}")
+        email_sender = EmailSender(empresa)
+        
+        cedula = data.get('No_Identificacion', '')
+        nombre = data.get('Nombre_Completo', 'Trabajador')
+        fecha_atencion = data.get('Fecha_Atencion', '')
+        
+        if not cedula:
+            raise ValueError("No se encontró el número de identificación en los datos para el email")
+            
+        log(f"Buscando contacto de email para la cédula: {cedula}")
+        telefono, email_destino = email_sender.obtener_contacto(cedula)
+        
+        if not email_destino:
+            raise ValueError(f"No se encontró el correo electrónico para la cédula {cedula}")
+        
+        log(f"Contacto de email encontrado: {email_destino}. Procediendo a enviar.")
+        success = email_sender.enviar_correo(
+            destinatario=email_destino,
+            nombre=nombre,
+            fecha_atencion=fecha_atencion,
+            archivo_adjunto=doc_path
+        )
+        
+        if success:
+            log("Correo enviado exitosamente.")
+            return {"success": True, "message": "Correo enviado exitosamente"}
+        else:
+            raise RuntimeError("La función enviar_correo de EmailSender retornó False.")
+
+    except Exception as e:
+        log(f"Error al enviar correo: {str(e)}", level='ERROR')
+        return {"success": False, "error": str(e)}
+
+def send_remision_by_whatsapp(doc_path, data, empresa):
+    """
+    Prepara el envío de un documento de remisión por WhatsApp.
+    """
+    try:
+        log(f"Iniciando preparación de WhatsApp para la empresa {empresa} con el documento {doc_path}")
+        whatsapp_sender = WhatsAppSender()
+        
+        cedula = data.get('No_Identificacion', '')
+        nombre = data.get('Nombre_Completo', 'Trabajador')
+        fecha_atencion = data.get('Fecha_Atencion', '')
+        afiliacion = data.get('Afiliacion', empresa)
+        
+        if not cedula:
+            raise ValueError("No se encontró el número de identificación en los datos para WhatsApp")
+
+        empresa_normalizada = afiliacion.upper().strip()
+        log(f"Buscando contacto de WhatsApp para la cédula: {cedula} en la empresa normalizada: {empresa_normalizada}")
+        
+        # Usar la clase EmailSender para obtener el contacto, ya que centraliza la lógica
+        contact_finder = EmailSender(empresa_normalizada)
+        phone, _ = contact_finder.obtener_contacto(cedula)
+        
+        if not phone or phone == "nan":
+            raise ValueError(f"No se encontró el número de teléfono para la cédula {cedula}")
+            
+        log(f"Teléfono encontrado: {phone}. Construyendo mensaje.")
+        mensaje = f"""*Remisión EPS - {afiliacion}*
+
+*Trabajador:* {nombre}
+*Cédula:* {cedula}
+*Fecha de atención:* {fecha_atencion}
+
+Adjunto encontrará su documento de remisión EPS con las recomendaciones médicas.
+
+Por favor:
+1. Revise el documento adjunto ✅
+2. Siga las indicaciones del profesional de salud ✅
+3. Confirme recepción ✅
+
+_Cualquier duda estamos disponibles para resolverla_"""
+        
+        whatsapp_sender.send_message(
+            phone_number=phone,
+            message=mensaje,
+            file_path=doc_path
+        )
+        
+        log("Se ha abierto la URL de WhatsApp y la carpeta del archivo.")
+        return {
+            "success": True,
+            "message": "Se abrirá WhatsApp Web con el mensaje preparado"
+        }
+    except Exception as e:
+        log(f"Error al preparar WhatsApp: {str(e)}", level='ERROR')
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+def log(message, level='INFO'):
+    """Envía un log estructurado a stdout y también al logger de archivo."""
+    # Imprimir para que Electron lo capture
+    print(json.dumps({'type': 'log', 'level': level, 'message': message}))
+    # Registrar en el archivo de log de Python
+    if level == 'ERROR':
+        logger.error(message)
+    elif level == 'WARN':
+        logger.warning(message)
+    else:
+        logger.info(message)
+
 if __name__ == "__main__":
     import sys
     import json
     
+    # Redirigir el logger de Python a stdout para que Electron lo capture todo
+    # Esto es útil para logs de librerías de terceros
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    # Descomentar la siguiente línea para una depuración muy detallada:
+    # logger.addHandler(stream_handler)
+
     if len(sys.argv) > 2:
         command = sys.argv[1]
         data_file = sys.argv[2]
+        result = {}
         
-        # Cargar datos desde archivo temporal
-        with open(data_file, 'r', encoding='utf-8') as f:
-            temp_data = json.load(f)
+        try:
+            log(f"Comando '{command}' recibido con el archivo de datos: {data_file}")
+            with open(data_file, 'r', encoding='utf-8') as f:
+                temp_data = json.load(f)
+            
+            if command == "--generate-remision":
+                result = generate_remision_document(temp_data['data'], temp_data['empresa'])
+            elif command == "--send-email":
+                result = send_remision_by_email(
+                    temp_data['docPath'], 
+                    temp_data['data'], 
+                    temp_data['empresa']
+                )
+            elif command == "--send-whatsapp":
+                result = send_remision_by_whatsapp(
+                    temp_data['docPath'], 
+                    temp_data['data'], 
+                    temp_data['empresa']
+                )
+            else:
+                result = {"success": False, "error": "Comando no reconocido"}
+
+        except Exception as e:
+            log(f"Error crítico en la ejecución del script: {str(e)}", level='ERROR')
+            result = {"success": False, "error": str(e), "traceback": traceback.format_exc()}
         
-        if command == "--generate-remision":
-            result = generate_remision_document(temp_data['data'], temp_data['empresa'])
-            print(json.dumps(result, ensure_ascii=False))
-        elif command == "--send-email":
-            result = send_remision_by_email(
-                temp_data['docPath'], 
-                temp_data['data'], 
-                temp_data['empresa']
-            )
-            print(json.dumps(result, ensure_ascii=False))
-        elif command == "--send-whatsapp":
-            result = send_remision_by_whatsapp(
-                temp_data['docPath'], 
-                temp_data['data'], 
-                temp_data['empresa']
-            )
-            print(json.dumps(result, ensure_ascii=False))
-        else:
-            print(json.dumps({"success": False, "error": "Comando no reconocido"}))
+        # Imprimir el resultado final
+        final_output = {'type': 'result', 'payload': result}
+        print(json.dumps(final_output, ensure_ascii=False))
+
     else:
         # Comportamiento normal de la aplicación GUI
+        log("Iniciando en modo de interfaz gráfica (GUI).")
+        app = RemisionesApp()
+        app.mainloop()
+
+        # Procesamiento del DataFrame
+        if 'Fecha_Atencion' in df.columns:
+            df['Fecha_Atencion'] = pd.to_datetime(df['Fecha_Atencion'], format='%Y/%m/%d', errors='coerce')
+
+        if 'Item' in df.columns and not df['Item'].isnull().all():
+            max_item = df['Item'].dropna().astype(int).max()
+            new_item = max_item + 1
+        else:
+            new_item = 1
+
+        data_id = str(data['No_Identificacion']).strip()
+        same_person = (df['No_Identificacion'] == data_id) & (df['Fecha_Atencion'] == data_date)
+
+        new_row_data = {'Item': new_item}
+        new_row_data.update({col: data.get(col, '') for col in Config.COLUMNAS_CONTROL if col != 'Item'})
+        new_row_data['No. Identificación'] = str(new_row_data['No. Identificación']).replace('.0', '')
+
+        if same_person.any():
+            idx = df[same_person].index[0]
+            for col, value in new_row_data.items():
+                if col in data and data[col]:
+                    # Cast value to match column dtype
+                    if col == 'Edad' and value:
+                        try:
+                            value = int(value)  # Convert to int for Edad
+                        except (ValueError, TypeError):
+                            value = pd.NA
+                    elif df[col].dtype in ['int64', 'float64'] and value:
+                        try:
+                            value = pd.to_numeric(value, errors='coerce')  # Convert to numeric if column is numeric
+                            if pd.isna(value):
+                                value = pd.NA
+                        except (ValueError, TypeError):
+                            value = pd.NA
+                    elif df[col].dtype == 'object':
+                        value = str(value)  # Ensure string for object columns
+                    df.loc[idx, col] = value
+            action = "actualizado"
+            row_number = idx + header_row + 2
+        else:
+            new_row = pd.Series(new_row_data)
+            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+            row_number = len(df) + header_row + 1
+            action = f"añadido en la fila {row_number}"
+
+        with pd.ExcelWriter(control_path, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, header=True, startrow=header_row)
+            logging.info(f"Archivo de control {action}: {control_path}")
+
+        return str(control_path)
+
+    except Exception as e:
+        logging.error(f"Error al actualizar archivo de control: {str(e)}")
+        logging.debug(traceback.format_exc())
+        raise
+
+# Clase DocumentGenerator para generar documentos Word
+class DocumentGenerator:
+    def generate_remision(self, data, template_path, output_dir):
+        try:
+            template_path = Path(template_path)
+            if not template_path.exists():
+                raise FileNotFoundError(f"Plantilla no encontrada: {template_path}")
+
+            if template_path.suffix.lower() not in ['.doc', '.docx']:
+                raise ValueError(f"La plantilla debe ser un archivo .doc o .docx: {template_path}")
+
+            doc = DocxTemplate(template_path)
+            context = {
+                'fecha': datetime.now().strftime('%d/%m/%Y'),
+                'nombre_destinatario': data.get('Nombre_Completo', 'N/A'),
+                'cc': data.get('No_Identificacion', 'N/A'),
+                'cargo': data.get('Cargo', 'N/A'),
+                'evaluacion_ocupacional': data.get('Evaluacion_Ocupacional', 'N/A'),
+                'recomendaciones_laborales': data.get('Recomendaciones_Laborales', 'N/A')
+            }
+
+            for key, value in context.items():
+                if value == 'N/A' and key in ['nombre_destinatario', 'cc', 'evaluación_ocupacional', 'recomendaciones_laborales']:
+                    context[key] = "Información no disponible"
+
+            doc.render(context)
+
+            output_dir = Path(output_dir)
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            fecha = datetime.now().strftime('%Y%m%d')
+            nombre_sanitizado = self._sanitize_filename(data.get('Nombre Completo', 'sin_nombre'))
+            output_path = output_dir / f"GI-OD-007 REMISION A EPS {nombre_sanitizado} {fecha}.docx"
+
+            counter = 1
+            while output_path.exists():
+                output_path = output_dir / f"GI-OD-007 REMISION A EPS {nombre_sanitizado} {fecha}_{counter}.docx"
+                counter += 1
+
+            doc.save(output_path)
+            logging.info(f"Documento creado: {output_path}")
+            return str(output_path)
+
+        except Exception as e:
+            logging.error(f"Error en generate_remision: {str(e)}")
+            logging.debug(traceback.format_exc())
+            raise
+
+    def _sanitize_filename(self, filename):
+        if not filename:
+            return "sin_nombre"
+        valid_filename = re.sub(r'[<>:"/\\\\|?*]', '_', filename)
+        valid_filename = valid_filename.replace(' ', '_')
+        valid_filename = ''.join(c for c in unicodedata.normalize('NFD', valid_filename)
+                                 if unicodedata.category(c) != 'Mn')
+        return valid_filename
+
+# Clase CacheManager para gestionar caché
+class CacheManager:
+    def __init__(self, cache_file=None):
+        self.cache_file = cache_file or Config.CACHE_FILE
+        self._load_cache()
+
+    def _load_cache(self):
+        try:
+            cache_path = Path(self.cache_file)
+            if cache_path.exists():
+                with open(cache_path, "r", encoding="utf-8") as f:
+                    self.cache = json.load(f)
+                logging.info(f"Caché cargada desde {self.cache_file}")
+            else:
+                self.cache = {}
+                logging.info("Caché inicializada (nueva, archivo no encontrado)")
+        except Exception as e:
+            logging.error(f"Error al cargar caché: {str(e)}")
+            self.cache = {}
+
+    def _save_cache(self):
+        try:
+            with open(self.cache_file, "w") as f:
+                json.dump(self.cache, f, indent=2)
+            logging.info(f"Caché guardada en {self.cache_file}")
+        except Exception as e:
+            logging.error(f"Error al guardar caché: {str(e)}")
+
+    def check_cache(self, pdf_path):
+        pdf_hash = self._get_file_hash(pdf_path)
+        if pdf_hash in self.cache:
+            logging.info(f"Archivo encontrado en caché: {pdf_path}")
+            return self.cache[pdf_hash]
+        logging.info(f"Archivo no encontrado en caché: {pdf_path}")
+        return None
+
+    def update_cache(self, pdf_path, output_paths):
+        pdf_hash = self._get_file_hash(pdf_path)
+        self.cache[pdf_hash] = output_paths
+        self._save_cache()
+        logging.info(f"Caché actualizada para {pdf_path}")
+
+    def _get_file_hash(self, file_path):
+        try:
+            import hashlib
+            file_path = Path(file_path)
+            stats = file_path.stat()
+            unique_id = f"{file_path}|{stats.st_size}|{stats.st_mtime}"
+            with open(file_path, "rb") as f:
+                file_hash = hashlib.md5(f.read()).hexdigest()
+            return f"{file_hash}|{unique_id}"
+        except Exception as e:
+            logging.error(f"Error al generar hash para {file_path}: {str(e)}")
+            return str(file_path)
+
+    def remove_from_cache(self, pdf_path):
+        pdf_hash = self._get_file_hash(pdf_path)
+        if pdf_hash in self.cache:
+            del self.cache[pdf_hash]
+            self._save_cache()
+            logging.info(f"Archivo {pdf_path} eliminado del caché")
+
+class WhatsAppSender:
+    def send_message(self, phone_number, message, file_path=None):
+        try:
+            # Copiar el mensaje al portapapeles
+            pyperclip.copy(message)
+            logging.info("Mensaje copiado al portapapeles.")
+
+            # Codificar el mensaje para URL
+            encoded_message = quote(message)
+            url = f"https://api.whatsapp.com/send?phone={phone_number}&text={encoded_message}" #si quieres que se abra en el navegador cambia api a web.
+            
+            webbrowser.open(url)
+
+                        # Abrir el archivo en el navegador para facilitar el adjunto
+            if file_path and Path(file_path).exists():
+                os.startfile(file_path)
+
+                # 2. Abrir carpeta contenedora del archivo automáticamente
+                folder_path = os.path.dirname(file_path)
+                os.startfile(folder_path)  # Windows
+                # Para Linux/Mac: os.system(f'open "{folder_path}"')
+
+            logging.info(f"Mensaje de WhatsApp enviado a y carpeta de archivo abierto para {phone_number}")
+        except Exception as e:
+            logging.error(f"Error al enviar WhatsApp: {str(e)}")
+            raise
+
+# Clase EmailSender para enviar correos electrónicos
+
+class EmailSender:
+    """Clase para enviar correos electrónicos con plantillas personalizadas y adjuntos."""
+    
+    # Plantillas de email por tipo de empresa
+    PLANTILLAS = {
+        "TEMPOACTIVA": {
+            "asunto": "Seguimiento a Recomendaciones Médicas Laborales",
+            "cuerpo": """Estimado/a {nombre},
+Conforme al resultado del examen médico ocupacional realizado el día {fecha}, te compartimos la carta de remisiones médicas, en la cual se detallan recomendaciones específicas relacionadas con tu estado de salud y tu actividad laboral.
+
+📎 Adjunto encontrarás el documento oficial con las recomendaciones.
+
+Te solicitamos por favor:
+
+✅ Leer atentamente las recomendaciones.  
+✅ Confirmar la recepción de este mensaje y del documento.  
+✅ Informarnos si ya estás realizando los controles médicos indicados (si aplica).   
+
+Estas recomendaciones serán tenidas en cuenta por el área de Seguridad y Salud en el Trabajo para realizar el seguimiento correspondiente y tomar las acciones necesarias en el marco del Sistema de Gestión SST, tal como lo establece la Resolución 0312 de 2019 y el Decreto 1072 de 2015.
+
+Tu salud es una prioridad para nosotros, y el cumplimiento de estas recomendaciones ayuda a prevenir posibles afectaciones laborales.
+
+Si tienes alguna duda, estamos atentos para aclararla.
+
+Saludos cordiales,
+Atentamente,
+Equipo {empresa}
+Correo: {remitente}"""
+        },
+        "TEMPOSUM": {
+            "asunto": "Seguimiento a Recomendaciones Médicas Laborales",
+            "cuerpo": """Estimado/a {nombre},
+Conforme al resultado del examen médico ocupacional realizado el día {fecha}, te compartimos la carta de remisiones médicas, en la cual se detallan recomendaciones específicas relacionadas con tu estado de salud y tu actividad laboral.
+
+📎 Adjunto encontrarás el documento oficial con las recomendaciones.
+
+Te solicitamos por favor:
+
+✅ Leer atentamente las recomendaciones.  
+✅ Confirmar la recepción de este mensaje y del documento.  
+✅ Informarnos si ya estás realizando los controles médicos indicados (si aplica).   
+
+Estas recomendaciones serán tenidas en cuenta por el área de Seguridad y Salud en el Trabajo para realizar el seguimiento correspondiente y tomar las acciones necesarias en el marco del Sistema de Gestión SST, tal como lo establece la Resolución 0312 de 2019 y el Decreto 1072 de 2015.
+
+Tu salud es una prioridad para nosotros, y el cumplimiento de estas recomendaciones ayuda a prevenir posibles afectaciones laborales.
+
+Si tienes alguna duda, estamos atentos para aclararla.
+
+Saludos cordiales,
+Atentamente,
+Equipo {empresa}
+Correo: {remitente}"""
+        },
+        "ASEPLUS": {
+            "asunto": "Seguimiento a Recomendaciones Médicas Laborales",
+            "cuerpo": """Estimado/a {nombre},
+Conforme al resultado del examen médico ocupacional realizado el día {fecha}, te compartimos la carta de remisiones médicas, en la cual se detallan recomendaciones específicas relacionadas con tu estado de salud y tu actividad laboral.
+
+📎 Adjunto encontrarás el documento oficial con las recomendaciones.
+
+Te solicitamos por favor:
+
+✅ Leer atentamente las recomendaciones.  
+✅ Confirmar la recepción de este mensaje y del documento.  
+✅ Informarnos si ya estás realizando los controles médicos indicados (si aplica).   
+
+Estas recomendaciones serán tenidas en cuenta por el área de Seguridad y Salud en el Trabajo para realizar el seguimiento correspondiente y tomar las acciones necesarias en el marco del Sistema de Gestión SST, tal como lo establece la Resolución 0312 de 2019 y el Decreto 1072 de 2015.
+
+Tu salud es una prioridad para nosotros, y el cumplimiento de estas recomendaciones ayuda a prevenir posibles afectaciones laborales.
+
+Si tienes alguna duda, estamos atentos para aclararla.
+
+Saludos cordiales,
+Atentamente,
+Equipo {empresa}
+Correo: {remitente}"""
+        },
+        "ASEL": {
+            "asunto": "Seguimiento a Recomendaciones Médicas Laborales",
+            "cuerpo": """Estimado/a {nombre},
+Conforme al resultado del examen médico ocupacional realizado el día {fecha}, te compartimos la carta de remisiones médicas, en la cual se detallan recomendaciones específicas relacionadas con tu estado de salud y tu actividad laboral.
+
+📎 Adjunto encontrarás el documento oficial con las recomendaciones.
+
+Te solicitamos por favor:
+
+✅ Leer atentamente las recomendaciones.  
+✅ Confirmar la recepción de este mensaje y del documento.  
+✅ Informarnos si ya estás realizando los controles médicos indicados (si aplica).   
+
+Estas recomendaciones serán tenidas en cuenta por el área de Seguridad y Salud en el Trabajo para realizar el seguimiento correspondiente y tomar las acciones necesarias en el marco del Sistema de Gestión SST, tal como lo establece la Resolución 0312 de 2019 y el Decreto 1072 de 2015.
+
+Tu salud es una prioridad para nosotros, y el cumplimiento de estas recomendaciones ayuda a prevenir posibles afectaciones laborales.
+
+Si tienes alguna duda, estamos atentos para aclararla.
+
+Atentamente,
+Equipo ASEL
+Correo: {remitente}"""
+        },
+        "DEFAULT": {
+            "asunto": "Documento de Remisión EPS",
+            "cuerpo": """Estimado/a {nombre},
+Adjunto encontrarás tu documento de remisión EPS.
+Atentamente,
+Equipo {empresa}
+Correo: {remitente}"""
+        }
+    }
+
+    # Rutas a las bases de datos de personal
+    BASES_DATOS = {
+        "TEMPOACTIVA": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\Base de Datos Personal Temporales.xlsx",
+        "TEMPOSUM": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\Base de Datos Personal Temporales.xlsx",
+        "ASEPLUS": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\Base de Datos Personal Temporales.xlsx",
+        "ASEL": "G:/Mi unidad/2. Trabajo/1. SG-SST/19. Asel S.A.S/Formato - Base de datos personal ASEL.xlsx"
+    }
+
+    # Credenciales de correo por empresa
+    CREDENCIALES = {
+        "TEMPOACTIVA": {"email": "tempoactivaestsas@gmail.com", "password": "pxfu wxit wpjf svxd"},
+        "TEMPOSUM": {"email": "temposumestsas@gmail.com", "password": "bcfw rzxh ksob ddns"},
+        "ASEPLUS": {"email": "asepluscaribesas@gmail.com", "password": "yudh myrl zjpk eoej"},
+        "ASEL": {"email": "asel.contratacion@gmail.com", "password": "kdyh degt juwf tuqd"}
+    }
+
+    def __init__(self, empresa):
+        """
+        Inicializa el enviador de correos para una empresa específica.
+        
+        Args:
+            empresa (str): Nombre de la empresa (TEMPOACTIVA, TEMPOSUM, etc.)
+        """
+        self.empresa = empresa.upper()
+        self.credenciales = self.CREDENCIALES.get(self.empresa)
+        self.plantilla = self.PLANTILLAS.get(self.empresa, self.PLANTILLAS["DEFAULT"])
+        self.base_datos = self.BASES_DATOS.get(self.empresa)
+        
+        if not self.credenciales:
+            raise ValueError(f"No hay credenciales configuradas para {self.empresa}")
+        
+        self.logger = logging.getLogger("EmailSender")
+
+    def obtener_contacto(self, cedula):
+        """
+        Obtiene la información de contacto de un trabajador desde la base de datos.
+        
+        Args:
+            cedula (str): Número de identificación del trabajador
+            
+        Returns:
+            tuple: (telefono, email) o (None, None) si no se encuentra
+        """
+        try:
+            if not self.base_datos or not Path(self.base_datos).exists():
+                self.logger.warning(f"Base de datos no encontrada: {self.base_datos}")
+                return None, None
+                
+            df = pd.read_excel(
+                self.base_datos,
+                sheet_name="FORMATO" if self.empresa == "ASEL" else "COMPLETO",
+                dtype=str
+            )
+            
+            # Buscar columnas relevantes
+            col_cedula = next((col for col in df.columns if 'CEDULA' in col.upper() or 'IDENTIFICACIÓN' in col.upper()), None)
+            col_celular = next((col for col in df.columns if 'CELULAR' in col.upper() or 'TELÉFONO' in col.upper()), None)
+            col_email = next((col for col in df.columns if 'CORREO' in col.upper() or 'EMAIL' in col.upper()), None)
+            
+            if not col_cedula or not col_celular:
+                self.logger.error("Columnas críticas no encontradas en la base de datos")
+                return None, None
+                
+            # Buscar el registro
+            registro = df[df[col_cedula].astype(str).str.strip() == str(cedula).strip()]
+            
+            if not registro.empty:
+                telefono = registro.iloc[0][col_celular]
+                email = registro.iloc[0][col_email] if col_email else None
+                return telefono, email
+                
+            return None, None
+        except Exception as e:
+            self.logger.error(f"Error al obtener contacto: {str(e)}")
+            return None, None
+
+    def enviar_correo(self, destinatario, nombre, fecha_atencion, archivo_adjunto):
+        """
+        Envía un correo electrónico con un documento adjunto.
+        
+        Args:
+            destinatario (str): Correo electrónico del destinatario
+            nombre (str): Nombre del trabajador
+            fecha_atencion (str): Fecha de atención médica
+            archivo_adjunto (str): Ruta al archivo a adjuntar
+            
+        Returns:
+            bool: True si el envío fue exitoso, False en caso contrario
+        """
+        try:
+            # Validación básica de parámetros
+            if not all([destinatario, nombre, fecha_atencion, archivo_adjunto]):
+                raise ValueError("Faltan parámetros requeridos para enviar el correo")
+                
+            if not Path(archivo_adjunto).exists():
+                raise FileNotFoundError(f"Archivo adjunto no encontrado: {archivo_adjunto}")
+
+            # Construir mensaje personalizado
+            asunto = self.plantilla["asunto"]
+            cuerpo = self.plantilla["cuerpo"].format(
+                nombre=nombre,
+                fecha=fecha_atencion,
+                empresa=self.empresa,
+                remitente=self.credenciales["email"]
+            )
+
+            # Configurar mensaje MIME
+            msg = MIMEMultipart()
+            # Encode both the empresa name and email address to handle non-ASCII characters
+            encoded_empresa = Header(self.empresa, 'utf-8').encode()
+            email_address = self.credenciales["email"].encode('ascii', errors='ignore').decode('ascii')
+            msg['From'] = formataddr((encoded_empresa, email_address))
+            msg['To'] = destinatario
+            msg['Subject'] = Header(asunto, 'utf-8').encode()
+            msg.attach(MIMEText(cuerpo, 'plain', 'utf-8'))
+
+            # Adjuntar documento
+            with open(archivo_adjunto, "rb") as adjunto:
+                parte = MIMEBase('application', 'octet-stream')
+                parte.set_payload(adjunto.read())
+                encoders.encode_base64(parte)
+                nombre_archivo = os.path.basename(archivo_adjunto)
+                parte.add_header(
+                    'Content-Disposition',
+                    f'attachment; filename="{Header(nombre_archivo, "utf-8").encode()}"'
+                )
+                msg.attach(parte)
+
+            # Enviar correo usando SMTP
+            with smtplib.SMTP('smtp.gmail.com', 587) as servidor:
+                servidor.starttls()
+                servidor.login(self.credenciales["email"], self.credenciales["password"])
+                servidor.send_message(msg)
+                
+            self.logger.info(f"Correo enviado exitosamente a {destinatario}")
+            return True
+            
+        except smtplib.SMTPAuthenticationError:
+            self.logger.error("Error de autenticación: Credenciales inválidas")
+            return False
+        except smtplib.SMTPException as e:
+            self.logger.error(f"Error SMTP: {str(e)}")
+            return False
+        except Exception as e:
+            self.logger.error(f"Error inesperado: {str(e)}\n{traceback.format_exc()}")
+            return False
+
+# Clase principal de la aplicación
+class RemisionesApp(ttk.Window):
+    
+        
+    def __init__(self):
+        super().__init__(themename="flatly")
+        self.title("Sistema de Gestión de Remisiones EPS")
+        self.geometry("800x650")
+        
+        Config.load_from_file()
+        self.pdf_processor = PdfProcessor()
+        self.excel_handler = ExcelHandler()
+        self.doc_generator = DocumentGenerator()
+        self.cache_manager = CacheManager()
+        self.whatsapp_sender = WhatsAppSender()
+        # ELIMINADO: self.email_sender = ... 
+
+        self.pdf_path = StringVar()
+        self.template_path = StringVar(value=str(Config.RUTAS["TEMPOACTIVA"]["plantilla"]))
+        self.output_path = StringVar(value=str(Config.RUTAS["TEMPOACTIVA"]["remisiones"]))
+        self.processing = BooleanVar(value=False)
+        self.extracted_data = {}
+
+        self.empresa = StringVar(value="TEMPOACTIVA")
+        self.last_generated_doc = None
+
+        self._create_widgets()
+        self.stats = {"processed": 0, "errors": 0, "cached": 0}
+
+    def _create_widgets(self):
+        main_frame = ttk.Frame(self)
+        main_frame.grid(row=0, column=0, sticky=NSEW, padx=10, pady=10)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+
+        main_frame.grid_rowconfigure(0, weight=0)
+        main_frame.grid_rowconfigure(1, weight=0)
+        main_frame.grid_rowconfigure(2, weight=3)
+        main_frame.grid_rowconfigure(3, weight=1)
+        main_frame.grid_rowconfigure(4, weight=0)
+        main_frame.grid_columnconfigure(0, weight=1)
+
+        header_frame = ttk.Frame(main_frame)
+        header_frame.grid(row=0, column=0, sticky=EW, pady=5)
+        ttk.Label(header_frame, text="SISTEMA DE GESTIÓN DE REMISIONES EPS",
+                  font=("TkDefaultFont", 16, "bold")).pack(side=LEFT, padx=5)
+
+        file_frame = ttk.LabelFrame(main_frame, text="Selección de Archivos")
+        file_frame.grid(row=1, column=0, sticky=EW, pady=5)
+
+        pdf_row = ttk.Frame(file_frame)
+        pdf_row.pack(fill=X, pady=3)
+        ttk.Label(pdf_row, text="Archivo PDF:").pack(side=LEFT, padx=5)
+        ttk.Entry(pdf_row, textvariable=self.pdf_path, width=64).pack(side=LEFT, padx=5, fill=X, expand=YES)
+        ttk.Button(pdf_row, text="Buscar", command=self._browse_pdf).pack(side=LEFT, padx=5)
+        ttk.Button(pdf_row, text="Procesar", command=self._process_pdf, bootstyle=SUCCESS).pack(side=LEFT, padx=5)
+
+        template_row = ttk.Frame(file_frame)
+        template_row.pack(fill=X, pady=3)
+        ttk.Label(template_row, text="Plantilla:").pack(side=LEFT, padx=5)
+        ttk.Entry(template_row, textvariable=self.template_path, width=64).pack(side=LEFT, padx=5, fill=X, expand=YES)
+        ttk.Button(template_row, text="Buscar", command=self._browse_template).pack(side=LEFT, padx=5)
+
+        output_row = ttk.Frame(file_frame)
+        output_row.pack(fill=X, pady=3)
+        ttk.Label(output_row, text="Carpeta de salida:").pack(side=LEFT, padx=5)
+        ttk.Entry(output_row, textvariable=self.output_path, width=64).pack(side=LEFT, padx=5, fill=X, expand=YES)
+        ttk.Button(output_row, text="Buscar", command=self._browse_output).pack(side=LEFT, padx=5)
+
+        empresa_row = ttk.Frame(file_frame)
+        empresa_row.pack(fill=X, pady=3)
+        ttk.Label(empresa_row, text="Empresa:").pack(side=LEFT, padx=5)
+        empresa_combo = ttk.Combobox(empresa_row, textvariable=self.empresa,
+                                     values=list(Config.RUTAS.keys()), state="readonly")
+        empresa_combo.pack(side=LEFT, padx=5)
+        empresa_combo.bind('<<ComboboxSelected>>', self._update_paths)
+
+        send_buttons_row = ttk.Frame(file_frame)
+        send_buttons_row.pack(fill=X, pady=3)
+        self.send_whatsapp_btn = ttk.Button(send_buttons_row, text="Enviar por WhatsApp",
+                                            command=self._send_whatsapp, state=DISABLED, bootstyle=INFO)
+        self.send_whatsapp_btn.pack(side=LEFT, padx=5)
+        self.send_email_btn = ttk.Button(send_buttons_row, text="Enviar por Correo",
+                                         command=self._send_email, state=DISABLED, bootstyle=INFO)
+        self.send_email_btn.pack(side=LEFT, padx=5)
+
+        data_frame = ttk.LabelFrame(main_frame, text="Datos Extraídos")
+        data_frame.grid(row=2, column=0, sticky=NSEW, pady=5)
+        self.scrolled_frame = ScrolledFrame(data_frame, autohide=False)
+        self.scrolled_frame.pack(fill=BOTH, expand=YES, padx=5, pady=5)
+        self.scrolled_frame.container.config(height=200)
+
+        self.data_widgets = {}
+
+        results_frame = ttk.LabelFrame(main_frame, text="Resultados")
+        results_frame.grid(row=3, column=0, sticky=NSEW, pady=5)
+        self.results_text = ttk.Text(results_frame, height=4, width=64, wrap=WORD)
+        self.results_text.pack(fill=BOTH, expand=YES, padx=5, pady=3)
+
+        status_frame = ttk.Frame(main_frame)
+        status_frame.grid(row=5, column=0, sticky=EW, pady=5)
+        self.status_label = ttk.Label(status_frame, text="Listo")
+        self.status_label.pack(side=LEFT, padx=5)
+
+        batch_frame = ttk.LabelFrame(main_frame, text="Procesamiento en Lote")
+        batch_frame.grid(row=4, column=0, sticky=EW, pady=3)
+        ttk.Button(batch_frame, text="Procesar Carpeta",
+                   command=self._batch_process,
+                   bootstyle=WARNING).pack(padx=5, pady=3)
+
+    def _update_paths(self, event=None):
+        empresa = self.empresa.get()
+        if empresa in Config.RUTAS:
+            rutas = Config.RUTAS[empresa]
+            self.template_path.set(str(rutas["plantilla"]))
+            self.output_path.set(str(rutas["remisiones"]))
+            self.log_message(f"Rutas actualizadas para {empresa}")
+
+    def _browse_pdf(self):
+        file = filedialog.askopenfilename(
+            title="Seleccionar PDF",
+            filetypes=[("Archivos PDF", "*.pdf")]
+        )
+        if file:
+            self.cache_manager.remove_from_cache(file)
+            self.pdf_path.set(file)
+            self.log_message(f"Archivo seleccionado: {file}")
+            self._clear_displayed_data()
+            self.send_whatsapp_btn.config(state=DISABLED)
+            self.send_email_btn.config(state=DISABLED)
+
+    def _browse_template(self):
+        file = filedialog.askopenfilename(
+            title="Seleccionar Plantilla",
+            filetypes=[("Archivos Word", "*.doc;*.docx")]
+        )
+        if file:
+            self.template_path.set(file)
+            self.log_message(f"Plantilla seleccionada: {file}")
+
+    def _browse_output(self):
+        folder = filedialog.askdirectory(
+            title="Seleccionar Carpeta de Salida"
+        )
+        if folder:
+            self.output_path.set(folder)
+            self.log_message(f"Carpeta de salida: {folder}")
+
+    def _process_pdf(self):
+        if not self.pdf_path.get():
+            if self.winfo_exists():
+                try:
+                    messagebox.showerror("Error", "Por favor seleccione un archivo PDF")
+                except Exception:
+                    pass
+            return
+        self.processing.set(True)
+        if self.winfo_exists():
+            try:
+                self.status_label.config(text="Procesando...")
+                self.update_idletasks()
+            except Exception:
+                pass
+        threading.Thread(target=self._process_pdf_thread, daemon=True).start()
+
+    def _process_pdf_thread(self):
+        try:
+            pdf_path = Path(self.pdf_path.get())
+            template_path = Path(self.template_path.get())
+            output_dir = Path(self.output_path.get())
+
+            # Punto 1: Inicio del procesamiento
+            logger.debug(f"Iniciando procesamiento de PDF: {pdf_path}")
+            
+            cached_result = self.cache_manager.check_cache(pdf_path)
+            if cached_result:
+                logger.info(f"Archivo encontrado en caché: {pdf_path.name}")
+                self.log_message(f"Archivo ya procesado: {pdf_path.name}")
+                self.log_message(f"Documento: {cached_result['remision']}")
+                self.log_message(f"Control: {cached_result['control']}")
+                self.stats["cached"] += 1
+                self.last_generated_doc = cached_result['remision']
+                if self.winfo_exists():
+                    try:
+                        self.send_whatsapp_btn.config(state=NORMAL)
+                        self.send_email_btn.config(state=NORMAL)
+                        if not hasattr(self, '_cache_msg_shown'):
+                            self._cache_msg_shown = True
+                            if messagebox.askyesno("Archivo en caché", "¿Desea abrir el documento de remisión generado?"):
+                                pass
+                    except Exception as e:
+                        logger.error(f"Error en interfaz de caché: {str(e)}", exc_info=True)
+                return
+
+            # Punto 2: Antes de extraer datos
+            logger.debug(f"Extrayendo datos de {pdf_path.name}")
+            self.log_message(f"Extrayendo datos de {pdf_path.name}...")
+            data = self.pdf_processor.extract_pdf_data(pdf_path)
+            
+            # Forzar la afiliación basada en la selección de la GUI
+            # Esto corrige los casos donde el PDF tiene información de la IPS en lugar de la empresa.
+            empresa_seleccionada = self.empresa.get()
+            data["Afiliación"] = empresa_seleccionada
+            logger.info(f"Afiliación forzada a '{empresa_seleccionada}' según la selección en la interfaz.")
+            self.log_message(f"Afiliación establecida a '{empresa_seleccionada}'.")
+
+            if self.winfo_exists():
+                try:
+                    self._display_extracted_data(data)
+                except Exception as e:
+                    logger.error(f"Error al mostrar datos extraídos: {str(e)}", exc_info=True)
+            
+            self.extracted_data = data
+
+            # La comprobación de conflicto de rutas ya no es necesaria si siempre forzamos la afiliación
+            # empresa_rutas = Config.get_empresa_paths(data.get('Afiliación', ''))
+            # ... (código de conflicto eliminado)
+            empresa_rutas = Config.RUTAS[empresa_seleccionada]
+
+            # Punto 3: Generación de documento
+            logger.info("Generando documento de remisión")
+            self.log_message("Generando documento de remisión...")
+            doc_path = self.doc_generator.generate_remision(data, template_path, output_dir)
+
+            control_path = empresa_rutas["control"]
+            logger.info("Actualizando archivo de control")
+            self.log_message("Actualizando archivo de control...")
+            excel_path = self.excel_handler.update_control_file(data, control_path)
+
+            self.cache_manager.update_cache(pdf_path, {
+                "remision": doc_path,
+                "control": excel_path
+            })
+            logger.debug(f"Cache actualizado para {pdf_path.name}")
+
+            # Punto 4: Proceso completado
+            logger.info(f"Proceso completado. Documento: {doc_path}, Control: {excel_path}")
+            self.log_message("¡Proceso completado exitosamente!")
+            self.log_message(f"Documento generado: {doc_path}")
+            self.log_message(f"Archivo de control actualizado: {excel_path}")
+            self.stats["processed"] += 1
+            self.last_generated_doc = doc_path
+            
+            if self.winfo_exists():
+                try:
+                    self.send_whatsapp_btn.config(state=NORMAL)
+                    self.send_email_btn.config(state=NORMAL)
+                    if not hasattr(self, '_done_msg_shown'):
+                        self._done_msg_shown = True
+                        if messagebox.askyesno("Proceso completado", "¿Desea abrir el documento de remisión generado?"):
+                            pass
+                except Exception as e:
+                    logger.error(f"Error en interfaz post-proceso: {str(e)}", exc_info=True)
+
+        except PermissionError as e:
+            error_msg = str(e)
+            logger.critical(f"Error de permisos: {error_msg}")
+            self.log_message(error_msg, error=True)
+            if self.winfo_exists():
+                try:
+                    messagebox.showerror("Error", error_msg)
+                except Exception:
+                    pass
+            self.stats["errors"] += 1
+        except ValueError as e:
+            error_msg = str(e)
+            logger.error(f"Error de valor: {error_msg}")
+            self.log_message(error_msg, error=True)
+            if self.winfo_exists():
+                try:
+                    messagebox.showerror("Error", error_msg)
+                except Exception:
+                    pass
+            self.stats["errors"] += 1
+        except Exception as e:
+            error_msg = f"Error inesperado al procesar el archivo: {str(e)}\n{traceback.format_exc()}"
+            logger.critical(f"Error inesperado: {error_msg}", exc_info=True)
+            self.log_message(error_msg, error=True)
+            if self.winfo_exists():
+                try:
+                    messagebox.showerror("Error", f"Error inesperado: {str(e)}")
+                except Exception:
+                    pass
+            self.stats["errors"] += 1
+        finally:
+            self.processing.set(False)
+            logger.debug("Proceso finalizado, reiniciando estado")
+            if self.winfo_exists():
+                try:
+                    self.status_label.config(text="Listo")
+                except Exception:
+                    pass
+
+    def _get_contact_info(self, empresa, cedula):
+        """
+        Busca el teléfono y correo del personal de forma unificada, 
+        seleccionando el archivo Excel correcto según la empresa.
+        """
+        try:
+            cedula = str(cedula).strip()
+            empresa = empresa.upper()
+            self.log_message(f"Iniciando búsqueda de contacto para Cédula: '{cedula}', Empresa: '{empresa}'")
+
+            import pandas as pd
+            import os
+            import logging
+            import traceback
+
+            # 1. Determinar la ruta del Excel y el nombre de la hoja
+            if empresa in ["TEMPOACTIVA", "TEMPOSUM", "ASEPLUS"]:
+                excel_path = "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\Base de Datos Personal Temporales.xlsx"
+                sheet_name = "COMPLETO"
+            elif empresa == "ASEL":
+                excel_path = "G:/Mi unidad/2. Trabajo/1. SG-SST/19. Asel S.A.S/Formato - Base de datos personal ASEL.xlsx"
+                sheet_name = "FORMATO"
+            else:
+                self.log_message(f"Empresa '{empresa}' no reconocida para búsqueda de contactos.", error=True)
+                return None, None
+
+            self.log_message(f"Usando archivo: {excel_path}, Hoja: {sheet_name}")
+
+            # 2. Leer el archivo Excel
+            if not os.path.exists(excel_path):
+                self.log_message(f"El archivo Excel no existe en la ruta: {excel_path}", error=True)
+                return None, None
+
+            df = pd.read_excel(excel_path, sheet_name=sheet_name, dtype=str)
+
+            # 3. Encontrar columnas de forma segura y estandarizada
+            cedula_col = next((col for col in df.columns if 'CEDULA' in str(col).upper() or 'IDENTIFICACIÓN' in str(col).upper()), None)
+            celular_col = next((col for col in df.columns if 'CELULAR' in str(col).upper() or 'TELÉFONO' in str(col).upper()), None)
+            email_col = next((col for col in df.columns if 'CORREO' in str(col).upper() or 'EMAIL' in str(col).upper()), None)
+
+            if not cedula_col:
+                self.log_message(f"No se encontró la columna de Cédula/Identificación en '{excel_path}'", error=True)
+                return None, None
+            if not celular_col:
+                self.log_message(f"No se encontró la columna de Celular/Teléfono en '{excel_path}'", error=True)
+                return None, None
+
+            self.log_message(f"Columnas a usar -> Cédula: '{cedula_col}', Celular: '{celular_col}', Email: '{email_col or 'No encontrada'}'")
+
+            # 4. Buscar la fila y extraer los datos
+            # Limpiar la columna de cédulas en el dataframe para una comparación más robusta
+            df[cedula_col] = df[cedula_col].astype(str).str.strip()
+            row = df[df[cedula_col] == cedula]
+
+            if not row.empty:
+                self.log_message(f"Cédula '{cedula}' encontrada en la fila de índice {row.index[0]}.")
+                phone = str(row.iloc[0][celular_col]).strip()
+                email = str(row.iloc[0][email_col]).strip() if email_col and pd.notna(row.iloc[0][email_col]) else None
+
+                if not phone or phone.lower() == 'nan':
+                    self.log_message(f"Teléfono no encontrado para la cédula {cedula}, pero se encontró el email: {email or 'Ninguno'}", error=True)
+                    return None, email
+                
+                phone = f"+57{phone}" if phone and not phone.startswith('+') else phone
+                self.log_message(f"Contacto encontrado -> Teléfono: {phone}, Email: {email or 'Ninguno'}")
+                return phone, email
+            else:
+                self.log_message(f"Cédula '{cedula}' NO encontrada en el archivo '{excel_path}'", error=True)
+                return None, None
+
+        except Exception as e:
+            self.log_message(f"Error crítico al obtener contacto: {str(e)}", error=True)
+            logging.error(traceback.format_exc()) # Log completo para depuración
+            return None, None
+
+    def _send_whatsapp(self):
+        if not self.last_generated_doc:
+            logger.error("Intento de enviar WhatsApp sin documento generado")
+            messagebox.showerror("Error", "No hay documento generado para enviar")
+            return
+
+        # Obtener datos relevantes
+        cedula = self.extracted_data.get('No. Identificación', 'N/A')
+        nombre = self.extracted_data.get('Nombre Completo', 'Trabajador')
+        fecha_atencion = self.extracted_data.get('Fecha de Atención', 'N/A')
+        afiliacion = self.extracted_data.get('Afiliación', self.empresa.get())
+
+        # Punto 1: Inicio del proceso
+        logger.info(f"Iniciando envío WhatsApp para {nombre} (Cédula: {cedula})")
+
+        # Construir mensaje estructurado
+        mensaje = f"""*Remisión EPS - {afiliacion}*
+
+    *Trabajador:* {nombre}
+    *Cédula:* {cedula}
+    *Fecha de atención:* {fecha_atencion}
+
+    Adjunto encontrará su documento de remisión EPS con las recomendaciones médicas.
+
+    Por favor:
+    1. Revise el documento adjunto ✅
+    2. Siga las indicaciones del profesional de salud ✅
+    3. Confirme recepción ✅
+
+    _Cualquier duda estamos disponibles para resolverla_"""
+
+        try:
+            # Punto 2: Antes de buscar información de contacto
+            logger.debug(f"Buscando contacto para cédula {cedula}")
+            phone, _ = self._get_contact_info(afiliacion, cedula)
+            
+            if not phone or phone == "nan":
+                logger.error(f"No se encontró teléfono para cédula {cedula}")
+                messagebox.showerror("Error", "No se encontró el número de teléfono")
+                return
+
+            # Punto 3: Antes de enviar el mensaje
+            logger.info(f"Preparando envío WhatsApp a {phone} (Documento: {self.last_generated_doc})")
+            
+            self.whatsapp_sender.send_message(
+                phone_number=phone,
+                message=mensaje,
+                file_path=self.last_generated_doc
+            )
+
+            # Punto 4: Envío exitoso
+            logger.info(f"WhatsApp enviado exitosamente a {phone} para {nombre}")
+
+        except Exception as e:
+            # Punto 5: Error en el proceso
+            logger.error(f"Error al enviar WhatsApp a {cedula}: {str(e)}", exc_info=True)
+            messagebox.showerror("Error", f"No se pudo enviar WhatsApp: {str(e)}")
+            self.log_message(f"Error en WhatsApp: {str(e)}", error=True)
+    def _send_email(self):
+        """Envía la remisión por correo electrónico usando la nueva clase EmailSender."""
+        if not self.last_generated_doc:
+            messagebox.showerror("Error", "No hay documento generado para enviar")
+            return
+
+        # Obtener datos relevantes
+        afiliacion = self.extracted_data.get('Afiliación', self.empresa.get())
+        cedula = self.extracted_data.get('No. Identificación', 'N/A')
+        nombre = self.extracted_data.get('Nombre Completo', 'Trabajador')
+        fecha_atencion = self.extracted_data.get('Fecha de Atención', 'N/A')
+
+        if not cedula or cedula == "N/A":
+            messagebox.showerror("Error", "No se encontró el número de identificación")
+            return
+
+        try:
+            # Crear instancia de EmailSender para la afiliación correspondiente
+            email_sender = EmailSender(afiliacion)
+            
+            # Obtener información de contacto del trabajador
+            telefono, email_destino = email_sender.obtener_contacto(cedula)
+            
+            if not email_destino:
+                messagebox.showerror("Error", "No se encontró el correo electrónico para este trabajador")
+                return
+
+            # Enviar el correo con el documento adjunto
+            if email_sender.enviar_correo(
+                destinatario=email_destino,
+                nombre=nombre,
+                fecha_atencion=fecha_atencion,
+                archivo_adjunto=self.last_generated_doc
+            ):
+                messagebox.showinfo("Éxito", "Correo enviado correctamente")
+                self.log_message(f"Correo enviado a {email_destino}")
+            else:
+                messagebox.showerror("Error", "No se pudo enviar el correo. Consulte los logs para más detalles.")
+                
+        except ValueError as e:
+            messagebox.showerror("Error", f"Error de configuración: {str(e)}")
+            self.log_message(f"Error en configuración de correo: {str(e)}", error=True)
+        except Exception as e:
+            messagebox.showerror("Error", f"Error inesperado: {str(e)}")
+            self.log_message(f"Error al enviar correo: {str(e)}", error=True)
+
+    def _display_extracted_data(self, data):
+        for widget in self.data_widgets.values():
+            for w in widget:
+                w.destroy()
+        self.data_widgets = {}
+
+        row = 0
+        for key, value in data.items():
+            if key in ['archivo_origen', 'fecha_procesamiento']:
+                continue
+            label = ttk.Label(self.scrolled_frame, text=f"{key}:", anchor=E)
+            label.grid(row=row, column=0, sticky=E, padx=5, pady=1)
+
+            if key in ['Recomendaciones Laborales', 'Restricciones Laborales', 'Motivo de Restricción']:
+                text = ttk.Text(self.scrolled_frame, height=2, width=50, wrap=WORD)
+                text.insert(END, value)
+                text.grid(row=row, column=1, sticky=W+E, padx=5, pady=1)
+                self.data_widgets[key] = [label, text]
+            else:
+                var = StringVar(value=value)
+                entry = ttk.Entry(self.scrolled_frame, textvariable=var, width=50)
+                entry.grid(row=row, column=1, sticky=W+E, padx=5, pady=1)
+                self.data_widgets[key] = [label, entry, var]
+            row += 1
+
+    def _clear_displayed_data(self):
+        # Solo destruir los widgets (Label, Entry, Text), no las StringVar
+        for widgets in self.data_widgets.values():
+            for widget in widgets:
+                if isinstance(widget, (ttk.Label, ttk.Entry, ttk.Text)):
+                    widget.destroy()
+        self.data_widgets = {}
+        self.results_text.delete(1.0, END)
+
+    def log_message(self, message, error=False):
+        timestamp = datetime.now().strftime('%H:%M:%S')
+        prefix = "[ERROR]" if error else "[INFO]"
+        formatted_message = f"{timestamp} {prefix} {message}\n"
+        
+        # Mostrar en la UI
+        self.results_text.insert(END, formatted_message)
+        self.results_text.see(END)
+        
+        # Usar el logger configurado
+        if error:
+            logger.error(message)
+        else:
+            logger.info(message)
+
+    def _batch_process(self):
+        folder = filedialog.askdirectory(
+            title="Seleccionar Carpeta con PDFs"
+        )
+        if not folder:
+            return
+        pdf_files = list(Path(folder).glob("*.pdf"))
+        if not pdf_files:
+            messagebox.showinfo("Información", "No se encontraron archivos PDF en la carpeta seleccionada")
+            return
+        if not messagebox.askyesno("Confirmar", f"¿Desea procesar {len(pdf_files)} archivos PDF?"):
+            return
+        self.processing.set(True)
+        self.status_label.config(text=f"Procesando lote de {len(pdf_files)} archivos...")
+        threading.Thread(target=self._batch_process_thread,
+                         args=(pdf_files,),
+                         daemon=True).start()
+
+    def _batch_process_thread(self, pdf_files):
+        total = len(pdf_files)
+        processed = 0
+        errors = 0
+        cached = 0
+        self.stats = {"processed": 0, "errors": 0, "cached": 0}
+
+        for i, pdf_path in enumerate(pdf_files):
+            try:
+                self.status_label.config(text=f"Procesando archivo {i+1} de {total}...")
+                self.log_message(f"Procesando {pdf_path.name} ({i+1}/{total})...")
+
+                cached_result = self.cache_manager.check_cache(pdf_path)
+                if cached_result:
+                    self.log_message(f"Archivo ya procesado: {pdf_path.name}")
+                    self.stats["cached"] += 1
+                    cached += 1
+                    continue
+
+                data = self.pdf_processor.extract_pdf_data(pdf_path)
+                empresa_rutas = Config.get_empresa_paths(data.get('Afiliación', ''))
+
+                doc_path = self.doc_generator.generate_remision(
+                    data,
+                    empresa_rutas["plantilla"],
+                    empresa_rutas["remisiones"]
+                )
+
+                excel_path = self.excel_handler.update_control_file(
+                    data,
+                    empresa_rutas["control"]
+                )
+
+                self.cache_manager.update_cache(pdf_path, {
+                    "remision": doc_path,
+                    "control": excel_path
+                })
+
+                self.log_message(f"Completado: {pdf_path.name}")
+                self.stats["processed"] += 1
+                processed += 1
+
+            except Exception as e:
+                error_msg = f"Error al procesar {pdf_path.name}: {str(e)}"
+                self.log_message(error_msg, error=True)
+                self.stats["errors"] += 1
+                errors += 1
+
+        self.status_label.config(text="Lote completado")
+        summary = (f"Procesamiento completado.\n"
+                   f"- Archivos procesados: {processed}\n"
+                   f"- Omitidos (en caché): {cached}\n"
+                   f"- Errores: {errors}\n"
+                   f"- Total: {total}")
+
+        self.log_message(summary)
+        messagebox.showinfo("Procesamiento completado", summary)
+        self.processing.set(False)
+        self.status_label.config(text="Listo")
+
+    def _sanitize_text(self, text):
+        """
+        Asegura que el texto tenga codificación UTF-8 válida.
+        Args:
+            text (str, bytes, any): Texto a sanitizar.
+        Returns:
+            str: Texto asegurado con codificación UTF-8.
+        """
+        try:
+            if isinstance(text, bytes):
+                return text.decode('utf-8', errors='replace')
+            elif isinstance(text, str):
+                return text.encode('utf-8', errors='replace').decode('utf-8')
+            else:
+                return str(text).encode('utf-8', errors='replace').decode('utf-8')
+        except Exception as e:
+            logging.error(f"Error al sanitizar texto: {str(e)}")
+            return str(text)
+
+def generate_remision_document(data, empresa):
+    """
+    Genera un documento de remisión a partir de los datos extraídos.
+    """
+    try:
+        log(f"Iniciando generación de documento para la empresa: {empresa}")
+        doc_generator = DocumentGenerator()
+        excel_handler = ExcelHandler()
+        
+        empresa_rutas = Config.get_empresa_paths(empresa)
+        log(f"Rutas obtenidas para {empresa}: {empresa_rutas}")
+        
+        template_path = empresa_rutas["plantilla"]
+        output_dir = empresa_rutas["remisiones"]
+        
+        log(f"Usando plantilla: {template_path}")
+        doc_path = doc_generator.generate_remision(data, template_path, output_dir)
+        log(f"Documento de remisión generado en: {doc_path}")
+        
+        control_path = empresa_rutas["control"]
+        log(f"Actualizando archivo de control: {control_path}")
+        excel_path = excel_handler.update_control_file(data, control_path)
+        log(f"Archivo de control actualizado en: {excel_path}")
+        
+        return {
+            "success": True,
+            "documentPath": doc_path,
+            "controlPath": excel_path
+        }
+    except Exception as e:
+        log(f"Error al generar documento de remisión: {str(e)}", level='ERROR')
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+def send_remision_by_email(doc_path, data, empresa):
+    """
+    Envía un documento de remisión por correo electrónico.
+    """
+    try:
+        log(f"Iniciando envío de email para la empresa {empresa} con el documento {doc_path}")
+        email_sender = EmailSender(empresa)
+        
+        cedula = data.get('No_Identificacion', '')
+        nombre = data.get('Nombre_Completo', 'Trabajador')
+        fecha_atencion = data.get('Fecha_Atencion', '')
+        
+        if not cedula:
+            raise ValueError("No se encontró el número de identificación en los datos para el email")
+            
+        log(f"Buscando contacto de email para la cédula: {cedula}")
+        telefono, email_destino = email_sender.obtener_contacto(cedula)
+        
+        if not email_destino:
+            raise ValueError(f"No se encontró el correo electrónico para la cédula {cedula}")
+        
+        log(f"Contacto de email encontrado: {email_destino}. Procediendo a enviar.")
+        success = email_sender.enviar_correo(
+            destinatario=email_destino,
+            nombre=nombre,
+            fecha_atencion=fecha_atencion,
+            archivo_adjunto=doc_path
+        )
+        
+        if success:
+            log("Correo enviado exitosamente.")
+            return {"success": True, "message": "Correo enviado exitosamente"}
+        else:
+            raise RuntimeError("La función enviar_correo de EmailSender retornó False.")
+
+    except Exception as e:
+        log(f"Error al enviar correo: {str(e)}", level='ERROR')
+        return {"success": False, "error": str(e)}
+
+def send_remision_by_whatsapp(doc_path, data, empresa):
+    """
+    Prepara el envío de un documento de remisión por WhatsApp.
+    """
+    try:
+        log(f"Iniciando preparación de WhatsApp para la empresa {empresa} con el documento {doc_path}")
+        whatsapp_sender = WhatsAppSender()
+        
+        cedula = data.get('No_Identificacion', '')
+        nombre = data.get('Nombre_Completo', 'Trabajador')
+        fecha_atencion = data.get('Fecha_Atencion', '')
+        afiliacion = data.get('Afiliacion', empresa)
+        
+        if not cedula:
+            raise ValueError("No se encontró el número de identificación en los datos para WhatsApp")
+
+        empresa_normalizada = afiliacion.upper().strip()
+        log(f"Buscando contacto de WhatsApp para la cédula: {cedula} en la empresa normalizada: {empresa_normalizada}")
+        
+        # Usar la clase EmailSender para obtener el contacto, ya que centraliza la lógica
+        contact_finder = EmailSender(empresa_normalizada)
+        phone, _ = contact_finder.obtener_contacto(cedula)
+        
+        if not phone or phone == "nan":
+            raise ValueError(f"No se encontró el número de teléfono para la cédula {cedula}")
+            
+        log(f"Teléfono encontrado: {phone}. Construyendo mensaje.")
+        mensaje = f"""*Remisión EPS - {afiliacion}*
+
+*Trabajador:* {nombre}
+*Cédula:* {cedula}
+*Fecha de atención:* {fecha_atencion}
+
+Adjunto encontrará su documento de remisión EPS con las recomendaciones médicas.
+
+Por favor:
+1. Revise el documento adjunto ✅
+2. Siga las indicaciones del profesional de salud ✅
+3. Confirme recepción ✅
+
+_Cualquier duda estamos disponibles para resolverla_"""
+        
+        whatsapp_sender.send_message(
+            phone_number=phone,
+            message=mensaje,
+            file_path=doc_path
+        )
+        
+        log("Se ha abierto la URL de WhatsApp y la carpeta del archivo.")
+        return {
+            "success": True,
+            "message": "Se abrirá WhatsApp Web con el mensaje preparado"
+        }
+    except Exception as e:
+        log(f"Error al preparar WhatsApp: {str(e)}", level='ERROR')
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+def log(message, level='INFO'):
+    """Envía un log estructurado a stdout y también al logger de archivo."""
+    # Imprimir para que Electron lo capture
+    print(json.dumps({'type': 'log', 'level': level, 'message': message}))
+    # Registrar en el archivo de log de Python
+    if level == 'ERROR':
+        logger.error(message)
+    elif level == 'WARN':
+        logger.warning(message)
+    else:
+        logger.info(message)
+
+if __name__ == "__main__":
+
+    # Redirigir el logger de Python a stdout para que Electron lo capture todo
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    # Descomentar para depuración detallada
+    # logger.addHandler(stream_handler)
+
+    if len(sys.argv) > 2:
+        command = sys.argv[1]
+        data_file = sys.argv[2]
+        result = {}
+
+        try:
+            log(f"Comando '{command}' recibido con el archivo de datos: {data_file}")
+            with open(data_file, 'r', encoding='utf-8') as f:
+                temp_data = json.load(f)
+
+            if command == "--generate-remision":
+                result = generate_remision_document(temp_data['data'], temp_data['empresa'])
+            elif command == "--send-email":
+                result = send_remision_by_email(
+                    temp_data['docPath'],
+                    temp_data['data'],
+                    temp_data['empresa']
+                )
+            elif command == "--send-whatsapp":
+                result = send_remision_by_whatsapp(
+                    temp_data['docPath'],
+                    temp_data['data'],
+                    temp_data['empresa']
+                )
+            else:
+                result = {"success": False, "error": "Comando no reconocido"}
+
+        except Exception as e:
+            log(f"Error crítico en la ejecución del script: {str(e)}", level='ERROR')
+            result = {"success": False, "error": str(e), "traceback": traceback.format_exc()}
+
+        # Imprimir el resultado final
+        final_output = {'type': 'result', 'payload': result}
+        print(json.dumps(final_output, ensure_ascii=False))
+
+    else:
+        # Comportamiento normal de la aplicación GUI
+        log("Iniciando en modo de interfaz gráfica (GUI).")
+        app = RemisionesApp()
+        app.mainloop()
+
+
+# Clase DocumentGenerator para generar documentos Word
+class DocumentGenerator:
+    def generate_remision(self, data, template_path, output_dir):
+        try:
+            template_path = Path(template_path)
+            if not template_path.exists():
+                raise FileNotFoundError(f"Plantilla no encontrada: {template_path}")
+
+            if template_path.suffix.lower() not in ['.doc', '.docx']:
+                raise ValueError(f"La plantilla debe ser un archivo .doc o .docx: {template_path}")
+
+            doc = DocxTemplate(template_path)
+            context = {
+                'fecha': datetime.now().strftime('%d/%m/%Y'),
+                'nombre_destinatario': data.get('Nombre_Completo', 'N/A'),
+                'cc': data.get('No_Identificacion', 'N/A'),
+                'cargo': data.get('Cargo', 'N/A'),
+                'evaluacion_ocupacional': data.get('Evaluacion_Ocupacional', 'N/A'),
+                'recomendaciones_laborales': data.get('Recomendaciones_Laborales', 'N/A')
+            }
+
+            for key, value in context.items():
+                if value == 'N/A' and key in ['nombre_destinatario', 'cc', 'evaluación_ocupacional', 'recomendaciones_laborales']:
+                    context[key] = "Información no disponible"
+
+            doc.render(context)
+
+            output_dir = Path(output_dir)
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            fecha = datetime.now().strftime('%Y%m%d')
+            nombre_sanitizado = self._sanitize_filename(data.get('Nombre Completo', 'sin_nombre'))
+            output_path = output_dir / f"GI-OD-007 REMISION A EPS {nombre_sanitizado} {fecha}.docx"
+
+            counter = 1
+            while output_path.exists():
+                output_path = output_dir / f"GI-OD-007 REMISION A EPS {nombre_sanitizado} {fecha}_{counter}.docx"
+                counter += 1
+
+            doc.save(output_path)
+            logging.info(f"Documento creado: {output_path}")
+            return str(output_path)
+
+        except Exception as e:
+            logging.error(f"Error en generate_remision: {str(e)}")
+            logging.debug(traceback.format_exc())
+            raise
+
+    def _sanitize_filename(self, filename):
+        if not filename:
+            return "sin_nombre"
+        valid_filename = re.sub(r'[<>:"/\\\\|?*]', '_', filename)
+        valid_filename = valid_filename.replace(' ', '_')
+        valid_filename = ''.join(c for c in unicodedata.normalize('NFD', valid_filename)
+                                 if unicodedata.category(c) != 'Mn')
+        return valid_filename
+
+# Clase CacheManager para gestionar caché
+class CacheManager:
+    def __init__(self, cache_file=None):
+        self.cache_file = cache_file or Config.CACHE_FILE
+        self._load_cache()
+
+    def _load_cache(self):
+        try:
+            cache_path = Path(self.cache_file)
+            if cache_path.exists():
+                with open(cache_path, "r", encoding="utf-8") as f:
+                    self.cache = json.load(f)
+                logging.info(f"Caché cargada desde {self.cache_file}")
+            else:
+                self.cache = {}
+                logging.info("Caché inicializada (nueva, archivo no encontrado)")
+        except Exception as e:
+            logging.error(f"Error al cargar caché: {str(e)}")
+            self.cache = {}
+
+    def _save_cache(self):
+        try:
+            with open(self.cache_file, "w") as f:
+                json.dump(self.cache, f, indent=2)
+            logging.info(f"Caché guardada en {self.cache_file}")
+        except Exception as e:
+            logging.error(f"Error al guardar caché: {str(e)}")
+
+    def check_cache(self, pdf_path):
+        pdf_hash = self._get_file_hash(pdf_path)
+        if pdf_hash in self.cache:
+            logging.info(f"Archivo encontrado en caché: {pdf_path}")
+            return self.cache[pdf_hash]
+        logging.info(f"Archivo no encontrado en caché: {pdf_path}")
+        return None
+
+    def update_cache(self, pdf_path, output_paths):
+        pdf_hash = self._get_file_hash(pdf_path)
+        self.cache[pdf_hash] = output_paths
+        self._save_cache()
+        logging.info(f"Caché actualizada para {pdf_path}")
+
+    def _get_file_hash(self, file_path):
+        try:
+            import hashlib
+            file_path = Path(file_path)
+            stats = file_path.stat()
+            unique_id = f"{file_path}|{stats.st_size}|{stats.st_mtime}"
+            with open(file_path, "rb") as f:
+                file_hash = hashlib.md5(f.read()).hexdigest()
+            return f"{file_hash}|{unique_id}"
+        except Exception as e:
+            logging.error(f"Error al generar hash para {file_path}: {str(e)}")
+            return str(file_path)
+
+    def remove_from_cache(self, pdf_path):
+        pdf_hash = self._get_file_hash(pdf_path)
+        if pdf_hash in self.cache:
+            del self.cache[pdf_hash]
+            self._save_cache()
+            logging.info(f"Archivo {pdf_path} eliminado del caché")
+
+class WhatsAppSender:
+    def send_message(self, phone_number, message, file_path=None):
+        try:
+            # Copiar el mensaje al portapapeles
+            pyperclip.copy(message)
+            logging.info("Mensaje copiado al portapapeles.")
+
+            # Codificar el mensaje para URL
+            encoded_message = quote(message)
+            url = f"https://api.whatsapp.com/send?phone={phone_number}&text={encoded_message}" #si quieres que se abra en el navegador cambia api a web.
+            
+            webbrowser.open(url)
+
+                        # Abrir el archivo en el navegador para facilitar el adjunto
+            if file_path and Path(file_path).exists():
+                os.startfile(file_path)
+
+                # 2. Abrir carpeta contenedora del archivo automáticamente
+                folder_path = os.path.dirname(file_path)
+                os.startfile(folder_path)  # Windows
+                # Para Linux/Mac: os.system(f'open "{folder_path}"')
+
+            logging.info(f"Mensaje de WhatsApp enviado a y carpeta de archivo abierto para {phone_number}")
+        except Exception as e:
+            logging.error(f"Error al enviar WhatsApp: {str(e)}")
+            raise
+
+# Clase EmailSender para enviar correos electrónicos
+
+class EmailSender:
+    """Clase para enviar correos electrónicos con plantillas personalizadas y adjuntos."""
+    
+    # Plantillas de email por tipo de empresa
+    PLANTILLAS = {
+        "TEMPOACTIVA": {
+            "asunto": "Seguimiento a Recomendaciones Médicas Laborales",
+            "cuerpo": """Estimado/a {nombre},
+Conforme al resultado del examen médico ocupacional realizado el día {fecha}, te compartimos la carta de remisiones médicas, en la cual se detallan recomendaciones específicas relacionadas con tu estado de salud y tu actividad laboral.
+
+📎 Adjunto encontrarás el documento oficial con las recomendaciones.
+
+Te solicitamos por favor:
+
+✅ Leer atentamente las recomendaciones.  
+✅ Confirmar la recepción de este mensaje y del documento.  
+✅ Informarnos si ya estás realizando los controles médicos indicados (si aplica).   
+
+Estas recomendaciones serán tenidas en cuenta por el área de Seguridad y Salud en el Trabajo para realizar el seguimiento correspondiente y tomar las acciones necesarias en el marco del Sistema de Gestión SST, tal como lo establece la Resolución 0312 de 2019 y el Decreto 1072 de 2015.
+
+Tu salud es una prioridad para nosotros, y el cumplimiento de estas recomendaciones ayuda a prevenir posibles afectaciones laborales.
+
+Si tienes alguna duda, estamos atentos para aclararla.
+
+Saludos cordiales,
+Atentamente,
+Equipo {empresa}
+Correo: {remitente}"""
+        },
+        "TEMPOSUM": {
+            "asunto": "Seguimiento a Recomendaciones Médicas Laborales",
+            "cuerpo": """Estimado/a {nombre},
+Conforme al resultado del examen médico ocupacional realizado el día {fecha}, te compartimos la carta de remisiones médicas, en la cual se detallan recomendaciones específicas relacionadas con tu estado de salud y tu actividad laboral.
+
+📎 Adjunto encontrarás el documento oficial con las recomendaciones.
+
+Te solicitamos por favor:
+
+✅ Leer atentamente las recomendaciones.  
+✅ Confirmar la recepción de este mensaje y del documento.  
+✅ Informarnos si ya estás realizando los controles médicos indicados (si aplica).   
+
+Estas recomendaciones serán tenidas en cuenta por el área de Seguridad y Salud en el Trabajo para realizar el seguimiento correspondiente y tomar las acciones necesarias en el marco del Sistema de Gestión SST, tal como lo establece la Resolución 0312 de 2019 y el Decreto 1072 de 2015.
+
+Tu salud es una prioridad para nosotros, y el cumplimiento de estas recomendaciones ayuda a prevenir posibles afectaciones laborales.
+
+Si tienes alguna duda, estamos atentos para aclararla.
+
+Saludos cordiales,
+Atentamente,
+Equipo {empresa}
+Correo: {remitente}"""
+        },
+        "ASEPLUS": {
+            "asunto": "Seguimiento a Recomendaciones Médicas Laborales",
+            "cuerpo": """Estimado/a {nombre},
+Conforme al resultado del examen médico ocupacional realizado el día {fecha}, te compartimos la carta de remisiones médicas, en la cual se detallan recomendaciones específicas relacionadas con tu estado de salud y tu actividad laboral.
+
+📎 Adjunto encontrarás el documento oficial con las recomendaciones.
+
+Te solicitamos por favor:
+
+✅ Leer atentamente las recomendaciones.  
+✅ Confirmar la recepción de este mensaje y del documento.  
+✅ Informarnos si ya estás realizando los controles médicos indicados (si aplica).   
+
+Estas recomendaciones serán tenidas en cuenta por el área de Seguridad y Salud en el Trabajo para realizar el seguimiento correspondiente y tomar las acciones necesarias en el marco del Sistema de Gestión SST, tal como lo establece la Resolución 0312 de 2019 y el Decreto 1072 de 2015.
+
+Tu salud es una prioridad para nosotros, y el cumplimiento de estas recomendaciones ayuda a prevenir posibles afectaciones laborales.
+
+Si tienes alguna duda, estamos atentos para aclararla.
+
+Saludos cordiales,
+Atentamente,
+Equipo {empresa}
+Correo: {remitente}"""
+        },
+        "ASEL": {
+            "asunto": "Seguimiento a Recomendaciones Médicas Laborales",
+            "cuerpo": """Estimado/a {nombre},
+Conforme al resultado del examen médico ocupacional realizado el día {fecha}, te compartimos la carta de remisiones médicas, en la cual se detallan recomendaciones específicas relacionadas con tu estado de salud y tu actividad laboral.
+
+📎 Adjunto encontrarás el documento oficial con las recomendaciones.
+
+Te solicitamos por favor:
+
+✅ Leer atentamente las recomendaciones.  
+✅ Confirmar la recepción de este mensaje y del documento.  
+✅ Informarnos si ya estás realizando los controles médicos indicados (si aplica).   
+
+Estas recomendaciones serán tenidas en cuenta por el área de Seguridad y Salud en el Trabajo para realizar el seguimiento correspondiente y tomar las acciones necesarias en el marco del Sistema de Gestión SST, tal como lo establece la Resolución 0312 de 2019 y el Decreto 1072 de 2015.
+
+Tu salud es una prioridad para nosotros, y el cumplimiento de estas recomendaciones ayuda a prevenir posibles afectaciones laborales.
+
+Si tienes alguna duda, estamos atentos para aclararla.
+
+Atentamente,
+Equipo ASEL
+Correo: {remitente}"""
+        },
+        "DEFAULT": {
+            "asunto": "Documento de Remisión EPS",
+            "cuerpo": """Estimado/a {nombre},
+Adjunto encontrarás tu documento de remisión EPS.
+Atentamente,
+Equipo {empresa}
+Correo: {remitente}"""
+        }
+    }
+
+    # Rutas a las bases de datos de personal
+    BASES_DATOS = {
+        "TEMPOACTIVA": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\Base de Datos Personal Temporales.xlsx",
+        "TEMPOSUM": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\Base de Datos Personal Temporales.xlsx",
+        "ASEPLUS": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\Base de Datos Personal Temporales.xlsx",
+        "ASEL": "G:/Mi unidad/2. Trabajo/1. SG-SST/19. Asel S.A.S/Formato - Base de datos personal ASEL.xlsx"
+    }
+
+    # Credenciales de correo por empresa
+    CREDENCIALES = {
+        "TEMPOACTIVA": {"email": "tempoactivaestsas@gmail.com", "password": "pxfu wxit wpjf svxd"},
+        "TEMPOSUM": {"email": "temposumestsas@gmail.com", "password": "bcfw rzxh ksob ddns"},
+        "ASEPLUS": {"email": "asepluscaribesas@gmail.com", "password": "yudh myrl zjpk eoej"},
+        "ASEL": {"email": "asel.contratacion@gmail.com", "password": "kdyh degt juwf tuqd"}
+    }
+
+    def __init__(self, empresa):
+        """
+        Inicializa el enviador de correos para una empresa específica.
+        
+        Args:
+            empresa (str): Nombre de la empresa (TEMPOACTIVA, TEMPOSUM, etc.)
+        """
+        self.empresa = empresa.upper()
+        self.credenciales = self.CREDENCIALES.get(self.empresa)
+        self.plantilla = self.PLANTILLAS.get(self.empresa, self.PLANTILLAS["DEFAULT"])
+        self.base_datos = self.BASES_DATOS.get(self.empresa)
+        
+        if not self.credenciales:
+            raise ValueError(f"No hay credenciales configuradas para {self.empresa}")
+        
+        self.logger = logging.getLogger("EmailSender")
+
+    def obtener_contacto(self, cedula):
+        """
+        Obtiene la información de contacto de un trabajador desde la base de datos.
+        
+        Args:
+            cedula (str): Número de identificación del trabajador
+            
+        Returns:
+            tuple: (telefono, email) o (None, None) si no se encuentra
+        """
+        try:
+            if not self.base_datos or not Path(self.base_datos).exists():
+                self.logger.warning(f"Base de datos no encontrada: {self.base_datos}")
+                return None, None
+                
+            df = pd.read_excel(
+                self.base_datos,
+                sheet_name="FORMATO" if self.empresa == "ASEL" else "COMPLETO",
+                dtype=str
+            )
+            
+            # Buscar columnas relevantes
+            col_cedula = next((col for col in df.columns if 'CEDULA' in col.upper() or 'IDENTIFICACIÓN' in col.upper()), None)
+            col_celular = next((col for col in df.columns if 'CELULAR' in col.upper() or 'TELÉFONO' in col.upper()), None)
+            col_email = next((col for col in df.columns if 'CORREO' in col.upper() or 'EMAIL' in col.upper()), None)
+            
+            if not col_cedula or not col_celular:
+                self.logger.error("Columnas críticas no encontradas en la base de datos")
+                return None, None
+                
+            # Buscar el registro
+            registro = df[df[col_cedula].astype(str).str.strip() == str(cedula).strip()]
+            
+            if not registro.empty:
+                telefono = registro.iloc[0][col_celular]
+                email = registro.iloc[0][col_email] if col_email else None
+                return telefono, email
+                
+            return None, None
+        except Exception as e:
+            self.logger.error(f"Error al obtener contacto: {str(e)}")
+            return None, None
+
+    def enviar_correo(self, destinatario, nombre, fecha_atencion, archivo_adjunto):
+        """
+        Envía un correo electrónico con un documento adjunto.
+        
+        Args:
+            destinatario (str): Correo electrónico del destinatario
+            nombre (str): Nombre del trabajador
+            fecha_atencion (str): Fecha de atención médica
+            archivo_adjunto (str): Ruta al archivo a adjuntar
+            
+        Returns:
+            bool: True si el envío fue exitoso, False en caso contrario
+        """
+        try:
+            # Validación básica de parámetros
+            if not all([destinatario, nombre, fecha_atencion, archivo_adjunto]):
+                raise ValueError("Faltan parámetros requeridos para enviar el correo")
+                
+            if not Path(archivo_adjunto).exists():
+                raise FileNotFoundError(f"Archivo adjunto no encontrado: {archivo_adjunto}")
+
+            # Construir mensaje personalizado
+            asunto = self.plantilla["asunto"]
+            cuerpo = self.plantilla["cuerpo"].format(
+                nombre=nombre,
+                fecha=fecha_atencion,
+                empresa=self.empresa,
+                remitente=self.credenciales["email"]
+            )
+
+            # Configurar mensaje MIME
+            msg = MIMEMultipart()
+            # Encode both the empresa name and email address to handle non-ASCII characters
+            encoded_empresa = Header(self.empresa, 'utf-8').encode()
+            email_address = self.credenciales["email"].encode('ascii', errors='ignore').decode('ascii')
+            msg['From'] = formataddr((encoded_empresa, email_address))
+            msg['To'] = destinatario
+            msg['Subject'] = Header(asunto, 'utf-8').encode()
+            msg.attach(MIMEText(cuerpo, 'plain', 'utf-8'))
+
+            # Adjuntar documento
+            with open(archivo_adjunto, "rb") as adjunto:
+                parte = MIMEBase('application', 'octet-stream')
+                parte.set_payload(adjunto.read())
+                encoders.encode_base64(parte)
+                nombre_archivo = os.path.basename(archivo_adjunto)
+                parte.add_header(
+                    'Content-Disposition',
+                    f'attachment; filename="{Header(nombre_archivo, "utf-8").encode()}"'
+                )
+                msg.attach(parte)
+
+            # Enviar correo usando SMTP
+            with smtplib.SMTP('smtp.gmail.com', 587) as servidor:
+                servidor.starttls()
+                servidor.login(self.credenciales["email"], self.credenciales["password"])
+                servidor.send_message(msg)
+                
+            self.logger.info(f"Correo enviado exitosamente a {destinatario}")
+            return True
+            
+        except smtplib.SMTPAuthenticationError:
+            self.logger.error("Error de autenticación: Credenciales inválidas")
+            return False
+        except smtplib.SMTPException as e:
+            self.logger.error(f"Error SMTP: {str(e)}")
+            return False
+        except Exception as e:
+            self.logger.error(f"Error inesperado: {str(e)}\n{traceback.format_exc()}")
+            return False
+
+# Clase principal de la aplicación
+class RemisionesApp(ttk.Window):
+    
+        
+    def __init__(self):
+        super().__init__(themename="flatly")
+        self.title("Sistema de Gestión de Remisiones EPS")
+        self.geometry("800x650")
+        
+        Config.load_from_file()
+        self.pdf_processor = PdfProcessor()
+        self.excel_handler = ExcelHandler()
+        self.doc_generator = DocumentGenerator()
+        self.cache_manager = CacheManager()
+        self.whatsapp_sender = WhatsAppSender()
+        # ELIMINADO: self.email_sender = ... 
+
+        self.pdf_path = StringVar()
+        self.template_path = StringVar(value=str(Config.RUTAS["TEMPOACTIVA"]["plantilla"]))
+        self.output_path = StringVar(value=str(Config.RUTAS["TEMPOACTIVA"]["remisiones"]))
+        self.processing = BooleanVar(value=False)
+        self.extracted_data = {}
+        self.empresa = StringVar(value="TEMPOACTIVA")
+        self.last_generated_doc = None
+
+        self._create_widgets()
+        self.stats = {"processed": 0, "errors": 0, "cached": 0}
+
+    def _create_widgets(self):
+        main_frame = ttk.Frame(self)
+        main_frame.grid(row=0, column=0, sticky=NSEW, padx=10, pady=10)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+
+        main_frame.grid_rowconfigure(0, weight=0)
+        main_frame.grid_rowconfigure(1, weight=0)
+        main_frame.grid_rowconfigure(2, weight=3)
+        main_frame.grid_rowconfigure(3, weight=1)
+        main_frame.grid_rowconfigure(4, weight=0)
+        main_frame.grid_columnconfigure(0, weight=1)
+
+        header_frame = ttk.Frame(main_frame)
+        header_frame.grid(row=0, column=0, sticky=EW, pady=5)
+        ttk.Label(header_frame, text="SISTEMA DE GESTIÓN DE REMISIONES EPS",
+                  font=("TkDefaultFont", 16, "bold")).pack(side=LEFT, padx=5)
+
+        file_frame = ttk.LabelFrame(main_frame, text="Selección de Archivos")
+        file_frame.grid(row=1, column=0, sticky=EW, pady=5)
+
+        pdf_row = ttk.Frame(file_frame)
+        pdf_row.pack(fill=X, pady=3)
+        ttk.Label(pdf_row, text="Archivo PDF:").pack(side=LEFT, padx=5)
+        ttk.Entry(pdf_row, textvariable=self.pdf_path, width=64).pack(side=LEFT, padx=5, fill=X, expand=YES)
+        ttk.Button(pdf_row, text="Buscar", command=self._browse_pdf).pack(side=LEFT, padx=5)
+        ttk.Button(pdf_row, text="Procesar", command=self._process_pdf, bootstyle=SUCCESS).pack(side=LEFT, padx=5)
+
+        template_row = ttk.Frame(file_frame)
+        template_row.pack(fill=X, pady=3)
+        ttk.Label(template_row, text="Plantilla:").pack(side=LEFT, padx=5)
+        ttk.Entry(template_row, textvariable=self.template_path, width=64).pack(side=LEFT, padx=5, fill=X, expand=YES)
+        ttk.Button(template_row, text="Buscar", command=self._browse_template).pack(side=LEFT, padx=5)
+
+        output_row = ttk.Frame(file_frame)
+        output_row.pack(fill=X, pady=3)
+        ttk.Label(output_row, text="Carpeta de salida:").pack(side=LEFT, padx=5)
+        ttk.Entry(output_row, textvariable=self.output_path, width=64).pack(side=LEFT, padx=5, fill=X, expand=YES)
+        ttk.Button(output_row, text="Buscar", command=self._browse_output).pack(side=LEFT, padx=5)
+
+        empresa_row = ttk.Frame(file_frame)
+        empresa_row.pack(fill=X, pady=3)
+        ttk.Label(empresa_row, text="Empresa:").pack(side=LEFT, padx=5)
+        empresa_combo = ttk.Combobox(empresa_row, textvariable=self.empresa,
+                                     values=list(Config.RUTAS.keys()), state="readonly")
+        empresa_combo.pack(side=LEFT, padx=5)
+        empresa_combo.bind('<<ComboboxSelected>>', self._update_paths)
+
+        send_buttons_row = ttk.Frame(file_frame)
+        send_buttons_row.pack(fill=X, pady=3)
+        self.send_whatsapp_btn = ttk.Button(send_buttons_row, text="Enviar por WhatsApp",
+                                            command=self._send_whatsapp, state=DISABLED, bootstyle=INFO)
+        self.send_whatsapp_btn.pack(side=LEFT, padx=5)
+        self.send_email_btn = ttk.Button(send_buttons_row, text="Enviar por Correo",
+                                         command=self._send_email, state=DISABLED, bootstyle=INFO)
+        self.send_email_btn.pack(side=LEFT, padx=5)
+
+        data_frame = ttk.LabelFrame(main_frame, text="Datos Extraídos")
+        data_frame.grid(row=2, column=0, sticky=NSEW, pady=5)
+        self.scrolled_frame = ScrolledFrame(data_frame, autohide=False)
+        self.scrolled_frame.pack(fill=BOTH, expand=YES, padx=5, pady=5)
+        self.scrolled_frame.container.config(height=200)
+
+        self.data_widgets = {}
+
+        results_frame = ttk.LabelFrame(main_frame, text="Resultados")
+        results_frame.grid(row=3, column=0, sticky=NSEW, pady=5)
+        self.results_text = ttk.Text(results_frame, height=4, width=64, wrap=WORD)
+        self.results_text.pack(fill=BOTH, expand=YES, padx=5, pady=3)
+
+        status_frame = ttk.Frame(main_frame)
+        status_frame.grid(row=5, column=0, sticky=EW, pady=5)
+        self.status_label = ttk.Label(status_frame, text="Listo")
+        self.status_label.pack(side=LEFT, padx=5)
+
+        batch_frame = ttk.LabelFrame(main_frame, text="Procesamiento en Lote")
+        batch_frame.grid(row=4, column=0, sticky=EW, pady=3)
+        ttk.Button(batch_frame, text="Procesar Carpeta",
+                   command=self._batch_process,
+                   bootstyle=WARNING).pack(padx=5, pady=3)
+
+    def _update_paths(self, event=None):
+        empresa = self.empresa.get()
+        if empresa in Config.RUTAS:
+            rutas = Config.RUTAS[empresa]
+            self.template_path.set(str(rutas["plantilla"]))
+            self.output_path.set(str(rutas["remisiones"]))
+            self.log_message(f"Rutas actualizadas para {empresa}")
+
+    def _browse_pdf(self):
+        file = filedialog.askopenfilename(
+            title="Seleccionar PDF",
+            filetypes=[("Archivos PDF", "*.pdf")]
+        )
+        if file:
+            self.cache_manager.remove_from_cache(file)
+            self.pdf_path.set(file)
+            self.log_message(f"Archivo seleccionado: {file}")
+            self._clear_displayed_data()
+            self.send_whatsapp_btn.config(state=DISABLED)
+            self.send_email_btn.config(state=DISABLED)
+
+    def _browse_template(self):
+        file = filedialog.askopenfilename(
+            title="Seleccionar Plantilla",
+            filetypes=[("Archivos Word", "*.doc;*.docx")]
+        )
+        if file:
+            self.template_path.set(file)
+            self.log_message(f"Plantilla seleccionada: {file}")
+
+    def _browse_output(self):
+        folder = filedialog.askdirectory(
+            title="Seleccionar Carpeta de Salida"
+        )
+        if folder:
+            self.output_path.set(folder)
+            self.log_message(f"Carpeta de salida: {folder}")
+
+    def _process_pdf(self):
+        if not self.pdf_path.get():
+            if self.winfo_exists():
+                try:
+                    messagebox.showerror("Error", "Por favor seleccione un archivo PDF")
+                except Exception:
+                    pass
+            return
+        self.processing.set(True)
+        if self.winfo_exists():
+            try:
+                self.status_label.config(text="Procesando...")
+                self.update_idletasks()
+            except Exception:
+                pass
+        threading.Thread(target=self._process_pdf_thread, daemon=True).start()
+
+    def _process_pdf_thread(self):
+        try:
+            pdf_path = Path(self.pdf_path.get())
+            template_path = Path(self.template_path.get())
+            output_dir = Path(self.output_path.get())
+
+            # Punto 1: Inicio del procesamiento
+            logger.debug(f"Iniciando procesamiento de PDF: {pdf_path}")
+            
+            cached_result = self.cache_manager.check_cache(pdf_path)
+            if cached_result:
+                logger.info(f"Archivo encontrado en caché: {pdf_path.name}")
+                self.log_message(f"Archivo ya procesado: {pdf_path.name}")
+                self.log_message(f"Documento: {cached_result['remision']}")
+                self.log_message(f"Control: {cached_result['control']}")
+                self.stats["cached"] += 1
+                self.last_generated_doc = cached_result['remision']
+                if self.winfo_exists():
+                    try:
+                        self.send_whatsapp_btn.config(state=NORMAL)
+                        self.send_email_btn.config(state=NORMAL)
+                        if not hasattr(self, '_cache_msg_shown'):
+                            self._cache_msg_shown = True
+                            if messagebox.askyesno("Archivo en caché", "¿Desea abrir el documento de remisión generado?"):
+                                pass
+                    except Exception as e:
+                        logger.error(f"Error en interfaz de caché: {str(e)}", exc_info=True)
+                return
+
+            # Punto 2: Antes de extraer datos
+            logger.debug(f"Extrayendo datos de {pdf_path.name}")
+            self.log_message(f"Extrayendo datos de {pdf_path.name}...")
+            data = self.pdf_processor.extract_pdf_data(pdf_path)
+            
+            # Forzar la afiliación basada en la selección de la GUI
+            # Esto corrige los casos donde el PDF tiene información de la IPS en lugar de la empresa.
+            empresa_seleccionada = self.empresa.get()
+            data["Afiliación"] = empresa_seleccionada
+            logger.info(f"Afiliación forzada a '{empresa_seleccionada}' según la selección en la interfaz.")
+            self.log_message(f"Afiliación establecida a '{empresa_seleccionada}'.")
+
+            if self.winfo_exists():
+                try:
+                    self._display_extracted_data(data)
+                except Exception as e:
+                    logger.error(f"Error al mostrar datos extraídos: {str(e)}", exc_info=True)
+            
+            self.extracted_data = data
+
+            # La comprobación de conflicto de rutas ya no es necesaria si siempre forzamos la afiliación
+            # empresa_rutas = Config.get_empresa_paths(data.get('Afiliación', ''))
+            # ... (código de conflicto eliminado)
+            empresa_rutas = Config.RUTAS[empresa_seleccionada]
+
+            # Punto 3: Generación de documento
+            logger.info("Generando documento de remisión")
+            self.log_message("Generando documento de remisión...")
+            doc_path = self.doc_generator.generate_remision(data, template_path, output_dir)
+
+            control_path = empresa_rutas["control"]
+            logger.info("Actualizando archivo de control")
+            self.log_message("Actualizando archivo de control...")
+            excel_path = self.excel_handler.update_control_file(data, control_path)
+
+            self.cache_manager.update_cache(pdf_path, {
+                "remision": doc_path,
+                "control": excel_path
+            })
+            logger.debug(f"Cache actualizado para {pdf_path.name}")
+
+            # Punto 4: Proceso completado
+            logger.info(f"Proceso completado. Documento: {doc_path}, Control: {excel_path}")
+            self.log_message("¡Proceso completado exitosamente!")
+            self.log_message(f"Documento generado: {doc_path}")
+            self.log_message(f"Archivo de control actualizado: {excel_path}")
+            self.stats["processed"] += 1
+            self.last_generated_doc = doc_path
+            
+            if self.winfo_exists():
+                try:
+                    self.send_whatsapp_btn.config(state=NORMAL)
+                    self.send_email_btn.config(state=NORMAL)
+                    if not hasattr(self, '_done_msg_shown'):
+                        self._done_msg_shown = True
+                        if messagebox.askyesno("Proceso completado", "¿Desea abrir el documento de remisión generado?"):
+                            pass
+                except Exception as e:
+                    logger.error(f"Error en interfaz post-proceso: {str(e)}", exc_info=True)
+
+        except PermissionError as e:
+            error_msg = str(e)
+            logger.critical(f"Error de permisos: {error_msg}")
+            self.log_message(error_msg, error=True)
+            if self.winfo_exists():
+                try:
+                    messagebox.showerror("Error", error_msg)
+                except Exception:
+                    pass
+            self.stats["errors"] += 1
+        except ValueError as e:
+            error_msg = str(e)
+            logger.error(f"Error de valor: {error_msg}")
+            self.log_message(error_msg, error=True)
+            if self.winfo_exists():
+                try:
+                    messagebox.showerror("Error", error_msg)
+                except Exception:
+                    pass
+            self.stats["errors"] += 1
+        except Exception as e:
+            error_msg = f"Error inesperado al procesar el archivo: {str(e)}\n{traceback.format_exc()}"
+            logger.critical(f"Error inesperado: {error_msg}", exc_info=True)
+            self.log_message(error_msg, error=True)
+            if self.winfo_exists():
+                try:
+                    messagebox.showerror("Error", f"Error inesperado: {str(e)}")
+                except Exception:
+                    pass
+            self.stats["errors"] += 1
+        finally:
+            self.processing.set(False)
+            logger.debug("Proceso finalizado, reiniciando estado")
+            if self.winfo_exists():
+                try:
+                    self.status_label.config(text="Listo")
+                except Exception:
+                    pass
+
+    def _get_contact_info(self, empresa, cedula):
+        """
+        Busca el teléfono y correo del personal de forma unificada, 
+        seleccionando el archivo Excel correcto según la empresa.
+        """
+        try:
+            cedula = str(cedula).strip()
+            empresa = empresa.upper()
+            self.log_message(f"Iniciando búsqueda de contacto para Cédula: '{cedula}', Empresa: '{empresa}'")
+
+            import pandas as pd
+            import os
+            import logging
+            import traceback
+
+            # 1. Determinar la ruta del Excel y el nombre de la hoja
+            if empresa in ["TEMPOACTIVA", "TEMPOSUM", "ASEPLUS"]:
+                excel_path = "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\Base de Datos Personal Temporales.xlsx"
+                sheet_name = "COMPLETO"
+            elif empresa == "ASEL":
+                excel_path = "G:/Mi unidad/2. Trabajo/1. SG-SST/19. Asel S.A.S/Formato - Base de datos personal ASEL.xlsx"
+                sheet_name = "FORMATO"
+            else:
+                self.log_message(f"Empresa '{empresa}' no reconocida para búsqueda de contactos.", error=True)
+                return None, None
+
+            self.log_message(f"Usando archivo: {excel_path}, Hoja: {sheet_name}")
+
+            # 2. Leer el archivo Excel
+            if not os.path.exists(excel_path):
+                self.log_message(f"El archivo Excel no existe en la ruta: {excel_path}", error=True)
+                return None, None
+
+            df = pd.read_excel(excel_path, sheet_name=sheet_name, dtype=str)
+
+            # 3. Encontrar columnas de forma segura y estandarizada
+            cedula_col = next((col for col in df.columns if 'CEDULA' in str(col).upper() or 'IDENTIFICACIÓN' in str(col).upper()), None)
+            celular_col = next((col for col in df.columns if 'CELULAR' in str(col).upper() or 'TELÉFONO' in str(col).upper()), None)
+            email_col = next((col for col in df.columns if 'CORREO' in str(col).upper() or 'EMAIL' in str(col).upper()), None)
+
+            if not cedula_col:
+                self.log_message(f"No se encontró la columna de Cédula/Identificación en '{excel_path}'", error=True)
+                return None, None
+            if not celular_col:
+                self.log_message(f"No se encontró la columna de Celular/Teléfono en '{excel_path}'", error=True)
+                return None, None
+
+            self.log_message(f"Columnas a usar -> Cédula: '{cedula_col}', Celular: '{celular_col}', Email: '{email_col or 'No encontrada'}'")
+
+            # 4. Buscar la fila y extraer los datos
+            # Limpiar la columna de cédulas en el dataframe para una comparación más robusta
+            df[cedula_col] = df[cedula_col].astype(str).str.strip()
+            row = df[df[cedula_col] == cedula]
+
+            if not row.empty:
+                self.log_message(f"Cédula '{cedula}' encontrada en la fila de índice {row.index[0]}.")
+                phone = str(row.iloc[0][celular_col]).strip()
+                email = str(row.iloc[0][email_col]).strip() if email_col and pd.notna(row.iloc[0][email_col]) else None
+
+                if not phone or phone.lower() == 'nan':
+                    self.log_message(f"Teléfono no encontrado para la cédula {cedula}, pero se encontró el email: {email or 'Ninguno'}", error=True)
+                    return None, email
+                
+                phone = f"+57{phone}" if phone and not phone.startswith('+') else phone
+                self.log_message(f"Contacto encontrado -> Teléfono: {phone}, Email: {email or 'Ninguno'}")
+                return phone, email
+            else:
+                self.log_message(f"Cédula '{cedula}' NO encontrada en el archivo '{excel_path}'", error=True)
+                return None, None
+
+        except Exception as e:
+            self.log_message(f"Error crítico al obtener contacto: {str(e)}", error=True)
+            logging.error(traceback.format_exc()) # Log completo para depuración
+            return None, None
+
+    def _send_whatsapp(self):
+        if not self.last_generated_doc:
+            logger.error("Intento de enviar WhatsApp sin documento generado")
+            messagebox.showerror("Error", "No hay documento generado para enviar")
+            return
+
+        # Obtener datos relevantes
+        cedula = self.extracted_data.get('No. Identificación', 'N/A')
+        nombre = self.extracted_data.get('Nombre Completo', 'Trabajador')
+        fecha_atencion = self.extracted_data.get('Fecha de Atención', 'N/A')
+        afiliacion = self.extracted_data.get('Afiliación', self.empresa.get())
+
+        # Punto 1: Inicio del proceso
+        logger.info(f"Iniciando envío WhatsApp para {nombre} (Cédula: {cedula})")
+
+        # Construir mensaje estructurado
+        mensaje = f"""*Remisión EPS - {afiliacion}*
+
+    *Trabajador:* {nombre}
+    *Cédula:* {cedula}
+    *Fecha de atención:* {fecha_atencion}
+
+    Adjunto encontrará su documento de remisión EPS con las recomendaciones médicas.
+
+    Por favor:
+    1. Revise el documento adjunto ✅
+    2. Siga las indicaciones del profesional de salud ✅
+    3. Confirme recepción ✅
+
+    _Cualquier duda estamos disponibles para resolverla_"""
+
+        try:
+            # Punto 2: Antes de buscar información de contacto
+            logger.debug(f"Buscando contacto para cédula {cedula}")
+            phone, _ = self._get_contact_info(afiliacion, cedula)
+            
+            if not phone or phone == "nan":
+                logger.error(f"No se encontró teléfono para cédula {cedula}")
+                messagebox.showerror("Error", "No se encontró el número de teléfono")
+                return
+
+            # Punto 3: Antes de enviar el mensaje
+            logger.info(f"Preparando envío WhatsApp a {phone} (Documento: {self.last_generated_doc})")
+            
+            self.whatsapp_sender.send_message(
+                phone_number=phone,
+                message=mensaje,
+                file_path=self.last_generated_doc
+            )
+
+            # Punto 4: Envío exitoso
+            logger.info(f"WhatsApp enviado exitosamente a {phone} para {nombre}")
+
+        except Exception as e:
+            # Punto 5: Error en el proceso
+            logger.error(f"Error al enviar WhatsApp a {cedula}: {str(e)}", exc_info=True)
+            messagebox.showerror("Error", f"No se pudo enviar WhatsApp: {str(e)}")
+            self.log_message(f"Error en WhatsApp: {str(e)}", error=True)
+    def _send_email(self):
+        """Envía la remisión por correo electrónico usando la nueva clase EmailSender."""
+        if not self.last_generated_doc:
+            messagebox.showerror("Error", "No hay documento generado para enviar")
+            return
+
+        # Obtener datos relevantes
+        afiliacion = self.extracted_data.get('Afiliación', self.empresa.get())
+        cedula = self.extracted_data.get('No. Identificación', 'N/A')
+        nombre = self.extracted_data.get('Nombre Completo', 'Trabajador')
+        fecha_atencion = self.extracted_data.get('Fecha de Atención', 'N/A')
+
+        if not cedula or cedula == "N/A":
+            messagebox.showerror("Error", "No se encontró el número de identificación")
+            return
+
+        try:
+            # Crear instancia de EmailSender para la afiliación correspondiente
+            email_sender = EmailSender(afiliacion)
+            
+            # Obtener información de contacto del trabajador
+            telefono, email_destino = email_sender.obtener_contacto(cedula)
+            
+            if not email_destino:
+                messagebox.showerror("Error", "No se encontró el correo electrónico para este trabajador")
+                return
+
+            # Enviar el correo con el documento adjunto
+            if email_sender.enviar_correo(
+                destinatario=email_destino,
+                nombre=nombre,
+                fecha_atencion=fecha_atencion,
+                archivo_adjunto=self.last_generated_doc
+            ):
+                messagebox.showinfo("Éxito", "Correo enviado correctamente")
+                self.log_message(f"Correo enviado a {email_destino}")
+            else:
+                messagebox.showerror("Error", "No se pudo enviar el correo. Consulte los logs para más detalles.")
+                
+        except ValueError as e:
+            messagebox.showerror("Error", f"Error de configuración: {str(e)}")
+            self.log_message(f"Error en configuración de correo: {str(e)}", error=True)
+        except Exception as e:
+            messagebox.showerror("Error", f"Error inesperado: {str(e)}")
+            self.log_message(f"Error al enviar correo: {str(e)}", error=True)
+
+    def _display_extracted_data(self, data):
+        for widget in self.data_widgets.values():
+            for w in widget:
+                w.destroy()
+        self.data_widgets = {}
+
+        row = 0
+        for key, value in data.items():
+            if key in ['archivo_origen', 'fecha_procesamiento']:
+                continue
+            label = ttk.Label(self.scrolled_frame, text=f"{key}:", anchor=E)
+            label.grid(row=row, column=0, sticky=E, padx=5, pady=1)
+
+            if key in ['Recomendaciones Laborales', 'Restricciones Laborales', 'Motivo de Restricción']:
+                text = ttk.Text(self.scrolled_frame, height=2, width=50, wrap=WORD)
+                text.insert(END, value)
+                text.grid(row=row, column=1, sticky=W+E, padx=5, pady=1)
+                self.data_widgets[key] = [label, text]
+            else:
+                var = StringVar(value=value)
+                entry = ttk.Entry(self.scrolled_frame, textvariable=var, width=50)
+                entry.grid(row=row, column=1, sticky=W+E, padx=5, pady=1)
+                self.data_widgets[key] = [label, entry, var]
+            row += 1
+
+    def _clear_displayed_data(self):
+        # Solo destruir los widgets (Label, Entry, Text), no las StringVar
+        for widgets in self.data_widgets.values():
+            for widget in widgets:
+                if isinstance(widget, (ttk.Label, ttk.Entry, ttk.Text)):
+                    widget.destroy()
+        self.data_widgets = {}
+        self.results_text.delete(1.0, END)
+
+    def log_message(self, message, error=False):
+        timestamp = datetime.now().strftime('%H:%M:%S')
+        prefix = "[ERROR]" if error else "[INFO]"
+        formatted_message = f"{timestamp} {prefix} {message}\n"
+        
+        # Mostrar en la UI
+        self.results_text.insert(END, formatted_message)
+        self.results_text.see(END)
+        
+        # Usar el logger configurado
+        if error:
+            logger.error(message)
+        else:
+            logger.info(message)
+
+    def _batch_process(self):
+        folder = filedialog.askdirectory(
+            title="Seleccionar Carpeta con PDFs"
+        )
+        if not folder:
+            return
+        pdf_files = list(Path(folder).glob("*.pdf"))
+        if not pdf_files:
+            messagebox.showinfo("Información", "No se encontraron archivos PDF en la carpeta seleccionada")
+            return
+        if not messagebox.askyesno("Confirmar", f"¿Desea procesar {len(pdf_files)} archivos PDF?"):
+            return
+        self.processing.set(True)
+        self.status_label.config(text=f"Procesando lote de {len(pdf_files)} archivos...")
+        threading.Thread(target=self._batch_process_thread,
+                         args=(pdf_files,),
+                         daemon=True).start()
+
+    def _batch_process_thread(self, pdf_files):
+        total = len(pdf_files)
+        processed = 0
+        errors = 0
+        cached = 0
+        self.stats = {"processed": 0, "errors": 0, "cached": 0}
+
+        for i, pdf_path in enumerate(pdf_files):
+            try:
+                self.status_label.config(text=f"Procesando archivo {i+1} de {total}...")
+                self.log_message(f"Procesando {pdf_path.name} ({i+1}/{total})...")
+
+                cached_result = self.cache_manager.check_cache(pdf_path)
+                if cached_result:
+                    self.log_message(f"Archivo ya procesado: {pdf_path.name}")
+                    self.stats["cached"] += 1
+                    cached += 1
+                    continue
+
+                data = self.pdf_processor.extract_pdf_data(pdf_path)
+                empresa_rutas = Config.get_empresa_paths(data.get('Afiliación', ''))
+
+                doc_path = self.doc_generator.generate_remision(
+                    data,
+                    empresa_rutas["plantilla"],
+                    empresa_rutas["remisiones"]
+                )
+
+                excel_path = self.excel_handler.update_control_file(
+                    data,
+                    empresa_rutas["control"]
+                )
+
+                self.cache_manager.update_cache(pdf_path, {
+                    "remision": doc_path,
+                    "control": excel_path
+                })
+
+                self.log_message(f"Completado: {pdf_path.name}")
+                self.stats["processed"] += 1
+                processed += 1
+
+            except Exception as e:
+                error_msg = f"Error al procesar {pdf_path.name}: {str(e)}"
+                self.log_message(error_msg, error=True)
+                self.stats["errors"] += 1
+                errors += 1
+
+        self.status_label.config(text="Lote completado")
+        summary = (f"Procesamiento completado.\n"
+                   f"- Archivos procesados: {processed}\n"
+                   f"- Omitidos (en caché): {cached}\n"
+                   f"- Errores: {errors}\n"
+                   f"- Total: {total}")
+
+        self.log_message(summary)
+        messagebox.showinfo("Procesamiento completado", summary)
+        self.processing.set(False)
+        self.status_label.config(text="Listo")
+
+    def _sanitize_text(self, text):
+        """
+        Asegura que el texto tenga codificación UTF-8 válida.
+        Args:
+            text (str, bytes, any): Texto a sanitizar.
+        Returns:
+            str: Texto asegurado con codificación UTF-8.
+        """
+        try:
+            if isinstance(text, bytes):
+                return text.decode('utf-8', errors='replace')
+            elif isinstance(text, str):
+                return text.encode('utf-8', errors='replace').decode('utf-8')
+            else:
+                return str(text).encode('utf-8', errors='replace').decode('utf-8')
+        except Exception as e:
+            logging.error(f"Error al sanitizar texto: {str(e)}")
+            return str(text)
+
+def generate_remision_document(data, empresa):
+    """
+    Genera un documento de remisión a partir de los datos extraídos.
+    """
+    try:
+        log(f"Iniciando generación de documento para la empresa: {empresa}")
+        doc_generator = DocumentGenerator()
+        excel_handler = ExcelHandler()
+        
+        empresa_rutas = Config.get_empresa_paths(empresa)
+        log(f"Rutas obtenidas para {empresa}: {empresa_rutas}")
+        
+        template_path = empresa_rutas["plantilla"]
+        output_dir = empresa_rutas["remisiones"]
+        
+        log(f"Usando plantilla: {template_path}")
+        doc_path = doc_generator.generate_remision(data, template_path, output_dir)
+        log(f"Documento de remisión generado en: {doc_path}")
+        
+        control_path = empresa_rutas["control"]
+        log(f"Actualizando archivo de control: {control_path}")
+        excel_path = excel_handler.update_control_file(data, control_path)
+        log(f"Archivo de control actualizado en: {excel_path}")
+        
+        return {
+            "success": True,
+            "documentPath": doc_path,
+            "controlPath": excel_path
+        }
+    except Exception as e:
+        log(f"Error al generar documento de remisión: {str(e)}", level='ERROR')
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+def send_remision_by_email(doc_path, data, empresa):
+    """
+    Envía un documento de remisión por correo electrónico.
+    """
+    try:
+        log(f"Iniciando envío de email para la empresa {empresa} con el documento {doc_path}")
+        email_sender = EmailSender(empresa)
+        
+        cedula = data.get('No_Identificacion', '')
+        nombre = data.get('Nombre_Completo', 'Trabajador')
+        fecha_atencion = data.get('Fecha_Atencion', '')
+        
+        if not cedula:
+            raise ValueError("No se encontró el número de identificación en los datos para el email")
+            
+        log(f"Buscando contacto de email para la cédula: {cedula}")
+        telefono, email_destino = email_sender.obtener_contacto(cedula)
+        
+        if not email_destino:
+            raise ValueError(f"No se encontró el correo electrónico para la cédula {cedula}")
+        
+        log(f"Contacto de email encontrado: {email_destino}. Procediendo a enviar.")
+        success = email_sender.enviar_correo(
+            destinatario=email_destino,
+            nombre=nombre,
+            fecha_atencion=fecha_atencion,
+            archivo_adjunto=doc_path
+        )
+        
+        if success:
+            log("Correo enviado exitosamente.")
+            return {"success": True, "message": "Correo enviado exitosamente"}
+        else:
+            raise RuntimeError("La función enviar_correo de EmailSender retornó False.")
+
+    except Exception as e:
+        log(f"Error al enviar correo: {str(e)}", level='ERROR')
+        return {"success": False, "error": str(e)}
+
+def send_remision_by_whatsapp(doc_path, data, empresa):
+    """
+    Prepara el envío de un documento de remisión por WhatsApp.
+    """
+    try:
+        log(f"Iniciando preparación de WhatsApp para la empresa {empresa} con el documento {doc_path}")
+        whatsapp_sender = WhatsAppSender()
+        
+        cedula = data.get('No_Identificacion', '')
+        nombre = data.get('Nombre_Completo', 'Trabajador')
+        fecha_atencion = data.get('Fecha_Atencion', '')
+        afiliacion = data.get('Afiliacion', empresa)
+        
+        if not cedula:
+            raise ValueError("No se encontró el número de identificación en los datos para WhatsApp")
+
+        empresa_normalizada = afiliacion.upper().strip()
+        log(f"Buscando contacto de WhatsApp para la cédula: {cedula} en la empresa normalizada: {empresa_normalizada}")
+        
+        # Usar la clase EmailSender para obtener el contacto, ya que centraliza la lógica
+        contact_finder = EmailSender(empresa_normalizada)
+        phone, _ = contact_finder.obtener_contacto(cedula)
+        
+        if not phone or phone == "nan":
+            raise ValueError(f"No se encontró el número de teléfono para la cédula {cedula}")
+            
+        log(f"Teléfono encontrado: {phone}. Construyendo mensaje.")
+        mensaje = f"""*Remisión EPS - {afiliacion}*
+
+*Trabajador:* {nombre}
+*Cédula:* {cedula}
+*Fecha de atención:* {fecha_atencion}
+
+Adjunto encontrará su documento de remisión EPS con las recomendaciones médicas.
+
+Por favor:
+1. Revise el documento adjunto ✅
+2. Siga las indicaciones del profesional de salud ✅
+3. Confirme recepción ✅
+
+_Cualquier duda estamos disponibles para resolverla_"""
+        
+        whatsapp_sender.send_message(
+            phone_number=phone,
+            message=mensaje,
+            file_path=doc_path
+        )
+        
+        log("Se ha abierto la URL de WhatsApp y la carpeta del archivo.")
+        return {
+            "success": True,
+            "message": "Se abrirá WhatsApp Web con el mensaje preparado"
+        }
+    except Exception as e:
+        log(f"Error al preparar WhatsApp: {str(e)}", level='ERROR')
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+def log(message, level='INFO'):
+    """Envía un log estructurado a stdout y también al logger de archivo."""
+    # Imprimir para que Electron lo capture
+    print(json.dumps({'type': 'log', 'level': level, 'message': message}))
+    # Registrar en el archivo de log de Python
+    if level == 'ERROR':
+        logger.error(message)
+    elif level == 'WARN':
+        logger.warning(message)
+    else:
+        logger.info(message)
+
+if __name__ == "__main__":
+    import sys
+    import json
+    
+    # Redirigir el logger de Python a stdout para que Electron lo capture todo
+    # Esto es útil para logs de librerías de terceros
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    # Descomentar la siguiente línea para una depuración muy detallada:
+    # logger.addHandler(stream_handler)
+
+    if len(sys.argv) > 2:
+        command = sys.argv[1]
+        data_file = sys.argv[2]
+        result = {}
+        
+        try:
+            log(f"Comando '{command}' recibido con el archivo de datos: {data_file}")
+            with open(data_file, 'r', encoding='utf-8') as f:
+                temp_data = json.load(f)
+            
+            if command == "--generate-remision":
+                result = generate_remision_document(temp_data['data'], temp_data['empresa'])
+            elif command == "--send-email":
+                result = send_remision_by_email(
+                    temp_data['docPath'], 
+                    temp_data['data'], 
+                    temp_data['empresa']
+                )
+            elif command == "--send-whatsapp":
+                result = send_remision_by_whatsapp(
+                    temp_data['docPath'], 
+                    temp_data['data'], 
+                    temp_data['empresa']
+                )
+            else:
+                result = {"success": False, "error": "Comando no reconocido"}
+
+        except Exception as e:
+            log(f"Error crítico en la ejecución del script: {str(e)}", level='ERROR')
+            result = {"success": False, "error": str(e), "traceback": traceback.format_exc()}
+        
+        # Imprimir el resultado final
+        final_output = {'type': 'result', 'payload': result}
+        print(json.dumps(final_output, ensure_ascii=False))
+
+    else:
+        # Comportamiento normal de la aplicación GUI
+        log("Iniciando en modo de interfaz gráfica (GUI).")
         app = RemisionesApp()
         app.mainloop()

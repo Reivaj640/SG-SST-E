@@ -101,6 +101,23 @@ const COMPANY_BUTTONS = ["Tempoactiva", "Temposum", "Aseplus", "Asel"];
 // --- Estado de la Aplicación ---
 let currentCompany = null;
 let currentModule = null;
+let logBuffer = []; // Búfer para almacenar los logs
+
+// --- Función de Logging Centralizada ---
+function logMessage(message, level = 'INFO') {
+  const timestamp = new Date().toLocaleTimeString();
+  const formattedMessage = `[${timestamp}] [${level}] ${message}`;
+  
+  // Guardar siempre en el búfer
+  logBuffer.push(formattedMessage);
+
+  // Si el área de logs está visible, actualizarla en tiempo real
+  const logTextarea = document.querySelector('.log-area textarea');
+  if (logTextarea) {
+    logTextarea.value = logBuffer.join('\n');
+    logTextarea.scrollTop = logTextarea.scrollHeight; // Auto-scroll al final
+  }
+}
 
 // --- Elementos del DOM ---
 let contentArea;
@@ -122,6 +139,16 @@ document.addEventListener('DOMContentLoaded', () => {
   companyLogoPlaceholder = document.getElementById('company-logo-placeholder');
 
   console.log('DOM elements found:', { contentArea, sidebarMenu, companyNameElement, companyLogoElement, companyLogoPlaceholder });
+
+  // Escuchar eventos de log desde el proceso principal
+  if (window.electronAPI && window.electronAPI.onIpcMessage) {
+    window.electronAPI.onIpcMessage('log-message', (message, level) => {
+      logMessage(message, level);
+    });
+    logMessage('Renderer: Conectado al sistema de logs del proceso principal.', 'DEBUG');
+  } else {
+    console.error('API de logging no disponible en window.electronAPI');
+  }
 
   if (!contentArea || !sidebarMenu) {
     console.error("No se pudieron encontrar elementos críticos del DOM.");
@@ -1200,6 +1227,11 @@ Error al mapear el directorio: ${error.message}`;
   logArea.className = 'log-area';
   logArea.innerHTML = '<h3>Registro de Actividad</h3><textarea disabled></textarea>';
   pathLinkingDiv.appendChild(logArea);
+
+  // Poblar el área de log con el búfer existente
+  const logTextarea = logArea.querySelector('textarea');
+  logTextarea.value = logBuffer.join('\n');
+  logTextarea.scrollTop = logTextarea.scrollHeight;
   
   // Botón para asegurar configuración
   const saveButton = document.createElement('button');
