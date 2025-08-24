@@ -30,26 +30,23 @@ import sys
 
 warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
 
-# Configurar el logger para que no muestre mensajes en la terminal
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARNING)  # Solo mostrar advertencias y errores
+# Configuración de logging centralizada.
+# Los logs se enviarán a stderr por defecto, y el resultado JSON a stdout.
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', stream=sys.stderr)
 
-# Si ya hay handlers, limpiarlos
-if logger.hasHandlers():
-    logger.handlers.clear()
-
-# Crear un handler que descarte los mensajes
-class NullHandler(logging.Handler):
-    def emit(self, record):
-        pass
-
-logger.addHandler(NullHandler())
-
-# Configuración de logging para captura en Electron
 def log(message, level='INFO'):
-    """Función de logging para enviar mensajes a la consola"""
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    print(f"[{timestamp}] {level}: {message}")
+    """Función de logging para enviar mensajes al logger configurado."""
+    level = level.upper()
+    if level == 'DEBUG':
+        logging.debug(message)
+    elif level == 'INFO':
+        logging.info(message)
+    elif level == 'WARNING':
+        logging.warning(message)
+    elif level == 'ERROR':
+        logging.error(message)
+    else:
+        logging.info(message)
 
 class Config:
     # Columnas para el archivo de control
@@ -207,7 +204,7 @@ Correo: {remitente}"""
         },
         "ASEL": {
             "base": Path("G:/Mi unidad/2. Trabajo/1. SG-SST/19. Asel S.A.S/3. Gestión de la Salud"),
-            "remisiones": Path("G:/Mi unidad2. Trabajo/1. SG-SST/19. Asel S.A.S/3. Gestión de la Salud/3.1.6 Restricciones y recomendaciones médicas/3.1.6.1. Remisiones EPS"),
+            "remisiones": Path("G:/Mi unidad/2. Trabajo/1. SG-SST/19. Asel S.A.S/3. Gestión de la Salud/3.1.6 Restricciones y recomendaciones médicas/3.1.6.1. Remisiones EPS"),
             "plantilla": Path("G:/Mi unidad/2. Trabajo/1. SG-SST/19. Asel S.A.S/3. Gestión de la Salud/3.1.6 Restricciones y recomendaciones médicas/3.1.6.1. Remisiones EPS/GI-OD-007 REMISION A EPS.docx"),
             "control": Path("G:/Mi unidad/2. Trabajo/1. SG-SST/19. Asel S.A.S/3. Gestión de la Salud/3.1.6 Restricciones y recomendaciones médicas/3.1.6.1. Remisiones EPS/GI-FO-012 CONTROL DE REMISIONES.xlsx")
         }
@@ -218,7 +215,6 @@ Correo: {remitente}"""
         """Obtiene las rutas para una empresa específica de forma más flexible."""
         afiliacion_normalizada = afiliacion.strip().upper()
         
-        # Mapeo más flexible de palabras clave a nombres de empresa canónicos
         mapeo_afiliaciones = {
             "TEMPOACTIVA": "TEMPOACTIVA",
             "TEMPOSUM": "TEMPOSUM",
@@ -227,7 +223,6 @@ Correo: {remitente}"""
         }
         
         for clave, empresa in mapeo_afiliaciones.items():
-            # Busca la clave como una palabra completa o parte del nombre
             if clave in afiliacion_normalizada:
                 log(f"Afiliación '{afiliacion}' mapeada a la empresa '{empresa}'")
                 return cls.RUTAS.get(empresa, cls.RUTAS["TEMPOACTIVA"])
@@ -238,27 +233,22 @@ Correo: {remitente}"""
 class WhatsAppSender:
     def send_message(self, phone_number, message, file_path=None):
         try:
-            # Copiar el mensaje al portapapeles
             pyperclip.copy(message)
-            logger.info("Mensaje copiado al portapapeles.")
+            log("Mensaje copiado al portapapeles.")
 
-            # Codificar el mensaje para URL
             encoded_message = quote(message)
             url = f"https://api.whatsapp.com/send?phone={phone_number}&text={encoded_message}"
             
             webbrowser.open(url)
 
-            # Abrir el archivo en el navegador para facilitar el adjunto
             if file_path and Path(file_path).exists():
                 os.startfile(file_path)
-
-                # Abrir carpeta contenedora del archivo automáticamente
                 folder_path = os.path.dirname(file_path)
-                os.startfile(folder_path)  # Windows
+                os.startfile(folder_path)
 
-            logger.info(f"Mensaje de WhatsApp enviado a y carpeta de archivo abierto para {phone_number}")
+            log(f"Mensaje de WhatsApp enviado a y carpeta de archivo abierto para {phone_number}")
         except Exception as e:
-            logger.error(f"Error al enviar WhatsApp: {str(e)}")
+            log(f"Error al enviar WhatsApp: {str(e)}", level='ERROR')
             raise
 
 class EmailSender:
@@ -270,13 +260,11 @@ class EmailSender:
         
         if not self.credenciales:
             raise ValueError(f"No hay credenciales configuradas para {self.empresa}")
-        
-        self.logger = logging.getLogger("EmailSender")
 
     def obtener_contacto(self, cedula):
         try:
             if not self.base_datos or not Path(self.base_datos).exists():
-                self.logger.warning(f"Base de datos no encontrada: {self.base_datos}")
+                log(f"Base de datos no encontrada: {self.base_datos}", level='WARNING')
                 return None, None
                 
             df = pd.read_excel(
@@ -285,16 +273,14 @@ class EmailSender:
                 dtype=str
             )
             
-            # Buscar columnas relevantes
             col_cedula = next((col for col in df.columns if 'CEDULA' in col.upper() or 'IDENTIFICACIÓN' in col.upper()), None)
             col_celular = next((col for col in df.columns if 'CELULAR' in col.upper() or 'TELÉFONO' in col.upper()), None)
             col_email = next((col for col in df.columns if 'CORREO' in col.upper() or 'EMAIL' in col.upper()), None)
             
             if not col_cedula or not col_celular:
-                self.logger.error("Columnas críticas no encontradas en la base de datos")
+                log("Columnas críticas no encontradas en la base de datos", level='ERROR')
                 return None, None
                 
-            # Buscar el registro
             registro = df[df[col_cedula].astype(str).str.strip() == str(cedula).strip()]
             
             if not registro.empty:
@@ -304,30 +290,26 @@ class EmailSender:
                 
             return None, None
         except Exception as e:
-            self.logger.error(f"Error al obtener contacto: {str(e)}")
+            log(f"Error al obtener contacto: {str(e)}", level='ERROR')
             return None, None
 
     def enviar_correo(self, destinatario, nombre, fecha_atencion, archivo_adjunto):
         try:
-            # Validación básica de parámetros
-            if not all([destinatario, nombre, fecha_atencion, archivo_adjunto]):
-                raise ValueError("Faltan parámetros requeridos para enviar el correo")
+            if not all([destinatario, nombre, archivo_adjunto]):
+                raise ValueError("Faltan parámetros requeridos (destinatario, nombre o adjunto) para enviar el correo")
                 
             if not Path(archivo_adjunto).exists():
                 raise FileNotFoundError(f"Archivo adjunto no encontrado: {archivo_adjunto}")
 
-            # Construir mensaje personalizado
             asunto = self.plantilla["asunto"]
             cuerpo = self.plantilla["cuerpo"].format(
                 nombre=nombre,
-                fecha=fecha_atencion,
+                fecha=fecha_atencion or 'N/A',
                 empresa=self.empresa,
                 remitente=self.credenciales["email"]
             )
 
-            # Configurar mensaje MIME
             msg = MIMEMultipart()
-            # Encode both the empresa name and email address to handle non-ASCII characters
             encoded_empresa = Header(self.empresa, 'utf-8').encode()
             email_address = self.credenciales["email"].encode('ascii', errors='ignore').decode('ascii')
             msg['From'] = formataddr((encoded_empresa, email_address))
@@ -335,19 +317,14 @@ class EmailSender:
             msg['Subject'] = Header(asunto, 'utf-8').encode()
             msg.attach(MIMEText(cuerpo, 'plain', 'utf-8'))
 
-            # Adjuntar documento
             with open(archivo_adjunto, "rb") as adjunto:
                 parte = MIMEBase('application', 'octet-stream')
                 parte.set_payload(adjunto.read())
                 encoders.encode_base64(parte)
                 nombre_archivo = os.path.basename(archivo_adjunto)
-                parte.add_header(
-                    'Content-Disposition',
-                    f'attachment; filename= {nombre_archivo}'
-                )
+                parte.add_header('Content-Disposition', f'attachment; filename= {nombre_archivo}')
                 msg.attach(parte)
 
-            # Enviar correo
             servidor = smtplib.SMTP('smtp.gmail.com', 587)
             servidor.starttls()
             servidor.login(self.credenciales["email"], self.credenciales["password"])
@@ -355,11 +332,11 @@ class EmailSender:
             servidor.sendmail(self.credenciales["email"], destinatario, texto)
             servidor.quit()
 
-            self.logger.info(f"Correo enviado exitosamente a {destinatario}")
+            log(f"Correo enviado exitosamente a {destinatario}")
             return True
 
         except Exception as e:
-            self.logger.error(f"Error al enviar correo: {str(e)}")
+            log(f"Error al enviar correo: {str(e)}", level='ERROR')
             return False
 
 class PdfProcessor:
@@ -380,7 +357,7 @@ class PdfProcessor:
             data = self._post_process_data(data)
             self._validate_critical_data(data, pdf_path.name)
 
-            for campo in ['Concepto Altura', 'Concepto de trabajo en espacios confinados', 'Motivo de Restricción', 'Incluir SVE', 'Restricciones Laborales', 'Concepto Manipulación Alimento']:
+            for campo in ['No_Identificacion', 'Nombre_Completo', 'Concepto Altura', 'Concepto de trabajo en espacios confinados','Motivo de Restricción', 'Incluir SVE', 'Restricciones Laborales', 'Concepto Manipulación Alimento']:
                 if not data.get(campo):
                     data[campo] = "NINGUNO"
 
@@ -388,91 +365,30 @@ class PdfProcessor:
             data['fecha_procesamiento'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             return data
         except Exception as e:
-            logger.error(f"Error en extract_pdf_data para {pdf_path}: {str(e)}")
+            log(f"Error en extract_pdf_data para {pdf_path}: {str(e)}", level='ERROR')
             raise ValueError(f"Errores en la extracción de datos en {pdf_path.name}: {str(e)}")
 
     def _extract_formato_generico(self, text):
-        """Extracción genérica para manejar otros formatos posibles"""
         extraction_rules = {
-            'Nombre Completo': {
-                'pattern': r'(?:Nombre\s*Completo|Paciente|Nombre)[:\s]*(.*?)(?:\n|SEXO:|DOCUMENTO|IDENTIFICACI[ÓO]N|$)',
-                'processor': lambda x: x.strip().upper() if x else ""
-            },
-            'No_Identificacion': {
-                'pattern': r'(?:Documento[:\s]*CC[:\s]*(\d+))|' 
-                           r'(?:(?:No\.|N[úu]mero)\s*(?:de)?\s*Identificaci[óo]n[:\s]*(?:CC\s*-\s*)?(\d{7,12}))|' 
-                           r'(?:(?:CC|TI|CE)[:\s-]*(\d{7,12}))|' 
-                           r'(?:(?:c[ée]dula|documento|identificaci[óo]n)[:\s]*(\d{7,12}))',
-                'processor': lambda x: re.sub(r'[^\d]', '', x.strip()) if x else ""
-            },
-            'Fecha Nac': {
-                'pattern': r'Fecha\s*(?:de)?\s*Nac(?:imiento)?[:\s]*([\d/-]+)',
-                'processor': lambda x: self._format_date(x.strip()) if x else ""
-            },
-            'Edad': {
-                'pattern': r'Edad[:\s]*(\d+)',
-                'processor': lambda x: int(x.strip()) if x and x.strip().isdigit() else ""
-            },
-            'Sexo': {
-                'pattern': r'(?:Sexo|G[ée]nero)[:\s]*([A-Za-zÁ-Úá-ú]+)',
-                'processor': lambda x: x.strip().capitalize() if x else ""
-            },
-            'Afiliación': {
-                'pattern': r'(?:Afiliaci[óo]n|Empresa)[:\s]*(.*?)(?:\n|$)',
-                'processor': lambda x: self._process_afiliacion(x.strip()) if x else ""
-            },
-            'Estado civil': {
-                'pattern': r'Estado\s*civil[:\s]*(.*?)(?:\n|$)',
-                'processor': lambda x: x.strip().capitalize() if x else ""
-            },
-            'Evaluación Ocupacional': {
-                'pattern': r'(?:TIPO\s*DE\s*EVALUACI[ÓO]N\s*REALIZADA|Tipo\s*de\s*Examen|Evaluaci[óo]n\s*Ocupacional)[:\s]*([^:\n]+?)(?=\s*Fecha\s*de\s*atenci[óo]n:|$)',
-                'processor': lambda x: x.strip().upper() if x else ""
-            },
-            'Fecha de Atención': {
-                'pattern': r'Fecha\s*(?:de)?\s*atenci[óo]n[:\s]*([\d/-]+)',
-                'processor': lambda x: self._format_date(x.strip()) if x else ""
-            },
-            'Cargo': {
-                'pattern': r'Cargo[:\s]*([^:\n]+?)(?=\s*Fecha\s*de|$)',
-                'processor': self._process_cargo
-            },
-            'Exámenes realizados': {
-                'pattern': r'EX[ÁA]MENES\s*REALIZADOS[:\s]*(.*?)(?=\s*(?:RECOMENDACIONES|INCLUIR|RESTRICCIONES|MANEJO|$))',
-                'processor': lambda x: x.strip().replace('\n', ' ').strip().upper() if x else ""
-            },
-            'Recomendaciones Laborales': {
-                'pattern': r'RECOMENDACIONES\s*LABORALES[:\s]*(.*?)(?=MANEJO\s*EPS/ARL|\Z)',
-                'processor': lambda x: x.strip().upper() if x else "NINGUNO"
-            },
-            'Incluir SVE': {
-                'pattern': r'Incluir\s*SVE[:\s]*([^\n:]+?)(?=\s*(?:RESTRICCIONES|Concepto|$))',
-                'processor': lambda x: x.strip().upper() if x and not x.strip().startswith('RESTRICCIONES') else "NINGUNO"
-            },
-            'Restricciones Laborales': {
-                'pattern': r'RESTRICCIONES\s*LABORALES[:\s]*(.*?)(?=\s*(?:Para\s*la\s*revisi[óo]n|INCLUIR|CONCEPTO|[A-ZÁ-Ú]+:|$))',
-                'processor': lambda x: x.strip().upper() if x else "NINGUNO"
-            },
-            'Concepto Medico': {
-                'pattern': r'Concepto\s*Medico[:\s]*((?!LEVANTAMIENTO)[^:\n]+)',
-                'processor': lambda x: x.strip().upper() if x else "NINGUNO"
-            },
-            'Concepto Manipulación Alimento': {
-                'pattern': r'Concepto\s*(?:Manipulaci[óo]n)?\s*Alimento[:\s]*(.*?)(?:\n|$)',
-                'processor': lambda x: x.strip().upper() if x else "NINGUNO"
-            },
-            'Concepto Altura': {
-                'pattern': r'Concepto\s*Altura[:\s]*(.*?)(?:\n|$)',
-                'processor': lambda x: x.strip().upper() if x else "NINGUNO"
-            },
-            'Concepto de trabajo en espacios confinados': {
-                'pattern': r'Concepto\s*de\s*trabajo\s*en\s*espacios\s*confinados[:\s]*([^\n:]+?)(?=\s*(?:MOTIVO|$))',
-                'processor': lambda x: x.strip().upper() if x and not x.strip().startswith('MOTIVO') else "NINGUNO"
-            },
-            'Motivo de Restricción': {
-                'pattern': r'MOTIVO\s*DE\s*RESTRICCI[OÓ]N[:\s]*(.*?)(?:\nFIRMA|\Z)',
-                'processor': lambda x: x.strip().upper() if x else "NINGUNO"
-            },
+            'Nombre Completo': {'pattern': r'(?:Nombre\s*Completo|Paciente|Nombre)[:\s]*(.*?)(?:\n|SEXO:|DOCUMENTO|IDENTIFICACI[ÓO]N|$)', 'processor': lambda x: x.strip().upper() if x else ""},
+            'No_Identificacion': {'pattern': r'(?:Documento[:\s]*CC[:\s]*(\d+))|(?:(?:No\.|N[úu]mero)\s*(?:de)?\s*Identificaci[óo]n[:\s]*(?:CC\s*-\s*)?(\d{7,12}))|(?:(?:CC|TI|CE)[:\s-]*(\d{7,12}))|(?:(?:c[ée]dula|documento|identificaci[óo]n)[:\s]*(\d{7,12}))', 'processor': lambda x: re.sub(r'[^\d]', '', x.strip()) if x else ""},
+            'Fecha Nac': {'pattern': r'Fecha\s*(?:de)?\s*Nac(?:imiento)?[:\s]*([\d/-]+)', 'processor': lambda x: self._format_date(x.strip()) if x else ""},
+            'Edad': {'pattern': r'Edad[:\s]*(\d+)', 'processor': lambda x: int(x.strip()) if x and x.strip().isdigit() else ""},
+            'Sexo': {'pattern': r'(?:Sexo|G[ée]nero)[:\s]*([A-Za-zÁ-Úá-ú]+)', 'processor': lambda x: x.strip().capitalize() if x else ""},
+            'Afiliación': {'pattern': r'(?:Afiliaci[óo]n|Empresa)[:\s]*(.*?)(?:\n|$)', 'processor': lambda x: self._process_afiliacion(x.strip()) if x else ""},
+            'Estado civil': {'pattern': r'Estado\s*civil[:\s]*(.*?)(?:\n|$)', 'processor': lambda x: x.strip().capitalize() if x else ""},
+            'Evaluación Ocupacional': {'pattern': r'(?:TIPO\s*DE\s*EVALUACI[ÓO]N\s*REALIZADA|Tipo\s*de\s*Examen|Evaluaci[óo]n\s*Ocupacional)[:\s]*([^:\n]+?)(?=\s*Fecha\s*de\s*atenci[óo]n:|$)', 'processor': lambda x: x.strip().upper() if x else ""},
+            'Fecha de Atención': {'pattern': r'Fecha\s*(?:de)?\s*atenci[óo]n[:\s]*([\d/-]+)', 'processor': lambda x: self._format_date(x.strip()) if x else ""},
+            'Cargo': {'pattern': r'Cargo[:\s]*([^:\n]+?)(?=\s*Fecha\s*de|$)', 'processor': self._process_cargo},
+            'Exámenes realizados': {'pattern': r'EX[ÁA]MENES\s*REALIZADOS[:\s]*(.*?)(?=\s*(?:RECOMENDACIONES|INCLUIR|RESTRICCIONES|MANEJO|$))', 'processor': lambda x: x.strip().replace('\n', ' ').strip().upper() if x else ""},
+            'Recomendaciones Laborales': {'pattern': r'RECOMENDACIONES\s*LABORALES[:\s]*(.*?)(?=MANEJO\s*EPS/ARL|\Z)', 'processor': lambda x: x.strip().upper() if x else "NINGUNO"},
+            'Incluir SVE': {'pattern': r'Incluir\s*SVE[:\s]*([^\n:]+?)(?=\s*(?:RESTRICCIONES|Concepto|$))', 'processor': lambda x: x.strip().upper() if x and not x.strip().startswith('RESTRICCIONES') else "NINGUNO"},
+            'Restricciones Laborales': {'pattern': r'RESTRICCIONES\s*LABORALES[:\s]*(.*?)(?=\s*(?:Para\s*la\s*revisi[óo]n|INCLUIR|CONCEPTO|[A-ZÁ-Ú]+:|$))', 'processor': lambda x: x.strip().upper() if x else "NINGUNO"},
+            'Concepto Medico': {'pattern': r'Concepto\s*Medico[:\s]*((?!LEVANTAMIENTO)[^:\n]+)', 'processor': lambda x: x.strip().upper() if x else "NINGUNO"},
+            'Concepto Manipulación Alimento': {'pattern': r'Concepto\s*(?:Manipulaci[óo]n)?\s*Alimento[:\s]*(.*?)(?:\n|$)', 'processor': lambda x: x.strip().upper() if x else "NINGUNO"},
+            'Concepto Altura': {'pattern': r'Concepto\s*Altura[:\s]*(.*?)(?:\n|$)', 'processor': lambda x: x.strip().upper() if x else "NINGUNO"},
+            'Concepto de trabajo en espacios confinados': {'pattern': r'Concepto\s*de\s*trabajo\s*en\s*espacios\s*confinados[:\s]*([^:\n]+?)(?=\s*(?:MOTIVO|$))', 'processor': lambda x: x.strip().upper() if x and not x.strip().startswith('MOTIVO') else "NINGUNO"},
+            'Motivo de Restricción': {'pattern': r'MOTIVO\s*DE\s*RESTRICCI[OÓ]N[:\s]*(.*?)(?:\nFIRMA|\Z)', 'processor': lambda x: x.strip().upper() if x else "NINGUNO"},
         }
 
         data = {}
@@ -483,7 +399,7 @@ class PdfProcessor:
                 data[key] = rule['processor'](value)
             else:
                 data[key] = ""
-                logging.warning(f"No se encontró el campo '{key}' usando regex genérico")
+                log(f"No se encontró el campo '{key}' usando regex genérico", level='WARNING')
 
         return data
 
@@ -493,10 +409,7 @@ class PdfProcessor:
         return data
 
     def _validate_critical_data(self, data, filename):
-        required_fields = {
-            'No_Identificacion': "No Identificacion no encontrado",
-            'Fecha de Atención': "Fecha de Atención no encontrada",
-        }
+        required_fields = {'No_Identificacion': "No Identificacion no encontrado"}
         errors = []
         for field, message in required_fields.items():
             if not data.get(field):
@@ -505,26 +418,20 @@ class PdfProcessor:
             raise ValueError(", ".join(errors))
 
     def _format_date(self, date_str):
-        if not date_str:
-            return ""
+        if not date_str: return ""
         date_formats = ['%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%Y/%m/%d']
         for fmt in date_formats:
             try:
-                date_obj = datetime.strptime(date_str, fmt)
-                return date_obj.strftime('%Y/%m/%d')
+                return datetime.strptime(date_str, fmt).strftime('%Y/%m/%d')
             except ValueError:
                 continue
         return date_str
 
     def _process_afiliacion(self, value):
-        if not value:
-            return ""
-        return value.strip().upper()
+        return value.strip().upper() if value else ""
 
     def _process_cargo(self, value):
-        if not value:
-            return ""
-        return value.strip().upper()
+        return value.strip().upper() if value else ""
 
 class ExcelHandler:
     def update_control_file(self, data, control_path):
@@ -538,33 +445,20 @@ class ExcelHandler:
                 header_row = 6
 
             df = df.dropna(how='all')
-            if not df.empty:
-                df['No_Identificacion'] = df['No_Identificacion'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
-                if 'Fecha de Atención' in df.columns:
-                    df['Fecha de Atención'] = pd.to_datetime(df['Fecha de Atención'], errors='coerce')
+            if not df.empty and 'No_Identificacion' in df.columns:
+                df['No_Identificacion'] = df['No_Identificacion'].astype(str).str.replace(r'\.0$', '', regex=True)
 
-            data_id = str(data['No_Identificacion']).strip()
-            data_date = pd.to_datetime(data['Fecha de Atención'], errors='coerce')
+            no_id = data.get("No_Identificacion") or "NO_DISPONIBLE"
+            new_row = {col: data.get(col, "NO_DISPONIBLE") for col in Config.COLUMNAS_CONTROL}
+            new_row["No_Identificacion"] = no_id
+            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
 
-            same_person = (df['No_Identificacion'] == data_id) & (df['Fecha de Atención'] == data_date)
-            
-            new_row_data = {col: data.get(col, '') for col in df.columns}
-            if 'Item' in df.columns and not df['Item'].isnull().all():
-                new_row_data['Item'] = int(df['Item'].dropna().max()) + 1
-            else:
-                new_row_data['Item'] = 1
+            with pd.ExcelWriter(control_path, engine='openpyxl', mode='w') as writer:
+                df.to_excel(writer, index=False, startrow=header_row)
 
-            if same_person.any():
-                df.update(pd.DataFrame(new_row_data, index=df[same_person].index))
-            else:
-                df = pd.concat([df, pd.DataFrame([new_row_data])], ignore_index=True)
-
-            with pd.ExcelWriter(control_path, engine='openpyxl') as writer:
-                df.to_excel(writer, index=False, header=True, startrow=header_row)
-
+            return {"success": True, "file": str(control_path)}
         except Exception as e:
-            logger.error(f"Error al actualizar archivo de control: {str(e)}")
-            raise
+            return {"success": False, "error": str(e), "traceback": traceback.format_exc()}
 
 class DocumentGenerator:
     def generate_remision(self, data, template_path, output_dir):
@@ -595,12 +489,10 @@ class DocumentGenerator:
             doc.save(output_path)
             return str(output_path)
         except Exception as e:
-            logger.error(f"Error en generate_remision: {str(e)}")
-            raise# Funciones principales que se llaman desde Electron
+            log(f"Error en generate_remision: {str(e)}", level='ERROR')
+            raise
+
 def generate_remision_document(data, empresa):
-    """
-    Genera un documento de remisión a partir de los datos extraídos.
-    """
     try:
         log(f"Iniciando generación de documento para la empresa: {empresa}")
         doc_generator = DocumentGenerator()
@@ -621,22 +513,12 @@ def generate_remision_document(data, empresa):
         excel_path = excel_handler.update_control_file(data, control_path)
         log(f"Archivo de control actualizado en: {excel_path}")
         
-        return {
-            "success": True,
-            "documentPath": doc_path,
-            "controlPath": excel_path
-        }
+        return {"success": True, "documentPath": doc_path, "controlPath": excel_path}
     except Exception as e:
         log(f"Error al generar documento de remisión: {str(e)}", level='ERROR')
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        return {"success": False, "error": str(e)}
 
 def send_remision_by_email(doc_path, data, empresa):
-    """
-    Envía un documento de remisión por correo electrónico.
-    """
     try:
         log(f"Iniciando envío de email para la empresa {empresa} con el documento {doc_path}")
         email_sender = EmailSender(empresa)
@@ -648,8 +530,7 @@ def send_remision_by_email(doc_path, data, empresa):
         if not cedula:
             raise ValueError("No se encontró el número de identificación en los datos para el email")
             
-        contacto = email_sender.obtener_contacto(cedula)
-        destinatario = contacto.get('email', '')
+        telefono, destinatario = email_sender.obtener_contacto(cedula)
         
         if not destinatario:
             raise ValueError("No se encontró la dirección de correo para el destinatario")
@@ -658,72 +539,43 @@ def send_remision_by_email(doc_path, data, empresa):
         
         if success:
             log(f"Documento enviado exitosamente por email a {destinatario}")
-            return {
-                "success": True,
-                "message": "Documento enviado exitosamente por email"
-            }
+            return {"success": True, "message": "Documento enviado exitosamente por email"}
         else:
             log("Error al enviar el documento por email", level='ERROR')
-            return {
-                "success": False,
-                "error": "Error al enviar el documento por email"
-            }
+            return {"success": False, "error": "Error interno al enviar el documento por email"}
     except Exception as e:
         log(f"Error al enviar documento por email: {str(e)}", level='ERROR')
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        return {"success": False, "error": str(e)}
 
 def send_remision_by_whatsapp(doc_path, data, empresa):
-    """
-    Prepara un documento de remisión para enviar por WhatsApp.
-    """
     try:
         log(f"Iniciando preparación de documento para WhatsApp: {doc_path}")
+        email_sender = EmailSender(empresa)
+        cedula = data.get('No_Identificacion', '')
+        if not cedula:
+            raise ValueError("No se encontró Cédula para buscar contacto de WhatsApp.")
         
-        # En una implementación real, aquí se prepararía el documento para enviar por WhatsApp
-        # Por ahora, solo devolvemos la ruta del documento
+        telefono, _ = email_sender.obtener_contacto(cedula)
+        
+        if not telefono:
+            raise ValueError("No se encontró teléfono para el contacto.")
+
         if os.path.exists(doc_path):
             log(f"Documento preparado para WhatsApp: {doc_path}")
             return {
                 "success": True,
                 "documentPath": doc_path,
+                "phoneNumber": telefono,
                 "message": "Documento preparado para enviar por WhatsApp"
             }
         else:
-            log("Documento no encontrado para enviar por WhatsApp", level='ERROR')
-            return {
-                "success": False,
-                "error": "Documento no encontrado"
-            }
+            log(f"Documento no encontrado para enviar por WhatsApp: {doc_path}", level='ERROR')
+            return {"success": False, "error": "Documento no encontrado"}
     except Exception as e:
         log(f"Error al preparar documento para WhatsApp: {str(e)}", level='ERROR')
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        return {"success": False, "error": str(e)}
 
-
-# Punto de entrada principal cuando se ejecuta como script
 if __name__ == "__main__":
-    # Redirigir el logger de Python a stdout para que Electron lo capture todo
-    import logging
-    import sys
-    
-    # Configurar logging para salida a stdout
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
-    
-    # Limpiar handlers existentes
-    if root_logger.hasHandlers():
-        root_logger.handlers.clear()
-    
-    # Agregar handler para stdout
-    stream_handler = logging.StreamHandler(sys.stdout)
-    stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-    root_logger.addHandler(stream_handler)
-
     if len(sys.argv) > 2:
         command = sys.argv[1]
         data_file = sys.argv[2]
@@ -734,20 +586,14 @@ if __name__ == "__main__":
             with open(data_file, 'r', encoding='utf-8') as f:
                 temp_data = json.load(f)
 
+            data = temp_data.get('data', {})
+            
             if command == "--generate-remision":
-                result = generate_remision_document(temp_data['data'], temp_data['empresa'])
+                result = generate_remision_document(data, temp_data['empresa'])
             elif command == "--send-email":
-                result = send_remision_by_email(
-                    temp_data['docPath'],
-                    temp_data['data'],
-                    temp_data['empresa']
-                )
+                result = send_remision_by_email(temp_data['docPath'], data, temp_data['empresa'])
             elif command == "--send-whatsapp":
-                result = send_remision_by_whatsapp(
-                    temp_data['docPath'],
-                    temp_data['data'],
-                    temp_data['empresa']
-                )
+                result = send_remision_by_whatsapp(temp_data['docPath'], data, temp_data['empresa'])
             else:
                 result = {"success": False, "error": "Comando no reconocido"}
 
@@ -755,12 +601,9 @@ if __name__ == "__main__":
             log(f"Error crítico en la ejecución del script: {str(e)}", level='ERROR')
             result = {"success": False, "error": str(e), "traceback": traceback.format_exc()}
 
-        # Imprimir el resultado final
+        # Imprimir el resultado final a stdout
         final_output = {'type': 'result', 'payload': result}
-        print(json.dumps(final_output, ensure_ascii=False))
+        print(json.dumps(final_output, ensure_ascii=False), file=sys.stdout)
 
     else:
-        # Comportamiento normal de la aplicación GUI
-        log("Iniciando en modo de interfaz gráfica (GUI).")
-        # app = RemisionesApp()
-        # app.mainloop()
+        log("Script iniciado sin argumentos para la línea de comandos.")

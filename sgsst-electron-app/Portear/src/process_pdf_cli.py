@@ -26,7 +26,7 @@ class PdfProcessor:
             self._validate_critical_data(data, pdf_path)
             
             # Agregar campos faltantes con NINGUNO
-            for campo in ['Concepto Altura', 'Concepto de trabajo en espacios confinados', 'Motivo de Restricción', 'Incluir SVE', 'Restricciones Laborales', 'Concepto Manipulación Alimento']:
+            for campo in ['No_Identificacion', 'Nombre_Completo', 'Concepto Altura', 'Concepto de trabajo en espacios confinados','Motivo de Restricción', 'Incluir SVE', 'Restricciones Laborales', 'Concepto Manipulación Alimento']:
                 if not data.get(campo):
                     data[campo] = "NINGUNO"
             
@@ -48,8 +48,8 @@ class PdfProcessor:
 
     def _extract_formato_generico(self, text):
         extraction_rules = {
-            'Nombre_Completo': r'(?:PACIENTE|Nombre Completo|Nombre)[:\s]*([A-ZÁÉÍÓÚÑ\s]+?)(?:\n|SEXO:|DOCUMENTO|IDENTIFICACI[ÓO]N|$)',
-            'No_Identificacion': r'(?:Documento[:\s]*CC[:\s]*(\d+))|(?:(?:No\.|N[úu]mero)\s*(?:de)?\s*Identificaci[óo]n[:\s]*(?:CC\s*-\s*)?(\d{7,12}))|(?:(?:CC|TI|CE)[:\s-]*(\d{7,12}))|(?:(?:c[ée]dula|documento|identificaci[óo]n)[:\s]*(\d{7,12}))',
+            'Nombre_Completo': r'(?:Nombre\s*Completo[:\s]*|PACIENTE:[:\s]*)([A-ZÁÉÍÓÚÑ\s]+?)(?:\n|Fecha Nac|SEXO:|$)',
+            'No_Identificacion': r'(?:No\.\s*Identificacion[:\s]*CC\s*-\s*|DOCUMENTO\s*:\s*CC\s+)(\d+)',
             'Fecha_Nac': r'Fecha\s*(?:de)?\s*Nac(?:imiento)?[:\s]*([\d/-]+)',
             'Edad': r'Edad[:\s]*(\d+)',
             'Sexo': r'(?:Sexo|G[ée]nero)[:\s]*([A-Za-zÁ-Úá-ú]+)',
@@ -78,14 +78,39 @@ class PdfProcessor:
         return data
 
     def _post_process_data(self, data):
+        # Normaliza las claves para que siempre tengan los mismos nombres
+        key_map = {
+            'No. Identificacion': 'No_Identificacion',
+            'No Identificacion': 'No_Identificacion',
+            'No_Identificación': 'No_Identificacion',
+            'Nombre Completo': 'Nombre_Completo',
+            'Fecha Nac': 'Fecha_Nac',
+            'Estado civil': 'Estado_civil',
+            'Evaluación Ocupacional': 'Evaluacion_Ocupacional',
+            'Fecha de Atención': 'Fecha_Atencion',
+            'Exámenes realizados': 'Examenes_realizados',
+            'Recomendaciones Laborales': 'Recomendaciones_Laborales',
+            'Concepto Medico': 'Concepto_Medico',
+            'Concepto Manipulación Alimento': 'Concepto_Manipulacion_Alimento',
+            'Concepto Altura': 'Concepto_Altura',
+            'Concepto de trabajo en espacios confinados': 'Concepto_trabajo_en_espacios_confinados',
+            'Motivo de Restricción': 'Motivo_de_Restriccion',
+        }
+        # Usar list(data.keys()) para evitar errores de ejecución al cambiar el tamaño del diccionario
+        for old_key in list(data.keys()):
+            if old_key in key_map:
+                new_key = key_map[old_key]
+                if old_key != new_key:
+                    data[new_key] = data.pop(old_key)
+        
         for key, value in data.items():
             if isinstance(value, str):
                 data[key] = value.upper().replace('\n', ' ').strip()
         
-        if data.get('Fecha Nac'):
-            data['Fecha Nac'] = self._format_date(data['Fecha Nac'])
-        if data.get('Fecha de Atención'):
-            data['Fecha de Atención'] = self._format_date(data['Fecha de Atención'])
+        if data.get('Fecha_Nac'):
+            data['Fecha_Nac'] = self._format_date(data.get('Fecha_Nac', ''))
+        if data.get('Fecha_Atencion'):
+            data['Fecha_Atencion'] = self._format_date(data.get('Fecha_Atencion', ''))
             
         return data
 

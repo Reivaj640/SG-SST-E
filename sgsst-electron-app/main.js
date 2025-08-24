@@ -646,6 +646,29 @@ ${finalResult.debug_full_text}
 
       if (finalResult) {
         sendLog(`Resultado de preparación de WhatsApp: ${JSON.stringify(finalResult)}`);
+        
+        // Si el script fue exitoso y devolvió un número de teléfono
+        if (finalResult.success && finalResult.phoneNumber) {
+          const phoneNumber = finalResult.phoneNumber;
+          let cleanPhoneNumber = String(phoneNumber).replace(/[^0-9]/g, '');
+          if (cleanPhoneNumber.length === 10) {
+            cleanPhoneNumber = `57${cleanPhoneNumber}`;
+          }
+
+          // Datos del trabajador para el mensaje
+          const nombreTrabajador = extractedData['Nombre Completo'] || 'N/A';
+          const cedulaTrabajador = extractedData['No_Identificacion'] || 'N/A';
+
+          // Plantilla del mensaje
+          const messageBody = `Remisión EPS - ${empresa.toUpperCase()}\n\nTrabajador: ${nombreTrabajador}\nCédula: ${cedulaTrabajador}\n\nAdjunto encontrará su documento de remisión EPS con las recomendaciones médicas.\n\nPor favor:\n1. Revise el documento adjunto ✅\n2. Siga las indicaciones del profesional de salud ✅\n3. Confirme recepción ✅\n\nCualquier duda estamos disponibles para resolverla`;
+          
+          const message = encodeURIComponent(messageBody);
+          const whatsappUrl = `https://wa.me/${cleanPhoneNumber}?text=${message}`;
+          
+          sendLog(`Abriendo WhatsApp con la URL: ${whatsappUrl}`);
+          shell.openExternal(whatsappUrl);
+        }
+        
         return finalResult;
       } else {
         throw new Error("El script de Python no devolvió un resultado final.");
