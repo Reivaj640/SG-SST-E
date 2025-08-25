@@ -51,12 +51,12 @@ def log(message, level='INFO'):
 class Config:
     # Columnas para el archivo de control
     COLUMNAS_CONTROL = [
-        "Item", "Nombre Completo", "No_Identificacion", "Fecha Nac", "Edad", "Sexo",
-        "Afiliación", "Estado civil", "Evaluación Ocupacional", "Fecha de Atención",
-        "Cargo", "Exámenes realizados", "Recomendaciones Laborales", "Incluir SVE",
-        "Restricciones Laborales", "Concepto medico laboral", "Concepto Medico",
-        "Concepto Manipulación Alimento", "Concepto Altura",
-        "Concepto de trabajo en espacios confinados", "Motivo de Restricción"
+        "Item", "Nombre_Completo", "No_Identificacion", "Fecha_Nac", "Edad", "Sexo",
+        "Afiliacion", "Estado_civil", "Evaluacion_Ocupacional", "Fecha_Atencion",
+        "Cargo", "Examenes_realizados", "Recomendaciones_Laborales", "Incluir_SVE",
+        "Restricciones_Laborales", "Concepto_medico_laboral", "Concepto_Medico",
+        "Concepto_Manipulacion_Alimento", "Concepto_Altura",
+        "Concepto_de_trabajo_en_espacios_confinados", "Motivo_de_Restriccion"
     ]
     
     # Plantillas de email por tipo de empresa
@@ -453,8 +453,29 @@ class ExcelHandler:
             new_row["No_Identificacion"] = no_id
             df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
 
+            # Renombrar columnas para el output en Excel
+            column_rename_map = {
+                "Nombre_Completo": "Nombre Completo",
+                "Fecha_Nac": "Fecha Nac",
+                "Estado_civil": "Estado civil",
+                "Evaluacion_Ocupacional": "Evaluación Ocupacional",
+                "Fecha_Atencion": "Fecha de Atención",
+                "Examenes_realizados": "Exámenes realizados",
+                "Recomendaciones_Laborales": "Recomendaciones Laborales",
+                "Incluir_SVE": "Incluir SVE",
+                "Restricciones_Laborales": "Restricciones Laborales",
+                "Concepto_medico_laboral": "Concepto medico laboral",
+                "Concepto_Medico": "Concepto Medico",
+                "Concepto_Manipulacion_Alimento": "Concepto Manipulación Alimento",
+                "Concepto_Altura": "Concepto Altura",
+                "Concepto_de_trabajo_en_espacios_confinados": "Concepto de trabajo en espacios confinados",
+                "Motivo_de_Restriccion": "Motivo de Restricción",
+                "Afiliacion": "Afiliación"
+            }
+            df_to_write = df.rename(columns=column_rename_map)
+
             with pd.ExcelWriter(control_path, engine='openpyxl', mode='w') as writer:
-                df.to_excel(writer, index=False, startrow=header_row)
+                df_to_write.to_excel(writer, index=False, startrow=header_row)
 
             return {"success": True, "file": str(control_path)}
         except Exception as e:
