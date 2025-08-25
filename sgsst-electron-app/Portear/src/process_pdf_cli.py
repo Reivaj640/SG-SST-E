@@ -21,6 +21,7 @@ class PdfProcessor:
             
             text = unicodedata.normalize('NFC', text)
             pdf_format = self._detect_pdf_format(text)
+            log(f"Formato de PDF detectado: {pdf_format}")
             data = self._extract_data_based_on_format(text, pdf_format)
             data = self._post_process_data(data)
             self._validate_critical_data(data, pdf_path)
@@ -36,19 +37,55 @@ class PdfProcessor:
             raise
 
     def _detect_pdf_format(self, text):
-        text_upper = text.upper()
-        if "DOCUMENTO : CC" in text_upper and "PACIENTE:" in text_upper:
-            return "formato_1"
-        elif "NOMBRE COMPLETO:" in text_upper and "TIPO DE EVALUACION REALIZADA" in text_upper:
-            return "formato_2"
+        # Se cambia el detector para que busque un identificador más fiable del formato.
+        if "www.biofile.com.co" in text:
+            return "vemedic"
+        if "DOCUMENTO : CC" in text.upper() and "PACIENTE:" in text.upper():
+            return "formato_generico"
         return "formato_generico"
 
+
     def _extract_data_based_on_format(self, text, pdf_format):
-        return self._extract_formato_generico(text)
+        if pdf_format == "vemedic":
+            return self._extract_formato_vemedic(text)
+        else:
+            return self._extract_formato_generico(text)
+
+
+    def _extract_formato_vemedic(self, text):
+        # Reglas de extracción mejoradas para el formato Vemedic (biofile)
+        extraction_rules = {
+            'Nombre_Completo': r'Genero Edad Documento de Identificaci[óo]n\n([^\n]+)',
+            'No_Identificacion': r'CC\s+([\d]+)',
+            'Edad': r'(\d+)\s*AÑOS',
+            'Sexo': r'\n(FEMENINO|MASCULINO)',
+            'Afiliacion': r'DATOS DE LA EMPRESA[^\n]*\n([^\n]+)',
+            'Cargo': r'Cargo\n([^\n]+)',
+            'Fecha_Atencion': r'FECHA Y CIUDAD DE REALIZACI[ÓO]N DEL EX[ÁA]MEN[\s\S]*?(\d{2}\s+\d{2}\s+\d{4})',
+            'Recomendaciones_Laborales': r'RECOMENDACIONES OCUPACIONALES\s*([^\n]+)',
+            'Restricciones_Laborales': r'RESTRICCIONES LABORALES\s*([^\n]+)',
+            'Concepto_Medico': r'CONCEPTO DE APTITUD OCUPACIONAL\s*([^\n]+)',
+            'Evaluacion_Ocupacional': r'TIPO DE EX[ÁA]MEN M[ÉE]DICO OCUPACIONAL\s*([^\n]+)',
+        }
+
+        data = {}
+        for key, pattern in extraction_rules.items():
+            match = re.search(pattern, text, re.IGNORECASE | re.DOTALL | re.UNICODE)
+            value = ""
+            if match:
+                if key == 'Fecha_Atencion':
+                    date_str = match.group(1).strip()
+                    value = date_str.replace(' ', '/')
+                else:
+                    value = next((g for g in match.groups() if g is not None), "")
+            data[key] = value.strip()
+
+        return data
+
 
     def _extract_formato_generico(self, text):
         extraction_rules = {
-            'Nombre_Completo': r'(?:Nombre\s*Completo[:\s]*|PACIENTE:[:\s]*)([A-ZÁÉÍÓÚÑ\s]+?)(?:\n|Fecha Nac|SEXO:|$)',
+            'Nombre_Completo': r'(?:Nombre\s*Completo[:\s]*|PACIENTE[:\s]*)([A-ZÁÉÍÓÚÑ\s]+?)(?:\n|Fecha Nac|SEXO:|$)',
             'No_Identificacion': r'(?:No\.\s*Identificacion[:\s]*CC\s*-\s*|DOCUMENTO\s*:\s*CC\s+)(\d+)',
             'Fecha_Nac': r'Fecha\s*(?:de)?\s*Nac(?:imiento)?[:\s]*([\d/-]+)',
             'Edad': r'Edad[:\s]*(\d+)',
@@ -127,6 +164,7 @@ class PdfProcessor:
             except ValueError:
                 pass
         return date_str
+
 
 # --- Lógica Principal ---
 
