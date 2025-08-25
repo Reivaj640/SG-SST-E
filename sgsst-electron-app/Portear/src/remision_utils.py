@@ -467,18 +467,18 @@ class DocumentGenerator:
             doc = DocxTemplate(template_path)
             context = {
                 'fecha': datetime.now().strftime('%d/%m/%Y'),
-                'nombre_destinatario': data.get('Nombre Completo', 'N/A'),
+                'nombre_destinatario': data.get('Nombre_Completo', 'N/A'),
                 'cc': data.get('No_Identificacion', 'N/A'),
                 'cargo': data.get('Cargo', 'N/A'),
-                'evaluación_ocupacional': data.get('Evaluación Ocupacional', 'N/A'),
-                'recomendaciones_laborales': data.get('Recomendaciones Laborales', 'N/A')
+                'evaluación_ocupacional': data.get('Evaluacion_Ocupacional', 'N/A'),
+                'recomendaciones_laborales': data.get('Recomendaciones_Laborales', 'N/A')
             }
             doc.render(context)
 
             output_dir = Path(output_dir)
             output_dir.mkdir(parents=True, exist_ok=True)
             fecha = datetime.now().strftime('%Y%m%d')
-            nombre_sanitizado = re.sub(r'[<>:"/\\|?*]', '_', data.get('Nombre Completo', 'sin_nombre'))
+            nombre_sanitizado = re.sub(r'[<>:"/\\|?*]', '_', data.get('Nombre_Completo', 'sin_nombre'))
             output_path = output_dir / f"GI-OD-007 REMISION A EPS {nombre_sanitizado} {fecha}.docx"
 
             counter = 1
