@@ -96,7 +96,7 @@ class PdfProcessor:
             'Afiliacion': r'Afiliaci[óo]n[:\s]*(.*?)(?:Estado civil|Ocupacion)',
             'Estado_civil': r'Estado\s*civil[:\s]*(.*?)(?:\n|$)',
             'Evaluacion_Ocupacional': r'(?:TIPO\s*DE\s*EVALUACI[ÓO]N\s*REALIZADA|Tipo\s*de\s*Examen|Evaluaci[óo]n\s*Ocupacional)[:\s]*([^:\n]+?)(?=\s*Fecha\s*de\s*atenci[óo]n:|$)',
-            'Fecha de Atención': r'Fecha\s*(?:de)?\s*atenci[óo]n[:\s]*([\d/-]+)',
+            'Fecha de Atención': r'Fecha\s*(?:de)?\s*atenci[óo]n[:\s]*([0-9]{1,2}[/-][0-9]{1,2}[/-][0-9]{2,4})',
             'Cargo': r'Cargo[:\s]*([^:\n]+?)(?=\s*Fecha\s*de|$)',
             'Examenes_realizados': r'EX[ÁA]MENES\s*REALIZADOS[:\s]*(.*?)(?=\s*(?:RECOMENDACIONES|INCLUIR|RESTRICCIONES|MANEJO|$))',
             'Recomendaciones_Laborales': r'RECOMENDACIONES\s*LABORALES[:\s]*(.*?)(?=MANEJO\s*EPS/ARL|\Z)',
@@ -223,10 +223,6 @@ def main():
                 'traceback': traceback.format_exc()
             }
         }
-        log(f"Datos finales extraídos: {list(extracted_data.keys())}")
-        log(f"Cédula: {extracted_data.get('No. Identificacion', 'NO_ENCONTRADA')}")
-        log(f"Fecha: {extracted_data.get('Fecha de AtenciÃ³n', 'NO_ENCONTRADA')}")
-
         # Imprimir el error final en una sola línea (sin indent=2)
         print(json.dumps(error_info, ensure_ascii=False))
 

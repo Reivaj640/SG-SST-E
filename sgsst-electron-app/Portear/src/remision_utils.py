@@ -378,7 +378,7 @@ class PdfProcessor:
             'Afiliación': {'pattern': r'(?:Afiliaci[óo]n|Empresa)[:\s]*(.*?)(?:\n|$)', 'processor': lambda x: self._process_afiliacion(x.strip()) if x else ""},
             'Estado civil': {'pattern': r'Estado\s*civil[:\s]*(.*?)(?:\n|$)', 'processor': lambda x: x.strip().capitalize() if x else ""},
             'Evaluación Ocupacional': {'pattern': r'(?:TIPO\s*DE\s*EVALUACI[ÓO]N\s*REALIZADA|Tipo\s*de\s*Examen|Evaluaci[óo]n\s*Ocupacional)[:\s]*([^:\n]+?)(?=\s*Fecha\s*de\s*atenci[óo]n:|$)', 'processor': lambda x: x.strip().upper() if x else ""},
-            'Fecha de Atención': {'pattern': r'Fecha\s*(?:de)?\s*atenc[ií]?[óo]n[:\s]*([\d]{1,2}[\-/][\d]{1,2}[\-/][\d]{2,4})', 'processor': lambda x: self._format_date(x.strip()) if x else ""},
+            'Fecha de Atención': {'pattern': r'Fecha\s*(?:de)?\s*atenc[\w\s]*[:\s]*([\d]{1,2}[\-/][\d]{1,2}[\-/][\d]{2,4})','processor': lambda x: self._format_date(x.strip()) if x else ""},
             'Cargo': {'pattern': r'Cargo[:\s]*([^:\n]+?)(?=\s*Fecha\s*de|$)', 'processor': self._process_cargo},
             'Exámenes realizados': {'pattern': r'EX[ÁA]MENES\s*REALIZADOS[:\s]*(.*?)(?=\s*(?:RECOMENDACIONES|INCLUIR|RESTRICCIONES|MANEJO|$))', 'processor': lambda x: x.strip().replace('\n', ' ').strip().upper() if x else ""},
             'Recomendaciones Laborales': {'pattern': r'RECOMENDACIONES\s*LABORALES[:\s]*(.*?)(?=MANEJO\s*EPS/ARL|\Z)', 'processor': lambda x: x.strip().upper() if x else "NINGUNO"},
@@ -472,24 +472,29 @@ class ExcelHandler:
             logging.info(f"  - Fecha encontrada: '{fecha}' (tipo: {type(fecha)})")
             logging.info(f"  - Todas las claves en data: {list(data.keys())}")
 
-            if not cedula or not fecha:
-                error_msg = f"Cédula o fecha de atención no válidos en los datos extraídos. Cédula: '{cedula}', Fecha: '{fecha}'"
+            # Solo validar que la cédula exista, la fecha es opcional
+            if not cedula:
+                error_msg = f"Cédula no válida en los datos extraídos. Cédula: '{cedula}'"
                 logging.error(error_msg)
                 raise ValueError(error_msg)
 
-            # 🔹 CONVERTIR LA FECHA - ESTA LÍNEA FALTABA
-            try:
-                # Intentar diferentes formatos de fecha
-                if ' ' in fecha and len(fecha.split()) == 3:  # Formato "15 08 2025"
-                    data_date = pd.to_datetime(fecha, format='%d %m %Y', errors='raise')
-                    logging.info(f"Fecha convertida usando formato '%d %m %Y': {data_date}")
-                else:
-                    data_date = pd.to_datetime(fecha, dayfirst=True, errors='raise')
-                    logging.info(f"Fecha convertida usando dayfirst=True: {data_date}")
-            except Exception as e:
-                error_msg = f"Error al convertir la fecha '{fecha}': {str(e)}"
-                logging.error(error_msg)
-                raise ValueError(error_msg)
+            # Si hay fecha, intentar convertirla
+            if fecha:
+                try:
+                    # Intentar diferentes formatos de fecha
+                    if ' ' in fecha and len(fecha.split()) == 3:  # Formato "15 08 2025"
+                        data_date = pd.to_datetime(fecha, format='%d %m %Y', errors='raise')
+                        logging.info(f"Fecha convertida usando formato '%d %m %Y': {data_date}")
+                    else:
+                        data_date = pd.to_datetime(fecha, dayfirst=True, errors='raise')
+                        logging.info(f"Fecha convertida usando dayfirst=True: {data_date}")
+                except Exception as e:
+                    error_msg = f"Error al convertir la fecha '{fecha}': {str(e)}"
+                    logging.warning(error_msg)  # Usar warning en lugar de error
+                    data_date = None  # Permitir continuar sin fecha válida
+            else:
+                data_date = None
+                logging.info("No se encontró fecha de atención, continuando sin ella")
 
             # 🔹 Cargar o crear el archivo
             header_row = 6
@@ -521,7 +526,11 @@ class ExcelHandler:
 
             # 🔹 Buscar si ya existe el mismo registro
             data_id = str(data['No. Identificación']).strip()
-            same_person = (df['No. Identificación'] == data_id) & (df['Fecha de Atención'] == data_date)
+            # Buscar si ya existe el mismo registro (solo por cédula si no hay fecha)
+            if data_date is not None:
+                same_person = (df['No. Identificación'] == data_id) & (df['Fecha de Atención'] == data_date)
+            else:
+                same_person = (df['No. Identificación'] == data_id)
 
             # 🔹 Mapear nombres de campos a columnas del Excel
             field_to_column_map = {
