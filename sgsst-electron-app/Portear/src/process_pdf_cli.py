@@ -27,7 +27,7 @@ class PdfProcessor:
             self._validate_critical_data(data, pdf_path)
             
             # Agregar campos faltantes con NINGUNO
-            for campo in ['No_Identificacion', 'Nombre_Completo', 'Concepto Altura', 'Concepto de trabajo en espacios confinados','Motivo de Restricción', 'Incluir SVE', 'Restricciones Laborales', 'Concepto Manipulación Alimento']:
+            for campo in ['No. Identificacion', 'Nombre_Completo', 'Concepto Altura', 'Concepto de trabajo en espacios confinados','Motivo de Restricción', 'Incluir SVE', 'Restricciones Laborales', 'Concepto Manipulación Alimento']:
                 if not data.get(campo):
                     data[campo] = "NINGUNO"
             
@@ -56,44 +56,47 @@ class PdfProcessor:
         # Reglas de extracción mejoradas para el formato Vemedic (biofile)
         extraction_rules = {
             'Nombre_Completo': r'Genero Edad Documento de Identificaci[óo]n\n([^\n]+)',
-            'No_Identificacion': r'CC\s+([\d]+)',
+            'No. Identificacion': r'CC\s+([\d]+)',
             'Edad': r'(\d+)\s*AÑOS',
             'Sexo': r'\n(FEMENINO|MASCULINO)',
             'Afiliacion': r'DATOS DE LA EMPRESA[^\n]*\n([^\n]+)',
             'Cargo': r'Cargo\n([^\n]+)',
-            'Fecha_Atencion': r'FECHA Y CIUDAD DE REALIZACI[ÓO]N DEL EX[ÁA]MEN[\s\S]*?(\d{2}\s+\d{2}\s+\d{4})',
+            'Fecha de AtenciÃ³n': r'FECHA Y CIUDAD DE REALIZACI[ÓO]N DEL EX[ÁA]MEN[\s\S]*?(\d{2}\s+\d{2}\s+\d{4})',
             'Recomendaciones_Laborales': r'RECOMENDACIONES OCUPACIONALES\s*([^\n]+)',
             'Restricciones_Laborales': r'RESTRICCIONES LABORALES\s*([^\n]+)',
             'Concepto_Medico': r'CONCEPTO DE APTITUD OCUPACIONAL\s*([^\n]+)',
             'Evaluacion_Ocupacional': r'TIPO DE EX[ÁA]MEN M[ÉE]DICO OCUPACIONAL\s*([^\n]+)',
         }
 
-        data = {}
+        data = {}  # Inicializamos el diccionario antes del bucle
+        
         for key, pattern in extraction_rules.items():
             match = re.search(pattern, text, re.IGNORECASE | re.DOTALL | re.UNICODE)
             value = ""
             if match:
-                if key == 'Fecha_Atencion':
-                    date_str = match.group(1).strip()
-                    value = date_str.replace(' ', '/')
-                else:
-                    value = next((g for g in match.groups() if g is not None), "")
-            data[key] = value.strip()
+                value = next((g for g in match.groups() if g is not None), "")
+            
+            # Asegurar que value sea string antes de aplicar strip()
+            if isinstance(value, str):
+                data[key] = value.strip()
+            else:
+                data[key] = str(value).strip() if value else ""
 
         return data
+
 
 
     def _extract_formato_generico(self, text):
         extraction_rules = {
             'Nombre_Completo': r'(?:Nombre\s*Completo[:\s]*|PACIENTE[:\s]*)([A-ZÁÉÍÓÚÑ\s]+?)(?:\n|Fecha Nac|SEXO:|$)',
-            'No_Identificacion': r'(?:No\.\s*Identificacion[:\s]*CC\s*-\s*|DOCUMENTO\s*:\s*CC\s+)(\d+)',
+            'No. Identificacion': r'(?:No\.\s*Identificacion[:\s]*CC\s*-\s*|DOCUMENTO\s*:\s*CC\s+)(\d+)',
             'Fecha_Nac': r'Fecha\s*(?:de)?\s*Nac(?:imiento)?[:\s]*([\d/-]+)',
             'Edad': r'Edad[:\s]*(\d+)',
             'Sexo': r'(?:Sexo|G[ée]nero)[:\s]*([A-Za-zÁ-Úá-ú]+)',
             'Afiliacion': r'Afiliaci[óo]n[:\s]*(.*?)(?:Estado civil|Ocupacion)',
             'Estado_civil': r'Estado\s*civil[:\s]*(.*?)(?:\n|$)',
             'Evaluacion_Ocupacional': r'(?:TIPO\s*DE\s*EVALUACI[ÓO]N\s*REALIZADA|Tipo\s*de\s*Examen|Evaluaci[óo]n\s*Ocupacional)[:\s]*([^:\n]+?)(?=\s*Fecha\s*de\s*atenci[óo]n:|$)',
-            'Fecha_Atencion': r'Fecha\s*(?:de)?\s*atenci[óo]n[:\s]*([\d/-]+)',
+            'Fecha de Atención': r'Fecha\s*(?:de)?\s*atenci[óo]n[:\s]*([\d/-]+)',
             'Cargo': r'Cargo[:\s]*([^:\n]+?)(?=\s*Fecha\s*de|$)',
             'Examenes_realizados': r'EX[ÁA]MENES\s*REALIZADOS[:\s]*(.*?)(?=\s*(?:RECOMENDACIONES|INCLUIR|RESTRICCIONES|MANEJO|$))',
             'Recomendaciones_Laborales': r'RECOMENDACIONES\s*LABORALES[:\s]*(.*?)(?=MANEJO\s*EPS/ARL|\Z)',
@@ -117,14 +120,14 @@ class PdfProcessor:
     def _post_process_data(self, data):
         # Normaliza las claves para que siempre tengan los mismos nombres
         key_map = {
-            'No. Identificacion': 'No_Identificacion',
-            'No Identificacion': 'No_Identificacion',
-            'No_Identificación': 'No_Identificacion',
+            'No. Identificacion': 'No. Identificacion',
+            'No Identificacion': 'No. Identificacion',
+            'No_Identificación': 'No. Identificacion',
             'Nombre Completo': 'Nombre_Completo',
             'Fecha Nac': 'Fecha_Nac',
             'Estado civil': 'Estado_civil',
             'Evaluación Ocupacional': 'Evaluacion_Ocupacional',
-            'Fecha de Atención': 'Fecha_Atencion',
+            'Fecha de Atención': 'Fecha de Atención',
             'Exámenes realizados': 'Examenes_realizados',
             'Recomendaciones Laborales': 'Recomendaciones_Laborales',
             'Concepto Medico': 'Concepto_Medico',
@@ -146,14 +149,14 @@ class PdfProcessor:
         
         if data.get('Fecha_Nac'):
             data['Fecha_Nac'] = self._format_date(data.get('Fecha_Nac', ''))
-        if data.get('Fecha_Atencion'):
-            data['Fecha_Atencion'] = self._format_date(data.get('Fecha_Atencion', ''))
+        if data.get('Fecha de Atención'):
+            data['Fecha de Atención'] = self._format_date(data.get('Fecha de Atención', ''))
             
         return data
 
     def _validate_critical_data(self, data, pdf_path):
-        if not data.get('No_Identificacion'):
-            data['No_Identificacion'] = "NO_DISPONIBLE"
+        if not data.get('No. Identificacion'):
+            data['No. Identificacion'] = "NO_DISPONIBLE"
         if not data.get('Nombre_Completo'):
             data['Nombre_Completo'] = "NO_DISPONIBLE"
 
@@ -220,6 +223,10 @@ def main():
                 'traceback': traceback.format_exc()
             }
         }
+        log(f"Datos finales extraídos: {list(extracted_data.keys())}")
+        log(f"Cédula: {extracted_data.get('No. Identificacion', 'NO_ENCONTRADA')}")
+        log(f"Fecha: {extracted_data.get('Fecha de AtenciÃ³n', 'NO_ENCONTRADA')}")
+
         # Imprimir el error final en una sola línea (sin indent=2)
         print(json.dumps(error_info, ensure_ascii=False))
 

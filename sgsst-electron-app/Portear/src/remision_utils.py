@@ -51,12 +51,12 @@ def log(message, level='INFO'):
 class Config:
     # Columnas para el archivo de control
     COLUMNAS_CONTROL = [
-        "Item", "Nombre_Completo", "No_Identificacion", "Fecha_Nac", "Edad", "Sexo",
-        "Afiliacion", "Estado_civil", "Evaluacion_Ocupacional", "Fecha_Atencion",
-        "Cargo", "Examenes_realizados", "Recomendaciones_Laborales", "Incluir_SVE",
-        "Restricciones_Laborales", "Concepto_medico_laboral", "Concepto_Medico",
-        "Concepto_Manipulacion_Alimento", "Concepto_Altura",
-        "Concepto_de_trabajo_en_espacios_confinados", "Motivo_de_Restriccion"
+        "Item", "Nombre Completo", "No. Identificacion", "Fecha Nac", "Edad", "Sexo",
+        "Afiliación", "Estado civil", "Evaluación Ocupacional", "Fecha de Atención",
+        "Cargo", "Exámenes realizados", "Recomendaciones Laborales", "Incluir SVE",
+        "Restricciones Laborales", "Concepto medico laboral", "Concepto Medico",
+        "Concepto Manipulación Alimento", "Concepto Altura",
+        "Concepto de trabajo en espacios confinados", "Motivo de Restricción"
     ]
     
     # Plantillas de email por tipo de empresa
@@ -357,7 +357,7 @@ class PdfProcessor:
             data = self._post_process_data(data)
             self._validate_critical_data(data, pdf_path.name)
 
-            for campo in ['No_Identificacion', 'Nombre_Completo', 'Concepto Altura', 'Concepto de trabajo en espacios confinados','Motivo de Restricción', 'Incluir SVE', 'Restricciones Laborales', 'Concepto Manipulación Alimento']:
+            for campo in ['No. Identificacion', 'Nombre_Completo', 'Concepto Altura', 'Concepto de trabajo en espacios confinados','Motivo de Restricción', 'Incluir SVE', 'Restricciones Laborales', 'Concepto Manipulación Alimento']:
                 if not data.get(campo):
                     data[campo] = "NINGUNO"
 
@@ -371,14 +371,14 @@ class PdfProcessor:
     def _extract_formato_generico(self, text):
         extraction_rules = {
             'Nombre Completo': {'pattern': r'(?:Nombre\s*Completo|Paciente|Nombre)[:\s]*(.*?)(?:\n|SEXO:|DOCUMENTO|IDENTIFICACI[ÓO]N|$)', 'processor': lambda x: x.strip().upper() if x else ""},
-            'No_Identificacion': {'pattern': r'(?:Documento[:\s]*CC[:\s]*(\d+))|(?:(?:No\.|N[úu]mero)\s*(?:de)?\s*Identificaci[óo]n[:\s]*(?:CC\s*-\s*)?(\d{7,12}))|(?:(?:CC|TI|CE)[:\s-]*(\d{7,12}))|(?:(?:c[ée]dula|documento|identificaci[óo]n)[:\s]*(\d{7,12}))', 'processor': lambda x: re.sub(r'[^\d]', '', x.strip()) if x else ""},
+            'No. Identificacion': {'pattern': r'(?:Documento[:\s]*CC[:\s]*(\d+))|(?:(?:No\.|N[úu]mero)\s*(?:de)?\s*Identificaci[óo]n[:\s]*(?:CC\s*-\s*)?(\d{7,12}))|(?:(?:CC|TI|CE)[:\s-]*(\d{7,12}))|(?:(?:c[ée]dula|documento|identificaci[óo]n)[:\s]*(\d{7,12}))', 'processor': lambda x: re.sub(r'[^\d]', '', x.strip()) if x else ""},
             'Fecha Nac': {'pattern': r'Fecha\s*(?:de)?\s*Nac(?:imiento)?[:\s]*([\d/-]+)', 'processor': lambda x: self._format_date(x.strip()) if x else ""},
             'Edad': {'pattern': r'Edad[:\s]*(\d+)', 'processor': lambda x: int(x.strip()) if x and x.strip().isdigit() else ""},
             'Sexo': {'pattern': r'(?:Sexo|G[ée]nero)[:\s]*([A-Za-zÁ-Úá-ú]+)', 'processor': lambda x: x.strip().capitalize() if x else ""},
             'Afiliación': {'pattern': r'(?:Afiliaci[óo]n|Empresa)[:\s]*(.*?)(?:\n|$)', 'processor': lambda x: self._process_afiliacion(x.strip()) if x else ""},
             'Estado civil': {'pattern': r'Estado\s*civil[:\s]*(.*?)(?:\n|$)', 'processor': lambda x: x.strip().capitalize() if x else ""},
             'Evaluación Ocupacional': {'pattern': r'(?:TIPO\s*DE\s*EVALUACI[ÓO]N\s*REALIZADA|Tipo\s*de\s*Examen|Evaluaci[óo]n\s*Ocupacional)[:\s]*([^:\n]+?)(?=\s*Fecha\s*de\s*atenci[óo]n:|$)', 'processor': lambda x: x.strip().upper() if x else ""},
-            'Fecha de Atención': {'pattern': r'Fecha\s*(?:de)?\s*atenci[óo]n[:\s]*([\d/-]+)', 'processor': lambda x: self._format_date(x.strip()) if x else ""},
+            'Fecha de Atención': {'pattern': r'Fecha\s*(?:de)?\s*atenc[ií]?[óo]n[:\s]*([\d]{1,2}[\-/][\d]{1,2}[\-/][\d]{2,4})', 'processor': lambda x: self._format_date(x.strip()) if x else ""},
             'Cargo': {'pattern': r'Cargo[:\s]*([^:\n]+?)(?=\s*Fecha\s*de|$)', 'processor': self._process_cargo},
             'Exámenes realizados': {'pattern': r'EX[ÁA]MENES\s*REALIZADOS[:\s]*(.*?)(?=\s*(?:RECOMENDACIONES|INCLUIR|RESTRICCIONES|MANEJO|$))', 'processor': lambda x: x.strip().replace('\n', ' ').strip().upper() if x else ""},
             'Recomendaciones Laborales': {'pattern': r'RECOMENDACIONES\s*LABORALES[:\s]*(.*?)(?=MANEJO\s*EPS/ARL|\Z)', 'processor': lambda x: x.strip().upper() if x else "NINGUNO"},
@@ -409,7 +409,10 @@ class PdfProcessor:
         return data
 
     def _validate_critical_data(self, data, filename):
-        required_fields = {'No_Identificacion': "No Identificacion no encontrado"}
+        required_fields = {
+            'No. Identificacion': "No Identificacion no encontrado",
+            'Fecha de Atención': "Fecha de Atención no encontrada"
+        }
         errors = []
         for field, message in required_fields.items():
             if not data.get(field):
@@ -437,49 +440,167 @@ class ExcelHandler:
     def update_control_file(self, data, control_path):
         try:
             control_path = Path(control_path)
+            logging.info(f"Actualizando archivo de control: {control_path}")
+
+            # 🔹 Normalizar claves antes de validar - CORRECCIÓN
+            # Mapear todas las variantes posibles de claves
+            key_mapping = {
+                'No. Identificacion': 'No. Identificación',
+                'No Identificacion': 'No. Identificación', 
+                'No_Identificacion': 'No. Identificación',
+                'Cedula': 'No. Identificación',
+                'Cédula': 'No. Identificación',
+                'Fecha de Atencion': 'Fecha de Atención',
+                'Fecha_Atencion': 'Fecha de Atención',
+                'Fecha de AtenciÃ³n': 'Fecha de Atención',  # Esta es la clave que viene del PDF
+                'Fecha_de_Atencion': 'Fecha de Atención'
+            }
+
+            # Aplicar el mapeo
+            for old_key, new_key in key_mapping.items():
+                if old_key in data:
+                    data[new_key] = data.pop(old_key)
+                    logging.info(f"Clave normalizada: {old_key} -> {new_key} = {data[new_key]}")
+
+            
+            # 🔹 Validar datos críticos CON LOGGING DETALLADO
+            cedula = data.get('No. Identificación', '')
+            fecha = data.get('Fecha de Atención', '')
+
+            logging.info(f"Validando datos críticos:")
+            logging.info(f"  - Cédula encontrada: '{cedula}' (tipo: {type(cedula)})")
+            logging.info(f"  - Fecha encontrada: '{fecha}' (tipo: {type(fecha)})")
+            logging.info(f"  - Todas las claves en data: {list(data.keys())}")
+
+            if not cedula or not fecha:
+                error_msg = f"Cédula o fecha de atención no válidos en los datos extraídos. Cédula: '{cedula}', Fecha: '{fecha}'"
+                logging.error(error_msg)
+                raise ValueError(error_msg)
+
+            # 🔹 CONVERTIR LA FECHA - ESTA LÍNEA FALTABA
+            try:
+                # Intentar diferentes formatos de fecha
+                if ' ' in fecha and len(fecha.split()) == 3:  # Formato "15 08 2025"
+                    data_date = pd.to_datetime(fecha, format='%d %m %Y', errors='raise')
+                    logging.info(f"Fecha convertida usando formato '%d %m %Y': {data_date}")
+                else:
+                    data_date = pd.to_datetime(fecha, dayfirst=True, errors='raise')
+                    logging.info(f"Fecha convertida usando dayfirst=True: {data_date}")
+            except Exception as e:
+                error_msg = f"Error al convertir la fecha '{fecha}': {str(e)}"
+                logging.error(error_msg)
+                raise ValueError(error_msg)
+
+            # 🔹 Cargar o crear el archivo
+            header_row = 6
             if not control_path.exists():
+                logging.info(f"Archivo de control no existe. Creando nuevo en: {control_path}")
                 df = pd.DataFrame(columns=Config.COLUMNAS_CONTROL)
-                header_row = 6
             else:
-                df = pd.read_excel(control_path, engine='openpyxl', header=6, dtype={'No_Identificacion': str})
-                header_row = 6
+                try:
+                    df = pd.read_excel(control_path, engine='openpyxl', header=header_row, dtype={'No. Identificación': str})
+                except ValueError:
+                    df = pd.read_excel(control_path, engine='openpyxl', header=None, dtype={'No. Identificación': str})
+                    df.columns = Config.COLUMNAS_CONTROL
+                    df = df.iloc[header_row + 1:].reset_index(drop=True)
 
             df = df.dropna(how='all')
-            if not df.empty and 'No_Identificacion' in df.columns:
-                df['No_Identificacion'] = df['No_Identificacion'].astype(str).str.replace(r'\.0$', '', regex=True)
 
-            no_id = data.get("No_Identificacion") or "NO_DISPONIBLE"
-            new_row = {col: data.get(col, "NO_DISPONIBLE") for col in Config.COLUMNAS_CONTROL}
-            new_row["No_Identificacion"] = no_id
-            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+            if not df.empty:
+                if 'No. Identificación' in df.columns:
+                    df['No. Identificación'] = df['No. Identificación'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+                if 'Fecha de Atención' in df.columns:
+                    df['Fecha de Atención'] = pd.to_datetime(df['Fecha de Atención'], format='%Y/%m/%d', errors='coerce')
 
-            # Renombrar columnas para el output en Excel
-            column_rename_map = {
-                "Nombre_Completo": "Nombre Completo",
-                "Fecha_Nac": "Fecha Nac",
-                "Estado_civil": "Estado civil",
-                "Evaluacion_Ocupacional": "Evaluación Ocupacional",
-                "Fecha_Atencion": "Fecha de Atención",
-                "Examenes_realizados": "Exámenes realizados",
-                "Recomendaciones_Laborales": "Recomendaciones Laborales",
-                "Incluir_SVE": "Incluir SVE",
-                "Restricciones_Laborales": "Restricciones Laborales",
-                "Concepto_medico_laboral": "Concepto medico laboral",
-                "Concepto_Medico": "Concepto Medico",
-                "Concepto_Manipulacion_Alimento": "Concepto Manipulación Alimento",
-                "Concepto_Altura": "Concepto Altura",
-                "Concepto_de_trabajo_en_espacios_confinados": "Concepto de trabajo en espacios confinados",
-                "Motivo_de_Restriccion": "Motivo de Restricción",
-                "Afiliacion": "Afiliación"
+            # 🔹 Generar nuevo Item
+            if 'Item' in df.columns and not df['Item'].isnull().all():
+                max_item = df['Item'].dropna().astype(int).max()
+                new_item = max_item + 1
+            else:
+                new_item = 1
+
+            # 🔹 Buscar si ya existe el mismo registro
+            data_id = str(data['No. Identificación']).strip()
+            same_person = (df['No. Identificación'] == data_id) & (df['Fecha de Atención'] == data_date)
+
+            # 🔹 Mapear nombres de campos a columnas del Excel
+            field_to_column_map = {
+                'Nombre_Completo': 'Nombre Completo',
+                'No. Identificación': 'No. Identificacion',
+                'Fecha_Nac': 'Fecha Nac',
+                'Edad': 'Edad',
+                'Sexo': 'Sexo',
+                'Afiliacion': 'Afiliación',
+                'Estado_civil': 'Estado civil',
+                'Evaluacion_Ocupacional': 'Evaluación Ocupacional',
+                'Fecha de Atención': 'Fecha de Atención',
+                'Cargo': 'Cargo',
+                'Examenes_realizados': 'Exámenes realizados',
+                'Recomendaciones_Laborales': 'Recomendaciones Laborales',
+                'Incluir SVE': 'Incluir SVE',
+                'Restricciones_Laborales': 'Restricciones Laborales',
+                'Concepto_Medico': 'Concepto medico laboral',
+                'Concepto Medico': 'Concepto Medico',
+                'Concepto Manipulación Alimento': 'Concepto Manipulación Alimento',
+                'Concepto Altura': 'Concepto Altura',
+                'Concepto de trabajo en espacios confinados': 'Concepto de trabajo en espacios confinados',
+                'Motivo de Restricción': 'Motivo de Restricción'
             }
-            df_to_write = df.rename(columns=column_rename_map)
 
-            with pd.ExcelWriter(control_path, engine='openpyxl', mode='w') as writer:
-                df_to_write.to_excel(writer, index=False, startrow=header_row)
+            # Crear new_row_data usando el mapeo correcto
+            new_row_data = {'Item': new_item}
+            for excel_col in Config.COLUMNAS_CONTROL:
+                if excel_col != 'Item':
+                    # Buscar el valor en data usando el mapeo inverso
+                    data_key = None
+                    for data_field, excel_field in field_to_column_map.items():
+                        if excel_field == excel_col and data_field in data:
+                            data_key = data_field
+                            break
+                    
+                    if data_key:
+                        new_row_data[excel_col] = data[data_key]
+                    else:
+                        # Si no encuentra el mapeo, buscar directamente
+                        new_row_data[excel_col] = data.get(excel_col, '')
 
-            return {"success": True, "file": str(control_path)}
+            # Asegurar que la cédula no tenga .0
+            new_row_data['No. Identificacion'] = str(new_row_data.get('No. Identificacion', '')).replace('.0', '')
+
+            if same_person.any():
+                idx = df[same_person].index[0]
+                for col, value in new_row_data.items():
+                    if col in data and data[col]:
+                        if col == 'Edad':
+                            try:
+                                value = int(value)
+                            except (ValueError, TypeError):
+                                value = pd.NA
+                        elif col in df.columns and df[col].dtype in ['int64', 'float64']:
+                            value = pd.to_numeric(value, errors='coerce')
+                        elif col in df.columns and df[col].dtype == 'object':
+                            value = str(value)
+                        df.loc[idx, col] = value
+                action = "actualizado"
+                row_number = idx + header_row + 2
+            else:
+                new_row = pd.Series(new_row_data)
+                df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+                row_number = len(df) + header_row + 1
+                action = f"añadido en la fila {row_number}"
+
+            # 🔹 Guardar archivo
+            with pd.ExcelWriter(control_path, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False, header=True, startrow=header_row)
+                logging.info(f"Archivo de control {action}: {control_path}")
+
+            return str(control_path)
+
         except Exception as e:
-            return {"success": False, "error": str(e), "traceback": traceback.format_exc()}
+            logging.error(f"Error al actualizar archivo de control: {str(e)}")
+            logging.debug(traceback.format_exc())
+            raise
+
 
 class DocumentGenerator:
     def generate_remision(self, data, template_path, output_dir):
@@ -489,7 +610,7 @@ class DocumentGenerator:
             context = {
                 'fecha': datetime.now().strftime('%d/%m/%Y'),
                 'nombre_destinatario': data.get('Nombre_Completo', 'N/A'),
-                'cc': data.get('No_Identificacion', 'N/A'),
+                'cc': data.get('No. Identificacion', 'N/A'),
                 'cargo': data.get('Cargo', 'N/A'),
                 'evaluación_ocupacional': data.get('Evaluacion_Ocupacional', 'N/A'),
                 'recomendaciones_laborales': data.get('Recomendaciones_Laborales', 'N/A')
@@ -544,7 +665,7 @@ def send_remision_by_email(doc_path, data, empresa):
         log(f"Iniciando envío de email para la empresa {empresa} con el documento {doc_path}")
         email_sender = EmailSender(empresa)
         
-        cedula = data.get('No_Identificacion', '')
+        cedula = data.get('No. Identificacion', '')
         nombre = data.get('Nombre Completo', 'Trabajador')
         fecha_atencion = data.get('Fecha de Atención', '')
         
@@ -572,7 +693,7 @@ def send_remision_by_whatsapp(doc_path, data, empresa):
     try:
         log(f"Iniciando preparación de documento para WhatsApp: {doc_path}")
         email_sender = EmailSender(empresa)
-        cedula = data.get('No_Identificacion', '')
+        cedula = data.get('No. Identificacion', '')
         if not cedula:
             raise ValueError("No se encontró Cédula para buscar contacto de WhatsApp.")
         
