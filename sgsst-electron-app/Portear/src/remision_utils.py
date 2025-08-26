@@ -51,7 +51,7 @@ def log(message, level='INFO'):
 class Config:
     # Columnas para el archivo de control
     COLUMNAS_CONTROL = [
-        "Item", "Nombre Completo", "No. Identificacion", "Fecha Nac", "Edad", "Sexo",
+        "Item", "Nombre Completo", "No. Identificación", "Fecha Nac", "Edad", "Sexo",
         "Afiliación", "Estado civil", "Evaluación Ocupacional", "Fecha de Atención",
         "Cargo", "Exámenes realizados", "Recomendaciones Laborales", "Incluir SVE",
         "Restricciones Laborales", "Concepto medico laboral", "Concepto Medico",
@@ -535,7 +535,8 @@ class ExcelHandler:
             # 🔹 Mapear nombres de campos a columnas del Excel
             field_to_column_map = {
                 'Nombre_Completo': 'Nombre Completo',
-                'No. Identificación': 'No. Identificacion',
+                # CORRECCIÓN: Mapear la clave interna 'No. Identificación' a la columna Excel 'No. Identificación' (con tilde)
+                'No. Identificación': 'No. Identificación',
                 'Fecha_Nac': 'Fecha Nac',
                 'Edad': 'Edad',
                 'Sexo': 'Sexo',
@@ -566,15 +567,22 @@ class ExcelHandler:
                         if excel_field == excel_col and data_field in data:
                             data_key = data_field
                             break
-                    
+
                     if data_key:
                         new_row_data[excel_col] = data[data_key]
                     else:
                         # Si no encuentra el mapeo, buscar directamente
                         new_row_data[excel_col] = data.get(excel_col, '')
 
-            # Asegurar que la cédula no tenga .0
-            new_row_data['No. Identificacion'] = str(new_row_data.get('No. Identificacion', '')).replace('.0', '')
+            # Asegurar que la cédula no tenga .0 - Asignar a la columna CORRECTA del Excel
+            # La clave interna normalizada es 'No. Identificación', y ahora debe ir a la columna 'No. Identificación' (con tilde) del Excel.
+            cedula_valor = data.get('No. Identificación', '') # Obtener desde la clave normalizada
+            # CORRECCIÓN: Asignar a la columna del Excel con tilde
+            new_row_data['No. Identificación'] = str(cedula_valor).replace('.0', '')
+
+            # Asegurarse de que la clave sin tilde no se incluya accidentalmente en new_row_data si el mapeo falla
+            # (Esto es menos probable ahora, pero puede ser una medida de seguridad si otras partes del código la agregan)
+            # new_row_data.pop('No. Identificacion', None) # Descomentar si es necesario 
 
             if same_person.any():
                 idx = df[same_person].index[0]
@@ -674,7 +682,7 @@ def send_remision_by_email(doc_path, data, empresa):
         log(f"Iniciando envío de email para la empresa {empresa} con el documento {doc_path}")
         email_sender = EmailSender(empresa)
         
-        cedula = data.get('No. Identificacion', '')
+        cedula = data.get('No. Identificación', '')  #Correcto, usar la clave normalizada
         nombre = data.get('Nombre Completo', 'Trabajador')
         fecha_atencion = data.get('Fecha de Atención', '')
         
@@ -702,7 +710,7 @@ def send_remision_by_whatsapp(doc_path, data, empresa):
     try:
         log(f"Iniciando preparación de documento para WhatsApp: {doc_path}")
         email_sender = EmailSender(empresa)
-        cedula = data.get('No. Identificacion', '')
+        cedula = data.get('No. Identificación', '') #Correcto, usar la clave normalizada
         if not cedula:
             raise ValueError("No se encontró Cédula para buscar contacto de WhatsApp.")
         
