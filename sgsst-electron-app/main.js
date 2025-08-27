@@ -162,15 +162,37 @@ const registerIPCHandlers = () => {
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
       
-      // Leer todo el contenido del sheet
-      const allData = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
+      // Obtener el rango de datos
+      const range = xlsx.utils.decode_range(worksheet['!ref']);
+      sendLog(`[MAIN] Rango de datos en la hoja: ${worksheet['!ref']}`);
+      
+      // Definir el rango para leer desde la fila 7 (índice 6 en base 0)
+      const startRow = 6; // Fila 7
+      const endRow = range.e.r; // Última fila
+      
+      // Crear un nuevo rango que comience desde la fila 7
+      const newRange = {
+        s: { c: range.s.c, r: startRow }, // Comenzar desde la columna 0, fila 7
+        e: { c: range.e.c, r: endRow }    // Terminar en la última columna y fila
+      };
+      
+      // Convertir el rango a string
+      const rangeStr = xlsx.utils.encode_range(newRange);
+      sendLog(`[MAIN] Rango para lectura: ${rangeStr}`);
+      
+      // Leer los datos desde la fila 7
+      const allData = xlsx.utils.sheet_to_json(worksheet, {
+        header: 1,
+        range: rangeStr
+      });
+      
       sendLog(`[MAIN] Datos extraídos. Total filas: ${allData.length}`);
 
-      if (allData.length < 7) {
-          sendLog('[MAIN] Archivo Excel no contiene datos suficientes (solo cabecera).', 'WARN');
+      if (allData.length < 1) {
+          sendLog('[MAIN] Archivo Excel no contiene datos suficientes.', 'WARN');
           return { 
               success: true, 
-              headers: allData.length > 0 ? allData[0] : [], 
+              headers: [], 
               rows: [], 
               message: 'Archivo no contiene filas de datos.',
               filePath: excelFilePath,
@@ -178,11 +200,32 @@ const registerIPCHandlers = () => {
           };
       }
 
-      // Saltar las primeras 6 filas (las de cabecera)
-      const headers = allData[6]; // Los encabezados reales están en la fila 7 (índice 6)
-      const rows = allData.slice(7); // Los datos reales comienzan en la fila 8 (índice 7)
+      // La primera fila ahora será los encabezados (fila 7 del Excel original)
+      const headers = allData[0]; // Fila 7 del Excel
+      const rows = allData.slice(1); // Filas 8 en adelante del Excel
 
+      sendLog(`[MAIN] Encabezados encontrados: ${headers.length} columnas`);
       sendLog(`[MAIN] Datos de remisiones encontrados. Total filas: ${rows.length}`);
+      
+      // Validar y ajustar la longitud de las filas
+      const expectedColumns = headers.length;
+      for (let i = 0; i < rows.length; i++) {
+        if (rows[i].length < expectedColumns) {
+          // Rellenar con cadenas vacías si faltan columnas
+          while (rows[i].length < expectedColumns) {
+            rows[i].push('');
+          }
+        } else if (rows[i].length > expectedColumns) {
+          // Truncar si hay demasiadas columnas
+          rows[i] = rows[i].slice(0, expectedColumns);
+        }
+      }
+
+      // Log para depuración
+      sendLog(`[MAIN] Primeras 3 filas de datos:`, 'DEBUG');
+      for(let i = 0; i < Math.min(3, rows.length); i++) {
+        sendLog(`[MAIN] Fila ${i+1}: ${JSON.stringify(rows[i])}`, 'DEBUG');
+      }
       
       return { 
         success: true, 
