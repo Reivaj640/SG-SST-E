@@ -656,8 +656,8 @@ ${finalResult.debug_full_text}
           }
 
           // Datos del trabajador para el mensaje
-          const nombreTrabajador = extractedData['Nombre Completo'] || 'N/A';
-          const cedulaTrabajador = extractedData['No_Identificacion'] || 'N/A';
+          const nombreTrabajador = finalResult.nombre || 'N/A';
+          const cedulaTrabajador = finalResult.cedula || 'N/A';
 
           // Plantilla del mensaje
           const messageBody = `Remisión EPS - ${empresa.toUpperCase()}\n\nTrabajador: ${nombreTrabajador}\nCédula: ${cedulaTrabajador}\n\nAdjunto encontrará su documento de remisión EPS con las recomendaciones médicas.\n\nPor favor:\n1. Revise el documento adjunto ✅\n2. Siga las indicaciones del profesional de salud ✅\n3. Confirme recepción ✅\n\nCualquier duda estamos disponibles para resolverla`;
