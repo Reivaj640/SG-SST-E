@@ -31,7 +31,7 @@ class RestriccionesMedicasComponent {
 
         cardsContainer.appendChild(this.createModuleCard('Ver Remisiones Médicas', 'Navegar, visualizar y previsualizar el historial de remisiones.', () => this.showVerRemisionesPage()));
         cardsContainer.appendChild(this.createModuleCard('Enviar Remisiones', 'Crear y enviar nuevas remisiones y recomendaciones.', () => this.showEnviarRemisionPage()));
-        cardsContainer.appendChild(this.createModuleCard('Control de Remisiones', 'Realizar seguimiento al estado de las remisiones enviadas.', () => this.showPlaceholder('Control de Remisiones')));
+        cardsContainer.appendChild(this.createModuleCard('Control de Remisiones', 'Realizar seguimiento al estado de las remisiones enviadas.', () => this._renderControlRemisionesView()));
         cardsContainer.appendChild(this.createModuleCard('Próxima Función', 'Una nueva funcionalidad estará disponible aquí pronto.', () => this.showPlaceholder('Próxima Función')));
 
         this.container.appendChild(cardsContainer);
@@ -512,6 +512,30 @@ class RestriccionesMedicasComponent {
         card.innerHTML = `<div class="card-body"><h5 class="card-title">${title}</h5><p class="card-text">${description}</p><button class="btn btn-primary">Acceder</button></div>`;
         card.querySelector('button').addEventListener('click', onClick);
         return card;
+    }
+
+    _renderControlRemisionesView() {
+        this.container.innerHTML = '';
+        const header = this.createHeader('Control de Remisiones', () => this.render());
+        this.container.appendChild(header);
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'placeholder-content';
+        contentDiv.style.padding = '20px';
+        contentDiv.style.textAlign = 'center';
+
+        const placeholderText = document.createElement('p');
+        placeholderText.textContent = 'Aquí se mostrará la tabla de control de remisiones.';
+        contentDiv.appendChild(placeholderText);
+
+        const placeholderTable = document.createElement('div');
+        placeholderTable.style.border = '2px dashed #ccc';
+        placeholderTable.style.padding = '50px';
+        placeholderTable.style.marginTop = '20px';
+        placeholderTable.textContent = 'Área para futura tabla/componente';
+        contentDiv.appendChild(placeholderTable);
+
+        this.container.appendChild(contentDiv);
     }
 
     showPlaceholder(featureName) {
