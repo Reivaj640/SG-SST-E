@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const { exec } = require('child_process');
 const { promisify } = require('util');
+const xlsx = require('xlsx');
 
 const execPromise = promisify(exec);
 
@@ -156,14 +157,13 @@ const registerIPCHandlers = () => {
       sendLog(`[MAIN] Archivo Excel encontrado: ${excelFilePath}`);
 
       // Leer y procesar Excel
-      const XLSX = require('xlsx');
       sendLog(`[MAIN] Leyendo archivo Excel...`);
-      const workbook = XLSX.readFile(excelFilePath);
+      const workbook = xlsx.readFile(excelFilePath);
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
       
       // Leer todo el contenido del sheet
-      const allData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      const allData = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
       sendLog(`[MAIN] Datos extraídos. Total filas: ${allData.length}`);
 
       if (allData.length < 7) {
@@ -184,7 +184,6 @@ const registerIPCHandlers = () => {
 
       sendLog(`[MAIN] Datos de remisiones encontrados. Total filas: ${rows.length}`);
       
-      console.log(`[MAIN] Excel procesado exitosamente para ${companyName}. Encontradas ${rows.length} filas.`);
       return { 
         success: true, 
         headers: headers,
@@ -297,98 +296,493 @@ const registerIPCHandlers = () => {
   // Manejar búsqueda de ruta de submódulo
   ipcMain.handle('find-submodule-path', async (event, companyName, module, submodule) => {
     try {
-      console.log(`Finding path for company: ${companyName}, module: ${module}, submodule: ${submodule}`);
+      console.log(`[INFO] Finding path for company: ${companyName}, module: ${module}, submodule: ${submodule}`);
 
       // Cargar la configuración
-      const config = await fs.readFile(configPath, 'utf8').then(JSON.parse).catch(() => ({}));
+      const configData = await fs.readFile(configPath, 'utf8').catch(() => '{}');
+      const config = JSON.parse(configData);
+      console.log(`[DEBUG] Full config keys: [${Object.keys(config)}]`);
 
       // Verificar si tenemos rutas de empresa para la empresa especificada
       if (!config.companyPaths || !config.companyPaths[companyName]) {
-        throw new Error(`No configuration or path found for company: ${companyName}`);
+        const availableCompanies = config.companyPaths ? Object.keys(config.companyPaths) : [];
+        console.log(`[ERROR] Company '${companyName}' not found. Available: [${availableCompanies.join(', ')}]`);
+        throw new Error(`No configuration found for company: ${companyName}`);
       }
       
-      // Obtener la estructura para esta empresa
-      const companyStructure = config.companyPaths[companyName];
-      console.log('Company structure:', JSON.stringify(companyStructure, null, 2));
+      // Obtener la estructura para esta empresa - Nivel 1
+      const companyStructureRoot = config.companyPaths[companyName];
+      console.log(`[DEBUG] Company root keys: [${Object.keys(companyStructureRoot)}]`);
       
-      if (!companyStructure || !companyStructure.structure) {
-        throw new Error(`No structure found for company: ${companyName}`);
+      // Obtener la estructura real que contiene las carpetas - Nivel 2 (ESTE ES EL CORRECTO)
+      // Según el config.json: config.companyPaths.Tempoactiva.structure.structure
+      const actualCompanyStructure = companyStructureRoot.structure?.structure;
+      
+      if (!actualCompanyStructure) {
+          console.log(`[ERROR] Actual company structure (structure.structure) is missing or invalid.`, companyStructureRoot);
+          throw new Error(`Invalid structure found for company: ${companyName}`);
       }
+      
+      console.log(`[DEBUG] Actual structure name: '${actualCompanyStructure.name}', path: '${actualCompanyStructure.path}'`);
+      console.log(`[DEBUG] Actual structure subdirectories keys: [${Object.keys(actualCompanyStructure.subdirectories || {}).join(', ')}]`);
       
       // Extraer el código del nombre del submódulo (ej. "1.1.1 Responsable del SG" -> "1.1.1")
       const submoduleCode = submodule.match(/^([\d.]+)/);
       if (!submoduleCode) {
+        console.log(`[ERROR] Invalid submodule name format: ${submodule}`);
         throw new Error(`Invalid submodule name format: ${submodule}`);
       }
       const code = submoduleCode[1];
-      console.log(`Extracted code: ${code}`);
+      console.log(`[DEBUG] Extracted code: '${code}'`);
       
-      // Para el módulo "Recursos", necesitamos buscar primero el módulo y luego el submódulo dentro de él
       let foundPath = null;
+      
+      // Para ciertos módulos conocidos, buscar primero el módulo y luego el submódulo dentro de él
+      // Asumimos que "Recursos" es uno de ellos basado en el log anterior.
       if (module === "Recursos") {
-        // Buscar primero el módulo "Recursos"
-        const resourcesModules = ["1. Recursos", "1. Recursos\\\\"]; // Corregido: escapar la barra invertida
-        for (const resourcesName of resourcesModules) {
-          if (companyStructure.structure.structure.subdirectories && 
-              companyStructure.structure.structure.subdirectories[resourcesName]) {
-            // Buscar el submódulo dentro del módulo "Recursos"
-            foundPath = searchInStructure(companyStructure.structure.structure.subdirectories[resourcesName], code);
-            if (foundPath) break;
-          }
+        const resourcesFolderName = "1. Recursos"; // Nombre fijo esperado
+        
+        console.log(`[DEBUG] Searching for module '${module}' (folder: '${resourcesFolderName}') containing code '${code}'`);
+        
+        // Verificar si la carpeta "1. Recursos" existe en el nivel raíz de la estructura
+        if (actualCompanyStructure.subdirectories && actualCompanyStructure.subdirectories[resourcesFolderName]) {
+            const resourcesFolderNode = actualCompanyStructure.subdirectories[resourcesFolderName];
+            console.log(`[DEBUG] Found '${resourcesFolderName}' folder. Searching inside it for code '${code}'...`);
+            // Buscar el submódulo (ej. "1.1.1 Responsable del SG") DENTRO de la carpeta "1. Recursos"
+            foundPath = searchInStructure(resourcesFolderNode, code);
+        } else {
+            console.log(`[WARN] Folder '${resourcesFolderName}' not found at root level. Available root folders: [${Object.keys(actualCompanyStructure.subdirectories || {}).join(', ')}]`);
         }
       }
       
-      // Si no se encontró en "Recursos" o no es del módulo "Recursos", buscar en la raíz
+      // Si no se encontró en un módulo específico o no es un módulo conocido, buscar el código directamente en la raíz
       if (!foundPath) {
-        foundPath = searchInStructure(companyStructure.structure.structure, code);
+        console.log(`[DEBUG] Searching for code '${code}' directly in root structure...`);
+        foundPath = searchInStructure(actualCompanyStructure, code);
       }
       
       if (foundPath) {
-        console.log(`Found path: ${foundPath}`);
+        console.log(`[SUCCESS] Found path for '${companyName}' -> '${module}' -> '${submodule}': ${foundPath}`);
         return { success: true, path: foundPath };
       } else {
-        console.log(`Path not found for code: ${code}`);
+        console.log(`[WARN] Path not found for code: ${code} under module '${module}' or root.`);
         return { success: false, error: `Path not found for module: ${module}, submodule: ${submodule} (code: ${code})` };
       }
     } catch (error) {
-      console.error('Error finding submodule path:', error);
+      console.error('[CRITICAL ERROR] Error in find-submodule-path:', error);
       return { success: false, error: error.message };
     }
   });
-  
+
   // Función auxiliar para buscar una ruta en la estructura de directorio
+  // Busca coincidencias parciales del 'code' (ej. "1.1.1") en el 'name' de los directorios o archivos.
   function searchInStructure(directoryNode, code, depth = 0) {
-    // ... (código de la función auxiliar)
+    // Verificar que directoryNode no sea undefined, null o vacío
+    if (!directoryNode || typeof directoryNode !== 'object') {
+      console.log(`[searchInStructure] Invalid directory node received. Type: ${typeof directoryNode}`);
+      return null;
+    }
+    
+    const indent = "  ".repeat(depth);
+    const nodeName = directoryNode.name || 'unnamed directory';
+    console.log(`${indent}[searchInStructure] Searching in: ${nodeName} (path: ${directoryNode.path || 'N/A'})`);
+    
+    // Verificar archivos en el directorio actual
+    const files = directoryNode.files || [];
+    for (const file of files) {
+      if (file && file.name) {
+        // console.log(`${indent}  [searchInStructure] Checking file: ${file.name} (includes ${code})`); // Demasiado verbose
+        if (file.name.includes(code)) {
+          console.log(`${indent}  [searchInStructure] Found FILE match: ${file.path}`);
+          return file.path;
+        }
+      }
+    }
+    
+    // Verificar subdirectorios
+    const subdirs = directoryNode.subdirectories || {};
+    // console.log(`${indent}  [searchInStructure] Subdirectories found: [${Object.keys(subdirs).join(', ')}]`); // Demasiado verbose
+    
+    for (const [subDirName, subDirNode] of Object.entries(subdirs)) {
+      if (subDirName && subDirNode) {
+        // console.log(`${indent}    [searchInStructure] Checking subdirectory: '${subDirName}' (includes '${code}')`); // Demasiado verbose
+        // ✅ Buscar coincidencia parcial en el nombre de la carpeta (subDirName)
+        if (subDirName.includes(code)) {
+          console.log(`${indent}    [searchInStructure] Found DIRECTORY match: ${subDirNode.path}`);
+          return subDirNode.path;
+        }
+        
+        // Si no, seguir buscando recursivamente dentro de ese subdirectorio
+        const foundPath = searchInStructure(subDirNode, code, depth + 1);
+        if (foundPath) {
+          return foundPath;
+        }
+      }
+    }
+    
+    return null;
   }
 
   // Manejar procesamiento de PDF
   ipcMain.handle('process-remision-pdf', async (event, pdfPath) => {
-    // ... (código del handler)
+    sendLog(`IPC: process-remision-pdf recibido para: ${pdfPath}`);
+    try {
+      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'process_pdf_cli.py');
+      const tempDataPath = path.join(app.getPath('temp'), `remision_data_${Date.now()}.json`);
+      
+      sendLog(`Ejecutando script de Python: python "${pythonScriptPath}" "${pdfPath}"`);
+      const { stdout, stderr } = await execPromise(`python "${pythonScriptPath}" "${pdfPath}"`);
+      
+      if (stderr) {
+        sendLog(`Error en script de procesamiento de PDF: ${stderr}`, 'ERROR');
+      }
+
+      // Procesar el stream de logs y el resultado final
+      let finalResult = null;
+      const lines = stdout.split(/\r?\n/).filter(line => line.trim() !== '');
+      lines.forEach(line => {
+        try {
+          const output = JSON.parse(line);
+          if (output.type === 'log') {
+            sendLog(`[Python] ${output.message}`, output.level);
+          } else if (output.type === 'result') {
+            finalResult = output.payload; // Estandarizado para usar siempre el payload
+          }
+        } catch (e) {
+          sendLog(`No se pudo parsear la línea de salida de Python: ${line}`, 'WARN');
+        }
+      });
+
+      if (finalResult) {
+        // Log del texto completo del PDF si está presente en el resultado
+        if (finalResult.debug_full_text) {
+          sendLog(`Texto extraído del PDF ${path.basename(pdfPath)}:
+---
+INICIO ---
+${finalResult.debug_full_text}
+--- FIN ---`, 'DEBUG');
+          delete finalResult.debug_full_text;
+        }
+        sendLog('Procesamiento de PDF completado exitosamente.');
+        return finalResult;
+      } else {
+        throw new Error("El script de Python no devolvió un resultado final.");
+      }
+
+    } catch (error) {
+      sendLog(`Fallo en la ejecución del script de procesamiento de PDF: ${error.message}`, 'ERROR');
+      return { success: false, error: error.message, traceback: error.stack };
+    }
   });
 
-  // Manejar conversión de DOCX a PDF
+  // Manejar conversión de DOCX a PDF para previsualización
   ipcMain.handle('convert-docx-to-pdf', async (event, docxPath) => {
-    // ... (código del handler)
+    try {
+      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'convert_docx_to_pdf.py');
+      const command = `python "${pythonScriptPath}" "${docxPath}"`;
+      
+      console.log(`Executing DOCX conversion: ${command}`);
+      const { stdout, stderr } = await execPromise(command);
+
+      // Si stderr contiene nuestro error JSON específico, lo procesamos como error.
+      if (stderr && stderr.includes('"success": false')) {
+        try {
+          const errJsonMatch = stderr.match(/\{.*\}/s);
+          if (errJsonMatch && errJsonMatch[0]) {
+            return JSON.parse(errJsonMatch[0]);
+          }
+          // Fallback si la expresión regular falla
+          throw new Error(`Error en script (no se pudo parsear JSON de error): ${stderr}`);
+        } catch (e) {
+          throw new Error(`Error al procesar error del script: ${stderr}`);
+        }
+      }
+
+      // Si stderr solo contenía la barra de progreso, lo ignoramos y confiamos en stdout.
+      if (!stdout) {
+        const errorMessage = stderr ? `El script produjo un error o mensaje inesperado: ${stderr}` : 'El script de conversión no produjo ninguna salida.';
+        throw new Error(errorMessage);
+      }
+
+      // Buscamos el JSON de éxito en stdout.
+      const jsonMatch = stdout.match(/\{.*\}/s);
+      if (jsonMatch && jsonMatch[0]) {
+        try {
+          return JSON.parse(jsonMatch[0]);
+        } catch (e) {
+          throw new Error(`Error al parsear la salida JSON del script: ${e.message}. Salida recibida: ${stdout}`);
+        }
+      }
+      
+      throw new Error(`No se encontró una respuesta JSON válida en la salida del script. Salida recibida: ${stdout}`);
+
+    } catch (error) {
+      console.error('Error executing DOCX conversion script:', error);
+      return { success: false, error: error.message };
+    }
   });
 
-  // Manejar selección de PDF
+  // Manejar selección de archivo PDF
   ipcMain.handle('select-pdf-file', async () => {
-    // ... (código del handler)
+    console.log('Handling select-pdf-file request');
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: 'PDF Files', extensions: ['pdf'] }]
+    });
+    
+    if (result.canceled) {
+      console.log('PDF file selection canceled');
+      return null;
+    }
+    
+    console.log('Selected PDF file:', result.filePaths[0]);
+    return result.filePaths[0];
   });
-
-  // Manejar generación de documento
+  
+  
+  
+  // Manejar generación de documento de remisión
   ipcMain.handle('generate-remision-document', async (event, extractedData, empresa) => {
-    // ... (código del handler)
+    sendLog(`IPC: generate-remision-document recibido para empresa: ${empresa}`);
+    try {
+      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'remision_utils.py');
+      const tempDataPath = path.join(app.getPath('temp'), `remision_data_${Date.now()}.json`);
+      
+      sendLog(`Creando archivo de datos temporal: ${tempDataPath}`);
+      await fs.writeFile(tempDataPath, JSON.stringify({ data: extractedData, empresa: empresa }));
+      
+      const command = `python "${pythonScriptPath}" --generate-remision "${tempDataPath}"`;
+      
+      sendLog(`Ejecutando script de generación de remisión: ${command.replace(/\\/g, '/')}`);
+      const { stdout, stderr } = await execPromise(command);
+      
+      await fs.unlink(tempDataPath);
+      
+      if (stderr) {
+        sendLog(`Error en script de generación de remisión: ${stderr}`, 'ERROR');
+      }
+
+      let finalResult = null;
+      const lines = stdout.split(/\r?\n/).filter(line => line.trim() !== '');
+      lines.forEach(line => {
+        try {
+          const output = JSON.parse(line);
+          if (output.type === 'log') {
+            sendLog(`[Python] ${output.message}`, output.level);
+          } else if (output.type === 'result') {
+            finalResult = output.payload;
+          }
+        } catch (e) {
+          sendLog(`No se pudo parsear la línea de salida de Python: ${line}`, 'WARN');
+        }
+      });
+
+      if (!finalResult) {
+        throw new Error("El script de Python no devolvió un resultado final.");
+      }
+
+      sendLog(`Resultado de la generación: ${JSON.stringify(finalResult)}`);
+      
+      if (finalResult.success && finalResult.documentPath) {
+        const docPath = finalResult.documentPath;
+        try {
+          await fs.access(docPath);
+        } catch (accessError) {
+          // Silencio
+        }
+        
+        try {
+          const empresaPaths = {
+            "Temposum": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\2. Temposum Est SAS\\3. Gestión de la Salud\\3.1.6 Restricciones y recomendaciones médicas\\3.1.6.1. Remisiones EPS",
+            "Tempoactiva": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\1. Tempoactiva Est SAS\\3. Gestión de la Salud\\3.1.6 Restricciones y recomendaciones médicas\\3.1.6.1. Remisiones EPS",
+            "Aseplus": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\3. Aseplus\\3. Gestión de la Salud\\3.1.6 Restricciones y recomendaciones médicas\\3.1.6.1. Remisiones EPS",
+            "Asel": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\19. Asel S.A.S\\3. Gestión de la Salud\\3.1.6 Restricciones y recomendaciones médicas\\3.1.6.1. Remisiones EPS"
+          };
+          
+          const remisionesDir = empresaPaths[empresa] || empresaPaths["Temposum"];
+          const files = await fs.readdir(remisionesDir);
+          const docxFiles = files.filter(file => file.endsWith('.docx') && file.includes('GI-OD-007 REMISION A EPS'));
+          
+          if (docxFiles.length > 0) {
+            const fileStats = await Promise.all(docxFiles.map(async (file) => {
+              const filePath = path.join(remisionesDir, file);
+              const stats = await fs.stat(filePath);
+              return { file, filePath, mtime: stats.mtime };
+            }));
+            
+            fileStats.sort((a, b) => b.mtime - a.mtime);
+            const latestFile = fileStats[0];
+            
+            const tempFileName = `temp_remision_${Date.now()}.docx`;
+            const tempFilePath = path.join(app.getPath('temp'), tempFileName);
+            
+            await fs.copyFile(latestFile.filePath, tempFilePath);
+            finalResult.documentPath = tempFilePath;
+            finalResult.originalDocumentPath = latestFile.filePath;
+            sendLog(`Documento copiado a ruta temporal: ${tempFilePath}`);
+          } else {
+            sendLog('No se encontraron archivos de remisión para la copia de seguridad.', 'WARN');
+          }
+        } catch (searchError) {
+          sendLog(`Error buscando el archivo más reciente para la copia: ${searchError.message}`, 'ERROR');
+        }
+      }
+      
+      return finalResult;
+    } catch (error) {
+      sendLog(`Fallo en la ejecución del script de generación de remisión: ${error.message}`, 'ERROR');
+      return { success: false, error: error.message };
+    }
   });
 
-  // Manejar envío por email
+  // Manejar envío de remisión por email
   ipcMain.handle('send-remision-by-email', async (event, docPath, extractedData, empresa) => {
-    // ... (código del handler)
-  });
+    sendLog(`IPC: send-remision-by-email recibido para: ${docPath}`);
+    try {
+      sendLog('Creando copia temporal del archivo para envío de correo...');
+      const tempFileName = `temp_remision_${Date.now()}.docx`;
+      const tempFilePath = path.join(app.getPath('temp'), tempFileName);
+      
+      await fs.copyFile(docPath, tempFilePath);
+      sendLog(`Archivo copiado a: ${tempFilePath}`);
+      
+      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'remision_utils.py');
+      const tempDataPath = path.join(app.getPath('temp'), `email_data_${Date.now()}.json`);
+      const tempData = { 
+        docPath: tempFilePath, 
+        data: extractedData, 
+        empresa: empresa 
+      };
+      
+      sendLog(`Creando archivo de datos temporal para email: ${tempDataPath}`);
+      await fs.writeFile(tempDataPath, JSON.stringify(tempData), 'utf-8');
+      
+      const command = `python "${pythonScriptPath}" --send-email "${tempDataPath}"`;
+      
+      sendLog(`Ejecutando script de envío de email: ${command.replace(/\\/g, '/')}`);
+      const { stdout, stderr } = await execPromise(command, { encoding: 'utf-8' });
+      
+      await fs.unlink(tempFilePath);
+      await fs.unlink(tempDataPath);
 
-  // Manejar envío por WhatsApp
+      if (stderr) {
+        sendLog(`Error en script de email (stderr): ${stderr}`, 'ERROR');
+      }
+
+      let finalResult = null;
+      const lines = stdout.split(/\r?\n/).filter(line => line.trim() !== '');
+      lines.forEach(line => {
+        try {
+          const output = JSON.parse(line);
+          if (output.type === 'log') {
+            sendLog(`[Python] ${output.message}`, output.level);
+          } else if (output.type === 'result') {
+            finalResult = output.payload;
+          }
+        } catch (e) {
+          sendLog(`No se pudo parsear la línea de salida de Python: ${line}`, 'WARN');
+        }
+      });
+
+      if (finalResult) {
+        sendLog(`Resultado del envío de email: ${JSON.stringify(finalResult)}`);
+        return finalResult;
+      } else {
+        throw new Error("El script de Python no devolvió un resultado final.");
+      }
+
+    } catch (error) {
+      sendLog(`Fallo en la ejecución del script de email: ${error.message}`, 'ERROR');
+      return { success: false, error: error.message };
+    }
+  });
+  
+  // Manejar envío de remisión por WhatsApp
   ipcMain.handle('send-remision-by-whatsapp', async (event, docPath, extractedData, empresa) => {
-    // ... (código del handler)
+    sendLog(`IPC: send-remision-by-whatsapp recibido para: ${docPath}`);
+    try {
+      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'remision_utils.py');
+      const tempDataPath = path.join(app.getPath('temp'), `whatsapp_data_${Date.now()}.json`);
+      
+      sendLog(`Creando archivo de datos temporal para WhatsApp: ${tempDataPath}`);
+      await fs.writeFile(tempDataPath, JSON.stringify({ 
+        docPath: docPath, 
+        data: extractedData, 
+        empresa: empresa 
+      }));
+      
+      const command = `python "${pythonScriptPath}" --send-whatsapp "${tempDataPath}"`;
+      
+      sendLog(`Ejecutando script de preparación de WhatsApp: ${command.replace(/\\/g, '/')}`);
+      const { stdout, stderr } = await execPromise(command);
+      
+      await fs.unlink(tempDataPath);
+      
+      if (stderr) {
+        sendLog(`Error en script de WhatsApp: ${stderr}`, 'ERROR');
+      }
+
+      let finalResult = null;
+      const lines = stdout.split(/\r?\n/).filter(line => line.trim() !== '');
+      lines.forEach(line => {
+        try {
+          const output = JSON.parse(line);
+          if (output.type === 'log') {
+            sendLog(`[Python] ${output.message}`, output.level);
+          } else if (output.type === 'result') {
+            finalResult = output.payload;
+          }
+        } catch (e) {
+          sendLog(`No se pudo parsear la línea de salida de Python: ${line}`, 'WARN');
+        }
+      });
+
+      if (finalResult) {
+        sendLog(`Resultado de preparación de WhatsApp: ${JSON.stringify(finalResult)}`);
+        
+        // Si el script fue exitoso y devolvió un número de teléfono
+        if (finalResult.success && finalResult.phoneNumber) {
+          const phoneNumber = finalResult.phoneNumber;
+          let cleanPhoneNumber = String(phoneNumber).replace(/[^0-9]/g, '');
+          if (cleanPhoneNumber.length === 10) {
+            cleanPhoneNumber = `57${cleanPhoneNumber}`;
+          }
+
+          // Datos del trabajador para el mensaje
+          const nombreTrabajador = finalResult.nombre || 'N/A';
+          const cedulaTrabajador = finalResult.cedula || 'N/A';
+
+          // Plantilla del mensaje
+          const messageBody = `Remisión EPS - ${empresa.toUpperCase()}
+
+Trabajador: ${nombreTrabajador}
+Cédula: ${cedulaTrabajador}
+
+Adjunto encontrará su documento de remisión EPS con las recomendaciones médicas.
+
+Por favor:
+1. Revise el documento adjunto ✅
+2. Siga las indicaciones del profesional de salud ✅
+3. Confirme recepción ✅
+
+Cualquier duda estamos disponibles para resolverla`;
+          
+          const message = encodeURIComponent(messageBody);
+          const whatsappUrl = `https://wa.me/${cleanPhoneNumber}?text=${message}`;
+          
+          sendLog(`Abriendo WhatsApp con la URL: ${whatsappUrl}`);
+          shell.openExternal(whatsappUrl);
+        }
+        
+        return finalResult;
+      } else {
+        throw new Error("El script de Python no devolvió un resultado final.");
+      }
+
+    } catch (error) {
+      sendLog(`Fallo en la ejecución del script de WhatsApp: ${error.message}`, 'ERROR');
+      return { success: false, error: error.message };
+    }
   });
 };
 

@@ -588,10 +588,11 @@ class RestriccionesMedicasComponent {
                             if (Array.isArray(row)) {
                                 row.forEach((cellData, cellIndex) => {
                                     const td = document.createElement('td');
-                                    td.textContent = cellData != null ? cellData : ''; // Manejar null/undefined
+                                    td.textContent = cellData != null ? cellData.toString() : ''; // Manejar null/undefined y convertir a string
                                     td.style.padding = '8px';
                                     td.style.border = '1px solid #eee';
                                     td.style.verticalAlign = 'top';
+                                    td.style.whiteSpace = 'nowrap'; // Evita que el texto se salte a otra línea
                                     tr.appendChild(td);
                                 });
                             }
@@ -713,6 +714,36 @@ style.textContent = `
         background-color: #e9ecef; 
         color: #6c757d; 
         border-color: #dee2e6; 
+    }
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+        margin-bottom: 1rem;
+    }
+    .data-table th, .data-table td {
+        padding: 8px;
+        border: 1px solid #ddd;
+        text-align: left;
+        vertical-align: top;
+        white-space: nowrap;
+    }
+    .data-table th {
+        background-color: #f8f9fa;
+        font-weight: bold;
+        position: sticky;
+        top: 0;
+        z-index: 1;
+    }
+    .data-table tr:nth-child(even) {
+        background-color: #f8f9fa;
+    }
+    .data-table tr:hover {
+        background-color: #e9ecef;
+    }
+    .control-remisiones-content {
+        max-height: 70vh;
+        overflow-y: auto;
     }
 `;
 document.head.appendChild(style);
