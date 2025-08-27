@@ -1,11 +1,12 @@
 // restricciones-medicas.js - Componente para el submódulo "3.1.6 Restricciones y recomendaciones médicas"
 
 class RestriccionesMedicasComponent {
-    constructor(container, companyName, moduleName, submoduleName, onBackToModuleHome) {
+    constructor(container, companyName, moduleName, submoduleName, logMessage, onBackToModuleHome) {
         this.container = container;
         this.companyName = companyName;
         this.moduleName = moduleName;
         this.submoduleName = submoduleName;
+        this.logMessage = logMessage;
         this.onBackToModuleHome = onBackToModuleHome;
         this.extractedData = null;
         this.lastGeneratedDoc = null;
@@ -514,28 +515,159 @@ class RestriccionesMedicasComponent {
         return card;
     }
 
-    _renderControlRemisionesView() {
+    async _renderControlRemisionesView() {
         this.container.innerHTML = '';
         const header = this.createHeader('Control de Remisiones', () => this.render());
         this.container.appendChild(header);
 
         const contentDiv = document.createElement('div');
-        contentDiv.className = 'placeholder-content';
+        contentDiv.className = 'control-remisiones-content';
         contentDiv.style.padding = '20px';
-        contentDiv.style.textAlign = 'center';
-
-        const placeholderText = document.createElement('p');
-        placeholderText.textContent = 'Aquí se mostrará la tabla de control de remisiones.';
-        contentDiv.appendChild(placeholderText);
-
-        const placeholderTable = document.createElement('div');
-        placeholderTable.style.border = '2px dashed #ccc';
-        placeholderTable.style.padding = '50px';
-        placeholderTable.style.marginTop = '20px';
-        placeholderTable.textContent = 'Área para futura tabla/componente';
-        contentDiv.appendChild(placeholderTable);
-
         this.container.appendChild(contentDiv);
+
+        // Función interna para renderizar contenido (movida dentro del método)
+        const renderContent = async () => {
+            this.logMessage(`Cargando datos del archivo de control para ${this.companyName}...`);
+            contentDiv.innerHTML = '<p style="text-align:center;">Cargando datos del archivo de control...</p>';
+
+            try {
+                this.logMessage(`Solicitando datos para empresa: ${this.companyName}`);
+                const result = await window.electronAPI.getControlRemisionesData(this.companyName);
+                // ✅ Log de depuración para ver la estructura exacta
+                this.logMessage(`Estructura del resultado: ${Object.keys(result).join(', ')}`);
+                this.logMessage(`Headers tipo: ${Array.isArray(result.headers) ? 'Array' : typeof result.headers}`);
+                this.logMessage(`Rows tipo: ${Array.isArray(result.rows) ? 'Array' : typeof result.rows}, Longitud: ${result.rows?.length ?? 'N/A'}`);
+                
+                contentDiv.innerHTML = ''; // Limpiar mensaje de "Cargando..."
+
+                if (result.success) {
+                    // ✅ CORRECCIÓN: Verificar result.rows en lugar de result.data
+                    if (result.rows && result.rows.length > 0) {
+                        this.logMessage(`Encontrados ${result.rows.length} registros. Renderizando tabla.`);
+                        // Crear contenedor con scroll
+                        const tableContainer = document.createElement('div');
+                        tableContainer.style.maxHeight = '70vh';
+                        tableContainer.style.overflowY = 'auto';
+                        tableContainer.style.border = '1px solid #ddd';
+                        tableContainer.style.borderRadius = '4px';
+
+                        // Crear tabla
+                        const table = document.createElement('table');
+                        table.className = 'data-table';
+                        table.style.width = '100%';
+                        table.style.borderCollapse = 'collapse';
+
+                        // Crear encabezado
+                        const thead = document.createElement('thead');
+                        const headerRow = document.createElement('tr');
+                        // ✅ CORRECCIÓN: Usar result.headers
+                        if (result.headers && Array.isArray(result.headers)) {
+                            result.headers.forEach(headerText => {
+                                const th = document.createElement('th');
+                                th.textContent = headerText;
+                                th.style.backgroundColor = '#f8f9fa';
+                                th.style.padding = '12px 8px';
+                                th.style.border = '1px solid #ddd';
+                                th.style.textAlign = 'left';
+                                th.style.position = 'sticky';
+                                th.style.top = '0';
+                                headerRow.appendChild(th);
+                            });
+                        }
+                        thead.appendChild(headerRow);
+                        table.appendChild(thead);
+
+                        // Crear cuerpo
+                        const tbody = document.createElement('tbody');
+                        // ✅ CORRECCIÓN: Usar result.rows
+                        result.rows.forEach((row, rowIndex) => {
+                            const tr = document.createElement('tr');
+                            tr.style.backgroundColor = rowIndex % 2 === 0 ? '#fff' : '#f8f9fa';
+                            
+                            // Asegurarse de que row es un array
+                            if (Array.isArray(row)) {
+                                row.forEach((cellData, cellIndex) => {
+                                    const td = document.createElement('td');
+                                    td.textContent = cellData != null ? cellData : ''; // Manejar null/undefined
+                                    td.style.padding = '8px';
+                                    td.style.border = '1px solid #eee';
+                                    td.style.verticalAlign = 'top';
+                                    tr.appendChild(td);
+                                });
+                            }
+                            
+                            tbody.appendChild(tr);
+                        });
+                        table.appendChild(tbody);
+
+                        tableContainer.appendChild(table);
+                        contentDiv.appendChild(tableContainer);
+                        
+                        // Mostrar información adicional
+                        const infoDiv = document.createElement('div');
+                        infoDiv.style.marginTop = '15px';
+                        infoDiv.style.fontSize = '14px';
+                        infoDiv.style.color = '#666';
+                        infoDiv.innerHTML = `
+                            <p><strong>Archivo:</strong> ${result.filePath}</p>
+                            <p><strong>Total de registros:</strong> ${result.rows.length}</p>
+                        `;
+                        contentDiv.appendChild(infoDiv);
+                        
+                    } else {
+                        // Si no hay filas, mostrar mensaje apropiado
+                        this.logMessage('El archivo de control de remisiones está vacío o no contiene registros.', 'WARN');
+                        contentDiv.innerHTML = `
+                            <div style="text-align:center; padding:40px; color:#666;">
+                                <h3>📋 No se encontraron datos</h3>
+                                <p>El archivo de control de remisiones está vacío o no contiene registros.</p>
+                                <button id="retry-btn" 
+                                        style="margin-top:20px; padding:10px 20px; background:#3498db; color:white; border:none; border-radius:4px; cursor:pointer;">
+                                    Reintentar
+                                </button>
+                            </div>
+                        `;
+                        contentDiv.querySelector('#retry-btn')?.addEventListener('click', renderContent);
+                    }
+                } else {
+                    this.logMessage(`Error al cargar el archivo: ${result.error}`, 'ERROR');
+                    // Mostrar error
+                    contentDiv.innerHTML = `
+                        <div style="text-align:center; padding:40px; color:#d32f2f;">
+                            <h3>❌ Error al cargar el archivo</h3>
+                            <p>${result.error}</p>
+                            <button id="retry-btn" 
+                                    style="margin-top:20px; padding:10px 20px; background:#3498db; color:white; border:none; border-radius:4px; cursor:pointer;">
+                                Reintentar
+                            </button>
+                        </div>
+                    `;
+                    contentDiv.querySelector('#retry-btn').addEventListener('click', renderContent);
+                }
+            } catch (error) {
+                this.logMessage(`Error inesperado en la interfaz: ${error.message}`, 'ERROR');
+                contentDiv.innerHTML = `
+                    <div style="text-align:center; padding:40px; color:#d32f2f;">
+                        <h3>💥 Error inesperado</h3>
+                        <p>${error.message}</p>
+                        <details style="margin-top:15px; text-align:left;">
+                            <summary>Detalles técnicos</summary>
+                            <pre style="background:#f5f5f5; padding:10px; border-radius:4px; font-size:12px; overflow:auto;">
+${error.stack}
+                            </pre>
+                        </details>
+                        <button id="retry-btn-critical" 
+                                style="margin-top:20px; padding:10px 20px; background:#3498db; color:white; border:none; border-radius:4px; cursor:pointer;">
+                            Reintentar
+                        </button>
+                    </div>
+                `;
+                contentDiv.querySelector('#retry-btn-critical').addEventListener('click', renderContent);
+            }
+        };
+
+        // Llamar a la función de renderizado
+        await renderContent();
     }
 
     showPlaceholder(featureName) {

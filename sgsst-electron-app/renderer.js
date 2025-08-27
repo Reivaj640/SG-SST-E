@@ -723,6 +723,7 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
           currentCompany, 
           moduleName, 
           submoduleName,
+          logMessage, // Pasar la función de log
           () => {
             // Verificar que container.parentElement exista antes de usarlo
             if (container.parentElement) {

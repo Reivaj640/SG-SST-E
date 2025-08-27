@@ -24,6 +24,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // Encontrar ruta de un submódulo
   findSubmodulePath: (company, module, submodule) => ipcRenderer.invoke('find-submodule-path', company, module, submodule),
+
+  // Obtener datos del archivo de control de remisiones
+  getControlRemisionesData: (companyName) => ipcRenderer.invoke('get-control-remisiones-data', companyName),
   
   // Convertir DOCX a PDF para previsualización
   convertDocxToPdf: (path) => ipcRenderer.invoke('convert-docx-to-pdf', path),
