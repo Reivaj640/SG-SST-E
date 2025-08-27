@@ -442,25 +442,7 @@ class ExcelHandler:
             control_path = Path(control_path)
             logging.info(f"Actualizando archivo de control: {control_path}")
 
-            # 🔹 Normalizar claves antes de validar - CORRECCIÓN
-            # Mapear todas las variantes posibles de claves
-            key_mapping = {
-                'No. Identificacion': 'No. Identificación',
-                'No Identificacion': 'No. Identificación', 
-                'No_Identificacion': 'No. Identificación',
-                'Cedula': 'No. Identificación',
-                'Cédula': 'No. Identificación',
-                'Fecha de Atencion': 'Fecha de Atención',
-                'Fecha_Atencion': 'Fecha de Atención',
-                'Fecha de AtenciÃ³n': 'Fecha de Atención',  # Esta es la clave que viene del PDF
-                'Fecha_de_Atencion': 'Fecha de Atención'
-            }
-
-            # Aplicar el mapeo
-            for old_key, new_key in key_mapping.items():
-                if old_key in data:
-                    data[new_key] = data.pop(old_key)
-                    logging.info(f"Clave normalizada: {old_key} -> {new_key} = {data[new_key]}")
+            # Las claves ahora se normalizan en el punto de entrada del script.
 
             
             # 🔹 Validar datos críticos CON LOGGING DETALLADO
@@ -734,6 +716,85 @@ def send_remision_by_whatsapp(doc_path, data, empresa):
         log(f"Error al preparar documento para WhatsApp: {str(e)}", level='ERROR')
         return {"success": False, "error": str(e)}
 
+# --- Función de normalización de claves agregada ---
+def normalize_data_keys(data):
+    """
+    Normaliza las claves del diccionario de datos extraídos para usar nombres estándar.
+    Esto es crucial para que todas las funciones posteriores puedan encontrar los datos.
+    """
+    # Mapeo de claves posibles a las claves estándar utilizadas internamente
+    key_mapping = {
+        # Cédula / Identificación
+        'No. Identificacion': 'No. Identificación', # Sin tilde, común en extracciones con errores
+        'No Identificacion': 'No. Identificación',
+        'No_Identificacion': 'No. Identificación',
+        'Cedula': 'No. Identificación',
+        'Cédula': 'No. Identificación',
+        'Documento': 'No. Identificación',
+        'IDENTIFICACIÓN': 'No. Identificación',
+        'IDENTIFICACION': 'No. Identificación',
+        'No. Identificación': 'No. Identificación', # Ya correcta, asegura que no cambie
+        
+        # Fecha de Atención
+        'Fecha de Atencion': 'Fecha de Atención',
+        'Fecha_Atencion': 'Fecha de Atención',
+        'Fecha de AtenciÃ³n': 'Fecha de Atención', # UTF-8 mal interpretado
+        'Fecha_de_Atencion': 'Fecha de Atención',
+        'Fecha de atención': 'Fecha de Atención',
+        'Fecha Atención': 'Fecha de Atención',
+        'Fecha de Atención': 'Fecha de Atención', # Ya correcta
+        
+        # Nombre Completo
+        'Nombre_Completo': 'Nombre Completo',
+        'PACIENTE': 'Nombre Completo',
+        'Nombre completo': 'Nombre Completo',
+        'Nombre': 'Nombre Completo', # Asumiendo que es el principal
+        'Nombre Completo': 'Nombre Completo', # Ya correcta
+        
+        # Agrega aquí más mapeos si encuentras otras variaciones en los logs
+        # Por ejemplo, para otros campos como 'Cargo', 'Afiliación', etc.
+        'Cargo Laboral': 'Cargo',
+        'Ocupación': 'Cargo',
+        'Cargo': 'Cargo', # Ya correcta
+        
+        'Afiliacion': 'Afiliación',
+        'Empresa': 'Afiliación',
+        'Afiliación': 'Afiliación', # Ya correcta
+        
+        'Concepto Medico': 'Concepto Medico', # Ya correcta
+        'Concepto Médico': 'Concepto Medico',
+        
+        'Concepto Manipulacion Alimento': 'Concepto Manipulación Alimento',
+        'Concepto Manipulación Alimento': 'Concepto Manipulación Alimento', # Ya correcta
+        
+         'Motivo de Restricciufffdn': 'Motivo de Restricción', # Carácter inválido
+         'Motivo de Restricción': 'Motivo de Restricción', # Ya correcta
+         
+         'Recomendaciones Laborales': 'Recomendaciones Laborales', # Ya correcta
+         'Restricciones Laborales': 'Restricciones Laborales', # Ya correcta
+    }
+    
+    normalized_data = {}
+    for key, value in data.items():
+        # Normaliza la clave usando el mapeo
+        normalized_key = key_mapping.get(key.strip(), key.strip()) # Usa la clave original si no hay mapeo
+        normalized_data[normalized_key] = value
+    
+    # Asegurar que siempre exista una clave estándar incluso si el PDF usaba una muy diferente
+    # Por ejemplo, si el PDF tenía "CC 123456789", y se extrajo como "Documento", 
+    # la normalización anterior lo habría convertido a "No. Identificación".
+    # Pero si no se encuentra ninguna variante, podemos hacer una búsqueda más flexible.
+    # (Opcional, para ser más robustos)
+    if 'No. Identificación' not in normalized_data:
+        # Buscar cualquier clave que contenga "ident" y tenga un número
+        for key, value in normalized_data.items():
+             if 'ident' in key.lower() and isinstance(value, str) and re.search(r'\d{6,}', value):
+                 normalized_data['No. Identificación'] = value
+                 log(f"Clave de cédula inferida: '{key}' -> 'No. Identificación' = {value}")
+                 break
+    
+    return normalized_data
+
 if __name__ == "__main__":
     if len(sys.argv) > 2:
         command = sys.argv[1]
@@ -745,14 +806,28 @@ if __name__ == "__main__":
             with open(data_file, 'r', encoding='utf-8') as f:
                 temp_data = json.load(f)
 
-            data = temp_data.get('data', {})
+            # --- CORRECCIÓN: Normalizar las claves de los datos cargados ---
+            raw_data = temp_data.get('data', {})
+            data = normalize_data_keys(raw_data) # <-- Aplicar normalización aquí
+            log(f"Claves normalizadas. Claves finales: {list(data.keys())}")
+            # --- FIN CORRECCIÓN ---
+            
+            empresa = temp_data.get('empresa', 'TEMPOACTIVA') # Asegurar valor por defecto
             
             if command == "--generate-remision":
-                result = generate_remision_document(data, temp_data['empresa'])
+                result = generate_remision_document(data, empresa)
             elif command == "--send-email":
-                result = send_remision_by_email(temp_data['docPath'], data, temp_data['empresa'])
+                # Asegurarse de pasar el docPath correcto
+                doc_path = temp_data.get('docPath') 
+                if not doc_path:
+                     raise ValueError("docPath no encontrado en los datos temporales para --send-email")
+                result = send_remision_by_email(doc_path, data, empresa)
             elif command == "--send-whatsapp":
-                result = send_remision_by_whatsapp(temp_data['docPath'], data, temp_data['empresa'])
+                # Asegurarse de pasar el docPath correcto
+                doc_path = temp_data.get('docPath')
+                if not doc_path:
+                     raise ValueError("docPath no encontrado en los datos temporales para --send-whatsapp")
+                result = send_remision_by_whatsapp(doc_path, data, empresa)
             else:
                 result = {"success": False, "error": "Comando no reconocido"}
 
