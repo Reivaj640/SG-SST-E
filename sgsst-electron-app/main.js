@@ -740,6 +740,38 @@ ${finalResult.debug_full_text}
     }
   });
   
+  // Agrega este nuevo handler IPC en tu main.js
+  ipcMain.handle('update-excel-cell', async (event, filePath, row, col, value) => {
+    sendLog(`[MAIN] Actualizando celda en ${filePath}, fila: ${row}, columna: ${col}, valor: ${value}`);
+    
+    try {
+      // Verificar que el archivo existe
+      await fs.access(filePath);
+      
+      // Leer el workbook
+      const workbook = xlsx.readFile(filePath);
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      
+      // Convertir coordenadas a formato de celda de Excel (ej: A1, B2, etc.)
+      const cellAddress = xlsx.utils.encode_cell({ r: row - 1, c: col - 1 }); // Convertir a 0-indexed
+      
+      // Actualizar el valor de la celda
+      worksheet[cellAddress] = { v: value, t: 's' }; // t: 's' para string
+      
+      // Guardar el archivo
+      xlsx.writeFile(workbook, filePath);
+      
+      sendLog(`[MAIN] Celda actualizada exitosamente: ${cellAddress} = ${value}`);
+      
+      return { success: true };
+      
+    } catch (error) {
+      sendLog(`[MAIN] Error al actualizar celda: ${error.message}`, 'ERROR');
+      return { success: false, error: error.message };
+    }
+  });
+
   // Manejar envío de remisión por WhatsApp
   ipcMain.handle('send-remision-by-whatsapp', async (event, docPath, extractedData, empresa) => {
     sendLog(`IPC: send-remision-by-whatsapp recibido para: ${docPath}`);

@@ -53,5 +53,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sendRemisionByWhatsApp: (docPath, extractedData, empresa) => ipcRenderer.invoke('send-remision-by-whatsapp', docPath, extractedData, empresa),
   
   // Enviar remisión por correo electrónico
-  sendRemisionByEmail: (docPath, extractedData, empresa) => ipcRenderer.invoke('send-remision-by-email', docPath, extractedData, empresa)
+  sendRemisionByEmail: (docPath, extractedData, empresa) => ipcRenderer.invoke('send-remision-by-email', docPath, extractedData, empresa),
+
+  // Agrega esto en el contextBridge.exposeInMainWorld
+  updateExcelCell: (filePath, row, col, value) => ipcRenderer.invoke('update-excel-cell', filePath, row, col, value)
 });

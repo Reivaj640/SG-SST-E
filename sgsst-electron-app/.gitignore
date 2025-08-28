@@ -1,0 +1,44 @@
+# Dependencias de Node
+node_modules/
+
+# Archivos de compilación
+dist/
+build/
+out/
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Archivos de logs
+*.log
+
+# Archivos temporales
+temp/
+tmp/
+
+# Archivos de configuración de IDE
+.vscode/
+.idea/
+
+# Archivos de respaldo
+*.bak
+*.backup
+
+# Entornos virtuales de Python
+Portear/.venv/
+Portear/venv/
+
+# Archivos compilados de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Archivos de datos temporales
+*.tmp
+*.temp
+
+# Archivos de configuración generados
+config.json

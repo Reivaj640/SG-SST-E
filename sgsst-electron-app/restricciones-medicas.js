@@ -588,7 +588,25 @@ class RestriccionesMedicasComponent {
                             if (Array.isArray(row)) {
                                 row.forEach((cellData, cellIndex) => {
                                     const td = document.createElement('td');
-                                    td.textContent = cellData != null ? cellData.toString() : ''; // Manejar null/undefined y convertir a string
+                                    // Si es la última columna, hacerla editable
+                                    if (cellIndex === row.length - 1) { // Última columna
+                                        const input = document.createElement('input');
+                                        input.type = 'text';
+                                        input.value = cellData != null ? cellData.toString() : '';
+                                        input.style.width = '100%';
+                                        input.style.boxSizing = 'border-box';
+                                        input.style.border = '1px solid #ccc';
+                                        input.style.padding = '4px';
+                                        input.dataset.rowIndex = rowIndex; // Guardar índice de fila
+                                        input.dataset.colIndex = cellIndex; // Guardar índice de columna
+                                        input.addEventListener('change', (e) => {
+                                            // Cuando cambie el valor, enviar al backend para guardar
+                                            this.saveCellData(rowIndex, cellIndex, e.target.value, result.filePath);
+                                        });
+                                        td.appendChild(input);
+                                    } else {
+                                        td.textContent = cellData != null ? cellData.toString() : '';
+                                    }
                                     td.style.padding = '8px';
                                     td.style.border = '1px solid #eee';
                                     td.style.verticalAlign = 'top';
@@ -669,6 +687,29 @@ ${error.stack}
 
         // Llamar a la función de renderizado
         await renderContent();
+    }
+
+    // Agrega este método a la clase RestriccionesMedicasComponent
+    async saveCellData(rowIndex, colIndex, newValue, filePath) {
+        try {
+            this.logMessage(`Guardando cambios en fila ${rowIndex + 1}, columna ${colIndex + 1}...`);
+            const result = await window.electronAPI.updateExcelCell(
+                filePath, 
+                rowIndex + 7 + 1, // +7 por encabezados, +1 por base 1-indexed de Excel
+                colIndex + 1,     // 1-indexed para Excel
+                newValue
+            );
+            
+            if (result.success) {
+                this.logMessage('Cambios guardados exitosamente en el archivo Excel.');
+            } else {
+                this.logMessage(`Error al guardar cambios: ${result.error}`, 'error');
+                alert(`Error al guardar cambios: ${result.error}`);
+            }
+        } catch (error) {
+            this.logMessage(`Error crítico al guardar cambios: ${error.message}`, 'error');
+            alert(`Error crítico al guardar cambios: ${error.message}`);
+        }
     }
 
     showPlaceholder(featureName) {

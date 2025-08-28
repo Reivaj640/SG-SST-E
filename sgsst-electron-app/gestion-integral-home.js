@@ -4,6 +4,8 @@ class GestionIntegralHome {
     constructor(container, moduleName) {
         this.container = container;
         this.moduleName = moduleName;
+        // Importar los submódulos desde el renderer.js
+        this.submodules = window.RESOURCES_SUBMODULES?.[moduleName] || [];
     }
 
     async render() {
@@ -76,7 +78,7 @@ class GestionIntegralHome {
         `;
         container.appendChild(chartContainer);
         
-        // Listado de submódulos
+        // Listado de submódulos - MOSTRAR TODOS LOS SUBMÓDULOS
         const submodulesContainer = document.createElement('div');
         submodulesContainer.className = 'submodules-container';
         
@@ -87,12 +89,13 @@ class GestionIntegralHome {
         const submodulesList = document.createElement('div');
         submodulesList.className = 'submodules-list';
         
-        const submoduleItems = [
-            this.renderSubmoduleItem('2.1.1 Politica del SG-SST', 'Hace 2 días', '15 min'),
-            this.renderSubmoduleItem('2.2.1 Objetivos SST', 'Hace 1 semana', '30 min'),
-            this.renderSubmoduleItem('2.3.1 Evaluación inicial del SG-SST', 'Hace 3 días', '45 min'),
-            this.renderSubmoduleItem('2.4.1 Plan de Trabajo Anual', 'Hace 5 días', '1 hora')
-        ];
+        // Mostrar todos los submódulos disponibles
+        const submoduleItems = this.submodules.map((submoduleName, index) => {
+            // Generar datos simulados para cada submódulo
+            const timeAgo = this.getTimeAgo(index);
+            const timeSpent = this.getTimeSpent(index);
+            return this.renderSubmoduleItem(submoduleName, timeAgo, timeSpent);
+        });
         
         submoduleItems.forEach(item => {
             submodulesList.appendChild(item);
@@ -133,17 +136,32 @@ class GestionIntegralHome {
         const button = document.createElement('button');
         button.className = 'btn btn-primary';
         button.textContent = 'Ingresar';
-        // Escape comillas para evitar problemas con el atributo onclick
-        const escapedName = name.replace(/'/g, "\\'");
-        const escapedModule = this.moduleName.replace(/'/g, "\\'");
+        
+        // Usar addEventListener en lugar de onclick para mejor manejo
         button.addEventListener('click', () => {
-            showSubmoduleContent(document.querySelector('.main-canvas'), escapedModule, escapedName);
+            showSubmoduleContent(
+                document.querySelector('.main-canvas'), 
+                this.moduleName, 
+                name
+            );
         });
 
         submoduleItem.appendChild(submoduleInfo);
         submoduleItem.appendChild(button);
         
         return submoduleItem;
+    }
+    
+    // Función auxiliar para generar tiempos simulados
+    getTimeAgo(index) {
+        const times = ['Hace 2 días', 'Hace 1 semana', 'Hace 3 días', 'Hace 5 días', 'Hace 1 día', 'Hace 4 días', 'Hace 6 días', 'Hace 2 semanas', 'Hace 3 horas', 'Hace 1 mes', 'Hace 2 horas', 'Hace 8 días', 'Hace 12 días'];
+        return times[index % times.length] || 'Recientemente';
+    }
+    
+    // Función auxiliar para generar tiempos de uso simulados
+    getTimeSpent(index) {
+        const times = ['15 min', '30 min', '45 min', '1 hora', '20 min', '1 hora 15 min', '25 min', '2 horas', '10 min', '45 min', '5 min', '35 min', '1 hora 30 min'];
+        return times[index % times.length] || '30 min';
     }
     
     async renderSidebarPanel(container) {

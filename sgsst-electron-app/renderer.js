@@ -557,93 +557,96 @@ function showModuleHome(container, moduleName) {
     container.appendChild(noSubmodulesMessage);
     return;
   }
-  
-  // Verificar si es un módulo con home personalizado
+
+  // Para "Gestión Integral", usar directamente showGenericModuleHome
+  if (moduleName === "Gestión Integral") {
+    showGenericModuleHome(container, moduleName, submodules);
+    return;
+  }
+
+// Verificar si es un módulo con home personalizado
   try {
-    if (moduleName === "Gestión Integral") {
-      // Crear una instancia del componente personalizado y renderizarlo
-      if (window.GestionIntegralHome) {
-        const gestionIntegralHome = new window.GestionIntegralHome(container, moduleName);
-        gestionIntegralHome.render();
-      } else {
-        console.error('GestionIntegralHome component not found');
-        showGenericModuleHome(container, moduleName, submodules);
-      }
-      return;
-    } else if (moduleName === "Recursos") {
-      // Crear una instancia del componente personalizado y renderizarlo
-      if (window.RecursosHome) {
-        const recursosHome = new window.RecursosHome(container, moduleName, submodules);
-        recursosHome.render();
-      } else {
-        console.error('RecursosHome component not found');
-        showGenericModuleHome(container, moduleName, submodules);
-      }
-      return;
-    } else if (moduleName === "Gestión de la Salud") {
-      // Crear una instancia del componente personalizado y renderizarlo
-      if (window.GestionSaludHome) {
-        const gestionSaludHome = new window.GestionSaludHome(container, moduleName, submodules);
-        gestionSaludHome.render();
-      } else {
-        console.error('GestionSaludHome component not found');
-        showGenericModuleHome(container, moduleName, submodules);
-      }
-      return;
-    } else if (moduleName === "Gestión de Peligros y Riesgos") {
-      // Crear una instancia del componente personalizado y renderizarlo
-      if (window.GestionPeligrosHome) {
-        const gestionPeligrosHome = new window.GestionPeligrosHome(container, moduleName, submodules);
-        gestionPeligrosHome.render();
-      } else {
-        console.error('GestionPeligrosHome component not found');
-        showGenericModuleHome(container, moduleName, submodules);
-      }
-      return;
-    } else if (moduleName === "Gestión de Amenazas") {
-      // Crear una instancia del componente personalizado y renderizarlo
-      if (window.GestionAmenazasHome) {
-        const gestionAmenazasHome = new window.GestionAmenazasHome(container, moduleName, submodules);
-        gestionAmenazasHome.render();
-      } else {
-        console.error('GestionAmenazasHome component not found');
-        showGenericModuleHome(container, moduleName, submodules);
-      }
-      return;
-    } else if (moduleName === "Verificación") {
-      // Crear una instancia del componente personalizado y renderizarlo
-      if (window.VerificacionHome) {
-        const verificacionHome = new window.VerificacionHome(container, moduleName, submodules);
-        verificacionHome.render();
-      } else {
-        console.error('VerificacionHome component not found');
-        showGenericModuleHome(container, moduleName, submodules);
-      }
-      return;
-    } else if (moduleName === "Mejoramiento") {
-      // Crear una instancia del componente personalizado y renderizarlo
-      if (window.MejoramientoHome) {
-        const mejoramientoHome = new window.MejoramientoHome(container, moduleName, submodules);
-        mejoramientoHome.render();
-      } else {
-        console.error('MejoramientoHome component not found');
-        showGenericModuleHome(container, moduleName, submodules);
-      }
-      return;
-    }
-    
-    // Para otros módulos, usar el componente base
-    if (window.ModuleHomeBase) {
-      const moduleHomeBase = new window.ModuleHomeBase(container, moduleName, submodules);
-      moduleHomeBase.render();
-    } else {
-      console.error('ModuleHomeBase component not found');
-      showGenericModuleHome(container, moduleName, submodules);
-    }
+    // Este bloque ahora está vacío pero es necesario para la estructura
+    // Puedes agregar un comentario o dejarlo vacío
   } catch (error) {
     console.error('Error rendering module home:', error);
     showGenericModuleHome(container, moduleName, submodules);
   }
+
+  // Ahora puedes usar las condiciones normales
+  if (moduleName === "Gestión Integral") {
+    showGenericModuleHome(container, moduleName, submodules);
+    return;
+  } else if (moduleName === "Recursos") {
+    // Crear una instancia del componente personalizado y renderizarlo
+    if (window.RecursosHome) {
+      const recursosHome = new window.RecursosHome(container, moduleName, submodules);
+      recursosHome.render();
+    } else {
+      console.error('RecursosHome component not found');
+      showGenericModuleHome(container, moduleName, submodules);
+    }
+    return;
+  } else if (moduleName === "Gestión de la Salud") {
+    // Crear una instancia del componente personalizado y renderizarlo
+    if (window.GestionSaludHome) {
+      const gestionSaludHome = new window.GestionSaludHome(container, moduleName, submodules);
+      gestionSaludHome.render();
+    } else {
+      console.error('GestionSaludHome component not found');
+      showGenericModuleHome(container, moduleName, submodules);
+    }
+    return;
+  } else if (moduleName === "Gestión de Peligros y Riesgos") {
+    // Crear una instancia del componente personalizado y renderizarlo
+    if (window.GestionPeligrosHome) {
+      const gestionPeligrosHome = new window.GestionPeligrosHome(container, moduleName, submodules);
+      gestionPeligrosHome.render();
+    } else {
+      console.error('GestionPeligrosHome component not found');
+      showGenericModuleHome(container, moduleName, submodules);
+    }
+    return;
+  } else if (moduleName === "Gestión de Amenazas") {
+    // Crear una instancia del componente personalizado y renderizarlo
+    if (window.GestionAmenazasHome) {
+      const gestionAmenazasHome = new window.GestionAmenazasHome(container, moduleName, submodules);
+      gestionAmenazasHome.render();
+    } else {
+      console.error('GestionAmenazasHome component not found');
+      showGenericModuleHome(container, moduleName, submodules);
+    }
+    return;
+  } else if (moduleName === "Verificación") {
+    // Crear una instancia del componente personalizado y renderizarlo
+    if (window.VerificacionHome) {
+      const verificacionHome = new window.VerificacionHome(container, moduleName, submodules);
+      verificacionHome.render();
+    } else {
+      console.error('VerificacionHome component not found');
+      showGenericModuleHome(container, moduleName, submodules);
+    }
+    return;
+  } else if (moduleName === "Mejoramiento") {
+    // Crear una instancia del componente personalizado y renderizarlo
+    if (window.MejoramientoHome) {
+      const mejoramientoHome = new window.MejoramientoHome(container, moduleName, submodules);
+      mejoramientoHome.render();
+    } else {
+      console.error('MejoramientoHome component not found');
+      showGenericModuleHome(container, moduleName, submodules);
+    }
+    return;
+  }
+}
+
+// Para otros módulos, usar el componente base
+if (window.ModuleHomeBase) {
+  const moduleHomeBase = new window.ModuleHomeBase(container, moduleName, submodules);
+  moduleHomeBase.render();
+} else {
+  console.error('ModuleHomeBase component not found');
+  showGenericModuleHome(container, moduleName, submodules);
 }
 
 function showGenericModuleHome(container, moduleName, submodules) {
