@@ -899,6 +899,401 @@ select.form-control {
   width: 400px;
 }
 
+/* Estilos para formularios de investigación */
+.investigacion-form {
+  background-color: var(--widget-bg-color);
+  border-radius: var(--border-radius-md);
+  padding: 20px;
+  box-shadow: var(--box-shadow);
+  margin-top: 20px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 600;
+  color: var(--heading-color);
+}
+
+.form-control {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  font-family: inherit;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 0.2rem rgba(32, 106, 93, 0.25);
+}
+
+.form-control[required] {
+  border-left: 3px solid var(--primary-color);
+}
+
+textarea.form-control {
+  resize: vertical;
+  min-height: 80px;
+}
+
+select.form-control {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 16px;
+  padding-right: 40px;
+}
+
+/* Estilos para la funcionalidad de investigación de accidentes */
+
+/* Área de selección de archivos */
+.file-selection-area {
+  margin: 20px 0;
+}
+
+.file-drop-zone {
+  border: 2px dashed var(--border-color);
+  border-radius: var(--border-radius-lg);
+  padding: 40px 20px;
+  text-align: center;
+  background-color: var(--widget-bg-color);
+  transition: var(--transition-normal);
+  cursor: pointer;
+}
+
+.file-drop-zone.dragover {
+  border-color: var(--primary-color);
+  background-color: rgba(32, 106, 93, 0.05);
+}
+
+.file-drop-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.file-drop-icon {
+  font-size: 3rem;
+  color: var(--text-light-color);
+}
+
+.file-drop-text {
+  color: var(--text-light-color);
+  margin-bottom: 10px;
+}
+
+.selected-file-info {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: var(--light-color);
+  border-radius: var(--border-radius-md);
+  border-left: 4px solid var(--primary-color);
+}
+
+.selected-file-info h4 {
+  margin-top: 0;
+  color: var(--heading-color);
+}
+
+.selected-file-info p {
+  margin: 5px 0;
+  font-weight: 500;
+}
+
+/* Área de contexto adicional */
+.context-area {
+  margin: 20px 0;
+}
+
+.context-area h4 {
+  color: var(--heading-color);
+  margin-bottom: 10px;
+}
+
+.context-area textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  font-family: inherit;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.context-area textarea:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 0.2rem rgba(32, 106, 93, 0.25);
+}
+
+/* Área de procesamiento */
+.processing-area {
+  margin: 20px 0;
+}
+
+.progress-container {
+  text-align: center;
+  padding: 30px;
+  background-color: var(--widget-bg-color);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--box-shadow);
+}
+
+.progress-icon {
+  font-size: 3rem;
+  margin-bottom: 15px;
+}
+
+.progress-text {
+  font-size: 1.2rem;
+  font-weight: 500;
+  margin-bottom: 20px;
+  color: var(--heading-color);
+}
+
+.progress-bar {
+  width: 100%;
+  height: 10px;
+  background-color: var(--border-color);
+  border-radius: 5px;
+  overflow: hidden;
+  margin-bottom: 15px;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: var(--primary-color);
+  width: 50%;
+  border-radius: 5px;
+  animation: progressAnimation 2s infinite;
+}
+
+@keyframes progressAnimation {
+  0% { width: 0%; }
+  50% { width: 70%; }
+  100% { width: 100%; }
+}
+
+.progress-status {
+  font-style: italic;
+  color: var(--text-light-color);
+}
+
+.log-area {
+  margin-top: 30px;
+}
+
+.log-area h4 {
+  color: var(--heading-color);
+  margin-bottom: 10px;
+}
+
+.log-content {
+  background-color: #000;
+  color: #00ff00;
+  padding: 15px;
+  border-radius: var(--border-radius-md);
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  height: 150px;
+  overflow-y: auto;
+}
+
+/* Tarjetas de resultados */
+.result-summary {
+  margin-bottom: 20px;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.summary-item label {
+  font-weight: 600;
+  color: var(--text-light-color);
+  font-size: 0.9rem;
+}
+
+.summary-item span {
+  font-weight: 500;
+  margin-top: 3px;
+}
+
+/* Análisis 5 Porqués */
+.five-whys-analysis {
+  margin-top: 20px;
+}
+
+.five-whys-card {
+  background-color: var(--widget-bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: var(--box-shadow);
+}
+
+.cause-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.cause-number {
+  font-weight: bold;
+  color: var(--primary-color);
+  font-size: 1.2rem;
+}
+
+.cause-text {
+  font-weight: 500;
+  color: var(--heading-color);
+}
+
+.m-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.m-cell {
+  background-color: rgba(32, 106, 93, 0.05);
+  border-radius: var(--border-radius-sm);
+  padding: 10px;
+}
+
+.m-category {
+  font-weight: 600;
+  color: var(--primary-color);
+  font-size: 0.85rem;
+  margin-bottom: 5px;
+}
+
+.m-content {
+  font-size: 0.9rem;
+  color: var(--text-color);
+}
+
+/* Ajustes menores para consistencia */
+.extracted-data-area,
+.context-area,
+.processing-area,
+.five-whys-analysis {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: var(--widget-bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--box-shadow);
+}
+
+.process-controls {
+  margin-bottom: 15px;
+}
+
+.error {
+  color: var(--danger-color);
+  font-weight: bold;
+}
+
+/* Asegurar que el grid de datos se vea bien */
+.summary-grid {
+  /* Ya definido, pero asegurar */
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); /* Ajustar si es necesario */
+  gap: 10px; /* Reducir gap */
+}
+
+.summary-item {
+  /* Ya definido */
+  background-color: rgba(0, 0, 0, 0.02); /* Fondo muy sutil */
+  padding: 8px;
+  border-radius: var(--border-radius-sm);
+}
+
+.summary-item label {
+  /* Ya definido */
+  font-weight: 600;
+  color: var(--text-light-color);
+  font-size: 0.85rem; /* Un poco más pequeño */
+}
+
+.summary-item span {
+  /* Ya definido */
+  font-weight: 500;
+  margin-top: 2px; /* Menos margen */
+  font-size: 0.95rem; /* Un poco más pequeño */
+}
+
+/* Estilos para el área de procesamiento */
+.progress-container {
+  text-align: center;
+  padding: 20px;
+  background-color: rgba(32, 106, 93, 0.05); /* Fondo muy claro del color primario */
+  border-radius: var(--border-radius-lg);
+}
+
+.progress-icon {
+  font-size: 2.5rem; /* Un poco más pequeño */
+  margin-bottom: 10px;
+}
+
+.progress-text {
+  font-size: 1.1rem; /* Un poco más pequeño */
+  font-weight: 500;
+  margin-bottom: 15px;
+  color: var(--heading-color);
+}
+
+/* Ajustar animación de progreso */
+ @keyframes progressAnimation {
+    0% { width: 0%; }
+    50% { width: 60%; }
+    100% { width: 100%; }
+}
+
+/* Asegurar que las tarjetas del análisis 5M se vean bien */
+.m-grid {
+    /* Ya definido */
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); /* Ajustar tamaño */
+    gap: 10px; /* Reducir gap */
+}
+
+.m-cell {
+    /* Ya definido */
+    padding: 8px; /* Menos padding */
+}
+
+.m-category {
+    /* Ya definido */
+    font-size: 0.8rem; /* Más pequeño */
+    margin-bottom: 3px; /* Menos margen */
+}
+
+.m-content {
+    /* Ya definido */
+    font-size: 0.85rem; /* Más pequeño */
+}
+
 #custom-alert-message {
   margin: 0 0 20px 0;
   font-size: 1rem;

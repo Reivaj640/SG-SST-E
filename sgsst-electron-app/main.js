@@ -859,7 +859,65 @@ Cualquier duda estamos disponibles para resolverla`;
       return { success: false, error: error.message };
     }
   });
-};
+
+  // --- Nuevos manejadores IPC para procesamiento de accidentes ---
+  
+  // Manejar selección de PDF de accidente
+  ipcMain.handle('select-accident-pdf', async () => {
+    try {
+      console.log('Handling select-accident-pdf request');
+      const result = await dialog.showOpenDialog({
+        properties: ['openFile'],
+        filters: [{ name: 'PDF Files', extensions: ['pdf'] }]
+      });
+      
+      if (result.canceled) {
+        console.log('Accident PDF selection canceled');
+        return null;
+      }
+      
+      console.log('Selected accident PDF:', result.filePaths[0]);
+      return result.filePaths[0];
+    } catch (error) {
+      console.error('Error selecting accident PDF:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Manejar procesamiento de PDF de accidente
+  ipcMain.handle('process-accident-pdf', async (event, pdfPath, empresa = "TEMPOACTIVA", contextoAdicional = "") => {
+    try {
+      sendLog(`IPC: process-accident-pdf recibido para: ${pdfPath}`);
+      
+      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_processor.py');
+      const command = `python "${pythonScriptPath}" "${pdfPath}" "${empresa}" "${contextoAdicional}"`;
+      
+      sendLog(`Ejecutando script de procesamiento de accidente: ${command}`);
+      const { stdout, stderr } = await execPromise(command);
+      
+      if (stderr) {
+        sendLog(`Error en script de procesamiento de accidente: ${stderr}`, 'ERROR');
+      }
+
+      // Parsear la salida JSON
+      let result;
+      try {
+        result = JSON.parse(stdout);
+      } catch (parseError) {
+        sendLog(`Error al parsear JSON de salida: ${parseError.message}`, 'ERROR');
+        sendLog(`Salida recibida: ${stdout}`, 'ERROR');
+        throw new Error(`Error al parsear la salida del script: ${parseError.message}`);
+      }
+
+      sendLog(`Resultado del procesamiento: ${JSON.stringify(result)}`);
+      return result;
+
+    } catch (error) {
+      sendLog(`Fallo en la ejecución del script de procesamiento de accidente: ${error.message}`, 'ERROR');
+      return { success: false, error: error.message, traceback: error.stack };
+    }
+  });
+}
 
 // Registrar los manejadores IPC antes de que la aplicación esté lista
 registerIPCHandlers();

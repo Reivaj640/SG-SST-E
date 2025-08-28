@@ -7,6 +7,7 @@ class InvestigacionAccidentesComponent {
         this.moduleName = moduleName;
         this.submoduleName = submoduleName;
         this.onBack = onBack;
+        this.currentView = 'main'; // 'main' o 'realizar-investigacion'
     }
 
     render() {
@@ -16,6 +17,16 @@ class InvestigacionAccidentesComponent {
         const mainContainer = document.createElement('div');
         mainContainer.className = 'submodule-content';
 
+        if (this.currentView === 'main') {
+            this.renderMainView(mainContainer);
+        } else if (this.currentView === 'realizar-investigacion') {
+            this.renderRealizarInvestigacionView(mainContainer);
+        }
+
+        this.container.appendChild(mainContainer);
+    }
+
+    renderMainView(container) {
         // Encabezado
         const header = document.createElement('div');
         header.className = 'submodule-header';
@@ -32,13 +43,13 @@ class InvestigacionAccidentesComponent {
             header.appendChild(backButton);
         }
 
-        mainContainer.appendChild(header);
+        container.appendChild(header);
 
         // Descripción
         const description = document.createElement('p');
         description.className = 'submodule-description';
         description.textContent = 'Este submódulo permite gestionar la investigación de accidentes, incidentes y enfermedades laborales.';
-        mainContainer.appendChild(description);
+        container.appendChild(description);
 
         // Crear tarjetas para las opciones del submódulo
         const cardsContainer = document.createElement('div');
@@ -68,7 +79,7 @@ class InvestigacionAccidentesComponent {
         );
         cardsContainer.appendChild(card3);
         
-        mainContainer.appendChild(cardsContainer);
+        container.appendChild(cardsContainer);
 
         // Área de notificaciones
         const notificationArea = document.createElement('div');
@@ -87,12 +98,61 @@ class InvestigacionAccidentesComponent {
                 <div class="notification-icon">✅</div>
                 <div class="notification-content">
                     <div class="notification-title">Investigación completada</div>
+                    <div class="notification-message">La investigación del incidente del 15/08/2025 ha sido completada.</div>
+                    <div class="notification-time">Hace 1 día</div>
                 </div>
             </div>
         `;
-        mainContainer.appendChild(notificationArea);
+        container.appendChild(notificationArea);
+    }
 
-        this.container.appendChild(mainContainer);
+    renderRealizarInvestigacionView(container) {
+        // Crear una instancia del nuevo componente de investigación de accidente
+        if (typeof window.InvestigacionAccidenteComponent === 'function') {
+            try {
+                const investigacionAccidenteComponent = new window.InvestigacionAccidenteComponent(
+                    container,
+                    this.currentCompany,
+                    this.moduleName,
+                    this.submoduleName,
+                    () => {
+                        this.currentView = 'main';
+                        this.render();
+                    }
+                );
+                investigacionAccidenteComponent.render();
+            } catch (error) {
+                console.error('Error al crear/renderizar InvestigacionAccidenteComponent:', error);
+                this.renderFallbackView(container);
+            }
+        } else {
+            // Fallback si el componente no está disponible
+            this.renderFallbackView(container);
+        }
+    }
+
+    renderFallbackView(container) {
+        const header = document.createElement('div');
+        header.className = 'submodule-header';
+        
+        const title = document.createElement('h2');
+        title.textContent = 'Realizar Investigación';
+        header.appendChild(title);
+
+        const backButton = document.createElement('button');
+        backButton.className = 'btn';
+        backButton.textContent = '← Volver';
+        backButton.addEventListener('click', () => {
+            this.currentView = 'main';
+            this.render();
+        });
+        header.appendChild(backButton);
+
+        container.appendChild(header);
+
+        const message = document.createElement('p');
+        message.textContent = 'La funcionalidad de investigación de accidentes está en desarrollo.';
+        container.appendChild(message);
     }
 
     createModuleCard(title, description, onClick) {
@@ -135,13 +195,36 @@ class InvestigacionAccidentesComponent {
     }
 
     handlePerformInvestigation() {
-        // Mostrar mensaje de funcionalidad en desarrollo
-        alert('Funcionalidad "Realizar investigación" en desarrollo. Próximamente podrás iniciar nuevas investigaciones.');
+        // Cambiar a la vista de realizar investigación
+        this.currentView = 'realizar-investigacion';
+        this.render();
     }
 
     handleComingSoon() {
         // Mostrar mensaje de funcionalidad próxima
         alert('Esta funcionalidad estará disponible próximamente.');
+    }
+
+    handleSubmitInvestigacion(form) {
+        // Obtener los valores del formulario
+        const tipoInvestigacion = form.querySelector('#tipo-investigacion').value;
+        const fechaOcurrencia = form.querySelector('#fecha-ocurrencia').value;
+        const descripcion = form.querySelector('#descripcion').value;
+        const departamento = form.querySelector('#departamento').value;
+        const trabajador = form.querySelector('#trabajador').value;
+        
+        // Validar campos requeridos
+        if (!tipoInvestigacion || !fechaOcurrencia || !descripcion || !departamento) {
+            alert('Por favor complete todos los campos marcados con *');
+            return;
+        }
+        
+        // Mostrar mensaje de confirmación
+        alert(`Investigación iniciada correctamente:\n\nTipo: ${tipoInvestigacion}\nFecha: ${fechaOcurrencia}\nDepartamento: ${departamento}\n\nLa investigación se ha registrado en el sistema y está lista para ser procesada.`);
+        
+        // Volver a la vista principal
+        this.currentView = 'main';
+        this.render();
     }
 }
 

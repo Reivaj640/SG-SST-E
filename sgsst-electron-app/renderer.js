@@ -940,25 +940,30 @@ function showAsignacionRecursosContent(container) {
 
 function showInvestigacionAccidentesContent(container, currentCompany, moduleName, submoduleName) {
   // Crear una instancia del componente y renderizarlo
-  if (window.InvestigacionAccidentesComponent) {
-    const investigacionComponent = new window.InvestigacionAccidentesComponent(
-      container, 
-      currentCompany, 
-      moduleName, 
-      submoduleName,
-      () => {
-        // Callback para volver al home del módulo
-        const mainCanvas = document.querySelector('.main-canvas');
-        if (mainCanvas && mainCanvas.parentElement) {
-          showModuleHome(mainCanvas.parentElement, moduleName);
-        } else {
-          showModuleHome(container, moduleName);
+  if (typeof window.InvestigacionAccidentesComponent === 'function') {
+    try {
+      const investigacionComponent = new window.InvestigacionAccidentesComponent(
+        container, 
+        currentCompany, 
+        moduleName, 
+        submoduleName,
+        () => {
+          // Callback para volver al home del módulo
+          const mainCanvas = document.querySelector('.main-canvas');
+          if (mainCanvas && mainCanvas.parentElement) {
+            showModuleHome(mainCanvas.parentElement, moduleName);
+          } else {
+            showModuleHome(container, moduleName);
+          }
         }
-      }
-    );
-    investigacionComponent.render();
+      );
+      investigacionComponent.render();
+    } catch (error) {
+      console.error('Error al crear/renderizar InvestigacionAccidentesComponent:', error);
+      showDevelopmentMessage(container, submoduleName);
+    }
   } else {
-    console.error('InvestigacionAccidentesComponent not found');
+    console.error('InvestigacionAccidentesComponent no está disponible o no es una función');
     showDevelopmentMessage(container, submoduleName);
   }
 }
