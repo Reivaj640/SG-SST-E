@@ -767,6 +767,8 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
       }
     } else if (submoduleName === "3.1.6.1 Control de Remisiones") {
       showControlRemisionesContent(submoduleContentDiv);
+    } else if (submoduleName === "3.2.2 Investigación de Accidentes, indicentes y Enfermedades") {
+      showInvestigacionAccidentesContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
     } else if (submoduleName === "1.1.3 Asignación de Recursos") {
       showAsignacionRecursosContent(submoduleContentDiv);
     } else if (submoduleName === "1.1.1 Responsable del SG") {
@@ -934,6 +936,31 @@ function showAsignacionRecursosContent(container) {
   cardsContainer.appendChild(card3);
   
   container.appendChild(cardsContainer);
+}
+
+function showInvestigacionAccidentesContent(container, currentCompany, moduleName, submoduleName) {
+  // Crear una instancia del componente y renderizarlo
+  if (window.InvestigacionAccidentesComponent) {
+    const investigacionComponent = new window.InvestigacionAccidentesComponent(
+      container, 
+      currentCompany, 
+      moduleName, 
+      submoduleName,
+      () => {
+        // Callback para volver al home del módulo
+        const mainCanvas = document.querySelector('.main-canvas');
+        if (mainCanvas && mainCanvas.parentElement) {
+          showModuleHome(mainCanvas.parentElement, moduleName);
+        } else {
+          showModuleHome(container, moduleName);
+        }
+      }
+    );
+    investigacionComponent.render();
+  } else {
+    console.error('InvestigacionAccidentesComponent not found');
+    showDevelopmentMessage(container, submoduleName);
+  }
 }
 
 // Función auxiliar para crear tarjetas de módulo
