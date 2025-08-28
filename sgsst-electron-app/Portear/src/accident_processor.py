@@ -22,7 +22,7 @@ def process_accident_pdf(pdf_path, empresa="TEMPOACTIVA", contexto_adicional="")
     try:
         # Importar las clases necesarias del script original
         sys.path.append(str(Path(__file__).parent))
-        from invest_APP_V_3 import PdfProcessor, AccidentAnalyzer, DocumentGenerator, Config
+        from Invest_APP_V_3 import PdfProcessor, AccidentAnalyzer, DocumentGenerator, Config
         
         # Crear instancias de los procesadores
         pdf_processor = PdfProcessor()

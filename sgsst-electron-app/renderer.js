@@ -155,6 +155,32 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
+  // Botón de configuraciones
+  const configButton = document.getElementById('config-button');
+  if (configButton) {
+    console.log('Found config button, attaching event listener.');
+    configButton.addEventListener('click', function(event) {
+      console.log('Config button clicked.');
+      event.preventDefault(); // Prevenir comportamiento por defecto
+      showSettingsPage(); // Esta función debe estar definida en renderer.js
+    });
+  } else {
+    console.error('Config button NOT found in DOM.');
+  }
+
+  // Botón de chat LLM
+  const llmButton = document.getElementById('llm-button');
+  if (llmButton) {
+    console.log('Found LLM button, attaching event listener.');
+    llmButton.addEventListener('click', function(event) {
+      console.log('LLM button clicked.');
+      event.preventDefault(); // Prevenir comportamiento por defecto
+      showLLMChatPage(); // Esta función debe estar definida en renderer.js
+    });
+  } else {
+    console.error('LLM button NOT found in DOM.');
+  }
+
   initializeApp();
 });
 
@@ -641,14 +667,6 @@ function showModuleHome(container, moduleName) {
 }
 
 // Para otros módulos, usar el componente base
-if (window.ModuleHomeBase) {
-  const moduleHomeBase = new window.ModuleHomeBase(container, moduleName, submodules);
-  moduleHomeBase.render();
-} else {
-  console.error('ModuleHomeBase component not found');
-  showGenericModuleHome(container, moduleName, submodules);
-}
-
 function showGenericModuleHome(container, moduleName, submodules) {
   console.log(`Showing generic home for module: ${moduleName}`);
   
@@ -1003,23 +1021,23 @@ function createModuleCard(title, description, onClick) {
   return card;
 }
 
-// --- Event Listeners para los botones del header ---
-document.addEventListener('DOMContentLoaded', () => {
-  // Botón de configuraciones
-  const configButton = document.getElementById('config-button');
-  if (configButton) {
-    configButton.addEventListener('click', showSettingsPage);
-  }
-  
-  // Botón de chat LLM
-  const llmButton = document.getElementById('llm-button');
-  if (llmButton) {
-    llmButton.addEventListener('click', showLLMChatPage);
-  }
-});
-
 function showSettingsPage() {
   console.log('Showing settings page...');
+  // Verificar que contentArea exista
+  if (!contentArea) {
+    console.error('contentArea is not defined or accessible in showSettingsPage.');
+    // Intentar encontrarlo nuevamente si es necesario
+    contentArea = document.getElementById('content-area');
+    if (!contentArea) {
+      console.error('Critical: content-area element still not found.');
+      // Mostrar mensaje de error en la UI
+      if (document.body) {
+        document.body.innerHTML = '<h1>Error: No se puede cargar la página de configuración</h1>';
+      }
+      return;
+    }
+  }
+  
   contentArea.innerHTML = ''; // Limpiar contenido anterior
 
   // Crear el contenedor principal del canvas
@@ -1400,6 +1418,21 @@ function showUserSettingsPage() {
 // --- Funciones para Chat LLM ---
 function showLLMChatPage() {
   console.log('Showing LLM chat page...');
+  // Verificar que contentArea exista
+  if (!contentArea) {
+    console.error('contentArea is not defined or accessible in showLLMChatPage.');
+    // Intentar encontrarlo nuevamente si es necesario
+    contentArea = document.getElementById('content-area');
+    if (!contentArea) {
+      console.error('Critical: content-area element still not found.');
+      // Mostrar mensaje de error en la UI
+      if (document.body) {
+        document.body.innerHTML = '<h1>Error: No se puede cargar la página de chat</h1>';
+      }
+      return;
+    }
+  }
+  
   contentArea.innerHTML = ''; // Limpiar contenido anterior
 
   // Crear el contenedor principal del canvas

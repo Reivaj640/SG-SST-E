@@ -56,5 +56,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sendRemisionByEmail: (docPath, extractedData, empresa) => ipcRenderer.invoke('send-remision-by-email', docPath, extractedData, empresa),
 
   // Agrega esto en el contextBridge.exposeInMainWorld
-  updateExcelCell: (filePath, row, col, value) => ipcRenderer.invoke('update-excel-cell', filePath, row, col, value)
+  updateExcelCell: (filePath, row, col, value) => ipcRenderer.invoke('update-excel-cell', filePath, row, col, value),
+  
+  // Funciones para procesamiento de accidentes
+  selectAccidentPdf: () => ipcRenderer.invoke('select-accident-pdf'),
+  processAccidentPdf: (pdfPath, empresa, contextoAdicional) => ipcRenderer.invoke('process-accident-pdf', pdfPath, empresa, contextoAdicional)
 });
