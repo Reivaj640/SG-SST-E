@@ -16,7 +16,13 @@ class InvestigacionAccidenteComponent {
 
     render() {
         this.container.innerHTML = '';
-
+        // Iniciar la carga del modelo en segundo plano
+        if (window.electronAPI && typeof window.electronAPI.startModelLoading === 'function') {
+            window.electronAPI.startModelLoading().catch(err => {
+                console.error('Error al iniciar carga del modelo en segundo plano:', err);
+                this.logToActivity('Advertencia: No se pudo iniciar la carga del modelo en segundo plano.');
+            });
+        }
         const mainContainer = document.createElement('div');
         mainContainer.className = 'submodule-content';
         mainContainer.style.padding = '20px'; // Añadir algo de padding general
@@ -57,10 +63,6 @@ class InvestigacionAccidenteComponent {
                     <input type="text" class="form-control" id="pdf-path-display" readonly placeholder="Ningún archivo seleccionado">
                     <button type="button" class="btn btn-primary" id="select-pdf-btn">Buscar...</button>
                 </div>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Empresa:</label>
-                <input type="text" class="form-control" value="${this.currentCompany}" readonly>
             </div>
         `;
         configContent.querySelector('#select-pdf-btn').addEventListener('click', () => this.selectPdfFile());
@@ -183,42 +185,51 @@ class InvestigacionAccidenteComponent {
     }
 
     async processPdf() {
-        if (!this.selectedPdfPath || !window.electronAPI) return;
+    if (!this.selectedPdfPath || !window.electronAPI) return;
 
-        this.isProcessing = true;
-        this.updateButtonStates();
-        this.logToActivity('Iniciando proceso de extracción de datos...');
+    this.isProcessing = true;
+    this.updateButtonStates();
+    this.logToActivity('Iniciando proceso de extracción de datos...');
 
-        try {
-            // Limpiar datos y análisis previos
-            this.extractedData = {};
-            this.analysisResult = {};
-            this.populateExtractedData({});
-            this.populateAnalysisResults({});
+    try {
+        // Limpiar datos y análisis previos
+        this.extractedData = {};
+        this.analysisResult = {};
+        this.populateExtractedData({});
+        this.populateAnalysisResults({}); // ← Vacío inicialmente
 
-            const result = await window.electronAPI.processAccidentPdf(
-                this.selectedPdfPath,
-                this.currentCompany,
-                "" // No pasar contexto aún en esta etapa
-            );
+        const result = await window.electronAPI.processAccidentPdf(
+            this.selectedPdfPath,
+            this.currentCompany,
+            "" // No pasar contexto aún en esta etapa
+        );
 
-            if (result.success) {
-                this.extractedData = result.data || {};
-                this.populateExtractedData(this.extractedData);
-                this.logToActivity('Datos extraídos correctamente.');
+        if (result.success) {
+            this.extractedData = result.data || {};
+            this.populateExtractedData(this.extractedData);
+
+            // ← Aquí es clave: Mostrar el análisis si existe
+            if (result.analysis && Object.keys(result.analysis).length > 0) {
+                this.analysisResult = result.analysis;
+                this.populateAnalysisResults(this.analysisResult);
+                this.logToActivity('Análisis de causa raíz completado.');
             } else {
-                throw new Error(result.error || 'Error desconocido al procesar el PDF.');
+                this.logToActivity('No se generó un análisis de causa raíz.');
             }
-        } catch (error) {
-            console.error('Error al procesar el PDF:', error);
-            this.logToActivity(`Error al procesar el PDF: ${error.message}`);
-            this.populateExtractedData({ error: error.message });
-        } finally {
-            this.isProcessing = false;
-            this.updateButtonStates();
+        } else {
+            throw new Error(result.error || 'Error desconocido al procesar el PDF.');
         }
+    } catch (error) {
+        console.error('Error al procesar el PDF:', error);
+        this.logToActivity(`Error al procesar el PDF: ${error.message}`);
+        this.populateExtractedData({ error: error.message });
+    } finally {
+        this.isProcessing = false;
+        this.updateButtonStates();
     }
+}
 
+    // En investigacion-accidente.js
     populateExtractedData(data) {
         this.dataCardContent.innerHTML = ''; // Limpiar contenido
 
@@ -232,39 +243,50 @@ class InvestigacionAccidenteComponent {
             return;
         }
 
+        // Asegúrate de que este orden y estos nombres coincidan EXACTAMENTE con los de Python
         const fields = [
-            'Nombre Completo', 'No Identificacion', 'Fecha del Accidente', 'Hora del Accidente',
-            'Cargo', 'Tipo de Accidente', 'Lugar del Accidente', 'Sitio de Ocurrencia',
-            'Tipo de Lesion', 'Parte del Cuerpo Afectada', 'Agente del Accidente',
+            'No Identificacion',
+            'Nombre Completo',
+            'Fecha del Accidente',
+            'Hora del Accidente',
+            'Cargo',
+            'Tipo de Accidente',
+            'Lugar del Accidente',
+            'Sitio de Ocurrencia',
+            'Tipo de Lesion',
+            'Parte del Cuerpo Afectada',
+            'Agente del Accidente',
             'Mecanismo o Forma del Accidente'
         ];
 
         const gridContainer = document.createElement('div');
         gridContainer.className = 'summary-grid';
-        gridContainer.style.gridTemplateColumns = '1fr 1fr'; // 2 columnas
+        gridContainer.style.gridTemplateColumns = '1fr 1fr';
         gridContainer.style.gap = '10px';
 
         fields.forEach(field => {
-            const key = field.replace(/\s+/g, '_');
-            const value = data[key] || 'N/A';
+            // Usar directamente la clave del objeto `data` de Python
+            const value = data[field] || 'N/A';
 
             const itemDiv = document.createElement('div');
             itemDiv.className = 'summary-item';
             itemDiv.innerHTML = `
                 <label style="font-weight:bold; display:block;">${field}:</label>
-                <span>${value}</span>
+                <span>${this.escapeHtml(value)}</span>
             `;
             gridContainer.appendChild(itemDiv);
         });
 
-        const descripcion = data['Descripcion_del_Accidente'] || data['descripcion_del_accidente'] || 'N/A';
-        if (descripcion !== 'N/A') {
+        // Manejar la descripción por separado, usando la clave exacta de Python
+        const descripcionKey = 'Descripcion del Accidente'; // Clave exacta de Python
+        const descripcion = data[descripcionKey] || 'N/A';
+        if (descripcion && descripcion !== 'N/A') {
             const descDiv = document.createElement('div');
             descDiv.className = 'form-group';
-            descDiv.style.gridColumn = '1 / -1'; // Ocupar todo el ancho
+            descDiv.style.gridColumn = '1 / -1';
             descDiv.innerHTML = `
-                <label class="form-label" style="font-weight:bold;">Descripción del Accidente:</label>
-                <textarea class="form-control" rows="3" readonly>${descripcion}</textarea>
+                <label class="form-label" style="font-weight:bold;">${descripcionKey}:</label>
+                <textarea class="form-control" rows="4" readonly>${this.escapeHtml(descripcion)}</textarea>
             `;
             gridContainer.appendChild(descDiv);
         }
@@ -272,47 +294,106 @@ class InvestigacionAccidenteComponent {
         this.dataCardContent.appendChild(gridContainer);
     }
 
-    async analyzeWithLLM() { // Este método ahora combina análisis y generación
-        if (!this.selectedPdfPath || !window.electronAPI || this.isProcessing) return;
+    // Función auxiliar para escapar HTML
+    escapeHtml(unsafe) {
+        if (typeof unsafe !== 'string') return String(unsafe);
+        return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "<")
+            .replace(/>/g, ">")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;")
+            .replace(/\n/g, "<br>");
+    }
 
-        this.isProcessing = true;
-        this.updateButtonStates();
-        this.logToActivity('Iniciando análisis de causa raíz con IA...');
+    // En investigacion-accidente.js
+    async analyzeWithLLM() {
+    if (!this.selectedPdfPath || !window.electronAPI || this.isProcessing) return;
 
-        try {
-            const contextoAdicional = this.contextInput.value;
+    this.isProcessing = true;
+    this.updateButtonStates();
+    this.logToActivity('Iniciando análisis de causa raíz con IA...');
 
-            const result = await window.electronAPI.processAccidentPdf(
-                this.selectedPdfPath,
-                this.currentCompany,
-                contextoAdicional // Pasar el contexto para el análisis
-            );
+    try {
+        const contextoAdicional = this.contextInput.value;
 
-            if (result.success) {
-                // Asumir que el resultado ahora incluye el análisis 5 Porqués
-                this.analysisResult = result.analysis || {};
+        const result = await window.electronAPI.processAccidentPdf(
+            this.selectedPdfPath,
+            this.currentCompany,
+            contextoAdicional
+        );
+
+        if (result.success) {
+            this.extractedData = result.data || {};
+            this.populateExtractedData(this.extractedData);
+
+            // ← Mostrar análisis si existe
+            if (result.analysis && Object.keys(result.analysis).length > 0) {
+                this.analysisResult = result.analysis;
                 this.populateAnalysisResults(this.analysisResult);
                 this.logToActivity('Análisis de causa raíz completado.');
-
-                // --- Generar informe inmediatamente después del análisis ---
-                this.logToActivity('Generando informe...');
-                // Aquí iría la lógica de generación de informe
-                // Por ahora, solo un mensaje
-                this.logToActivity('Informe generado exitosamente. (Funcionalidad simulada)');
-                alert('Informe generado exitosamente. (Funcionalidad simulada en esta etapa)');
-
             } else {
-                throw new Error(result.error || 'Error desconocido en el análisis.');
+                this.logToActivity('No se generó un análisis de causa raíz.');
+            }
+
+            // Generar informe
+            await this.generateAccidentReport(result);
+        } else {
+            throw new Error(result.error || 'Error desconocido en el análisis.');
+        }
+    } catch (error) {
+        console.error('Error en análisis/generación con LLM:', error);
+        this.logToActivity(`Error en el proceso: ${error.message}`);
+        this.populateAnalysisResults({ error: error.message });
+    } finally {
+        this.isProcessing = false;
+        this.updateButtonStates();
+    }
+}
+
+    /**
+     * Genera el informe de accidente usando los datos procesados.
+     * @param {Object} processingResult - El resultado completo de processAccidentPdf.
+     */
+    async generateAccidentReport(processingResult) {
+        try {
+            // Extraer datos necesarios
+            const { data: extractedData, analysis: analysisResult, metadata } = processingResult;
+            const empresa = this.currentCompany; // O metadata.empresa si se prefiere
+
+            this.logToActivity('Solicitando generación del informe al proceso principal...');
+            
+            // 1. Llamar al proceso principal para generar el documento
+            // Asumimos que crearemos un nuevo manejador IPC: 'generate-accident-report'
+            const generationResult = await window.electronAPI.generateAccidentReport(
+                { ...extractedData, ...analysisResult }, // Combinar datos y análisis
+                empresa
+            );
+
+            if (generationResult && generationResult.success) {
+                const documentPath = generationResult.documentPath;
+                this.logToActivity(`Informe generado exitosamente: ${documentPath}`);
+                alert(`Informe generado exitosamente:\n${documentPath}\n\n(Nota: La funcionalidad para abrir/ver el archivo puede agregarse aquí)`);
+                
+                // Opcional: Ofrecer abrir el archivo generado
+                // if (confirm('¿Desea abrir el informe generado?')) {
+                //     // Necesitarías un manejador IPC 'open-file' o usar shell.openPath
+                //     // window.electronAPI.openPath(documentPath);
+                // }
+                
+            } else {
+                const errorMsg = generationResult ? generationResult.error : 'Error desconocido al generar el informe.';
+                throw new Error(errorMsg);
             }
         } catch (error) {
-            console.error('Error en análisis con LLM:', error);
-            this.logToActivity(`Error en el análisis con IA: ${error.message}`);
-            this.populateAnalysisResults({ error: error.message });
-        } finally {
-            this.isProcessing = false;
-            this.updateButtonStates();
+            console.error('Error al generar el informe:', error);
+            this.logToActivity(`Error al generar el informe: ${error.message}`);
+            alert(`Error al generar el informe:\n${error.message}`);
+            // Podrías mostrar el error en algún lugar de la UI si es necesario
         }
     }
+
+
 
     populateAnalysisResults(analysisData) {
         this.analysisCardContent.innerHTML = ''; // Limpiar contenido

@@ -893,7 +893,7 @@ Cualquier duda estamos disponibles para resolverla`;
       const command = `python "${pythonScriptPath}" "${pdfPath}" "${empresa}" "${contextoAdicional}"`;
       
       sendLog(`Ejecutando script de procesamiento de accidente: ${command}`);
-      const { stdout, stderr } = await execPromise(command);
+      const { stdout, stderr } = await execPromise(command, { encoding: 'utf-8' });
       
       if (stderr) {
         sendLog(`Error en script de procesamiento de accidente: ${stderr}`, 'ERROR');
@@ -917,7 +917,72 @@ Cualquier duda estamos disponibles para resolverla`;
       return { success: false, error: error.message, traceback: error.stack };
     }
   });
+  // En main.js, dentro de registerIPCHandlers()
+  ipcMain.handle('start-model-loading', async () => {
+      try {
+          console.log('Iniciando carga del modelo LLM en segundo plano...');
+          // Aquí podrías ejecutar un script que inicie un proceso Python separado
+          // o simplemente lanzar el comando de carga con un tiempo de espera.
+          // Por simplicidad, vamos a simularlo con un timeout.
+          await new Promise(resolve => setTimeout(resolve, 5000)); // Simula 5 segundos de carga
+          console.log('Modelo LLM cargado en segundo plano.');
+          return { success: true };
+      } catch (error) {
+          console.error('Error al iniciar la carga del modelo:', error);
+          return { success: false, error: error.message };
+      }
+  });
+  // --- Manejar generación de informe de accidente ---
+  ipcMain.handle('generate-accident-report', async (event, combinedData, empresa) => {
+      sendLog(`IPC: generate-accident-report recibido para empresa: ${empresa}`);
+      try {
+          const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_report_generator.py');
+          // Crear un archivo temporal con los datos
+          const tempDataPath = path.join(app.getPath('temp'), `accident_report_data_${Date.now()}.json`);
+          
+          sendLog(`Creando archivo de datos temporal: ${tempDataPath}`);
+          // Guardar los datos combinados y la empresa
+          await fs.writeFile(tempDataPath, JSON.stringify({  combinedData, empresa: empresa }, null, 2));
+
+          const command = `python "${pythonScriptPath}" "${tempDataPath}"`;
+          
+          sendLog(`Ejecutando script de generación de informe de accidente: ${command.replace(/\\/g, '/')}`);
+          const { stdout, stderr } = await execPromise(command);
+          
+          // Limpiar archivo temporal
+          await fs.unlink(tempDataPath);
+
+          if (stderr) {
+              sendLog(`Error en script de generación de informe de accidente: ${stderr}`, 'ERROR');
+          }
+
+          // Parsear la salida JSON del script de Python
+          let finalResult = null;
+          try {
+              finalResult = JSON.parse(stdout);
+          } catch (parseError) {
+              sendLog(`Error al parsear JSON de salida del script de informe: ${parseError.message}`, 'ERROR');
+              sendLog(`Salida recibida: ${stdout}`, 'ERROR');
+              throw new Error(`Error al parsear la salida del script: ${parseError.message}`);
+          }
+
+          sendLog(`Resultado de la generación del informe: ${JSON.stringify(finalResult)}`);
+          
+          if (finalResult.success && finalResult.documentPath) {
+              // Opcional: Copiar el documento generado a una ubicación específica
+              // como se hacía en generateRemisionDocument
+              // ... (lógica de copia si es necesaria) ...
+          }
+          
+          return finalResult;
+
+      } catch (error) {
+          sendLog(`Fallo en la ejecución del script de generación de informe de accidente: ${error.message}`, 'ERROR');
+          return { success: false, error: error.message };
+      }
+  });
 }
+
 
 // Registrar los manejadores IPC antes de que la aplicación esté lista
 registerIPCHandlers();

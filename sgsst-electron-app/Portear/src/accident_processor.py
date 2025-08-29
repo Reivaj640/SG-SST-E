@@ -87,6 +87,8 @@ def main():
     contexto_adicional = sys.argv[3] if len(sys.argv) > 3 else ""
     
     result = process_accident_pdf(pdf_path, empresa, contexto_adicional)
+    # Reconfigurar stdout para asegurar la codificación UTF-8
+    sys.stdout.reconfigure(encoding='utf-8')
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 if __name__ == "__main__":

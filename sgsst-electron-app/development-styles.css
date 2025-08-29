@@ -249,7 +249,7 @@
 }
 
 .submodule-content h3 {
-  color: #007bff;
+  color: #495057;
   margin-bottom: 20px;
 }
 
@@ -310,7 +310,7 @@
 }
 
 .settings-card .card-title {
-  color: #007bff;
+  color: #495057;
   margin-bottom: 15px;
   font-size: 1.3rem;
 }
@@ -361,7 +361,7 @@
 }
 
 .log-area h3 {
-  color: #007bff;
+  color: #495057;
   margin-bottom: 10px;
 }
 
@@ -395,7 +395,7 @@
 }
 
 .user-message {
-  background-color: #007bff;
+  background-color: #495057;
   color: white;
   padding: 10px 15px;
   border-radius: 18px;

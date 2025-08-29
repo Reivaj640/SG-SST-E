@@ -19,6 +19,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 import torch
 import warnings
 import fitz
+import sys
 
 #-------------------------------------------------------------------------------------------------------------------
 # Configuración de la GPU y advertencias
@@ -35,13 +36,13 @@ class AccidentAnalyzer:
         if not os.path.exists(self.model_path):
             raise FileNotFoundError(f"No se encontró el modelo en la ruta: {self.model_path}")
         try:
-            print("🔄 Cargando tokenizer...")
+            print("Cargando tokenizer...", file=sys.stderr)
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
             self.tokenizer.pad_token = self.tokenizer.eos_token
-            print("🔄 Cargando modelo...")
+            print("Modelo cargado.", file=sys.stderr)
             
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            print(f"📍 Usando dispositivo: {device}")
+            print(f"Usando dispositivo: {device}", file=sys.stderr)
             quantization_config = BitsAndBytesConfig(
                 load_in_4bit=True,
                 bnb_4bit_quant_type="nf4",
@@ -56,7 +57,7 @@ class AccidentAnalyzer:
                 trust_remote_code=True,
                 low_cpu_mem_usage=True
             )
-            print("✅ Modelo cargado exitosamente.")
+            print(" Modelo cargado exitosamente.", file=sys.stderr)
         except Exception as e:
             raise RuntimeError(f"No se pudo cargar el modelo: {e}")
 
