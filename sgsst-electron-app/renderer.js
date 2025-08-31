@@ -110,37 +110,45 @@ let currentCalendarInstance = null; // Para mantener una referencia a la instanc
  * Crea y muestra el calendario dentro de un contenedor específico.
  * @param {HTMLElement} parentContainer - El elemento donde se insertará el calendario.
  */
-function showCalendarInModule(container) {
-    // Crear el contendedor del calendario
+function showCalendarInModule(parentContainer) {
+    // 1. Crear el contenedores del calendario
     const calendarContainer = document.createElement('div');
-    calendarContainer.id = 'calendar-container';
-    calendarContainer.className = 'module-calendar-container';
+    calendarContainer.className = 'module-calendar-container'; // Aplicar estilos CSS
 
-    // Insertar el calendario al FINAL del contenedores
-    container.appendChild(calendarContainer);
+    // 2. Insertar el contenedores en el área deseada (por ejemplo, al final del módulo)
+    parentContainer.appendChild(calendarContainer);
 
-    // Inicializar Vanilla Calendar
+    // 3. Inicializar Vanilla Calendar dentro del nuevo contenedores
     try {
         if (window.VanillaCalendarPro) {
             const { Calendar } = window.VanillaCalendarPro;
 
             // Destruir instancia anterior si existe
             if (currentCalendarInstance) {
-                calendarContainer.innerHTML = '';
+                // Nota: Vanilla Calendar Pro no tiene un método destroy() explícito documentado.
+                // Limpiar el contenedores es suficiente en la mayoría de los casos.
+                currentCalendarInstance = null;
             }
 
-            const calendar = new Calendar('#calendar-container', {
-                // Opciones de configuración opcionales
-                // lang: 'es',
+            // LA CORRECCIÓN CLAVE: Pasar el elemento del DOM directamente
+            const calendar = new Calendar(calendarContainer, {
+                // Puedes añadir opciones de configuración aquí
+                // Por ejemplo:
+                // settings: {
+                //     lang: 'es', // Asegúrate de tener el archivo de idioma si usas i18n
+                // }
+                // Más opciones en la documentación oficial
             });
             calendar.init();
             console.log('Vanilla Calendar initialized inside module.');
-            currentCalendarInstance = calendar;
+            currentCalendarInstance = calendar; // Guardar referencia
         } else {
             console.error('Vanilla Calendar Pro script not loaded.');
+            // Opcional: Mostrar un mensaje de error en la UI
         }
     } catch (e) {
         console.error('Error initializing Vanilla Calendar inside module:', e);
+        // Opcional: Mostrar un mensaje de error en la UI
     }
 }
 
