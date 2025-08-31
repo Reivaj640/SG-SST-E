@@ -102,6 +102,62 @@ const COMPANY_BUTTONS = ["Tempoactiva", "Temposum", "Aseplus", "Asel"];
 let currentCompany = null;
 let currentModule = null;
 let logBuffer = []; // Búfer para almacenar los logs
+let currentCalendarInstance = null; // Para mantener una referencia a la instancia del calendario
+
+// --- Funciones para controlar el Calendario ---
+
+/**
+ * Crea y muestra el calendario dentro de un contenedor específico.
+ * @param {HTMLElement} parentContainer - El elemento donde se insertará el calendario.
+ */
+function showCalendarInModule(container) {
+    // Crear el contendedor del calendario
+    const calendarContainer = document.createElement('div');
+    calendarContainer.id = 'calendar-container';
+    calendarContainer.className = 'module-calendar-container';
+
+    // Insertar el calendario al FINAL del contenedores
+    container.appendChild(calendarContainer);
+
+    // Inicializar Vanilla Calendar
+    try {
+        if (window.VanillaCalendarPro) {
+            const { Calendar } = window.VanillaCalendarPro;
+
+            // Destruir instancia anterior si existe
+            if (currentCalendarInstance) {
+                calendarContainer.innerHTML = '';
+            }
+
+            const calendar = new Calendar('#calendar-container', {
+                // Opciones de configuración opcionales
+                // lang: 'es',
+            });
+            calendar.init();
+            console.log('Vanilla Calendar initialized inside module.');
+            currentCalendarInstance = calendar;
+        } else {
+            console.error('Vanilla Calendar Pro script not loaded.');
+        }
+    } catch (e) {
+        console.error('Error initializing Vanilla Calendar inside module:', e);
+    }
+}
+
+/**
+ * Oculta y destruye el calendario si está presente.
+ */
+function hideCalendar() {
+    const existingCalendarContainer = document.getElementById('calendar-container');
+    if (existingCalendarContainer) {
+        // Limpiar el contenedor
+        existingCalendarContainer.innerHTML = '';
+        // Eliminar el elemento del DOM
+        existingCalendarContainer.remove();
+        console.log('Vanilla Calendar removed from DOM.');
+    }
+    currentCalendarInstance = null; // Limpiar referencia
+}
 
 // --- Función de Logging Centralizada ---
 function logMessage(message, level = 'INFO') {
@@ -126,6 +182,8 @@ let companyNameElement;
 let companyLogoElement;
 let companyLogoPlaceholder;
 
+// --- Inicialización ---
+// Esperar a que el DOM esté completamente cargado
 document.addEventListener('DOMContentLoaded', () => {
   console.log('DOM fully loaded and parsed.');
 
@@ -135,31 +193,6 @@ document.addEventListener('DOMContentLoaded', () => {
   companyNameElement = document.getElementById('company-name');
   companyLogoElement = document.getElementById('company-logo');
   companyLogoPlaceholder = document.getElementById('company-logo-placeholder');
-
-  // Crear el layout principal
-  contentArea.innerHTML = `
-    <div class="main-layout">
-      <div class="left-column">
-        <div id="calendar-container" class="card vanilla-calendar_light"></div>
-        <div id="notes-container" class="card">
-          <div id="notes-header">
-            <h4>Notas Rápidas</h4>
-            <button id="add-note-btn" class="btn btn-primary">+</button>
-          </div>
-          <ul id="notes-list"></ul>
-          <div id="note-input-container" style="display: none;">
-            <input type="text" id="note-input" placeholder="Escribe una nueva nota...">
-            <button id="save-note-btn" class="btn">Guardar</button>
-          </div>
-        </div>
-      </div>
-      <div class="right-column">
-        <div id="data-cards-container" class="data-cards-container"></div>
-        <div id="submodules-container" class="submodules-container"></div>
-        <div id="chart-container" class="chart-container" style="display: none;"></div>
-      </div>
-    </div>
-  `;
 
   console.log('DOM elements found:', { contentArea, sidebarMenu, companyNameElement, companyLogoElement, companyLogoPlaceholder });
 
@@ -204,121 +237,10 @@ document.addEventListener('DOMContentLoaded', () => {
     console.error('LLM button NOT found in DOM.');
   }
 
-  // Inicializar el calendario correctamente
-  initializeCalendar();
-
-  // Lógica de las notas
-  const addNoteBtn = document.getElementById('add-note-btn');
-  const noteInputContainer = document.getElementById('note-input-container');
-  const noteInput = document.getElementById('note-input');
-  const saveNoteBtn = document.getElementById('save-note-btn');
-  const notesList = document.getElementById('notes-list');
-
-  let notes = JSON.parse(localStorage.getItem('notes')) || [];
-
-  function renderNotes() {
-    notesList.innerHTML = '';
-    notes.forEach((note, index) => {
-      const li = document.createElement('li');
-      li.className = note.completed ? 'completed' : '';
-      li.innerHTML = `
-        <span>${note.text}</span>
-        <div>
-          <button class="btn-note-complete">✓</button>
-          <button class="btn-note-delete">×</button>
-        </div>
-      `;
-
-      li.querySelector('.btn-note-complete').addEventListener('click', () => toggleNote(index));
-      li.querySelector('.btn-note-delete').addEventListener('click', () => removeNote(index));
-
-      notesList.appendChild(li);
-    });
-  }
-
-  function addNote() {
-    noteInputContainer.style.display = 'flex';
-    noteInput.focus();
-  }
-
-  function saveNote() {
-    const text = noteInput.value.trim();
-    if (text) {
-      notes.push({ text, completed: false });
-      localStorage.setItem('notes', JSON.stringify(notes));
-      renderNotes();
-      noteInput.value = '';
-      noteInputContainer.style.display = 'none';
-    }
-  }
-
-  function toggleNote(index) {
-    notes[index].completed = !notes[index].completed;
-    localStorage.setItem('notes', JSON.stringify(notes));
-    renderNotes();
-  }
-
-  function removeNote(index) {
-    const li = notesList.children[index];
-    li.classList.add('removing');
-    setTimeout(() => {
-      notes.splice(index, 1);
-      localStorage.setItem('notes', JSON.stringify(notes));
-      renderNotes();
-    }, 300);
-  }
-
-  addNoteBtn.addEventListener('click', addNote);
-  saveNoteBtn.addEventListener('click', saveNote);
-  noteInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      saveNote();
-    }
-  });
-
-  renderNotes();
+  
 
   initializeApp();
 });
-
-// Función para inicializar el calendario correctamente
-function initializeCalendar() {
-  // Verificar si VanillaCalendarPro está disponible
-  if (typeof window.VanillaCalendarPro !== 'undefined') {
-    console.log('VanillaCalendarPro está disponible, inicializando calendario...');
-    
-    // Inicializar el calendario usando el objeto correcto desde window.VanillaCalendarPro
-    const { Calendar } = window.VanillaCalendarPro;
-    const calendar = new Calendar('#calendar-container', {
-      settings: {
-        lang: 'es',
-        iso8601: true,
-        selection: {
-          day: 'multiple',
-        },
-      },
-    });
-    
-    // Verificar si el método init existe
-    if (typeof calendar.init === 'function') {
-      calendar.init();
-      console.log('Calendario inicializado correctamente.');
-    } else {
-      console.error('El método init no está disponible en el objeto calendar.');
-      const calendarContainer = document.getElementById('calendar-container');
-      if (calendarContainer) {
-        calendarContainer.innerHTML = '<p>Error: No se pudo inicializar el calendario. El método init no está disponible.</p>';
-      }
-    }
-  } else {
-    console.error('VanillaCalendarPro no está definido. Verifica que el script se haya cargado correctamente.');
-    // Mostrar un mensaje de error en el contenedor del calendario
-    const calendarContainer = document.getElementById('calendar-container');
-    if (calendarContainer) {
-      calendarContainer.innerHTML = '<p>Error: No se pudo cargar el calendario. Por favor, verifica la consola para más detalles.</p>';
-    }
-  }
-}
 
 // Variable para mantener el botón activo del sidebar
 let activeSidebarButton = null;
@@ -388,23 +310,23 @@ function setActiveSidebarButton(buttonElement) {
 }
 
 function showHomePage() {
+  hideCalendar();
   console.log('Showing home page...');
-  const rightColumn = document.querySelector('.right-column');
-  if (!rightColumn) {
-    console.error('Right column not found');
-    return;
-  }
-  rightColumn.innerHTML = '';
+  // Limpiar el área de contenido
+  contentArea.innerHTML = '';
 
   const homePageDiv = document.createElement('div');
   homePageDiv.id = 'home-page';
   console.log('Created homePageDiv:', homePageDiv);
 
+  // Placeholder para la imagen de bienvenida
+  // En una implementación completa, se cargaría una imagen real
   const welcomePlaceholder = document.createElement('div');
   welcomePlaceholder.id = 'welcome-placeholder';
   welcomePlaceholder.textContent = '¡Bienvenido al SG-SST! Selecciona una empresa para comenzar.';
   homePageDiv.appendChild(welcomePlaceholder);
 
+  // Contenedor para los botones de selección de empresa
   const companySelectionDiv = document.createElement('div');
   companySelectionDiv.id = 'company-selection';
 
@@ -417,8 +339,8 @@ function showHomePage() {
   });
 
   homePageDiv.appendChild(companySelectionDiv);
-  rightColumn.appendChild(homePageDiv);
-  console.log('Added home page to right column');
+  contentArea.appendChild(homePageDiv);
+  console.log('Added home page to contentArea');
 }
 
 function selectCompany(companyName, buttonElement) {
@@ -479,13 +401,13 @@ function handleLogout() {
 }
 
 function showCompanyHomePage() {
+  hideCalendar();
   console.log(`Showing home page for company: ${currentCompany}`);
-  const rightColumn = document.querySelector('.right-column');
-  if (!rightColumn) {
-    console.error('Right column not found');
-    return;
-  }
-  rightColumn.innerHTML = '';
+  contentArea.innerHTML = '';
+
+  // Crear el contenedor principal del canvas
+  const mainCanvas = document.createElement('div');
+  mainCanvas.className = 'main-canvas';
 
   // Contenido del home de la empresa
   const companyHomeDiv = document.createElement('div');
@@ -558,28 +480,38 @@ function showCompanyHomePage() {
   `;
   companyHomeDiv.appendChild(modulesInfo);
   
-  rightColumn.appendChild(companyHomeDiv);
+  mainCanvas.appendChild(companyHomeDiv);
+  contentArea.appendChild(mainCanvas);
 }
 
 function showModuleContent(moduleName) {
   console.log(`Showing content for module: ${moduleName}`);
   currentModule = moduleName;
   
-  const rightColumn = document.querySelector('.right-column');
-  if (!rightColumn) {
-    console.error('Right column not found');
+  // Verificar que contentArea exista
+  if (!contentArea) {
+    console.error('contentArea is not defined');
     return;
   }
-  rightColumn.innerHTML = ''; // Limpiar contenido anterior
+  
+  contentArea.innerHTML = ''; // Limpiar contenido anterior
 
-  // Verificar si el módulo tiene submódulos definidos
+  // Crear el contenedor principal del canvas
+  const mainCanvas = document.createElement('div');
+
+  // **LA CORRECCIÓN:**
+  // 1. Añadir el contenedor al DOM ANTES de llenarlo.
+  contentArea.appendChild(mainCanvas);
+
+  // 2. Llenar el contenedor (que ya está en el DOM).
   const submodules = RESOURCES_SUBMODULES[moduleName];
   
   if (submodules && submodules.length > 0) {
-    // Mostrar directamente el home del módulo
-    showModuleHome(rightColumn, moduleName);
+    // Mostrar directamente el home del módulo, que asignará la clase a mainCanvas
+    showModuleHome(mainCanvas, moduleName);
   } else {
     // Mostrar contenido genérico si no hay submódulos definidos
+    mainCanvas.className = 'main-canvas'; // Asignar clase aquí si no se va a showModuleHome
     const moduleDiv = document.createElement('div');
     moduleDiv.className = 'module-content';
     
@@ -600,7 +532,7 @@ function showModuleContent(moduleName) {
     `;
     moduleDiv.appendChild(placeholderCard);
     
-    rightColumn.appendChild(moduleDiv);
+    mainCanvas.appendChild(moduleDiv);
   }
 }
 
@@ -693,107 +625,94 @@ function showSubmoduleSelectorAndContent(container, moduleName) {
 }
 
 function showModuleHome(container, moduleName) {
-  console.log(`Showing home for module: ${moduleName}`);
-  
-  // Verificar que container no sea null
-  if (!container) {
-    console.error('Container is null in showModuleHome');
-    return;
-  }
-  
-  // Limpiar el contenedor
-  container.innerHTML = '';
-  
-  // Obtener los submódulos para este módulo
-  const submodules = RESOURCES_SUBMODULES[moduleName];
-  
-  if (!submodules || submodules.length === 0) {
-    const noSubmodulesMessage = document.createElement('p');
-    noSubmodulesMessage.textContent = 'No hay submódulos disponibles para este módulo.';
-    container.appendChild(noSubmodulesMessage);
-    return;
-  }
+    console.log(`Showing home for module: ${moduleName}`);
+    if (!container) {
+        console.error('Container is null in showModuleHome');
+        return;
+    }
 
-  // Para "Gestión Integral", usar directamente showGenericModuleHome
-  if (moduleName === "Gestión Integral") {
-    showGenericModuleHome(container, moduleName, submodules);
-    return;
-  }
+    // 1. Limpiar estado y DOM
+    hideCalendar();
+    container.innerHTML = '';
 
-// Verificar si es un módulo con home personalizado
-  try {
-    // Este bloque ahora está vacío pero es necesario para la estructura
-    // Puedes agregar un comentario o dejarlo vacío
-  } catch (error) {
-    console.error('Error rendering module home:', error);
-    showGenericModuleHome(container, moduleName, submodules);
-  }
+    // 2. Crear la estructura de contenedores
+    const mainCanvas = document.createElement('div');
+    mainCanvas.className = 'main-canvas';
+    container.appendChild(mainCanvas);
 
-  // Ahora puedes usar las condiciones normales
-  if (moduleName === "Gestión Integral") {
-    showGenericModuleHome(container, moduleName, submodules);
-    return;
-  } else if (moduleName === "Recursos") {
-    // Crear una instancia del componente personalizado y renderizarlo
-    if (window.RecursosHome) {
-      const recursosHome = new window.RecursosHome(container, moduleName, submodules);
-      recursosHome.render();
-    } else {
-      console.error('RecursosHome component not found');
-      showGenericModuleHome(container, moduleName, submodules);
+    const moduleContentContainer = document.createElement('div');
+    moduleContentContainer.className = 'module-content-area';
+    mainCanvas.appendChild(moduleContentContainer);
+
+    // 3. Decidir si el calendario es necesario y crearlo
+    const modulesToShowCalendar = ["Gestión Integral", "Recursos", "Gestión de la Salud", "Gestión de Peligros y Riesgos", "Gestión de Amenazas", "Verificación", "Mejoramiento"];
+    if (modulesToShowCalendar.includes(moduleName)) {
+        showCalendarInModule(mainCanvas); // Se añade al final del mainCanvas, a la derecha del moduleContentContainer
     }
-    return;
-  } else if (moduleName === "Gestión de la Salud") {
-    // Crear una instancia del componente personalizado y renderizarlo
-    if (window.GestionSaludHome) {
-      const gestionSaludHome = new window.GestionSaludHome(container, moduleName, submodules);
-      gestionSaludHome.render();
-    } else {
-      console.error('GestionSaludHome component not found');
-      showGenericModuleHome(container, moduleName, submodules);
+
+    // 4. Renderizar el contenido del módulo DENTRO del 'moduleContentContainer'
+    const submodules = RESOURCES_SUBMODULES[moduleName];
+    if (!submodules || submodules.length === 0) {
+        const noSubmodulesMessage = document.createElement('p');
+        noSubmodulesMessage.textContent = 'No hay submódulos disponibles para este módulo.';
+        moduleContentContainer.appendChild(noSubmodulesMessage);
+        return;
     }
-    return;
-  } else if (moduleName === "Gestión de Peligros y Riesgos") {
-    // Crear una instancia del componente personalizado y renderizarlo
-    if (window.GestionPeligrosHome) {
-      const gestionPeligrosHome = new window.GestionPeligrosHome(container, moduleName, submodules);
-      gestionPeligrosHome.render();
+
+    // 5. Llamar a las funciones de renderizado
+    if (moduleName === "Gestión Integral") {
+        showGenericModuleHome(moduleContentContainer, moduleName, submodules);
+    } else if (moduleName === "Recursos") {
+        if (window.RecursosHome) {
+            const recursosHome = new window.RecursosHome(moduleContentContainer, moduleName, submodules);
+            recursosHome.render();
+        } else {
+            console.error('RecursosHome component not found');
+            showGenericModuleHome(moduleContentContainer, moduleName, submodules);
+        }
+    } else if (moduleName === "Gestión de la Salud") {
+        if (window.GestionSaludHome) {
+            const gestionSaludHome = new window.GestionSaludHome(moduleContentContainer, moduleName, submodules);
+            gestionSaludHome.render();
+        } else {
+            console.error('GestionSaludHome component not found');
+            showGenericModuleHome(moduleContentContainer, moduleName, submodules);
+        }
+    } else if (moduleName === "Gestión de Peligros y Riesgos") {
+        if (window.GestionPeligrosHome) {
+            const gestionPeligrosHome = new window.GestionPeligrosHome(moduleContentContainer, moduleName, submodules);
+            gestionPeligrosHome.render();
+        } else {
+            console.error('GestionPeligrosHome component not found');
+            showGenericModuleHome(moduleContentContainer, moduleName, submodules);
+        }
+    } else if (moduleName === "Gestión de Amenazas") {
+        if (window.GestionAmenazasHome) {
+            const gestionAmenazasHome = new window.GestionAmenazasHome(moduleContentContainer, moduleName, submodules);
+            gestionAmenazasHome.render();
+        } else {
+            console.error('GestionAmenazasHome component not found');
+            showGenericModuleHome(moduleContentContainer, moduleName, submodules);
+        }
+    } else if (moduleName === "Verificación") {
+        if (window.VerificacionHome) {
+            const verificacionHome = new window.VerificacionHome(moduleContentContainer, moduleName, submodules);
+            verificacionHome.render();
+        } else {
+            console.error('VerificacionHome component not found');
+            showGenericModuleHome(moduleContentContainer, moduleName, submodules);
+        }
+    } else if (moduleName === "Mejoramiento") {
+        if (window.MejoramientoHome) {
+            const mejoramientoHome = new window.MejoramientoHome(moduleContentContainer, moduleName, submodules);
+            mejoramientoHome.render();
+        } else {
+            console.error('MejoramientoHome component not found');
+            showGenericModuleHome(moduleContentContainer, moduleName, submodules);
+        }
     } else {
-      console.error('GestionPeligrosHome component not found');
-      showGenericModuleHome(container, moduleName, submodules);
+        showGenericModuleHome(moduleContentContainer, moduleName, submodules);
     }
-    return;
-  } else if (moduleName === "Gestión de Amenazas") {
-    // Crear una instancia del componente personalizado y renderizarlo
-    if (window.GestionAmenazasHome) {
-      const gestionAmenazasHome = new window.GestionAmenazasHome(container, moduleName, submodules);
-      gestionAmenazasHome.render();
-    } else {
-      console.error('GestionAmenazasHome component not found');
-      showGenericModuleHome(container, moduleName, submodules);
-    }
-    return;
-  } else if (moduleName === "Verificación") {
-    // Crear una instancia del componente personalizado y renderizarlo
-    if (window.VerificacionHome) {
-      const verificacionHome = new window.VerificacionHome(container, moduleName, submodules);
-      verificacionHome.render();
-    } else {
-      console.error('VerificacionHome component not found');
-      showGenericModuleHome(container, moduleName, submodules);
-    }
-    return;
-  } else if (moduleName === "Mejoramiento") {
-    // Crear una instancia del componente personalizado y renderizarlo
-    if (window.MejoramientoHome) {
-      const mejoramientoHome = new window.MejoramientoHome(container, moduleName, submodules);
-      mejoramientoHome.render();
-    } else {
-      console.error('MejoramientoHome component not found');
-      showGenericModuleHome(container, moduleName, submodules);
-    }
-    return;
-  }
 }
 
 // Para otros módulos, usar el componente base
@@ -850,13 +769,16 @@ function showGenericModuleHome(container, moduleName, submodules) {
 }
 
 function showSubmoduleContent(container, moduleName, submoduleName) {
+  hideCalendar();
   console.log(`Showing content for submodule: ${submoduleName}`);
-  const rightColumn = document.querySelector('.right-column');
-  if (!rightColumn) {
-    console.error('Right column not found');
+  
+  // Verificar que container no sea null
+  if (!container) {
+    console.error('Container is null, cannot show submodule content');
     return;
   }
-  rightColumn.innerHTML = ''; // Limpiar contenido anterior
+  
+  container.innerHTML = ''; // Limpiar contenido anterior
 
   // Crear el contenedor principal del contenido del submódulo
   const submoduleContentDiv = document.createElement('div');
@@ -948,7 +870,7 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
     showErrorMessage(submoduleContentDiv, submoduleName, error.message);
   }
   
-  rightColumn.appendChild(submoduleContentDiv);
+  container.appendChild(submoduleContentDiv);
 }
 
 function showDevelopmentMessage(container, submoduleName) {
@@ -1150,6 +1072,7 @@ function createModuleCard(title, description, onClick) {
 }
 
 function showSettingsPage() {
+  hideCalendar();
   console.log('Showing settings page...');
   // Verificar que contentArea exista
   if (!contentArea) {
@@ -1545,6 +1468,7 @@ function showUserSettingsPage() {
 
 // --- Funciones para Chat LLM ---
 function showLLMChatPage() {
+  hideCalendar();
   console.log('Showing LLM chat page...');
   // Verificar que contentArea exista
   if (!contentArea) {

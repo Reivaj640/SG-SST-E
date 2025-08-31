@@ -1314,97 +1314,52 @@ select.form-control {
   border-color: var(--secondary-color);
 }
 
-/* Estilos para el nuevo layout */
-.main-layout {
-  display: grid;
-  grid-template-columns: 350px 1fr;
+/* --- Layout del Módulo con Flexbox --- */
+
+/* Contenedor principal del contenido del módulo */
+.main-canvas {
+  display: flex;
+  flex-direction: row; /* Asegura layout horizontal */
   gap: var(--spacer);
-  height: 100%;
+  align-items: flex-start; /* Alinear todos los hijos arriba */
 }
 
-.left-column, .right-column {
+/* Área de contenido principal (izquierda) */
+.module-content-area {
+  flex-grow: 1; /* Ocupa todo el espacio flexible */
+  /* Este contenedor puede ser flex y column si su contenido interno lo requiere */
   display: flex;
   flex-direction: column;
   gap: var(--spacer);
-  overflow-y: auto;
+  min-width: 0; /* Evita que el contenido empuje al calendario fuera de la pantalla */
 }
 
-/* Estilos para el calendario */
-#calendar-container {
-  height: 350px; /* Altura fija para el calendario */
-  padding: var(--spacer);
-}
-
-/* Estilos para las notas */
-#notes-container {
-  flex-grow: 1;
-  padding: var(--spacer);
+/* Grid de tarjetas de métricas */
+.metrics-grid {
   display: flex;
-  flex-direction: column;
-}
-
-#notes-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--spacer-sm);
-}
-
-#notes-header h4 {
-  margin: 0;
-}
-
-#add-note-btn {
-  padding: 2px 8px;
-  font-size: 1.2rem;
-}
-
-#notes-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  flex-grow: 1;
-  overflow-y: auto;
-}
-
-#notes-list li {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--spacer-xs) 0;
-  border-bottom: 1px solid var(--border-color);
-  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
-}
-
-#notes-list li.completed {
-  opacity: 0.5;
-  text-decoration: line-through;
-}
-
-#notes-list li.removing {
-  transform: translateX(-100%);
-  opacity: 0;
-}
-
-#note-input-container {
-  display: flex;
-  gap: var(--spacer-sm);
-  margin-top: var(--spacer-sm);
-}
-
-/* Estilos para las tarjetas de datos y submódulos en la columna derecha */
-.right-column .data-cards-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  flex-wrap: wrap;
   gap: var(--spacer);
 }
 
-.right-column .submodules-container {
-  display: grid;
-  grid-template-columns: 1fr 1fr; /* Dos columnas */
-  gap: var(--spacer);
+.metric-card {
+  flex: 1 1 calc(50% - var(--spacer));
+  min-width: 200px;
+  background-color: var(--widget-bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacer-sm);
+  box-shadow: var(--box-shadow);
 }
 
-.right-column .chart-container {
-  height: 250px; /* Altura ajustada para la gráfica */
+/* Contenedor para el calendario (derecha) */
+.module-calendar-container {
+  background-color: var(--widget-bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--box-shadow);
+  padding: var(--spacer-sm);
+  width: 280px;
+  flex-shrink: 0; /* Evita que el calendario se encoja */
+  align-self: flex-start; /* LA CLAVE: Evita que se estire verticalmente */
+  max-height: 360px;      /* Buena medida de seguridad */
 }

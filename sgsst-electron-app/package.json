@@ -17,6 +17,7 @@
     "nodemon": "^3.1.10"
   },
   "dependencies": {
+    "vanilla-calendar-pro": "^3.0.5",
     "xlsx": "^0.18.5"
   }
 }
