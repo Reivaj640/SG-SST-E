@@ -126,8 +126,6 @@ let companyNameElement;
 let companyLogoElement;
 let companyLogoPlaceholder;
 
-// --- Inicialización ---
-// Esperar a que el DOM esté completamente cargado
 document.addEventListener('DOMContentLoaded', () => {
   console.log('DOM fully loaded and parsed.');
 
@@ -137,6 +135,31 @@ document.addEventListener('DOMContentLoaded', () => {
   companyNameElement = document.getElementById('company-name');
   companyLogoElement = document.getElementById('company-logo');
   companyLogoPlaceholder = document.getElementById('company-logo-placeholder');
+
+  // Crear el layout principal
+  contentArea.innerHTML = `
+    <div class="main-layout">
+      <div class="left-column">
+        <div id="calendar-container" class="card vanilla-calendar_light"></div>
+        <div id="notes-container" class="card">
+          <div id="notes-header">
+            <h4>Notas Rápidas</h4>
+            <button id="add-note-btn" class="btn btn-primary">+</button>
+          </div>
+          <ul id="notes-list"></ul>
+          <div id="note-input-container" style="display: none;">
+            <input type="text" id="note-input" placeholder="Escribe una nueva nota...">
+            <button id="save-note-btn" class="btn">Guardar</button>
+          </div>
+        </div>
+      </div>
+      <div class="right-column">
+        <div id="data-cards-container" class="data-cards-container"></div>
+        <div id="submodules-container" class="submodules-container"></div>
+        <div id="chart-container" class="chart-container" style="display: none;"></div>
+      </div>
+    </div>
+  `;
 
   console.log('DOM elements found:', { contentArea, sidebarMenu, companyNameElement, companyLogoElement, companyLogoPlaceholder });
 
@@ -181,8 +204,121 @@ document.addEventListener('DOMContentLoaded', () => {
     console.error('LLM button NOT found in DOM.');
   }
 
+  // Inicializar el calendario correctamente
+  initializeCalendar();
+
+  // Lógica de las notas
+  const addNoteBtn = document.getElementById('add-note-btn');
+  const noteInputContainer = document.getElementById('note-input-container');
+  const noteInput = document.getElementById('note-input');
+  const saveNoteBtn = document.getElementById('save-note-btn');
+  const notesList = document.getElementById('notes-list');
+
+  let notes = JSON.parse(localStorage.getItem('notes')) || [];
+
+  function renderNotes() {
+    notesList.innerHTML = '';
+    notes.forEach((note, index) => {
+      const li = document.createElement('li');
+      li.className = note.completed ? 'completed' : '';
+      li.innerHTML = `
+        <span>${note.text}</span>
+        <div>
+          <button class="btn-note-complete">✓</button>
+          <button class="btn-note-delete">×</button>
+        </div>
+      `;
+
+      li.querySelector('.btn-note-complete').addEventListener('click', () => toggleNote(index));
+      li.querySelector('.btn-note-delete').addEventListener('click', () => removeNote(index));
+
+      notesList.appendChild(li);
+    });
+  }
+
+  function addNote() {
+    noteInputContainer.style.display = 'flex';
+    noteInput.focus();
+  }
+
+  function saveNote() {
+    const text = noteInput.value.trim();
+    if (text) {
+      notes.push({ text, completed: false });
+      localStorage.setItem('notes', JSON.stringify(notes));
+      renderNotes();
+      noteInput.value = '';
+      noteInputContainer.style.display = 'none';
+    }
+  }
+
+  function toggleNote(index) {
+    notes[index].completed = !notes[index].completed;
+    localStorage.setItem('notes', JSON.stringify(notes));
+    renderNotes();
+  }
+
+  function removeNote(index) {
+    const li = notesList.children[index];
+    li.classList.add('removing');
+    setTimeout(() => {
+      notes.splice(index, 1);
+      localStorage.setItem('notes', JSON.stringify(notes));
+      renderNotes();
+    }, 300);
+  }
+
+  addNoteBtn.addEventListener('click', addNote);
+  saveNoteBtn.addEventListener('click', saveNote);
+  noteInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      saveNote();
+    }
+  });
+
+  renderNotes();
+
   initializeApp();
 });
+
+// Función para inicializar el calendario correctamente
+function initializeCalendar() {
+  // Verificar si VanillaCalendarPro está disponible
+  if (typeof window.VanillaCalendarPro !== 'undefined') {
+    console.log('VanillaCalendarPro está disponible, inicializando calendario...');
+    
+    // Inicializar el calendario usando el objeto correcto desde window.VanillaCalendarPro
+    const { Calendar } = window.VanillaCalendarPro;
+    const calendar = new Calendar('#calendar-container', {
+      settings: {
+        lang: 'es',
+        iso8601: true,
+        selection: {
+          day: 'multiple',
+        },
+      },
+    });
+    
+    // Verificar si el método init existe
+    if (typeof calendar.init === 'function') {
+      calendar.init();
+      console.log('Calendario inicializado correctamente.');
+    } else {
+      console.error('El método init no está disponible en el objeto calendar.');
+      const calendarContainer = document.getElementById('calendar-container');
+      if (calendarContainer) {
+        calendarContainer.innerHTML = '<p>Error: No se pudo inicializar el calendario. El método init no está disponible.</p>';
+      }
+    }
+  } else {
+    console.error('VanillaCalendarPro no está definido. Verifica que el script se haya cargado correctamente.');
+    // Mostrar un mensaje de error en el contenedor del calendario
+    const calendarContainer = document.getElementById('calendar-container');
+    if (calendarContainer) {
+      calendarContainer.innerHTML = '<p>Error: No se pudo cargar el calendario. Por favor, verifica la consola para más detalles.</p>';
+    }
+  }
+}
 
 // Variable para mantener el botón activo del sidebar
 let activeSidebarButton = null;
@@ -253,21 +389,22 @@ function setActiveSidebarButton(buttonElement) {
 
 function showHomePage() {
   console.log('Showing home page...');
-  // Limpiar el área de contenido
-  contentArea.innerHTML = '';
+  const rightColumn = document.querySelector('.right-column');
+  if (!rightColumn) {
+    console.error('Right column not found');
+    return;
+  }
+  rightColumn.innerHTML = '';
 
   const homePageDiv = document.createElement('div');
   homePageDiv.id = 'home-page';
   console.log('Created homePageDiv:', homePageDiv);
 
-  // Placeholder para la imagen de bienvenida
-  // En una implementación completa, se cargaría una imagen real
   const welcomePlaceholder = document.createElement('div');
   welcomePlaceholder.id = 'welcome-placeholder';
   welcomePlaceholder.textContent = '¡Bienvenido al SG-SST! Selecciona una empresa para comenzar.';
   homePageDiv.appendChild(welcomePlaceholder);
 
-  // Contenedor para los botones de selección de empresa
   const companySelectionDiv = document.createElement('div');
   companySelectionDiv.id = 'company-selection';
 
@@ -280,8 +417,8 @@ function showHomePage() {
   });
 
   homePageDiv.appendChild(companySelectionDiv);
-  contentArea.appendChild(homePageDiv);
-  console.log('Added home page to contentArea');
+  rightColumn.appendChild(homePageDiv);
+  console.log('Added home page to right column');
 }
 
 function selectCompany(companyName, buttonElement) {
@@ -343,11 +480,12 @@ function handleLogout() {
 
 function showCompanyHomePage() {
   console.log(`Showing home page for company: ${currentCompany}`);
-  contentArea.innerHTML = '';
-
-  // Crear el contenedor principal del canvas
-  const mainCanvas = document.createElement('div');
-  mainCanvas.className = 'main-canvas';
+  const rightColumn = document.querySelector('.right-column');
+  if (!rightColumn) {
+    console.error('Right column not found');
+    return;
+  }
+  rightColumn.innerHTML = '';
 
   // Contenido del home de la empresa
   const companyHomeDiv = document.createElement('div');
@@ -420,32 +558,26 @@ function showCompanyHomePage() {
   `;
   companyHomeDiv.appendChild(modulesInfo);
   
-  mainCanvas.appendChild(companyHomeDiv);
-  contentArea.appendChild(mainCanvas);
+  rightColumn.appendChild(companyHomeDiv);
 }
 
 function showModuleContent(moduleName) {
   console.log(`Showing content for module: ${moduleName}`);
   currentModule = moduleName;
   
-  // Verificar que contentArea exista
-  if (!contentArea) {
-    console.error('contentArea is not defined');
+  const rightColumn = document.querySelector('.right-column');
+  if (!rightColumn) {
+    console.error('Right column not found');
     return;
   }
-  
-  contentArea.innerHTML = ''; // Limpiar contenido anterior
-
-  // Crear el contenedor principal del canvas
-  const mainCanvas = document.createElement('div');
-  mainCanvas.className = 'main-canvas';
+  rightColumn.innerHTML = ''; // Limpiar contenido anterior
 
   // Verificar si el módulo tiene submódulos definidos
   const submodules = RESOURCES_SUBMODULES[moduleName];
   
   if (submodules && submodules.length > 0) {
     // Mostrar directamente el home del módulo
-    showModuleHome(mainCanvas, moduleName);
+    showModuleHome(rightColumn, moduleName);
   } else {
     // Mostrar contenido genérico si no hay submódulos definidos
     const moduleDiv = document.createElement('div');
@@ -468,10 +600,8 @@ function showModuleContent(moduleName) {
     `;
     moduleDiv.appendChild(placeholderCard);
     
-    mainCanvas.appendChild(moduleDiv);
+    rightColumn.appendChild(moduleDiv);
   }
-  
-  contentArea.appendChild(mainCanvas);
 }
 
 function showModuleWelcomeScreen(container, moduleName) {
@@ -721,14 +851,12 @@ function showGenericModuleHome(container, moduleName, submodules) {
 
 function showSubmoduleContent(container, moduleName, submoduleName) {
   console.log(`Showing content for submodule: ${submoduleName}`);
-  
-  // Verificar que container no sea null
-  if (!container) {
-    console.error('Container is null, cannot show submodule content');
+  const rightColumn = document.querySelector('.right-column');
+  if (!rightColumn) {
+    console.error('Right column not found');
     return;
   }
-  
-  container.innerHTML = ''; // Limpiar contenido anterior
+  rightColumn.innerHTML = ''; // Limpiar contenido anterior
 
   // Crear el contenedor principal del contenido del submódulo
   const submoduleContentDiv = document.createElement('div');
@@ -820,7 +948,7 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
     showErrorMessage(submoduleContentDiv, submoduleName, error.message);
   }
   
-  container.appendChild(submoduleContentDiv);
+  rightColumn.appendChild(submoduleContentDiv);
 }
 
 function showDevelopmentMessage(container, submoduleName) {

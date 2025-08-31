@@ -1313,3 +1313,98 @@ select.form-control {
   color: var(--white-color); /* Texto blanco al pasar el mouse */
   border-color: var(--secondary-color);
 }
+
+/* Estilos para el nuevo layout */
+.main-layout {
+  display: grid;
+  grid-template-columns: 350px 1fr;
+  gap: var(--spacer);
+  height: 100%;
+}
+
+.left-column, .right-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacer);
+  overflow-y: auto;
+}
+
+/* Estilos para el calendario */
+#calendar-container {
+  height: 350px; /* Altura fija para el calendario */
+  padding: var(--spacer);
+}
+
+/* Estilos para las notas */
+#notes-container {
+  flex-grow: 1;
+  padding: var(--spacer);
+  display: flex;
+  flex-direction: column;
+}
+
+#notes-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacer-sm);
+}
+
+#notes-header h4 {
+  margin: 0;
+}
+
+#add-note-btn {
+  padding: 2px 8px;
+  font-size: 1.2rem;
+}
+
+#notes-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  flex-grow: 1;
+  overflow-y: auto;
+}
+
+#notes-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacer-xs) 0;
+  border-bottom: 1px solid var(--border-color);
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+}
+
+#notes-list li.completed {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+#notes-list li.removing {
+  transform: translateX(-100%);
+  opacity: 0;
+}
+
+#note-input-container {
+  display: flex;
+  gap: var(--spacer-sm);
+  margin-top: var(--spacer-sm);
+}
+
+/* Estilos para las tarjetas de datos y submódulos en la columna derecha */
+.right-column .data-cards-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--spacer);
+}
+
+.right-column .submodules-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr; /* Dos columnas */
+  gap: var(--spacer);
+}
+
+.right-column .chart-container {
+  height: 250px; /* Altura ajustada para la gráfica */
+}
