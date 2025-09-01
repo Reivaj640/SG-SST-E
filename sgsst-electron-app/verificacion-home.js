@@ -152,58 +152,7 @@ class VerificacionHome {
     }
     
     async renderSidebarPanel(container) {
-        // Calendario de Outlook (simulado)
-        const calendarWidget = document.createElement('div');
-        calendarWidget.className = 'calendar-widget';
-        calendarWidget.innerHTML = `
-            <h3>Mi Calendario</h3>
-            <div class="calendar-header">
-                <button class="btn-icon">←</button>
-                <span class="calendar-title">18 de Agosto, 2025</span>
-                <button class="btn-icon">→</button>
-            </div>
-            <div class="calendar-events">
-                <div class="event">
-                    <div class="event-time">09:00 - 10:00</div>
-                    <div class="event-title">Reunión de Planificación</div>
-                    <div class="event-location">Sala de Juntas A</div>
-                </div>
-                <div class="event">
-                    <div class="event-time">11:30 - 12:30</div>
-                    <div class="event-title">Auditoría de Proveedores</div>
-                    <div class="event-location">Oficina Virtual</div>
-                </div>
-                <div class="event">
-                    <div class="event-time">15:00 - 16:00</div>
-                    <div class="event-title">Evaluación de Riesgos</div>
-                    <div class="event-location">Área de Producción</div>
-                </div>
-            </div>
-        `;
-        container.appendChild(calendarWidget);
-        
-        // Notas personales (simuladas)
-        const notesWidget = document.createElement('div');
-        notesWidget.className = 'notes-widget';
-        notesWidget.innerHTML = `
-            <h3>Mis Notas</h3>
-            <div class="notes-list">
-                <div class="note">
-                    <div class="note-title">Actualizar matriz legal</div>
-                    <div class="note-content">Revisar nuevas normativas para el sector.</div>
-                </div>
-                <div class="note">
-                    <div class="note-title">Capacitación de nuevo personal</div>
-                    <div class="note-content">Programar inducción para los 5 nuevos operarios.</div>
-                </div>
-                <div class="note">
-                    <div class="note-title">Revisión de EPPs</div>
-                    <div class="note-content">Verificar stock y solicitar reposición si es necesario.</div>
-                </div>
-            </div>
-            <button class="btn" style="width: 100%;">+ Añadir Nota</button>
-        `;
-        container.appendChild(notesWidget);
+        // El contenido del calendario y las notas ha sido eliminado.
     }
 }
 
