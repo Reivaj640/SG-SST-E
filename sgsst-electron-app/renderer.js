@@ -669,7 +669,13 @@ function showModuleHome(container, moduleName) {
 
     // 5. Llamar a las funciones de renderizado
     if (moduleName === "Gestión Integral") {
-        showGenericModuleHome(moduleContentContainer, moduleName, submodules);
+        if (window.GestionIntegralHome) {
+            const gestionIntegralHome = new window.GestionIntegralHome(moduleContentContainer, moduleName, submodules);
+            gestionIntegralHome.render();
+        } else {
+            console.error('GestionIntegralHome component not found');
+            showGenericModuleHome(moduleContentContainer, moduleName, submodules);
+        }
     } else if (moduleName === "Recursos") {
         if (window.RecursosHome) {
             const recursosHome = new window.RecursosHome(moduleContentContainer, moduleName, submodules);

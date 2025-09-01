@@ -1,11 +1,10 @@
 // gestion-integral-home.js - Componente para el home del módulo "Gestión Integral"
 
 class GestionIntegralHome {
-    constructor(container, moduleName) {
+    constructor(container, moduleName, submodules) {
         this.container = container;
         this.moduleName = moduleName;
-        // Importar los submódulos desde el renderer.js
-        this.submodules = window.RESOURCES_SUBMODULES?.[moduleName] || [];
+        this.submodules = submodules || window.RESOURCES_SUBMODULES?.[moduleName] || [];
     }
 
     async render() {

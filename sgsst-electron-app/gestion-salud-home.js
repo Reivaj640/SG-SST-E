@@ -12,7 +12,7 @@ class GestionSaludHome {
         
         // Crear el contenedor principal
         const mainContainer = document.createElement('div');
-        mainContainer.className = 'gestion-integral-home';
+        mainContainer.className = 'gestion-salud-home';
         
         // Crear el área principal (izquierda)
         const mainArea = document.createElement('div');
