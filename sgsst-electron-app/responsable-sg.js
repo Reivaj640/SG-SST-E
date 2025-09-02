@@ -297,6 +297,7 @@ class ResponsableSgComponent {
     }
     
     closePreview() {
+        console.error('🚨 [responsable-sg.js] closePreview() FUE LLAMADO. ESTO NO DEBERÍA OCURRIR AUTOMÁTICAMENTE.', { stack: new Error().stack });
         if (this.onBackToModuleHome) {
             this.onBackToModuleHome();
         }

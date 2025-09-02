@@ -157,7 +157,6 @@ class GestionSaludHome {
     }
     
     async renderSidebarPanel(container) {
-        // El contenido del calendario y las notas ha sido eliminado.
     }
 }
 

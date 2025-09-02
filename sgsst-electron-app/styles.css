@@ -1363,3 +1363,7 @@ select.form-control {
   align-self: flex-start; /* LA CLAVE: Evita que se estire verticalmente */
   max-height: 360px;      /* Buena medida de seguridad */
 }
+
+.module-calendar-container.hidden {
+    display: none !important; /* Importante para anular otros estilos */
+}

@@ -8,7 +8,13 @@ class RecursosHome {
     }
 
     async render() {
-        this.container.innerHTML = '';
+        // Si el contenedor ya tiene contenido, no hacer nada.
+        if (this.container.hasChildNodes()) {
+            console.warn('RecursosHome.render() llamado de nuevo, pero el contenido ya existe. Se ignora para prevenir re-renderizado.');
+            return;
+        }
+
+        // this.container.innerHTML = ''; // ESTA LÍNEA CAUSABA EL ERROR
         
         // Crear el contenedor principal
         const mainContainer = document.createElement('div');
@@ -143,7 +149,6 @@ class RecursosHome {
     }
     
     async renderSidebarPanel(container) {
-        // El contenido del calendario y las notas ha sido eliminado.
     }
 }
 
