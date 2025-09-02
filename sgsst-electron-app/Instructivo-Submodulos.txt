@@ -1,0 +1,195 @@
+Claro, aquí tienes un instructivo detallado para que puedas crear nuevas
+  interfaces para otros submódulos, basándonos en el ejemplo de "3.2.2
+  Investigación de Accidentes".
+
+  Instructivo para Crear una Nueva Interfaz de Submódulo
+
+  Este instructivo te guiará a través de los 4 pasos necesarios para crear y conectar una nueva interfaz en la aplicación.
+
+  ---
+
+  Paso 1: Crear el Archivo del Componente
+
+  Primero, necesitas crear un nuevo archivo JavaScript que contendrá el código de tu nueva interfaz.
+
+   1. Crea un nuevo archivo `.js` en la raíz del proyecto.
+   2. Nombra el archivo de forma descriptiva, siguiendo el patrón de los
+      existentes. Por ejemplo, si tu nuevo submódulo es "Gestión de
+      Proveedores", podrías nombrar el archivo gestion-proveedores.js.
+
+  ---
+
+  Paso 2: Definir la Clase del Componente
+
+  Ahora, dentro del archivo que acabas de crear, definirás la estructura de tu componente. Puedes copiar y pegar la siguiente plantilla, que está basada en InvestigacionAccidentesComponent.
+
+    1 // mi-nuevo-componente.js
+    2
+    3 class MiNuevoComponente {
+    4     constructor(container, currentCompany, moduleName,
+      submoduleName, backToModuleCallback) {
+    5         this.container = container;
+    6         this.currentCompany = currentCompany;
+    7         this.moduleName = moduleName;
+    8         this.submoduleName = submoduleName;
+    9         this.backToModuleCallback = backToModuleCallback;
+   10         // Puedes añadir más propiedades aquí si las necesitas
+   11     }
+   12
+   13     render() {
+   14         // Limpia el contenedor antes de dibujar la nueva
+      interfaz
+   15         this.container.innerHTML = '';
+   16
+   17         // Crea el título del submódulo
+   18         const title = document.createElement('h2');
+   19         title.textContent = this.submoduleName;
+   20         this.container.appendChild(title);
+   21
+   22         // Crea un botón para volver al menú del módulo
+      principal
+   23         const backButton = document.createElement('button');
+   24         backButton.className = 'btn';
+   25         backButton.textContent = '< Volver al Módulo';
+   26         backButton.addEventListener('click', () => this.
+      backToModuleCallback());
+   27         this.container.appendChild(backButton);
+   28
+   29         // --- AQUÍ COMIENZA EL CONTENIDO DE TU INTERFAZ ---
+   30         // Este es el lugar donde agregarás tus propios
+      elementos HTML:
+   31         // formularios, tablas, botones, etc.
+   32
+   33         const contentDiv = document.createElement('div');
+   34         contentDiv.className = 'mi-nuevo-componente-content';
+   35         contentDiv.innerHTML = `
+   36             <p>Contenido para la empresa: <strong>
+      ${this.currentCompany}</strong></p>
+   37             <p>Esta es la interfaz para <strong>${this.
+      submoduleName}</strong>.</p>
+   38
+   39             <!-- Ejemplo de un formulario -->
+   40             <form>
+   41                 <label for="nombre">Nombre:</label>
+   42                 <input type="text" id="nombre" name="nombre">
+   43                 <button type="submit" class="btn btn-primary">
+      Guardar</button>
+   44             </form>
+   45         `;
+   46         this.container.appendChild(contentDiv);
+   47
+   48         // --- FIN DEL CONTENIDO DE TU INTERFAZ ---
+   49     }
+   50 }
+   51
+   52 // Asegúrate de que el componente esté disponible globalmente
+   53 window.MiNuevoComponente = MiNuevoComponente;
+
+  Qué debes modificar:
+
+   * `MiNuevoComponente`: Cambia este nombre por el de tu componente (ej.
+     GestionProveedoresComponent).
+   * El contenido dentro de `contentDiv.innerHTML`: Aquí es donde construirás       
+     tu interfaz. Puedes añadir cualquier elemento HTML que necesites.
+   * `window.MiNuevoComponente`: Asegúrate de que el nombre coincida con el de      
+     tu clase.
+
+  ---
+
+
+
+
+  Paso 3: Incluir el Nuevo Componente en index.html
+
+  Para que la aplicación pueda encontrar y usar tu nuevo componente, debes
+  agregar el archivo .js al index.html.
+
+   1. Abre el archivo `index.html`.
+   2. Busca la sección de scripts al final del archivo, donde veas los otros componentes como investigacion-accidentes.js.
+   3. Añade una nueva línea para tu componente, manteniendo el orden.
+
+    1     <!-- ... otros scripts ... -->
+    2     <script src="responsable-sg.js"></script>
+    3     <script src="restricciones-medicas.js"></script>
+    4     <script src="evaluaciones-medicas.js"></script>
+    5     <script src="investigacion-accidentes.js"></script>
+    6     <!-- AÑADE TU NUEVO SCRIPT AQUÍ -->
+    7     <script src="gestion-proveedores.js"></script>
+    8     <!-- ... -->
+    9     </body>
+   10     </html>
+
+  ---
+
+  Paso 4: Registrar el Submódulo en renderer.js
+
+  Finalmente, necesitas "registrar" tu submódulo en la lógica principal de
+  la aplicación para que aparezca en el menú y sepa qué interfaz cargar.
+
+   1. Abre el archivo `renderer.js`.
+
+   2. Añade tu submódulo a la lista `RESOURCES_SUBMODULES`: Busca el módulo
+      principal al que pertenece tu nuevo submódulo (por ejemplo, "Gestión
+      Integral") y añade el nombre de tu submódulo a la lista.
+
+    1     // renderer.js
+    2
+    3     const RESOURCES_SUBMODULES = {
+    4       // ...
+    5       "Gestión Integral": [
+    6         "2.1.1 Politica del SG-SST",
+    7         // ... otros submódulos ...
+    8         "2.13.1 Elementos de Protección Personal",
+    9         "2.14.1 Gestión de Proveedores" // <-- AÑADE TU
+      SUBMÓDULO AQUÍ
+   10       ],
+   11       // ...
+   12     };
+
+   3. Crea la lógica de carga en `showSubmoduleContent`: Busca la función
+      showSubmoduleContent (alrededor de la línea 1000) y añade un nuevo
+      bloque else if para tu submódulo.
+
+    1     // renderer.js -> showSubmoduleContent()
+    2
+    3     // ... otros else if ...
+    4
+    5     } else if (submoduleName === "3.2.2 Investigación de
+      Accidentes, indicentes y Enfermedades") {
+    6       showInvestigacionAccidentesContent(submoduleContentDiv,
+      currentCompany, moduleName, submoduleName);
+    7
+    8     // AÑADE TU NUEVO BLOQUE AQUÍ
+    9     } else if (submoduleName === "2.14.1 Gestión de Proveedores"
+      ) {
+   10       if (window.GestionProveedoresComponent) { // Usa el nombre
+      de tu componente
+   11         const miComponente = new window.
+      GestionProveedoresComponent(
+   12           submoduleContentDiv,
+   13           currentCompany,
+   14           moduleName,
+   15           submoduleName,
+   16           backToModuleCallback
+   17         );
+   18         miComponente.render();
+   19       } else {
+   20         console.error('❌ GestionProveedoresComponent no
+      encontrado');
+   21         showDevelopmentMessage(submoduleContentDiv,
+      submoduleName);
+   22       }
+   23
+   24     } else {
+   25       // ...
+
+      Importante:
+       * Asegúrate de que el submoduleName coincida exactamente con el que
+         pusiste en RESOURCES_SUBMODULES.
+       * Asegúrate de que window.GestionProveedoresComponent coincida con el        
+         nombre que le diste a tu clase en el Paso 2.
+
+  ---
+
+  ¡Y eso es todo! Si sigues estos 4 pasos, habrás creado y conectado una
+  nueva interfaz para un submódulo en tu aplicación.

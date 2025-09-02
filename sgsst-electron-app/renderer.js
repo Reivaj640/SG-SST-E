@@ -961,6 +961,20 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         console.error('❌ ResponsableSgComponent no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
+    } else if (submoduleName === "1.1.6 Conformación de Copasst") {
+      if (window.CopasstComponent) {
+        const copasstComponent = new window.CopasstComponent(
+          submoduleContentDiv,
+          currentCompany,
+          moduleName,
+          submoduleName,
+          backToModuleCallback
+        );
+        copasstComponent.render();
+      } else {
+        console.error('❌ CopasstComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
 
     } else if (submoduleName === "3.1.6 Restricciones y recomendaciones médicas") {
       if (window.RestriccionesMedicasComponent) {
