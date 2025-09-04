@@ -983,7 +983,43 @@ Cualquier duda estamos disponibles para resolverla`;
       }
   });
 
-// Convertir Excel a PDF usando Microsoft Office
+  // Manejador para leer la plantilla de acta de COPASST
+  ipcMain.handle('get-acta-data', async () => {
+    try {
+        // Ruta a la plantilla de Excel
+        const templatePath = path.join(__dirname, 'utils', 'ACT-FO-029 Acta de Reunión Copasst Enero.xlsx');
+        console.log(`[INFO] Leyendo plantilla de acta desde: ${templatePath}`);
+
+        // Verificar que el archivo existe
+        await fsp.access(templatePath);
+
+        // Leer el archivo Excel
+        const workbook = xlsx.readFile(templatePath);
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+
+        // Convertir la hoja a un arreglo de datos
+        const data = xlsx.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: '' });
+
+        // Obtener las celdas combinadas (merges)
+        const merges = worksheet['!merges'] || [];
+
+        console.log(`[SUCCESS] Plantilla cargada. Filas: ${data.length}, Merges: ${merges.length}`);
+        return {
+            success: true,
+            data,
+            merges
+        };
+    } catch (error) {
+        console.error('[ERROR] Error al cargar la plantilla del acta:', error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+  });
+
+// Convertir Excel a PDF usando Microsoft Office'''
 ipcMain.handle('convertExcelToPdf', async (event, filePath) => {
     try {
         console.log('=== INICIO CONVERSIÓN EXCEL ===');

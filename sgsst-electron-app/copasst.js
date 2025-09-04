@@ -40,8 +40,8 @@ class CopasstComponent {
 
         const card2 = this.createCard(
             'Realizar Actas',
-            'Crear una nueva acta.',
-            () => alert('Funcionalidad para realizar actas en desarrollo.')
+            'Crear una nueva acta a partir de una plantilla de Excel.',
+            () => this.showRealizarActasInterface()
         );
         cardsContainer.appendChild(card2);
 
@@ -133,7 +133,6 @@ class CopasstComponent {
         const list = document.createElement('ul');
         list.className = 'search-results-list';
 
-        // Extensiones permitidas ahora incluyen Excel
         const allowedExtensions = ['.pdf', '.doc', '.docx', '.xlsx', '.xls'];
         const folders = items.filter(item => item.isDirectory);
         const files = items.filter(item => !item.isDirectory && allowedExtensions.includes(item.name.slice(item.name.lastIndexOf('.')).toLowerCase()));
@@ -152,15 +151,9 @@ class CopasstComponent {
             const li = document.createElement('li');
             const extension = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
             let icon = '📄';
-            
-            // Iconos específicos para cada tipo de archivo
-            if (extension === '.pdf') {
-                icon = '📕';
-            } else if (extension === '.doc' || extension === '.docx') {
-                icon = '📘';
-            } else if (extension === '.xlsx' || extension === '.xls') {
-                icon = '📊';
-            }
+            if (extension === '.pdf') icon = '📕';
+            else if (extension === '.doc' || extension === '.docx') icon = '📘';
+            else if (extension === '.xlsx' || extension === '.xls') icon = '📊';
             
             li.innerHTML = `${icon} ${file.name}`;
             li.addEventListener('click', () => this.previewDocument(file.path));
@@ -176,29 +169,22 @@ class CopasstComponent {
     async previewDocument(filePath) {
         const previewCol = document.getElementById('preview-col');
         const fileExtension = filePath.split('.').pop().toLowerCase();
-        const fileName = filePath.split(/[\/]/).pop();
         const escapedPath = filePath.replace(/\\/g, '\\');
 
         previewCol.innerHTML = `<div class="preview-placeholder">Cargando previsualización...</div>`;
 
         if (fileExtension === 'pdf') {
-            previewCol.innerHTML = `<iframe src="${filePath}" width="100%" height="100%" style="border: none;"></iframe>`;
-        } else if (fileExtension === 'doc' || fileExtension === 'docx') {
+            const safePath = filePath.replace(/\\/g, '/');
+            previewCol.innerHTML = `<iframe src="file:///${safePath}?t=${new Date().getTime()}" width="100%" height="100%" style="border: none;"></iframe>`;
+        } else if (['doc', 'docx', 'xlsx', 'xls'].includes(fileExtension)) {
             try {
-                const result = await window.electronAPI.convertDocxToPdf(filePath);
+                const result = fileExtension.startsWith('doc') 
+                    ? await window.electronAPI.convertDocxToPdf(filePath)
+                    : await window.electronAPI.convertExcelToPdf(filePath);
+
                 if (result.success) {
-                    previewCol.innerHTML = `<iframe src="${result.pdf_path}?t=${new Date().getTime()}" width="100%" height="100%" style="border: none;"></iframe>`;
-                } else {
-                    previewCol.innerHTML = `<div class="preview-error"><h3>Error de Conversión</h3><p>${result.error}</p><button class="btn btn-primary" onclick="window.currentCopasstComponent.openDocument('${escapedPath}')">Abrir con aplicación externa</button></div>`;
-                }
-            } catch (error) {
-                previewCol.innerHTML = `<div class="preview-error"><h3>Error Inesperado</h3><p>${error.message}</p><button class="btn btn-primary" onclick="window.currentCopasstComponent.openDocument('${escapedPath}')">Abrir con aplicación externa</button></div>`;
-            }
-        } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
-            try {
-                const result = await window.electronAPI.convertExcelToPdf(filePath);
-                if (result.success) {
-                    previewCol.innerHTML = `<iframe src="${result.pdf_path}?t=${new Date().getTime()}" width="100%" height="100%" style="border: none;"></iframe>`;
+                    const safePath = result.pdf_path.replace(/\\/g, '/');
+                    previewCol.innerHTML = `<iframe src="file:///${safePath}?t=${new Date().getTime()}" width="100%" height="100%" style="border: none;"></iframe>`;
                 } else {
                     previewCol.innerHTML = `<div class="preview-error"><h3>Error de Conversión</h3><p>${result.error}</p><button class="btn btn-primary" onclick="window.currentCopasstComponent.openDocument('${escapedPath}')">Abrir con aplicación externa</button></div>`;
                 }
@@ -209,7 +195,7 @@ class CopasstComponent {
             previewCol.innerHTML = `<div class="preview-error"><h3>Previsualización no disponible</h3><p>La previsualización para archivos <strong>.${fileExtension}</strong> no está soportada.</p><button class="btn btn-primary" onclick="window.currentCopasstComponent.openDocument('${escapedPath}')">Abrir con aplicación externa</button></div>`;
         }
     }
-    
+
     async openDocument(filePath) {
         try {
             await window.electronAPI.openPath(filePath);
@@ -217,6 +203,113 @@ class CopasstComponent {
             console.error('Error al abrir el documento:', error);
             alert('Error al abrir el documento.');
         }
+    }
+
+    showRealizarActasInterface() {
+        this.container.innerHTML = '';
+
+        const header = this.createHeader('Realizar Acta de Reunión', () => this.render());
+        this.container.appendChild(header);
+
+        const editorContainer = document.createElement('div');
+        editorContainer.className = 'acta-editor-container';
+        editorContainer.innerHTML = `
+            <div class="acta-editor-placeholder">
+                <p>Cargue la plantilla de Excel para empezar a editar el acta.</p>
+                <button id="load-acta-template-btn" class="btn btn-primary">Cargar Plantilla de Acta</button>
+            </div>
+        `;
+        this.container.appendChild(editorContainer);
+
+        const loadButton = editorContainer.querySelector('#load-acta-template-btn');
+        loadButton.addEventListener('click', () => this.loadAndRenderActaEditor(editorContainer));
+    }
+
+    async loadAndRenderActaEditor(container) {
+        container.innerHTML = '<p>Cargando datos de la plantilla...</p>';
+        try {
+            const result = await window.electronAPI.getActaData();
+            console.log('Datos recibidos:', result); // Para depuración
+            if (result.success) {
+                if (!result.data || !Array.isArray(result.data) || result.data.length === 0) {
+                    throw new Error('Los datos de la plantilla están vacíos o no son válidos.');
+                }
+                this.renderEditableActa(container, result.data, result.merges || []);
+            } else {
+                throw new Error(result.error || 'Error desconocido al cargar la plantilla.');
+            }
+        } catch (error) {
+            console.error('Error al cargar la plantilla del acta:', error);
+            container.innerHTML = `<p class="error">Error al cargar la plantilla: ${error.message}</p>`;
+        }
+    }
+
+    renderEditableActa(container, data, merges) {
+        container.innerHTML = ''; // Limpiar el contenedor
+
+        const table = document.createElement('table');
+        table.className = 'editable-acta-table';
+        const tbody = document.createElement('tbody');
+
+        const rowCount = data.length;
+        const colCount = rowCount > 0 ? data[0].length : 0;
+        if (rowCount === 0) return;
+
+        const mergedCells = Array(rowCount).fill(0).map(() => Array(colCount).fill(false));
+
+        (merges || []).forEach(merge => {
+            if (!merge || typeof merge.s === 'undefined' || typeof merge.e === 'undefined') return;
+            const startRow = Math.max(0, merge.s.r);
+            const endRow = Math.min(rowCount - 1, merge.e.r);
+            const startCol = Math.max(0, merge.s.c);
+            const endCol = Math.min(colCount - 1, merge.e.c);
+
+            for (let row = startRow; row <= endRow; row++) {
+                for (let col = startCol; col <= endCol; col++) {
+                    if (row !== startRow || col !== startCol) {
+                        if (mergedCells[row]) {
+                            mergedCells[row][col] = true;
+                        }
+                    }
+                }
+            }
+        });
+
+        data.forEach((rowData, rowIndex) => {
+            const tr = document.createElement('tr');
+            if (!Array.isArray(rowData)) return;
+
+            rowData.forEach((cellData, colIndex) => {
+                if (mergedCells[rowIndex]?.[colIndex]) {
+                    return;
+                }
+
+                const td = document.createElement('td');
+                td.textContent = cellData ?? '';
+                td.setAttribute('contenteditable', 'true');
+
+                const merge = (merges || []).find(m => m.s.r === rowIndex && m.s.c === colIndex);
+                if (merge) {
+                    td.colSpan = (merge.e.c - merge.s.c) + 1;
+                    td.rowSpan = (merge.e.r - merge.s.r) + 1;
+                }
+
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+
+        table.appendChild(tbody);
+        container.appendChild(table);
+
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'acta-actions';
+        const saveButton = document.createElement('button');
+        saveButton.className = 'btn btn-success';
+        saveButton.textContent = 'Guardar Acta';
+        saveButton.addEventListener('click', () => alert('Guardado no implementado.'));
+        actionsDiv.appendChild(saveButton);
+        container.appendChild(actionsDiv);
     }
 
     createHeader(titleText, onBack) {

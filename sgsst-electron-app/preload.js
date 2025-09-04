@@ -67,8 +67,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // --- LÍNEA QUE FALTABA ---
   // Generar informe de accidente
-  generateAccidentReport: (combinedData, empresa) => ipcRenderer.invoke('generate-accident-report', combinedData, empresa),
+  //  generateAccidentReport: (combinedData, empresa) => ipcRenderer.invoke('generate-accident-report', combinedData, empresa),
   
+  // Obtener datos de la plantilla de acta
+  getActaData: () => ipcRenderer.invoke('get-acta-data'),
+
   // Convertir Excel a PDF usando Microsoft Office
   convertExcelToPdf: (filePath) => ipcRenderer.invoke('convertExcelToPdf', filePath),
   // -------------------------
