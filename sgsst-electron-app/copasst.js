@@ -1,4 +1,4 @@
-// copasst.js - Componente para la vista de actas de CopassT
+// copasst.js - Componente para la vista de actas de CopassT con soporte para Excel
 
 class CopasstComponent {
     constructor(container, currentCompany, moduleName, submoduleName, backToModuleCallback) {
@@ -133,7 +133,8 @@ class CopasstComponent {
         const list = document.createElement('ul');
         list.className = 'search-results-list';
 
-        const allowedExtensions = ['.pdf', '.doc', '.docx'];
+        // Extensiones permitidas ahora incluyen Excel
+        const allowedExtensions = ['.pdf', '.doc', '.docx', '.xlsx', '.xls'];
         const folders = items.filter(item => item.isDirectory);
         const files = items.filter(item => !item.isDirectory && allowedExtensions.includes(item.name.slice(item.name.lastIndexOf('.')).toLowerCase()));
 
@@ -149,7 +150,19 @@ class CopasstComponent {
 
         files.forEach(file => {
             const li = document.createElement('li');
-            li.innerHTML = `📄 ${file.name}`;
+            const extension = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+            let icon = '📄';
+            
+            // Iconos específicos para cada tipo de archivo
+            if (extension === '.pdf') {
+                icon = '📕';
+            } else if (extension === '.doc' || extension === '.docx') {
+                icon = '📘';
+            } else if (extension === '.xlsx' || extension === '.xls') {
+                icon = '📊';
+            }
+            
+            li.innerHTML = `${icon} ${file.name}`;
             li.addEventListener('click', () => this.previewDocument(file.path));
             list.appendChild(li);
         });
@@ -173,6 +186,17 @@ class CopasstComponent {
         } else if (fileExtension === 'doc' || fileExtension === 'docx') {
             try {
                 const result = await window.electronAPI.convertDocxToPdf(filePath);
+                if (result.success) {
+                    previewCol.innerHTML = `<iframe src="${result.pdf_path}?t=${new Date().getTime()}" width="100%" height="100%" style="border: none;"></iframe>`;
+                } else {
+                    previewCol.innerHTML = `<div class="preview-error"><h3>Error de Conversión</h3><p>${result.error}</p><button class="btn btn-primary" onclick="window.currentCopasstComponent.openDocument('${escapedPath}')">Abrir con aplicación externa</button></div>`;
+                }
+            } catch (error) {
+                previewCol.innerHTML = `<div class="preview-error"><h3>Error Inesperado</h3><p>${error.message}</p><button class="btn btn-primary" onclick="window.currentCopasstComponent.openDocument('${escapedPath}')">Abrir con aplicación externa</button></div>`;
+            }
+        } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+            try {
+                const result = await window.electronAPI.convertExcelToPdf(filePath);
                 if (result.success) {
                     previewCol.innerHTML = `<iframe src="${result.pdf_path}?t=${new Date().getTime()}" width="100%" height="100%" style="border: none;"></iframe>`;
                 } else {

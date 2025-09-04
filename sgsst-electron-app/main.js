@@ -2,8 +2,9 @@
 
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
-const fs = require('fs').promises;
-const { exec } = require('child_process');
+const fsp = require('fs').promises;
+const fs = require('fs');
+const { exec, spawn } = require('child_process');
 const { promisify } = require('util');
 const xlsx = require('xlsx');
 
@@ -67,7 +68,7 @@ const registerIPCHandlers = () => {
   ipcMain.handle('save-config', async (event, config) => {
     try {
       console.log('Saving config:', config);
-      await fs.writeFile(configPath, JSON.stringify(config, null, 2));
+      await fsp.writeFile(configPath, JSON.stringify(config, null, 2));
       console.log('Config saved successfully');
       return { success: true };
     } catch (error) {
@@ -80,7 +81,7 @@ const registerIPCHandlers = () => {
   ipcMain.handle('load-config', async () => {
     try {
       console.log('Loading config from:', configPath);
-      const data = await fs.readFile(configPath, 'utf8');
+      const data = await fsp.readFile(configPath, 'utf8');
       const config = JSON.parse(data);
       console.log('Config loaded successfully');
       return config;
@@ -103,7 +104,7 @@ const registerIPCHandlers = () => {
       // Función auxiliar para búsqueda recursiva
       async function findFileRecursive(dir, fileName) {
         try {
-          const entries = await fs.readdir(dir, { withFileTypes: true });
+          const entries = await fsp.readdir(dir, { withFileTypes: true });
           for (const entry of entries) {
             const fullPath = path.join(dir, entry.name);
             if (entry.isDirectory()) {
@@ -121,7 +122,7 @@ const registerIPCHandlers = () => {
 
       // Cargar configuración
       sendLog(`[MAIN] Cargando configuración desde: ${configPath}`);
-      const configData = await fs.readFile(configPath, 'utf8').catch(() => '{}');
+      const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
       const config = JSON.parse(configData);
       sendLog(`[MAIN] Configuración cargada.`);
 
@@ -142,7 +143,7 @@ const registerIPCHandlers = () => {
       sendLog(`[MAIN] Ruta base encontrada: ${basePath}`);
 
       // Verificar que la ruta base exista
-      await fs.access(basePath);
+      await fsp.access(basePath);
       sendLog(`[MAIN] Ruta base verificada exitosamente`);
 
       // Buscar archivo recursivamente
@@ -190,7 +191,7 @@ const registerIPCHandlers = () => {
 
       if (allData.length < 1) {
           sendLog('[MAIN] Archivo Excel no contiene datos suficientes.', 'WARN');
-          return { 
+          return {
               success: true, 
               headers: [], 
               rows: [], 
@@ -227,7 +228,7 @@ const registerIPCHandlers = () => {
         sendLog(`[MAIN] Fila ${i+1}: ${JSON.stringify(rows[i])}`, 'DEBUG');
       }
       
-      return { 
+      return {
         success: true, 
         headers: headers,
         rows: rows,
@@ -237,7 +238,7 @@ const registerIPCHandlers = () => {
       
     } catch (error) {
       sendLog(`[MAIN] Error crítico en get-control-remisiones-data: ${error.message}`, 'ERROR');
-      return { 
+      return {
         success: false, 
         error: error.message,
         stack: error.stack,
@@ -255,7 +256,7 @@ const registerIPCHandlers = () => {
       
       // Verificar si el script de Python existe
       try {
-        await fs.access(pythonScriptPath);
+        await fsp.access(pythonScriptPath);
       } catch (error) {
         throw new Error(`Python script not found at: ${pythonScriptPath}`);
       }
@@ -282,12 +283,12 @@ const registerIPCHandlers = () => {
   ipcMain.handle('read-directory', async (event, directoryPath) => {
     try {
       console.log('Reading directory:', directoryPath);
-      const items = await fs.readdir(directoryPath, { withFileTypes: true });
+      const items = await fsp.readdir(directoryPath, { withFileTypes: true });
       
       const result = [];
       for (const item of items) {
         const itemPath = path.join(directoryPath, item.name);
-        const stats = await fs.stat(itemPath);
+        const stats = await fsp.stat(itemPath);
         
         result.push({
           name: item.name,
@@ -342,7 +343,7 @@ const registerIPCHandlers = () => {
       console.log(`[INFO] Finding path for company: ${companyName}, module: ${module}, submodule: ${submodule}`);
 
       // Cargar la configuración
-      const configData = await fs.readFile(configPath, 'utf8').catch(() => '{}');
+      const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
       const config = JSON.parse(configData);
       console.log(`[DEBUG] Full config keys: [${Object.keys(config)}]`);
 
@@ -592,14 +593,14 @@ ${finalResult.debug_full_text}
       const tempDataPath = path.join(app.getPath('temp'), `remision_data_${Date.now()}.json`);
       
       sendLog(`Creando archivo de datos temporal: ${tempDataPath}`);
-      await fs.writeFile(tempDataPath, JSON.stringify({ data: extractedData, empresa: empresa }));
+      await fsp.writeFile(tempDataPath, JSON.stringify({ data: extractedData, empresa: empresa }));
       
       const command = `python "${pythonScriptPath}" --generate-remision "${tempDataPath}"`;
       
       sendLog(`Ejecutando script de generación de remisión: ${command.replace(/\\/g, '/')}`);
       const { stdout, stderr } = await execPromise(command);
       
-      await fs.unlink(tempDataPath);
+      await fsp.unlink(tempDataPath);
       
       if (stderr) {
         sendLog(`Error en script de generación de remisión: ${stderr}`, 'ERROR');
@@ -629,7 +630,7 @@ ${finalResult.debug_full_text}
       if (finalResult.success && finalResult.documentPath) {
         const docPath = finalResult.documentPath;
         try {
-          await fs.access(docPath);
+          await fsp.access(docPath);
         } catch (accessError) {
           // Silencio
         }
@@ -643,13 +644,13 @@ ${finalResult.debug_full_text}
           };
           
           const remisionesDir = empresaPaths[empresa] || empresaPaths["Temposum"];
-          const files = await fs.readdir(remisionesDir);
+          const files = await fsp.readdir(remisionesDir);
           const docxFiles = files.filter(file => file.endsWith('.docx') && file.includes('GI-OD-007 REMISION A EPS'));
           
           if (docxFiles.length > 0) {
             const fileStats = await Promise.all(docxFiles.map(async (file) => {
               const filePath = path.join(remisionesDir, file);
-              const stats = await fs.stat(filePath);
+              const stats = await fsp.stat(filePath);
               return { file, filePath, mtime: stats.mtime };
             }));
             
@@ -659,7 +660,7 @@ ${finalResult.debug_full_text}
             const tempFileName = `temp_remision_${Date.now()}.docx`;
             const tempFilePath = path.join(app.getPath('temp'), tempFileName);
             
-            await fs.copyFile(latestFile.filePath, tempFilePath);
+            await fsp.copyFile(latestFile.filePath, tempFilePath);
             finalResult.documentPath = tempFilePath;
             finalResult.originalDocumentPath = latestFile.filePath;
             sendLog(`Documento copiado a ruta temporal: ${tempFilePath}`);
@@ -686,7 +687,7 @@ ${finalResult.debug_full_text}
       const tempFileName = `temp_remision_${Date.now()}.docx`;
       const tempFilePath = path.join(app.getPath('temp'), tempFileName);
       
-      await fs.copyFile(docPath, tempFilePath);
+      await fsp.copyFile(docPath, tempFilePath);
       sendLog(`Archivo copiado a: ${tempFilePath}`);
       
       const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'remision_utils.py');
@@ -698,15 +699,15 @@ ${finalResult.debug_full_text}
       };
       
       sendLog(`Creando archivo de datos temporal para email: ${tempDataPath}`);
-      await fs.writeFile(tempDataPath, JSON.stringify(tempData), 'utf-8');
+      await fsp.writeFile(tempDataPath, JSON.stringify(tempData), 'utf-8');
       
       const command = `python "${pythonScriptPath}" --send-email "${tempDataPath}"`;
       
       sendLog(`Ejecutando script de envío de email: ${command.replace(/\\/g, '/')}`);
       const { stdout, stderr } = await execPromise(command, { encoding: 'utf-8' });
       
-      await fs.unlink(tempFilePath);
-      await fs.unlink(tempDataPath);
+      await fsp.unlink(tempFilePath);
+      await fsp.unlink(tempDataPath);
 
       if (stderr) {
         sendLog(`Error en script de email (stderr): ${stderr}`, 'ERROR');
@@ -746,7 +747,7 @@ ${finalResult.debug_full_text}
     
     try {
       // Verificar que el archivo existe
-      await fs.access(filePath);
+      await fsp.access(filePath);
       
       // Leer el workbook
       const workbook = xlsx.readFile(filePath);
@@ -780,7 +781,7 @@ ${finalResult.debug_full_text}
       const tempDataPath = path.join(app.getPath('temp'), `whatsapp_data_${Date.now()}.json`);
       
       sendLog(`Creando archivo de datos temporal para WhatsApp: ${tempDataPath}`);
-      await fs.writeFile(tempDataPath, JSON.stringify({ 
+      await fsp.writeFile(tempDataPath, JSON.stringify({
         docPath: docPath, 
         data: extractedData, 
         empresa: empresa 
@@ -791,7 +792,7 @@ ${finalResult.debug_full_text}
       sendLog(`Ejecutando script de preparación de WhatsApp: ${command.replace(/\\/g, '/')}`);
       const { stdout, stderr } = await execPromise(command);
       
-      await fs.unlink(tempDataPath);
+      await fsp.unlink(tempDataPath);
       
       if (stderr) {
         sendLog(`Error en script de WhatsApp: ${stderr}`, 'ERROR');
@@ -942,7 +943,7 @@ Cualquier duda estamos disponibles para resolverla`;
           
           sendLog(`Creando archivo de datos temporal: ${tempDataPath}`);
           // Guardar los datos combinados y la empresa
-          await fs.writeFile(tempDataPath, JSON.stringify({  combinedData, empresa: empresa }, null, 2));
+          await fsp.writeFile(tempDataPath, JSON.stringify({  combinedData, empresa: empresa }, null, 2));
 
           const command = `python "${pythonScriptPath}" "${tempDataPath}"`;
           
@@ -950,7 +951,7 @@ Cualquier duda estamos disponibles para resolverla`;
           const { stdout, stderr } = await execPromise(command);
           
           // Limpiar archivo temporal
-          await fs.unlink(tempDataPath);
+          await fsp.unlink(tempDataPath);
 
           if (stderr) {
               sendLog(`Error en script de generación de informe de accidente: ${stderr}`, 'ERROR');
@@ -981,28 +982,493 @@ Cualquier duda estamos disponibles para resolverla`;
           return { success: false, error: error.message };
       }
   });
-}
 
+// Convertir Excel a PDF usando Microsoft Office
+ipcMain.handle('convertExcelToPdf', async (event, filePath) => {
+    try {
+        console.log('=== INICIO CONVERSIÓN EXCEL ===');
+        console.log('Archivo original:', filePath);
+        
+        // Normalizar ruta y manejar caracteres especiales
+        const normalizedPath = path.resolve(filePath);
+        console.log('Ruta normalizada:', normalizedPath);
 
-// Registrar los manejadores IPC antes de que la aplicación esté lista
-registerIPCHandlers();
+        // Verificar que el archivo existe
+        if (!fs.existsSync(normalizedPath)) {
+            console.error('Archivo no encontrado');
+            return {
+                success: false,
+                error: `Archivo no encontrado: ${normalizedPath}`
+            };
+        }
 
-// Evento cuando la aplicación está lista
-app.on('ready', () => {
-  console.log('App is ready');
-  createWindow();
+        const inputDir = path.dirname(normalizedPath);
+        const fileNameWithoutExt = path.basename(normalizedPath, path.extname(normalizedPath));
+        
+        // Limpiar nombre para evitar problemas con caracteres especiales
+        const cleanFileName = fileNameWithoutExt
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '') // Remover acentos
+            .replace(/[^\w\s-]/g, '_') // Reemplazar caracteres especiales
+            .replace(/\s+/g, '_') // Reemplazar espacios
+            .substring(0, 50); // Limitar longitud
+        
+        const outputDir = path.join(inputDir, 'temp_pdf_previews');
+        const outputPath = path.join(outputDir, `${cleanFileName}.pdf`);
+
+        console.log('Archivo PDF destino:', outputPath);
+
+        // Crear directorio temporal
+        if (!fs.existsSync(outputDir)) {
+            fs.mkdirSync(outputDir, { recursive: true });
+        }
+
+        // Verificar si ya existe PDF actualizado
+        if (fs.existsSync(outputPath)) {
+            const excelStats = fs.statSync(normalizedPath);
+            const pdfStats = fs.statSync(outputPath);
+            
+            if (pdfStats.mtime > excelStats.mtime) {
+                console.log('PDF ya existe y está actualizado');
+                return {
+                    success: true,
+                    pdf_path: outputPath
+                };
+            }
+        }
+
+        // Convertir usando Microsoft Office
+        console.log('Iniciando conversión con Microsoft Office...');
+        const result = await convertWithMicrosoftOffice(normalizedPath, outputPath);
+        
+        if (result.success) {
+            console.log('Conversión exitosa');
+            return {
+                success: true,
+                pdf_path: outputPath
+            };
+        } else {
+            console.error('Error en conversión:', result.error);
+            return result;
+        }
+
+    } catch (error) {
+        console.error('Error crítico en convertExcelToPdf:', error);
+        return {
+            success: false,
+            error: `Error crítico: ${error.message}`
+        };
+    }
 });
 
-// Evento cuando todas las ventanas se cierran
+// Función mejorada para convertir usando Microsoft Office COM
+function convertWithMicrosoftOffice(inputPath, outputPath) {
+    return new Promise((resolve) => {
+        console.log('Creando script PowerShell para conversión...');
+        
+        // Codificar rutas en Base64 para evitar problemas de caracteres especiales
+        const inputPathB64 = Buffer.from(inputPath, 'utf8').toString('base64');
+        const outputPathB64 = Buffer.from(outputPath, 'utf8').toString('base64');
+        
+        // Script PowerShell mejorado con correcciones
+        const powershellScript = `
+# Establecer codificación UTF-8 para PowerShell
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
+try {
+    Write-Host "=== INICIO CONVERSION EXCEL ===" -Encoding UTF8
+    
+    # Decodificar rutas desde Base64
+    $inputPath = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("${inputPathB64}"))
+    $outputPath = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("${outputPathB64}"))
+    
+    Write-Host "Ruta de entrada: $inputPath" -Encoding UTF8
+    Write-Host "Ruta de salida: $outputPath" -Encoding UTF8
+    
+    # Verificar que el archivo de entrada existe
+    if (-not (Test-Path $inputPath)) {
+        throw "Archivo de entrada no encontrado: $inputPath"
+    }
+    
+    # Crear directorio de salida si no existe
+    $outputDir = Split-Path $outputPath -Parent
+    if (-not (Test-Path $outputDir)) {
+        New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
+        Write-Host "Directorio creado: $outputDir" -Encoding UTF8
+    }
+    
+    Write-Host "Iniciando Excel..." -Encoding UTF8
+    $excel = New-Object -ComObject Excel.Application
+    $excel.Visible = $false
+    $excel.DisplayAlerts = $false
+    $excel.ScreenUpdating = $false
+    $excel.EnableEvents = $false
+    $excel.AskToUpdateLinks = $false
+    
+    Write-Host "Abriendo archivo Excel..." -Encoding UTF8
+    
+    # Parámetros para Open() con ReadOnly = $false
+    $workbook = $excel.Workbooks.Open(
+        $inputPath,
+        0,      # UpdateLinks: 0 = No
+        $false, # ReadOnly: $false para permitir guardar/exportar
+        5,      # Format: 5 = CSV, pero para XLSX es ignorado
+        "",     # Password
+        "",     # WriteResPassword
+        $true,  # IgnoreReadOnlyRecommended
+        2,      # Origin: xlWindows
+        "",     # Delimiter
+        $false, # Editable
+        $false, # Notify
+        0,      # Converter
+        $true   # AddToMru
+    )
+    
+    Write-Host "Archivo Excel abierto correctamente" -Encoding UTF8
+    
+    # Esperar un momento para que Excel procese completamente el archivo
+    Start-Sleep -Seconds 5  # Aumentado a 5 segundos
+    
+    Write-Host "Iniciando exportación a PDF..." -Encoding UTF8
+    
+    # Configurar parámetros de exportación más robustos
+    try {
+        # Método 1: ExportAsFixedFormat con parámetros completos
+        $workbook.ExportAsFixedFormat(
+            [Microsoft.Office.Interop.Excel.XlFixedFormatType]::xlTypePDF,
+            $outputPath,
+            [Microsoft.Office.Interop.Excel.XlFixedFormatQuality]::xlQualityStandard,
+            $true,   # IncludeDocProperties
+            $false,  # IgnorePrintAreas
+            $null,   # From
+            $null,   # To
+            $false   # OpenAfterPublish
+        )
+        Write-Host "Exportación completada con ExportAsFixedFormat" -Encoding UTF8
+        
+    } catch {
+        Write-Host "Error con ExportAsFixedFormat: $($_.Exception.Message)" -Encoding UTF8
+        Write-Host "Intentando método alternativo (PrintOut)..." -Encoding UTF8
+        
+        # Método 2: Usar PrintOut to PDF con búsqueda de puerto correcta
+        try {
+            $originalPrinter = $excel.ActivePrinter
+            $pdfPrinterName = "Microsoft Print to PDF"
+            
+            # Buscar el puerto correcto (Ne00: a Ne99:)
+            $foundPort = $false
+            for ($i = 0; $i -lt 100; $i++) {
+                $port = "Ne{0:D2}:" -f $i
+                $printerString = "$pdfPrinterName on $port"
+                
+                try {
+                    $excel.ActivePrinter = $printerString
+                    Write-Host "Puerto encontrado: $port" -Encoding UTF8
+                    $foundPort = $true
+                    break
+                } catch {}
+            }
+            
+            if (-not $foundPort) {
+                throw "No se pudo encontrar un puerto válido para $pdfPrinterName"
+            }
+            
+            # Imprimir a archivo PDF
+            $workbook.PrintOut(
+                $null,   # From
+                $null,   # To
+                1,       # Copies
+                $false,  # Preview
+                $null,   # ActivePrinter (ya seteado)
+                $true,   # PrintToFile
+                $false,  # Collate
+                $outputPath  # PrToFileName
+            )
+            
+            # Restaurar impresora original
+            $excel.ActivePrinter = $originalPrinter
+            Write-Host "Exportación completada con PrintOut" -Encoding UTF8
+            
+        } catch {
+            Write-Host "Error con PrintOut: $($_.Exception.Message)" -Encoding UTF8
+            Write-Host "Intentando método alternativo (SaveAs)..." -Encoding UTF8
+            
+            # Método 3: Guardar como PDF usando SaveAs (en lugar de SaveAs2)
+            try {
+                $workbook.SaveAs(
+                    $outputPath,
+                    57  # xlPDFFormat
+                )
+                Write-Host "Exportación completada con SaveAs" -Encoding UTF8
+                
+            } catch {
+                Write-Host "Todos los métodos de exportación fallaron: $($_.Exception.Message)" -Encoding UTF8
+                throw "No se pudo exportar el archivo"
+            }
+        }
+    }
+    
+    Write-Host "Cerrando libro de trabajo..." -Encoding UTF8
+    $workbook.Close($false)
+    
+    Write-Host "Cerrando Excel..." -Encoding UTF8
+    $excel.Quit()
+    
+    # Liberar objetos COM
+    Write-Host "Liberando recursos COM..." -Encoding UTF8
+    if ($workbook) {
+        [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($workbook)
+        $workbook = $null
+    }
+    if ($excel) {
+        [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($excel)
+        $excel = $null
+    }
+    
+    # Forzar recolección de basura
+    [System.GC]::Collect()
+    [System.GC]::WaitForPendingFinalizers()
+    [System.GC]::Collect()
+    
+    # Verificar que el PDF se creó correctamente
+    if (Test-Path $outputPath) {
+        $pdfSize = (Get-Item $outputPath).Length
+        if ($pdfSize -gt 1024) { # PDF debe tener al menos 1KB
+            Write-Host "PDF creado exitosamente. Tamaño: $pdfSize bytes" -Encoding UTF8
+            Write-Host "CONVERSION_SUCCESS" -Encoding UTF8
+        } else {
+            throw "PDF creado pero parece estar vacío o corrupto (tamaño: $pdfSize bytes)"
+        }
+    } else {
+        throw "PDF no fue creado en la ruta esperada: $outputPath"
+    }
+    
+} catch {
+    $errorMsg = $_.Exception.Message
+    Write-Host "=== ERROR EN CONVERSION ===" -Encoding UTF8
+    Write-Host "ERROR: $errorMsg" -Encoding UTF8
+    Write-Host "Tipo de excepción: $($_.Exception.GetType().Name)" -Encoding UTF8
+    
+    # Información adicional de debugging
+    if ($_.Exception.InnerException) {
+        Write-Host "Error interno: $($_.Exception.InnerException.Message)" -Encoding UTF8
+    }
+    
+    # Cleanup forzado en caso de error
+    Write-Host "Iniciando cleanup de emergencia..." -Encoding UTF8
+    try {
+        if ($workbook -ne $null) { 
+            Write-Host "Cerrando workbook..." -Encoding UTF8
+            $workbook.Close($false)
+            [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($workbook)
+        }
+    } catch {
+        Write-Host "Error cerrando workbook: $($_.Exception.Message)" -Encoding UTF8
+    }
+    
+    try {
+        if ($excel -ne $null) { 
+            Write-Host "Cerrando Excel..." -Encoding UTF8
+            $excel.Quit()
+            [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($excel)
+        }
+    } catch {
+        Write-Host "Error cerrando Excel: $($_.Exception.Message)" -Encoding UTF8
+    }
+    
+    # Forzar terminación de procesos Excel colgados
+    Write-Host "Terminando procesos Excel residuales..." -Encoding UTF8
+    try {
+        Get-Process excel -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 1
+    } catch {
+        Write-Host "Sin procesos Excel para terminar" -Encoding UTF8
+    }
+    
+    # Forzar recolección de basura final
+    [System.GC]::Collect()
+    [System.GC]::WaitForPendingFinalizers()
+    
+    exit 1
+}
+`;
+
+        console.log('=== EJECUTANDO POWERSHELL ===');
+        
+        // Crear archivo temporal para el script PS1
+        const tempPs1Path = path.join(app.getPath('temp'), `excel_convert_${Date.now()}.ps1`);
+        console.log('Guardando script temporal en:', tempPs1Path);
+        
+        fs.writeFileSync(tempPs1Path, powershellScript, 'utf8');
+
+        // Ejecutar PowerShell con -File para evitar problemas con stdin
+        const child = spawn('powershell.exe', [
+            '-ExecutionPolicy', 'Bypass',
+            '-NoProfile',
+            '-NoLogo',
+            '-File', tempPs1Path
+        ], {
+            stdio: ['ignore', 'pipe', 'pipe'],
+            windowsHide: false, // Mostrar ventana para debugging si es necesario
+            shell: false,
+            cwd: path.dirname(inputPath) // Establecer directorio de trabajo
+        });
+
+        let stdout = '';
+        let stderr = '';
+
+        child.stdout.on('data', (data) => {
+            const output = data.toString('utf8').trim();
+            if (output) {
+                stdout += output + '\n';
+                console.log('📋 PowerShell OUT:', output);
+            }
+        });
+
+        child.stderr.on('data', (data) => {
+            const error = data.toString('utf8').trim();
+            if (error) {
+                stderr += error + '\n';
+                console.log('❌ PowerShell ERR:', error);
+            }
+        });
+
+        child.on('close', async (code) => {
+            // Limpiar archivo temporal
+            try {
+                await fsp.unlink(tempPs1Path);
+                console.log('Archivo temporal PS1 eliminado');
+            } catch (e) {
+                console.warn('No se pudo eliminar temp PS1:', e.message);
+            }
+            
+            console.log('=== RESULTADO POWERSHELL ===');
+            console.log('Código de salida:', code);
+            console.log('STDOUT longitud:', stdout.length);
+            console.log('STDERR longitud:', stderr.length);
+            
+            if (code !== 0) {
+                console.error('PowerShell falló con código:', code);
+                resolve({
+                    success: false,
+                    error: `PowerShell falló (código ${code}): ${stderr || stdout || 'Sin salida'}`
+                });
+                return;
+            }
+            
+            if (stdout.includes('CONVERSION_SUCCESS')) {
+                console.log('✅ Marcador de éxito encontrado');
+                
+                if (fs.existsSync(outputPath)) {
+                    const stats = fs.statSync(outputPath);
+                    console.log(`✅ PDF existe: ${stats.size} bytes`);
+                    
+                    if (stats.size > 1024) {
+                        resolve({ success: true });
+                    } else {
+                        resolve({
+                            success: false,
+                            error: `PDF generado pero muy pequeño: ${stats.size} bytes`
+                        });
+                    }
+                } else {
+                    resolve({
+                        success: false,
+                        error: 'Marcador de éxito encontrado pero PDF no existe'
+                    });
+                }
+            } else if (stdout.includes('ERROR')) {
+                // Extraer error específico
+                const errorMatch = stdout.match(/ERROR:\s*(.+)/);
+                const specificError = errorMatch ? errorMatch[1].trim() : 'Error desconocido';
+                console.log('❌ Error detectado:', specificError);
+                
+                resolve({
+                    success: false,
+                    error: specificError
+                });
+            } else {
+                console.log('❌ No se encontraron marcadores reconocibles');
+                console.log('Salida completa:', stdout);
+                console.log('Errores:', stderr);
+                
+                resolve({
+                    success: false,
+                    error: `Salida inesperada de PowerShell. Ver logs para detalles.`
+                });
+            }
+        });
+
+        child.on('error', (error) => {
+            console.error('❌ Error ejecutando PowerShell:', error);
+            resolve({
+                success: false,
+                error: `Error ejecutando PowerShell: ${error.message}`
+            });
+        });
+
+        // Timeout con mejor logging
+        const timeout = setTimeout(() => {
+            console.log('⏱️ TIMEOUT ALCANZADO');
+            console.log('Salida hasta el momento:', stdout);
+            
+            try {
+                child.kill('SIGTERM');
+                
+                // Cleanup después de timeout
+                setTimeout(() => {
+                    exec('taskkill /F /IM EXCEL.EXE /T', (error) => {
+                        if (!error) {
+                            console.log('🧹 Procesos Excel terminados');
+                        }
+                    });
+                }, 3000);
+            } catch (e) {
+                console.error('Error terminando proceso:', e);
+            }
+            
+            resolve({
+                success: false,
+                error: 'Timeout: La conversión tomó demasiado tiempo. Revisa si Excel está bloqueado.'
+            });
+        }, 120000);
+
+        // Limpiar timeout si el proceso termina normalmente
+        child.on('close', () => {
+            clearTimeout(timeout);
+        });
+    });
+}
+
+};
+
+// --- Ciclo de vida de la aplicación ---
+
+// Este método se llamará cuando Electron haya terminado la inicialización
+// y esté listo para crear ventanas de navegador.
+// Algunas API solo se pueden usar después de que ocurra este evento.
+app.whenReady().then(() => {
+  registerIPCHandlers(); // Registrar todos los manejadores de eventos
+  createWindow(); // Crear la ventana principal
+
+  app.on('activate', () => {
+    // En macOS, es común volver a crear una ventana en la aplicación cuando
+    // se hace clic en el ícono del dock y no hay otras ventanas abiertas.
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
+  });
+});
+
+// Salir cuando todas las ventanas estén cerradas, excepto en macOS.
+// Allí, es común que las aplicaciones y su barra de menú permanezcan activas
+// hasta que el usuario salga explícitamente con Cmd + Q.
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
 
-// Evento cuando la aplicación se activa
-app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  }
-});
+// En este archivo puedes incluir el resto del código del proceso principal de tu aplicación.
+// También puedes ponerlos en archivos separados y requerirlos aquí.

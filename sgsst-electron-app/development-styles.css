@@ -376,6 +376,384 @@
   resize: vertical;
 }
 
+/* development-styles.css - Estilos adicionales para desarrollo */
+
+/* Estilos para el área de contenido principal */
+#content-area {
+  flex: 1;
+  padding: 20px;
+  background-color: #f8f9fa;
+  overflow-y: auto;
+}
+
+/* Estilos para la página de inicio */
+#home-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  padding: 40px;
+}
+
+#welcome-placeholder {
+  font-size: 1.5rem;
+  color: #6c757d;
+  margin-bottom: 30px;
+}
+
+#company-selection {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20px;
+}
+
+.company-select-button {
+  min-width: 150px;
+  padding: 15px 20px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  border: 2px solid var(--border-color); /* Borde gris claro */
+  background-color: var(--white-color);
+  color: var(--dark-color); /* Texto oscuro */
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.company-select-button:hover {
+  background-color: var(--secondary-color); /* Fondo gris medio */
+  border-color: var(--secondary-color);
+  color: var(--white-color); /* Texto blanco */
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Sombra neutra */
+}
+
+.company-select-button.selected {
+  background-color: var(--secondary-color); /* Fondo gris medio */
+  border-color: var(--secondary-color);
+  color: var(--white-color);
+}
+
+/* Estilos para el home de la empresa seleccionada */
+.main-canvas {
+  background-color: var(--widget-bg-color);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--box-shadow);
+  padding: var(--spacer-lg);
+  margin: var(--spacer);
+}
+
+.company-home-content {
+  text-align: center;
+}
+
+.company-home-title {
+  color: var(--heading-color);
+  margin-bottom: var(--spacer);
+  font-size: 1.75rem;
+}
+
+.company-home-text {
+  font-size: var(--font-size-base);
+  color: var(--text-light-color);
+  margin-bottom: var(--spacer-lg);
+  line-height: 1.6;
+}
+
+/* Estilos para la sección de métricas */
+.metrics-section {
+  margin-bottom: var(--spacer-lg);
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacer);
+  margin-bottom: var(--spacer-lg);
+}
+
+.metric-card {
+  display: flex;
+  align-items: center;
+  padding: var(--spacer);
+  background-color: var(--widget-bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--box-shadow);
+  transition: transform var(--transition-fast);
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+}
+
+.metric-icon-placeholder {
+  width: 40px;
+  height: 40px;
+  background-color: var(--light-color);
+  border-radius: 50%;
+  margin-right: var(--spacer);
+}
+
+.metric-info {
+  text-align: left;
+}
+
+.metric-value {
+  font-size: 1.5rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--primary-color);
+}
+
+.metric-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-light-color);
+}
+
+.modules-info {
+  text-align: left;
+  background-color: var(--light-color);
+  padding: var(--spacer);
+  border-radius: var(--border-radius-md);
+  margin-top: var(--spacer-lg);
+}
+
+.modules-info h3 {
+  color: var(--heading-color);
+  margin-bottom: 15px;
+}
+
+.modules-info ul {
+  padding-left: 20px;
+}
+
+.modules-info li {
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+/* Estilos para las tarjetas de módulo */
+.module-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--spacer-lg); /* Aumentar el espacio entre tarjetas */
+  margin-top: var(--spacer-lg);
+}
+
+.module-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg); /* Bordes más redondeados */
+  padding: var(--spacer);
+  background-color: var(--widget-bg-color);
+  box-shadow: var(--box-shadow); /* Usar la sombra definida en variables */
+  transition: all var(--transition-normal); /* Usar la transición definida en variables */
+}
+
+.module-card:hover {
+  transform: translateY(-3px); /* Efecto hover más sutil */
+  box-shadow: var(--box-shadow-lg); /* Sombra más pronunciada al hacer hover */
+}
+
+.module-card .card-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--spacer-sm);
+}
+
+.module-card .card-icon-placeholder {
+  width: 30px;
+  height: 30px;
+  background-color: var(--light-color);
+  border-radius: 50%;
+  margin-right: var(--spacer-sm);
+}
+
+.module-card .card-title {
+  color: var(--heading-color);
+  margin-bottom: 0; /* Eliminar el margen inferior ya que está en el contenedor */
+  font-size: 1.25rem;
+  font-weight: var(--font-weight-bold);
+}
+
+.module-card .card-description {
+  flex-grow: 1;
+  margin-bottom: var(--spacer);
+  color: var(--text-light-color);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+/* Añadir estilo para el botón dentro de las tarjetas */
+.module-card .btn {
+  align-self: flex-start; /* Alinear el botón a la izquierda */
+  margin-top: auto; /* Empujar el botón hacia abajo */
+}
+
+/* Estilos para el selector de submódulos */
+.submodule-selector-frame {
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  margin-bottom: 20px;
+}
+
+.submodule-select {
+  width: 100%;
+  padding: 10px;
+  font-size: 1rem;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  background-color: white;
+  margin-top: 10px;
+}
+
+/* Estilos para el contenido del submódulo */
+.submodule-content-canvas {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 30px;
+  margin-top: 20px;
+}
+
+.submodule-content {
+  padding: 20px;
+}
+
+.submodule-content h3 {
+  color: #495057;
+  margin-bottom: 20px;
+}
+
+/* Estilos para mensajes de desarrollo */
+.development-message {
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+  text-align: center;
+}
+
+.development-message h3 {
+  color: #856404;
+  margin-bottom: 10px;
+}
+
+.development-message p {
+  color: #856404;
+  margin-bottom: 15px;
+}
+
+/* Estilos para la tabla de control de remisiones */
+.control-remisiones-table {
+  background-color: white;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 20px;
+  text-align: center;
+}
+
+/* Estilos para la página de configuraciones */
+.settings-content {
+  padding: 20px;
+}
+
+.settings-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 25px;
+  margin-top: 30px;
+}
+
+.settings-card {
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 20px;
+  background-color: white;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+.settings-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.settings-card .card-title {
+  color: #495057;
+  margin-bottom: 15px;
+  font-size: 1.3rem;
+}
+
+.settings-card .card-description {
+  color: #6c757d;
+  margin-bottom: 20px;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+/* Estilos para la página de vinculación de rutas */
+.path-linking-content {
+  padding: 20px;
+}
+
+.company-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+  gap: 15px;
+}
+
+.company-row label {
+  min-width: 120px;
+  font-weight: bold;
+}
+
+.company-row input[type="text"] {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+}
+
+.checkmark {
+  color: #28a745;
+  font-size: 1.5rem;
+  margin-left: 10px;
+}
+
+.log-area {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 15px;
+  margin: 20px 0;
+}
+
+.log-area h3 {
+  color: #495057;
+  margin-bottom: 10px;
+}
+
+.log-area textarea {
+  width: 100%;
+  height: 200px;
+  padding: 10px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.9rem;
+  resize: vertical;
+}
+
 /* Estilos para el chat LLM */
 .llm-chat-content {
   padding: 20px;
@@ -425,6 +803,270 @@
   border: 1px solid #ced4da;
   border-radius: 4px;
 }
+
+/* Estilos responsivos */
+@media (max-width: 768px) {
+  .module-cards,
+  .settings-cards {
+    grid-template-columns: 1fr;
+  }
+  
+  #company-selection {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .company-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .company-row input[type="text"] {
+    width: 100%;
+    margin-top: 10px;
+  }
+  
+  .chat-input-area {
+    flex-direction: column;
+  }
+}
+
+/* Añadir estilos para los elementos de submódulo */
+.submodule-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacer);
+  background-color: var(--widget-bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--box-shadow);
+  transition: all var(--transition-fast);
+  margin-bottom: var(--spacer-sm);
+}
+
+.submodule-item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--box-shadow-lg);
+}
+
+.submodule-info {
+  flex-grow: 1;
+  margin-right: var(--spacer);
+}
+
+.submodule-name {
+  font-weight: var(--font-weight-bold);
+  color: var(--heading-color);
+  margin-bottom: var(--spacer-xs);
+}
+
+.submodule-meta {
+  font-size: var(--font-size-sm);
+  color: var(--text-light-color);
+}
+
+/* Añadir estilos para los widgets */
+.widgets-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--spacer);
+  margin-bottom: var(--spacer-lg);
+}
+
+.widget {
+  padding: var(--spacer);
+  background-color: var(--widget-bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--box-shadow);
+  transition: transform var(--transition-fast);
+}
+
+.widget:hover {
+  transform: translateY(-2px);
+}
+
+.widget h4 {
+  margin-top: 0;
+  margin-bottom: var(--spacer-xs);
+  color: var(--heading-color);
+  font-size: var(--font-size-base);
+}
+
+.widget-value {
+  font-size: 1.5rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--primary-color);
+  margin-bottom: var(--spacer-xs);
+}
+
+.widget-description {
+  font-size: var(--font-size-sm);
+  color: var(--text-light-color);
+}
+
+/* Estilos para la previsualización de archivos Excel */
+
+.excel-preview {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.excel-header {
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    flex-shrink: 0;
+}
+
+.excel-header h4 {
+    margin: 0;
+    color: #495057;
+    font-size: 16px;
+}
+
+.excel-content {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.excel-tabs {
+    display: flex;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    padding: 0 15px;
+    flex-shrink: 0;
+}
+
+.excel-tab {
+    padding: 8px 16px;
+    border: none;
+    background-color: transparent;
+    color: #6c757d;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    font-size: 14px;
+    margin-right: 5px;
+    transition: all 0.2s ease;
+}
+
+.excel-tab:hover {
+    color: #495057;
+    background-color: #e9ecef;
+}
+
+.excel-tab.active {
+    color: #007bff;
+    border-bottom-color: #007bff;
+    background-color: #fff;
+}
+
+.excel-sheet {
+    flex: 1;
+    overflow: hidden;
+}
+
+.excel-table-container {
+    height: 100%;
+    overflow: auto;
+    padding: 15px;
+}
+
+.excel-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.excel-table th {
+    background-color: #e9ecef;
+    color: #495057;
+    font-weight: 600;
+    padding: 8px 12px;
+    text-align: left;
+    border: 1px solid #dee2e6;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.excel-table td {
+    padding: 6px 12px;
+    border: 1px solid #dee2e6;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: top;
+}
+
+.excel-table tbody tr:nth-child(even) {
+    background-color: #f8f9fa;
+}
+
+.excel-table tbody tr:hover {
+    background-color: #e3f2fd;
+}
+
+.excel-table tfoot td {
+    background-color: #f1f3f4;
+    font-style: italic;
+    color: #6c757d;
+    text-align: center;
+    padding: 12px;
+    border-top: 2px solid #dee2e6;
+}
+
+/* Responsive design para tablas Excel */
+ @media (max-width: 768px) {
+    .excel-table {
+        font-size: 11px;
+    }
+    
+    .excel-table th,
+    .excel-table td {
+        padding: 4px 8px;
+        max-width: 120px;
+    }
+    
+    .excel-tabs {
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+    
+    .excel-tab {
+        flex-shrink: 0;
+    }
+}
+
+/* Scroll personalizado para la tabla Excel */
+.excel-table-container::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.excel-table-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.excel-table-container::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+.excel-table-container::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
 
 /* Estilos responsivos */
 @media (max-width: 768px) {
