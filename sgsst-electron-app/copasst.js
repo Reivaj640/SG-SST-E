@@ -234,7 +234,8 @@ class CopasstComponent {
                 if (!result.data || !Array.isArray(result.data) || result.data.length === 0) {
                     throw new Error('Los datos de la plantilla están vacíos o no son válidos.');
                 }
-                this.renderEditableActa(container, result.data, result.merges || []);
+                this.merges = result.merges || [];
+                this.renderEditableActa(container, result.data, this.merges);
             } else {
                 throw new Error(result.error || 'Error desconocido al cargar la plantilla.');
             }
@@ -257,7 +258,7 @@ class CopasstComponent {
 
         const mergedCells = Array(rowCount).fill(0).map(() => Array(colCount).fill(false));
 
-        (merges || []).forEach(merge => {
+        merges.forEach(merge => {
             if (!merge || typeof merge.s === 'undefined' || typeof merge.e === 'undefined') return;
             const startRow = Math.max(0, merge.s.r);
             const endRow = Math.min(rowCount - 1, merge.e.r);
@@ -287,8 +288,10 @@ class CopasstComponent {
                 const td = document.createElement('td');
                 td.textContent = cellData ?? '';
                 td.setAttribute('contenteditable', 'true');
+                td.setAttribute('data-row', rowIndex);
+                td.setAttribute('data-col', colIndex);
 
-                const merge = (merges || []).find(m => m.s.r === rowIndex && m.s.c === colIndex);
+                const merge = merges.find(m => m.s.r === rowIndex && m.s.c === colIndex);
                 if (merge) {
                     td.colSpan = (merge.e.c - merge.s.c) + 1;
                     td.rowSpan = (merge.e.r - merge.s.r) + 1;
@@ -307,9 +310,57 @@ class CopasstComponent {
         const saveButton = document.createElement('button');
         saveButton.className = 'btn btn-success';
         saveButton.textContent = 'Guardar Acta';
-        saveButton.addEventListener('click', () => alert('Guardado no implementado.'));
+        saveButton.addEventListener('click', () => this.saveActa());
         actionsDiv.appendChild(saveButton);
         container.appendChild(actionsDiv);
+    }
+
+    async saveActa() {
+        const table = this.container.querySelector('.editable-acta-table');
+        if (!table) {
+            alert('Error: No se encontró la tabla de datos del acta.');
+            console.error('[COPASST] No se encontró la tabla editable');
+            return;
+        }
+
+        const changes = [];
+        const cells = table.querySelectorAll('td[contenteditable="true"]');
+        console.log('[COPASST] Total celdas editables encontradas:', cells.length);
+        
+        cells.forEach(cell => {
+            const row = parseInt(cell.getAttribute('data-row'));
+            const col = parseInt(cell.getAttribute('data-col'));
+            const value = cell.textContent.trim();
+            
+            if (!isNaN(row) && !isNaN(col) && value) {
+                // Ajustar índice para alinearse con Excel (0-based en frontend, +1 para bajar una fila)
+                changes.push({ row: row + 1, col: col, value });
+                console.log(`[COPASST] Cambio detectado: row=${row} (Excel row=${row + 2}), col=${col} (Excel col=${col + 1}), value="${value}"`);
+            } else {
+                console.warn(`[COPASST] Celda ignorada: row=${row}, col=${col}, value="${value}"`);
+            }
+        });
+
+        if (changes.length === 0) {
+            alert('No hay datos para guardar.');
+            console.warn('[COPASST] No se encontraron cambios para guardar');
+            return;
+        }
+
+        try {
+            console.log('[COPASST] Enviando cambios al IPC:', JSON.stringify(changes, null, 2));
+            const result = await window.electronAPI.generateCopasstActa(changes);
+            if (result.success) {
+                alert(`Acta guardada exitosamente en: ${result.documentPath}`);
+                console.log('[COPASST] Acta guardada:', result.documentPath);
+            } else {
+                alert(`Error al guardar el acta: ${result.error}`);
+                console.error('[COPASST] Error en IPC:', result.error);
+            }
+        } catch (error) {
+            console.error('[COPASST] Error al invocar la generación del acta:', error);
+            alert(`Error fatal al guardar el acta: ${error.message}`);
+        }
     }
 
     createHeader(titleText, onBack) {

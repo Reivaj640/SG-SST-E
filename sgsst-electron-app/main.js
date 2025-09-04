@@ -1019,6 +1019,73 @@ Cualquier duda estamos disponibles para resolverla`;
     }
   });
 
+  // Manejador para generar el acta de COPASST usando el script de Python
+  ipcMain.handle('generate-copasst-acta', async (event, changes) => {
+    sendLog(`IPC: generate-copasst-acta recibido con ${changes.length} cambios`);
+    try {
+        // 1. Pedir al usuario la ruta para guardar el archivo
+        const { canceled, filePath } = await dialog.showSaveDialog({
+            title: 'Guardar Acta de COPASST',
+            defaultPath: `Acta-COPASST-${new Date().toISOString().split('T')[0]}.xlsx`,
+            filters: [
+                { name: 'Archivos de Excel', extensions: ['xlsx'] }
+            ]
+        });
+
+        if (canceled) {
+            sendLog('El usuario canceló el guardado del acta.');
+            return { success: false, canceled: true };
+        }
+
+        // 2. Preparar para llamar al script de Python
+        const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'copasst_acta_generator.py');
+        const tempDataPath = path.join(app.getPath('temp'), `copasst_data_${Date.now()}.json`);
+        
+        sendLog(`Creando archivo de datos temporal: ${tempDataPath}`);
+        await fsp.writeFile(tempDataPath, JSON.stringify({ changes }, null, 2));
+
+        // 3. Ejecutar el script de Python con la ruta del JSON y la ruta de salida
+        const command = `python "${pythonScriptPath}" "${tempDataPath}" "${filePath}"`;
+        
+        sendLog(`Ejecutando script de generación de acta: ${command.replace(/\\/g, '/')}`);
+        const { stdout, stderr } = await execPromise(command);
+        
+        // 4. Limpiar el archivo temporal
+        await fsp.unlink(tempDataPath);
+
+        if (stderr) {
+            sendLog(`Error en script de generación de acta: ${stderr}`, 'ERROR');
+        }
+
+        // 5. Procesar la respuesta del script
+        let finalResult = null;
+        const lines = stdout.split(/\r?\n/).filter(line => line.trim() !== '');
+        lines.forEach(line => {
+            try {
+                const output = JSON.parse(line);
+                if (output.type === 'log') {
+                    sendLog(`[Python] ${output.message}`, output.level);
+                } else if (output.type === 'result') {
+                    finalResult = output.payload;
+                }
+            } catch (e) {
+                sendLog(`No se pudo parsear la línea de salida de Python: ${line}`, 'WARN');
+            }
+        });
+
+        if (finalResult) {
+            sendLog(`Resultado de la generación: ${JSON.stringify(finalResult)}`);
+            return finalResult;
+        } else {
+            throw new Error("El script de Python no devolvió un resultado final.");
+        }
+
+    } catch (error) {
+        sendLog(`Fallo en la ejecución del script de acta: ${error.message}`, 'ERROR');
+        return { success: false, error: error.message };
+    }
+  });
+
 // Convertir Excel a PDF usando Microsoft Office'''
 ipcMain.handle('convertExcelToPdf', async (event, filePath) => {
     try {
@@ -1038,7 +1105,12 @@ ipcMain.handle('convertExcelToPdf', async (event, filePath) => {
             };
         }
 
-        const inputDir = path.dirname(normalizedPath);
+        // Usar directorio temporal local para evitar problemas con unidades de red
+        const tempDir = path.join(app.getPath('temp'), 'excel_pdf_conversions');
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+        }
+
         const fileNameWithoutExt = path.basename(normalizedPath, path.extname(normalizedPath));
         
         // Limpiar nombre para evitar problemas con caracteres especiales
@@ -1049,15 +1121,13 @@ ipcMain.handle('convertExcelToPdf', async (event, filePath) => {
             .replace(/\s+/g, '_') // Reemplazar espacios
             .substring(0, 50); // Limitar longitud
         
-        const outputDir = path.join(inputDir, 'temp_pdf_previews');
-        const outputPath = path.join(outputDir, `${cleanFileName}.pdf`);
+        // Copiar archivo de entrada a temporal local
+        const tempInputPath = path.join(tempDir, `${cleanFileName}.xlsx`);
+        await fsp.copyFile(normalizedPath, tempInputPath);
+        console.log('Archivo copiado a temporal:', tempInputPath);
 
+        const outputPath = path.join(tempDir, `${cleanFileName}.pdf`);
         console.log('Archivo PDF destino:', outputPath);
-
-        // Crear directorio temporal
-        if (!fs.existsSync(outputDir)) {
-            fs.mkdirSync(outputDir, { recursive: true });
-        }
 
         // Verificar si ya existe PDF actualizado
         if (fs.existsSync(outputPath)) {
@@ -1075,7 +1145,10 @@ ipcMain.handle('convertExcelToPdf', async (event, filePath) => {
 
         // Convertir usando Microsoft Office
         console.log('Iniciando conversión con Microsoft Office...');
-        const result = await convertWithMicrosoftOffice(normalizedPath, outputPath);
+        const result = await convertWithMicrosoftOffice(tempInputPath, outputPath);
+        
+        // Limpiar temporal input después de conversión
+        await fsp.unlink(tempInputPath).catch(e => console.warn('No se pudo eliminar temp input:', e.message));
         
         if (result.success) {
             console.log('Conversión exitosa');
@@ -1094,8 +1167,27 @@ ipcMain.handle('convertExcelToPdf', async (event, filePath) => {
             success: false,
             error: `Error crítico: ${error.message}`
         };
+    } finally {
+        // Opcional: Limpiar directorio temp después de un tiempo
+        setTimeout(() => cleanTempDir(tempDir), 300000); // 5 minutos
     }
 });
+
+// Función para limpiar directorio temporal
+async function cleanTempDir(dir) {
+    try {
+        const files = await fsp.readdir(dir);
+        for (const file of files) {
+            const filePath = path.join(dir, file);
+            const stats = await fsp.stat(filePath);
+            if (Date.now() - stats.mtimeMs > 3600000) { // 1 hora
+                await fsp.unlink(filePath);
+            }
+        }
+    } catch (e) {
+        console.warn('Error limpiando temp dir:', e.message);
+    }
+}
 
 // Función mejorada para convertir usando Microsoft Office COM
 function convertWithMicrosoftOffice(inputPath, outputPath) {

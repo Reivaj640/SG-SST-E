@@ -72,6 +72,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Obtener datos de la plantilla de acta
   getActaData: () => ipcRenderer.invoke('get-acta-data'),
 
+  // Generar acta de COPASST via Python
+  generateCopasstActa: (changes) => ipcRenderer.invoke('generate-copasst-acta', changes),
+
+  // Guardar datos de acta de COPASST
+  saveActa: (data) => ipcRenderer.invoke('save-acta', data),
+
   // Convertir Excel a PDF usando Microsoft Office
   convertExcelToPdf: (filePath) => ipcRenderer.invoke('convertExcelToPdf', filePath),
   // -------------------------
