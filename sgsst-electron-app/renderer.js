@@ -1041,6 +1041,20 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
     } else if (submoduleName === "3.1.6.1 Control de Remisiones") {
       showControlRemisionesContent(submoduleContentDiv);
 
+    } else if (submoduleName === "3.2.1 Reporte de los accidentes de trabajo") {
+      if (window.ReportesAccidentesComponent) {
+        const reportesComponent = new window.ReportesAccidentesComponent(
+          submoduleContentDiv,
+          currentCompany,
+          moduleName,
+          submoduleName,
+          backToModuleCallback
+        );
+        reportesComponent.render();
+      } else {
+        console.error('❌ ReportesAccidentesComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
     } else if (submoduleName === "3.2.2 Investigación de Accidentes, indicentes y Enfermedades") {
       showInvestigacionAccidentesContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
 
