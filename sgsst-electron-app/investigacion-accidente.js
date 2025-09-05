@@ -12,6 +12,7 @@ class InvestigacionAccidenteComponent {
         this.analysisResult = {};
         this.isProcessing = false;
         this.logMessages = []; // Para almacenar mensajes de log internos
+        this.progressListener = null;
     }
 
     render() {
@@ -163,7 +164,7 @@ class InvestigacionAccidenteComponent {
         return card;
     }
 
-    toggleProgressIndicator(show) {
+    toggleProgressIndicator(show, message = "Iniciando...") {
         const progressContainer = this.container.querySelector('#progress-container');
         if (!progressContainer) return;
 
@@ -171,19 +172,24 @@ class InvestigacionAccidenteComponent {
             progressContainer.innerHTML = `
                 <div class="progress-bar">
                     <span class="bar">
-                        <span class="progress"></span>
+                        <span class="progress" style="width: 0%;"></span>
                     </span>
                 </div>
+                <div class="progress-bar-text">${message}</div>
             `;
         } else {
-            const progress = progressContainer.querySelector('.progress');
-            if (progress) {
-                progress.style.animation = 'none';
-                progress.style.width = '100%';
-                setTimeout(() => {
-                    progressContainer.innerHTML = '';
-                }, 1000);
-            }
+            progressContainer.innerHTML = '';
+        }
+    }
+
+    updateProgress(percentage, message) {
+        const progressBar = this.container.querySelector('.progress');
+        const progressText = this.container.querySelector('.progress-bar-text');
+        if (progressBar) {
+            progressBar.style.width = `${percentage}%`;
+        }
+        if (progressText) {
+            progressText.textContent = message;
         }
     }
 
@@ -226,12 +232,12 @@ class InvestigacionAccidenteComponent {
         this.updateButtonStates();
         this.logToActivity('Iniciando proceso de extracción de datos...');
 
-        try {
-            this.extractedData = {};
-            this.analysisResult = {};
-            this.populateExtractedData({});
-            this.populateAnalysisResults({});
+        this.progressListener = (progress) => {
+            this.updateProgress(progress.percentage, progress.message);
+        };
+        window.electronAPI.onIpcMessage('accident-processing-progress', this.progressListener);
 
+        try {
             const result = await window.electronAPI.processAccidentPdf(
                 this.selectedPdfPath,
                 this.currentCompany,
@@ -260,6 +266,10 @@ class InvestigacionAccidenteComponent {
             this.isProcessing = false;
             this.toggleProgressIndicator(false);
             this.updateButtonStates();
+            if (this.progressListener) {
+                window.electronAPI.removeIpcMessageListener('accident-processing-progress', this.progressListener);
+                this.progressListener = null;
+            }
         }
     }
 
@@ -338,9 +348,14 @@ class InvestigacionAccidenteComponent {
         if (!this.selectedPdfPath || !window.electronAPI || this.isProcessing) return;
 
         this.isProcessing = true;
-        this.toggleProgressIndicator(true);
+        this.toggleProgressIndicator(true, "Iniciando análisis...");
         this.updateButtonStates();
         this.logToActivity('Iniciando análisis de causa raíz con IA...');
+
+        this.progressListener = (progress) => {
+            this.updateProgress(progress.percentage, progress.message);
+        };
+        window.electronAPI.onIpcMessage('accident-processing-progress', this.progressListener);
 
         try {
             const contextoAdicional = this.contextInput.value;
@@ -374,6 +389,10 @@ class InvestigacionAccidenteComponent {
             this.isProcessing = false;
             this.toggleProgressIndicator(false);
             this.updateButtonStates();
+            if (this.progressListener) {
+                window.electronAPI.removeIpcMessageListener('accident-processing-progress', this.progressListener);
+                this.progressListener = null;
+            }
         }
     }
 

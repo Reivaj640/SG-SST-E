@@ -14,6 +14,17 @@ import logging
 # Configurar logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+def send_progress(step, percentage, message):
+    """Sends a progress update to stdout."""
+    progress = {
+        "type": "progress",
+        "step": step,
+        "percentage": percentage,
+        "message": message
+    }
+    print(json.dumps(progress, ensure_ascii=False))
+    sys.stdout.flush()
+
 def process_accident_pdf(pdf_path, empresa="TEMPOACTIVA", contexto_adicional=""):
     """
     Procesa un PDF de accidente y devuelve los resultados en formato JSON
@@ -24,21 +35,23 @@ def process_accident_pdf(pdf_path, empresa="TEMPOACTIVA", contexto_adicional="")
         sys.path.append(str(Path(__file__).parent))
         from Invest_APP_V_3 import PdfProcessor, AccidentAnalyzer, DocumentGenerator, Config
         
+        send_progress("setup", 10, "Inicializando componentes...")
         # Crear instancias de los procesadores
         pdf_processor = PdfProcessor()
         analyzer = AccidentAnalyzer()
         doc_generator = DocumentGenerator()
         
         # 1. Extraer datos del PDF
-        logging.info(f"Extrayendo datos del PDF: {pdf_path}")
+        send_progress("extraction", 25, f"Extrayendo datos del PDF: {pdf_path}")
         extracted_data = pdf_processor.extract_pdf_data(pdf_path)
         
         # 2. Analizar causas con IA
-        logging.info("Analizando causas con IA...")
+        send_progress("analysis", 60, "Analizando causas con IA...")
         descripcion = extracted_data.get("Descripcion del Accidente", "")
         analysis = analyzer.analyze_5whys(descripcion, contexto_adicional)
         
         # 3. Combinar datos
+        send_progress("combining", 85, "Combinando datos y preparando resultado...")
         combined_data = {**extracted_data, **analysis}
         
         # 4. Preparar rutas
@@ -63,6 +76,7 @@ def process_accident_pdf(pdf_path, empresa="TEMPOACTIVA", contexto_adicional="")
             }
         }
         
+        send_progress("finished", 100, "Proceso completado.")
         return result
         
     except Exception as e:
@@ -79,7 +93,7 @@ def main():
     Punto de entrada CLI para el procesamiento de accidentes
     """
     if len(sys.argv) < 2:
-        print(json.dumps({"success": False, "error": "No se proporcionó la ruta del PDF"}))
+        print(json.dumps({"type": "result", "payload": {"success": False, "error": "No se proporcionó la ruta del PDF"}}))
         sys.exit(1)
     
     pdf_path = sys.argv[1]
@@ -89,7 +103,7 @@ def main():
     result = process_accident_pdf(pdf_path, empresa, contexto_adicional)
     # Reconfigurar stdout para asegurar la codificación UTF-8
     sys.stdout.reconfigure(encoding='utf-8')
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    print(json.dumps({"type": "result", "payload": result}, ensure_ascii=False))
 
 if __name__ == "__main__":
     main()

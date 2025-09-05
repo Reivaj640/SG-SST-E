@@ -886,37 +886,53 @@ Cualquier duda estamos disponibles para resolverla`;
   });
 
   // Manejar procesamiento de PDF de accidente
-  ipcMain.handle('process-accident-pdf', async (event, pdfPath, empresa = "TEMPOACTIVA", contextoAdicional = "") => {
-    try {
+  ipcMain.handle('process-accident-pdf', (event, pdfPath, empresa = "TEMPOACTIVA", contextoAdicional = "") => {
+    return new Promise((resolve, reject) => {
       sendLog(`IPC: process-accident-pdf recibido para: ${pdfPath}`);
       
       const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_processor.py');
-      const command = `python "${pythonScriptPath}" "${pdfPath}" "${empresa}" "${contextoAdicional}"`;
-      
-      sendLog(`Ejecutando script de procesamiento de accidente: ${command}`);
-      const { stdout, stderr } = await execPromise(command, { encoding: 'utf-8' });
-      
-      if (stderr) {
-        sendLog(`Error en script de procesamiento de accidente: ${stderr}`, 'ERROR');
-      }
+      const pythonProcess = spawn('python', [pythonScriptPath, pdfPath, empresa, contextoAdicional]);
 
-      // Parsear la salida JSON
-      let result;
-      try {
-        result = JSON.parse(stdout);
-      } catch (parseError) {
-        sendLog(`Error al parsear JSON de salida: ${parseError.message}`, 'ERROR');
-        sendLog(`Salida recibida: ${stdout}`, 'ERROR');
-        throw new Error(`Error al parsear la salida del script: ${parseError.message}`);
-      }
+      let stdoutData = '';
+      let stderrData = '';
 
-      sendLog(`Resultado del procesamiento: ${JSON.stringify(result)}`);
-      return result;
+      pythonProcess.stdout.on('data', (data) => {
+        stdoutData += data.toString();
+        // Process line by line
+        const lines = stdoutData.split('\n');
+        stdoutData = lines.pop(); // Keep the last partial line
 
-    } catch (error) {
-      sendLog(`Fallo en la ejecución del script de procesamiento de accidente: ${error.message}`, 'ERROR');
-      return { success: false, error: error.message, traceback: error.stack };
-    }
+        lines.forEach(line => {
+          if (line) {
+            try {
+              const json = JSON.parse(line);
+              if (json.type === 'progress') {
+                event.sender.send('accident-processing-progress', json);
+              } else if (json.type === 'result') {
+                resolve(json.payload);
+              }
+            } catch (e) {
+              sendLog(`Error parsing python output: ${e.message}`, 'WARN');
+            }
+          }
+        });
+      });
+
+      pythonProcess.stderr.on('data', (data) => {
+        stderrData += data.toString();
+        sendLog(`Python stderr: ${data}`, 'ERROR');
+      });
+
+      pythonProcess.on('close', (code) => {
+        if (code !== 0) {
+          reject(new Error(`Python script exited with code ${code}: ${stderrData}`));
+        }
+      });
+
+      pythonProcess.on('error', (err) => {
+        reject(err);
+      });
+    });
   });
   // En main.js, dentro de registerIPCHandlers()
   ipcMain.handle('start-model-loading', async () => {
@@ -1219,8 +1235,8 @@ ipcMain.handle('convertExcelToPdf', async (event, filePath) => {
         // Limpiar nombre para evitar problemas con caracteres especiales
         const cleanFileName = fileNameWithoutExt
             .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '') // Remover acentos
-            .replace(/[^\w\s-]/g, '_') // Reemplazar caracteres especiales
+            .replace(/[̀-ͯ]/g, '') // Remover acentos
+            .replace(/[^\\w\s-]/g, '_') // Reemplazar caracteres especiales
             .replace(/\s+/g, '_') // Reemplazar espacios
             .substring(0, 50); // Limitar longitud
         
@@ -1536,7 +1552,7 @@ try {
                     const stats = fs.statSync(outputPath);
                     console.log(`✅ PDF existe: ${stats.size} bytes`);
                     
-                    if (stats.size > 1024) {
+                    if (stats.size > 1024) { // PDF debe tener al menos 1KB
                         resolve({ success: true });
                     } else {
                         resolve({
