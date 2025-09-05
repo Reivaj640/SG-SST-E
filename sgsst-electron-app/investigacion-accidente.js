@@ -25,7 +25,7 @@ class InvestigacionAccidenteComponent {
         }
         const mainContainer = document.createElement('div');
         mainContainer.className = 'submodule-content';
-        mainContainer.style.padding = '20px'; // Añadir algo de padding general
+        mainContainer.style.padding = '10px'; // Añadir algo de padding general
 
         // Encabezado
         const header = document.createElement('div');
@@ -43,7 +43,7 @@ class InvestigacionAccidenteComponent {
         // --- Grid Principal (2 Columnas) ---
         const mainGrid = document.createElement('div');
         mainGrid.style.display = 'grid';
-        mainGrid.style.gridTemplateColumns = '1fr 2fr'; // Izquierda más estrecha
+        mainGrid.style.gridTemplateColumns = '2fr 4fr'; // Izquierda más estrecha
         mainGrid.style.gap = '20px';
         mainGrid.style.marginTop = '20px';
 
@@ -51,7 +51,7 @@ class InvestigacionAccidenteComponent {
         const leftColumn = document.createElement('div');
         leftColumn.style.display = 'flex';
         leftColumn.style.flexDirection = 'column';
-        leftColumn.style.gap = '20px';
+        leftColumn.style.gap = '30px';
 
         // 1. Tarjeta de Configuración
         this.configCard = this.createCard('1. Configuración');
@@ -115,33 +115,43 @@ class InvestigacionAccidenteComponent {
         actionArea.className = 'form-group';
         actionArea.style.marginTop = '20px';
         actionArea.style.display = 'flex';
-        actionArea.style.justifyContent = 'flex-end'; // Alinear a la derecha
+        actionArea.style.justifyContent = 'space-between';
+        actionArea.style.alignItems = 'center';
         actionArea.style.gap = '10px';
-        actionArea.innerHTML = `
+
+        const progressContainer = document.createElement('div');
+        progressContainer.id = 'progress-container';
+        progressContainer.style.flexGrow = '1';
+        actionArea.appendChild(progressContainer);
+
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.display = 'flex';
+        buttonContainer.style.gap = '10px';
+        buttonContainer.innerHTML = `
             <button type="button" class="btn btn-success" id="process-btn" disabled>PROCESAR Y GENERAR INFORME</button>
             <button type="button" class="btn btn-secondary" id="clear-btn">LIMPIAR</button>
         `;
+        actionArea.appendChild(buttonContainer);
+
         const processBtn = actionArea.querySelector('#process-btn');
         const clearBtn = actionArea.querySelector('#clear-btn');
-        processBtn.addEventListener('click', () => this.analyzeWithLLM()); // Combinar procesar y generar
+        processBtn.addEventListener('click', () => this.analyzeWithLLM());
         clearBtn.addEventListener('click', () => this.clearAll());
 
         // --- Ensamblar todo ---
         mainGrid.appendChild(leftColumn);
         mainGrid.appendChild(rightColumn);
         mainContainer.appendChild(mainGrid);
-        mainContainer.appendChild(actionArea); // Botones fuera del grid
+        mainContainer.appendChild(actionArea);
 
         this.container.appendChild(mainContainer);
 
-        // Inicialmente deshabilitar botones que requieren PDF
         this.updateButtonStates();
     }
 
-    // Función auxiliar para crear tarjetas estilo 'Card.TFrame'
     createCard(title) {
         const card = document.createElement('div');
-        card.className = 'card'; // Usar estilo existente
+        card.className = 'card';
         card.style.padding = '15px';
 
         const titleElement = document.createElement('h3');
@@ -153,13 +163,37 @@ class InvestigacionAccidenteComponent {
         return card;
     }
 
+    toggleProgressIndicator(show) {
+        const progressContainer = this.container.querySelector('#progress-container');
+        if (!progressContainer) return;
+
+        if (show) {
+            progressContainer.innerHTML = `
+                <div class="progress-bar">
+                    <span class="bar">
+                        <span class="progress"></span>
+                    </span>
+                </div>
+            `;
+        } else {
+            const progress = progressContainer.querySelector('.progress');
+            if (progress) {
+                progress.style.animation = 'none';
+                progress.style.width = '100%';
+                setTimeout(() => {
+                    progressContainer.innerHTML = '';
+                }, 1000);
+            }
+        }
+    }
+
     logToActivity(message) {
         const timestamp = new Date().toLocaleTimeString();
         const logEntry = `[${timestamp}] ${message}`;
         this.logMessages.push(logEntry);
         if (this.activityLogTextarea) {
             this.activityLogTextarea.value = this.logMessages.join('\n');
-            this.activityLogTextarea.scrollTop = this.activityLogTextarea.scrollHeight; // Auto-scroll
+            this.activityLogTextarea.scrollTop = this.activityLogTextarea.scrollHeight;
         }
     }
 
@@ -174,9 +208,9 @@ class InvestigacionAccidenteComponent {
             const pdfPath = await window.electronAPI.selectAccidentPdf();
             if (pdfPath) {
                 this.selectedPdfPath = pdfPath;
-                this.container.querySelector('#pdf-path-display').value = pdfPath.split('\\').pop(); // Solo nombre
+                this.container.querySelector('#pdf-path-display').value = pdfPath.split('\\').pop();
                 this.logToActivity(`Archivo seleccionado: ${pdfPath.split('\\').pop()}`);
-                await this.processPdf(); // Procesar automáticamente
+                await this.processPdf();
             }
         } catch (error) {
             console.error('Error al seleccionar PDF:', error);
@@ -185,53 +219,52 @@ class InvestigacionAccidenteComponent {
     }
 
     async processPdf() {
-    if (!this.selectedPdfPath || !window.electronAPI) return;
+        if (!this.selectedPdfPath || !window.electronAPI) return;
 
-    this.isProcessing = true;
-    this.updateButtonStates();
-    this.logToActivity('Iniciando proceso de extracción de datos...');
-
-    try {
-        // Limpiar datos y análisis previos
-        this.extractedData = {};
-        this.analysisResult = {};
-        this.populateExtractedData({});
-        this.populateAnalysisResults({}); // ← Vacío inicialmente
-
-        const result = await window.electronAPI.processAccidentPdf(
-            this.selectedPdfPath,
-            this.currentCompany,
-            "" // No pasar contexto aún en esta etapa
-        );
-
-        if (result.success) {
-            this.extractedData = result.data || {};
-            this.populateExtractedData(this.extractedData);
-
-            // ← Aquí es clave: Mostrar el análisis si existe
-            if (result.analysis && Object.keys(result.analysis).length > 0) {
-                this.analysisResult = result.analysis;
-                this.populateAnalysisResults(this.analysisResult);
-                this.logToActivity('Análisis de causa raíz completado.');
-            } else {
-                this.logToActivity('No se generó un análisis de causa raíz.');
-            }
-        } else {
-            throw new Error(result.error || 'Error desconocido al procesar el PDF.');
-        }
-    } catch (error) {
-        console.error('Error al procesar el PDF:', error);
-        this.logToActivity(`Error al procesar el PDF: ${error.message}`);
-        this.populateExtractedData({ error: error.message });
-    } finally {
-        this.isProcessing = false;
+        this.isProcessing = true;
+        this.toggleProgressIndicator(true);
         this.updateButtonStates();
-    }
-}
+        this.logToActivity('Iniciando proceso de extracción de datos...');
 
-    // En investigacion-accidente.js
+        try {
+            this.extractedData = {};
+            this.analysisResult = {};
+            this.populateExtractedData({});
+            this.populateAnalysisResults({});
+
+            const result = await window.electronAPI.processAccidentPdf(
+                this.selectedPdfPath,
+                this.currentCompany,
+                ""
+            );
+
+            if (result.success) {
+                this.extractedData = result.data || {};
+                this.populateExtractedData(this.extractedData);
+
+                if (result.analysis && Object.keys(result.analysis).length > 0) {
+                    this.analysisResult = result.analysis;
+                    this.populateAnalysisResults(this.analysisResult);
+                    this.logToActivity('Análisis de causa raíz completado.');
+                } else {
+                    this.logToActivity('No se generó un análisis de causa raíz.');
+                }
+            } else {
+                throw new Error(result.error || 'Error desconocido al procesar el PDF.');
+            }
+        } catch (error) {
+            console.error('Error al procesar el PDF:', error);
+            this.logToActivity(`Error al procesar el PDF: ${error.message}`);
+            this.populateExtractedData({ error: error.message });
+        } finally {
+            this.isProcessing = false;
+            this.toggleProgressIndicator(false);
+            this.updateButtonStates();
+        }
+    }
+
     populateExtractedData(data) {
-        this.dataCardContent.innerHTML = ''; // Limpiar contenido
+        this.dataCardContent.innerHTML = '';
 
         if (data.error) {
             this.dataCardContent.innerHTML = `<p class="error">Error: ${data.error}</p>`;
@@ -243,7 +276,6 @@ class InvestigacionAccidenteComponent {
             return;
         }
 
-        // Asegúrate de que este orden y estos nombres coincidan EXACTAMENTE con los de Python
         const fields = [
             'No Identificacion',
             'Nombre Completo',
@@ -265,9 +297,7 @@ class InvestigacionAccidenteComponent {
         gridContainer.style.gap = '10px';
 
         fields.forEach(field => {
-            // Usar directamente la clave del objeto `data` de Python
             const value = data[field] || 'N/A';
-
             const itemDiv = document.createElement('div');
             itemDiv.className = 'summary-item';
             itemDiv.innerHTML = `
@@ -277,8 +307,7 @@ class InvestigacionAccidenteComponent {
             gridContainer.appendChild(itemDiv);
         });
 
-        // Manejar la descripción por separado, usando la clave exacta de Python
-        const descripcionKey = 'Descripcion del Accidente'; // Clave exacta de Python
+        const descripcionKey = 'Descripcion del Accidente';
         const descripcion = data[descripcionKey] || 'N/A';
         if (descripcion && descripcion !== 'N/A') {
             const descDiv = document.createElement('div');
@@ -294,7 +323,6 @@ class InvestigacionAccidenteComponent {
         this.dataCardContent.appendChild(gridContainer);
     }
 
-    // Función auxiliar para escapar HTML
     escapeHtml(unsafe) {
         if (typeof unsafe !== 'string') return String(unsafe);
         return unsafe
@@ -306,67 +334,58 @@ class InvestigacionAccidenteComponent {
             .replace(/\n/g, "<br>");
     }
 
-    // En investigacion-accidente.js
     async analyzeWithLLM() {
-    if (!this.selectedPdfPath || !window.electronAPI || this.isProcessing) return;
+        if (!this.selectedPdfPath || !window.electronAPI || this.isProcessing) return;
 
-    this.isProcessing = true;
-    this.updateButtonStates();
-    this.logToActivity('Iniciando análisis de causa raíz con IA...');
-
-    try {
-        const contextoAdicional = this.contextInput.value;
-
-        const result = await window.electronAPI.processAccidentPdf(
-            this.selectedPdfPath,
-            this.currentCompany,
-            contextoAdicional
-        );
-
-        if (result.success) {
-            this.extractedData = result.data || {};
-            this.populateExtractedData(this.extractedData);
-
-            // ← Mostrar análisis si existe
-            if (result.analysis && Object.keys(result.analysis).length > 0) {
-                this.analysisResult = result.analysis;
-                this.populateAnalysisResults(this.analysisResult);
-                this.logToActivity('Análisis de causa raíz completado.');
-            } else {
-                this.logToActivity('No se generó un análisis de causa raíz.');
-            }
-
-            // Generar informe
-            await this.generateAccidentReport(result);
-        } else {
-            throw new Error(result.error || 'Error desconocido en el análisis.');
-        }
-    } catch (error) {
-        console.error('Error en análisis/generación con LLM:', error);
-        this.logToActivity(`Error en el proceso: ${error.message}`);
-        this.populateAnalysisResults({ error: error.message });
-    } finally {
-        this.isProcessing = false;
+        this.isProcessing = true;
+        this.toggleProgressIndicator(true);
         this.updateButtonStates();
-    }
-}
+        this.logToActivity('Iniciando análisis de causa raíz con IA...');
 
-    /**
-     * Genera el informe de accidente usando los datos procesados.
-     * @param {Object} processingResult - El resultado completo de processAccidentPdf.
-     */
+        try {
+            const contextoAdicional = this.contextInput.value;
+            const result = await window.electronAPI.processAccidentPdf(
+                this.selectedPdfPath,
+                this.currentCompany,
+                contextoAdicional
+            );
+
+            if (result.success) {
+                this.extractedData = result.data || {};
+                this.populateExtractedData(this.extractedData);
+
+                if (result.analysis && Object.keys(result.analysis).length > 0) {
+                    this.analysisResult = result.analysis;
+                    this.populateAnalysisResults(this.analysisResult);
+                    this.logToActivity('Análisis de causa raíz completado.');
+                } else {
+                    this.logToActivity('No se generó un análisis de causa raíz.');
+                }
+
+                await this.generateAccidentReport(result);
+            } else {
+                throw new Error(result.error || 'Error desconocido en el análisis.');
+            }
+        } catch (error) {
+            console.error('Error en análisis/generación con LLM:', error);
+            this.logToActivity(`Error en el proceso: ${error.message}`);
+            this.populateAnalysisResults({ error: error.message });
+        } finally {
+            this.isProcessing = false;
+            this.toggleProgressIndicator(false);
+            this.updateButtonStates();
+        }
+    }
+
     async generateAccidentReport(processingResult) {
         try {
-            // Extraer datos necesarios
             const { data: extractedData, analysis: analysisResult, metadata } = processingResult;
-            const empresa = this.currentCompany; // O metadata.empresa si se prefiere
+            const empresa = this.currentCompany;
 
             this.logToActivity('Solicitando generación del informe al proceso principal...');
             
-            // 1. Llamar al proceso principal para generar el documento
-            // Asumimos que crearemos un nuevo manejador IPC: 'generate-accident-report'
             const generationResult = await window.electronAPI.generateAccidentReport(
-                { ...extractedData, ...analysisResult }, // Combinar datos y análisis
+                { ...extractedData, ...analysisResult },
                 empresa
             );
 
@@ -374,13 +393,6 @@ class InvestigacionAccidenteComponent {
                 const documentPath = generationResult.documentPath;
                 this.logToActivity(`Informe generado exitosamente: ${documentPath}`);
                 alert(`Informe generado exitosamente:\n${documentPath}\n\n(Nota: La funcionalidad para abrir/ver el archivo puede agregarse aquí)`);
-                
-                // Opcional: Ofrecer abrir el archivo generado
-                // if (confirm('¿Desea abrir el informe generado?')) {
-                //     // Necesitarías un manejador IPC 'open-file' o usar shell.openPath
-                //     // window.electronAPI.openPath(documentPath);
-                // }
-                
             } else {
                 const errorMsg = generationResult ? generationResult.error : 'Error desconocido al generar el informe.';
                 throw new Error(errorMsg);
@@ -389,14 +401,11 @@ class InvestigacionAccidenteComponent {
             console.error('Error al generar el informe:', error);
             this.logToActivity(`Error al generar el informe: ${error.message}`);
             alert(`Error al generar el informe:\n${error.message}`);
-            // Podrías mostrar el error en algún lugar de la UI si es necesario
         }
     }
 
-
-
     populateAnalysisResults(analysisData) {
-        this.analysisCardContent.innerHTML = ''; // Limpiar contenido
+        this.analysisCardContent.innerHTML = '';
 
         if (analysisData.error) {
             this.analysisCardContent.innerHTML = `<p class="error">Error en el análisis: ${analysisData.error}</p>`;
@@ -487,5 +496,4 @@ class InvestigacionAccidenteComponent {
     }
 }
 
-// Hacer la clase disponible globalmente
 window.InvestigacionAccidenteComponent = InvestigacionAccidenteComponent;
