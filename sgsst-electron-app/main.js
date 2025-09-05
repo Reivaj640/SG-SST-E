@@ -1019,6 +1019,42 @@ Cualquier duda estamos disponibles para resolverla`;
     }
   });
 
+  // Manejador para leer la plantilla de acta de Comité de Convivencia
+  ipcMain.handle('getConvivenciaActaData', async () => {
+    try {
+        // Ruta a la plantilla de Excel
+        const templatePath = path.join(__dirname, 'utils', 'GI-FO-029 ACTA DE REUNION CONVIVENCIA Mayo.xlsx');
+        console.log(`[INFO] Leyendo plantilla de acta de convivencia desde: ${templatePath}`);
+
+        // Verificar que el archivo existe
+        await fsp.access(templatePath);
+
+        // Leer el archivo Excel
+        const workbook = xlsx.readFile(templatePath);
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+
+        // Convertir la hoja a un arreglo de datos
+        const data = xlsx.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: '' });
+
+        // Obtener las celdas combinadas (merges)
+        const merges = worksheet['!merges'] || [];
+
+        console.log(`[SUCCESS] Plantilla de convivencia cargada. Filas: ${data.length}, Merges: ${merges.length}`);
+        return {
+            success: true,
+            data,
+            merges
+        };
+    } catch (error) {
+        console.error('[ERROR] Error al cargar la plantilla del acta de convivencia:', error);
+        return {
+            success: false,
+            error: `No se encontró o no se pudo cargar la plantilla para el Comité de Convivencia. Asegúrate de que el archivo 'PLANTILLA_CONVIVENCIA_POR_DEFINIR.xlsx' existe en la carpeta 'utils'. Detalle: ${error.message}`
+        };
+    }
+  });
+
   // Manejador para generar el acta de COPASST usando el script de Python
   ipcMain.handle('generate-copasst-acta', async (event, changes) => {
     sendLog(`IPC: generate-copasst-acta recibido con ${changes.length} cambios`);
@@ -1082,6 +1118,73 @@ Cualquier duda estamos disponibles para resolverla`;
 
     } catch (error) {
         sendLog(`Fallo en la ejecución del script de acta: ${error.message}`, 'ERROR');
+        return { success: false, error: error.message };
+    }
+  });
+
+  // Manejador para generar el acta de Comité de Convivencia usando el script de Python
+  ipcMain.handle('generateConvivenciaActa', async (event, changes) => {
+    sendLog(`IPC: generateConvivenciaActa recibido con ${changes.length} cambios`);
+    try {
+        // 1. Pedir al usuario la ruta para guardar el archivo
+        const { canceled, filePath } = await dialog.showSaveDialog({
+            title: 'Guardar Acta de Comité de Convivencia',
+            defaultPath: `Acta-Convivencia-${new Date().toISOString().split('T')[0]}.xlsx`,
+            filters: [
+                { name: 'Archivos de Excel', extensions: ['xlsx'] }
+            ]
+        });
+
+        if (canceled) {
+            sendLog('El usuario canceló el guardado del acta de convivencia.');
+            return { success: false, canceled: true };
+        }
+
+        // 2. Preparar para llamar al script de Python
+        const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'comite_convivencia_acta_generator.py');
+        const tempDataPath = path.join(app.getPath('temp'), `convivencia_data_${Date.now()}.json`);
+        
+        sendLog(`Creando archivo de datos temporal: ${tempDataPath}`);
+        await fsp.writeFile(tempDataPath, JSON.stringify({ changes }, null, 2));
+
+        // 3. Ejecutar el script de Python
+        const command = `python "${pythonScriptPath}" "${tempDataPath}" "${filePath}"`;
+        
+        sendLog(`Ejecutando script de generación de acta de convivencia: ${command.replace(/\\/g, '/')}`);
+        const { stdout, stderr } = await execPromise(command);
+        
+        // 4. Limpiar el archivo temporal
+        await fsp.unlink(tempDataPath);
+
+        if (stderr) {
+            sendLog(`Error en script de generación de acta de convivencia: ${stderr}`, 'ERROR');
+        }
+
+        // 5. Procesar la respuesta del script
+        let finalResult = null;
+        const lines = stdout.split(/\r?\n/).filter(line => line.trim() !== '');
+        lines.forEach(line => {
+            try {
+                const output = JSON.parse(line);
+                if (output.type === 'log') {
+                    sendLog(`[Python] ${output.message}`, output.level);
+                } else if (output.type === 'result') {
+                    finalResult = output.payload;
+                }
+            } catch (e) {
+                sendLog(`No se pudo parsear la línea de salida de Python: ${line}`, 'WARN');
+            }
+        });
+
+        if (finalResult) {
+            sendLog(`Resultado de la generación: ${JSON.stringify(finalResult)}`);
+            return finalResult;
+        } else {
+            throw new Error("El script de Python no devolvió un resultado final.");
+        }
+
+    } catch (error) {
+        sendLog(`Fallo en la ejecución del script de acta de convivencia: ${error.message}`, 'ERROR');
         return { success: false, error: error.message };
     }
   });
@@ -1255,86 +1358,27 @@ try {
     
     Write-Host "Archivo Excel abierto correctamente" -Encoding UTF8
     
+    # Activar el libro de trabajo para asegurar que es el foco
+    $workbook.Activate()
+    Write-Host "Libro de trabajo activado" -Encoding UTF8
+
     # Esperar un momento para que Excel procese completamente el archivo
-    Start-Sleep -Seconds 5  # Aumentado a 5 segundos
+    Start-Sleep -Seconds 7 # Aumentado a 7 segundos
     
     Write-Host "Iniciando exportación a PDF..." -Encoding UTF8
     
-    # Configurar parámetros de exportación más robustos
+    # Usar SaveAs como método principal por su fiabilidad en este entorno.
+    # ExportAsFixedFormat estaba fallando consistentemente.
     try {
-        # Método 1: ExportAsFixedFormat con parámetros completos
-        $workbook.ExportAsFixedFormat(
-            [Microsoft.Office.Interop.Excel.XlFixedFormatType]::xlTypePDF,
+        $workbook.SaveAs(
             $outputPath,
-            [Microsoft.Office.Interop.Excel.XlFixedFormatQuality]::xlQualityStandard,
-            $true,   # IncludeDocProperties
-            $false,  # IgnorePrintAreas
-            $null,   # From
-            $null,   # To
-            $false   # OpenAfterPublish
+            57  # xlTypePDF
         )
-        Write-Host "Exportación completada con ExportAsFixedFormat" -Encoding UTF8
+        Write-Host "Exportación completada con SaveAs" -Encoding UTF8
         
     } catch {
-        Write-Host "Error con ExportAsFixedFormat: $($_.Exception.Message)" -Encoding UTF8
-        Write-Host "Intentando método alternativo (PrintOut)..." -Encoding UTF8
-        
-        # Método 2: Usar PrintOut to PDF con búsqueda de puerto correcta
-        try {
-            $originalPrinter = $excel.ActivePrinter
-            $pdfPrinterName = "Microsoft Print to PDF"
-            
-            # Buscar el puerto correcto (Ne00: a Ne99:)
-            $foundPort = $false
-            for ($i = 0; $i -lt 100; $i++) {
-                $port = "Ne{0:D2}:" -f $i
-                $printerString = "$pdfPrinterName on $port"
-                
-                try {
-                    $excel.ActivePrinter = $printerString
-                    Write-Host "Puerto encontrado: $port" -Encoding UTF8
-                    $foundPort = $true
-                    break
-                } catch {}
-            }
-            
-            if (-not $foundPort) {
-                throw "No se pudo encontrar un puerto válido para $pdfPrinterName"
-            }
-            
-            # Imprimir a archivo PDF
-            $workbook.PrintOut(
-                $null,   # From
-                $null,   # To
-                1,       # Copies
-                $false,  # Preview
-                $null,   # ActivePrinter (ya seteado)
-                $true,   # PrintToFile
-                $false,  # Collate
-                $outputPath  # PrToFileName
-            )
-            
-            # Restaurar impresora original
-            $excel.ActivePrinter = $originalPrinter
-            Write-Host "Exportación completada con PrintOut" -Encoding UTF8
-            
-        } catch {
-            Write-Host "Error con PrintOut: $($_.Exception.Message)" -Encoding UTF8
-            Write-Host "Intentando método alternativo (SaveAs)..." -Encoding UTF8
-            
-            # Método 3: Guardar como PDF usando SaveAs (en lugar de SaveAs2)
-            try {
-                $workbook.SaveAs(
-                    $outputPath,
-                    57  # xlPDFFormat
-                )
-                Write-Host "Exportación completada con SaveAs" -Encoding UTF8
-                
-            } catch {
-                Write-Host "Todos los métodos de exportación fallaron: $($_.Exception.Message)" -Encoding UTF8
-                throw "No se pudo exportar el archivo"
-            }
-        }
+        Write-Host "La exportación con SaveAs falló: $($_.Exception.Message)" -Encoding UTF8
+        throw "No se pudo exportar el archivo a PDF"
     }
     
     Write-Host "Cerrando libro de trabajo..." -Encoding UTF8

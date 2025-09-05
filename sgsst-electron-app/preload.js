@@ -75,6 +75,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Generar acta de COPASST via Python
   generateCopasstActa: (changes) => ipcRenderer.invoke('generate-copasst-acta', changes),
 
+  // Obtener datos de la plantilla de acta de Convivencia
+  getConvivenciaActaData: () => ipcRenderer.invoke('getConvivenciaActaData'),
+
+  // Generar acta de Convivencia via Python
+  generateConvivenciaActa: (changes) => ipcRenderer.invoke('generateConvivenciaActa', changes),
+
   // Guardar datos de acta de COPASST
   saveActa: (data) => ipcRenderer.invoke('save-acta', data),
 

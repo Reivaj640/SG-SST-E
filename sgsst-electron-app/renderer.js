@@ -976,6 +976,36 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 
+    } else if (submoduleName === "1.1.8 Conformación de Comite de Convivencia") {
+      if (window.ComiteConvivenciaComponent) {
+        const convivenciaComponent = new window.ComiteConvivenciaComponent(
+          submoduleContentDiv,
+          currentCompany,
+          moduleName,
+          submoduleName,
+          backToModuleCallback
+        );
+        convivenciaComponent.render();
+      } else {
+        console.error('❌ ComiteConvivenciaComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
+    } else if (submoduleName === "1.2.3 Curso Virtual 50 Horas") {
+      if (window.Curso50HorasComponent) {
+        const cursoComponent = new window.Curso50HorasComponent(
+          submoduleContentDiv,
+          currentCompany,
+          moduleName,
+          submoduleName,
+          backToModuleCallback
+        );
+        cursoComponent.render();
+      } else {
+        console.error('❌ Curso50HorasComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
     } else if (submoduleName === "3.1.6 Restricciones y recomendaciones médicas") {
       if (window.RestriccionesMedicasComponent) {
         const restriccionesComponent = new window.RestriccionesMedicasComponent(
