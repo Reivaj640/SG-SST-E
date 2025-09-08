@@ -10,6 +10,7 @@ import json
 import traceback
 from pathlib import Path
 import logging
+import argparse
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -25,82 +26,79 @@ def send_progress(step, percentage, message):
     print(json.dumps(progress, ensure_ascii=False))
     sys.stdout.flush()
 
-def process_accident_pdf(pdf_path, empresa="TEMPOACTIVA", contexto_adicional=""):
+def extract_data_from_pdf(pdf_path):
     """
-    Procesa un PDF de accidente y devuelve los resultados en formato JSON
-    Esta función replica la lógica de procesamiento de la aplicación GUI
+    Extrae los datos de un PDF de accidente.
     """
     try:
-        # Importar las clases necesarias del script original
         sys.path.append(str(Path(__file__).parent))
-        from Invest_APP_V_3 import PdfProcessor, AccidentAnalyzer, DocumentGenerator, Config
-        
-        send_progress("setup", 10, "Inicializando componentes...")
-        # Crear instancias de los procesadores
+        from Invest_APP_V_3 import PdfProcessor
+
+        send_progress("setup", 20, "Inicializando extractor de PDF...")
         pdf_processor = PdfProcessor()
-        analyzer = AccidentAnalyzer()
-        doc_generator = DocumentGenerator()
-        
-        # 1. Extraer datos del PDF
-        send_progress("extraction", 25, f"Extrayendo datos del PDF: {pdf_path}")
+
+        send_progress("extraction", 50, f"Extrayendo datos del PDF: {Path(pdf_path).name}")
         extracted_data = pdf_processor.extract_pdf_data(pdf_path)
-        
-        # 2. Analizar causas con IA
-        send_progress("analysis", 60, "Analizando causas con IA...")
+
+        send_progress("finished", 100, "Extracción completada.")
+        return {"success": True, "data": extracted_data}
+
+    except Exception as e:
+        logging.error(f"Error al extraer datos del PDF: {str(e)}")
+        logging.error(traceback.format_exc())
+        return {"success": False, "error": str(e), "traceback": traceback.format_exc()}
+
+def analyze_accident(extracted_data, contexto_adicional=""):
+    """
+    Analiza los datos de un accidente para determinar las causas.
+    """
+    try:
+        sys.path.append(str(Path(__file__).parent))
+        from Invest_APP_V_3 import AccidentAnalyzer
+
+        send_progress("setup", 10, "Inicializando analizador de IA...")
+        analyzer = AccidentAnalyzer()
+
+        send_progress("analysis", 50, "Analizando causas con IA...")
         descripcion = extracted_data.get("Descripcion del Accidente", "")
         analysis = analyzer.analyze_5whys(descripcion, contexto_adicional)
-        
-        # 3. Combinar datos
-        send_progress("combining", 85, "Combinando datos y preparando resultado...")
-        combined_data = {**extracted_data, **analysis}
-        
-        # 4. Preparar rutas
-        empresa_paths = Config.get_empresa_paths(empresa)
-        template_path = empresa_paths["plantilla"]
-        output_dir = empresa_paths["investigaciones"]
-        
-        # 5. Generar informe (opcional, solo para obtener la ruta)
-        # No generamos el informe completo aquí para ahorrar tiempo
-        # Solo preparamos la información necesaria
-        
-        result = {
-            "success": True,
-            "data": extracted_data,
-            "analysis": analysis,
-            "metadata": {
-                "pdf_path": str(pdf_path),
-                "empresa": empresa,
-                "template_path": str(template_path),
-                "output_dir": str(output_dir),
-                "contexto_adicional": contexto_adicional
-            }
-        }
-        
-        send_progress("finished", 100, "Proceso completado.")
-        return result
-        
+
+        send_progress("finished", 100, "Análisis completado.")
+        return {"success": True, "analysis": analysis}
+
     except Exception as e:
-        logging.error(f"Error al procesar el PDF: {str(e)}")
+        logging.error(f"Error al analizar el accidente: {str(e)}")
         logging.error(traceback.format_exc())
-        return {
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }
+        return {"success": False, "error": str(e), "traceback": traceback.format_exc()}
 
 def main():
     """
-    Punto de entrada CLI para el procesamiento de accidentes
+    Punto de entrada CLI para el procesamiento de accidentes.
     """
-    if len(sys.argv) < 2:
-        print(json.dumps({"type": "result", "payload": {"success": False, "error": "No se proporcionó la ruta del PDF"}}))
-        sys.exit(1)
-    
-    pdf_path = sys.argv[1]
-    empresa = sys.argv[2] if len(sys.argv) > 2 else "TEMPOACTIVA"
-    contexto_adicional = sys.argv[3] if len(sys.argv) > 3 else ""
-    
-    result = process_accident_pdf(pdf_path, empresa, contexto_adicional)
+    parser = argparse.ArgumentParser(description="Procesador de accidentes.")
+    parser.add_argument("action", choices=["extract", "analyze"], help="La acción a realizar.")
+    parser.add_argument("--pdf_path", help="Ruta al archivo PDF para la acción 'extract'.")
+    parser.add_argument("--json_data", help="String JSON con datos extraídos para la acción 'analyze'.")
+    parser.add_argument("--contexto", default="", help="Contexto adicional para el análisis.")
+
+    args = parser.parse_args()
+
+    result = {}
+    try:
+        if args.action == "extract":
+            if not args.pdf_path:
+                raise ValueError("La acción 'extract' requiere --pdf_path.")
+            result = extract_data_from_pdf(args.pdf_path)
+        
+        elif args.action == "analyze":
+            if not args.json_data:
+                raise ValueError("La acción 'analyze' requiere --json_data.")
+            extracted_data = json.loads(args.json_data)
+            result = analyze_accident(extracted_data, args.contexto)
+
+    except Exception as e:
+        result = {"success": False, "error": str(e), "traceback": traceback.format_exc()}
+
     # Reconfigurar stdout para asegurar la codificación UTF-8
     sys.stdout.reconfigure(encoding='utf-8')
     print(json.dumps({"type": "result", "payload": result}, ensure_ascii=False))

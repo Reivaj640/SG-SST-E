@@ -60,14 +60,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // Funciones para procesamiento de accidentes
   selectAccidentPdf: () => ipcRenderer.invoke('select-accident-pdf'),
-  processAccidentPdf: (pdfPath, empresa, contextoAdicional) => ipcRenderer.invoke('process-accident-pdf', pdfPath, empresa, contextoAdicional),
+  processAccidentPdf: (pdfPath) => ipcRenderer.invoke('process-accident-pdf', pdfPath),
+  analyzeAccident: (extractedData, contextoAdicional) => ipcRenderer.invoke('analyze-accident', extractedData, contextoAdicional),
   
   // Funciones para procesamiento de accidentes
   startModelLoading: () => ipcRenderer.invoke('start-model-loading'),
 
   // --- LÍNEA QUE FALTABA ---
   // Generar informe de accidente
-  //  generateAccidentReport: (combinedData, empresa) => ipcRenderer.invoke('generate-accident-report', combinedData, empresa),
+  generateAccidentReport: (combinedData, empresa) => ipcRenderer.invoke('generate-accident-report', combinedData, empresa),
   
   // Obtener datos de la plantilla de acta
   getActaData: () => ipcRenderer.invoke('get-acta-data'),

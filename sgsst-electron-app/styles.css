@@ -1129,7 +1129,7 @@ select.form-control {
 .summary-item label {
   font-weight: 600;
   color: var(--text-light-color);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
 .summary-item span {
@@ -1241,7 +1241,7 @@ select.form-control {
   /* Ya definido */
   font-weight: 500;
   margin-top: 2px; /* Menos margen */
-  font-size: 0.95rem; /* Un poco más pequeño */
+  font-size: 0.85rem; /* Un poco más pequeño */
 }
 
 /* Estilos para el área de procesamiento */

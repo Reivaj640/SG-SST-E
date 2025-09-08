@@ -177,11 +177,32 @@ class Config:
         "TEMPOACTIVA": {
             "investigaciones": RUTA_BASE / "2. Temporales Comfa/1. Tempoactiva Est SAS/3. Gestión de la Salud/3.2.2 Investigación de Accidentes, incidentes y Enfermedades/Investigaciones/2. Accidentes",
             "plantilla": RUTA_BASE / "2. Temporales Comfa/1. Tempoactiva Est SAS/3. Gestión de la Salud/3.2.2 Investigación de Accidentes, incidentes y Enfermedades/Investigaciones/4. Procedimientos/GI-FO-020 INVESTIGACION.docx"
+        },
+        "TEMPOSUM": {
+            "investigaciones": RUTA_BASE / "2. Temporales Comfa/2. Temposum Est SAS/3. Gestión de la Salud/3.2.2 Investigación de Accidentes, incidentes y Enfermedades",
+            "plantilla": RUTA_BASE / "2. Temporales Comfa/2. Temposum Est SAS/3. Gestión de la Salud/3.2.2 Investigación de Accidentes, incidentes y Enfermedades/4. Procedimientos/GI-FO-020 INVESTIGACION.docx"
+        },
+        "ASEPLUS": {
+            "investigaciones": RUTA_BASE / "2. Temporales Comfa/3. Aseplus/3. Gestión de la Salud/3.2.2 Investigación de Accidentes, incidentes y Enfermedades/3.2.2.1. Investigaciones",
+            "plantilla": RUTA_BASE / "2. Temporales Comfa/3. Aseplus/3. Gestión de la Salud/3.2.2 Investigación de Accidentes, incidentes y Enfermedades/4. Procedimientos/GI-FO-020 INVESTIGACION.docx"
+        },
+        "ASEL": {
+            "investigaciones": RUTA_BASE / "19. Asel S.A.S/3. Gestión de la Salud/3.2.2 Investigación de Accidentes, incidentes y Enfermedades/Investigaciones/2. Accidentes",
+            "plantilla": RUTA_BASE / "19. Asel S.A.S/3. Gestión de la Salud/3.2.2 Investigación de Accidentes, incidentes y Enfermedades/Investigaciones/4. Procedimientos/GI-FO-020 INVESTIGACION.docx"
         }
-    }
+    },
+    
     @classmethod
     def get_empresa_paths(cls, empresa):
         return cls.RUTAS.get(empresa.upper(), cls.RUTAS["TEMPOACTIVA"])
+
+    @classmethod
+    def get_template_path(cls, empresa):
+        return str(cls.get_empresa_paths(empresa)["plantilla"])
+
+    @classmethod
+    def get_output_dir(cls, empresa):
+        return str(cls.get_empresa_paths(empresa)["generated_reports"])
 
 #-------------------------------------------------------------------------------------------------------------------
 class PdfProcessor:
@@ -230,8 +251,8 @@ class PdfProcessor:
             extraction_rules = {
                 'No Identificacion': {
                     'patterns': [
-                        r'Identificación\s*\n.*?C\.C\.\s*(\d[\d\.\s]+)',
-                        r'C\.C\.\s*([\d\.\s]+)',
+                        r'Identificación\s*\n.*?C\.C\. \s*(\d[\d\.\s]+)',
+                        r'C\.C\. \s*([\d\.\s]+)',
                         r'Identificaci[oó]n\s*[:\s]*(\d[\d\.\s]+?)\s'
                     ],
                     'processor': lambda x: re.sub(r'[^\d]', '', x) if x else ""
@@ -288,10 +309,40 @@ class PdfProcessor:
                 },
                 'Descripcion del Accidente': {
                     'patterns': [
-                        r'IV\.\s*DESCRIPCIÓN\s+DEL\s+ACCIDENTE\s*\n(.*?)(?=\nPersonas)'
-                    ],
+                        r'IV\.\s*DESCRIPCIÓN\s+DEL\s+ACCIDENTE\s*\n(.*?)(?=\nPersonas)'],
                     'processor': lambda x: x.strip().replace('\n', ' ') if x else ''
                 },
+                'Fecha de Nacimiento': {
+                    'patterns': [
+                        r'Fecha\s+de\s+Nacimiento\s*[:\s]*([^\n]+)'], # Captura toda la línea después de "Fecha de Nacimiento:"
+                    'processor': self._format_date # Reutiliza el formateador existente
+                },
+                'Telefono Domicilio': {
+                    'patterns': [
+                        r'Teléfono\s+Domicilio\s*[:\s]*([^\n]+)'],
+                    'processor': lambda x: x.strip() if x else "N/A"
+                },
+                'Fecha de Ingreso a la Empresa': {
+                    'patterns': [
+                        r'Fecha\s+de\s+Ingreso\s+a\s+la\s+Empresa\s*[:\s]*([^\n]+)'],
+                    'processor': self._format_date # Reutiliza el formateador existente
+                },
+                'Jornada de Trabajo Habitual': {
+                    'patterns': [
+                        r'Jornada\s+de\s+Trabajo\s+Habitual\s*[:\s]*([^\n]+)'],
+                    'processor': lambda x: x.strip() if x else "N/A"
+                },
+                'Tiempo de Ocupacion': { # Clave normalizada
+                    'patterns': [
+                        r'Tiempo\s+de\s+Ocupación\s+Habitual\s+al\s+Momento\s+del\s+Accidente\s*[:\s]*([^\n]+)'],
+                    'processor': lambda x: x.strip() if x else "N/A"
+                },
+                'Tipo de Vinculacion': { # Clave normalizada
+                    'patterns': [
+                        r'Tipo\s+de\s+Vinculaci[oó]n\s*[:\s]*([^\n]+)'],
+                    'processor': lambda x: x.strip() if x else "N/A"
+                },
+                
             }
             data = {}
             for key, rule in extraction_rules.items():
@@ -669,6 +720,12 @@ class RemisionesApp(ttk.Window):
         logging.info(message)
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == '--get-template-path' and len(sys.argv) > 2:
+        empresa = sys.argv[2]
+        paths = Config.get_empresa_paths(empresa)
+        print(json.dumps({"template_path": str(paths["plantilla"]) }))
+        sys.exit(0)
+
     if not torch.cuda.is_available():
         messagebox.showwarning("Advertencia de GPU", "No se ha detectado una GPU compatible con CUDA. El análisis se ejecutará en la CPU, lo que puede ser significativamente más lento.")
     try:

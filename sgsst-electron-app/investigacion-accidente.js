@@ -44,9 +44,9 @@ class InvestigacionAccidenteComponent {
         // --- Grid Principal (2 Columnas) ---
         const mainGrid = document.createElement('div');
         mainGrid.style.display = 'grid';
-        mainGrid.style.gridTemplateColumns = '2fr 4fr'; // Izquierda más estrecha
-        mainGrid.style.gap = '20px';
-        mainGrid.style.marginTop = '20px';
+        mainGrid.style.gridTemplateColumns = '3fr 4fr'; // Izquierda más estrecha
+        mainGrid.style.gap = '10px';
+        mainGrid.style.marginTop = '10px';
 
         // --- Columna Izquierda (Config, Datos, Logs) ---
         const leftColumn = document.createElement('div');
@@ -114,11 +114,11 @@ class InvestigacionAccidenteComponent {
         // --- Botones de Acción (Fuera del grid, abajo) ---
         const actionArea = document.createElement('div');
         actionArea.className = 'form-group';
-        actionArea.style.marginTop = '20px';
+        actionArea.style.marginTop = '15px';
         actionArea.style.display = 'flex';
         actionArea.style.justifyContent = 'space-between';
         actionArea.style.alignItems = 'center';
-        actionArea.style.gap = '10px';
+        actionArea.style.gap = '15px';
 
         const progressContainer = document.createElement('div');
         progressContainer.id = 'progress-container';
@@ -136,7 +136,7 @@ class InvestigacionAccidenteComponent {
 
         const processBtn = actionArea.querySelector('#process-btn');
         const clearBtn = actionArea.querySelector('#clear-btn');
-        processBtn.addEventListener('click', () => this.analyzeWithLLM());
+        processBtn.addEventListener('click', () => this.analyzeAndGenerateReport());
         clearBtn.addEventListener('click', () => this.clearAll());
 
         // --- Ensamblar todo ---
@@ -153,12 +153,12 @@ class InvestigacionAccidenteComponent {
     createCard(title) {
         const card = document.createElement('div');
         card.className = 'card';
-        card.style.padding = '15px';
+        card.style.padding = '10px';
 
         const titleElement = document.createElement('h3');
         titleElement.textContent = title;
         titleElement.style.marginTop = '0';
-        titleElement.style.marginBottom = '15px';
+        titleElement.style.marginBottom = '10px';
         card.appendChild(titleElement);
 
         return card;
@@ -228,7 +228,7 @@ class InvestigacionAccidenteComponent {
         if (!this.selectedPdfPath || !window.electronAPI) return;
 
         this.isProcessing = true;
-        this.toggleProgressIndicator(true);
+        this.toggleProgressIndicator(true, 'Extrayendo datos del PDF...');
         this.updateButtonStates();
         this.logToActivity('Iniciando proceso de extracción de datos...');
 
@@ -238,23 +238,12 @@ class InvestigacionAccidenteComponent {
         window.electronAPI.onIpcMessage('accident-processing-progress', this.progressListener);
 
         try {
-            const result = await window.electronAPI.processAccidentPdf(
-                this.selectedPdfPath,
-                this.currentCompany,
-                ""
-            );
+            const result = await window.electronAPI.processAccidentPdf(this.selectedPdfPath);
 
             if (result.success) {
                 this.extractedData = result.data || {};
                 this.populateExtractedData(this.extractedData);
-
-                if (result.analysis && Object.keys(result.analysis).length > 0) {
-                    this.analysisResult = result.analysis;
-                    this.populateAnalysisResults(this.analysisResult);
-                    this.logToActivity('Análisis de causa raíz completado.');
-                } else {
-                    this.logToActivity('No se generó un análisis de causa raíz.');
-                }
+                this.logToActivity('Extracción de datos completada.');
             } else {
                 throw new Error(result.error || 'Error desconocido al procesar el PDF.');
             }
@@ -310,10 +299,9 @@ class InvestigacionAccidenteComponent {
             const value = data[field] || 'N/A';
             const itemDiv = document.createElement('div');
             itemDiv.className = 'summary-item';
-            itemDiv.innerHTML = `
-                <label style="font-weight:bold; display:block;">${field}:</label>
-                <span>${this.escapeHtml(value)}</span>
-            `;
+            itemDiv.innerHTML = 
+                `<label style="font-weight:bold; display:block;">${field}:</label>
+                <span>${this.escapeHtml(value)}</span>`;
             gridContainer.appendChild(itemDiv);
         });
 
@@ -323,10 +311,9 @@ class InvestigacionAccidenteComponent {
             const descDiv = document.createElement('div');
             descDiv.className = 'form-group';
             descDiv.style.gridColumn = '1 / -1';
-            descDiv.innerHTML = `
-                <label class="form-label" style="font-weight:bold;">${descripcionKey}:</label>
-                <textarea class="form-control" rows="4" readonly>${this.escapeHtml(descripcion)}</textarea>
-            `;
+            descDiv.innerHTML = 
+                `<label class="form-label" style="font-weight:bold;">${descripcionKey}:</label>
+                <textarea class="form-control" rows="4" readonly>${this.escapeHtml(descripcion)}</textarea>`;
             gridContainer.appendChild(descDiv);
         }
 
@@ -344,42 +331,92 @@ class InvestigacionAccidenteComponent {
             .replace(/\n/g, "<br>");
     }
 
-    async analyzeWithLLM() {
-        if (!this.selectedPdfPath || !window.electronAPI || this.isProcessing) return;
+    async analyzeAndGenerateReport() {
+        if (!this.extractedData || Object.keys(this.extractedData).length === 0 || !window.electronAPI || this.isProcessing) {
+            this.logToActivity('No hay datos extraídos para analizar. Por favor, procese un PDF primero.', 'WARN');
+            return;
+        }
 
         this.isProcessing = true;
         this.toggleProgressIndicator(true, "Iniciando análisis...");
         this.updateButtonStates();
         this.logToActivity('Iniciando análisis de causa raíz con IA...');
 
-        this.progressListener = (progress) => {
-            this.updateProgress(progress.percentage, progress.message);
-        };
-        window.electronAPI.onIpcMessage('accident-processing-progress', this.progressListener);
-
         try {
             const contextoAdicional = this.contextInput.value;
-            const result = await window.electronAPI.processAccidentPdf(
-                this.selectedPdfPath,
-                this.currentCompany,
-                contextoAdicional
-            );
+            const analysisResult = await window.electronAPI.analyzeAccident(this.extractedData, contextoAdicional);
 
-            if (result.success) {
-                this.extractedData = result.data || {};
-                this.populateExtractedData(this.extractedData);
+            if (analysisResult.success) {
+                this.analysisResult = analysisResult.analysis || {};
+                this.populateAnalysisResults(this.analysisResult);
+                this.logToActivity('Análisis de causa raíz completado.');
 
-                if (result.analysis && Object.keys(result.analysis).length > 0) {
-                    this.analysisResult = result.analysis;
-                    this.populateAnalysisResults(this.analysisResult);
-                    this.logToActivity('Análisis de causa raíz completado.');
-                } else {
-                    this.logToActivity('No se generó un análisis de causa raíz.');
+                // Mapeo manual de claves extraídas a placeholders de la plantilla
+                const keyMapping = {
+                    'Nombre Completo': 'nombre_completo',
+                    'No Identificacion': 'no_identificacion',
+                    'Edad': 'edad',
+                    'Estado Civil': 'estado_civil',
+                    'Telefono/Celular': 'telefono_celular',
+                    'Tiempo en el Contrato': 'tiempo_en_el_contrato',
+                    'Experiencia en el Cargo': 'experiencia_en_el_cargo',
+                    'Dia de Turno': 'dia_de_turno',
+                    'Equipo que Operaba/Reparaba': 'equipo_que_operaba_reparaba',
+                    'Supervisor Inmediato': 'supervisor_inmediato',
+                    'Fecha del Accidente': 'fecha_accidente',
+                    'Hora del Accidente': 'hora_del_accidente',
+                    'Lugar del Accidente': 'lugar_accidente',
+                    'Sitio de Ocurrencia': 'sitio_ocurrencia',
+                    'Agente del Accidente': 'agente_accidente',
+                    'Tipo de Accidente': 'tipo_accidente',
+                    'Mecanismo o Forma del Accidente': 'mecanismo_accidente',
+                    'Tipo de Lesion': 'tipo_lesion',
+                    'Parte del Cuerpo Afectada': 'parte_cuerpo_afectada',
+                    'Descripcion del Accidente': 'descripcion_accidente',
+                    'Cargo': 'cargo'
+                };
+
+                const normalizedExtracted = {};
+                Object.keys(this.extractedData).forEach(key => {
+                    const mappedKey = keyMapping[key] || key.toLowerCase().replace(/ /g, '_').replace(/[áéíóú]/g, m => ({ 'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u' })[m] || m).replace(/[^a-z0-9_]/g, '');
+                    normalizedExtracted[mappedKey] = this.extractedData[key].replace(/\n/g, ' '); // Limpiar saltos de línea
+                });
+
+                // Transformación de recomendaciones
+                const recommendations = [];
+                for (let i = 1; i <= 5; i++) {
+                    const pqKey = `Por Qué ${i}`;
+                    const pqData = this.analysisResult[pqKey] || {};
+                    if (pqData.causa) {
+                        recommendations.push(pqData.causa);
+                    }
                 }
+                const normalizedAnalysis = {
+                    'recomendacion_1': recommendations[0] || 'Implementar medidas de seguridad adicionales.',
+                    'recomendacion_2': recommendations[1] || 'Capacitar al personal en procedimientos seguros.',
+                    'recomendacion_3': recommendations[2] || 'Revisar mantenimiento de equipos.',
+                };
 
-                await this.generateAccidentReport(result);
+                // Inferir checkboxes
+                const hasLesion = normalizedExtracted['tipo_lesion'] && normalizedExtracted['tipo_lesion'] !== '';
+                const isGrave = hasLesion && normalizedExtracted['tipo_lesion'].toLowerCase().includes('grave');
+                const isMortal = hasLesion && normalizedExtracted['tipo_lesion'].toLowerCase().includes('mortal');
+                const hasDano = normalizedExtracted['agente_accidente']?.toLowerCase().includes('equipo') || false;
+
+                normalizedExtracted['incidente_con_lesion'] = hasLesion ? 'X' : '';
+                normalizedExtracted['incidente_grave'] = isGrave ? 'X' : '';
+                normalizedExtracted['casi_accidente'] = !hasLesion ? 'X' : '';
+                normalizedExtracted['genero_muerte'] = isMortal ? 'X' : '';
+                normalizedExtracted['dano_a_la_propiedad'] = hasDano ? 'X' : '';
+
+                // Combinar y loggear
+                const combinedData = { ...normalizedExtracted, ...normalizedAnalysis, ...this.analysisResult };
+                this.logToActivity(`Datos combinados antes de enviar: ${JSON.stringify(combinedData)}`);
+
+                await this.generateAccidentReport(combinedData);
+
             } else {
-                throw new Error(result.error || 'Error desconocido en el análisis.');
+                throw new Error(analysisResult.error || 'Error desconocido en el análisis.');
             }
         } catch (error) {
             console.error('Error en análisis/generación con LLM:', error);
@@ -396,17 +433,14 @@ class InvestigacionAccidenteComponent {
         }
     }
 
-    async generateAccidentReport(processingResult) {
+    async generateAccidentReport(combinedData) {
         try {
-            const { data: extractedData, analysis: analysisResult, metadata } = processingResult;
-            const empresa = this.currentCompany;
-
             this.logToActivity('Solicitando generación del informe al proceso principal...');
             
-            const generationResult = await window.electronAPI.generateAccidentReport(
-                { ...extractedData, ...analysisResult },
-                empresa
-            );
+            const generationResult = await window.electronAPI.generateAccidentReport({
+                ...combinedData,
+                empresa: this.currentCompany
+            });
 
             if (generationResult && generationResult.success) {
                 const documentPath = generationResult.documentPath;
@@ -418,7 +452,7 @@ class InvestigacionAccidenteComponent {
             }
         } catch (error) {
             console.error('Error al generar el informe:', error);
-            this.logToActivity(`Error al generar el informe: ${error.message}`);
+            this.logToActivity(`Error al generar el informe: ${error.message}`, 'ERROR');
             alert(`Error al generar el informe:\n${error.message}`);
         }
     }
@@ -453,8 +487,7 @@ class InvestigacionAccidenteComponent {
             headerDiv.className = 'cause-header';
             headerDiv.innerHTML = `
                 <div class="cause-number" style="font-weight:bold; margin-right: 10px;">${i}.</div>
-                <div class="cause-text">${pqData.causa || 'Causa no especificada'}</div>
-            `;
+                <div class="cause-text">${pqData.causa || 'Causa no especificada'}</div>`;
             card.appendChild(headerDiv);
 
             const mGrid = document.createElement('div');
@@ -473,8 +506,7 @@ class InvestigacionAccidenteComponent {
                 mCell.style.border = '1px solid #eee';
                 mCell.innerHTML = `
                     <div class="m-category" style="font-weight:bold; color: #206A5D; font-size: 0.85em;">${category}</div>
-                    <div class="m-content" style="font-size: 0.9em;">${pqData[category] || 'N/A'}</div>
-                `;
+                    <div class="m-content" style="font-size: 0.9em;">${pqData[category] || 'N/A'}</div>`;
                 mGrid.appendChild(mCell);
             });
 

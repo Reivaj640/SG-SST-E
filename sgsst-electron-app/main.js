@@ -4,11 +4,14 @@ const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fsp = require('fs').promises;
 const fs = require('fs');
-const { exec, spawn } = require('child_process');
+const { exec, spawn, execFile } = require('child_process'); // Asegúrate de incluir execFile
 const { promisify } = require('util');
 const xlsx = require('xlsx');
+const os = require('os');
 
 const execPromise = promisify(exec);
+const execFilePromise = promisify(execFile); // Añadir esta línea
+
 
 let mainWindow;
 
@@ -371,12 +374,12 @@ const registerIPCHandlers = () => {
       console.log(`[DEBUG] Actual structure subdirectories keys: [${Object.keys(actualCompanyStructure.subdirectories || {}).join(', ')}]`);
       
       // Extraer el código del nombre del submódulo (ej. "1.1.1 Responsable del SG" -> "1.1.1")
-      const submoduleCode = submodule.match(/^([\d.]+)/);
+      const submoduleCode = submodule.match(/^[ -]+/);
       if (!submoduleCode) {
         console.log(`[ERROR] Invalid submodule name format: ${submodule}`);
         throw new Error(`Invalid submodule name format: ${submodule}`);
       }
-      const code = submoduleCode[1];
+      const code = submoduleCode[0];
       console.log(`[DEBUG] Extracted code: '${code}'`);
       
       let foundPath = null;
@@ -500,11 +503,7 @@ const registerIPCHandlers = () => {
       if (finalResult) {
         // Log del texto completo del PDF si está presente en el resultado
         if (finalResult.debug_full_text) {
-          sendLog(`Texto extraído del PDF ${path.basename(pdfPath)}:
----
-INICIO ---
-${finalResult.debug_full_text}
---- FIN ---`, 'DEBUG');
+          sendLog(`Texto extraído del PDF ${path.basename(pdfPath)}:\n---\nINICIO ---\n${finalResult.debug_full_text}\n--- FIN ---`, 'DEBUG');
           delete finalResult.debug_full_text;
         }
         sendLog('Procesamiento de PDF completado exitosamente.');
@@ -614,7 +613,7 @@ ${finalResult.debug_full_text}
           if (output.type === 'log') {
             sendLog(`[Python] ${output.message}`, output.level);
           } else if (output.type === 'result') {
-            finalResult = output.payload;
+            finalResult = output.payload; // Estandarizado para usar siempre el payload
           }
         } catch (e) {
           sendLog(`No se pudo parsear la línea de salida de Python: ${line}`, 'WARN');
@@ -829,19 +828,7 @@ ${finalResult.debug_full_text}
           const cedulaTrabajador = finalResult.cedula || 'N/A';
 
           // Plantilla del mensaje
-          const messageBody = `Remisión EPS - ${empresa.toUpperCase()}
-
-Trabajador: ${nombreTrabajador}
-Cédula: ${cedulaTrabajador}
-
-Adjunto encontrará su documento de remisión EPS con las recomendaciones médicas.
-
-Por favor:
-1. Revise el documento adjunto ✅
-2. Siga las indicaciones del profesional de salud ✅
-3. Confirme recepción ✅
-
-Cualquier duda estamos disponibles para resolverla`;
+          const messageBody = `Remisión EPS - ${empresa.toUpperCase()}\n\nTrabajador: ${nombreTrabajador}\nCédula: ${cedulaTrabajador}\n\nAdjunto encontrará su documento de remisión EPS con las recomendaciones médicas.\n\nPor favor:\n1. Revise el documento adjunto ✅\n2. Siga las indicaciones del profesional de salud ✅\n3. Confirme recepción ✅\n\nCualquier duda estamos disponibles para resolverla`;
           
           const message = encodeURIComponent(messageBody);
           const whatsappUrl = `https://wa.me/${cleanPhoneNumber}?text=${message}`;
@@ -885,22 +872,69 @@ Cualquier duda estamos disponibles para resolverla`;
     }
   });
 
-  // Manejar procesamiento de PDF de accidente
-  ipcMain.handle('process-accident-pdf', (event, pdfPath, empresa = "TEMPOACTIVA", contextoAdicional = "") => {
+  ipcMain.handle('process-accident-pdf', (event, pdfPath) => {
     return new Promise((resolve, reject) => {
-      sendLog(`IPC: process-accident-pdf recibido para: ${pdfPath}`);
+      sendLog(`IPC: process-accident-pdf (extract) recibido para: ${pdfPath}`);
       
       const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_processor.py');
-      const pythonProcess = spawn('python', [pythonScriptPath, pdfPath, empresa, contextoAdicional]);
+      const pythonProcess = spawn('python', [pythonScriptPath, 'extract', '--pdf_path', pdfPath]);
 
       let stdoutData = '';
       let stderrData = '';
 
       pythonProcess.stdout.on('data', (data) => {
         stdoutData += data.toString();
-        // Process line by line
         const lines = stdoutData.split('\n');
-        stdoutData = lines.pop(); // Keep the last partial line
+        stdoutData = lines.pop();
+
+        lines.forEach(line => {
+          if (line) {
+            try {
+              const json = JSON.parse(line);
+              if (json.type === 'progress') {
+                event.sender.send('accident-processing-progress', json);
+              } else if (json.type === 'result') {
+                resolve(json.payload);
+              }
+            } catch (e) {
+              sendLog(`Error parsing python output: ${e.message}`, 'WARN');
+            }
+          }
+        });
+      });
+
+      pythonProcess.stderr.on('data', (data) => {
+        stderrData += data.toString();
+        sendLog(`Python stderr: ${data}`, 'ERROR');
+      });
+
+      pythonProcess.on('close', (code) => {
+        if (code !== 0) {
+          reject(new Error(`Python script exited with code ${code}: ${stderrData}`));
+        }
+      });
+
+      pythonProcess.on('error', (err) => {
+        reject(err);
+      });
+    });
+  });
+
+  ipcMain.handle('analyze-accident', (event, extractedData, contextoAdicional) => {
+    return new Promise((resolve, reject) => {
+      sendLog(`IPC: analyze-accident recibido`);
+      
+      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_processor.py');
+      const jsonData = JSON.stringify(extractedData);
+      const pythonProcess = spawn('python', [pythonScriptPath, 'analyze', '--json_data', jsonData, '--contexto', contextoAdicional]);
+
+      let stdoutData = '';
+      let stderrData = '';
+
+      pythonProcess.stdout.on('data', (data) => {
+        stdoutData += data.toString();
+        const lines = stdoutData.split('\n');
+        stdoutData = lines.pop();
 
         lines.forEach(line => {
           if (line) {
@@ -949,54 +983,93 @@ Cualquier duda estamos disponibles para resolverla`;
           return { success: false, error: error.message };
       }
   });
+
   // --- Manejar generación de informe de accidente ---
-  ipcMain.handle('generate-accident-report', async (event, combinedData, empresa) => {
-      sendLog(`IPC: generate-accident-report recibido para empresa: ${empresa}`);
+  ipcMain.handle('generate-accident-report', async (event, combinedData) => {
+    sendLog(`IPC: generate-accident-report recibido`);
+    
+    try {
+      // Crear archivo temporal con los datos
+      const tempDataPath = path.join(app.getPath('temp'), `accident_report_data_${Date.now()}.json`);
+      
+      // Preparar los datos con la empresa por defecto
+      const reportData = {
+        combinedData: combinedData,
+        empresa: combinedData.empresa || 'TEMPOACTIVA'
+      };
+      
+      sendLog(`Creando archivo de datos temporal: ${tempDataPath}`);
+      await fsp.writeFile(tempDataPath, JSON.stringify(reportData, null, 2));
+      
+      // Ruta al script de Python (NO pasar un directorio de salida para usar las rutas configuradas)
+      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_report_generator.py');
+      
+      // Verificar que el script existe
       try {
-          const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_report_generator.py');
-          // Crear un archivo temporal con los datos
-          const tempDataPath = path.join(app.getPath('temp'), `accident_report_data_${Date.now()}.json`);
-          
-          sendLog(`Creando archivo de datos temporal: ${tempDataPath}`);
-          // Guardar los datos combinados y la empresa
-          await fsp.writeFile(tempDataPath, JSON.stringify({  combinedData, empresa: empresa }, null, 2));
-
-          const command = `python "${pythonScriptPath}" "${tempDataPath}"`;
-          
-          sendLog(`Ejecutando script de generación de informe de accidente: ${command.replace(/\\/g, '/')}`);
-          const { stdout, stderr } = await execPromise(command);
-          
-          // Limpiar archivo temporal
-          await fsp.unlink(tempDataPath);
-
-          if (stderr) {
-              sendLog(`Error en script de generación de informe de accidente: ${stderr}`, 'ERROR');
-          }
-
-          // Parsear la salida JSON del script de Python
-          let finalResult = null;
-          try {
-              finalResult = JSON.parse(stdout);
-          } catch (parseError) {
-              sendLog(`Error al parsear JSON de salida del script de informe: ${parseError.message}`, 'ERROR');
-              sendLog(`Salida recibida: ${stdout}`, 'ERROR');
-              throw new Error(`Error al parsear la salida del script: ${parseError.message}`);
-          }
-
-          sendLog(`Resultado de la generación del informe: ${JSON.stringify(finalResult)}`);
-          
-          if (finalResult.success && finalResult.documentPath) {
-              // Opcional: Copiar el documento generado a una ubicación específica
-              // como se hacía en generateRemisionDocument
-              // ... (lógica de copia si es necesaria) ...
-          }
-          
-          return finalResult;
-
+        await fsp.access(pythonScriptPath);
       } catch (error) {
-          sendLog(`Fallo en la ejecución del script de generación de informe de accidente: ${error.message}`, 'ERROR');
-          return { success: false, error: error.message };
+        throw new Error(`Script de generación no encontrado: ${pythonScriptPath}`);
       }
+      
+      // Ejecutar el script de Python SOLO con la ruta de datos (usará rutas configuradas)
+      const command = `python "${pythonScriptPath}" "${tempDataPath}"`;
+      
+      sendLog(`Ejecutando script de generación de informe: ${command.replace(/\\/g, '/')}`);
+      const { stdout, stderr } = await execPromise(command);
+      
+      // Limpiar archivo temporal
+      await fsp.unlink(tempDataPath);
+      
+      if (stderr) {
+        sendLog(`Error en script de generación de informe: ${stderr}`, 'ERROR');
+      }
+
+      // Procesar la respuesta del script
+      let finalResult = null;
+      const lines = stdout.split(/\r?\n/).filter(line => line.trim() !== '');
+      
+      for (const line of lines) {
+        try {
+          const output = JSON.parse(line);
+          if (output.type === 'progress') {
+            sendLog(`[Python] ${output.message}`, 'INFO');
+          } else if (output.success !== undefined) {
+            finalResult = output;
+          }
+        } catch (e) {
+          sendLog(`No se pudo parsear la línea de salida de Python: ${line}`, 'WARN');
+        }
+      }
+
+      if (finalResult) {
+        sendLog(`Resultado de la generación: ${JSON.stringify(finalResult)}`);
+        return finalResult;
+      } else {
+        try {
+          const result = JSON.parse(stdout);
+          return result;
+        } catch (e) {
+          if (stderr) {
+            throw new Error(`El script de Python falló. Revisa los logs para ver el error: ${stderr}`);
+          }
+          throw new Error(`El script de Python no devolvió un resultado válido y no hubo error estándar. Salida: ${stdout}`);
+        }
+      }
+
+    } catch (error) {
+      sendLog(`Fallo en la ejecución del script de generación de informe: ${error.message}`, 'ERROR');
+      return { 
+        success: false, 
+        error: error.message,
+        stack: error.stack 
+      };
+    }
+  });
+
+  ipcMain.handle('get-config', async (event, empresa) => {
+      const investAppPath = path.join(__dirname, 'Portear', 'src', 'Invest_APP_V_3.py');
+      const { stdout } = await execFilePromise('python', [investAppPath, '--get-config', empresa]);
+      return JSON.parse(stdout.trim());
   });
 
   // Manejador para leer la plantilla de acta de COPASST
@@ -1205,92 +1278,92 @@ Cualquier duda estamos disponibles para resolverla`;
     }
   });
 
-// Convertir Excel a PDF usando Microsoft Office'''
-ipcMain.handle('convertExcelToPdf', async (event, filePath) => {
-    try {
-        console.log('=== INICIO CONVERSIÓN EXCEL ===');
-        console.log('Archivo original:', filePath);
-        
-        // Normalizar ruta y manejar caracteres especiales
-        const normalizedPath = path.resolve(filePath);
-        console.log('Ruta normalizada:', normalizedPath);
+  // Convertir Excel a PDF usando Microsoft Office'''
+  ipcMain.handle('convertExcelToPdf', async (event, filePath) => {
+      try {
+          console.log('=== INICIO CONVERSIÓN EXCEL ===');
+          console.log('Archivo original:', filePath);
+          
+          // Normalizar ruta y manejar caracteres especiales
+          const normalizedPath = path.resolve(filePath);
+          console.log('Ruta normalizada:', normalizedPath);
 
-        // Verificar que el archivo existe
-        if (!fs.existsSync(normalizedPath)) {
-            console.error('Archivo no encontrado');
-            return {
-                success: false,
-                error: `Archivo no encontrado: ${normalizedPath}`
-            };
-        }
+          // Verificar que el archivo existe
+          if (!fs.existsSync(normalizedPath)) {
+              console.error('Archivo no encontrado');
+              return {
+                  success: false,
+                  error: `Archivo no encontrado: ${normalizedPath}`
+              };
+          }
 
-        // Usar directorio temporal local para evitar problemas con unidades de red
-        const tempDir = path.join(app.getPath('temp'), 'excel_pdf_conversions');
-        if (!fs.existsSync(tempDir)) {
-            fs.mkdirSync(tempDir, { recursive: true });
-        }
+          // Usar directorio temporal local para evitar problemas con unidades de red
+          const tempDir = path.join(app.getPath('temp'), 'excel_pdf_conversions');
+          if (!fs.existsSync(tempDir)) {
+              fs.mkdirSync(tempDir, { recursive: true });
+          }
 
-        const fileNameWithoutExt = path.basename(normalizedPath, path.extname(normalizedPath));
-        
-        // Limpiar nombre para evitar problemas con caracteres especiales
-        const cleanFileName = fileNameWithoutExt
-            .normalize('NFD')
-            .replace(/[̀-ͯ]/g, '') // Remover acentos
-            .replace(/[^\\w\s-]/g, '_') // Reemplazar caracteres especiales
-            .replace(/\s+/g, '_') // Reemplazar espacios
-            .substring(0, 50); // Limitar longitud
-        
-        // Copiar archivo de entrada a temporal local
-        const tempInputPath = path.join(tempDir, `${cleanFileName}.xlsx`);
-        await fsp.copyFile(normalizedPath, tempInputPath);
-        console.log('Archivo copiado a temporal:', tempInputPath);
+          const fileNameWithoutExt = path.basename(normalizedPath, path.extname(normalizedPath));
+          
+          // Limpiar nombre para evitar problemas con caracteres especiales
+          const cleanFileName = fileNameWithoutExt
+              .normalize('NFD')
+              .replace(/[̀-ͯ]/g, '') // Remover acentos
+              .replace(/[^ - -퟿豈-﷏ﷰ-￯]/g, '_') // Reemplazar caracteres no ASCII
+              .replace(/ +/g, '_') // Reemplazar espacios
+              .substring(0, 50); // Limitar longitud
+          
+          // Copiar archivo de entrada a temporal local
+          const tempInputPath = path.join(tempDir, `${cleanFileName}.xlsx`);
+          await fsp.copyFile(normalizedPath, tempInputPath);
+          console.log('Archivo copiado a temporal:', tempInputPath);
 
-        const outputPath = path.join(tempDir, `${cleanFileName}.pdf`);
-        console.log('Archivo PDF destino:', outputPath);
+          const outputPath = path.join(tempDir, `${cleanFileName}.pdf`);
+          console.log('Archivo PDF destino:', outputPath);
 
-        // Verificar si ya existe PDF actualizado
-        if (fs.existsSync(outputPath)) {
-            const excelStats = fs.statSync(normalizedPath);
-            const pdfStats = fs.statSync(outputPath);
-            
-            if (pdfStats.mtime > excelStats.mtime) {
-                console.log('PDF ya existe y está actualizado');
-                return {
-                    success: true,
-                    pdf_path: outputPath
-                };
-            }
-        }
+          // Verificar si ya existe PDF actualizado
+          if (fs.existsSync(outputPath)) {
+              const excelStats = fs.statSync(normalizedPath);
+              const pdfStats = fs.statSync(outputPath);
+              
+              if (pdfStats.mtime > excelStats.mtime) {
+                  console.log('PDF ya existe y está actualizado');
+                  return {
+                      success: true,
+                      pdf_path: outputPath
+                  };
+              }
+          }
 
-        // Convertir usando Microsoft Office
-        console.log('Iniciando conversión con Microsoft Office...');
-        const result = await convertWithMicrosoftOffice(tempInputPath, outputPath);
-        
-        // Limpiar temporal input después de conversión
-        await fsp.unlink(tempInputPath).catch(e => console.warn('No se pudo eliminar temp input:', e.message));
-        
-        if (result.success) {
-            console.log('Conversión exitosa');
-            return {
-                success: true,
-                pdf_path: outputPath
-            };
-        } else {
-            console.error('Error en conversión:', result.error);
-            return result;
-        }
+          // Convertir usando Microsoft Office
+          console.log('Iniciando conversión con Microsoft Office...');
+          const result = await convertWithMicrosoftOffice(tempInputPath, outputPath);
+          
+          // Limpiar temporal input después de conversión
+          await fsp.unlink(tempInputPath).catch(e => console.warn('No se pudo eliminar temp input:', e.message));
+          
+          if (result.success) {
+              console.log('Conversión exitosa');
+              return {
+                  success: true,
+                  pdf_path: outputPath
+              };
+          } else {
+              console.error('Error en conversión:', result.error);
+              return result;
+          }
 
-    } catch (error) {
-        console.error('Error crítico en convertExcelToPdf:', error);
-        return {
-            success: false,
-            error: `Error crítico: ${error.message}`
-        };
-    } finally {
-        // Opcional: Limpiar directorio temp después de un tiempo
-        setTimeout(() => cleanTempDir(tempDir), 300000); // 5 minutos
-    }
-});
+      } catch (error) {
+          console.error('Error crítico en convertExcelToPdf:', error);
+          return {
+              success: false,
+              error: `Error crítico: ${error.message}`
+          };
+      } finally {
+          // Opcional: Limpiar directorio temp después de un tiempo
+          setTimeout(() => cleanTempDir(tempDir), 300000); // 5 minutos
+      }
+  });
 
 // Función para limpiar directorio temporal
 async function cleanTempDir(dir) {
@@ -1405,14 +1478,8 @@ try {
     
     # Liberar objetos COM
     Write-Host "Liberando recursos COM..." -Encoding UTF8
-    if ($workbook) {
-        [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($workbook)
-        $workbook = $null
-    }
-    if ($excel) {
-        [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($excel)
-        $excel = $null
-    }
+    if ($workbook) { [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($workbook); $workbook = $null }
+    if ($excel) { [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($excel); $excel = $null }
     
     # Forzar recolección de basura
     [System.GC]::Collect()
@@ -1451,9 +1518,7 @@ try {
             $workbook.Close($false)
             [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($workbook)
         }
-    } catch {
-        Write-Host "Error cerrando workbook: $($_.Exception.Message)" -Encoding UTF8
-    }
+    } catch { Write-Host "Error cerrando workbook: $($_.Exception.Message)" -Encoding UTF8 }
     
     try {
         if ($excel -ne $null) { 
@@ -1461,18 +1526,14 @@ try {
             $excel.Quit()
             [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($excel)
         }
-    } catch {
-        Write-Host "Error cerrando Excel: $($_.Exception.Message)" -Encoding UTF8
-    }
+    } catch { Write-Host "Error cerrando Excel: $($_.Exception.Message)" -Encoding UTF8 }
     
     # Forzar terminación de procesos Excel colgados
     Write-Host "Terminando procesos Excel residuales..." -Encoding UTF8
     try {
         Get-Process excel -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
         Start-Sleep -Seconds 1
-    } catch {
-        Write-Host "Sin procesos Excel para terminar" -Encoding UTF8
-    }
+    } catch { Write-Host "Sin procesos Excel para terminar" -Encoding UTF8 }
     
     # Forzar recolección de basura final
     [System.GC]::Collect()
@@ -1527,9 +1588,7 @@ try {
             try {
                 await fsp.unlink(tempPs1Path);
                 console.log('Archivo temporal PS1 eliminado');
-            } catch (e) {
-                console.warn('No se pudo eliminar temp PS1:', e.message);
-            }
+            } catch (e) { console.warn('No se pudo eliminar temp PS1:', e.message); }
             
             console.log('=== RESULTADO POWERSHELL ===');
             console.log('Código de salida:', code);
@@ -1607,14 +1666,10 @@ try {
                 // Cleanup después de timeout
                 setTimeout(() => {
                     exec('taskkill /F /IM EXCEL.EXE /T', (error) => {
-                        if (!error) {
-                            console.log('🧹 Procesos Excel terminados');
-                        }
+                        if (!error) { console.log('🧹 Procesos Excel terminados'); }
                     });
                 }, 3000);
-            } catch (e) {
-                console.error('Error terminando proceso:', e);
-            }
+            } catch (e) { console.error('Error terminando proceso:', e); }
             
             resolve({
                 success: false,
@@ -1622,7 +1677,7 @@ try {
             });
         }, 120000);
 
-        // Limpiar timeout si el proceso termina normalmente
+        // Limpiar timeout si el proceso termina normally
         child.on('close', () => {
             clearTimeout(timeout);
         });
