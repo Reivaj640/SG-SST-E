@@ -985,85 +985,108 @@ const registerIPCHandlers = () => {
   });
 
   // --- Manejar generación de informe de accidente ---
-  ipcMain.handle('generate-accident-report', async (event, combinedData) => {
-    sendLog(`IPC: generate-accident-report recibido`);
-    
-    try {
-      // Crear archivo temporal con los datos
-      const tempDataPath = path.join(app.getPath('temp'), `accident_report_data_${Date.now()}.json`);
-      
-      // Preparar los datos con la empresa por defecto
-      const reportData = {
-        combinedData: combinedData,
-        empresa: combinedData.empresa || 'TEMPOACTIVA'
-      };
-      
-      sendLog(`Creando archivo de datos temporal: ${tempDataPath}`);
-      await fsp.writeFile(tempDataPath, JSON.stringify(reportData, null, 2));
-      
-      // Ruta al script de Python (NO pasar un directorio de salida para usar las rutas configuradas)
-      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_report_generator.py');
-      
-      // Verificar que el script existe
+  ipcMain.handle('generate-accident-report', (event, combinedData) => {
+    return new Promise(async (resolve, reject) => {
+      sendLog(`IPC: generate-accident-report recibido`);
+      let tempDataPath;
       try {
+        // Crear archivo temporal con los datos
+        tempDataPath = path.join(app.getPath('temp'), `accident_report_data_${Date.now()}.json`);
+        
+        const reportData = {
+          combinedData: combinedData,
+          empresa: combinedData.empresa || 'TEMPOACTIVA'
+        };
+        
+        sendLog(`Creando archivo de datos temporal: ${tempDataPath}`);
+        await fsp.writeFile(tempDataPath, JSON.stringify(reportData, null, 2));
+        
+        const pythonExecutable = 'python';
+        const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_report_generator.py');
+
+        // Verificar que el script existe
         await fsp.access(pythonScriptPath);
+        
+        sendLog(`Ejecutando script con UTF-8 forzado: ${pythonExecutable} -X utf8 "${pythonScriptPath}"`);
+
+        const pythonProcess = spawn(pythonExecutable, [
+          '-X', 'utf8',
+          pythonScriptPath,
+          tempDataPath
+        ]);
+
+        let stdoutData = '';
+        let stderrData = '';
+
+        pythonProcess.stdout.on('data', (data) => {
+          stdoutData += data.toString();
+        });
+
+        pythonProcess.stderr.on('data', (data) => {
+          // Loguear errores de Python en tiempo real
+          const stderrLine = data.toString();
+          stderrData += stderrLine;
+          sendLog(`[Python STDERR] ${stderrLine}`, 'ERROR');
+        });
+
+        pythonProcess.on('close', async (code) => {
+          sendLog(`Proceso de Python terminado con código: ${code}`);
+          
+          // Limpiar archivo temporal
+          if (tempDataPath) {
+            await fsp.unlink(tempDataPath).catch(err => sendLog(`No se pudo limpiar el archivo temporal: ${err.message}`, 'WARN'));
+          }
+
+          if (code !== 0) {
+            return reject(new Error(`El script de Python falló con código ${code}. Revisa los logs de STDERR.`));
+          }
+
+          // Procesar la salida estándar para encontrar el resultado JSON final
+          let finalResult = null;
+          const lines = stdoutData.split(/\r?\n/).filter(line => line.trim() !== '');
+          
+          for (const line of lines) {
+            try {
+              const output = JSON.parse(line);
+              if (output.type === 'progress') {
+                sendLog(`[Python Progress] ${output.message}`, 'INFO');
+              } else if (output.success !== undefined) {
+                finalResult = output;
+              }
+            } catch (e) {
+              sendLog(`No se pudo parsear la línea de salida de Python (stdout): ${line}`, 'WARN');
+            }
+          }
+
+          if (finalResult) {
+            // Limpiar el prefijo de ruta larga de Windows si existe, para que sea usable por el frontend.
+            if (finalResult.documentPath && finalResult.documentPath.startsWith('\\\\?\\')) {
+              finalResult.documentPath = finalResult.documentPath.substring(4);
+              console.log('Path corregido:', finalResult.documentPath);
+            }
+            // Asegurar que los separadores de ruta son los correctos para el OS actual.
+            finalResult.documentPath = finalResult.documentPath.replace(/[\\\/]/g, path.sep);
+
+            sendLog(`Resultado de la generación: ${JSON.stringify(finalResult)}`);
+            resolve(finalResult);
+          } else {
+            reject(new Error(`El script de Python no devolvió un resultado JSON válido en stdout.`));
+          }
+        });
+
+        pythonProcess.on('error', (err) => {
+          sendLog(`Fallo al iniciar el proceso de Python: ${err.message}`, 'CRITICAL');
+          reject(err);
+        });
+
       } catch (error) {
-        throw new Error(`Script de generación no encontrado: ${pythonScriptPath}`);
-      }
-      
-      // Ejecutar el script de Python SOLO con la ruta de datos (usará rutas configuradas)
-      const command = `python "${pythonScriptPath}" "${tempDataPath}"`;
-      
-      sendLog(`Ejecutando script de generación de informe: ${command.replace(/\\/g, '/')}`);
-      const { stdout, stderr } = await execPromise(command);
-      
-      // Limpiar archivo temporal
-      await fsp.unlink(tempDataPath);
-      
-      if (stderr) {
-        sendLog(`Error en script de generación de informe: ${stderr}`, 'ERROR');
-      }
-
-      // Procesar la respuesta del script
-      let finalResult = null;
-      const lines = stdout.split(/\r?\n/).filter(line => line.trim() !== '');
-      
-      for (const line of lines) {
-        try {
-          const output = JSON.parse(line);
-          if (output.type === 'progress') {
-            sendLog(`[Python] ${output.message}`, 'INFO');
-          } else if (output.success !== undefined) {
-            finalResult = output;
-          }
-        } catch (e) {
-          sendLog(`No se pudo parsear la línea de salida de Python: ${line}`, 'WARN');
+        sendLog(`Fallo en la ejecución del script de generación de informe: ${error.message}`, 'ERROR');
+        if (tempDataPath) {
+          await fsp.unlink(tempDataPath).catch(err => sendLog(`No se pudo limpiar el archivo temporal tras error: ${err.message}`, 'WARN'));
         }
+        reject(error);
       }
-
-      if (finalResult) {
-        sendLog(`Resultado de la generación: ${JSON.stringify(finalResult)}`);
-        return finalResult;
-      } else {
-        try {
-          const result = JSON.parse(stdout);
-          return result;
-        } catch (e) {
-          if (stderr) {
-            throw new Error(`El script de Python falló. Revisa los logs para ver el error: ${stderr}`);
-          }
-          throw new Error(`El script de Python no devolvió un resultado válido y no hubo error estándar. Salida: ${stdout}`);
-        }
-      }
-
-    } catch (error) {
-      sendLog(`Fallo en la ejecución del script de generación de informe: ${error.message}`, 'ERROR');
-      return { 
-        success: false, 
-        error: error.message,
-        stack: error.stack 
-      };
-    }
+    });
   });
 
   ipcMain.handle('get-config', async (event, empresa) => {
