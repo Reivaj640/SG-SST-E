@@ -249,100 +249,132 @@ class PdfProcessor:
             text = unicodedata.normalize('NFC', text)
             
             extraction_rules = {
-                'No Identificacion': {
+                'No. Identificación': {
                     'patterns': [
-                        r'Identificación\s*\n.*?C\.C\. \s*(\d[\d\.\s]+)',
-                        r'C\.C\. \s*([\d\.\s]+)',
-                        r'Identificaci[oó]n\s*[:\s]*(\d[\d\.\s]+?)\s'
+                        r'Identificación\n+C\.C\.\s*([\d\.]+)',
+                        r'(?:No\.?\s+Identificación|Identificación|Cédula de Ciudadanía|C\.C\.)\s*[:\s]*\n?(\d[\d\.\s]{5,11}\d)',
+                        r'(\d{1,3}(?:\.\d{3})*-\d)',
                     ],
-                    'processor': lambda x: re.sub(r'[^\d]', '', x) if x else ""
+                    'processor': lambda x: re.sub(r'[^\d]', '', x.strip()) if x else ""
                 },
                 'Nombre Completo': {
                     'patterns': [
+                        r'Primer Apellido\n(.*?)\nNombres\n(.*?)\n',
                         r'Primer Apellido\s*([\w\s]+?)\s*Segundo Apellido\s*([\w\s]+?)\s*Nombres\s*([\w\s]+?)(?=\n)',
+                        r'Nombre(?:s y|\s+)Apellidos\s*[:\s]*([\w\s]+?)(?=\n)',
                         r'Nombre Completo\s*[:\s]*([\w\s]+?)(?=\n)'
                     ],
                     'processor': lambda x: " ".join(x).strip().upper() if isinstance(x, tuple) else x.strip().upper()
                 },
                 'Fecha del Accidente': {
                     'patterns': [
-                        r'Fecha\s+y\s+Hora\s+del\s+Accidente\s*(\d{2}/\d{2}/\d{4})',
-                        r'Fecha\s+del\s+Accidente\s*[:\s]*(\d{2}/\d{2}/\d{4})\b'
+                        r'Fecha y Hora del Accidente\n(\d{2}/\d{2}/\d{4})',
+                        r'(?:Fecha y Hora del Accidente|Fecha del Accidente|Fecha de Ocurrencia|Fecha Accidente)\s*[:\s]*\b(\d{2}/\d{2}/\d{4})',
+                        r'Fecha del evento:\s*(\d{2}/\d{2}/\d{4})'
                     ],
-                    'processor': self._format_date
+                    'processor': lambda x: self._format_date(x.strip())
                 },
                 'Hora del Accidente': {
-                    'patterns': [r'Fecha\s+y\s+Hora\s+del\s+Accidente\s.*?(\d{1,2}:\d{2}:\d{2}\s*(?:AM|PM))'],
+                    'patterns': [
+                        r'Fecha y Hora del Accidente\n\d{2}/\d{2}/\d{4}\s*([0-9:]+\s*[AP]M)',
+                        r'(?:Fecha y Hora del Accidente|Hora del Accidente|Hora de Ocurrencia)\s*[:\s]*.*?(\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?)',
+                        r'Hora del evento:\s*(\d{1,2}:\d{2})'
+                    ],
                     'processor': lambda x: x.strip()
                 },
                 'Cargo': {
-                    'patterns': [r'Cargo\s*\n.*?\n([\w\s]+?)\n'],
+                    'patterns': [
+                        r'Cargo\n([A-Z\s]+?)\nOcupación Habitual',
+                        r'Cargo\s*\n.*?\n([\w\s]+?)\n',
+                        r'Ocupación Habitual\s*[:\s]*([\w\s]+?)(?=\n|Código)'
+                        ],
                     'processor': lambda x: x.strip().upper()
-                },
-                'Tipo de Accidente': {
-                    'patterns': [r'Tipo\s+de\s+Accidente\s*\n([\w\s]+?)(?=\n)'],
-                    'processor': lambda x: x.strip()
-                },
-                'Lugar del Accidente': {
-                    'patterns': [r'Lugar\s+donde\s+Ocurrio\s+el\s+accidente\s*\n([\w\s]+?)(?=\n)'],
-                    'processor': lambda x: x.strip()
-                },
-                'Sitio de Ocurrencia': {
-                    'patterns': [r'Sitio\s+de\s+Ocurrencia\s*\n([\w\s]+?)(?=\n)'],
-                    'processor': lambda x: x.strip()
-                },
-                'Tipo de Lesion': {
-                    'patterns': [r'Tipo\s+de\s+Lesión\s*\n([\w\s]+?)(?=\n)'],
-                    'processor': lambda x: x.strip()
-                },
-                'Parte del Cuerpo Afectada': {
-                    'patterns': [r'Parte\s+del\s+Cuerpo\s+Aparentemente\s+Afectada\s*\n([\w\s]+?)(?=\n)'],
-                    'processor': lambda x: x.strip()
-                },
-                'Agente del Accidente': {
-                    'patterns': [r'Agente\s+del\s+Accidente\s*\n([\w\s\(\)]+?)(?=\n)'],
-                    'processor': lambda x: x.strip()
-                },
-                'Mecanismo o Forma del Accidente': {
-                    'patterns': [r'Mecanismo\s+o\s+Forma\s+del\s+Accidente\s*\n([\w\s]+?)(?=\n)'],
-                    'processor': lambda x: x.strip()
                 },
                 'Descripcion del Accidente': {
                     'patterns': [
-                        r'IV\.\s*DESCRIPCIÓN\s+DEL\s+ACCIDENTE\s*\n(.*?)(?=\nPersonas)'],
+                        r'IV. DESCRIPCIÓN DEL ACCIDENTE\nObservaciones\n(.*?)(?=\nPersonas que Presenciaron)',
+                        r'IV\.\s*DESCRIPCIÓN\s+DEL\s+ACCIDENTE\s*\n(.*?)(?=\nPersonas|V\.\s*DATOS)',
+                        r'Descripción detallada del Accidente\s*[:\s]*(.*?)(?=\n\n|Firma)'
+                    ],
                     'processor': lambda x: x.strip().replace('\n', ' ') if x else ''
                 },
                 'Fecha de Nacimiento': {
                     'patterns': [
-                        r'Fecha\s+de\s+Nacimiento\s*[:\s]*([^\n]+)'], # Captura toda la línea después de "Fecha de Nacimiento:"
-                    'processor': self._format_date # Reutiliza el formateador existente
+                        r'Fecha de Nacimiento\s+Sexo\n(?:.|)*?(\d{2}/\d{2}/\d{4})',
+                        r'Fecha\s+de\s+Nacimiento\s*[:\s]*([\d/]+)',
+                        r'Nacimiento\s*[:\s]*([\d/]+)'
+                        ],
+                    'processor': self._format_date
                 },
                 'Telefono Domicilio': {
                     'patterns': [
-                        r'Teléfono\s+Domicilio\s*[:\s]*([^\n]+)'],
+                        r'Teléfono Domicilio(?:.|)*?(\d{10})',
+                        r'Teléfono:\s*([\d\s()-]+)'
+                        ],
                     'processor': lambda x: x.strip() if x else "N/A"
                 },
                 'Fecha de Ingreso a la Empresa': {
                     'patterns': [
-                        r'Fecha\s+de\s+Ingreso\s+a\s+la\s+Empresa\s*[:\s]*([^\n]+)'],
-                    'processor': self._format_date # Reutiliza el formateador existente
+                        r'Fecha de Ingreso a la Empresa\s+Salario(?:.|)*?(\d{2}/\d{2}/\d{4})',
+                        r'Fecha de Ingreso\s*[:\s]*([\d/]+)'
+                        ],
+                    'processor': self._format_date
+                },
+                'Tipo de Accidente': {
+                    'patterns': [
+                        r'Tipo de Accidente\n([^\n]+)',
+                        r'Propios del trabajo\s*[:\s]*(.*?)(?:\n|$)',
+                    ],
+                    'processor': lambda x: x.strip()
+                },
+                'Lugar del Accidente': {
+                    'patterns': [r'Lugar donde Ocurrio el accidente\n([^\n]+)'],
+                    'processor': lambda x: x.strip()
+                },
+                'Sitio de Ocurrencia': {
+                    'patterns': [
+                        r'Sitio de Ocurrencia\n([^\n]+)',
+                        r'AREAS DE PRODUCCION\s*[:\s]*(.*?)(?:\n|$)',
+                    ],
+                    'processor': lambda x: x.strip()
+                },
+                'Tipo de Lesion': {
+                    'patterns': [r'Tipo de Lesión\n([^\n]+)'],
+                    'processor': lambda x: x.strip()
+                },
+                'Parte del Cuerpo Afectada': {
+                    'patterns': [r'Parte del Cuerpo Aparentemente Afectada\n([^\n]+)'],
+                    'processor': lambda x: x.strip()
+                },
+                'Agente del Accidente': {
+                    'patterns': [r'Agente del Accidente\n([^\n]+)'],
+                    'processor': lambda x: x.strip()
+                },
+                'Mecanismo o Forma del Accidente': {
+                    'patterns': [r'Mecanismo o Forma del Accidente\n([^\n]+)'],
+                    'processor': lambda x: x.strip()
                 },
                 'Jornada de Trabajo Habitual': {
                     'patterns': [
-                        r'Jornada\s+de\s+Trabajo\s+Habitual\s*[:\s]*([^\n]+)'],
+                        r'Jornada de Trabajo Habitual(?:.|)+?([A-Za-z]+)\n+III',
+                        r'Jornada de Trabajo\s*[:\s]*([a-zA-Z\s]+)'
+                        ],
                     'processor': lambda x: x.strip() if x else "N/A"
                 },
-                'Tiempo de Ocupacion': { # Clave normalizada
+                'Tiempo de Ocupacion': {
                     'patterns': [
-                        r'Tiempo\s+de\s+Ocupación\s+Habitual\s+al\s+Momento\s+del\s+Accidente\s*[:\s]*([^\n]+)'],
+                        r'Tiempo de Ocupación Habitual al Momento del Accidente\n([^\n]+)',
+                        r'Tiempo de Ocupación Habitual\s*[:\s]*([\w\s.,]+)'
+                        ],
                     'processor': lambda x: x.strip() if x else "N/A"
                 },
-                'Tipo de Vinculacion': { # Clave normalizada
+                'Tipo de Vinculacion': {
                     'patterns': [
-                        r'Tipo\s+de\s+Vinculaci[oó]n\s*[:\s]*([^\n]+)'],
+                        r'Tipo de Vinculación\n([^\n]+)',
+                        r'Vinculación\s*[:\s]*([\w\s]+)'
+                        ],
                     'processor': lambda x: x.strip() if x else "N/A"
                 },
-                
             }
             data = {}
             for key, rule in extraction_rules.items():

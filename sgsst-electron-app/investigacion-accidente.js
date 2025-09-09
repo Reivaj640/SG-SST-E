@@ -351,66 +351,9 @@ class InvestigacionAccidenteComponent {
                 this.populateAnalysisResults(this.analysisResult);
                 this.logToActivity('Análisis de causa raíz completado.');
 
-                // Mapeo manual de claves extraídas a placeholders de la plantilla
-                const keyMapping = {
-                    'Nombre Completo': 'nombre_completo',
-                    'No Identificacion': 'no_identificacion',
-                    'Edad': 'edad',
-                    'Estado Civil': 'estado_civil',
-                    'Telefono/Celular': 'telefono_celular',
-                    'Tiempo en el Contrato': 'tiempo_en_el_contrato',
-                    'Experiencia en el Cargo': 'experiencia_en_el_cargo',
-                    'Dia de Turno': 'dia_de_turno',
-                    'Equipo que Operaba/Reparaba': 'equipo_que_operaba_reparaba',
-                    'Supervisor Inmediato': 'supervisor_inmediato',
-                    'Fecha del Accidente': 'fecha_accidente',
-                    'Hora del Accidente': 'hora_del_accidente',
-                    'Lugar del Accidente': 'lugar_accidente',
-                    'Sitio de Ocurrencia': 'sitio_ocurrencia',
-                    'Agente del Accidente': 'agente_accidente',
-                    'Tipo de Accidente': 'tipo_accidente',
-                    'Mecanismo o Forma del Accidente': 'mecanismo_accidente',
-                    'Tipo de Lesion': 'tipo_lesion',
-                    'Parte del Cuerpo Afectada': 'parte_cuerpo_afectada',
-                    'Descripcion del Accidente': 'descripcion_accidente',
-                    'Cargo': 'cargo'
-                };
+                // Combinar datos extraídos y de análisis sin mapeo manual en JS
+                const combinedData = { ...this.extractedData, ...this.analysisResult };
 
-                const normalizedExtracted = {};
-                Object.keys(this.extractedData).forEach(key => {
-                    const mappedKey = keyMapping[key] || key.toLowerCase().replace(/ /g, '_').replace(/[áéíóú]/g, m => ({ 'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u' })[m] || m).replace(/[^a-z0-9_]/g, '');
-                    normalizedExtracted[mappedKey] = this.extractedData[key].replace(/\n/g, ' '); // Limpiar saltos de línea
-                });
-
-                // Transformación de recomendaciones
-                const recommendations = [];
-                for (let i = 1; i <= 5; i++) {
-                    const pqKey = `Por Qué ${i}`;
-                    const pqData = this.analysisResult[pqKey] || {};
-                    if (pqData.causa) {
-                        recommendations.push(pqData.causa);
-                    }
-                }
-                const normalizedAnalysis = {
-                    'recomendacion_1': recommendations[0] || 'Implementar medidas de seguridad adicionales.',
-                    'recomendacion_2': recommendations[1] || 'Capacitar al personal en procedimientos seguros.',
-                    'recomendacion_3': recommendations[2] || 'Revisar mantenimiento de equipos.',
-                };
-
-                // Inferir checkboxes
-                const hasLesion = normalizedExtracted['tipo_lesion'] && normalizedExtracted['tipo_lesion'] !== '';
-                const isGrave = hasLesion && normalizedExtracted['tipo_lesion'].toLowerCase().includes('grave');
-                const isMortal = hasLesion && normalizedExtracted['tipo_lesion'].toLowerCase().includes('mortal');
-                const hasDano = normalizedExtracted['agente_accidente']?.toLowerCase().includes('equipo') || false;
-
-                normalizedExtracted['incidente_con_lesion'] = hasLesion ? 'X' : '';
-                normalizedExtracted['incidente_grave'] = isGrave ? 'X' : '';
-                normalizedExtracted['casi_accidente'] = !hasLesion ? 'X' : '';
-                normalizedExtracted['genero_muerte'] = isMortal ? 'X' : '';
-                normalizedExtracted['dano_a_la_propiedad'] = hasDano ? 'X' : '';
-
-                // Combinar y loggear
-                const combinedData = { ...normalizedExtracted, ...normalizedAnalysis, ...this.analysisResult };
                 this.logToActivity(`Datos combinados antes de enviar: ${JSON.stringify(combinedData)}`);
 
                 await this.generateAccidentReport(combinedData);
