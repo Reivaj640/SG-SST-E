@@ -246,12 +246,40 @@ def main():
         doc.render(normalized_data)
         logging.info("Plantilla renderizada exitosamente")
         send_progress("saving", 80, "Preparando para guardar informe...")
+        # --- Nueva lógica para generar nombre de archivo corto y seguro ---
         nombre_completo = normalized_data.get('nombre_completo', 'sin_nombre')
-        nombre_sanitizado = nombre_completo.replace('\n', ' ').replace('\r', '')
-        nombre_sanitizado = re.sub(r'[^\w\s.-]', '', nombre_sanitizado).replace(' ', '_')
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        output_filename = f"GI-FO-020_INVESTIGACION_{nombre_sanitizado}_{timestamp}.docx"
-        logging.info(f"Nombre de archivo: {output_filename}")
+        
+        # Procesamiento inteligente del nombre para acortarlo
+        name_parts = [part.strip() for part in nombre_completo.split('\n') if part.strip()]
+        if len(name_parts) > 1:
+            # Asume formatos como "SEGUNDO APELLIDO\nAPELLIDO1 APELLIDO2\nNOMBRES" y toma los últimos elementos
+            nombre_base = "_".join(name_parts[-2:])
+        else:
+            # Fallback para nombres en una sola línea
+            nombre_base = nombre_completo
+        
+        # Sanitización final del nombre
+        nombre_sanitizado = re.sub(r'[^\w\s.-]', '', nombre_base).replace(' ', '_').replace('__', '_')
+        
+        fecha = datetime.now().strftime('%Y%m%d')
+        
+        # Lógica para añadir contador si el archivo ya existe
+        base_filename = f"GI-FO-020_INVESTIGACION_{nombre_sanitizado}_{fecha}"
+        output_filename = f"{base_filename}.docx"
+        
+        # Para la comprobación, usamos una ruta normalizada que Path.exists() pueda manejar
+        # La función de guardado se encargará del prefijo \\?\ si es necesario
+        check_path = Path(os.path.normpath(preferred_output_dir))
+        
+        output_path_check = check_path / output_filename
+        counter = 1
+        while output_path_check.exists():
+            counter += 1
+            output_filename = f"{base_filename}_{counter}.docx"
+            output_path_check = check_path / output_filename
+            
+        logging.info(f"Nombre de archivo final (corto y seguro): {output_filename}")
+        
         final_path = guardar_documento_seguro(doc, preferred_output_dir, output_filename)
         send_progress("finished", 100, f"Informe guardado en: {final_path}")
         logging.info(f"Informe generado exitosamente: {final_path}")
