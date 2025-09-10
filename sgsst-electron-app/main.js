@@ -8,6 +8,13 @@ const { exec, spawn, execFile } = require('child_process'); // Asegúrate de inc
 const { promisify } = require('util');
 const xlsx = require('xlsx');
 const os = require('os');
+const { autoUpdater } = require('electron-updater');
+const log = require('electron-log');
+
+// --- Configuración del Auto-Updater ---
+log.transports.file.level = 'info';
+autoUpdater.logger = log;
+// ------------------------------------
 
 const execPromise = promisify(exec);
 const execFilePromise = promisify(execFile); // Añadir esta línea
@@ -1738,3 +1745,29 @@ app.on('window-all-closed', () => {
 
 // En este archivo puedes incluir el resto del código del proceso principal de tu aplicación.
 // También puedes ponerlos en archivos separados y requerirlos aquí.
+
+// --- Eventos del Auto-Updater ---
+
+autoUpdater.on('update-available', () => {
+  log.info('Actualización disponible.');
+  if (mainWindow) {
+    mainWindow.webContents.send('update_available');
+  }
+});
+
+autoUpdater.on('update-downloaded', () => {
+  log.info('Actualización descargada. Lista para ser instalada.');
+  if (mainWindow) {
+    mainWindow.webContents.send('update_downloaded');
+  }
+});
+
+autoUpdater.on('error', (err) => {
+  log.error('Error en el auto-updater: ' + err.toString());
+});
+
+// --- Manejador para reiniciar la aplicación ---
+ipcMain.on('restart_app', () => {
+  log.info('El usuario ha aceptado la actualización. Reiniciando para instalar...');
+  autoUpdater.quitAndInstall();
+});

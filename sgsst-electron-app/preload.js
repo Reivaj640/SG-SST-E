@@ -87,5 +87,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Convertir Excel a PDF usando Microsoft Office
   convertExcelToPdf: (filePath) => ipcRenderer.invoke('convertExcelToPdf', filePath),
+
+  // --- API para Auto Updater ---
+  onUpdateAvailable: (callback) => ipcRenderer.on('update_available', (event, ...args) => callback(...args)),
+  onUpdateDownloaded: (callback) => ipcRenderer.on('update_downloaded', (event, ...args) => callback(...args)),
+  restartApp: () => ipcRenderer.send('restart_app'),
   // -------------------------
 });

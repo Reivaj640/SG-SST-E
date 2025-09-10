@@ -1,23 +1,75 @@
 {
-  "name": "sgsst-desktop-app",
-  "version": "1.0.0",
-  "description": "Sistema SG-SST Desktop",
+  "name": "sgsst-electron-app",
+  "version": "0.1.1",
+  "description": "Sistema de Gestión de Seguridad y Salud en el Trabajo",
   "main": "main.js",
+  "author": "Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos.",
   "scripts": {
     "start": "electron .",
     "dev": "nodemon --exec electron . --watch ./",
     "build": "electron-builder",
-    "pack": "electron-builder --dir",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
     "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.jrfsoluciones.sgsst",
+    "productName": "SG-SST Electron App",
+    "copyright": "Copyright © 2025 Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos.",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+      "!**/node_modules/*.d.ts",
+      "!**/node_modules/.bin",
+      "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}",
+      "!.editorconfig",
+      "!**/._*",
+      "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}",
+      "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}",
+      "!**/{appveyor.yml,.travis.yml,circle.yml}",
+      "!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}",
+      "!Instructivo-Submodulos.txt",
+      "!Portear/.venv/**"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/shutterstock1.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.business"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png",
+      "category": "Business"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Reivaj640",
+        "repo": "SG-SST-E",
+        "private": false,
+        "releaseType": "draft"
+      }
+    ]
   },
   "devDependencies": {
     "electron": "^37.3.0",
     "electron-builder": "^26.0.12",
-    "electron-squirrel-startup": "^1.0.1",
     "nodemon": "^3.1.10"
   },
   "dependencies": {
     "vanilla-calendar-pro": "^3.0.5",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "electron-log": "^5.4.3",
+    "electron-squirrel-startup": "^1.0.1",
+    "electron-updater": "^6.6.2"
   }
 }

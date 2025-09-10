@@ -274,6 +274,24 @@ document.addEventListener('DOMContentLoaded', () => {
       logMessage(message, level);
     });
     logMessage('Renderer: Conectado al sistema de logs del proceso principal.', 'DEBUG');
+
+    // --- Lógica para Auto Updater ---
+    window.electronAPI.onUpdateAvailable(() => {
+      logMessage('Nueva actualización disponible. Descargando en segundo plano.', 'INFO');
+      // Opcional: Muestra una notificación no intrusiva en tu UI.
+      // Por ejemplo, usando tu función de alerta personalizada:
+      showCustomAlert('Hay una nueva actualización disponible y se está descargando.');
+    });
+
+    window.electronAPI.onUpdateDownloaded(() => {
+      logMessage('Actualización lista para instalar.', 'INFO');
+      // Usar confirm() es simple, pero una ventana modal personalizada sería mejor UX.
+      const userResponse = confirm('¡Actualización descargada! ¿Desea reiniciar la aplicación ahora para instalarla?');
+      if (userResponse) {
+        window.electronAPI.restartApp();
+      }
+    });
+
   } else {
     console.error('API de logging no disponible en window.electronAPI');
   }
