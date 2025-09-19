@@ -279,7 +279,7 @@ const registerIPCHandlers = () => {
       const command = `"C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe" "${pythonScriptPath}" "${directoryPath}"`;
       console.log(`Executing command: ${command}`);
       
-      const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath) });
+      const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath), shell: 'C:\\Windows\\System32\\cmd.exe' });
       
       // Parsear la salida JSON del script de Python
       const structure = JSON.parse(stdout);
@@ -489,7 +489,7 @@ const registerIPCHandlers = () => {
       const tempDataPath = path.join(app.getPath('temp'), `remision_data_${Date.now()}.json`);
       
       sendLog(`Ejecutando script de Python: python "${pythonScriptPath}" "${pdfPath}"`);
-      const { stdout, stderr } = await execPromise(`"C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe" "${pythonScriptPath}" "${pdfPath}"`, { cwd: path.dirname(pythonScriptPath) });
+      const { stdout, stderr } = await execPromise(`"C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe" "${pythonScriptPath}" "${pdfPath}"`, { cwd: path.dirname(pythonScriptPath), shell: 'C:\\Windows\\System32\\cmd.exe' });
       
       if (stderr) {
         sendLog(`Error en script de procesamiento de PDF: ${stderr}`, 'ERROR');
@@ -536,7 +536,7 @@ const registerIPCHandlers = () => {
       const command = `"C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe" "${pythonScriptPath}" "${docxPath}"`;
       
       console.log(`Executing DOCX conversion: ${command}`);
-      const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath) });
+      const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath), shell: 'C:\\Windows\\System32\\cmd.exe' });
 
       // Si stderr contiene nuestro error JSON específico, lo procesamos como error.
       if (stderr && stderr.includes('"success": false')) {
@@ -608,7 +608,7 @@ const registerIPCHandlers = () => {
       const command = `"C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe" "${pythonScriptPath}" --generate-remision "${tempDataPath}"`;
       
       sendLog(`Ejecutando script de generación de remisión: ${command.replace(/\\/g, '/')}`);
-      const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath) });
+      const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath), shell: 'C:\\Windows\\System32\\cmd.exe' });
       
       await fsp.unlink(tempDataPath);
       
@@ -714,7 +714,7 @@ const registerIPCHandlers = () => {
       const command = `"C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe" "${pythonScriptPath}" --send-email "${tempDataPath}"`;
       
       sendLog(`Ejecutando script de envío de email: ${command.replace(/\\/g, '/')}`);
-      const { stdout, stderr } = await execPromise(command, { encoding: 'utf-8', cwd: path.dirname(pythonScriptPath) });
+      const { stdout, stderr } = await execPromise(command, { encoding: 'utf-8', cwd: path.dirname(pythonScriptPath), shell: 'C:\\Windows\\System32\\cmd.exe' });
       
       await fsp.unlink(tempFilePath);
       await fsp.unlink(tempDataPath);
@@ -800,7 +800,7 @@ const registerIPCHandlers = () => {
       const command = `"C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe" "${pythonScriptPath}" --send-whatsapp "${tempDataPath}"`;
       
       sendLog(`Ejecutando script de preparación de WhatsApp: ${command.replace(/\\/g, '/')}`);
-      const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath) });
+      const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath), shell: 'C:\\Windows\\System32\\cmd.exe' });
       
       await fsp.unlink(tempDataPath);
       
@@ -888,7 +888,7 @@ const registerIPCHandlers = () => {
       sendLog(`IPC: process-accident-pdf (extract) recibido para: ${pdfPath}`);
       
       const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_processor.py');
-      const pythonProcess = spawn('C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe', [pythonScriptPath, 'extract', '--pdf_path', pdfPath], { cwd: path.dirname(pythonScriptPath) });
+      const pythonProcess = spawn('C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe', [pythonScriptPath, 'extract', '--pdf_path', pdfPath], { cwd: path.dirname(pythonScriptPath), shell: 'C:\\Windows\\System32\\cmd.exe' });
 
       let stdoutData = '';
       let stderrData = '';
@@ -937,7 +937,7 @@ const registerIPCHandlers = () => {
       
       const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_processor.py');
       const jsonData = JSON.stringify(extractedData);
-      const pythonProcess = spawn('C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe', [pythonScriptPath, 'analyze', '--json_data', jsonData, '--contexto', contextoAdicional], { cwd: path.dirname(pythonScriptPath) });
+      const pythonProcess = spawn('C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe', [pythonScriptPath, 'analyze', '--json_data', jsonData, '--contexto', contextoAdicional], { cwd: path.dirname(pythonScriptPath), shell: 'C:\\Windows\\System32\\cmd.exe' });
 
       let stdoutData = '';
       let stderrData = '';
@@ -1024,7 +1024,7 @@ const registerIPCHandlers = () => {
           '-X', 'utf8',
           pythonScriptPath,
           tempDataPath
-        ], { cwd: path.dirname(pythonScriptPath) });
+        ], { cwd: path.dirname(pythonScriptPath), shell: 'C:\\Windows\\System32\\cmd.exe' });
 
         let stdoutData = '';
         let stderrData = '';
@@ -1102,7 +1102,7 @@ const registerIPCHandlers = () => {
 
   ipcMain.handle('get-config', async (event, empresa) => {
       const investAppPath = path.join(__dirname, 'Portear', 'src', 'Invest_APP_V_3.py');
-      const { stdout } = await execFilePromise('C:\Users\Javier RF\AppData\Local\Programs\Python\Python310\python.exe', [investAppPath, '--get-config', empresa], { cwd: path.dirname(investAppPath) });
+      const { stdout } = await execFilePromise('C:\Users\Javier RF\AppData\Local\Programs\Python\Python310\python.exe', [investAppPath, '--get-config', empresa], { cwd: path.dirname(investAppPath), shell: 'C:\Windows\System32\cmd.exe' });
       return JSON.parse(stdout.trim());
   });
 
@@ -1207,7 +1207,7 @@ const registerIPCHandlers = () => {
         const command = `"C:\Users\Javier RF\AppData\Local\Programs\Python\Python310\python.exe" "${pythonScriptPath}" "${tempDataPath}" "${filePath}"`;
         
         sendLog(`Ejecutando script de generación de acta: ${command.replace(/\\/g, '/')}`);
-        const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath) });
+        const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath), shell: 'C:\\Windows\\System32\\cmd.exe' });
         
         // 4. Limpiar el archivo temporal
         await fsp.unlink(tempDataPath);
@@ -1274,7 +1274,7 @@ const registerIPCHandlers = () => {
         const command = `"C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe" "${pythonScriptPath}" "${tempDataPath}" "${filePath}"`;
         
         sendLog(`Ejecutando script de generación de acta de convivencia: ${command.replace(/\\/g, '/')}`);
-        const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath) });
+        const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath), shell: 'C:\\Windows\\System32\\cmd.exe' });
         
         // 4. Limpiar el archivo temporal
         await fsp.unlink(tempDataPath);
@@ -1594,7 +1594,7 @@ try {
         ], {
             stdio: ['ignore', 'pipe', 'pipe'],
             windowsHide: false, // Mostrar ventana para debugging si es necesario
-            shell: false,
+            shell: 'C:\\Windows\\System32\\cmd.exe',
             cwd: path.dirname(inputPath) // Establecer directorio de trabajo
         });
 
