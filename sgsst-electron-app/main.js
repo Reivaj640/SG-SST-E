@@ -276,7 +276,7 @@ const registerIPCHandlers = () => {
       }
       
       // Ejecutar el script de Python
-      const command = `python "${pythonScriptPath}" "${directoryPath}"`;
+      const command = `"C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe" "${pythonScriptPath}" "${directoryPath}"`;
       console.log(`Executing command: ${command}`);
       
       const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath) });
@@ -489,7 +489,7 @@ const registerIPCHandlers = () => {
       const tempDataPath = path.join(app.getPath('temp'), `remision_data_${Date.now()}.json`);
       
       sendLog(`Ejecutando script de Python: python "${pythonScriptPath}" "${pdfPath}"`);
-      const { stdout, stderr } = await execPromise(`python "${pythonScriptPath}" "${pdfPath}"`, { cwd: path.dirname(pythonScriptPath) });
+      const { stdout, stderr } = await execPromise(`"C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe" "${pythonScriptPath}" "${pdfPath}"`, { cwd: path.dirname(pythonScriptPath) });
       
       if (stderr) {
         sendLog(`Error en script de procesamiento de PDF: ${stderr}`, 'ERROR');
@@ -533,7 +533,7 @@ const registerIPCHandlers = () => {
   ipcMain.handle('convert-docx-to-pdf', async (event, docxPath) => {
     try {
       const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'convert_docx_to_pdf.py');
-      const command = `python "${pythonScriptPath}" "${docxPath}"`;
+      const command = `"C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe" "${pythonScriptPath}" "${docxPath}"`;
       
       console.log(`Executing DOCX conversion: ${command}`);
       const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath) });
@@ -605,7 +605,7 @@ const registerIPCHandlers = () => {
       sendLog(`Creando archivo de datos temporal: ${tempDataPath}`);
       await fsp.writeFile(tempDataPath, JSON.stringify({ data: extractedData, empresa: empresa }));
       
-      const command = `python "${pythonScriptPath}" --generate-remision "${tempDataPath}"`;
+      const command = `"C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe" "${pythonScriptPath}" --generate-remision "${tempDataPath}"`;
       
       sendLog(`Ejecutando script de generación de remisión: ${command.replace(/\\/g, '/')}`);
       const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath) });
@@ -711,7 +711,7 @@ const registerIPCHandlers = () => {
       sendLog(`Creando archivo de datos temporal para email: ${tempDataPath}`);
       await fsp.writeFile(tempDataPath, JSON.stringify(tempData), 'utf-8');
       
-      const command = `python "${pythonScriptPath}" --send-email "${tempDataPath}"`;
+      const command = `"C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe" "${pythonScriptPath}" --send-email "${tempDataPath}"`;
       
       sendLog(`Ejecutando script de envío de email: ${command.replace(/\\/g, '/')}`);
       const { stdout, stderr } = await execPromise(command, { encoding: 'utf-8', cwd: path.dirname(pythonScriptPath) });
@@ -797,7 +797,7 @@ const registerIPCHandlers = () => {
         empresa: empresa 
       }));
       
-      const command = `python "${pythonScriptPath}" --send-whatsapp "${tempDataPath}"`;
+      const command = `"C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe" "${pythonScriptPath}" --send-whatsapp "${tempDataPath}"`;
       
       sendLog(`Ejecutando script de preparación de WhatsApp: ${command.replace(/\\/g, '/')}`);
       const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath) });
@@ -888,7 +888,7 @@ const registerIPCHandlers = () => {
       sendLog(`IPC: process-accident-pdf (extract) recibido para: ${pdfPath}`);
       
       const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_processor.py');
-      const pythonProcess = spawn('python', [pythonScriptPath, 'extract', '--pdf_path', pdfPath], { cwd: path.dirname(pythonScriptPath) });
+      const pythonProcess = spawn('C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe', [pythonScriptPath, 'extract', '--pdf_path', pdfPath], { cwd: path.dirname(pythonScriptPath) });
 
       let stdoutData = '';
       let stderrData = '';
@@ -937,7 +937,7 @@ const registerIPCHandlers = () => {
       
       const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_processor.py');
       const jsonData = JSON.stringify(extractedData);
-      const pythonProcess = spawn('python', [pythonScriptPath, 'analyze', '--json_data', jsonData, '--contexto', contextoAdicional], { cwd: path.dirname(pythonScriptPath) });
+      const pythonProcess = spawn('C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe', [pythonScriptPath, 'analyze', '--json_data', jsonData, '--contexto', contextoAdicional], { cwd: path.dirname(pythonScriptPath) });
 
       let stdoutData = '';
       let stderrData = '';
@@ -1012,7 +1012,7 @@ const registerIPCHandlers = () => {
         sendLog(`Creando archivo de datos temporal: ${tempDataPath}`);
         await fsp.writeFile(tempDataPath, JSON.stringify(reportData, null, 2));
         
-        const pythonExecutable = 'python';
+        const pythonExecutable = 'C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe';
         const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_report_generator.py');
 
         // Verificar que el script existe
@@ -1102,7 +1102,7 @@ const registerIPCHandlers = () => {
 
   ipcMain.handle('get-config', async (event, empresa) => {
       const investAppPath = path.join(__dirname, 'Portear', 'src', 'Invest_APP_V_3.py');
-      const { stdout } = await execFilePromise('python', [investAppPath, '--get-config', empresa], { cwd: path.dirname(investAppPath) });
+      const { stdout } = await execFilePromise('C:\Users\Javier RF\AppData\Local\Programs\Python\Python310\python.exe', [investAppPath, '--get-config', empresa], { cwd: path.dirname(investAppPath) });
       return JSON.parse(stdout.trim());
   });
 
@@ -1204,7 +1204,7 @@ const registerIPCHandlers = () => {
         await fsp.writeFile(tempDataPath, JSON.stringify({ changes }, null, 2));
 
         // 3. Ejecutar el script de Python con la ruta del JSON y la ruta de salida
-        const command = `python "${pythonScriptPath}" "${tempDataPath}" "${filePath}"`;
+        const command = `"C:\Users\Javier RF\AppData\Local\Programs\Python\Python310\python.exe" "${pythonScriptPath}" "${tempDataPath}" "${filePath}"`;
         
         sendLog(`Ejecutando script de generación de acta: ${command.replace(/\\/g, '/')}`);
         const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath) });
@@ -1271,7 +1271,7 @@ const registerIPCHandlers = () => {
         await fsp.writeFile(tempDataPath, JSON.stringify({ changes }, null, 2));
 
         // 3. Ejecutar el script de Python
-        const command = `python "${pythonScriptPath}" "${tempDataPath}" "${filePath}"`;
+        const command = `"C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe" "${pythonScriptPath}" "${tempDataPath}" "${filePath}"`;
         
         sendLog(`Ejecutando script de generación de acta de convivencia: ${command.replace(/\\/g, '/')}`);
         const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath) });
