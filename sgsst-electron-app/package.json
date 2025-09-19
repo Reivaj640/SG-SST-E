@@ -1,6 +1,6 @@
 {
   "name": "sgsst-electron-app",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Sistema de Gestión de Seguridad y Salud en el Trabajo",
   "main": "main.js",
   "author": "Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos.",
