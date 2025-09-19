@@ -10,6 +10,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Guardar y cargar configuración
   saveConfig: (config) => ipcRenderer.invoke('save-config', config),
   loadConfig: () => ipcRenderer.invoke('load-config'),
+
+  // Obtener la versión de la aplicación
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   
   // Mapear estructura de directorio
   mapDirectory: (path) => ipcRenderer.invoke('map-directory', path),

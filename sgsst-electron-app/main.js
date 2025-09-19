@@ -88,6 +88,10 @@ const registerIPCHandlers = () => {
   });
 
   // Manejar carga de configuración
+  ipcMain.handle('get-app-version', () => {
+    return app.getVersion();
+  });
+
   ipcMain.handle('load-config', async () => {
     try {
       console.log('Loading config from:', configPath);

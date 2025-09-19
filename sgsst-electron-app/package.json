@@ -1,6 +1,6 @@
 {
   "name": "sgsst-electron-app",
-  "version": "0.1.4",
+  "version": "0.1.4b",
   "description": "Sistema de Gestión de Seguridad y Salud en el Trabajo",
   "main": "main.js",
   "author": "Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos.",
@@ -11,7 +11,8 @@
     "build:win": "electron-builder --win",
     "build:mac": "electron-builder --mac",
     "build:linux": "electron-builder --linux",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s"
   },
   "build": {
     "appId": "com.jrfsoluciones.sgsst",
@@ -61,15 +62,16 @@
     ]
   },
   "devDependencies": {
+    "conventional-changelog-cli": "^5.0.0",
     "electron": "^37.3.0",
     "electron-builder": "^26.0.12",
     "nodemon": "^3.1.10"
   },
   "dependencies": {
-    "vanilla-calendar-pro": "^3.0.5",
-    "xlsx": "^0.18.5",
     "electron-log": "^5.4.3",
     "electron-squirrel-startup": "^1.0.1",
-    "electron-updater": "^6.6.2"
+    "electron-updater": "^6.6.2",
+    "vanilla-calendar-pro": "^3.0.5",
+    "xlsx": "^0.18.5"
   }
 }

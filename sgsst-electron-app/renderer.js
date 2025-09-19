@@ -256,8 +256,19 @@ let companyLogoPlaceholder;
 
 // --- Inicialización ---
 // Esperar a que el DOM esté completamente cargado
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   console.log('DOM fully loaded and parsed.');
+
+  // Cargar y mostrar la versión de la aplicación
+  try {
+    const version = await window.electronAPI.getAppVersion();
+    const versionElement = document.getElementById('app-version');
+    if (versionElement) {
+      versionElement.innerText = `v${version}`;
+    }
+  } catch (error) {
+    console.error('Error al obtener la versión de la app:', error);
+  }
 
   // Obtener referencias a los elementos del DOM
   contentArea = document.getElementById('content-area');
