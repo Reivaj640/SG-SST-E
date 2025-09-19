@@ -1725,6 +1725,9 @@ app.whenReady().then(() => {
   registerIPCHandlers(); // Registrar todos los manejadores de eventos
   createWindow(); // Crear la ventana principal
 
+  // Iniciar la búsqueda de actualizaciones una vez que la app está lista
+  autoUpdater.checkForUpdatesAndNotify();
+
   app.on('activate', () => {
     // En macOS, es común volver a crear una ventana en la aplicación cuando
     // se hace clic en el ícono del dock y no hay otras ventanas abiertas.
