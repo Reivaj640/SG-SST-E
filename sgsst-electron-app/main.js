@@ -536,11 +536,11 @@ const registerIPCHandlers = () => {
       const command = `"C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe" "${pythonScriptPath}" "${docxPath}"`;
       
       console.log(`Executing DOCX conversion: ${command}`);
-      const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath), shell: 'C:\\Windows\\System32\\cmd.exe' });
+      const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath), shell: true });
 
       // Si stderr contiene nuestro error JSON específico, lo procesamos como error.
       if (stderr && stderr.includes('"success": false')) {
-        try {
+        try {;
           const errJsonMatch = stderr.match(/\{.*\}/s);
           if (errJsonMatch && errJsonMatch[0]) {
             return JSON.parse(errJsonMatch[0]);
