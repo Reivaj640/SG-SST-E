@@ -10,6 +10,7 @@ const xlsx = require('xlsx');
 const os = require('os');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
+const { spawn } = require('child_process');
 
 // --- Configuración del Auto-Updater ---
 log.transports.file.level = 'info';
@@ -529,50 +530,154 @@ const registerIPCHandlers = () => {
     }
   });
 
-  // Manejar conversión de DOCX a PDF para previsualización
+  // Función auxiliar para ejecutar Python con spawn
+function executePythonScript(pythonPath, scriptPath, docxPath) {
+  return new Promise((resolve, reject) => {
+    console.log(`[DEBUG] Iniciando spawn de Python:`);
+    console.log(`[DEBUG] - Python: ${pythonPath}`);
+    console.log(`[DEBUG] - Script: ${scriptPath}`);
+    console.log(`[DEBUG] - DOCX: ${docxPath}`);
+    console.log(`[DEBUG] - CWD: ${path.dirname(scriptPath)}`);
+
+    const pythonProcess = spawn(pythonPath, [scriptPath, docxPath], {
+      cwd: path.dirname(scriptPath),
+      stdio: ['pipe', 'pipe', 'pipe'],
+      shell: false // Sin shell para evitar problemas con cmd.exe
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    pythonProcess.stdout.on('data', (data) => {
+      const chunk = data.toString();
+      console.log(`[DEBUG STDOUT]: ${chunk}`);
+      stdout += chunk;
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+      const chunk = data.toString();
+      console.log(`[DEBUG STDERR]: ${chunk}`);
+      stderr += chunk;
+    });
+
+    pythonProcess.on('close', (code) => {
+      console.log(`[DEBUG] Proceso Python terminado con código: ${code}`);
+      console.log(`[DEBUG] STDOUT completo: ${stdout}`);
+      console.log(`[DEBUG] STDERR completo: ${stderr}`);
+      
+      if (code !== 0) {
+        reject(new Error(`Proceso Python terminó con código ${code}. STDERR: ${stderr}`));
+        return;
+      }
+      
+      resolve({ stdout, stderr });
+    });
+
+    pythonProcess.on('error', (error) => {
+      console.error(`[DEBUG ERROR] Error al iniciar proceso Python:`, error);
+      reject(new Error(`Error al iniciar proceso Python: ${error.message}`));
+    });
+
+    // Timeout de seguridad
+    setTimeout(() => {
+      if (!pythonProcess.killed) {
+        console.log(`[DEBUG] Matando proceso Python por timeout`);
+        pythonProcess.kill();
+        reject(new Error('Timeout: El proceso de conversión tardó demasiado'));
+      }
+    }, 60000); // 60 segundos timeout
+  });
+}
+
+  // Handler principal para conversión de DOCX a PDF
   ipcMain.handle('convert-docx-to-pdf', async (event, docxPath) => {
+    console.log(`[DEBUG] === INICIANDO CONVERSIÓN DOCX A PDF ===`);
+    console.log(`[DEBUG] Archivo solicitado: ${docxPath}`);
+    
     try {
       const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'convert_docx_to_pdf.py');
-      const command = `"C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe" "${pythonScriptPath}" "${docxPath}"`;
+      const pythonExePath = "C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe";
       
-      console.log(`Executing DOCX conversion: ${command}`);
-      const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath), shell: true });
-
+      console.log(`[DEBUG] Rutas calculadas:`);
+      console.log(`[DEBUG] - __dirname: ${__dirname}`);
+      console.log(`[DEBUG] - Python script: ${pythonScriptPath}`);
+      console.log(`[DEBUG] - Python exe: ${pythonExePath}`);
+      console.log(`[DEBUG] - Working directory: ${process.cwd()}`);
+      
+      // Verificar existencia de archivos
+      console.log(`[DEBUG] Verificando existencia de archivos...`);
+      
+      if (!fs.existsSync(pythonExePath)) {
+        console.error(`[DEBUG ERROR] Python executable no encontrado: ${pythonExePath}`);
+        return { success: false, error: `Python no encontrado en: ${pythonExePath}` };
+      }
+      console.log(`[DEBUG] ✓ Python executable encontrado`);
+      
+      if (!fs.existsSync(pythonScriptPath)) {
+        console.error(`[DEBUG ERROR] Script de Python no encontrado: ${pythonScriptPath}`);
+        return { success: false, error: `Script no encontrado en: ${pythonScriptPath}` };
+      }
+      console.log(`[DEBUG] ✓ Script de Python encontrado`);
+      
+      if (!fs.existsSync(docxPath)) {
+        console.error(`[DEBUG ERROR] Archivo DOCX no encontrado: ${docxPath}`);
+        return { success: false, error: `Archivo DOCX no encontrado: ${docxPath}` };
+      }
+      console.log(`[DEBUG] ✓ Archivo DOCX encontrado`);
+      
+      // Intentar la conversión
+      console.log(`[DEBUG] Ejecutando conversión...`);
+      const { stdout, stderr } = await executePythonScript(pythonExePath, pythonScriptPath, docxPath);
+      
+      // Procesar respuesta
+      console.log(`[DEBUG] Procesando respuesta del script...`);
+      
       // Si stderr contiene nuestro error JSON específico, lo procesamos como error.
       if (stderr && stderr.includes('"success": false')) {
-        try {;
+        console.log(`[DEBUG] Error detectado en STDERR`);
+        try {
           const errJsonMatch = stderr.match(/\{.*\}/s);
           if (errJsonMatch && errJsonMatch[0]) {
+            console.log(`[DEBUG] JSON de error parseado correctamente`);
             return JSON.parse(errJsonMatch[0]);
           }
-          // Fallback si la expresión regular falla
-          throw new Error(`Error en script (no se pudo parsear JSON de error): ${stderr}`);
+          throw new Error(`Error en script (no se pudo parsear JSON): ${stderr}`);
         } catch (e) {
-          throw new Error(`Error al procesar error del script: ${stderr}`);
+          console.error(`[DEBUG] Error parseando JSON de error:`, e);
+          return { success: false, error: `Error del script: ${stderr}` };
         }
       }
-
-      // Si stderr solo contenía la barra de progreso, lo ignoramos y confiamos en stdout.
+      
       if (!stdout) {
-        const errorMessage = stderr ? `El script produjo un error o mensaje inesperado: ${stderr}` : 'El script de conversión no produjo ninguna salida.';
-        throw new Error(errorMessage);
+        const errorMessage = stderr ? 
+          `El script produjo un error: ${stderr}` : 
+          'El script no produjo ninguna salida.';
+        console.error(`[DEBUG ERROR] Sin STDOUT: ${errorMessage}`);
+        return { success: false, error: errorMessage };
       }
-
-      // Buscamos el JSON de éxito en stdout.
+      
+      // Buscar JSON de éxito en stdout
+      console.log(`[DEBUG] Buscando JSON en STDOUT...`);
       const jsonMatch = stdout.match(/\{.*\}/s);
       if (jsonMatch && jsonMatch[0]) {
         try {
-          return JSON.parse(jsonMatch[0]);
+          const result = JSON.parse(jsonMatch[0]);
+          console.log(`[DEBUG] ✓ Conversión exitosa:`, result);
+          return result;
         } catch (e) {
-          throw new Error(`Error al parsear la salida JSON del script: ${e.message}. Salida recibida: ${stdout}`);
+          console.error(`[DEBUG ERROR] Error parseando JSON de éxito:`, e);
+          return { success: false, error: `Error parseando respuesta: ${e.message}. STDOUT: ${stdout}` };
         }
       }
       
-      throw new Error(`No se encontró una respuesta JSON válida en la salida del script. Salida recibida: ${stdout}`);
-
+      console.error(`[DEBUG ERROR] No se encontró JSON válido en STDOUT: ${stdout}`);
+      return { success: false, error: `Respuesta inválida del script. STDOUT: ${stdout}` };
+      
     } catch (error) {
-      console.error('Error executing DOCX conversion script:', error);
+      console.error(`[DEBUG ERROR] Error general en conversión:`, error);
       return { success: false, error: error.message };
+    } finally {
+      console.log(`[DEBUG] === FIN DE CONVERSIÓN DOCX A PDF ===`);
     }
   });
 
