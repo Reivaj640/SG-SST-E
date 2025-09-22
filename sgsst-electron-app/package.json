@@ -1,11 +1,14 @@
 {
   "name": "sgsst-electron-app",
-  "version": "0.1.8",
-  "description": "Sistema de Gestión de Seguridad y Salud en el Trabajo",
+  "version": "0.1.10",
+  "description": "Sistema de GestiÃ³n de Seguridad y Salud en el Trabajo",
   "main": "main.js",
   "author": "Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos.",
   "scripts": {
     "start": "electron .",
+    "debug": "electron debug-app.js",
+    "debug-main": "electron debug-main.js",
+    "debug-full": "electron debug-full.js",
     "dev": "nodemon --exec electron . --watch ./",
     "build": "electron-builder",
     "build:win": "electron-builder --win",
@@ -17,7 +20,7 @@
   "build": {
     "appId": "com.jrfsoluciones.sgsst",
     "productName": "SG-SST Electron App",
-    "copyright": "Copyright © 2025 Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos.",
+    "copyright": "Copyright Â© 2025 Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos.",
     "directories": {
       "output": "dist"
     },
@@ -35,7 +38,15 @@
       "!**/{appveyor.yml,.travis.yml,circle.yml}",
       "!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}",
       "!Instructivo-Submodulos.txt",
-      "!Portear/.venv/**"
+      "!Portear/.venv/**",
+      "!Portear/__pycache__/**"
+    ],
+    "extraResources": [
+      {
+        "from": "Portear/src",
+        "to": "python-scripts",
+        "filter": ["**/*.py"]
+      }
     ],
     "win": {
       "target": "nsis",

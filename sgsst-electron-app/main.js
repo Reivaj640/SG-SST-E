@@ -10,7 +10,6 @@ const xlsx = require('xlsx');
 const os = require('os');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
-const { spawn } = require('child_process');
 
 // --- Configuración del Auto-Updater ---
 log.transports.file.level = 'info';
@@ -89,10 +88,6 @@ const registerIPCHandlers = () => {
   });
 
   // Manejar carga de configuración
-  ipcMain.handle('get-app-version', () => {
-    return app.getVersion();
-  });
-
   ipcMain.handle('load-config', async () => {
     try {
       console.log('Loading config from:', configPath);
@@ -277,10 +272,10 @@ const registerIPCHandlers = () => {
       }
       
       // Ejecutar el script de Python
-      const command = `"C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe" "${pythonScriptPath}" "${directoryPath}"`;
+      const command = `python "${pythonScriptPath}" "${directoryPath}"`;
       console.log(`Executing command: ${command}`);
       
-      const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath), shell: 'C:\\Windows\\System32\\cmd.exe' });
+      const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath) });
       
       // Parsear la salida JSON del script de Python
       const structure = JSON.parse(stdout);
@@ -490,7 +485,7 @@ const registerIPCHandlers = () => {
       const tempDataPath = path.join(app.getPath('temp'), `remision_data_${Date.now()}.json`);
       
       sendLog(`Ejecutando script de Python: python "${pythonScriptPath}" "${pdfPath}"`);
-      const { stdout, stderr } = await execPromise(`"C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe" "${pythonScriptPath}" "${pdfPath}"`, { cwd: path.dirname(pythonScriptPath), shell: 'C:\\Windows\\System32\\cmd.exe' });
+      const { stdout, stderr } = await execPromise(`python "${pythonScriptPath}" "${pdfPath}"`, { cwd: path.dirname(pythonScriptPath) });
       
       if (stderr) {
         sendLog(`Error en script de procesamiento de PDF: ${stderr}`, 'ERROR');
@@ -530,154 +525,50 @@ const registerIPCHandlers = () => {
     }
   });
 
-  // Función auxiliar para ejecutar Python con spawn
-function executePythonScript(pythonPath, scriptPath, docxPath) {
-  return new Promise((resolve, reject) => {
-    console.log(`[DEBUG] Iniciando spawn de Python:`);
-    console.log(`[DEBUG] - Python: ${pythonPath}`);
-    console.log(`[DEBUG] - Script: ${scriptPath}`);
-    console.log(`[DEBUG] - DOCX: ${docxPath}`);
-    console.log(`[DEBUG] - CWD: ${path.dirname(scriptPath)}`);
-
-    const pythonProcess = spawn(pythonPath, [scriptPath, docxPath], {
-      cwd: path.dirname(scriptPath),
-      stdio: ['pipe', 'pipe', 'pipe'],
-      shell: false // Sin shell para evitar problemas con cmd.exe
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    pythonProcess.stdout.on('data', (data) => {
-      const chunk = data.toString();
-      console.log(`[DEBUG STDOUT]: ${chunk}`);
-      stdout += chunk;
-    });
-
-    pythonProcess.stderr.on('data', (data) => {
-      const chunk = data.toString();
-      console.log(`[DEBUG STDERR]: ${chunk}`);
-      stderr += chunk;
-    });
-
-    pythonProcess.on('close', (code) => {
-      console.log(`[DEBUG] Proceso Python terminado con código: ${code}`);
-      console.log(`[DEBUG] STDOUT completo: ${stdout}`);
-      console.log(`[DEBUG] STDERR completo: ${stderr}`);
-      
-      if (code !== 0) {
-        reject(new Error(`Proceso Python terminó con código ${code}. STDERR: ${stderr}`));
-        return;
-      }
-      
-      resolve({ stdout, stderr });
-    });
-
-    pythonProcess.on('error', (error) => {
-      console.error(`[DEBUG ERROR] Error al iniciar proceso Python:`, error);
-      reject(new Error(`Error al iniciar proceso Python: ${error.message}`));
-    });
-
-    // Timeout de seguridad
-    setTimeout(() => {
-      if (!pythonProcess.killed) {
-        console.log(`[DEBUG] Matando proceso Python por timeout`);
-        pythonProcess.kill();
-        reject(new Error('Timeout: El proceso de conversión tardó demasiado'));
-      }
-    }, 60000); // 60 segundos timeout
-  });
-}
-
-  // Handler principal para conversión de DOCX a PDF
+  // Manejar conversión de DOCX a PDF para previsualización
   ipcMain.handle('convert-docx-to-pdf', async (event, docxPath) => {
-    console.log(`[DEBUG] === INICIANDO CONVERSIÓN DOCX A PDF ===`);
-    console.log(`[DEBUG] Archivo solicitado: ${docxPath}`);
-    
     try {
       const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'convert_docx_to_pdf.py');
-      const pythonExePath = "C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe";
+      const command = `python "${pythonScriptPath}" "${docxPath}"`;
       
-      console.log(`[DEBUG] Rutas calculadas:`);
-      console.log(`[DEBUG] - __dirname: ${__dirname}`);
-      console.log(`[DEBUG] - Python script: ${pythonScriptPath}`);
-      console.log(`[DEBUG] - Python exe: ${pythonExePath}`);
-      console.log(`[DEBUG] - Working directory: ${process.cwd()}`);
-      
-      // Verificar existencia de archivos
-      console.log(`[DEBUG] Verificando existencia de archivos...`);
-      
-      if (!fs.existsSync(pythonExePath)) {
-        console.error(`[DEBUG ERROR] Python executable no encontrado: ${pythonExePath}`);
-        return { success: false, error: `Python no encontrado en: ${pythonExePath}` };
-      }
-      console.log(`[DEBUG] ✓ Python executable encontrado`);
-      
-      if (!fs.existsSync(pythonScriptPath)) {
-        console.error(`[DEBUG ERROR] Script de Python no encontrado: ${pythonScriptPath}`);
-        return { success: false, error: `Script no encontrado en: ${pythonScriptPath}` };
-      }
-      console.log(`[DEBUG] ✓ Script de Python encontrado`);
-      
-      if (!fs.existsSync(docxPath)) {
-        console.error(`[DEBUG ERROR] Archivo DOCX no encontrado: ${docxPath}`);
-        return { success: false, error: `Archivo DOCX no encontrado: ${docxPath}` };
-      }
-      console.log(`[DEBUG] ✓ Archivo DOCX encontrado`);
-      
-      // Intentar la conversión
-      console.log(`[DEBUG] Ejecutando conversión...`);
-      const { stdout, stderr } = await executePythonScript(pythonExePath, pythonScriptPath, docxPath);
-      
-      // Procesar respuesta
-      console.log(`[DEBUG] Procesando respuesta del script...`);
-      
+      console.log(`Executing DOCX conversion: ${command}`);
+      const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath) });
+
       // Si stderr contiene nuestro error JSON específico, lo procesamos como error.
       if (stderr && stderr.includes('"success": false')) {
-        console.log(`[DEBUG] Error detectado en STDERR`);
         try {
           const errJsonMatch = stderr.match(/\{.*\}/s);
           if (errJsonMatch && errJsonMatch[0]) {
-            console.log(`[DEBUG] JSON de error parseado correctamente`);
             return JSON.parse(errJsonMatch[0]);
           }
-          throw new Error(`Error en script (no se pudo parsear JSON): ${stderr}`);
+          // Fallback si la expresión regular falla
+          throw new Error(`Error en script (no se pudo parsear JSON de error): ${stderr}`);
         } catch (e) {
-          console.error(`[DEBUG] Error parseando JSON de error:`, e);
-          return { success: false, error: `Error del script: ${stderr}` };
+          throw new Error(`Error al procesar error del script: ${stderr}`);
         }
       }
-      
+
+      // Si stderr solo contenía la barra de progreso, lo ignoramos y confiamos en stdout.
       if (!stdout) {
-        const errorMessage = stderr ? 
-          `El script produjo un error: ${stderr}` : 
-          'El script no produjo ninguna salida.';
-        console.error(`[DEBUG ERROR] Sin STDOUT: ${errorMessage}`);
-        return { success: false, error: errorMessage };
+        const errorMessage = stderr ? `El script produjo un error o mensaje inesperado: ${stderr}` : 'El script de conversión no produjo ninguna salida.';
+        throw new Error(errorMessage);
       }
-      
-      // Buscar JSON de éxito en stdout
-      console.log(`[DEBUG] Buscando JSON en STDOUT...`);
+
+      // Buscamos el JSON de éxito en stdout.
       const jsonMatch = stdout.match(/\{.*\}/s);
       if (jsonMatch && jsonMatch[0]) {
         try {
-          const result = JSON.parse(jsonMatch[0]);
-          console.log(`[DEBUG] ✓ Conversión exitosa:`, result);
-          return result;
+          return JSON.parse(jsonMatch[0]);
         } catch (e) {
-          console.error(`[DEBUG ERROR] Error parseando JSON de éxito:`, e);
-          return { success: false, error: `Error parseando respuesta: ${e.message}. STDOUT: ${stdout}` };
+          throw new Error(`Error al parsear la salida JSON del script: ${e.message}. Salida recibida: ${stdout}`);
         }
       }
       
-      console.error(`[DEBUG ERROR] No se encontró JSON válido en STDOUT: ${stdout}`);
-      return { success: false, error: `Respuesta inválida del script. STDOUT: ${stdout}` };
-      
+      throw new Error(`No se encontró una respuesta JSON válida en la salida del script. Salida recibida: ${stdout}`);
+
     } catch (error) {
-      console.error(`[DEBUG ERROR] Error general en conversión:`, error);
+      console.error('Error executing DOCX conversion script:', error);
       return { success: false, error: error.message };
-    } finally {
-      console.log(`[DEBUG] === FIN DE CONVERSIÓN DOCX A PDF ===`);
     }
   });
 
@@ -710,10 +601,10 @@ function executePythonScript(pythonPath, scriptPath, docxPath) {
       sendLog(`Creando archivo de datos temporal: ${tempDataPath}`);
       await fsp.writeFile(tempDataPath, JSON.stringify({ data: extractedData, empresa: empresa }));
       
-      const command = `"C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe" "${pythonScriptPath}" --generate-remision "${tempDataPath}"`;
+      const command = `python "${pythonScriptPath}" --generate-remision "${tempDataPath}"`;
       
       sendLog(`Ejecutando script de generación de remisión: ${command.replace(/\\/g, '/')}`);
-      const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath), shell: 'C:\\Windows\\System32\\cmd.exe' });
+      const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath) });
       
       await fsp.unlink(tempDataPath);
       
@@ -816,10 +707,10 @@ function executePythonScript(pythonPath, scriptPath, docxPath) {
       sendLog(`Creando archivo de datos temporal para email: ${tempDataPath}`);
       await fsp.writeFile(tempDataPath, JSON.stringify(tempData), 'utf-8');
       
-      const command = `"C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe" "${pythonScriptPath}" --send-email "${tempDataPath}"`;
+      const command = `python "${pythonScriptPath}" --send-email "${tempDataPath}"`;
       
       sendLog(`Ejecutando script de envío de email: ${command.replace(/\\/g, '/')}`);
-      const { stdout, stderr } = await execPromise(command, { encoding: 'utf-8', cwd: path.dirname(pythonScriptPath), shell: 'C:\\Windows\\System32\\cmd.exe' });
+      const { stdout, stderr } = await execPromise(command, { encoding: 'utf-8', cwd: path.dirname(pythonScriptPath) });
       
       await fsp.unlink(tempFilePath);
       await fsp.unlink(tempDataPath);
@@ -902,10 +793,10 @@ function executePythonScript(pythonPath, scriptPath, docxPath) {
         empresa: empresa 
       }));
       
-      const command = `"C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe" "${pythonScriptPath}" --send-whatsapp "${tempDataPath}"`;
+      const command = `python "${pythonScriptPath}" --send-whatsapp "${tempDataPath}"`;
       
       sendLog(`Ejecutando script de preparación de WhatsApp: ${command.replace(/\\/g, '/')}`);
-      const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath), shell: 'C:\\Windows\\System32\\cmd.exe' });
+      const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath) });
       
       await fsp.unlink(tempDataPath);
       
@@ -993,7 +884,7 @@ function executePythonScript(pythonPath, scriptPath, docxPath) {
       sendLog(`IPC: process-accident-pdf (extract) recibido para: ${pdfPath}`);
       
       const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_processor.py');
-      const pythonProcess = spawn('C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe', [pythonScriptPath, 'extract', '--pdf_path', pdfPath], { cwd: path.dirname(pythonScriptPath), shell: 'C:\\Windows\\System32\\cmd.exe' });
+      const pythonProcess = spawn('python', [pythonScriptPath, 'extract', '--pdf_path', pdfPath], { cwd: path.dirname(pythonScriptPath) });
 
       let stdoutData = '';
       let stderrData = '';
@@ -1042,7 +933,7 @@ function executePythonScript(pythonPath, scriptPath, docxPath) {
       
       const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_processor.py');
       const jsonData = JSON.stringify(extractedData);
-      const pythonProcess = spawn('C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe', [pythonScriptPath, 'analyze', '--json_data', jsonData, '--contexto', contextoAdicional], { cwd: path.dirname(pythonScriptPath), shell: 'C:\\Windows\\System32\\cmd.exe' });
+      const pythonProcess = spawn('python', [pythonScriptPath, 'analyze', '--json_data', jsonData, '--contexto', contextoAdicional], { cwd: path.dirname(pythonScriptPath) });
 
       let stdoutData = '';
       let stderrData = '';
@@ -1117,7 +1008,7 @@ function executePythonScript(pythonPath, scriptPath, docxPath) {
         sendLog(`Creando archivo de datos temporal: ${tempDataPath}`);
         await fsp.writeFile(tempDataPath, JSON.stringify(reportData, null, 2));
         
-        const pythonExecutable = 'C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe';
+        const pythonExecutable = 'python';
         const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_report_generator.py');
 
         // Verificar que el script existe
@@ -1129,7 +1020,7 @@ function executePythonScript(pythonPath, scriptPath, docxPath) {
           '-X', 'utf8',
           pythonScriptPath,
           tempDataPath
-        ], { cwd: path.dirname(pythonScriptPath), shell: 'C:\\Windows\\System32\\cmd.exe' });
+        ], { cwd: path.dirname(pythonScriptPath) });
 
         let stdoutData = '';
         let stderrData = '';
@@ -1207,7 +1098,7 @@ function executePythonScript(pythonPath, scriptPath, docxPath) {
 
   ipcMain.handle('get-config', async (event, empresa) => {
       const investAppPath = path.join(__dirname, 'Portear', 'src', 'Invest_APP_V_3.py');
-      const { stdout } = await execFilePromise('C:\Users\Javier RF\AppData\Local\Programs\Python\Python310\python.exe', [investAppPath, '--get-config', empresa], { cwd: path.dirname(investAppPath), shell: 'C:\Windows\System32\cmd.exe' });
+      const { stdout } = await execFilePromise('python', [investAppPath, '--get-config', empresa], { cwd: path.dirname(investAppPath) });
       return JSON.parse(stdout.trim());
   });
 
@@ -1309,10 +1200,10 @@ function executePythonScript(pythonPath, scriptPath, docxPath) {
         await fsp.writeFile(tempDataPath, JSON.stringify({ changes }, null, 2));
 
         // 3. Ejecutar el script de Python con la ruta del JSON y la ruta de salida
-        const command = `"C:\Users\Javier RF\AppData\Local\Programs\Python\Python310\python.exe" "${pythonScriptPath}" "${tempDataPath}" "${filePath}"`;
+        const command = `python "${pythonScriptPath}" "${tempDataPath}" "${filePath}"`;
         
         sendLog(`Ejecutando script de generación de acta: ${command.replace(/\\/g, '/')}`);
-        const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath), shell: 'C:\\Windows\\System32\\cmd.exe' });
+        const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath) });
         
         // 4. Limpiar el archivo temporal
         await fsp.unlink(tempDataPath);
@@ -1376,10 +1267,10 @@ function executePythonScript(pythonPath, scriptPath, docxPath) {
         await fsp.writeFile(tempDataPath, JSON.stringify({ changes }, null, 2));
 
         // 3. Ejecutar el script de Python
-        const command = `"C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Python\\Python310\\python.exe" "${pythonScriptPath}" "${tempDataPath}" "${filePath}"`;
+        const command = `python "${pythonScriptPath}" "${tempDataPath}" "${filePath}"`;
         
         sendLog(`Ejecutando script de generación de acta de convivencia: ${command.replace(/\\/g, '/')}`);
-        const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath), shell: 'C:\\Windows\\System32\\cmd.exe' });
+        const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath) });
         
         // 4. Limpiar el archivo temporal
         await fsp.unlink(tempDataPath);
@@ -1699,7 +1590,7 @@ try {
         ], {
             stdio: ['ignore', 'pipe', 'pipe'],
             windowsHide: false, // Mostrar ventana para debugging si es necesario
-            shell: 'C:\\Windows\\System32\\cmd.exe',
+            shell: false,
             cwd: path.dirname(inputPath) // Establecer directorio de trabajo
         });
 
