@@ -58,6 +58,11 @@ const createWindow = () => {
 
 // Función para registrar los manejadores IPC
 const registerIPCHandlers = () => {
+  // Manejador para obtener la versión de la aplicación
+  ipcMain.handle('get-app-version', () => {
+    return app.getVersion();
+  });
+
   // Manejar selección de directorio
   ipcMain.handle('select-directory', async () => {
     console.log('Handling select-directory request');
@@ -529,10 +534,9 @@ const registerIPCHandlers = () => {
   ipcMain.handle('convert-docx-to-pdf', async (event, docxPath) => {
     try {
       const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'convert_docx_to_pdf.py');
-      const command = `python "${pythonScriptPath}" "${docxPath}"`;
       
-      console.log(`Executing DOCX conversion: ${command}`);
-      const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath) });
+      console.log(`Executing DOCX conversion for: ${docxPath}`);
+      const { stdout, stderr } = await execFilePromise('python', [pythonScriptPath, docxPath], { cwd: path.dirname(pythonScriptPath) });
 
       // Si stderr contiene nuestro error JSON específico, lo procesamos como error.
       if (stderr && stderr.includes('"success": false')) {
