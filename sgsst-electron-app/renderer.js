@@ -1100,6 +1100,12 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
     } else if (submoduleName === "3.2.2 Investigación de Accidentes, indicentes y Enfermedades") {
       showInvestigacionAccidentesContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
 
+    } else if (submoduleName === "3.3.6 Medición del ausentismo por causa médica") {
+      showMedicionAusentismoContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
+
+    } else if (submoduleName === "Registrar Ausentismo") {
+      showRegistrarAusentismoContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
+
     } else if (submoduleName === "1.1.3 Asignación de Recursos") {
       showAsignacionRecursosContent(submoduleContentDiv);
 
@@ -1280,6 +1286,66 @@ function showInvestigacionAccidentesContent(container, currentCompany, moduleNam
     }
   } else {
     console.error('InvestigacionAccidentesComponent no está disponible o no es una función');
+    showDevelopmentMessage(container, submoduleName);
+  }
+}
+
+function showMedicionAusentismoContent(container, currentCompany, moduleName, submoduleName) {
+  // Crear una instancia del componente y renderizarlo
+  if (typeof window.MedicionAusentismoComponent === 'function') {
+    try {
+      const medicionComponent = new window.MedicionAusentismoComponent(
+        container, 
+        currentCompany, 
+        moduleName, 
+        submoduleName,
+        () => {
+          // Callback para volver al home del módulo
+          const mainCanvas = document.querySelector('.main-canvas');
+          if (mainCanvas && mainCanvas.parentElement) {
+            showModuleHome(mainCanvas.parentElement, moduleName);
+          } else {
+            showModuleHome(container, moduleName);
+          }
+        }
+      );
+      medicionComponent.render();
+    } catch (error) {
+      console.error('Error al crear/renderizar MedicionAusentismoComponent:', error);
+      showDevelopmentMessage(container, submoduleName);
+    }
+  } else {
+    console.error('MedicionAusentismoComponent no está disponible o no es una función');
+    showDevelopmentMessage(container, submoduleName);
+  }
+}
+
+function showRegistrarAusentismoContent(container, currentCompany, moduleName, submoduleName) {
+  // Crear una instancia del componente y renderizarlo
+  if (typeof window.RegistrarAusentismoComponent === 'function') {
+    try {
+      const registrarComponent = new window.RegistrarAusentismoComponent(
+        container, 
+        currentCompany, 
+        moduleName, 
+        submoduleName,
+        () => {
+          // Callback para volver al home del módulo
+          const mainCanvas = document.querySelector('.main-canvas');
+          if (mainCanvas && mainCanvas.parentElement) {
+            showModuleHome(mainCanvas.parentElement, moduleName);
+          } else {
+            showModuleHome(container, moduleName);
+          }
+        }
+      );
+      registrarComponent.render();
+    } catch (error) {
+      console.error('Error al crear/renderizar RegistrarAusentismoComponent:', error);
+      showDevelopmentMessage(container, submoduleName);
+    }
+  } else {
+    console.error('RegistrarAusentismoComponent no está disponible o no es una función');
     showDevelopmentMessage(container, submoduleName);
   }
 }

@@ -24,3 +24,27 @@
 
 5.  **`styles.css` - Ajustar el padding izquierdo del encabezado:**
     *   Modifiqué la propiedad `padding` de `.app-header` de `padding: var(--spacer-sm) var(--spacer);` a `padding: var(--spacer-sm) var(--spacer) var(--spacer-sm) var(--spacer-xs);` para reducir el padding izquierdo de `16px` a `4px`. 
+
+--- Modificaciones del 23 de septiembre de 2025 (continuación) ---
+
+6.  **`medicion-ausentismo.js` - Actualización del componente "Medición del ausentismo por causa médica":**
+    *   Cambié el nombre de la sección de "Ver Ausentismo" a "Registrar Ausentismo" para reflejar mejor su propósito.
+    *   Reemplacé la interfaz existente por una nueva basada en la estructura de "Control de Remisiones" del submódulo "3.1.6 Restricciones y recomendaciones médicas".
+    *   Implementé una vista de tabla editable similar al formato "GI-FO-076 AUSENTISMO POR ARL Y EPS 2024.xlsx".
+    *   Añadí funcionalidad para mostrar datos de ejemplo en la tabla con campos como N°, Documento, Nombre del Trabajador, Fecha Inicio, Fecha Final, Días Ausentismo, Diagnóstico, EPS/ARL y Estado.
+    *   Implementé controles para editar el estado de los registros mediante selects desplegables.
+    *   Agregué botones para "Agregar Nuevo Registro" y "Guardar Cambios" (funcionalidad simulada).
+
+7.  **`utils/ausentismoUtils.js` - Creación de utilidades para procesamiento de ausentismos:**
+    *   Creé un nuevo archivo con funciones para cargar datos del archivo de ausentismo.
+    *   Implementé funciones simuladas para guardar cambios en celdas y agregar nuevos registros.
+    *   Estructuré el código para futura conexión con el backend para operaciones reales con archivos Excel.
+
+8.  **`renderer.js` - Actualización de la navegación de submódulos:**
+    *   Verifiqué que la condición para mostrar "Registrar Ausentismo" esté correctamente implementada en la función `showSubmoduleContent`.
+    *   Confirmé que el componente `RegistrarAusentismoComponent` esté disponible globalmente para su uso.
+
+9.  **`registrar-ausentismo.js` - Creación de componente independiente para "Registrar Ausentismo":**
+    *   Creé un nuevo componente dedicado exclusivamente para la funcionalidad de registro de ausentismo.
+    *   Implementé una interfaz modular con opciones para "Registrar Nuevo Ausentismo", "Ver Ausentismos Registrados" y "Generar Reporte".
+    *   Desarrollé la funcionalidad de navegación por archivos de ausentismo con previsualización de documentos. 
