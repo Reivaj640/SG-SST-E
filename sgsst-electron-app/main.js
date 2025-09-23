@@ -17,8 +17,88 @@ autoUpdater.logger = log;
 // ------------------------------------
 
 const execPromise = promisify(exec);
-const execFilePromise = promisify(execFile); // Añadir esta línea
+const execFilePromise = promisify(execFile);
 
+// --- Detección robusta de Python ---
+let cachedPythonPath = null;
+
+async function findPython() {
+    console.log('[DEBUG] Starting Python path search');
+
+    // 1. Buscar en la variable de entorno PATH
+    console.log('[DEBUG] Searching for "python.exe" in system PATH');
+    try {
+        // En Windows, 'where' es el comando para encontrar un ejecutable en el PATH
+        const { stdout } = await execPromise('where python');
+        const potentialPaths = stdout.split(/\r?\n/).filter(p => p.endsWith('python.exe'));
+        
+        for (const p of potentialPaths) {
+            const trimmedPath = p.trim();
+            if (trimmedPath && fs.existsSync(trimmedPath)) {
+                try {
+                    console.log(`[DEBUG] Testing Python executable from PATH: ${trimmedPath}`);
+                    await execFilePromise(trimmedPath, ['--version']);
+                    console.log(`[SUCCESS] Python found in PATH at: ${trimmedPath}`);
+                    return trimmedPath;
+                } catch (e) {
+                    console.warn(`[WARN] Path from PATH found but not executable: ${trimmedPath}. Error: ${e.message}`);
+                    continue;
+                }
+            }
+        }
+    } catch (e) {
+        console.log('[DEBUG] "where python" command failed or returned no results. Will check common paths.');
+    }
+
+    // 2. Si no se encuentra en PATH, buscar en rutas comunes (fallback)
+    console.log('[DEBUG] Python not found in PATH, checking common installation directories.');
+    const username = os.userInfo().username;
+    console.log('[DEBUG] Current username:', username);
+    const commonPaths = [
+        path.join(__dirname, 'Portear', '.venv', 'Scripts', 'python.exe'), // Entorno virtual local
+        `C:\\Users\\${username}\\AppData\\Local\\Programs\\Python\\Python312\\python.exe`,
+        `C:\\Users\\${username}\\AppData\\Local\\Programs\\Python\\Python311\\python.exe`,
+        `C:\\Users\\${username}\\AppData\\Local\\Programs\\Python\\Python310\\python.exe`,
+        'C:\\Python312\\python.exe',
+        'C:\\Python311\\python.exe',
+        'C:\\Python310\\python.exe',
+        'C:\\Program Files\\Python312\\python.exe',
+        'C:\\Program Files\\Python311\\python.exe',
+        'C:\\Program Files\\Python310\\python.exe',
+        `C:\\Users\\${username}\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe`,
+        `C:\\Users\\${username}\\AppData\\Local\\Microsoft\\WindowsApps\\python3.exe`
+    ];
+
+    for (const p of commonPaths) {
+        console.log(`[DEBUG] Checking common path: ${p}`);
+        if (fs.existsSync(p)) {
+            try {
+                console.log(`[DEBUG] Testing Python executable: ${p}`);
+                await execFilePromise(p, ['--version']);
+                console.log(`[SUCCESS] Python found at: ${p}`);
+                return p;
+            } catch (e) {
+                console.warn(`[WARN] Path found but not executable: ${p}. Error: ${e.message}`);
+                continue;
+            }
+        } else {
+            console.log(`[DEBUG] Path does not exist: ${p}`);
+        }
+    }
+
+    throw new Error('No se pudo encontrar un ejecutable de Python válido en el PATH del sistema ni en las rutas conocidas.');
+}
+
+async function getPython() {
+    console.log('[DEBUG] Current cachedPythonPath:', cachedPythonPath);
+    if (cachedPythonPath && fs.existsSync(cachedPythonPath)) {
+        console.log('[DEBUG] Using cached Python path:', cachedPythonPath);
+        return cachedPythonPath;
+    }
+    cachedPythonPath = await findPython();
+    console.log('[DEBUG] New Python path cached:', cachedPythonPath);
+    return cachedPythonPath;
+}
 
 let mainWindow;
 
@@ -266,27 +346,16 @@ const registerIPCHandlers = () => {
   ipcMain.handle('map-directory', async (event, directoryPath) => {
     try {
       console.log('Mapping directory:', directoryPath);
-      // Ruta al script de mapeo de Python
+      const pythonPath = await getPython();
       const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'map_directory.py');
       
-      // Verificar si el script de Python existe
-      try {
-        await fsp.access(pythonScriptPath);
-      } catch (error) {
-        throw new Error(`Python script not found at: ${pythonScriptPath}`);
-      }
+      console.log(`Executing command: ${pythonPath} "${pythonScriptPath}" "${directoryPath}"`);
       
-      // Ejecutar el script de Python
-      const command = `python "${pythonScriptPath}" "${directoryPath}"`;
-      console.log(`Executing command: ${command}`);
+      const { stdout, stderr } = await execFilePromise(pythonPath, [pythonScriptPath, directoryPath], { cwd: path.dirname(pythonScriptPath) });
       
-      const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath) });
-      
-      // Parsear la salida JSON del script de Python
       const structure = JSON.parse(stdout);
       console.log('Directory mapping completed successfully');
       
-      // Devolver tanto la estructura como los posibles logs/errores de stderr
       return { success: true, structure: structure, log: stderr || 'Mapeo completado sin errores.' };
     } catch (error) {
       console.error('Error mapping directory:', error);
@@ -327,23 +396,7 @@ const registerIPCHandlers = () => {
   ipcMain.handle('open-path', async (event, pathToOpen) => {
     try {
       console.log('Opening path:', pathToOpen);
-      // Usar el comando apropiado según el sistema operativo
-      let command;
-      switch (process.platform) {
-        case 'win32':
-          command = `start "" "${pathToOpen}"`;
-          break;
-        case 'darwin':
-          command = `open "${pathToOpen}"`;
-          break;
-        case 'linux':
-          command = `xdg-open "${pathToOpen}"`;
-          break;
-        default:
-          throw new Error(`Unsupported platform: ${process.platform}`);
-      }
-      
-      await execPromise(command);
+      await shell.openPath(pathToOpen);
       console.log('Path opened successfully');
       return { success: true };
     } catch (error) {
@@ -486,11 +539,11 @@ const registerIPCHandlers = () => {
   ipcMain.handle('process-remision-pdf', async (event, pdfPath) => {
     sendLog(`IPC: process-remision-pdf recibido para: ${pdfPath}`);
     try {
+      const pythonPath = await getPython();
       const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'process_pdf_cli.py');
-      const tempDataPath = path.join(app.getPath('temp'), `remision_data_${Date.now()}.json`);
       
-      sendLog(`Ejecutando script de Python: python "${pythonScriptPath}" "${pdfPath}"`);
-      const { stdout, stderr } = await execPromise(`python "${pythonScriptPath}" "${pdfPath}"`, { cwd: path.dirname(pythonScriptPath) });
+      sendLog(`Ejecutando script de Python: ${pythonPath} "${pythonScriptPath}" "${pdfPath}"`);
+      const { stdout, stderr } = await execFilePromise(pythonPath, [pythonScriptPath, pdfPath], { cwd: path.dirname(pythonScriptPath) });
       
       if (stderr) {
         sendLog(`Error en script de procesamiento de PDF: ${stderr}`, 'ERROR');
@@ -533,10 +586,11 @@ const registerIPCHandlers = () => {
   // Manejar conversión de DOCX a PDF para previsualización
   ipcMain.handle('convert-docx-to-pdf', async (event, docxPath) => {
     try {
+      const pythonPath = await getPython();
       const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'convert_docx_to_pdf.py');
       
       console.log(`Executing DOCX conversion for: ${docxPath}`);
-      const { stdout, stderr } = await execFilePromise('python', [pythonScriptPath, docxPath], { cwd: path.dirname(pythonScriptPath) });
+      const { stdout, stderr } = await execFilePromise(pythonPath, [pythonScriptPath, docxPath], { cwd: path.dirname(pythonScriptPath) });
 
       // Si stderr contiene nuestro error JSON específico, lo procesamos como error.
       if (stderr && stderr.includes('"success": false')) {
@@ -599,16 +653,17 @@ const registerIPCHandlers = () => {
   ipcMain.handle('generate-remision-document', async (event, extractedData, empresa) => {
     sendLog(`IPC: generate-remision-document recibido para empresa: ${empresa}`);
     try {
+      const pythonPath = await getPython();
       const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'remision_utils.py');
       const tempDataPath = path.join(app.getPath('temp'), `remision_data_${Date.now()}.json`);
       
       sendLog(`Creando archivo de datos temporal: ${tempDataPath}`);
       await fsp.writeFile(tempDataPath, JSON.stringify({ data: extractedData, empresa: empresa }));
       
-      const command = `python "${pythonScriptPath}" --generate-remision "${tempDataPath}"`;
+      const commandArgs = [pythonScriptPath, '--generate-remision', tempDataPath];
       
-      sendLog(`Ejecutando script de generación de remisión: ${command.replace(/\\/g, '/')}`);
-      const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath) });
+      sendLog(`Ejecutando script de generación de remisión...`);
+      const { stdout, stderr } = await execFilePromise(pythonPath, commandArgs, { cwd: path.dirname(pythonScriptPath) });
       
       await fsp.unlink(tempDataPath);
       
@@ -693,6 +748,7 @@ const registerIPCHandlers = () => {
   ipcMain.handle('send-remision-by-email', async (event, docPath, extractedData, empresa) => {
     sendLog(`IPC: send-remision-by-email recibido para: ${docPath}`);
     try {
+      const pythonPath = await getPython();
       sendLog('Creando copia temporal del archivo para envío de correo...');
       const tempFileName = `temp_remision_${Date.now()}.docx`;
       const tempFilePath = path.join(app.getPath('temp'), tempFileName);
@@ -711,10 +767,10 @@ const registerIPCHandlers = () => {
       sendLog(`Creando archivo de datos temporal para email: ${tempDataPath}`);
       await fsp.writeFile(tempDataPath, JSON.stringify(tempData), 'utf-8');
       
-      const command = `python "${pythonScriptPath}" --send-email "${tempDataPath}"`;
+      const commandArgs = [pythonScriptPath, '--send-email', tempDataPath];
       
-      sendLog(`Ejecutando script de envío de email: ${command.replace(/\\/g, '/')}`);
-      const { stdout, stderr } = await execPromise(command, { encoding: 'utf-8', cwd: path.dirname(pythonScriptPath) });
+      sendLog(`Ejecutando script de envío de email...`);
+      const { stdout, stderr } = await execFilePromise(pythonPath, commandArgs, { encoding: 'utf-8', cwd: path.dirname(pythonScriptPath) });
       
       await fsp.unlink(tempFilePath);
       await fsp.unlink(tempDataPath);
@@ -787,6 +843,7 @@ const registerIPCHandlers = () => {
   ipcMain.handle('send-remision-by-whatsapp', async (event, docPath, extractedData, empresa) => {
     sendLog(`IPC: send-remision-by-whatsapp recibido para: ${docPath}`);
     try {
+      const pythonPath = await getPython();
       const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'remision_utils.py');
       const tempDataPath = path.join(app.getPath('temp'), `whatsapp_data_${Date.now()}.json`);
       
@@ -797,10 +854,10 @@ const registerIPCHandlers = () => {
         empresa: empresa 
       }));
       
-      const command = `python "${pythonScriptPath}" --send-whatsapp "${tempDataPath}"`;
+      const commandArgs = [pythonScriptPath, '--send-whatsapp', tempDataPath];
       
-      sendLog(`Ejecutando script de preparación de WhatsApp: ${command.replace(/\\/g, '/')}`);
-      const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath) });
+      sendLog(`Ejecutando script de preparación de WhatsApp...`);
+      const { stdout, stderr } = await execFilePromise(pythonPath, commandArgs, { cwd: path.dirname(pythonScriptPath) });
       
       await fsp.unlink(tempDataPath);
       
@@ -883,12 +940,13 @@ const registerIPCHandlers = () => {
     }
   });
 
-  ipcMain.handle('process-accident-pdf', (event, pdfPath) => {
+  ipcMain.handle('process-accident-pdf', async (event, pdfPath) => {
+    const pythonPath = await getPython();
+    const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_processor.py');
     return new Promise((resolve, reject) => {
       sendLog(`IPC: process-accident-pdf (extract) recibido para: ${pdfPath}`);
       
-      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_processor.py');
-      const pythonProcess = spawn('python', [pythonScriptPath, 'extract', '--pdf_path', pdfPath], { cwd: path.dirname(pythonScriptPath) });
+      const pythonProcess = spawn(pythonPath, [pythonScriptPath, 'extract', '--pdf_path', pdfPath], { cwd: path.dirname(pythonScriptPath) });
 
       let stdoutData = '';
       let stderrData = '';
@@ -931,13 +989,14 @@ const registerIPCHandlers = () => {
     });
   });
 
-  ipcMain.handle('analyze-accident', (event, extractedData, contextoAdicional) => {
+  ipcMain.handle('analyze-accident', async (event, extractedData, contextoAdicional) => {
+    const pythonPath = await getPython();
+    const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_processor.py');
     return new Promise((resolve, reject) => {
       sendLog(`IPC: analyze-accident recibido`);
       
-      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_processor.py');
       const jsonData = JSON.stringify(extractedData);
-      const pythonProcess = spawn('python', [pythonScriptPath, 'analyze', '--json_data', jsonData, '--contexto', contextoAdicional], { cwd: path.dirname(pythonScriptPath) });
+      const pythonProcess = spawn(pythonPath, [pythonScriptPath, 'analyze', '--json_data', jsonData, '--contexto', contextoAdicional], { cwd: path.dirname(pythonScriptPath) });
 
       let stdoutData = '';
       let stderrData = '';
@@ -1001,6 +1060,7 @@ const registerIPCHandlers = () => {
       sendLog(`IPC: generate-accident-report recibido`);
       let tempDataPath;
       try {
+        const pythonPath = await getPython();
         // Crear archivo temporal con los datos
         tempDataPath = path.join(app.getPath('temp'), `accident_report_data_${Date.now()}.json`);
         
@@ -1012,15 +1072,14 @@ const registerIPCHandlers = () => {
         sendLog(`Creando archivo de datos temporal: ${tempDataPath}`);
         await fsp.writeFile(tempDataPath, JSON.stringify(reportData, null, 2));
         
-        const pythonExecutable = 'python';
         const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_report_generator.py');
 
         // Verificar que el script existe
         await fsp.access(pythonScriptPath);
         
-        sendLog(`Ejecutando script con UTF-8 forzado: ${pythonExecutable} -X utf8 "${pythonScriptPath}"`);
+        sendLog(`Ejecutando script con UTF-8 forzado: ${pythonPath} -X utf8 "${pythonScriptPath}"`);
 
-        const pythonProcess = spawn(pythonExecutable, [
+        const pythonProcess = spawn(pythonPath, [
           '-X', 'utf8',
           pythonScriptPath,
           tempDataPath
@@ -1101,8 +1160,9 @@ const registerIPCHandlers = () => {
   });
 
   ipcMain.handle('get-config', async (event, empresa) => {
+      const pythonPath = await getPython();
       const investAppPath = path.join(__dirname, 'Portear', 'src', 'Invest_APP_V_3.py');
-      const { stdout } = await execFilePromise('python', [investAppPath, '--get-config', empresa], { cwd: path.dirname(investAppPath) });
+      const { stdout } = await execFilePromise(pythonPath, [investAppPath, '--get-config', empresa], { cwd: path.dirname(investAppPath) });
       return JSON.parse(stdout.trim());
   });
 
@@ -1182,6 +1242,7 @@ const registerIPCHandlers = () => {
   ipcMain.handle('generate-copasst-acta', async (event, changes) => {
     sendLog(`IPC: generate-copasst-acta recibido con ${changes.length} cambios`);
     try {
+        const pythonPath = await getPython();
         // 1. Pedir al usuario la ruta para guardar el archivo
         const { canceled, filePath } = await dialog.showSaveDialog({
             title: 'Guardar Acta de COPASST',
@@ -1204,10 +1265,10 @@ const registerIPCHandlers = () => {
         await fsp.writeFile(tempDataPath, JSON.stringify({ changes }, null, 2));
 
         // 3. Ejecutar el script de Python con la ruta del JSON y la ruta de salida
-        const command = `python "${pythonScriptPath}" "${tempDataPath}" "${filePath}"`;
+        const commandArgs = [pythonScriptPath, tempDataPath, filePath];
         
-        sendLog(`Ejecutando script de generación de acta: ${command.replace(/\\/g, '/')}`);
-        const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath) });
+        sendLog(`Ejecutando script de generación de acta...`);
+        const { stdout, stderr } = await execFilePromise(pythonPath, commandArgs, { cwd: path.dirname(pythonScriptPath) });
         
         // 4. Limpiar el archivo temporal
         await fsp.unlink(tempDataPath);
@@ -1249,6 +1310,7 @@ const registerIPCHandlers = () => {
   ipcMain.handle('generateConvivenciaActa', async (event, changes) => {
     sendLog(`IPC: generateConvivenciaActa recibido con ${changes.length} cambios`);
     try {
+        const pythonPath = await getPython();
         // 1. Pedir al usuario la ruta para guardar el archivo
         const { canceled, filePath } = await dialog.showSaveDialog({
             title: 'Guardar Acta de Comité de Convivencia',
@@ -1271,10 +1333,10 @@ const registerIPCHandlers = () => {
         await fsp.writeFile(tempDataPath, JSON.stringify({ changes }, null, 2));
 
         // 3. Ejecutar el script de Python
-        const command = `python "${pythonScriptPath}" "${tempDataPath}" "${filePath}"`;
+        const commandArgs = [pythonScriptPath, tempDataPath, filePath];
         
-        sendLog(`Ejecutando script de generación de acta de convivencia: ${command.replace(/\\/g, '/')}`);
-        const { stdout, stderr } = await execPromise(command, { cwd: path.dirname(pythonScriptPath) });
+        sendLog(`Ejecutando script de generación de acta de convivencia...`);
+        const { stdout, stderr } = await execFilePromise(pythonPath, commandArgs, { cwd: path.dirname(pythonScriptPath) });
         
         // 4. Limpiar el archivo temporal
         await fsp.unlink(tempDataPath);
@@ -1726,6 +1788,7 @@ try {
 // y esté listo para crear ventanas de navegador.
 // Algunas API solo se pueden usar después de que ocurra este evento.
 app.whenReady().then(() => {
+  log.info(`Ruta de datos del usuario (userData) para config.json: ${app.getPath('userData')}`);
   registerIPCHandlers(); // Registrar todos los manejadores de eventos
   createWindow(); // Crear la ventana principal
 
