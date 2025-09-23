@@ -1,6 +1,6 @@
 {
   "name": "sgsst-electron-app",
-  "version": "0.1.20",
+  "version": "0.1.22",
   "description": "Sistema de GestiÃ³n de Seguridad y Salud en el Trabajo",
   "main": "main.js",
   "author": "Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos.",
@@ -21,6 +21,7 @@
     "appId": "com.jrfsoluciones.sgsst",
     "productName": "SG-SST Electron App",
     "copyright": "Copyright Â© 2025 Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos.",
+    "asar": false,
     "directories": {
       "output": "dist"
     },
@@ -50,7 +51,7 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "assets/shutterstock1.ico"
+      "icon": "assets/icons8-adelante-100.ico"
     },
     "mac": {
       "target": "dmg",

@@ -1,0 +1,26 @@
+--- Log del 23 de septiembre de 2025 ---
+
+**Resumen del Proyecto SG-SST-E:**
+
+- **Objetivo:** Se solucionó un error crítico en la versión de producción donde la aplicación no podía encontrar el ejecutable de Python.
+- **Diagnóstico:** El error (`ENOENT`) persistía incluso después de reconstruir la app. Se descubrió que la causa era un problema de caché en el proceso de empaquetado `asar` de `electron-builder`, que no incluía la versión actualizada de `main.js`.
+- **Solución:** Se añadió la configuración `"asar": false` al archivo `package.json` para deshabilitar el empaquetado `asar` y forzar una copia directa de los archivos del proyecto. Esto resolvió el problema.
+- **Preferencia del usuario:** El usuario prefiere ejecutar los comandos de compilación (`npx electron-builder...`) manualmente.
+
+--- Modificaciones Adicionales (23 de septiembre de 2025) ---
+
+1.  **`renderer.js` - Corrección del texto "Logo" al cerrar sesión:**
+    *   Modifiqué la función `handleLogout()` para que el `companyLogoPlaceholder` se oculte (`display: 'none'`) al cerrar sesión, evitando que el texto "IMG" reaparezca.
+
+2.  **`renderer.js` - Ocultar el nombre de la empresa tras la selección:**
+    *   En la función `selectCompany()`, añadí `companyNameElement.textContent = '';` y `companyNameElement.style.display = 'none';` para ocultar el nombre de la empresa debajo del logo una vez seleccionada.
+    *   En `handleLogout()`, aseguré que `companyNameElement.style.display = 'block';` para que el texto "Empresa" sea visible de nuevo al cerrar sesión.
+
+3.  **`index.html` - Añadir icono de la aplicación al encabezado:**
+    *   Inserté una etiqueta `<img>` con `src="assets/icons8-adelante-100.ico"` y estilos básicos (`vertical-align: middle; margin-right: 10px; height: 32px;`) dentro del `h1#app-title`.
+
+4.  **`index.html` - Ocultar el marcador de posición "IMG" en el encabezado:**
+    *   Añadí `style="display:none;"` al `div#logo-placeholder` en `index.html` para ocultar el texto "IMG".
+
+5.  **`styles.css` - Ajustar el padding izquierdo del encabezado:**
+    *   Modifiqué la propiedad `padding` de `.app-header` de `padding: var(--spacer-sm) var(--spacer);` a `padding: var(--spacer-sm) var(--spacer) var(--spacer-sm) var(--spacer-xs);` para reducir el padding izquierdo de `16px` a `4px`. 

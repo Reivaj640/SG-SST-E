@@ -105,6 +105,13 @@ const RESOURCES_SUBMODULES = {
 // Botones de selección de empresa
 const COMPANY_BUTTONS = ["Tempoactiva", "Temposum", "Aseplus", "Asel"];
 
+const COMPANY_LOGOS = {
+  "Tempoactiva": "assets/Tempoactiva.png",
+  "Temposum": "assets/Temposum.png",
+  "Aseplus": "assets/Aseplus.png",
+  "Asel": "assets/Asel.png"
+};
+
 // --- Estado de la Aplicación ---
 let currentCompany = null;
 let currentModule = null;
@@ -454,15 +461,21 @@ function showHomePage() {
 function selectCompany(companyName, buttonElement) {
   console.log(`Selecting company: ${companyName}`);
   currentCompany = companyName;
-  
+
   // Actualizar UI: nombre de la empresa y logo en la barra lateral
-  companyNameElement.textContent = companyName;
-  
-  // Mostrar el logo real o el placeholder
-  // companyLogoElement.src = `./assets/${companyName}.png`; // Ruta al logo
-  // companyLogoElement.style.display = 'block';
-  companyLogoPlaceholder.style.display = 'none'; // Ocultar placeholder si se quisiera mostrar imagen
-  
+  companyNameElement.textContent = ''; // Clear the text
+  companyNameElement.style.display = 'none'; // Hide the element
+
+  const logoPath = COMPANY_LOGOS[companyName];
+  if (logoPath) {
+    companyLogoElement.src = logoPath;
+    companyLogoElement.style.display = 'block';
+    companyLogoPlaceholder.style.display = 'none';
+  } else {
+    companyLogoElement.style.display = 'none';
+    companyLogoPlaceholder.style.display = 'flex';
+  }
+
   // Actualizar estado visual de los botones de empresa
   document.querySelectorAll('.company-select-button').forEach(btn => {
     btn.classList.remove('selected');
@@ -489,7 +502,7 @@ function handleLogout() {
     companyLogoElement.style.display = 'none';
   }
   if (companyLogoPlaceholder) {
-    companyLogoPlaceholder.style.display = 'flex';
+    companyLogoPlaceholder.style.display = 'none';
   }
   
   document.querySelectorAll('.company-select-button').forEach(btn => {

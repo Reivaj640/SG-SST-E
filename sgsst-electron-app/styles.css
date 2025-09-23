@@ -363,7 +363,7 @@ select.form-control {
 .app-header {
   background-color: var(--white-color);
   border-bottom: 1px solid var(--border-color);
-  padding: var(--spacer-sm) var(--spacer);
+  padding: var(--spacer-sm) var(--spacer) var(--spacer-sm) var(--spacer-xs); /* Reduced left padding to 4px */
   box-shadow: var(--box-shadow);
   z-index: 1000;
   flex-shrink: 0;
@@ -789,7 +789,7 @@ select.form-control {
   height: 60px;
   background-color: rgba(255, 255, 255, 0.1);
   border-radius: 50%;
-  display: flex;
+  display: none; /* Oculto por defecto */
   align-items: center;
   justify-content: center;
   font-weight: bold;
@@ -1079,9 +1079,9 @@ select.form-control {
 }
 
 @keyframes progressAnimation {
-  0% { width: 0%; }
-  50% { width: 70%; }
-  100% { width: 100%; }
+  0% { width: 0%; } 
+  50% { width: 70%; } 
+  100% { width: 100%; } 
 }
 
 .progress-status {
@@ -1266,9 +1266,9 @@ select.form-control {
 
 /* Ajustar animación de progreso */
  @keyframes progressAnimation {
-    0% { width: 0%; }
-    50% { width: 60%; }
-    100% { width: 100%; }
+    0% { width: 0%; } 
+    50% { width: 60%; } 
+    100% { width: 100%; } 
 }
 
 /* Asegurar que las tarjetas del análisis 5M se vean bien */
@@ -1366,4 +1366,13 @@ select.form-control {
 
 .module-calendar-container.hidden {
     display: none !important; /* Importante para anular otros estilos */
+}
+
+/* Estilos para el logo de la empresa en el sidebar */
+#company-logo {
+  width: 120px; /* Ancho fijo para consistencia */
+  height: 60px; /* Alto fijo para consistencia */
+  object-fit: contain; /* Mantiene la proporción del logo sin deformar */
+  margin-bottom: var(--spacer-sm);
+  display: none; /* Oculto por defecto */
 }
