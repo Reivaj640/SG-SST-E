@@ -864,11 +864,11 @@ function showGenericModuleHome(container, moduleName, submodules) {
   info.textContent = `Contenido del módulo "${moduleName}" se cargará aquí.`;
   container.appendChild(info);
   
-  // Crear tarjetas para los submódulos
+  // Crear tarjetas para los submódulos con límite de rendimiento
   const cardsContainer = document.createElement('div');
   cardsContainer.className = 'module-cards';
-  
-  submodules.forEach(submoduleName => {
+  const displaySubmodules = submodules.slice(0, 50); // Máximo 50 para rendimiento
+  displaySubmodules.forEach(submoduleName => {
     const card = document.createElement('div');
     card.className = 'card module-card';
     
@@ -917,11 +917,11 @@ function showGenericModuleHome(container, moduleName, submodules) {
   info.textContent = `Contenido del módulo "${moduleName}" se cargará aquí.`;
   container.appendChild(info);
   
-  // Crear tarjetas para los submódulos
+  // Crear tarjetas para los submódulos con límite de rendimiento
   const cardsContainer = document.createElement('div');
   cardsContainer.className = 'module-cards';
-  
-  submodules.forEach(submoduleName => {
+  const displaySubmodules = submodules.slice(0, 50); // Máximo 50 para rendimiento
+  displaySubmodules.forEach(submoduleName => {
     const card = document.createElement('div');
     card.className = 'card module-card';
     

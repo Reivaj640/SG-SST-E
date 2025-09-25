@@ -1,1 +1,160 @@
-// registrar-ausentismo.js - Componente para el submódulo "Registrar Ausentismo"\n\nclass RegistrarAusentismoComponent {\n  constructor(container, currentCompany, moduleName, submoduleName, onBack) {\n    this.container = container;\n    this.currentCompany = currentCompany;\n    this.moduleName = moduleName;\n    this.submoduleName = submoduleName;\n    this.onBack = onBack;\n    this.currentView = 'main'; // 'main' o 'ver-ausentismo'\n    this.currentPath = null;\n    this.pathHistory = [];\n\n    // Bind methods\n    this.openDocument = this.openDocument.bind(this);\n  }\n\n  render() {\n    this.container.innerHTML = '';\n    window.currentRegistrarAusentismoComponent = this;\n\n    // Crear el contenedor principal\n    const mainContainer = document.createElement('div');\n    mainContainer.className = 'submodule-content';\n\n    if (this.currentView === 'main') {\n      this.renderMainView(mainContainer);\n    } else if (this.currentView === 'ver-ausentismo') {\n      this.showVerAusentismoPage();\n    }\n\n    this.container.appendChild(mainContainer);\n  }\n\n  renderMainView(container) {\n    // Encabezado\n    const header = document.createElement('div');\n    header.className = 'submodule-header';\n    \n    const title = document.createElement('h2');\n    title.textContent = this.submoduleName;\n    header.appendChild(title);\n\n    if (this.onBack && typeof this.onBack === 'function') {\n      const backButton = document.createElement('button');\n      backButton.className = 'btn';\n      backButton.textContent = '← Volver';\n      backButton.addEventListener('click', this.onBack);\n      header.appendChild(backButton);\n    }\n\n    container.appendChild(header);\n\n    // Descripción\n    const description = document.createElement('p');\n    description.className = 'submodule-description';\n    description.textContent = 'Este submódulo permite registrar y gestionar el ausentismo por causa médica.';\n    container.appendChild(description);\n\n    // Crear tarjetas para las opciones del submódulo\n    const cardsContainer = document.createElement('div');\n    cardsContainer.className = 'module-cards';\n    \n    // Tarjeta 1: Registrar nuevo ausentismo\n    const card1 = this.createModuleCard(\n      'Registrar Nuevo Ausentismo',\n      'Registra un nuevo caso de ausentismo por causa médica.',\n      () => this.handleRegistrarNuevo()\n    );\n    cardsContainer.appendChild(card1);\n    \n    // Tarjeta 2: Ver ausentismos registrados\n    const card2 = this.createModuleCard(\n      'Ver Ausentismos Registrados',\n      'Consulta los registros de ausentismo ya realizados.',\n      () => this.handleViewAusentismo()\n    );\n    cardsContainer.appendChild(card2);\n    \n    // Tarjeta 3: Generar reporte\n    const card3 = this.createModuleCard(\n      'Generar Reporte',\n      'Genera un reporte consolidado del ausentismo.',\n      () => this.handleGenerarReporte()\n    );\n    cardsContainer.appendChild(card3);\n    \n    container.appendChild(cardsContainer);\n\n    // Área de notificaciones\n    const notificationArea = document.createElement('div');\n    notificationArea.className = 'notification-area';\n    notificationArea.innerHTML = `\n      <h3>Notificaciones recientes</h3>\n      <div class="notification-item">\n        <div class="notification-icon">ℹ️</div>\n        <div class="notification-content">\n          <div class="notification-title">Nuevo registro pendiente</div>\n          <div class="notification-message">Hay datos pendientes de registro para el ausentismo del mes.</div>\n          <div class="notification-time">Hace 1 día</div>\n        </div>\n      </div>\n      <div class="notification-item">\n        <div class="notification-icon">✅</div>\n        <div class="notification-content">\n          <div class="notification-title">Registro completado</div>\n          <div class="notification-message">El registro del ausentismo del mes pasado ha sido completado.</div>\n          <div class="notification-time">Hace 3 días</div>\n        </div>\n      </div>\n    `;\n    container.appendChild(notificationArea);\n  }\n\n  createModuleCard(title, description, onClick) {\n    const card = document.createElement('div');\n    card.className = 'card module-card';\n    \n    // Contenedor para el ícono y el título\n    const headerDiv = document.createElement('div');\n    headerDiv.className = 'card-header';\n    \n    // Placeholder para el ícono\n    const iconDiv = document.createElement('div');\n    iconDiv.className = 'card-icon-placeholder';\n    headerDiv.appendChild(iconDiv);\n    \n    const cardTitle = document.createElement('h3');\n    cardTitle.textContent = title;\n    cardTitle.className = 'card-title';\n    headerDiv.appendChild(cardTitle);\n    \n    card.appendChild(headerDiv);\n    \n    const cardDescription = document.createElement('p');\n    cardDescription.textContent = description;\n    cardDescription.className = 'card-description';\n    card.appendChild(cardDescription);\n    \n    const cardButton = document.createElement('button');\n    cardButton.className = 'btn btn-primary';\n    cardButton.textContent = 'Abrir';\n    cardButton.addEventListener('click', onClick);\n    card.appendChild(cardButton);\n    \n    return card;\n  }\n\n  handleRegistrarNuevo() {\n    // Mostrar mensaje de funcionalidad próxima\n    alert('Esta funcionalidad estará disponible próximamente.');\n  }\n\n  handleViewAusentismo() {\n    this.currentView = 'ver-ausentismo';\n    this.render();\n  }\n\n  handleGenerarReporte() {\n    // Mostrar mensaje de funcionalidad próxima\n    alert('Esta funcionalidad estará disponible próximamente.');\n  }\n\n  showVerAusentismoPage() {\n    this.container.innerHTML = '';\n    this.currentPath = null;\n    this.pathHistory = [];\n\n    const header = this.createHeader('Ver Ausentismos', () => {\n      this.currentView = 'main';\n      this.render();\n    });\n    this.container.appendChild(header);\n\n    const navBar = document.createElement('div');\n    navBar.className = 'file-nav-bar';\n    this.container.appendChild(navBar);\n\n    const mainLayout = document.createElement('div');\n    mainLayout.className = 'remisiones-layout'; // Re-using class for layout\n\n    const resultsCol = document.createElement('div');\n    resultsCol.id = 'search-results-col';\n    resultsCol.className = 'search-results-col';\n    mainLayout.appendChild(resultsCol);\n\n    const previewCol = document.createElement('div');\n    previewCol.id = 'preview-col';\n    previewCol.className = 'preview-col';\n    previewCol.innerHTML = `<div class="preview-placeholder">Seleccione un archivo de ausentismo para previsualizarlo.</div>`;\n    mainLayout.appendChild(previewCol);\n\n    this.container.appendChild(mainLayout);\n\n    this.navigateToInitialPath();\n  }\n\n  async navigateToInitialPath() {\n    try {\n      const result = await window.electronAPI.findSubmodulePath(this.currentCompany, this.moduleName, this.submoduleName);\n      if (result.success) {\n        this.navigateToPath(result.path);\n      } else {\n        document.getElementById('search-results-col').innerHTML = `<p>Error al encontrar la ruta inicial: ${result.error}</p>`;\n      }\n    } catch (error) {\n      document.getElementById('search-results-col').innerHTML = `<p>Error crítico al buscar ruta: ${error.message}</p>`;\n    }\n  }\n\n  async navigateToPath(path) {\n    const resultsCol = document.getElementById('search-results-col');\n    resultsCol.innerHTML = `<p>Cargando...</p>`;\n    try {\n      const items = await window.electronAPI.readDirectory(path);\n      this.currentPath = path;\n      this.updateNavBar();\n      this.displayItems(items);\n    } catch (error) {\n      resultsCol.innerHTML = `<p>Error al leer directorio: ${error.message}</p>`;\n    }\n  }\n\n  updateNavBar() {\n    const navBar = this.container.querySelector('.file-nav-bar');\n    navBar.innerHTML = '';\n\n    const upButton = document.createElement('button');\n    upButton.innerHTML = '&#8679; Subir Nivel';\n    upButton.className = 'btn btn-secondary btn-sm';\n    upButton.disabled = this.pathHistory.length === 0;\n    upButton.addEventListener('click', () => {\n      if (this.pathHistory.length > 0) {\n        const parentPath = this.pathHistory.pop();\n        this.navigateToPath(parentPath);\n      }\n    });\n    navBar.appendChild(upButton);\n\n    const breadcrumb = document.createElement('span');\n    breadcrumb.className = 'breadcrumb-display';\n    breadcrumb.textContent = this.currentPath;\n    navBar.appendChild(breadcrumb);\n  }\n\n  displayItems(items) {\n    const resultsCol = document.getElementById('search-results-col');\n    resultsCol.innerHTML = '';\n    const list = document.createElement('ul');\n    list.className = 'search-results-list';\n\n    const allowedExtensions = ['.pdf', '.doc', '.docx', '.xlsx', '.xls'];\n    const folders = items.filter(item => item.isDirectory);\n    const files = items.filter(item => !item.isDirectory && allowedExtensions.includes(item.name.slice(item.name.lastIndexOf('.')).toLowerCase()));\n\n    folders.forEach(folder => {\n      const li = document.createElement('li');\n      li.innerHTML = `📁 ${folder.name}`;\n      li.addEventListener('click', () => {\n        this.pathHistory.push(this.currentPath);\n        this.navigateToPath(folder.path);\n      });\n      list.appendChild(li);\n    });\n\n    files.forEach(file => {\n      const li = document.createElement('li');\n      const extension = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();\n      let icon = '📄';\n      if (extension === '.pdf') icon = '📕';\n      else if (extension === '.doc' || extension === '.docx') icon = '📘';\n      else if (extension === '.xlsx' || extension === '.xls') icon = '📊';\n      \n      li.innerHTML = `${icon} ${file.name}`;\n      li.addEventListener('click', () => this.previewDocument(file.path));\n      list.appendChild(li);\n    });\n\n    if (list.children.length === 0) {\n      resultsCol.innerHTML = '<p>No hay archivos de ausentismo o carpetas para mostrar.</p>';\n    }\n    resultsCol.appendChild(list);\n  }\n\n  async previewDocument(filePath) {\n    const previewCol = document.getElementById('preview-col');\n    const fileExtension = filePath.split('.').pop().toLowerCase();\n    const escapedPath = filePath.replace(/\\\\/g, '\\\\\\\\');\n\n    previewCol.innerHTML = `<div class="preview-placeholder">Cargando previsualización...</div>`;\n\n    if (fileExtension === 'pdf') {\n      const safePath = filePath.replace(/\\\\/g, '/');\n      previewCol.innerHTML = `<iframe src="file:///${safePath}?t=${new Date().getTime()}" width="100%" height="100%" style="border: none;"></iframe>`;\n    } else if (['doc', 'docx', 'xlsx', 'xls'].includes(fileExtension)) {\n      try {\n        const result = fileExtension.startsWith('doc') \n          ? await window.electronAPI.convertDocxToPdf(filePath)\n          : await window.electronAPI.convertExcelToPdf(filePath);\n\n        if (result.success) {\n          const safePath = result.pdf_path.replace(/\\\\/g, '/');\n          previewCol.innerHTML = `<iframe src="file:///${safePath}?t=${new Date().getTime()}" width="100%" height="100%" style="border: none;"></iframe>`;\n        } else {\n          previewCol.innerHTML = `<div class="preview-error"><h3>Error de Conversión</h3><p>${result.error}</p><button class="btn btn-primary" onclick="window.currentRegistrarAusentismoComponent.openDocument('${escapedPath}')">Abrir con aplicación externa</button></div>`;\n        }\n      } catch (error) {\n        previewCol.innerHTML = `<div class="preview-error"><h3>Error Inesperado</h3><p>${error.message}</p><button class="btn btn-primary" onclick="window.currentRegistrarAusentismoComponent.openDocument('${escapedPath}')">Abrir con aplicación externa</button></div>`;\n      }\n    } else {\n      previewCol.innerHTML = `<div class="preview-error"><h3>Previsualización no disponible</h3><p>La previsualización para archivos <strong>.${fileExtension}</strong> no está soportada.</p><button class="btn btn-primary" onclick="window.currentRegistrarAusentismoComponent.openDocument('${escapedPath}')">Abrir con aplicación externa</button></div>`;\n    }\n  }\n\n  async openDocument(filePath) {\n    try {\n      await window.electronAPI.openPath(filePath);\n    } catch (error) {\n      console.error('Error al abrir el documento:', error);\n      alert('Error al abrir el documento.');\n    }\n  }\n\n  createHeader(titleText, onBack) {\n    const header = document.createElement('div');\n    header.className = 'submodule-header';\n    header.appendChild(this.createBackButton('&#8592; Volver', onBack));\n    const title = document.createElement('h3');\n    title.textContent = titleText;\n    title.style.flexGrow = '1';\n    title.style.textAlign = 'center';\n    header.appendChild(title);\n    return header;\n  }\n  \n  createBackButton(text, onClick) {\n    const backButton = document.createElement('button');\n    backButton.className = 'btn btn-back';\n    backButton.innerHTML = text;\n    backButton.addEventListener('click', onClick);\n    return backButton;\n  }\n}\n\n// Hacer la clase disponible globalmente\nwindow.RegistrarAusentismoComponent = RegistrarAusentismoComponent;
+// registrar-ausentismo.js - Componente para el submódulo "Registrar Ausentismo"
+
+class RegistrarAusentismoComponent {
+  constructor(container, currentCompany, moduleName, submoduleName, onBack) {
+    this.container = container;
+    this.currentCompany = currentCompany;
+    this.moduleName = moduleName;
+    this.submoduleName = submoduleName;
+    this.onBack = onBack;
+    this.ausentismoFilePath = null; // Para guardar la ruta del archivo
+    this.logMessage = (msg, type) => console.log(`[${type}] ${msg}`); // Placeholder
+  }
+
+  render() {
+    this.container.innerHTML = '';
+    window.currentRegistrarAusentismoComponent = this;
+
+    const mainContainer = document.createElement('div');
+    mainContainer.className = 'submodule-content';
+
+    this.renderMainView(mainContainer);
+
+    this.container.appendChild(mainContainer);
+  }
+
+  renderMainView(container) {
+    // Encabezado
+    const header = document.createElement('div');
+    header.className = 'submodule-header';
+    
+    const title = document.createElement('h2');
+    title.textContent = this.submoduleName;
+    header.appendChild(title);
+
+    if (this.onBack && typeof this.onBack === 'function') {
+      const backButton = document.createElement('button');
+      backButton.className = 'btn';
+      backButton.textContent = '← Volver';
+      backButton.addEventListener('click', this.onBack);
+      header.appendChild(backButton);
+    }
+
+    container.appendChild(header);
+
+    // Contenedor para los datos de ausentismo
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'control-remisiones-content'; // Reutilizamos estilos
+    contentDiv.style.padding = '20px';
+    container.appendChild(contentDiv);
+
+    // Cargar y renderizar los datos
+    this.loadAndRenderAusentismoData(contentDiv);
+  }
+
+  async loadAndRenderAusentismoData(contentDiv) {
+    this.logMessage(`Cargando datos de ausentismo para ${this.currentCompany}...`, 'info');
+    contentDiv.innerHTML = '<p style="text-align:center;">Cargando datos del archivo de ausentismo...</p>';
+
+    try {
+      const result = await window.electronAPI.readAusentismoData(this.currentCompany);
+
+      if (result.success) {
+        this.ausentismoFilePath = result.filePath; // Guardar la ruta del archivo
+        contentDiv.innerHTML = ''; // Limpiar "Cargando..."
+
+        // Botón para abrir el archivo
+        const openFileButton = document.createElement('button');
+        openFileButton.textContent = 'Abrir Archivo de Ausentismo';
+        openFileButton.className = 'btn btn-primary';
+        openFileButton.style.marginBottom = '15px';
+        openFileButton.addEventListener('click', () => {
+          if (this.ausentismoFilePath) {
+            window.electronAPI.openPath(this.ausentismoFilePath);
+          } else {
+            alert('La ruta del archivo no está disponible.');
+          }
+        });
+        contentDiv.appendChild(openFileButton);
+
+        if (result.rows && result.rows.length > 0) {
+          this.logMessage(`Encontrados ${result.rows.length} registros. Renderizando tabla.`, 'info');
+          
+          const tableContainer = document.createElement('div');
+          tableContainer.style.maxHeight = '65vh';
+          tableContainer.style.overflowY = 'auto';
+          tableContainer.style.border = '1px solid #ddd';
+          tableContainer.style.borderRadius = '4px';
+
+          const table = document.createElement('table');
+          table.className = 'data-table';
+
+          const thead = document.createElement('thead');
+          const headerRow = document.createElement('tr');
+          if (result.headers && Array.isArray(result.headers)) {
+            result.headers.forEach(headerText => {
+              const th = document.createElement('th');
+              th.textContent = headerText;
+              headerRow.appendChild(th);
+            });
+          }
+          thead.appendChild(headerRow);
+          table.appendChild(thead);
+
+          const tbody = document.createElement('tbody');
+          result.rows.forEach((row, rowIndex) => {
+            const tr = document.createElement('tr');
+            if (Array.isArray(row)) {
+              row.forEach(cellData => {
+                const td = document.createElement('td');
+                td.textContent = cellData != null ? cellData.toString() : '';
+                tr.appendChild(td);
+              });
+            }
+            tbody.appendChild(tr);
+          });
+          table.appendChild(tbody);
+          tableContainer.appendChild(table);
+          contentDiv.appendChild(tableContainer);
+
+          const infoDiv = document.createElement('div');
+          infoDiv.style.marginTop = '15px';
+          infoDiv.style.fontSize = '14px';
+          infoDiv.style.color = '#666';
+          infoDiv.innerHTML = `
+            <p><strong>Archivo:</strong> ${result.filePath}</p>
+            <p><strong>Total de registros:</strong> ${result.rows.length}</p>
+          `;
+          contentDiv.appendChild(infoDiv);
+
+        } else {
+          this.logMessage('El archivo de ausentismo está vacío o no contiene registros.', 'warn');
+          contentDiv.innerHTML += `
+            <div style="text-align:center; padding:40px; color:#666;">
+              <h3>📋 No se encontraron datos</h3>
+              <p>El archivo de ausentismo está vacío o no contiene registros.</p>
+            </div>
+          `;
+        }
+      } else {
+        this.logMessage(`Error al cargar el archivo: ${result.error}`, 'error');
+        contentDiv.innerHTML = `
+          <div style="text-align:center; padding:40px; color:#d32f2f;">
+            <h3>❌ Error al cargar el archivo</h3>
+            <p>${result.error}</p>
+          </div>
+        `;
+      }
+    } catch (error) {
+      this.logMessage(`Error inesperado en la interfaz: ${error.message}`, 'error');
+      contentDiv.innerHTML = `
+        <div style="text-align:center; padding:40px; color:#d32f2f;">
+          <h3>💥 Error inesperado</h3>
+          <p>${error.message}</p>
+        </div>
+      `;
+    }
+  }
+}
+
+window.RegistrarAusentismoComponent = RegistrarAusentismoComponent;

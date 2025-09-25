@@ -10,7 +10,7 @@
   --warning-color: #ffc107;
   --info-color: #17a2b8;
   --light-color: #f8f9fa;
-  --dark-color: #343a40;
+  --dark-color: #33383d;
   --white-color: #ffffff;
   --black-color: #000000;
   
@@ -493,27 +493,48 @@ select.form-control {
 }
 
 /* Tarjetas de módulo */
+/* Tarjetas de módulo */
 .module-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: var(--spacer);
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: calc(var(--spacer) * 0.75);
+  padding: var(--spacer-sm);
+  width: 100%;
 }
 
 .module-card {
   display: flex;
   flex-direction: column;
   height: 100%;
+  background-color: var(--widget-bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--box-shadow);
+  padding: var(--spacer-sm);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.module-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--box-shadow-lg);
 }
 
 .module-card .card-title {
   font-size: 1.125rem;
   margin-bottom: var(--spacer-xs);
+  color: var(--text-color);
+  font-weight: var(--font-weight-bold);
 }
 
 .module-card .card-description {
   flex-grow: 1;
   margin-bottom: var(--spacer-sm);
   font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.module-card .btn {
+  align-self: flex-end; /* Alinea el botón al final del card */
 }
 
 /* Submódulo */
@@ -1375,4 +1396,68 @@ select.form-control {
   object-fit: contain; /* Mantiene la proporción del logo sin deformar */
   margin-bottom: var(--spacer-sm);
   display: none; /* Oculto por defecto */
+}
+/* --- Estilos para la tabla de ausentismo --- */
+.data-table-container {
+  overflow-x: auto;
+  max-width: 100%;
+  margin: 0 auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed; /* Esto hace que las columnas no se salgan */
+  min-width: 100%; /* Asegura que ocupe el 100% del contenedor */
+}
+
+.data-table th,
+.data-table td {
+  padding: 8px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 1px solid var(--border-color);
+  max-width: 150px; /* Limita el ancho de las celdas */
+}
+/* Primera fila (encabezados) con fondo oscuro */
+.data-table th {
+  background-color: var(--dark-color); /* Fondo oscuro */
+  color: var(--white-color); /* Texto blanco */
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+/* Opcional: Añadir sombra o borde superior para mayor contraste */
+.data-table thead tr {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.data-table-container {
+  max-height: 65vh;
+  overflow-y: auto;
+  margin-top: 15px;
+}
+
+/* Estilos específicos para la vista de ausentismo */
+.control-remisiones-content {
+  padding: 20px;
+}
+
+.control-remisiones-content .data-table-container {
+  margin-top: 15px;
+}
+
+/* Ajuste para pantallas pequeñas */
+@media (max-width: 768px) {
+  .data-table th,
+  .data-table td {
+    font-size: 0.8rem;
+    padding: 4px;
+    max-width: 100px;
+  }
 }

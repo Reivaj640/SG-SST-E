@@ -48,3 +48,20 @@
     *   Creé un nuevo componente dedicado exclusivamente para la funcionalidad de registro de ausentismo.
     *   Implementé una interfaz modular con opciones para "Registrar Nuevo Ausentismo", "Ver Ausentismos Registrados" y "Generar Reporte".
     *   Desarrollé la funcionalidad de navegación por archivos de ausentismo con previsualización de documentos. 
+
+10. **`styles.css` - Optimización del diseño de tarjetas de submódulos:**
+    *   Ajusté el tamaño mínimo de las tarjetas de submódulos de 300px a 280px para permitir más tarjetas por fila.
+    *   Reduje el espacio entre tarjetas de `var(--spacer)` a `calc(var(--spacer) * 0.75)` para mejorar el uso del espacio.
+    *   Verifiqué que las tarjetas se muestren correctamente en dos columnas gracias al estilo CSS `grid-template-columns: repeat(auto-fill, minmax(280px, 1fr))`. 
+
+--- Modificaciones del 23 de septiembre de 2025 (continuación) ---
+
+11. **`renderer.js` - Organización en dos columnas de los submódulos:**
+    *   Actualicé la función `showGenericModuleHome` para mostrar los submódulos en un diseño de dos columnas.
+    *   Modifiqué la estructura HTML generada dinámicamente para mejorar la presentación de las tarjetas de submódulos.
+    *   Ajusté los estilos CSS para optimizar el diseño responsivo de las tarjetas en diferentes tamaños de pantalla.
+
+12. **`styles.css` - Mejora del diseño responsivo:**
+    *   Añadí media queries para adaptar el diseño de las tarjetas de submódulos en pantallas pequeñas.
+    *   Optimicé el espaciado y el padding de las tarjetas para una mejor presentación visual.
+    *   Mejoré la transición y los efectos hover de las tarjetas para una experiencia de usuario más agradable. 
