@@ -3,13 +3,15 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fsp = require('fs').promises;
-const fs = require('fs');
+const fs = require('fs').promises;  // Para operaciones asíncronas
+const fsSync = require('fs');       // Para operaciones síncronas
 const { exec, spawn, execFile } = require('child_process'); // Asegúrate de incluir execFile
 const { promisify } = require('util');
 const xlsx = require('xlsx');
 const os = require('os');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
+const ExcelJS = require('exceljs');
 
 // --- Configuración del Auto-Updater ---
 log.transports.file.level = 'info';
@@ -120,8 +122,10 @@ if (require('electron-squirrel-startup')) {
 // Función para crear la ventana principal
 const createWindow = () => {
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 900,
+    width: 1024, // Ancho inicial 1200 para mejor visualización
+    height: 900, // Alto inicial 900 para mejor visualización
+    minWidth: 900,
+    minHeight: 800,
     icon: path.join(__dirname, 'assets', 'icons8-adelante-100.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -137,12 +141,7 @@ const createWindow = () => {
   // mainWindow.webContents.openDevTools();
 };
 
-// Función para registrar los manejadores IPC
-const registerIPCHandlers = () => {
-  // Manejador para obtener la versión de la aplicación
-  ipcMain.handle('get-app-version', () => {
-    return app.getVersion();
-  });
+
 
   // Manejar selección de directorio
   ipcMain.handle('select-directory', async () => {
@@ -808,114 +807,643 @@ const registerIPCHandlers = () => {
     }
   });
   
-  // Agrega este nuevo handler IPC en tu main.js
-  ipcMain.handle('update-excel-cell', async (event, filePath, row, col, value) => {
-    sendLog(`[MAIN] Actualizando celda en ${filePath}, fila: ${row}, columna: ${col}, valor: ${value}`);
+  
+// Clase para manejar Excel en tiempo real - VERSIÓN SIMPLIFICADA Y ROBUSTA
+class RealTimeExcelManager {
+  constructor(filePath) {
+    sendLog(`[DEBUG] Constructor recibió filePath: "${filePath}"`);
+    this.originalFilePath = filePath;
     
-    try {
-      // Verificar que el archivo existe
-      await fsp.access(filePath);
-      
-      // Leer el workbook
-      const workbook = xlsx.readFile(filePath);
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      
-      // Convertir coordenadas a formato de celda de Excel (ej: A1, B2, etc.)
-      const cellAddress = xlsx.utils.encode_cell({ r: row - 1, c: col - 1 }); // Convertir a 0-indexed
-      
-      // Actualizar el valor de la celda
-      worksheet[cellAddress] = { v: value, t: 's' }; // t: 's' para string
-      
-      // Guardar el archivo
-      xlsx.writeFile(workbook, filePath);
-      
-      sendLog(`[MAIN] Celda actualizada exitosamente: ${cellAddress} = ${value}`);
-      
-      return { success: true };
-      
-    } catch (error) {
-      sendLog(`[MAIN] Error al actualizar celda: ${error.message}`, 'ERROR');
-      return { success: false, error: error.message };
-    }
-  });
+    // Obtenemos la ruta para PowerShell desde el inicio.
+    // Esta será la única ruta que usaremos.
+    this.filePath = this.getPowerShellSafePath(filePath);
+    
+    this.workbook = new ExcelJS.Workbook();
+    this.worksheet = null;
+    this.isUpdating = false;
+    this.pendingUpdates = new Map();
+    this.formulaCells = new Set();
+    this.isInitialized = false;
 
-  // Manejar envío de remisión por WhatsApp
-  ipcMain.handle('send-remision-by-whatsapp', async (event, docPath, extractedData, empresa) => {
-    sendLog(`IPC: send-remision-by-whatsapp recibido para: ${docPath}`);
+    if (!fsSync.existsSync(this.filePath)) {
+      throw new Error(`Archivo no encontrado en la ruta segura generada: "${this.filePath}"`);
+    }
+    sendLog(`[DEBUG] Usando ruta final segura: "${this.filePath}"`);
+  }
+
+  async forceRecalculationFinal() {
     try {
-      const pythonPath = await getPython();
-      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'remision_utils.py');
-      const tempDataPath = path.join(app.getPath('temp'), `whatsapp_data_${Date.now()}.json`);
-      
-      sendLog(`Creando archivo de datos temporal para WhatsApp: ${tempDataPath}`);
-      await fsp.writeFile(tempDataPath, JSON.stringify({
-        docPath: docPath, 
-        data: extractedData, 
-        empresa: empresa 
-      }));
-      
-      const commandArgs = [pythonScriptPath, '--send-whatsapp', tempDataPath];
-      
-      sendLog(`Ejecutando script de preparación de WhatsApp...`);
-      const { stdout, stderr } = await execFilePromise(pythonPath, commandArgs, { cwd: path.dirname(pythonScriptPath) });
-      
-      await fsp.unlink(tempDataPath);
-      
-      if (stderr) {
-        sendLog(`Error en script de WhatsApp: ${stderr}`, 'ERROR');
+      if (!fsSync.existsSync(this.filePath)) {
+        throw new Error(`Archivo no existe antes del recálculo: "${this.filePath}"`);
       }
 
-      let finalResult = null;
-      const lines = stdout.split(/\r?\n/).filter(line => line.trim() !== '');
-      lines.forEach(line => {
-        try {
-          const output = JSON.parse(line);
-          if (output.type === 'log') {
-            sendLog(`[Python] ${output.message}`, output.level);
-          } else if (output.type === 'result') {
-            finalResult = output.payload;
-          }
-        } catch (e) {
-          sendLog(`No se pudo parsear la línea de salida de Python: ${line}`, 'WARN');
+      const psPath = this.getEscapedPathForScript();
+      sendLog(`[DEBUG] Usando ruta optimizada y escapada para PowerShell: "${psPath}"`);
+
+      const script = `
+$ErrorActionPreference = "Stop"
+
+Write-Host "=== EXCEL RECALCULATION SCRIPT (Encoded) ==="
+Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
+
+try {
+    $filePath = '${psPath}'
+    Write-Host "Archivo a procesar: $filePath"
+    
+    if (-not (Test-Path -LiteralPath $filePath)) {
+        throw "CRITICAL: Archivo no encontrado en ruta: $filePath"
+    }
+    
+    $fileInfo = Get-Item -LiteralPath $filePath
+    Write-Host "Archivo verificado: $($fileInfo.FullName)"
+    
+    Write-Host "Iniciando aplicación Excel..."
+    $excel = New-Object -ComObject Excel.Application -ErrorAction Stop
+    
+    $excel.Visible = $false
+    $excel.DisplayAlerts = $false
+    $excel.ScreenUpdating = $false
+    $excel.EnableEvents = $false
+    
+    Write-Host "Abriendo workbook..."
+    $workbook = $excel.Workbooks.Open($filePath, 0, $false, [Type]::Missing, [Type]::Missing, [Type]::Missing, $true)
+    
+    $excel.Calculation = -4105
+    Write-Host "Ejecutando CalculateFullRebuild..."
+    $excel.CalculateFullRebuild()
+    
+    Write-Host "Esperando finalización del cálculo..."
+    $maxWaitSeconds = 45
+    $checkIntervalMs = 200
+    $totalWaited = 0
+    
+    do {
+        Start-Sleep -Milliseconds $checkIntervalMs
+        $totalWaited += $checkIntervalMs
+        $waitedSeconds = $totalWaited / 1000
+        
+        if ($waitedSeconds -ge $maxWaitSeconds) {
+            Write-Host "ADVERTENCIA: Timeout alcanzado después de $maxWaitSeconds segundos"
+            break
         }
+    } while ($excel.CalculationState -ne -4143)
+    
+    $workbook.Save()
+    $workbook.Close($false)
+    
+    Write-Output "SUCCESS - Excel recalculation completed"
+    
+} catch {
+    $errorMsg = $_.Exception.Message
+    $errorLine = $_.InvocationInfo.ScriptLineNumber
+    Write-Error "SCRIPT ERROR at line $errorLine\`: $errorMsg"
+    throw "Excel processing failed: $errorMsg"
+} finally {
+    if ($workbook) { try { $workbook.Close($false) } catch {} }
+    if ($excel) {
+        try {
+            $excel.Quit()
+            [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null
+        } catch {}}
+    [System.GC]::Collect()
+    [System.GC]::WaitForPendingFinalizers()
+}
+      `;
+
+      const encodedCommand = Buffer.from(script, 'utf16le').toString('base64');
+
+      return await new Promise((resolve, reject) => {
+        const ps = spawn('powershell', [
+          '-NoProfile',
+          '-NonInteractive',
+          '-EncodedCommand',
+          encodedCommand
+        ], {
+          stdio: ['ignore', 'pipe', 'pipe'],
+          windowsHide: true,
+          env: { ...process.env, POWERSHELL_TELEMETRY_OPTOUT: '1' }
+        });
+
+        let output = '';
+        let errorOutput = '';
+
+        const timeout = setTimeout(() => {
+          ps.kill('SIGTERM');
+          setTimeout(() => ps.kill('SIGKILL'), 5000);
+          reject(new Error('Timeout: Excel recalculation took too long (60s)'));
+        }, 60000);
+
+        ps.stdout.on('data', (data) => {
+          const text = data.toString('utf8');
+          output += text;
+          sendLog(`[PS OUT] ${text.trim()}`);
+        });
+
+        ps.stderr.on('data', (data) => {
+          const text = data.toString('utf8');
+          errorOutput += text;
+          sendLog(`[PS ERR] ${text.trim()}`, 'ERROR');
+        });
+
+        ps.on('close', (code) => {
+          clearTimeout(timeout);
+          if (code === 0 && output.includes('SUCCESS')) {
+            sendLog('[SUCCESS] Excel recálculo exitoso con -EncodedCommand');
+            resolve();
+          } else {
+            const errorMsg = `PowerShell failed with code ${code}. Error: ${errorOutput}`;
+            sendLog(`[ERROR] ${errorMsg}`, 'ERROR');
+            reject(new Error(errorMsg));
+          }
+        });
+
+        ps.on('error', (err) => {
+          clearTimeout(timeout);
+          sendLog(`[ERROR] PowerShell process error: ${err.message}`, 'ERROR');
+          reject(err);
+        });
       });
 
-      if (finalResult) {
-        sendLog(`Resultado de preparación de WhatsApp: ${JSON.stringify(finalResult)}`);
-        
-        // Si el script fue exitoso y devolvió un número de teléfono
-        if (finalResult.success && finalResult.phoneNumber) {
-          const phoneNumber = finalResult.phoneNumber;
-          let cleanPhoneNumber = String(phoneNumber).replace(/[^0-9]/g, '');
-          if (cleanPhoneNumber.length === 10) {
-            cleanPhoneNumber = `57${cleanPhoneNumber}`;
-          }
+    } catch (error) {
+      throw error;
+    }
+  }
 
-          // Datos del trabajador para el mensaje
-          const nombreTrabajador = finalResult.nombre || 'N/A';
-          const cedulaTrabajador = finalResult.cedula || 'N/A';
 
-          // Plantilla del mensaje
-          const messageBody = `Remisión EPS - ${empresa.toUpperCase()}\n\nTrabajador: ${nombreTrabajador}\nCédula: ${cedulaTrabajador}\n\nAdjunto encontrará su documento de remisión EPS con las recomendaciones médicas.\n\nPor favor:\n1. Revise el documento adjunto ✅\n2. Siga las indicaciones del profesional de salud ✅\n3. Confirme recepción ✅\n\nCualquier duda estamos disponibles para resolverla`;
-          
-          const message = encodeURIComponent(messageBody);
-          const whatsappUrl = `https://wa.me/${cleanPhoneNumber}?text=${message}`;
-          
-          sendLog(`Abriendo WhatsApp con la URL: ${whatsappUrl}`);
-          shell.openExternal(whatsappUrl);
+
+  /**
+   * Obtiene la ruta más segura para PowerShell.
+   * Estrategia: Prioriza la ruta corta nativa de Node.js. Si falla, usa la original.
+   */
+  getPowerShellSafePath(originalPath) {
+    // 1. La mejor y más eficiente estrategia: fs.realpathSync.native
+    try {
+      const nativeShortPath = fsSync.realpathSync.native(originalPath);
+      if (nativeShortPath && fsSync.existsSync(nativeShortPath)) {
+        sendLog(`[SUCCESS] Estrategia de ruta corta nativa funcionó: "${nativeShortPath}"`);
+        return nativeShortPath;
+      }
+    } catch (error) {
+      sendLog(`[WARN] Estrategia de ruta corta nativa falló: ${error.message}. Se intentará la normalización manual.`);
+    }
+
+    // 2. Fallback: Normalización manual de caracteres problemáticos.
+    // Esto es un parche necesario porque la ruta corta no está disponible (posiblemente por ser una unidad de red como Google Drive)
+    // y la cadena de ruta llega con la codificación dañada.
+    let normalizedPath = path.normalize(originalPath);
+    const corrections = {
+        'Gestio╠ün': 'Gestion',
+        'Medicio╠ün': 'Medicion',
+        'Administracio╠ün': 'Administracion',
+        'cio╠ün': 'cion',
+        'o╠ün': 'on',
+        'a╠ün': 'an',
+        'e╠ün': 'en',
+        'i╠ün': 'in',
+        'u╠ün': 'un'
+    };
+    
+    let appliedCorrections = false;
+    for (const [bad, good] of Object.entries(corrections)) {
+        if (normalizedPath.includes(bad)) {
+            normalizedPath = normalizedPath.replace(new RegExp(bad, 'g'), good);
+            appliedCorrections = true;
         }
-        
-        return finalResult;
-      } else {
-        throw new Error("El script de Python no devolvió un resultado final.");
+    }
+
+    if(appliedCorrections) {
+        sendLog(`[DEBUG] Ruta corregida manualmente: "${normalizedPath}"`);
+    }
+
+    return normalizedPath;
+  }
+
+  /**
+   * Prepara la ruta para ser insertada en el string del script de PowerShell.
+   * La única manipulación necesaria es escapar comillas simples.
+   */
+  getEscapedPathForScript() {
+    return this.filePath.replace(/'/g, "''");
+  }
+
+  async debugPathResolution() {
+    console.log('\n=== DEBUGGING HÍBRIDO DE RUTAS v2 ===');
+    console.log(`1. Ruta original: "${this.originalFilePath}"`);
+    console.log(`2. Ruta final seleccionada: "${this.filePath}"`);
+    console.log(`3. Ruta para PowerShell (escapada): "${this.getEscapedPathForScript()}"`);
+    
+    console.log('\n=== VERIFICACIONES ===');
+    console.log(`7. Archivo existe (ruta final): ${fsSync.existsSync(this.filePath)}`);
+    console.log(`8. Ruta absoluta: ${path.isAbsolute(this.filePath)}`);
+    
+    if (fsSync.existsSync(this.filePath)) {
+      const stats = fsSync.statSync(this.filePath);
+      console.log(`9. Tamaño del archivo: ${stats.size} bytes`);
+      console.log(`10. Última modificación: ${stats.mtime}`);
+    }
+    
+    console.log('=== FIN DEBUGGING HÍBRIDO ===\n');
+  }
+
+  async forceExcelRecalculationWithTempScript() {
+    const tempScriptPath = path.join(os.tmpdir(), `excel_recalc_${Date.now()}.ps1`);
+    try {
+      if (!fsSync.existsSync(this.filePath)) {
+        throw new Error(`Archivo no existe antes del recálculo: "${this.filePath}"`);
       }
 
-    } catch (error) {
-      sendLog(`Fallo en la ejecución del script de WhatsApp: ${error.message}`, 'ERROR');
-      return { success: false, error: error.message };
+      const psPath = this.getEscapedPathForScript();
+      sendLog(`[DEBUG] Usando ruta optimizada para PowerShell: "${psPath}"`);
+
+      const script = `
+# Configuración de codificación mejorada
+[Console]::InputEncoding = [System.Text.Encoding]::UTF8
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
+$ErrorActionPreference = "Stop"
+
+Write-Host "=== EXCEL RECALCULATION SCRIPT ==="
+Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
+Write-Host "Current Encoding: $([System.Text.Encoding]::Default.EncodingName)"
+
+try {
+    $filePath = '${psPath}'
+    Write-Host "Archivo a procesar: $filePath"
+    
+    if (-not (Test-Path -LiteralPath $filePath)) {
+        throw "CRITICAL: Archivo no encontrado en ruta: $filePath"
     }
-  });
+    
+    $fileInfo = Get-Item -LiteralPath $filePath
+    Write-Host "Archivo verificado: $($fileInfo.FullName)"
+    
+    Write-Host "Iniciando aplicación Excel..."
+    try {
+        $excel = New-Object -ComObject Excel.Application -ErrorAction Stop
+    } catch {
+        throw "ERROR: No se pudo crear Excel COM Object: $($_.Exception.Message)"
+    }
+    
+    $excel.Visible = $false
+    $excel.DisplayAlerts = $false
+    $excel.ScreenUpdating = $false
+    $excel.EnableEvents = $false
+    
+    Write-Host "Abriendo workbook..."
+    try {
+        $workbook = $excel.Workbooks.Open($filePath, 0, $false, [Type]::Missing, [Type]::Missing, [Type]::Missing, $true)
+    } catch {
+        throw "ERROR: No se pudo abrir el workbook: $($_.Exception.Message)"
+    }
+    
+    $excel.Calculation = -4105
+    Write-Host "Ejecutando CalculateFullRebuild..."
+    $excel.CalculateFullRebuild()
+    
+    Write-Host "Esperando finalización del cálculo..."
+    $maxWaitSeconds = 45
+    $checkIntervalMs = 200
+    $totalWaited = 0
+    
+    do {
+        Start-Sleep -Milliseconds $checkIntervalMs
+        $totalWaited += $checkIntervalMs
+        $waitedSeconds = $totalWaited / 1000
+        
+        if ($waitedSeconds -ge $maxWaitSeconds) {
+            Write-Host "ADVERTENCIA: Timeout alcanzado después de $maxWaitSeconds segundos"
+            break
+        }
+    } while ($excel.CalculationState -ne -4143)
+    
+    $workbook.Save()
+    $workbook.Close($false)
+    
+    Write-Output "SUCCESS - Excel recalculation completed"
+    
+} catch {
+    $errorMsg = $_.Exception.Message
+    $errorLine = $_.InvocationInfo.ScriptLineNumber
+    Write-Error "SCRIPT ERROR at line $errorLine\`: $errorMsg"
+    throw "Excel processing failed: $errorMsg"
+} finally {
+    if ($workbook) { try { $workbook.Close($false) } catch {} }
+    if ($excel) {
+        try {
+            $excel.Quit()
+            [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null
+        } catch {}
+    }
+    [System.GC]::Collect()
+    [System.GC]::WaitForPendingFinalizers()
+}
+      `;
+
+      await fsp.writeFile(tempScriptPath, script, { encoding: 'utf8' });
+
+      return await new Promise((resolve, reject) => {
+        const ps = spawn('powershell', [
+          '-ExecutionPolicy', 'Bypass',
+          '-NoProfile',
+          '-NoLogo',
+          '-NonInteractive',
+          '-File', tempScriptPath
+        ], {
+          stdio: ['ignore', 'pipe', 'pipe'],
+          windowsHide: true,
+          env: { 
+            ...process.env, 
+            POWERSHELL_TELEMETRY_OPTOUT: '1',
+            PYTHONIOENCODING: 'utf-8',
+            LC_ALL: 'en_US.UTF-8'
+          }
+        });
+
+        let output = '';
+        let errorOutput = '';
+
+        const timeout = setTimeout(() => {
+          ps.kill('SIGTERM');
+          setTimeout(() => ps.kill('SIGKILL'), 5000);
+          reject(new Error('Timeout: Excel recalculation took too long (60s)'));
+        }, 60000);
+
+        ps.stdout.on('data', (data) => {
+          const text = data.toString('utf8');
+          output += text;
+          sendLog(`[PS OUT] ${text.trim()}`);
+        });
+
+        ps.stderr.on('data', (data) => {
+          const text = data.toString('utf8');
+          errorOutput += text;
+          sendLog(`[PS ERR] ${text.trim()}`, 'ERROR');
+        });
+
+        ps.on('close', async (code) => {
+          clearTimeout(timeout);
+          try { await fsp.unlink(tempScriptPath); } catch (e) { /* ignore */ }
+
+          if (code === 0 && output.includes('SUCCESS')) {
+            sendLog('[SUCCESS] Excel recálculo exitoso con solución simplificada');
+            resolve();
+          } else {
+            const errorMsg = `PowerShell failed with code ${code}. Error: ${errorOutput}`;
+            sendLog(`[ERROR] ${errorMsg}`, 'ERROR');
+            reject(new Error(errorMsg));
+          }
+        });
+
+        ps.on('error', (err) => {
+          clearTimeout(timeout);
+          sendLog(`[ERROR] PowerShell process error: ${err.message}`, 'ERROR');
+          reject(err);
+        });
+      });
+
+    } catch (error) {
+      try { await fsp.unlink(tempScriptPath); } catch (e) {}
+      throw error;
+    }
+  }
+
+  async initialize() {
+    if (this.isInitialized) {
+      sendLog(`[DEBUG] Excel Manager ya está inicializado para: ${this.filePath}`);
+      return;
+    }
+    sendLog(`[DEBUG] Inicializando Excel Manager para: ${this.filePath}`);
+    await this.debugPathResolution();
+    await this.loadWorkbook();
+    this.detectFormulaCells();
+    this.isInitialized = true;
+    sendLog(`[DEBUG] Inicializado. Fórmulas detectadas: ${Array.from(this.formulaCells).join(', ')}`);
+  }
+
+  async loadWorkbook() {
+    await this.workbook.xlsx.readFile(this.filePath);
+    this.worksheet = this.workbook.worksheets[0];
+  }
+
+  detectFormulaCells() {
+    this.formulaCells.clear();
+    if (!this.worksheet) return;
+    this.worksheet.eachRow((row, rowNumber) => {
+      row.eachCell((cell, colNumber) => {
+        if (cell && cell.formula) {
+          const cellAddress = this.getCellAddress(rowNumber, colNumber);
+          this.formulaCells.add(cellAddress);
+        }
+      });
+    });
+  }
+
+  getCellAddress(row, col) {
+    return this.worksheet.getCell(row, col).address;
+  }
+
+  async updateCellAndRecalculate(cellAddress, value) {
+    if (this.isUpdating) {
+      this.pendingUpdates.set(cellAddress, value);
+      return await this.waitForCurrentUpdate();
+    }
+
+    this.isUpdating = true;
+    sendLog(`[DEBUG] Actualizando celda ${cellAddress} con valor: ${value}`);
+
+    try {
+      await this.loadWorkbook();
+      this.worksheet.getCell(cellAddress).value = value;
+      await this.workbook.xlsx.writeFile(this.filePath);
+      
+      await this.forceRecalculationFinal();
+      
+      const updatedData = await this.getCurrentData();
+      await this.processPendingUpdates();
+      return updatedData;
+    } catch (error) {
+      sendLog(`[ERROR] Error actualizando celda: ${error.message}`, 'ERROR');
+      throw error;
+    } finally {
+      this.isUpdating = false;
+    }
+  }
+
+  async getCurrentData() {
+    await this.loadWorkbook();
+    const data = [];
+    const formulaResults = {};
+
+    this.worksheet.eachRow((row, rowNumber) => {
+      const rowData = [];
+      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        const cellAddress = this.getCellAddress(rowNumber, colNumber);
+        let cellValue = cell.value;
+
+        if (cell && cell.formula) {
+          formulaResults[cellAddress] = {
+            formula: cell.formula,
+            value: cellValue,
+            calculated: true
+          };
+        }
+
+        if (cellValue && typeof cellValue === 'object') {
+          if (cellValue.formula) {
+            cellValue = cellValue.result || cellValue.value || '';
+          } else if (cellValue.text) {
+            cellValue = cellValue.text;
+          }
+        }
+
+        rowData.push(cellValue != null ? cellValue : '');
+      });
+      data.push(rowData);
+    });
+
+    return { data, formulaResults, timestamp: Date.now() };
+  }
+
+  async processPendingUpdates() {
+    if (this.pendingUpdates.size === 0) return;
+    const updates = new Map(this.pendingUpdates);
+    this.pendingUpdates.clear();
+    for (const [cellAddress, value] of updates) {
+      await this.updateCellAndRecalculate(cellAddress, value);
+    }
+  }
+
+  async waitForCurrentUpdate() {
+    return new Promise((resolve) => {
+      const checkUpdate = () => {
+        if (!this.isUpdating) {
+          resolve(this.getCurrentData());
+        } else {
+          setTimeout(checkUpdate, 100);
+        }
+      };
+      checkUpdate();
+    });
+  }
+}
+
+// ----------------------
+// ExcelManagerRegistry
+// ----------------------
+class ExcelManagerRegistry {
+  constructor() {
+    this.instances = new Map(); // resolvedPath -> manager
+    this.activeManager = null;
+  }
+
+  async getOrCreateManager(filePath) {
+    const resolvedPath = path.resolve(filePath);
+
+    if (this.instances.has(resolvedPath)) {
+      sendLog(`[DEBUG] Reutilizando instancia existente para: ${resolvedPath}`);
+      const existingManager = this.instances.get(resolvedPath);
+      this.activeManager = existingManager;
+      if (!existingManager.isInitialized) {
+        await existingManager.initialize();
+      }
+      return existingManager;
+    }
+
+    sendLog(`[DEBUG] Creando nueva instancia para: ${resolvedPath}`);
+    const manager = new RealTimeExcelManager(resolvedPath);
+    await manager.initialize();
+    this.instances.set(resolvedPath, manager);
+    this.activeManager = manager;
+    return manager;
+  }
+
+  getActiveManager() {
+    return this.activeManager;
+  }
+
+  clearInstances() {
+    this.instances.clear();
+    this.activeManager = null;
+  }
+}
+
+const excelRegistry = new ExcelManagerRegistry();
+
+// ----------------------
+// IPC Handlers
+// ----------------------
+
+// limpiar manejadores previos (si existían)
+try {
+  ipcMain.removeHandler('init-excel');
+  ipcMain.removeHandler('update-excel-cell');
+  ipcMain.removeHandler('diagnose-excel-path');
+} catch (e) { /* ignore */ }
+
+ipcMain.handle('init-excel', async (event, filePath) => {
+  try {
+    sendLog(`[DEBUG] init-excel ruta: ${filePath}`);
+    if (!fsSync.existsSync(filePath)) {
+      throw new Error(`El archivo no existe en la ruta especificada: ${filePath}`);
+    }
+    const stats = fsSync.statSync(filePath);
+    const manager = await excelRegistry.getOrCreateManager(filePath);
+    const data = await manager.getCurrentData();
+    return {
+      success: true,
+      data,
+      fileInfo: { path: filePath, size: stats.size, modified: stats.mtime }
+    };
+  } catch (error) {
+    sendLog(`Error inicializando Excel: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message, stack: error.stack };
+  }
+});
+
+ipcMain.handle('update-excel-cell', async (event, { cellAddress, value }) => {
+  try {
+    let manager = excelRegistry.getActiveManager();
+    if (!manager) throw new Error('Excel Manager no está inicializado. Llama a init-excel primero.');
+    if (!manager.isInitialized) await manager.initialize();
+    const result = await manager.updateCellAndRecalculate(cellAddress, value);
+    return { success: true, data: result, cellAddress, value, timestamp: Date.now() };
+  } catch (error) {
+    sendLog(`Error actualizando celda: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message, stack: error.stack, cellAddress, value };
+  }
+});
+
+ipcMain.handle('diagnose-excel-path', async (event, filePath) => {
+  try {
+    const resolvedPath = path.resolve(filePath);
+    const exists = fsSync.existsSync(resolvedPath);
+    let fileInfo = null;
+    if (exists) {
+      const stats = fsSync.statSync(resolvedPath);
+      fileInfo = { size: stats.size, modified: stats.mtime, isFile: stats.isFile(), isDirectory: stats.isDirectory() };
+    }
+    const hasInstance = excelRegistry.instances.has(resolvedPath);
+    const activeManager = excelRegistry.getActiveManager();
+    return {
+      originalPath: filePath,
+      resolvedPath,
+      exists,
+      fileInfo,
+      pathSeparator: path.sep,
+      platform: process.platform,
+      registry: { hasInstance, hasActiveManager: !!activeManager, totalInstances: excelRegistry.instances.size }
+    };
+  } catch (error) {
+    return { error: error.message, originalPath: filePath };
+  }
+});
+
+module.exports = {
+  RealTimeExcelManager,
+  ExcelManagerRegistry,
+  excelRegistry
+};
 
   // --- Nuevos manejadores IPC para procesamiento de accidentes ---
   
@@ -1929,7 +2457,13 @@ try {
     });
 }
 
-};
+// Función para registrar los manejadores IPC
+const registerIPCHandlers = () => {
+  // Manejador para obtener la versión de la aplicación
+  ipcMain.handle('get-app-version', () => {
+    return app.getVersion();
+  });
+}
 
 // --- Ciclo de vida de la aplicación ---
 

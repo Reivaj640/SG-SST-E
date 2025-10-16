@@ -12,6 +12,7 @@ class MedicionAusentismoComponent {
         this.pathHistory = [];
         this.ausentismoFilePath = null; // Para guardar la ruta del archivo
         this.logMessage = (msg, type) => console.log(`[${type}] ${msg}`); // Placeholder
+        this.excelInitialized = false; // Para saber si ya inicializamos el gestor de Excel
 
         this.openDocument = this.openDocument.bind(this);
     }
@@ -371,6 +372,19 @@ class MedicionAusentismoComponent {
         contentDiv.style.padding = '20px';
         container.appendChild(contentDiv);
 
+        // Área de estado para mostrar feedback al usuario
+        const statusDiv = document.createElement('div');
+        statusDiv.id = 'excel-status';
+        statusDiv.style.cssText = `
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            text-align: center;
+            display: none;
+        `;
+        contentDiv.appendChild(statusDiv);
+
         this.logMessage(`Cargando datos de ausentismo para ${this.currentCompany}...`, 'info');
         console.log(`[DEBUG] renderRegistrarAusentismoView: Solicitando datos para ${this.currentCompany}`);
         contentDiv.innerHTML = '<p style="text-align:center;">Cargando datos del archivo de ausentismo...</p>';
@@ -383,8 +397,20 @@ class MedicionAusentismoComponent {
                 this.ausentismoFilePath = result.filePath;
                 console.log(`[DEBUG] renderRegistrarAusentismoView: Ruta de archivo guardada: ${this.ausentismoFilePath}`);
                 contentDiv.innerHTML = ''; // Limpiar "Cargando..."
+                contentDiv.appendChild(statusDiv); // Reañadir el div de estado
 
-
+                // ✅ Inicializar Excel aquí antes de renderizar la tabla
+                if (!this.excelInitialized) {
+                    statusDiv.style.display = 'block';
+                    statusDiv.textContent = 'Inicializando Excel...';
+                    statusDiv.style.backgroundColor = '#d1ecf1';
+                    statusDiv.style.color = '#0c5460';
+                    
+                    await window.electronAPI.initExcel(result.filePath);
+                    this.excelInitialized = true;
+                    
+                    statusDiv.style.display = 'none';
+                }
 
                 if (result.rows && result.rows.length > 0) {
                     console.log(`[DEBUG] renderRegistrarAusentismoView: ${result.rows.length} filas encontradas. Renderizando tabla.`);
@@ -419,14 +445,115 @@ class MedicionAusentismoComponent {
                     result.rows.forEach((row, rowIndex) => {
                         const tr = document.createElement('tr');
                         if (Array.isArray(row)) {
-                            row.forEach(cellData => {
+                            row.forEach((cellData, colIndex) => {
                                 const td = document.createElement('td');
                                 td.textContent = cellData != null ? cellData.toString() : '';
+                                
+                                // Hacer la celda editable si es una de las columnas permitidas
+                                const isEditable = this.isEditableColumn(colIndex);
+                                if (isEditable) {
+                                    td.contentEditable = true;
+                                    td.addEventListener('blur', async () => {
+                                        // Añadir clase visual de "actualizando"
+                                        td.classList.add('updating');
+                                        td.disabled = true;
+                                        
+                                        // Mostrar estado global
+                                        statusDiv.style.display = 'block';
+                                        statusDiv.textContent = 'Procesando en Excel...';
+                                        statusDiv.style.backgroundColor = '#fff3cd';
+                                        statusDiv.style.color = '#856404';
+                                        
+                                        try {
+                                            // Convertir fila/columna a dirección de celda Excel (sin usar ExcelJS)
+                                            const cellAddress = this.getExcelCellAddress(rowIndex + 7, colIndex); // +7 porque encabezado está en fila 7
+                                            
+                                            // Enviar actualización al backend
+                                            const updateResult = await window.electronAPI.updateExcelCell({
+                                                cellAddress,
+                                                value: td.textContent
+                                            });
+                                            
+                                            if (updateResult.success) {
+                                                // Actualizar la vista con los nuevos datos
+                                                this.updateTableWithNewData(updateResult.data.data);
+                                            } else {
+                                                alert(`Error actualizando celda: ${updateResult.error}`);
+                                            }
+                                        } catch (error) {
+                                            console.error('Error actualizando celda:', error);
+                                            alert(`Error: ${error.message}`);
+                                        } finally {
+                                            // Remover clase visual de "actualizando"
+                                            td.classList.remove('updating');
+                                            td.disabled = false;
+                                            
+                                            // Ocultar estado global
+                                            statusDiv.style.display = 'none';
+                                        }
+                                    });
+                                }
+                                
                                 tr.appendChild(td);
                             });
                         }
                         tbody.appendChild(tr);
                     });
+                    
+                    // Añadir fila vacía editable al final
+                    const emptyRow = document.createElement('tr');
+                    for (let i = 0; i < result.headers.length; i++) {
+                        const td = document.createElement('td');
+                        
+                        // Hacer la celda editable si es una de las columnas permitidas
+                        const isEditable = this.isEditableColumn(i);
+                        if (isEditable) {
+                            td.contentEditable = true;
+                            td.addEventListener('blur', async () => {
+                                // Añadir clase visual de "actualizando"
+                                td.classList.add('updating');
+                                td.disabled = true;
+                                
+                                // Mostrar estado global
+                                statusDiv.style.display = 'block';
+                                statusDiv.textContent = 'Procesando en Excel...';
+                                statusDiv.style.backgroundColor = '#fff3cd';
+                                statusDiv.style.color = '#856404';
+                                
+                                try {
+                                    // Convertir fila/columna a dirección de celda Excel (sin usar ExcelJS)
+                                    const cellAddress = this.getExcelCellAddress(result.rows.length + 7, i); // +7 porque encabezado está en fila 7
+                                    
+                                    // Enviar actualización al backend
+                                    const updateResult = await window.electronAPI.updateExcelCell({
+                                        cellAddress,
+                                        value: td.textContent
+                                    });
+                                    
+                                    if (updateResult.success) {
+                                        // Actualizar la vista con los nuevos datos
+                                        this.updateTableWithNewData(updateResult.data.data);
+                                    } else {
+                                        alert(`Error actualizando celda: ${updateResult.error}`);
+                                    }
+                                } catch (error) {
+                                    console.error('Error actualizando celda:', error);
+                                    alert(`Error: ${error.message}`);
+                                } finally {
+                                    // Remover clase visual de "actualizando"
+                                    td.classList.remove('updating');
+                                    td.disabled = false;
+                                    
+                                    // Ocultar estado global
+                                    statusDiv.style.display = 'none';
+                                }
+                            });
+                        }
+                        
+                        emptyRow.appendChild(td);
+                    }
+                    tbody.appendChild(emptyRow);
+                    
                     table.appendChild(tbody);
                     tableContainer.appendChild(table);
                     contentDiv.appendChild(tableContainer);
@@ -471,6 +598,35 @@ class MedicionAusentismoComponent {
                 </div>
             `;
         }
+    }
+
+    // Método para saber qué columnas son editables
+    isEditableColumn(colIndex) {
+        // Asumiendo que las columnas editables son:
+        // Cédula (índice 3), Género (índice 8), Clase de incapacidad (índice 11), 
+        // Tipo de incapacidad (índice 12), F. inicio (índice 15), F. final (índice 16), Código (índice 17)
+        const editableColumns = [3, 8, 11, 12, 15, 16, 17];
+        return editableColumns.includes(colIndex);
+    }
+
+    // Método para convertir fila y columna a dirección de celda Excel (por ejemplo, A1, B2, etc.)
+    getExcelCellAddress(row, col) {
+        // Convertir columna a letra (A, B, C, ..., Z, AA, AB, etc.)
+        let columnName = '';
+        let n = col + 1; // ExcelJS usa base 1, pero nosotros usamos base 0
+        while (n > 0) {
+            n--;
+            columnName = String.fromCharCode(65 + (n % 26)) + columnName;
+            n = Math.floor(n / 26);
+        }
+        return columnName + row;
+    }
+
+    // Método para actualizar la tabla con nuevos datos
+    updateTableWithNewData(newData) {
+        // Aquí puedes actualizar la tabla con los nuevos datos
+        // Por simplicidad, recargamos la vista
+        this.renderRegistrarAusentismoView(this.container);
     }
 
     async saveCellData(rowIndex, colIndex, newValue, filePath) {

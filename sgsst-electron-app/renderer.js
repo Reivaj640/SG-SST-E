@@ -1295,9 +1295,9 @@ function showMedicionAusentismoContent(container, currentCompany, moduleName, su
   if (typeof window.MedicionAusentismoComponent === 'function') {
     try {
       const medicionComponent = new window.MedicionAusentismoComponent(
-        container, 
-        currentCompany, 
-        moduleName, 
+        container,
+        currentCompany,
+        moduleName,
         submoduleName,
         () => {
           // Callback para volver al home del módulo

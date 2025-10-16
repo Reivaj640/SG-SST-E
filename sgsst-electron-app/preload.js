@@ -32,8 +32,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('send-remision-by-whatsapp', docPath, extractedData, empresa),
 
   // --- Excel ---
-  updateExcelCell: (filePath, row, col, value) => 
-    ipcRenderer.invoke('update-excel-cell', filePath, row, col, value),
+  initExcel: (filePath) => ipcRenderer.invoke('init-excel', filePath),
+  updateExcelCell: (data) => ipcRenderer.invoke('update-excel-cell', data),
   convertExcelToPdf: (filePath) => ipcRenderer.invoke('convertExcelToPdf', filePath),
 
   // --- Accidentes ---
