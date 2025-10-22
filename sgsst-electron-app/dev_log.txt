@@ -1,3 +1,24 @@
+Fecha: 21 de octubre de 2025
+
+Feature: Implementación de Sidebar Colapsable
+
+Descripción:
+Se ha implementado una barra lateral moderna y colapsable para optimizar el espacio de la interfaz de usuario. La barra lateral ahora se encuentra en un estado colapsado por defecto, mostrando únicamente los íconos de los módulos. Al pasar el cursor del ratón sobre ella, se expande suavemente para revelar los nombres completos de los módulos.
+
+Cambios Técnicos:
+- styles.css:
+  - Se agregaron nuevas reglas de CSS para la clase `.sidebar-collapsed`.
+  - Estos estilos controlan el ancho de la barra lateral en su estado colapsado (80px).
+  - Se oculta el texto de los botones (`font-size: 0;`) y la información de la empresa (`display: none;`) cuando la barra está colapsada.
+  - Se añadió una transición (`transition: width var(--transition-normal);`) al elemento `#sidebar` para una animación fluida.
+
+- renderer.js:
+  - Dentro del listener de `DOMContentLoaded`, se añadió la lógica para controlar la barra lateral.
+  - Se obtiene el elemento `#sidebar` y se le añade la clase `.sidebar-collapsed` por defecto al iniciar la aplicación.
+  - Se implementaron los event listeners `mouseenter` y `mouseleave` para añadir o remover la clase `.sidebar-collapsed`, controlando así la expansión y contracción de la barra.
+
+---
+
 --- Log del 23 de septiembre de 2025 ---
 
 **Resumen del Proyecto SG-SST-E:**
@@ -64,4 +85,4 @@
 12. **`styles.css` - Mejora del diseño responsivo:**
     *   Añadí media queries para adaptar el diseño de las tarjetas de submódulos en pantallas pequeñas.
     *   Optimicé el espaciado y el padding de las tarjetas para una mejor presentación visual.
-    *   Mejoré la transición y los efectos hover de las tarjetas para una experiencia de usuario más agradable. 
+    *   Mejoré la transición y los efectos hover de las tarjetas para una experiencia de usuario más agradable.

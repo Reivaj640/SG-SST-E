@@ -1461,3 +1461,30 @@ select.form-control {
     max-width: 100px;
   }
 }
+
+/* --- Collapsible Sidebar Styles --- */
+#sidebar {
+  transition: width var(--transition-normal);
+}
+
+#sidebar.sidebar-collapsed {
+  width: 80px; /* Ancho colapsado */
+}
+
+#sidebar.sidebar-collapsed .sidebar-menu-button {
+  font-size: 0; /* Oculta el texto */
+  padding: 10px;
+}
+
+#sidebar.sidebar-collapsed .sidebar-icon {
+  margin-bottom: 0; /* Elimina el margen inferior del icono cuando está colapsado */
+}
+
+#sidebar.sidebar-collapsed .company-info {
+  display: none; /* Oculta la información de la empresa */
+}
+
+/* Para que el texto no aparezca bruscamente */
+.sidebar-menu-button {
+    transition: font-size var(--transition-fast);
+}

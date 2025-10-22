@@ -286,6 +286,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   console.log('DOM elements found:', { contentArea, sidebarMenu, companyNameElement, companyLogoElement, companyLogoPlaceholder });
 
+  // --- BEGIN: Collapsible Sidebar Logic ---
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar) {
+    // Collapse sidebar by default
+    sidebar.classList.add('sidebar-collapsed');
+
+    sidebar.addEventListener('mouseenter', () => {
+      sidebar.classList.remove('sidebar-collapsed');
+    });
+
+    sidebar.addEventListener('mouseleave', () => {
+      sidebar.classList.add('sidebar-collapsed');
+    });
+    console.log('Collapsible sidebar logic initialized.');
+  }
+  // --- END: Collapsible Sidebar Logic ---
+
   // Escuchar eventos de log desde el proceso principal
   if (window.electronAPI && window.electronAPI.onIpcMessage) {
     window.electronAPI.onIpcMessage('log-message', (message, level) => {
