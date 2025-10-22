@@ -294,10 +294,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     sidebar.addEventListener('mouseenter', () => {
       sidebar.classList.remove('sidebar-collapsed');
+      // Actualizar la animación si existe
+      if (window.updateVantaEffect) {
+        setTimeout(window.updateVantaEffect, 100); // Pequeño retraso para que la animación se actualice después del cambio de estado
+      }
     });
 
     sidebar.addEventListener('mouseleave', () => {
       sidebar.classList.add('sidebar-collapsed');
+      // Actualizar la animación si existe
+      if (window.updateVantaEffect) {
+        setTimeout(window.updateVantaEffect, 100); // Pequeño retraso para que la animación se actualice después del cambio de estado
+      }
     });
     console.log('Collapsible sidebar logic initialized.');
   }
@@ -447,30 +455,97 @@ function showHomePage() {
   // Limpiar el área de contenido
   contentArea.innerHTML = '';
 
+  // Crear contenedor principal
   const homePageDiv = document.createElement('div');
   homePageDiv.id = 'home-page';
+  homePageDiv.style.position = 'relative';
+  homePageDiv.style.width = '100%';
+  homePageDiv.style.height = '100%';
+  homePageDiv.style.overflow = 'hidden'; // Asegurar que la animación no se salga del contenedor
   console.log('Created homePageDiv:', homePageDiv);
+
+  // Aplicar la animación de Vanta al contenedor principal
+  // Usar setTimeout para asegurar que el elemento esté en el DOM antes de aplicar la animación
+  setTimeout(() => {
+    if (typeof VANTA !== 'undefined' && typeof VANTA.WAVES !== 'undefined') {
+      // Asegurar que no haya animaciones previas
+      if (window.vantaEffect && typeof window.vantaEffect.destroy === 'function') {
+        window.vantaEffect.destroy();
+      }
+      window.vantaEffect = VANTA.WAVES({
+        el: homePageDiv,
+        mouseControls: true,
+        touchControls: true,
+        gyroControls: false,
+        minHeight: 200.00,
+        minWidth: 200.00,
+        scale: 1.00,
+        scaleMobile: 1.00,
+        color: 0x6a7f9b,
+        shininess: 36.00,
+        waveHeight: 16.00,
+        waveSpeed: 1.20,
+        zoom: 0.68
+      });
+      
+      // Función para actualizar la animación cuando cambia el tamaño
+      window.updateVantaEffect = function() {
+        if (window.vantaEffect && typeof window.vantaEffect.resize === 'function') {
+          window.vantaEffect.resize();
+        }
+      };
+      
+      // Escuchar cambios de tamaño en la ventana
+      window.addEventListener('resize', window.updateVantaEffect);
+      
+      console.log('Animación de Vanta aplicada correctamente');
+    } else {
+      console.error('VANTA no está disponible. Puede que los scripts no se hayan cargado correctamente.');
+    }
+  }, 100); // Pequeño retraso para asegurar que el elemento esté en el DOM
+
+  // Crear contenedor para los elementos de UI con posición absoluta encima de la animación
+  const uiContainer = document.createElement('div');
+  uiContainer.style.position = 'absolute';
+  uiContainer.style.top = '0';
+  uiContainer.style.left = '0';
+  uiContainer.style.width = '100%';
+  uiContainer.style.height = '100%';
+  uiContainer.style.display = 'flex';
+  uiContainer.style.flexDirection = 'column';
+  uiContainer.style.justifyContent = 'center';
+  uiContainer.style.alignItems = 'center';
+  uiContainer.style.zIndex = '10'; // Asegurar que esté encima de la animación
 
   // Placeholder para la imagen de bienvenida
   // En una implementación completa, se cargaría una imagen real
   const welcomePlaceholder = document.createElement('div');
   welcomePlaceholder.id = 'welcome-placeholder';
   welcomePlaceholder.textContent = '¡Bienvenido al SG-SST! Selecciona una empresa para comenzar.';
-  homePageDiv.appendChild(welcomePlaceholder);
+  welcomePlaceholder.style.color = 'white';
+  welcomePlaceholder.style.fontSize = '24px';
+  welcomePlaceholder.style.textAlign = 'center';
+  welcomePlaceholder.style.marginBottom = '20px';
+  welcomePlaceholder.style.textShadow = '2px 2px 4px rgba(0,0,0,0.8)';
+  uiContainer.appendChild(welcomePlaceholder);
 
   // Contenedor para los botones de selección de empresa
   const companySelectionDiv = document.createElement('div');
   companySelectionDiv.id = 'company-selection';
+  companySelectionDiv.style.textAlign = 'center';
 
   COMPANY_BUTTONS.forEach(companyName => {
     const button = document.createElement('button');
     button.className = 'company-select-button';
     button.textContent = companyName;
+    button.style.margin = '5px';
     button.addEventListener('click', () => selectCompany(companyName, button));
     companySelectionDiv.appendChild(button);
   });
 
-  homePageDiv.appendChild(companySelectionDiv);
+  uiContainer.appendChild(companySelectionDiv);
+  homePageDiv.appendChild(uiContainer);
+  
   contentArea.appendChild(homePageDiv);
   console.log('Added home page to contentArea');
 }
@@ -502,6 +577,18 @@ function selectCompany(companyName, buttonElement) {
   // Aquí se podría notificar al proceso principal para que inicie
   // el backend Python asociado a esta empresa.
   console.log(`Empresa seleccionada: ${companyName}`);
+  
+  // Destruir la animación de Vanta antes de cambiar de página
+  if (window.vantaEffect && typeof window.vantaEffect.destroy === 'function') {
+    window.vantaEffect.destroy();
+    window.vantaEffect = null;
+  }
+  // Eliminar el listener de resize si existe
+  if (window.updateVantaEffect) {
+    window.removeEventListener('resize', window.updateVantaEffect);
+    window.updateVantaEffect = null;
+  }
+  
   // Después de seleccionar empresa, mostrar el home de la empresa
   showCompanyHomePage();
 }
@@ -526,6 +613,17 @@ function handleLogout() {
     btn.classList.remove('selected');
   });
   
+  // Destruir la animación de Vanta si existe antes de volver al home
+  if (window.vantaEffect && typeof window.vantaEffect.destroy === 'function') {
+    window.vantaEffect.destroy();
+    window.vantaEffect = null;
+  }
+  // Eliminar el listener de resize si existe
+  if (window.updateVantaEffect) {
+    window.removeEventListener('resize', window.updateVantaEffect);
+    window.updateVantaEffect = null;
+  }
+  
   // Limpiar el contenido y volver a la página de inicio
   showHomePage();
   
@@ -541,6 +639,16 @@ function handleLogout() {
 function showCompanyHomePage() {
   // ✅ LIMPIAR ESTADO
   currentSubmodule = null;
+  // Destruir la animación de Vanta si existe
+  if (window.vantaEffect && typeof window.vantaEffect.destroy === 'function') {
+    window.vantaEffect.destroy();
+    window.vantaEffect = null;
+  }
+  // Eliminar el listener de resize si existe
+  if (window.updateVantaEffect) {
+    window.removeEventListener('resize', window.updateVantaEffect);
+    window.updateVantaEffect = null;
+  }
   // ✅ Pasar contentArea a hideCalendar
   hideCalendar(contentArea);
   console.log(`Showing home page for company: ${currentCompany}`);
