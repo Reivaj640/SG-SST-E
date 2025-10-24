@@ -46,7 +46,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('generate-accident-report', combinedData),
   readAusentismoData: (companyName) => 
     ipcRenderer.invoke('get-ausentismo-data', companyName),
+  procesarAusentismo: (empresa, rutaArchivo) => 
+    ipcRenderer.invoke('procesar-ausentismo', empresa, rutaArchivo),
 
+  // --- Ausentismo ---
+  buscarEmpleadoPorCedula: (cedula, empresa) => 
+    ipcRenderer.invoke('buscar-empleado-por-cedula', { cedula, empresa }),
+  
   // --- Actas ---
   getActaData: () => ipcRenderer.invoke('get-acta-data'),
   getConvivenciaActaData: () => ipcRenderer.invoke('getConvivenciaActaData'),

@@ -1731,153 +1731,241 @@ module.exports = {
     }
   });
 
-// Manejador para leer datos de ausentismo desde Excel
-ipcMain.handle('get-ausentismo-data', async (event, companyName) => {
-    sendLog(`[DEBUG] Handler get-ausentismo-data llamado para empresa: ${companyName}`);
-    sendLog(`[TEST] Este log debería aparecer si el handler se llama.`);
+  // Manejador para leer datos de ausentismo desde Excel
+  ipcMain.handle('get-ausentismo-data', async (event, companyName) => {
+      sendLog(`[DEBUG] Handler get-ausentismo-data llamado para empresa: ${companyName}`);
+      sendLog(`[TEST] Este log debería aparecer si el handler se llama.`);
 
-    try {
-      // --- Cargar configuración ---
-      const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
-      const config = JSON.parse(configData);
+      try {
+        // --- Cargar configuración ---
+        const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+        const config = JSON.parse(configData);
 
-      // --- Obtener la estructura real de la empresa (como en find-submodule-path) ---
-      const companyConfig = config.companyPaths?.[companyName];
-      if (!companyConfig || !companyConfig.structure?.structure) {
-        const available = Object.keys(config.companyPaths || {});
-        throw new Error(`Empresa "${companyName}" no tiene estructura mapeada. Disponibles: [${available.join(', ')}]`);
-      }
+        // --- Obtener la estructura real de la empresa (como en find-submodule-path) ---
+        const companyConfig = config.companyPaths?.[companyName];
+        if (!companyConfig || !companyConfig.structure?.structure) {
+          const available = Object.keys(config.companyPaths || {});
+          throw new Error(`Empresa "${companyName}" no tiene estructura mapeada. Disponibles: [${available.join(', ')}]`);
+        }
 
-      const rootStructure = companyConfig.structure.structure;
+        const rootStructure = companyConfig.structure.structure;
 
-      // --- Función auxiliar: buscar carpeta de forma flexible ---
-      function findDirFlexible(subdirs, target) {
-        if (!subdirs) return null;
-        const normalizedTarget = target
-          .toLowerCase()
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .replace(/\s+/g, ' ')
-          .trim();
-        for (const [key, value] of Object.entries(subdirs)) {
-          const normalizedKey = key
+        // --- Función auxiliar: buscar carpeta de forma flexible ---
+        function findDirFlexible(subdirs, target) {
+          if (!subdirs) return null;
+          const normalizedTarget = target
             .toLowerCase()
             .normalize('NFD')
             .replace(/[\u0300-\u036f]/g, '')
             .replace(/\s+/g, ' ')
             .trim();
-          if (normalizedKey === normalizedTarget) {
-            return value;
+          for (const [key, value] of Object.entries(subdirs)) {
+            const normalizedKey = key
+              .toLowerCase()
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .replace(/\s+/g, ' ')
+              .trim();
+            if (normalizedKey === normalizedTarget) {
+              return value;
+            }
+          }
+          return null;
+        }
+
+        // --- Buscar "3. Gestión de la Salud" ---
+        const gestionSalud = findDirFlexible(rootStructure.subdirectories, "3. Gestión de la Salud");
+        if (!gestionSalud) {
+          const keys = Object.keys(rootStructure.subdirectories || {});
+          throw new Error(`No se encontró "3. Gestión de la Salud". Carpetas: [${keys.join(', ')}]`);
+        }
+
+        // --- Buscar el submódulo de ausentismo ---
+        const ausentismoDir = findDirFlexible(
+          gestionSalud.subdirectories,
+          "3.3.6 Medición del ausentismo por causa médica"
+        );
+        if (!ausentismoDir) {
+          const keys = Object.keys(gestionSalud.subdirectories || {});
+          throw new Error(`No se encontró submódulo de ausentismo. Carpetas: [${keys.join(', ')}]`);
+        }
+
+        // --- Obtener el primer archivo .xlsx ---
+        const excelFiles = (ausentismoDir.files || []).filter(f => f.extension?.toLowerCase() === '.xlsx');
+        if (excelFiles.length === 0) {
+          throw new Error(`No hay archivos .xlsx en la carpeta de ausentismo.`);
+        }
+
+        const excelFile = excelFiles[0];
+        sendLog(`[DEBUG] Archivo de ausentismo encontrado: ${excelFile.path}`);
+
+        // --- Leer Excel ---
+        const workbook = xlsx.readFile(excelFile.path);
+        console.log('[DEBUG] Nombres de hojas en el archivo:', workbook.SheetNames);
+
+        // Buscar la hoja que contiene los datos según el nombre de la empresa
+        const normalizedCompanyName = companyName.toLowerCase().replace(/\s+/g, '');
+        const sheetName = workbook.SheetNames.find(name => 
+          name.toLowerCase().includes(normalizedCompanyName) && name.toLowerCase().includes('2024')
+        ) || workbook.SheetNames[0]; // Si no encuentra, usa la primera
+
+        console.log('[DEBUG] Hoja seleccionada:', sheetName);
+        const worksheet = workbook.Sheets[sheetName];
+        console.log('[DEBUG] !ref de la hoja:', worksheet['!ref']);
+
+        if (!worksheet['!ref']) {
+          sendLog('[WARN] La hoja de cálculo de ausentismo parece estar vacía (sin !ref).');
+          return { success: true, headers: [], rows: [], filePath: excelFile.path, companyName };
+        }
+
+        // --- Usar la fila 7 (índice 6) como encabezado, ya que sabemos que está ahí ---
+        const allData = xlsx.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: null });
+
+        // Intenta leer la hoja como JSON y ver si tiene datos
+        console.log('[DEBUG] Total de filas leídas:', allData.length);
+        console.log('[DEBUG] Primeras 5 filas:', allData.slice(0, 5));
+
+        // Log adicional para ver cuántas filas hay
+        sendLog(`[DEBUG] Total de filas en el archivo: ${allData.length}`);
+        sendLog(`[DEBUG] allData primeras 10 filas: ${JSON.stringify(allData.slice(0, 10))}`);
+        if (allData.length > 6) {
+          sendLog(`[DEBUG] allData fila 7 (índice 6): ${JSON.stringify(allData[6])}`);
+        }
+
+        // Verificar que haya al menos 7 filas
+        if (allData.length <= 6) {
+          sendLog('[WARN] No hay suficientes filas para encontrar el encabezado en la fila 7.');
+          return { success: true, headers: [], rows: [], filePath: excelFile.path, companyName };
+        }
+
+        // Fila 7 (índice 6) es el encabezado
+        const headerRowIndex = 6;
+        const headers = allData[headerRowIndex];
+
+        // Validar que tenga al menos 4 columnas
+        if (!headers || headers.filter(cell => cell !== null).length < 4) {
+          sendLog('[WARN] La fila 7 no parece ser un encabezado válido (menos de 4 columnas).');
+          return { success: true, headers: [], rows: [], filePath: excelFile.path, companyName };
+        }
+
+        sendLog(`[INFO] Encabezado fijo tomado de la fila 7 (índice ${headerRowIndex}).`);
+        sendLog(`[DEBUG] Encabezado detectado: ${JSON.stringify(headers)}`);
+
+        // Filtrar filas que no tengan al menos la mitad de las columnas del encabezado
+        const rows = allData.slice(headerRowIndex + 1)
+                            .filter(row => row && row.filter(cell => cell !== null).length >= (headers.length / 2));
+
+        // Limitar las columnas a mostrar (por ejemplo, hasta la columna S = índice 18)
+        const maxColumnsToShow = 19; // Columna S es índice 18 (0-based)
+        const limitedHeaders = headers.slice(0, maxColumnsToShow);
+        const limitedRows = rows.map(row => row.slice(0, maxColumnsToShow));
+
+        sendLog(`[DEBUG] Total de filas filtradas: ${limitedRows.length}`);
+        if (limitedRows.length > 0) {
+          sendLog(`[DEBUG] Primera fila de datos: ${JSON.stringify(limitedRows[0])}`);
+        }
+
+        return {
+          success: true,
+          headers: limitedHeaders,
+          rows: limitedRows,
+          filePath: excelFile.path,
+          companyName
+        };
+
+      } catch (error) {
+        sendLog(`[ERROR] Error crítico en get-ausentismo-data: ${error.message}`, 'ERROR');
+        return { success: false, error: error.message, companyName };
+      }
+    });
+
+  // ===============================
+  // 🔍 Manejador para buscar empleado por cédula
+  // ===============================
+  ipcMain.handle('buscar-empleado-por-cedula', async (event, { cedula, empresa }) => {
+    const { spawn } = require('child_process');
+    const path = require('path');
+
+    const scriptPath = path.join(__dirname, 'Portear', 'src', 'actualizar_ausentismo.py');
+
+    return new Promise((resolve, reject) => {
+      sendLog(`IPC: buscar-empleado-por-cedula recibido. Empresa: ${empresa}, Cédula: ${cedula}`);
+
+      const python = spawn('python', [scriptPath, 'buscar_empleado', cedula, empresa], {
+        cwd: path.dirname(scriptPath),
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+      });
+
+      let buffer = '';
+
+      python.stdout.on('data', (data) => {
+        buffer += data.toString();
+
+        // Procesar por líneas completas
+        const lines = buffer.split('\n');
+        // Mantener la última línea si está incompleta en buffer
+        buffer = lines.pop();
+
+        lines.forEach((line) => {
+          line = line.trim();
+          if (!line) return;
+
+          try {
+            const obj = JSON.parse(line);
+            if (obj.type === 'log') {
+              sendLog(`[Python Ausentismo] ${obj.message}`);
+            } else if (obj.type === 'result') {
+              // Entregamos el payload al renderer
+              sendLog('[Python Ausentismo] Resultado recibido (payload).');
+              resolve(obj.payload);
+            } else {
+              sendLog(`[Python Ausentismo] Mensaje sin tipo esperado: ${line}`, 'DEBUG');
+            }
+          } catch (err) {
+            // Línea no JSON -> la mostramos cruda para debug
+            sendLog(`[Python Ausentismo - RAW] ${line}`, 'DEBUG');
+          }
+        });
+      });
+
+      python.stderr.on('data', (data) => {
+        const txt = data.toString();
+        sendLog(`[Python Ausentismo - STDERR] ${txt}`, 'ERROR');
+      });
+
+      python.on('close', (code) => {
+        // Si cerró sin haber resuelto, resolvemos con null (o reject si prefieres)
+        sendLog(`[Python Ausentismo] Proceso cerrado con código ${code}`);
+        // Si buffer tiene algo pendiente, intentar parsearlo
+        if (buffer && buffer.trim()) {
+          try {
+            const last = JSON.parse(buffer.trim());
+            if (last.type === 'result') return resolve(last.payload);
+          } catch (e) {
+            sendLog(`[Python Ausentismo] Buffer final no parseable: ${buffer}`, 'DEBUG');
           }
         }
-        return null;
-      }
+        // Si llegamos aquí sin resultado, devolvemos null (no encontrado o error ya logueado)
+        resolve(null);
+      });
 
-      // --- Buscar "3. Gestión de la Salud" ---
-      const gestionSalud = findDirFlexible(rootStructure.subdirectories, "3. Gestión de la Salud");
-      if (!gestionSalud) {
-        const keys = Object.keys(rootStructure.subdirectories || {});
-        throw new Error(`No se encontró "3. Gestión de la Salud". Carpetas: [${keys.join(', ')}]`);
-      }
+      python.on('error', (err) => {
+        sendLog(`Error al iniciar proceso Python: ${err.message}`, 'CRITICAL');
+        reject(err);
+      });
 
-      // --- Buscar el submódulo de ausentismo ---
-      const ausentismoDir = findDirFlexible(
-        gestionSalud.subdirectories,
-        "3.3.6 Medición del ausentismo por causa médica"
-      );
-      if (!ausentismoDir) {
-        const keys = Object.keys(gestionSalud.subdirectories || {});
-        throw new Error(`No se encontró submódulo de ausentismo. Carpetas: [${keys.join(', ')}]`);
-      }
+      // Timeout opcional: si quieres evitar procesos colgados
+      const TIMEOUT_MS = 15_000; // 15s
+      const killTimer = setTimeout(() => {
+        sendLog('Timeout: matando proceso Python por demora (>15s)', 'WARN');
+        try { python.kill(); } catch (e) {}
+        resolve(null);
+      }, TIMEOUT_MS);
 
-      // --- Obtener el primer archivo .xlsx ---
-      const excelFiles = (ausentismoDir.files || []).filter(f => f.extension?.toLowerCase() === '.xlsx');
-      if (excelFiles.length === 0) {
-        throw new Error(`No hay archivos .xlsx en la carpeta de ausentismo.`);
-      }
-
-      const excelFile = excelFiles[0];
-      sendLog(`[DEBUG] Archivo de ausentismo encontrado: ${excelFile.path}`);
-
-      // --- Leer Excel ---
-      const workbook = xlsx.readFile(excelFile.path);
-      console.log('[DEBUG] Nombres de hojas en el archivo:', workbook.SheetNames);
-
-      // Buscar la hoja que contiene los datos según el nombre de la empresa
-      const normalizedCompanyName = companyName.toLowerCase().replace(/\s+/g, '');
-      const sheetName = workbook.SheetNames.find(name => 
-        name.toLowerCase().includes(normalizedCompanyName) && name.toLowerCase().includes('2024')
-      ) || workbook.SheetNames[0]; // Si no encuentra, usa la primera
-
-      console.log('[DEBUG] Hoja seleccionada:', sheetName);
-      const worksheet = workbook.Sheets[sheetName];
-      console.log('[DEBUG] !ref de la hoja:', worksheet['!ref']);
-
-      if (!worksheet['!ref']) {
-        sendLog('[WARN] La hoja de cálculo de ausentismo parece estar vacía (sin !ref).');
-        return { success: true, headers: [], rows: [], filePath: excelFile.path, companyName };
-      }
-
-      // --- Usar la fila 7 (índice 6) como encabezado, ya que sabemos que está ahí ---
-      const allData = xlsx.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: null });
-
-      // Intenta leer la hoja como JSON y ver si tiene datos
-      console.log('[DEBUG] Total de filas leídas:', allData.length);
-      console.log('[DEBUG] Primeras 5 filas:', allData.slice(0, 5));
-
-      // Log adicional para ver cuántas filas hay
-      sendLog(`[DEBUG] Total de filas en el archivo: ${allData.length}`);
-      sendLog(`[DEBUG] allData primeras 10 filas: ${JSON.stringify(allData.slice(0, 10))}`);
-      if (allData.length > 6) {
-        sendLog(`[DEBUG] allData fila 7 (índice 6): ${JSON.stringify(allData[6])}`);
-      }
-
-      // Verificar que haya al menos 7 filas
-      if (allData.length <= 6) {
-        sendLog('[WARN] No hay suficientes filas para encontrar el encabezado en la fila 7.');
-        return { success: true, headers: [], rows: [], filePath: excelFile.path, companyName };
-      }
-
-      // Fila 7 (índice 6) es el encabezado
-      const headerRowIndex = 6;
-      const headers = allData[headerRowIndex];
-
-      // Validar que tenga al menos 4 columnas
-      if (!headers || headers.filter(cell => cell !== null).length < 4) {
-        sendLog('[WARN] La fila 7 no parece ser un encabezado válido (menos de 4 columnas).');
-        return { success: true, headers: [], rows: [], filePath: excelFile.path, companyName };
-      }
-
-      sendLog(`[INFO] Encabezado fijo tomado de la fila 7 (índice ${headerRowIndex}).`);
-      sendLog(`[DEBUG] Encabezado detectado: ${JSON.stringify(headers)}`);
-
-      // Filtrar filas que no tengan al menos la mitad de las columnas del encabezado
-      const rows = allData.slice(headerRowIndex + 1)
-                          .filter(row => row && row.filter(cell => cell !== null).length >= (headers.length / 2));
-
-      // Limitar las columnas a mostrar (por ejemplo, hasta la columna S = índice 18)
-      const maxColumnsToShow = 19; // Columna S es índice 18 (0-based)
-      const limitedHeaders = headers.slice(0, maxColumnsToShow);
-      const limitedRows = rows.map(row => row.slice(0, maxColumnsToShow));
-
-      sendLog(`[DEBUG] Total de filas filtradas: ${limitedRows.length}`);
-      if (limitedRows.length > 0) {
-        sendLog(`[DEBUG] Primera fila de datos: ${JSON.stringify(limitedRows[0])}`);
-      }
-
-      return {
-        success: true,
-        headers: limitedHeaders,
-        rows: limitedRows,
-        filePath: excelFile.path,
-        companyName
-      };
-
-    } catch (error) {
-      sendLog(`[ERROR] Error crítico en get-ausentismo-data: ${error.message}`, 'ERROR');
-      return { success: false, error: error.message, companyName };
-    }
+      python.on('exit', () => clearTimeout(killTimer));
+    });
   });
+
 
   // Manejador para leer la plantilla de acta de Comité de Convivencia
   ipcMain.handle('getConvivenciaActaData', async () => {
