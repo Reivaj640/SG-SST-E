@@ -3,7 +3,7 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fsp = require('fs').promises;
-const fs = require('fs').promises;  // Para operaciones asíncronas
+const fs = require('fs');           // Para operaciones síncronas
 const fsSync = require('fs');       // Para operaciones síncronas
 const { exec, spawn, execFile } = require('child_process'); // Asegúrate de incluir execFile
 const { promisify } = require('util');
