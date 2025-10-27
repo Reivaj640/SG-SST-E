@@ -144,16 +144,20 @@ def buscar_empleado_por_cedula(cedula, empresa):
             return next((c for c in df.columns if any(palabra in str(c).upper() for palabra in candidatos)), None)
 
         col_cargo = buscar_columna(["CARGO"])
-        col_empresa = buscar_columna(["EMPRESA", "EMPRESA DONDE PRESTA"])
-        col_area = buscar_columna(["UBICACION", "UBICACIÓN", "AREA", "ÁREA"])
+        col_empresa_empleadora = next((c for c in df.columns if str(c).strip().upper() == 'EMPRESA'), None)
+        col_empresa_usuaria = buscar_columna(["EMPRESA DONDE PRESTA SERVICIO", "EMPRESA USUARIA"])
+        col_area = buscar_columna(["UBICACION", "UBICACIÓN", "AREA", "ÁREA", "DEPARTAMENTO"])
         col_genero = buscar_columna(["GENERO", "SEXO"])
+        col_entidad = buscar_columna(["EPS", "SURA","EPS/SURA", "ENTIDAD"])
 
         result = {
             "nombre": nombre_completo or "",
             "cargo": (row.get(col_cargo) or "") if col_cargo else "",
-            "empresa_usuaria": (row.get(col_empresa) or "") if col_empresa else "",
-            "area": (row.get(col_area) or "") if col_area else "",
+            "empresa": (row.get(col_empresa_empleadora) or "") if col_empresa_empleadora else "",
+            "empresa_usuaria": (row.get(col_empresa_usuaria) or "") if col_empresa_usuaria else "",
+            "area": (row.get(col_area) or "") if col_area else "",  # Departamento/Ubicación
             "genero": (row.get(col_genero) or "") if col_genero else "",
+            "entidad": (row.get(col_entidad) or "") if col_entidad else "",  # EPS/SURA
             "_fila_index": int(row.name)
         }
 
@@ -164,6 +168,108 @@ def buscar_empleado_por_cedula(cedula, empresa):
 
     except Exception as e:
         log(f"EXCEPCIÓN en buscar_empleado_por_cedula: {str(e)}")
+        import traceback
+        log(traceback.format_exc())
+        print(json.dumps({"type": "result", "payload": {"success": False, "error": str(e)}}))
+        return None
+
+
+def buscar_cie10_descripcion(file_path, cie10_code):
+    """
+    Busca la descripción de un código CIE-10 en el archivo de ausentismo.
+    """
+    try:
+        log(f"Inicio buscar_cie10_descripcion: file_path={file_path}, cie10_code={cie10_code}")
+
+        if not os.path.exists(file_path):
+            log(f"ERROR: Archivo no encontrado en ruta: {file_path}")
+            print(json.dumps({"type": "result", "payload": {"success": False, "error": f"Archivo no encontrado: {file_path}"}}))
+            return None
+
+        # Intentar leer la hoja específica, pero con detección más flexible de hojas CIE-10
+        sheet_name = "CIE-10 PARA RIPS"
+        log(f"Hoja que intentaremos leer: {sheet_name}")
+
+        # --- 1. Intentar leer la hoja específica ---
+        try:
+            df = pd.read_excel(file_path, sheet_name=sheet_name, dtype=str, header=None)
+        except Exception as e:
+            log(f"ERROR al leer hoja '{sheet_name}': {e}")
+            
+            # --- 2. Intentar detectar la hoja correcta ---
+            try:
+                from openpyxl import load_workbook as _load_wb
+                wb_tmp = _load_wb(file_path, read_only=True)
+                hojas = wb_tmp.sheetnames
+                log(f"Hojas detectadas en el archivo: {hojas}")
+                
+                # Buscar hoja que contenga "CIE", "CIE-10", "DIAGNOSTICO", "DIAGNÓSTICO"
+                sheet_candidates = [s for s in hojas if any(keyword in s.upper() for keyword in ["CIE", "DIAGNOST", "DIAGNÓST", "ENFERM"])]
+                log(f"Candidatos para hoja CIE-10: {sheet_candidates}")
+                
+                if sheet_candidates:
+                    # Tomar el primer candidato que contenga "CIE"
+                    cie_candidates = [s for s in sheet_candidates if "CIE" in s.upper()]
+                    sheet_name = cie_candidates[0] if cie_candidates else sheet_candidates[0]
+                    log(f"Usando hoja detectada: {sheet_name}")
+                    
+                    df = pd.read_excel(file_path, sheet_name=sheet_name, dtype=str, header=None)
+                else:
+                    # Si no encontramos hoja candidata, intentar leer la primera hoja
+                    log("No se encontraron hojas candidatas para CIE-10, intentando primera hoja")
+                    df = pd.read_excel(file_path, sheet_name=hojas[0], dtype=str, header=None)
+                    sheet_name = hojas[0]
+                    
+            except Exception as e2:
+                log(f"ERROR al leer archivo Excel con detección automática: {e2}")
+                print(json.dumps({"type": "result", "payload": {"success": False, "error": f"Error leyendo hoja {sheet_name}: {str(e2)}"}}))
+                return None
+
+        log(f"Excel leído. {len(df)} filas, {len(df.columns)} columnas.")
+
+        # Determinar columnas de código y descripción
+        # Suponemos que la primera columna tiene códigos y la segunda tiene descripciones
+        if len(df.columns) >= 2:
+            df.columns = ['codigo', 'descripcion'] + [f'col_{i}' for i in range(2, len(df.columns))]
+        else:
+            log("ERROR: No hay suficientes columnas en la hoja para código y descripción")
+            print(json.dumps({"type": "result", "payload": {"success": False, "error": "No hay suficientes columnas en la hoja CIE-10"}}))
+            return None
+
+        # Normalizar código de búsqueda
+        codigo_limpio = str(cie10_code).strip().upper()
+        log(f"Código CIE-10 de búsqueda normalizado: '{codigo_limpio}'")
+        
+        # Normalizar columna de códigos en el dataframe
+        df['codigo_norm'] = df['codigo'].astype(str).str.strip().str.upper()
+
+        coinc = df[df['codigo_norm'] == codigo_limpio]
+        log(f"Número de coincidencias encontradas: {len(coinc)}")
+
+        if coinc.empty:
+            # Intentar con variaciones del código (ej. con y sin puntos)
+            codigo_limpio_puntos = codigo_limpio.replace('.', '')
+            coinc = df[df['codigo_norm'].str.replace('.', '') == codigo_limpio_puntos]
+            log(f"Intentando con código sin puntos, coincidencias: {len(coinc)}")
+            
+            if coinc.empty:
+                log(f"No se encontró registro con código CIE-10 {codigo_limpio} (ni sin puntos)")
+                print(json.dumps({"type": "result", "payload": {"success": False, "error": f"No encontrado: {codigo_limpio}"}}))
+                return None
+
+        descripcion = coinc.iloc[0]['descripcion']
+        log(f"Descripción encontrada: {descripcion}")
+
+        result = {
+            "descripcion": descripcion
+        }
+
+        print(json.dumps({"type": "result", "payload": {"success": True, "datos": result}}, ensure_ascii=False))
+        log("Búsqueda de CIE-10 completada y resultado impreso.")
+        return result
+
+    except Exception as e:
+        log(f"EXCEPCIÓN en buscar_cie10_descripcion: {str(e)}")
         import traceback
         log(traceback.format_exc())
         print(json.dumps({"type": "result", "payload": {"success": False, "error": str(e)}}))
@@ -292,6 +398,136 @@ def buscar_empleado_main(cedula, empresa):
             "error": str(e)
         }
 
+def registrar_incapacidad(empresa, file_path, datos):
+    """
+    Agrega una nueva fila de incapacidad al archivo de ausentismo.
+    """
+    try:
+        log(f"Registrando nueva incapacidad en: {file_path}")
+        log(f"Datos recibidos: {datos}")
+
+        # Cargar el archivo con openpyxl para preservar formato
+        wb = load_workbook(file_path)
+
+        # 1. Intentar construir el nombre de la hoja a partir de la empresa
+        empresa_normalizada = empresa.strip().upper()
+        nombre_hoja_esperado = f"{empresa_normalizada} 2024"
+
+        # 2. Buscar la hoja correcta con lógica de fallback
+        nombre_hoja_datos = None
+
+        # a) Primero, intentar con el nombre esperado
+        if nombre_hoja_esperado in wb.sheetnames:
+            nombre_hoja_datos = nombre_hoja_esperado
+            log(f"✅ Hoja encontrada por nombre esperado: {nombre_hoja_datos}")
+        else:
+            # b) Si no, buscar una hoja que contenga el nombre de la empresa (ignorando mayúsculas)
+            candidatos_empresa = [
+                name for name in wb.sheetnames
+                if empresa_normalizada in name.upper()
+            ]
+            if candidatos_empresa:
+                nombre_hoja_datos = candidatos_empresa[0]
+                log(f"✅ Hoja encontrada por coincidencia con empresa: {nombre_hoja_datos}")
+            else:
+                # c) Si no, buscar una hoja que contenga "2024"
+                candidatos_2024 = [
+                    name for name in wb.sheetnames
+                    if "2024" in name
+                ]
+                if candidatos_2024:
+                    nombre_hoja_datos = candidatos_2024[0]
+                    log(f"✅ Hoja encontrada por año 2024: {nombre_hoja_datos}")
+                else:
+                    # d) Último recurso: usar la primera hoja
+                    nombre_hoja_datos = wb.sheetnames[0]
+                    log(f"⚠️ Advertencia: usando primera hoja disponible: {nombre_hoja_datos}")
+
+        # 3. Seleccionar la hoja
+        ws = wb[nombre_hoja_datos]
+
+        # Leer encabezados desde la fila 7 (índice 6 en 0-based)
+        headers = []
+        for col in range(1, ws.max_column + 1):
+            cell = ws.cell(row=7, column=col).value
+            headers.append(cell if cell else f"Columna{col}")
+
+        log(f"Encabezados detectados: {headers}")
+
+        # Mapear los datos del formulario a las columnas correctas
+        nueva_fila = []
+        for header in headers:
+            if header == "No":
+                # Contar filas existentes para asignar número
+                num_filas_datos = sum(1 for r in range(8, ws.max_row + 1) if ws.cell(row=r, column=1).value)
+                nueva_fila.append(str(num_filas_datos + 1))
+            elif header == "EMPRESA":
+                nueva_fila.append(datos.get("empresa", ""))
+            elif header == "NOMBRE ":
+                nueva_fila.append(datos.get("nombre", ""))
+            elif header == "CEDULA ":
+                nueva_fila.append(datos.get("cedula", ""))
+            elif header == "CARGO":
+                nueva_fila.append(datos.get("cargo", ""))
+            elif header == "EMPRESA USUARIA":
+                nueva_fila.append(datos.get("empresa_usuaria", ""))
+            elif header == "ÁREA O DPTO":
+                nueva_fila.append(datos.get("departamento", ""))
+            elif header == "GENERO":
+                nueva_fila.append(datos.get("genero", ""))
+            elif header == "CLASE DE INCAPACIDAD":
+                nueva_fila.append(datos.get("clase_incapacidad", ""))
+            elif header == "TIPO DE INCAPACIDAD":
+                nueva_fila.append(datos.get("tipo_incapacidad", ""))
+            elif header == "F. INICIO":
+                nueva_fila.append(datos.get("fecha_inicio", ""))
+            elif header == "F. FIN":
+                nueva_fila.append(datos.get("fecha_finalizacion", ""))
+            elif header == "CODIGO":
+                nueva_fila.append(datos.get("codigo", ""))
+            elif header == "DESCRIPCION":
+                nueva_fila.append(datos.get("descripcion", ""))
+            elif header == "ENTIDAD":
+                nueva_fila.append(datos.get("entidad", ""))
+            elif header == "AÑO":
+                nueva_fila.append(datos.get("fecha_inicio", "")[:4] if datos.get("fecha_inicio") else "")
+            elif header == "MES":
+                if datos.get("fecha_inicio"):
+                    try:
+                        mes_num = int(datos["fecha_inicio"].split("-")[1])
+                        meses = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO",
+                                 "JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"]
+                        nueva_fila.append(meses[mes_num - 1] if 1 <= mes_num <= 12 else "")
+                    except:
+                        nueva_fila.append("")
+                else:
+                    nueva_fila.append("")
+            else:
+                # Columnas calculadas o no mapeadas: dejar vacío
+                nueva_fila.append("")
+
+        # Encontrar la primera fila vacía (después de los datos existentes)
+        fila_destino = ws.max_row + 1
+        for r in range(8, ws.max_row + 1):
+            if not ws.cell(row=r, column=1).value:
+                fila_destino = r
+                break
+
+        # Escribir la nueva fila
+        for col_idx, valor in enumerate(nueva_fila, start=1):
+            ws.cell(row=fila_destino, column=col_idx, value=valor)
+
+        # Guardar
+        wb.save(file_path)
+        log(f"✅ Nueva incapacidad registrada en fila {fila_destino}")
+        return {"success": True, "fila": fila_destino}
+
+    except Exception as e:
+        log(f"❌ Error al registrar incapacidad: {str(e)}")
+        import traceback
+        log(traceback.format_exc())
+        return {"success": False, "error": str(e)}
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print(json.dumps({"type": "result", "payload": {"success": False, "error": "Uso: python actualizar_ausentismo.py <comando> [argumentos...]"}}))
@@ -359,7 +595,41 @@ if __name__ == "__main__":
                     "error": str(e)
                 }
             }))
+
+    elif comando == "buscar_cie10":
+        if len(sys.argv) != 4:
+            print(json.dumps({"type": "result", "payload": {"success": False, "error": "Uso: python actualizar_ausentismo.py buscar_cie10 <ruta_archivo> <codigo_cie10>"}}))
+            sys.exit(1)
+        
+        file_path = sys.argv[2]
+        cie10_code = sys.argv[3]
+        
+        try:
+            resultado = buscar_cie10_descripcion(file_path, cie10_code)
+            # The result is already printed inside the function
+        except Exception as e:
+            print(json.dumps({
+                "type": "result",
+                "payload": {
+                    "success": False,
+                    "error": str(e)
+                }
+            }))
     
+    elif comando == "registrar_incapacidad":
+        if len(sys.argv) != 5:
+            print(json.dumps({"type": "result", "payload": {"success": False, "error": "Uso: python actualizar_ausentismo.py registrar_incapacidad <empresa> <ruta_archivo> <json_datos>"}}))
+            sys.exit(1)
+        
+        empresa = sys.argv[2]
+        file_path = sys.argv[3]
+        datos_json = sys.argv[4]
+        try:
+            datos = json.loads(datos_json)
+            resultado = registrar_incapacidad(empresa, file_path, datos) #✅ 3 argumentos
+            print(json.dumps({"type": "result", "payload": resultado}, ensure_ascii=False))
+        except Exception as e:
+            print(json.dumps({"type": "result", "payload": {"success": False, "error": f"Error parsing JSON: {str(e)}"}}))
     else:
-        print(json.dumps({"type": "result", "payload": {"success": False, "error": f"Comando desconocido: {comando}. Comandos válidos: 'actualizar', 'buscar_empleado'"}}))
+        print(json.dumps({"type": "result", "payload": {"success": False, "error": f"Comando desconocido: {comando}. Comandos válidos: 'actualizar', 'buscar_empleado', 'buscar_cie10', 'registrar_incapacidad'"}}))
         sys.exit(1)

@@ -239,42 +239,68 @@ class MedicionAusentismoComponent {
 
             <div class="form-row">
                 <div class="form-group">
-                    <label for="clase-incapacidad-select">Clase de Incapacidad:</label>
-                    <select id="clase-incapacidad-select" class="form-control">
-                        <option value="">Seleccione...</option>
-                        <option value="Profesional">Profesional</option>
-                        <option value="Común">Común</option>
-                    </select>
+                    <label for="empresa-usuaria-input">Empresa Usuaria:</label>
+                    <input type="text" id="empresa-usuaria-input" class="form-control" placeholder="Empresa donde presta el servicio" readonly>
                 </div>
                 <div class="form-group">
-                    <label for="tipo-incapacidad-select">Tipo de Incapacidad:</label>
-                    <select id="tipo-incapacidad-select" class="form-control">
+                    <label for="genero-select">Género:</label>
+                    <select id="genero-select" class="form-control">
                         <option value="">Seleccione...</option>
-                        <option value="Enfermedad General">Enfermedad General</option>
-                        <option value="Accidente de Trabajo">Accidente de Trabajo</option>
-                        <option value="Accidente Común">Accidente Común</option>
-                        <option value="Licencia de Maternidad">Licencia de Maternidad</option>
+                        <option value="Masculino">Masculino</option>
+                        <option value="Femenino">Femenino</option>
+                        <option value="Otro">Otro</option>
                     </select>
                 </div>
             </div>
 
             <div class="form-row">
                 <div class="form-group">
+                    <label for="clase-incapacidad-select">Clase de Incapacidad:</label>
+                    <select id="clase-incapacidad-select" class="form-control">
+                        <option value="">Seleccione...</option>
+                        <option value="EPS">EPS</option>
+                        <option value="ARL">ARL</option>
+                        <option value="EMPRESA">EMPRESA</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="tipo-incapacidad-select">Tipo de Incapacidad:</label>
+                    <select id="tipo-incapacidad-select" class="form-control">
+                        <option value="">Seleccione...</option>
+                        <option value="ACCIDENTE DE TRANSITO">ACCIDENTE DE TRANSITO</option>
+                        <option value="ACCIDENTE LABORAL">ACCIDENTE LABORAL</option>
+                        <option value="ENFERMEDAD GENERAL">ENFERMEDAD GENERAL</option>
+                        <option value="LICENCIA DE LUTO">LICENCIA DE LUTO</option>
+                        <option value="LICENCIA DE MATERNIDAD">LICENCIA DE MATERNIDAD</option>
+                        <option value="LICENCIA DE PATERNIDAD">LICENCIA DE PATERNIDAD</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="entidad-input">Entidad (EPS/SURA):</label>
+                    <input type="text" id="entidad-input" class="form-control" placeholder="Entidad de salud" readonly>
+                </div>
+                <div class="form-group">
                     <label for="fecha-inicio-input">Fecha de Inicio:</label>
                     <input type="date" id="fecha-inicio-input" class="form-control">
                 </div>
+            </div>
+
+            <div class="form-row">
                 <div class="form-group">
                     <label for="fecha-fin-input">Fecha de Finalización:</label>
                     <input type="date" id="fecha-fin-input" class="form-control">
                 </div>
-            </div>
-            
-            <div class="form-row">
                 <div class="form-group">
                     <label for="codigo-input">Código Diagnóstico (CIE-10):</label>
                     <input type="text" id="codigo-input" class="form-control" placeholder="Ej: Z34.0">
                 </div>
-                <div class="form-group">
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group full-width">
                     <label for="descripcion-input">Descripción Diagnóstico:</label>
                     <input type="text" id="descripcion-input" class="form-control" placeholder="Descripción del diagnóstico">
                 </div>
@@ -318,14 +344,26 @@ class MedicionAusentismoComponent {
                         if (result && result.success) {
                             document.getElementById('nombre-input').value = result.datos.nombre || '';
                             document.getElementById('cargo-input').value = result.datos.cargo || '';
-                            document.getElementById('departamento-input').value = result.datos.departamento || '';
-                            this.showStatus(statusDiv, 'Empleado encontrado.', 'success');
+                            document.getElementById('departamento-input').value = result.datos.area || '';
+                            document.getElementById('empresa-usuaria-input').value = result.datos.empresa_usuaria || '';
+                            document.getElementById('entidad-input').value = result.datos.entidad || '';
+                            
+                            // ¡Importante! Actualizar la empresa actual si el empleado pertenece a otra.
+                            if (result.datos.empresa && this.currentCompany.toUpperCase() !== result.datos.empresa.toUpperCase()) {
+                                console.log(`[CONTEXT SWITCH] La empresa cambió de ${this.currentCompany} a ${result.datos.empresa}`);
+                                this.currentCompany = result.datos.empresa;
+                                this.showStatus(statusDiv, `Empleado encontrado. Contexto de empresa actualizado a: ${this.currentCompany}`, 'success');
+                            } else {
+                                this.showStatus(statusDiv, 'Empleado encontrado.', 'success');
+                            }
                         } else {
                             this.showStatus(statusDiv, 'Empleado no encontrado. Diligencie los datos manualmente.', 'warning');
                             // Limpiar campos autocompletados
                             document.getElementById('nombre-input').value = '';
                             document.getElementById('cargo-input').value = '';
                             document.getElementById('departamento-input').value = '';
+                            document.getElementById('empresa-usuaria-input').value = '';
+                            document.getElementById('entidad-input').value = '';
                         }
                     } catch (error) {
                         console.error('Error buscando empleado:', error);
@@ -336,7 +374,44 @@ class MedicionAusentismoComponent {
                 console.error('No se encontró el campo de cédula (cedula-input)');
             }
 
-            // 2. Enviar formulario al hacer clic en "Registrar"
+            // 2. Autocompletar descripción de diagnóstico al salir del campo Código
+            const codigoInput = document.getElementById('codigo-input');
+            if (codigoInput) {
+                console.log('Código input found, adding blur event listener');
+                codigoInput.addEventListener('blur', async () => {
+                    console.log('Blur event triggered on codigo-input');
+                    const cie10Code = codigoInput.value.trim();
+                    console.log('CIE-10 Code value:', cie10Code);
+                    
+                    if (!cie10Code) {
+                        console.log('CIE-10 Code is empty, skipping search');
+                        return;
+                    }
+
+                    this.showStatus(statusDiv, 'Buscando descripción de diagnóstico...', 'info');
+
+                    try {
+                        console.log('Calling buscarCie10Descripcion with:', { companyName: this.currentCompany, cie10Code });
+                        const result = await window.electronAPI.buscarCie10Descripcion(this.currentCompany, cie10Code);
+                        console.log('Search result:', result);
+                        
+                        if (result && result.success) {
+                            document.getElementById('descripcion-input').value = result.datos.descripcion || '';
+                            this.showStatus(statusDiv, 'Descripción de diagnóstico encontrada.', 'success');
+                        } else {
+                            this.showStatus(statusDiv, 'Descripción de diagnóstico no encontrada.', 'warning');
+                            document.getElementById('descripcion-input').value = '';
+                        }
+                    } catch (error) {
+                        console.error('Error buscando descripción de diagnóstico:', error);
+                        this.showStatus(statusDiv, `Error al buscar descripción: ${error.message}`, 'error');
+                    }
+                });
+            } else {
+                console.error('No se encontró el campo de código de diagnóstico (codigo-input)');
+            }
+
+            // 3. Enviar formulario al hacer clic en "Registrar"
             const registrarBtn = document.getElementById('registrar-btn');
             if (registrarBtn) {
                 registrarBtn.addEventListener('click', async () => {
@@ -359,9 +434,8 @@ class MedicionAusentismoComponent {
 
                         // Llamamos al nuevo método para agregar la incapacidad
                         const result = await window.electronAPI.procesarAusentismo(
-                            this.currentCompany, 
-                            filePath, 
-                            formData
+                            this.currentCompany,   // empresa
+                            formData               // json_datos (se convierte a string en preload.js)
                         );
 
                         if (result.success) {
@@ -450,12 +524,20 @@ class MedicionAusentismoComponent {
     }
 
     limpiarFormulario() {
-        const form = document.querySelector('.registrar-ausentismo-form');
-        form.reset();
-        // También limpiamos los campos readonly que no se resetean con .reset()
-        document.getElementById('nombre-input').value = '';
-        document.getElementById('cargo-input').value = '';
-        document.getElementById('departamento-input').value = '';
+    // Limpiar campos de entrada
+    const inputs = document.querySelectorAll('.registrar-ausentismo-form input:not([type="button"])');
+    inputs.forEach(input => input.value = '');
+
+    // Limpiar selects
+    const selects = document.querySelectorAll('.registrar-ausentismo-form select');
+    selects.forEach(select => select.selectedIndex = 0);
+
+    // Los campos readonly ya se limpian explícitamente
+    document.getElementById('nombre-input').value = '';
+    document.getElementById('cargo-input').value = '';
+    document.getElementById('departamento-input').value = '';
+    document.getElementById('empresa-usuaria-input').value = '';
+    document.getElementById('entidad-input').value = '';
     }
 
     renderVerAusentismoView(container) {
