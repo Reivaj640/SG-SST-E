@@ -1248,6 +1248,67 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
   container.appendChild(submoduleContentDiv);
 }
 
+// Funciones para mostrar contenido específico de submódulos
+function showVerAusentismoContent(container, currentCompany, moduleName, submoduleName) {
+  // Crear una instancia del componente y renderizarlo
+  if (typeof window.VerAusentismoComponent === 'function') {
+    try {
+      const verAusentismoComponent = new window.VerAusentismoComponent(
+        container, 
+        currentCompany, 
+        moduleName, 
+        submoduleName,
+        () => {
+          // Callback para volver al home del módulo
+          const mainCanvas = document.querySelector('.main-canvas');
+          if (mainCanvas && mainCanvas.parentElement) {
+            showModuleHome(mainCanvas.parentElement, moduleName);
+          } else {
+            showModuleHome(container, moduleName);
+          }
+        }
+      );
+      verAusentismoComponent.render();
+    } catch (error) {
+      console.error('Error al crear/renderizar VerAusentismoComponent:', error);
+      showDevelopmentMessage(container, submoduleName);
+    }
+  } else {
+    console.error('VerAusentismoComponent no está disponible o no es una función');
+    showDevelopmentMessage(container, submoduleName);
+  }
+}
+
+function showRegistrarAusentismoContent(container, currentCompany, moduleName, submoduleName) {
+  // Crear una instancia del componente y renderizarlo
+  if (typeof window.RegistrarAusentismoComponent === 'function') {
+    try {
+      const registrarAusentismoComponent = new window.RegistrarAusentismoComponent(
+        container, 
+        currentCompany, 
+        moduleName, 
+        submoduleName,
+        () => {
+          // Callback para volver al home del módulo
+          const mainCanvas = document.querySelector('.main-canvas');
+          if (mainCanvas && mainCanvas.parentElement) {
+            showModuleHome(mainCanvas.parentElement, moduleName);
+          } else {
+            showModuleHome(container, moduleName);
+          }
+        }
+      );
+      registrarAusentismoComponent.render();
+    } catch (error) {
+      console.error('Error al crear/renderizar RegistrarAusentismoComponent:', error);
+      showDevelopmentMessage(container, submoduleName);
+    }
+  } else {
+    console.error('RegistrarAusentismoComponent no está disponible o no es una función');
+    showDevelopmentMessage(container, submoduleName);
+  }
+}
+
 function showDevelopmentMessage(container, submoduleName) {
   container.innerHTML = `
     <div class="development-message">
@@ -1419,10 +1480,14 @@ function showMedicionAusentismoContent(container, currentCompany, moduleName, su
   // Crear una instancia del componente y renderizarlo
   if (typeof window.MedicionAusentismoComponent === 'function') {
     try {
+      // SOLUCIÓN PROVISIONAL: Forzamos la empresa aquí
+      const hardcodedCompany = "TEMPOACTIVA"; 
+      console.warn(`[ADVERTENCIA] Usando empresa hardcodeada '${hardcodedCompany}' porque currentCompany es ${currentCompany}.`);
+
       const medicionComponent = new window.MedicionAusentismoComponent(
-        container,
-        currentCompany,
-        moduleName,
+        container, 
+        hardcodedCompany, // <-- Usamos el valor hardcodeado
+        moduleName, 
         submoduleName,
         () => {
           // Callback para volver al home del módulo
@@ -1445,143 +1510,109 @@ function showMedicionAusentismoContent(container, currentCompany, moduleName, su
   }
 }
 
-function showRegistrarAusentismoContent(container, currentCompany, moduleName, submoduleName) {
-  // Crear una instancia del componente y renderizarlo
-  if (typeof window.RegistrarAusentismoComponent === 'function') {
-    try {
-      const registrarComponent = new window.RegistrarAusentismoComponent(
-        container, 
-        currentCompany, 
-        moduleName, 
-        submoduleName,
-        () => {
-          // Callback para volver al home del módulo
-          const mainCanvas = document.querySelector('.main-canvas');
-          if (mainCanvas && mainCanvas.parentElement) {
-            showModuleHome(mainCanvas.parentElement, moduleName);
-          } else {
-            showModuleHome(container, moduleName);
-          }
-        }
-      );
-      registrarComponent.render();
-    } catch (error) {
-      console.error('Error al crear/renderizar RegistrarAusentismoComponent:', error);
-      showDevelopmentMessage(container, submoduleName);
-    }
-  } else {
-    console.error('RegistrarAusentismoComponent no está disponible o no es una función');
-    showDevelopmentMessage(container, submoduleName);
-  }
-}
-
 // Función auxiliar para crear tarjetas de módulo
 function createModuleCard(title, description, onClick) {
-  const card = document.createElement('div');
-  card.className = 'card module-card';
-  
-  // Contenedor para el ícono y el título
-  const headerDiv = document.createElement('div');
-  headerDiv.className = 'card-header';
-  
-  // Placeholder para el ícono
-  const iconDiv = document.createElement('div');
-  iconDiv.className = 'card-icon-placeholder';
-  headerDiv.appendChild(iconDiv);
-  
-  const cardTitle = document.createElement('h3');
-  cardTitle.textContent = title;
-  cardTitle.className = 'card-title';
-  headerDiv.appendChild(cardTitle);
-  
-  card.appendChild(headerDiv);
-  
-  const cardDescription = document.createElement('p');
-  cardDescription.textContent = description;
-  cardDescription.className = 'card-description';
-  card.appendChild(cardDescription);
-  
-  const cardButton = document.createElement('button');
-  cardButton.className = 'btn btn-primary';
-  cardButton.textContent = 'Abrir';
-  cardButton.addEventListener('click', onClick);
-  card.appendChild(cardButton);
-  
-  return card;
-}
-
-function showSettingsPage() {
-  // ✅ Pasar contentArea a hideCalendar
-  hideCalendar(contentArea);
-  console.log('Showing settings page...');
-  // Verificar que contentArea exista
-  if (!contentArea) {
-    console.error('contentArea is not defined or accessible in showSettingsPage.');
-    // Intentar encontrarlo nuevamente si es necesario
-    contentArea = document.getElementById('content-area');
-    if (!contentArea) {
-      console.error('Critical: content-area element still not found.');
-      // Mostrar mensaje de error en la UI
-      if (document.body) {
-        document.body.innerHTML = '<h1>Error: No se puede cargar la página de configuración</h1>';
-      }
-      return;
-    }
+    // Contenedor para el ícono y el título
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'card-header';
+    
+    // Placeholder para el ícono
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'card-icon-placeholder';
+    headerDiv.appendChild(iconDiv);
+    
+    const cardTitle = document.createElement('h3');
+    cardTitle.textContent = title;
+    cardTitle.className = 'card-title';
+    headerDiv.appendChild(cardTitle);
+    
+    card.appendChild(headerDiv);
+    
+    const cardDescription = document.createElement('p');
+    cardDescription.textContent = description;
+    cardDescription.className = 'card-description';
+    card.appendChild(cardDescription);
+    
+    const cardButton = document.createElement('button');
+    cardButton.className = 'btn btn-primary';
+    cardButton.textContent = 'Abrir';
+    cardButton.addEventListener('click', onClick);
+    card.appendChild(cardButton);
+    
+    return card;
   }
   
-  contentArea.innerHTML = ''; // Limpiar contenido anterior
-
-  // Crear el contenedor principal del canvas
-  const mainCanvas = document.createElement('div');
-  mainCanvas.className = 'main-canvas';
-
-  const settingsDiv = document.createElement('div');
-  settingsDiv.className = 'settings-content';
+  function showSettingsPage() {
+    // ✅ Pasar contentArea a hideCalendar
+    hideCalendar(contentArea);
+    console.log('Showing settings page...');
+    // Verificar que contentArea exista
+    if (!contentArea) {
+      console.error('contentArea is not defined or accessible in showSettingsPage.');
+      // Intentar encontrarlo nuevamente si es necesario
+      contentArea = document.getElementById('content-area');
+      if (!contentArea) {
+        console.error('Critical: content-area element still not found.');
+        // Mostrar mensaje de error en la UI
+        if (document.body) {
+          document.body.innerHTML = '<h1>Error: No se puede cargar la página de configuración</h1>';
+        }
+        return;
+      }
+    }
+    
+    contentArea.innerHTML = ''; // Limpiar contenido anterior
   
-  const title = document.createElement('h2');
-  title.textContent = 'Panel de Configuraciones';
-  settingsDiv.appendChild(title);
+    // Crear el contenedor principal del canvas
+    const mainCanvas = document.createElement('div');
+    mainCanvas.className = 'main-canvas';
   
-  // Botón para volver al inicio
-  const backButton = document.createElement('button');
-  backButton.className = 'btn';
-  backButton.textContent = '< Volver al Inicio';
-  backButton.addEventListener('click', showHomePage);
-  settingsDiv.appendChild(backButton);
-  
-  // Crear tarjetas de configuración
-  const cardsContainer = document.createElement('div');
-  cardsContainer.className = 'settings-cards';
-  
-  // Tarjeta para vincular empresas
-  const pathCard = createSettingsCard(
-    'Vincular Empresas', 
-    'Conecta las carpetas de cada empresa para el análisis.',
-    showPathLinkingPage
-  );
-  cardsContainer.appendChild(pathCard);
-  
-  // Tarjeta para ajustes de chat
-  const chatCard = createSettingsCard(
-    'Ajustes de Chat', 
-    'Configura el comportamiento y la apariencia del asistente LLM.',
-    showChatSettingsPage
-  );
-  cardsContainer.appendChild(chatCard);
-  
-  // Tarjeta para ajustes de usuario
-  const userCard = createSettingsCard(
-    'Ajustes de Usuario', 
-    'Gestiona la información y preferencias del usuario.',
-    showUserSettingsPage
-  );
-  cardsContainer.appendChild(userCard);
-  
-  settingsDiv.appendChild(cardsContainer);
-  mainCanvas.appendChild(settingsDiv);
-  contentArea.appendChild(mainCanvas);
-}
-
+    const settingsDiv = document.createElement('div');
+    settingsDiv.className = 'settings-content';
+    
+    const title = document.createElement('h2');
+    title.textContent = 'Panel de Configuraciones';
+    settingsDiv.appendChild(title);
+    
+    // Botón para volver al inicio
+    const backButton = document.createElement('button');
+    backButton.className = 'btn';
+    backButton.textContent = '< Volver al Inicio';
+    backButton.addEventListener('click', showHomePage);
+    settingsDiv.appendChild(backButton);
+    
+    // Crear tarjetas de configuración
+    const cardsContainer = document.createElement('div');
+    cardsContainer.className = 'settings-cards';
+    
+    // Tarjeta para vincular empresas
+    const pathCard = createSettingsCard(
+      'Vincular Empresas', 
+      'Conecta las carpetas de cada empresa para el análisis.',
+      showPathLinkingPage
+    );
+    cardsContainer.appendChild(pathCard);
+    
+    // Tarjeta para ajustes de chat
+    const chatCard = createSettingsCard(
+      'Ajustes de Chat', 
+      'Configura el comportamiento y la apariencia del asistente LLM.',
+      showChatSettingsPage
+    );
+    cardsContainer.appendChild(chatCard);
+    
+    // Tarjeta para ajustes de usuario
+    const userCard = createSettingsCard(
+      'Ajustes de Usuario', 
+      'Gestiona la información y preferencias del usuario.',
+      showUserSettingsPage
+    );
+    cardsContainer.appendChild(userCard);
+    
+    settingsDiv.appendChild(cardsContainer);
+    mainCanvas.appendChild(settingsDiv);
+    contentArea.appendChild(mainCanvas);
+  }
 function createSettingsCard(title, description, onClick) {
   const card = document.createElement('div');
   card.className = 'card settings-card';
@@ -2037,7 +2068,7 @@ function formatStructureForLog(node, indent = '') {
             for (const dirName in node.subdirectories) {
                 logString += formatStructureForLog(node.subdirectories[dirName], indent + '  ');
             }
-        }
+      }
         
         if (node.files) {
             for (const file of node.files) {
@@ -2047,5 +2078,3 @@ function formatStructureForLog(node, indent = '') {
     }
     return logString;
 }
-
-

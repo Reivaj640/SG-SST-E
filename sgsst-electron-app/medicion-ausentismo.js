@@ -80,7 +80,7 @@ class MedicionAusentismoComponent {
 
         cardsContainer.appendChild(
             this.createModuleCard(
-                'Registrar ausentismo',
+                'Registrar Ausentismo',
                 'Registra nuevos casos de ausentismo por causa médica.',
                 () => this.handleRegistrarAusentismo()
             )
@@ -159,12 +159,385 @@ class MedicionAusentismoComponent {
     }
 
     handleRegistrarAusentismo() {
+        console.log(' handleClick en tarjeta Registrar Ausentismo');
+        // Verificar si el componente está disponible
+        if (typeof window.RegistrarAusentismoComponent === 'undefined') {
+            console.error('RegistrarAusentismoComponent no está definido');
+            alert('Error: El componente de registro de ausentismo no está disponible.');
+            return;
+        }
+        
+        // Aquí debemos cargar el componente de RegistrarAusentismoComponent
+        // pero primero necesitamos crear una nueva vista para esto
         this.currentView = 'registrar-ausentismo';
+        console.log('Cambiando a vista registrar-ausentismo');
+        this.render();
+    }
+
+    handleVerAusentismo() {
+        this.currentView = 'ver-ausentismo';
         this.render();
     }
 
     handleComingSoon() {
         alert('Esta funcionalidad estará disponible próximamente.');
+    }
+
+    async renderRegistrarAusentismoView(container) {
+        console.log('[DEBUG] renderRegistrarAusentismoView: Iniciando renderizado del formulario.');
+        const header = this.createHeader('Registrar Ausentismo', () => {
+            this.currentView = 'main';
+            this.render();
+        });
+        container.appendChild(header);
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'control-remisiones-content';
+        contentDiv.style.padding = '20px';
+        container.appendChild(contentDiv);
+
+        // Área de estado para mostrar feedback al usuario
+        const statusDiv = document.createElement('div');
+        statusDiv.id = 'form-status';
+        statusDiv.style.cssText = `
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            font-weight: bold;
+            text-align: center;
+            display: none;
+        `;
+        contentDiv.appendChild(statusDiv);
+
+        // --- Creación del Formulario ---
+        const form = document.createElement('div');
+        form.className = 'registrar-ausentismo-form';
+        form.innerHTML = `
+            <h3>Formulario de Registro de Incapacidad</h3>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="cedula-input">Cédula:</label>
+                    <input type="text" id="cedula-input" class="form-control" placeholder="Ingrese la cédula del empleado">
+                </div>
+                <div class="form-group">
+                    <label for="nombre-input">Nombre Completo:</label>
+                    <input type="text" id="nombre-input" class="form-control" placeholder="Nombre del empleado" readonly>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="cargo-input">Cargo:</label>
+                    <input type="text" id="cargo-input" class="form-control" placeholder="Cargo del empleado" readonly>
+                </div>
+                <div class="form-group">
+                    <label for="departamento-input">Departamento:</label>
+                    <input type="text" id="departamento-input" class="form-control" placeholder="Departamento" readonly>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="empresa-usuaria-input">Empresa Usuaria:</label>
+                    <input type="text" id="empresa-usuaria-input" class="form-control" placeholder="Empresa donde presta el servicio" readonly>
+                </div>
+                <div class="form-group">
+                    <label for="genero-select">Género:</label>
+                    <select id="genero-select" class="form-control">
+                        <option value="">Seleccione...</option>
+                        <option value="Masculino">Masculino</option>
+                        <option value="Femenino">Femenino</option>
+                        <option value="Otro">Otro</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="clase-incapacidad-select">Clase de Incapacidad:</label>
+                    <select id="clase-incapacidad-select" class="form-control">
+                        <option value="">Seleccione...</option>
+                        <option value="EPS">EPS</option>
+                        <option value="ARL">ARL</option>
+                        <option value="EMPRESA">EMPRESA</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="tipo-incapacidad-select">Tipo de Incapacidad:</label>
+                    <select id="tipo-incapacidad-select" class="form-control">
+                        <option value="">Seleccione...</option>
+                        <option value="ACCIDENTE DE TRANSITO">ACCIDENTE DE TRANSITO</option>
+                        <option value="ACCIDENTE LABORAL">ACCIDENTE LABORAL</option>
+                        <option value="ENFERMEDAD GENERAL">ENFERMEDAD GENERAL</option>
+                        <option value="LICENCIA DE LUTO">LICENCIA DE LUTO</option>
+                        <option value="LICENCIA DE MATERNIDAD">LICENCIA DE MATERNIDAD</option>
+                        <option value="LICENCIA DE PATERNIDAD">LICENCIA DE PATERNIDAD</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="entidad-input">Entidad (EPS/SURA):</label>
+                    <input type="text" id="entidad-input" class="form-control" placeholder="Entidad de salud" readonly>
+                </div>
+                <div class="form-group">
+                    <label for="fecha-inicio-input">Fecha de Inicio:</label>
+                    <input type="date" id="fecha-inicio-input" class="form-control">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="fecha-fin-input">Fecha de Finalización:</label>
+                    <input type="date" id="fecha-fin-input" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label for="codigo-input">Código Diagnóstico (CIE-10):</label>
+                    <input type="text" id="codigo-input" class="form-control" placeholder="Ej: Z34.0">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group full-width">
+                    <label for="descripcion-input">Descripción Diagnóstico:</label>
+                    <input type="text" id="descripcion-input" class="form-control" placeholder="Descripción del diagnóstico">
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" id="registrar-btn" class="btn btn-primary">Registrar Incapacidad</button>
+                <button type="button" id="limpiar-btn" class="btn btn-secondary">Limpiar Formulario</button>
+            </div>
+        `;
+        contentDiv.appendChild(form);
+
+        // --- Lógica de los Eventos ---
+        
+        // Usamos setTimeout para asegurarnos de que el DOM esté completamente renderizado
+        setTimeout(() => {
+            console.log('Event listeners setup started');
+            console.log('Current company:', this.currentCompany);
+            
+            // 1. Autocompletar al salir del campo Cédula
+            const cedulaInput = document.getElementById('cedula-input');
+            if (cedulaInput) {
+                console.log('Cédula input found, adding blur event listener');
+                cedulaInput.addEventListener('blur', async () => {
+                    console.log('Blur event triggered');
+                    const cedula = cedulaInput.value.trim();
+                    console.log('Cédula value:', cedula);
+                    
+                    if (!cedula) {
+                        console.log('Cédula is empty, skipping search');
+                        return;
+                    }
+
+                    this.showStatus(statusDiv, 'Buscando empleado...', 'info');
+
+                    try {
+                        console.log('Calling buscarEmpleadoPorCedula with:', { cedula, empresa: this.currentCompany });
+                        const result = await window.electronAPI.buscarEmpleadoPorCedula(cedula, this.currentCompany);
+                        console.log('Search result:', result);
+                        
+                        if (result && result.success) {
+                            document.getElementById('nombre-input').value = result.datos.nombre || '';
+                            document.getElementById('cargo-input').value = result.datos.cargo || '';
+                            document.getElementById('departamento-input').value = result.datos.area || '';
+                            document.getElementById('empresa-usuaria-input').value = result.datos.empresa_usuaria || '';
+                            document.getElementById('entidad-input').value = result.datos.entidad || '';
+                            
+                            // ¡Importante! Actualizar la empresa actual si el empleado pertenece a otra.
+                            if (result.datos.empresa && this.currentCompany.toUpperCase() !== result.datos.empresa.toUpperCase()) {
+                                console.log(`[CONTEXT SWITCH] La empresa cambió de ${this.currentCompany} a ${result.datos.empresa}`);
+                                this.currentCompany = result.datos.empresa;
+                                this.showStatus(statusDiv, `Empleado encontrado. Contexto de empresa actualizado a: ${this.currentCompany}`, 'success');
+                            } else {
+                                this.showStatus(statusDiv, 'Empleado encontrado.', 'success');
+                            }
+                        } else {
+                            this.showStatus(statusDiv, 'Empleado no encontrado. Diligencie los datos manualmente.', 'warning');
+                            // Limpiar campos autocompletados
+                            document.getElementById('nombre-input').value = '';
+                            document.getElementById('cargo-input').value = '';
+                            document.getElementById('departamento-input').value = '';
+                            document.getElementById('empresa-usuaria-input').value = '';
+                            document.getElementById('entidad-input').value = '';
+                        }
+                    } catch (error) {
+                        console.error('Error buscando empleado:', error);
+                        this.showStatus(statusDiv, `Error al buscar empleado: ${error.message}`, 'error');
+                    }
+                });
+            } else {
+                console.error('No se encontró el campo de cédula (cedula-input)');
+            }
+
+            // 2. Autocompletar descripción de diagnóstico al salir del campo Código
+            const codigoInput = document.getElementById('codigo-input');
+            if (codigoInput) {
+                console.log('Código input found, adding blur event listener');
+                codigoInput.addEventListener('blur', async () => {
+                    console.log('Blur event triggered on codigo-input');
+                    const cie10Code = codigoInput.value.trim();
+                    console.log('CIE-10 Code value:', cie10Code);
+                    
+                    if (!cie10Code) {
+                        console.log('CIE-10 Code is empty, skipping search');
+                        return;
+                    }
+
+                    this.showStatus(statusDiv, 'Buscando descripción de diagnóstico...', 'info');
+
+                    try {
+                        console.log('Calling buscarCie10Descripcion with:', { companyName: this.currentCompany, cie10Code });
+                        const result = await window.electronAPI.buscarCie10Descripcion(this.currentCompany, cie10Code);
+                        console.log('Search result:', result);
+                        
+                        if (result && result.success) {
+                            document.getElementById('descripcion-input').value = result.datos.descripcion || '';
+                            this.showStatus(statusDiv, 'Descripción de diagnóstico encontrada.', 'success');
+                        } else {
+                            this.showStatus(statusDiv, 'Descripción de diagnóstico no encontrada.', 'warning');
+                            document.getElementById('descripcion-input').value = '';
+                        }
+                    } catch (error) {
+                        console.error('Error buscando descripción de diagnóstico:', error);
+                        this.showStatus(statusDiv, `Error al buscar descripción: ${error.message}`, 'error');
+                    }
+                });
+            } else {
+                console.error('No se encontró el campo de código de diagnóstico (codigo-input)');
+            }
+
+            // 3. Enviar formulario al hacer clic en "Registrar"
+            const registrarBtn = document.getElementById('registrar-btn');
+            if (registrarBtn) {
+                registrarBtn.addEventListener('click', async () => {
+                    const formData = this.getFormData();
+                    if (!this.validateFormData(formData)) {
+                        this.showStatus(statusDiv, 'Por favor, complete todos los campos obligatorios.', 'error');
+                        return;
+                    }
+
+                    this.showStatus(statusDiv, 'Registrando incapacidad...', 'info');
+                    this.disableForm(true);
+
+                    try {
+                        // Primero, necesitamos la ruta del archivo de ausentismo
+                        const ausentismoResult = await window.electronAPI.readAusentismoData(this.currentCompany);
+                        if (!ausentismoResult.success) {
+                            throw new Error(ausentismoResult.error);
+                        }
+                        const filePath = ausentismoResult.filePath;
+
+                        // Llamamos al nuevo método para agregar la incapacidad
+                        const result = await window.electronAPI.procesarAusentismo(
+                            this.currentCompany,   // empresa
+                            formData               // json_datos (se convierte a string en preload.js)
+                        );
+
+                        if (result.success) {
+                            this.showStatus(statusDiv, '¡Incapacidad registrada exitosamente!', 'success');
+                            this.limpiarFormulario(); // Limpiar el formulario tras el éxito
+                        } else {
+                            throw new Error(result.error);
+                        }
+                    } catch (error) {
+                        console.error('Error registrando incapacidad:', error);
+                        this.showStatus(statusDiv, `Error al registrar: ${error.message}`, 'error');
+                    } finally {
+                        this.disableForm(false);
+                    }
+                });
+            }
+
+            // 3. Limpiar formulario
+            const limpiarBtn = document.getElementById('limpiar-btn');
+            if (limpiarBtn) {
+                limpiarBtn.addEventListener('click', () => {
+                    this.limpiarFormulario();
+                    this.showStatus(statusDiv, 'Formulario limpiado.', 'info');
+                });
+            }
+        }, 0); // Usamos 0ms para asegurar que se ejecute en el siguiente ciclo de eventos
+    }
+
+    // --- Funciones Auxiliares para el Formulario ---
+
+    showStatus(statusDiv, message, type) {
+        statusDiv.textContent = message;
+        statusDiv.style.display = 'block';
+        statusDiv.className = 'status-message'; // Clase base
+
+        switch (type) {
+            case 'success':
+                statusDiv.style.backgroundColor = '#d4edda';
+                statusDiv.style.color = '#155724';
+                break;
+            case 'error':
+                statusDiv.style.backgroundColor = '#f8d7da';
+                statusDiv.style.color = '#721c24';
+                break;
+            case 'warning':
+                statusDiv.style.backgroundColor = '#fff3cd';
+                statusDiv.style.color = '#856404';
+                break;
+            case 'info':
+            default:
+                statusDiv.style.backgroundColor = '#d1ecf1';
+                statusDiv.style.color = '#0c5460';
+                break;
+        }
+    }
+
+    disableForm(disabled) {
+        const inputs = document.querySelectorAll('.registrar-ausentismo-form input, .registrar-ausentismo-form select, .registrar-ausentismo-form button');
+        inputs.forEach(input => input.disabled = disabled);
+    }
+
+    getFormData() {
+        return {
+            cedula: document.getElementById('cedula-input').value.trim(),
+            nombre: document.getElementById('nombre-input').value.trim(),
+            cargo: document.getElementById('cargo-input').value.trim(),
+            departamento: document.getElementById('departamento-input').value.trim(),
+            clase_incapacidad: document.getElementById('clase-incapacidad-select').value,
+            tipo_incapacidad: document.getElementById('tipo-incapacidad-select').value,
+            fecha_inicio: document.getElementById('fecha-inicio-input').value,
+            fecha_finalizacion: document.getElementById('fecha-fin-input').value,
+            codigo: document.getElementById('codigo-input').value.trim(),
+            descripcion: document.getElementById('descripcion-input').value.trim()
+        };
+    }
+
+    validateFormData(data) {
+        // Campos obligatorios
+        const requiredFields = ['cedula', 'nombre', 'clase_incapacidad', 'tipo_incapacidad', 'fecha_inicio', 'fecha_finalizacion'];
+        for (const field of requiredFields) {
+            if (!data[field]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    limpiarFormulario() {
+    // Limpiar campos de entrada
+    const inputs = document.querySelectorAll('.registrar-ausentismo-form input:not([type="button"])');
+    inputs.forEach(input => input.value = '');
+
+    // Limpiar selects
+    const selects = document.querySelectorAll('.registrar-ausentismo-form select');
+    selects.forEach(select => select.selectedIndex = 0);
+
+    // Los campos readonly ya se limpian explícitamente
+    document.getElementById('nombre-input').value = '';
+    document.getElementById('cargo-input').value = '';
+    document.getElementById('departamento-input').value = '';
+    document.getElementById('empresa-usuaria-input').value = '';
+    document.getElementById('entidad-input').value = '';
     }
 
     renderVerAusentismoView(container) {
@@ -359,247 +732,6 @@ class MedicionAusentismoComponent {
         }
     }
 
-    async renderRegistrarAusentismoView(container) {
-        console.log('[DEBUG] renderRegistrarAusentismoView: Iniciando renderizado.');
-        const header = this.createHeader('Registrar Ausentismo', () => {
-            this.currentView = 'main';
-            this.render();
-        });
-        container.appendChild(header);
-
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'control-remisiones-content';
-        contentDiv.style.padding = '20px';
-        container.appendChild(contentDiv);
-
-        // Área de estado para mostrar feedback al usuario
-        const statusDiv = document.createElement('div');
-        statusDiv.id = 'excel-status';
-        statusDiv.style.cssText = `
-            padding: 10px;
-            margin-bottom: 10px;
-            border-radius: 4px;
-            font-weight: bold;
-            text-align: center;
-            display: none;
-        `;
-        contentDiv.appendChild(statusDiv);
-
-        this.logMessage(`Cargando datos de ausentismo para ${this.currentCompany}...`, 'info');
-        console.log(`[DEBUG] renderRegistrarAusentismoView: Solicitando datos para ${this.currentCompany}`);
-        contentDiv.innerHTML = '<p style="text-align:center;">Cargando datos del archivo de ausentismo...</p>';
-
-        try {
-            const result = await window.electronAPI.readAusentismoData(this.currentCompany);
-            console.log('[DEBUG] renderRegistrarAusentismoView: Resultado recibido de readAusentismoData:', result);
-
-            if (result.success) {
-                this.ausentismoFilePath = result.filePath;
-                console.log(`[DEBUG] renderRegistrarAusentismoView: Ruta de archivo guardada: ${this.ausentismoFilePath}`);
-                contentDiv.innerHTML = ''; // Limpiar "Cargando..."
-                contentDiv.appendChild(statusDiv); // Reañadir el div de estado
-
-                // ✅ Inicializar Excel aquí antes de renderizar la tabla
-                if (!this.excelInitialized) {
-                    statusDiv.style.display = 'block';
-                    statusDiv.textContent = 'Inicializando Excel...';
-                    statusDiv.style.backgroundColor = '#d1ecf1';
-                    statusDiv.style.color = '#0c5460';
-                    
-                    await window.electronAPI.initExcel(result.filePath);
-                    this.excelInitialized = true;
-                    
-                    statusDiv.style.display = 'none';
-                }
-
-                if (result.rows && result.rows.length > 0) {
-                    console.log(`[DEBUG] renderRegistrarAusentismoView: ${result.rows.length} filas encontradas. Renderizando tabla.`);
-                    this.logMessage(`Encontrados ${result.rows.length} registros. Renderizando tabla.`, 'info');
-                    
-                    const tableContainer = document.createElement('div');
-                    tableContainer.style.maxHeight = '65vh';
-                    tableContainer.style.overflowY = 'auto';
-                    tableContainer.style.border = '1px solid #ddd';
-                    tableContainer.style.borderRadius = '4px';
-                                        
-                    const table = document.createElement('table');
-                    table.className = 'data-table';
-                    
-                    // Encabezados de tabla
-                    const thead = document.createElement('thead');
-                    const headerRow = document.createElement('tr');
-                    
-                    if (result.headers && Array.isArray(result.headers)) {
-                        console.log('[DEBUG] renderRegistrarAusentismoView: Renderizando encabezados:', result.headers);
-                        result.headers.forEach(headerText => {
-                            const th = document.createElement('th');
-                            th.textContent = headerText;
-                            headerRow.appendChild(th);
-                        });
-                    }
-                    thead.appendChild(headerRow);
-                    table.appendChild(thead);
-
-                    // Cuerpo de la tabla
-                    const tbody = document.createElement('tbody');
-                    result.rows.forEach((row, rowIndex) => {
-                        const tr = document.createElement('tr');
-                        if (Array.isArray(row)) {
-                            row.forEach((cellData, colIndex) => {
-                                const td = document.createElement('td');
-                                td.textContent = cellData != null ? cellData.toString() : '';
-                                
-                                // Hacer la celda editable si es una de las columnas permitidas
-                                const isEditable = this.isEditableColumn(colIndex);
-                                if (isEditable) {
-                                    td.contentEditable = true;
-                                    td.addEventListener('blur', async () => {
-                                        // Añadir clase visual de "actualizando"
-                                        td.classList.add('updating');
-                                        td.disabled = true;
-                                        
-                                        // Mostrar estado global
-                                        statusDiv.style.display = 'block';
-                                        statusDiv.textContent = 'Procesando en Excel...';
-                                        statusDiv.style.backgroundColor = '#fff3cd';
-                                        statusDiv.style.color = '#856404';
-                                        
-                                        try {
-                                            // Convertir fila/columna a dirección de celda Excel (sin usar ExcelJS)
-                                            const cellAddress = this.getExcelCellAddress(rowIndex + 7, colIndex); // +7 porque encabezado está en fila 7
-                                            
-                                            // Enviar actualización al backend
-                                            const updateResult = await window.electronAPI.updateExcelCell({
-                                                cellAddress,
-                                                value: td.textContent
-                                            });
-                                            
-                                            if (updateResult.success) {
-                                                // Actualizar la vista con los nuevos datos
-                                                this.updateTableWithNewData(updateResult.data.data);
-                                            } else {
-                                                alert(`Error actualizando celda: ${updateResult.error}`);
-                                            }
-                                        } catch (error) {
-                                            console.error('Error actualizando celda:', error);
-                                            alert(`Error: ${error.message}`);
-                                        } finally {
-                                            // Remover clase visual de "actualizando"
-                                            td.classList.remove('updating');
-                                            td.disabled = false;
-                                            
-                                            // Ocultar estado global
-                                            statusDiv.style.display = 'none';
-                                        }
-                                    });
-                                }
-                                
-                                tr.appendChild(td);
-                            });
-                        }
-                        tbody.appendChild(tr);
-                    });
-                    
-                    // Añadir fila vacía editable al final
-                    const emptyRow = document.createElement('tr');
-                    for (let i = 0; i < result.headers.length; i++) {
-                        const td = document.createElement('td');
-                        
-                        // Hacer la celda editable si es una de las columnas permitidas
-                        const isEditable = this.isEditableColumn(i);
-                        if (isEditable) {
-                            td.contentEditable = true;
-                            td.addEventListener('blur', async () => {
-                                // Añadir clase visual de "actualizando"
-                                td.classList.add('updating');
-                                td.disabled = true;
-                                
-                                // Mostrar estado global
-                                statusDiv.style.display = 'block';
-                                statusDiv.textContent = 'Procesando en Excel...';
-                                statusDiv.style.backgroundColor = '#fff3cd';
-                                statusDiv.style.color = '#856404';
-                                
-                                try {
-                                    // Convertir fila/columna a dirección de celda Excel (sin usar ExcelJS)
-                                    const cellAddress = this.getExcelCellAddress(result.rows.length + 7, i); // +7 porque encabezado está en fila 7
-                                    
-                                    // Enviar actualización al backend
-                                    const updateResult = await window.electronAPI.updateExcelCell({
-                                        cellAddress,
-                                        value: td.textContent
-                                    });
-                                    
-                                    if (updateResult.success) {
-                                        // Actualizar la vista con los nuevos datos
-                                        this.updateTableWithNewData(updateResult.data.data);
-                                    } else {
-                                        alert(`Error actualizando celda: ${updateResult.error}`);
-                                    }
-                                } catch (error) {
-                                    console.error('Error actualizando celda:', error);
-                                    alert(`Error: ${error.message}`);
-                                } finally {
-                                    // Remover clase visual de "actualizando"
-                                    td.classList.remove('updating');
-                                    td.disabled = false;
-                                    
-                                    // Ocultar estado global
-                                    statusDiv.style.display = 'none';
-                                }
-                            });
-                        }
-                        
-                        emptyRow.appendChild(td);
-                    }
-                    tbody.appendChild(emptyRow);
-                    
-                    table.appendChild(tbody);
-                    tableContainer.appendChild(table);
-                    contentDiv.appendChild(tableContainer);
-
-                    const infoDiv = document.createElement('div');
-                    infoDiv.style.marginTop = '15px';
-                    infoDiv.style.fontSize = '14px';
-                    infoDiv.style.color = '#666';
-                    infoDiv.innerHTML = `
-                        <p><strong>Archivo:</strong> ${result.filePath}</p>
-                        <p><strong>Total de registros:</strong> ${result.rows.length}</p>
-                    `;
-                    contentDiv.appendChild(infoDiv);
-
-                } else {
-                    console.warn('[WARN] renderRegistrarAusentismoView: No se encontraron filas (result.rows está vacío o no existe).');
-                    this.logMessage('El archivo de ausentismo está vacío o no contiene registros.', 'warn');
-                    contentDiv.innerHTML += `
-                        <div style="text-align:center; padding:40px; color:#666;">
-                            <h3>📋 No se encontraron datos</h3>
-                            <p>El archivo de ausentismo está vacío o no contiene registros.</p>
-                        </div>
-                    `;
-                }
-            } else {
-                console.error(`[ERROR] renderRegistrarAusentismoView: El resultado de readAusentismoData no fue exitoso. Error: ${result.error}`);
-                this.logMessage(`Error al cargar el archivo: ${result.error}`, 'error');
-                contentDiv.innerHTML = `
-                    <div style="text-align:center; padding:40px; color:#d32f2f;">
-                        <h3>❌ Error al cargar el archivo</h3>
-                        <p>${result.error}</p>
-                    </div>
-                `;
-            }
-        } catch (error) {
-            console.error('[CRITICAL] renderRegistrarAusentismoView: Error inesperado en el bloque try-catch:', error);
-            this.logMessage(`Error inesperado en la interfaz: ${error.message}`, 'error');
-            contentDiv.innerHTML = `
-                <div style="text-align:center; padding:40px; color:#d32f2f;">
-                    <h3>💥 Error inesperado</h3>
-                    <p>${error.message}</p>
-                </div>
-            `;
-        }
-    }
-
     // Método para saber qué columnas son editables
     isEditableColumn(colIndex) {
         // Asumiendo que las columnas editables son:
@@ -626,7 +758,7 @@ class MedicionAusentismoComponent {
     updateTableWithNewData(newData) {
         // Aquí puedes actualizar la tabla con los nuevos datos
         // Por simplicidad, recargamos la vista
-        this.renderRegistrarAusentismoView(this.container);
+        this.renderVerAusentismoView(this.container);
     }
 
     async saveCellData(rowIndex, colIndex, newValue, filePath) {

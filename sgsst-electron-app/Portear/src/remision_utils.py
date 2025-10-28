@@ -771,12 +771,12 @@ def normalize_data_keys(data):
         'Concepto Manipulacion Alimento': 'Concepto Manipulación Alimento',
         'Concepto Manipulación Alimento': 'Concepto Manipulación Alimento', # Ya correcta
         
-         'Motivo de Restriccion': 'Motivo de Restricción', # Carácter inválido
-         'Motivo de Restricción': 'Motivo de Restricción', # Ya correcta
-         
-         'Recomendaciones_Laborales': 'Recomendaciones Laborales',
-         'Recomendaciones Laborales': 'Recomendaciones Laborales', # Ya correcta
-         'Restricciones Laborales': 'Restricciones Laborales', # Ya correcta
+        'Motivo de Restriccion': 'Motivo de Restricción', # Carácter inválido
+        'Motivo de Restricción': 'Motivo de Restricción', # Ya correcta
+        
+        'Recomendaciones_Laborales': 'Recomendaciones Laborales',
+        'Recomendaciones Laborales': 'Recomendaciones Laborales', # Ya correcta
+        'Restricciones Laborales': 'Restricciones Laborales', # Ya correcta
     }
     
     normalized_data = {}
