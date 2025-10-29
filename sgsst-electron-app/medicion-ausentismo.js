@@ -19,26 +19,23 @@ class MedicionAusentismoComponent {
 
     render() {
         this.container.innerHTML = '';
+        // Añadir clase específica para identificar este módulo y permitir estilos específicos
+        this.container.classList.add('medicion-ausentismo');
         window.currentMedicionAusentismoComponent = this;
-
-        const mainContainer = document.createElement('div');
-        mainContainer.className = 'submodule-content';
 
         switch (this.currentView) {
             case 'main':
-                this.renderMainView(mainContainer);
+                this.renderMainView(this.container);
                 break;
             case 'ver-ausentismo':
-                this.renderVerAusentismoView(mainContainer);
+                this.renderVerAusentismoView(this.container);
                 break;
             case 'registrar-ausentismo':
-                this.renderRegistrarAusentismoView(mainContainer);
+                this.renderRegistrarAusentismoView(this.container);
                 break;
             default:
-                this.renderMainView(mainContainer);
+                this.renderMainView(this.container);
         }
-
-        this.container.appendChild(mainContainer);
     }
 
     renderMainView(container) {
@@ -193,7 +190,7 @@ class MedicionAusentismoComponent {
 
         const contentDiv = document.createElement('div');
         contentDiv.className = 'control-remisiones-content';
-        contentDiv.style.padding = '20px';
+        contentDiv.style.padding = '0px';
         container.appendChild(contentDiv);
 
         // Área de estado para mostrar feedback al usuario
@@ -541,36 +538,64 @@ class MedicionAusentismoComponent {
     }
 
     renderVerAusentismoView(container) {
-        this.currentPath = null;
-        this.pathHistory = [];
+        // Limpiar el contenedor principal
+        container.innerHTML = '';
+        container.style.padding = '0'; // Eliminar padding para que el dashboard ocupe todo el ancho
 
-        const header = this.createHeader('Ver Ausentismo', () => {
+        const header = this.createHeader('Dashboard de Ausentismo', () => {
             this.currentView = 'main';
+            container.style.padding = ''; // Restaurar padding al volver
             this.render();
         });
         container.appendChild(header);
 
-        const navBar = document.createElement('div');
-        navBar.className = 'file-nav-bar';
-        container.appendChild(navBar);
+        // Crear el contenedor principal para el layout del dashboard, imitando el patrón de otros módulos
+        const dashboardLayout = document.createElement('div');
+        // Asignamos los estilos directamente, inspirados en la clase .remisiones-layout
+        Object.assign(dashboardLayout.style, {
+            display: 'flex',
+            flexDirection: 'column',
+            height: 'calc(100vh - 220px)', // Valor ajustado para dar más espacio
+            width: '100%', // Asegurar que ocupe todo el ancho disponible
+            maxWidth: 'none' // Eliminar cualquier restricción de ancho máximo
+        });
 
-        const mainLayout = document.createElement('div');
-        mainLayout.className = 'remisiones-layout';
+        const iframe = document.createElement('iframe');
+        iframe.src = 'ver-ausentismo-dashboard.html';
+        iframe.classList.add('dashboard-fullscreen'); // Añadir clase para asegurar ancho completo
+        Object.assign(iframe.style, {
+            width: '100%',
+            height: '100%', // El iframe ocupa el 100% de su nuevo padre (dashboardLayout)
+            border: 'none',
+            maxWidth: 'none' // Eliminar cualquier restricción de ancho máximo
+        });
 
-        const resultsCol = document.createElement('div');
-        resultsCol.id = 'search-results-col';
-        resultsCol.className = 'search-results-col';
-        mainLayout.appendChild(resultsCol);
+        // Cuando el iframe cargue, leer los datos y enviárselos
+        iframe.onload = async () => {
+            try {
+                console.log(`[Dashboard Host] Solicitando datos de ausentismo para ${this.currentCompany}`);
+                const result = await window.electronAPI.readAusentismoData(this.currentCompany);
+                
+                if (result.success) {
+                    console.log(`[Dashboard Host] Datos leídos correctamente. Filas encontradas: ${result.rows ? result.rows.length : 0}. Enviando al iframe...`);
+                    iframe.contentWindow.postMessage({ headers: result.headers, rows: result.rows }, '*');
+                } else {
+                    console.error('[Dashboard Host] La API reportó un error al leer los datos:', result.error);
+                    iframe.contentWindow.postMessage({ error: result.error }, '*');
+                }
 
-        const previewCol = document.createElement('div');
-        previewCol.id = 'preview-col';
-        previewCol.className = 'preview-col';
-        previewCol.innerHTML = '<div class="preview-placeholder">Seleccione un archivo de ausentismo para previsualizarlo.</div>';
-        mainLayout.appendChild(previewCol);
+                
+            } catch (error) {
+                console.error('[Dashboard Host] Error crítico al intentar cargar datos para el dashboard:', error);
+                iframe.contentWindow.postMessage({ error: error.message }, '*');
+            }
+        };
+        
+        // Añadir el iframe al contenedor del layout
+        dashboardLayout.appendChild(iframe);
 
-        container.appendChild(mainLayout);
-
-        this.navigateToInitialPath();
+        // Añadir el layout principal al contenedor del componente
+        container.appendChild(dashboardLayout);
     }
 
     async navigateToInitialPath() {
@@ -679,7 +704,7 @@ class MedicionAusentismoComponent {
         if (fileExtension === 'pdf') {
             const safePath = filePath.replace(/\\/g, '/');
             previewCol.innerHTML = `<iframe src="file:///${safePath}?t=${Date.now()}" width="100%" height="100%" style="border: none;"></iframe>`;
-        } else if (['doc', 'docx', 'xlsx', 'xls'].includes(fileExtension)) {
+        } else if (['doc', '.docx', 'xlsx', 'xls'].includes(fileExtension)) {
             try {
                 const result = fileExtension.startsWith('doc')
                     ? await window.electronAPI.convertDocxToPdf(filePath)
@@ -689,7 +714,7 @@ class MedicionAusentismoComponent {
                     const safePath = result.pdf_path.replace(/\\/g, '/');
                     previewCol.innerHTML = `<iframe src="file:///${safePath}?t=${Date.now()}" width="100%" height="100%" style="border: none;"></iframe>`;
                 } else {
-                    const escapedPath = filePath.replace(/\\/g, '\\\\');
+                    const escapedPath = filePath.replace(/\\/g, '\\');
                     previewCol.innerHTML = `
                         <div class="preview-error">
                             <h3>Error de Conversión</h3>
@@ -700,7 +725,7 @@ class MedicionAusentismoComponent {
                         </div>`;
                 }
             } catch (error) {
-                const escapedPath = filePath.replace(/\\/g, '\\\\');
+                const escapedPath = filePath.replace(/\\/g, '\\');
                 previewCol.innerHTML = `
                     <div class="preview-error">
                         <h3>Error Inesperado</h3>
@@ -711,7 +736,7 @@ class MedicionAusentismoComponent {
                     </div>`;
             }
         } else {
-            const escapedPath = filePath.replace(/\\/g, '\\\\');
+            const escapedPath = filePath.replace(/\\/g, '\\');
             previewCol.innerHTML = `
                 <div class="preview-error">
                     <h3>Previsualización no disponible</h3>

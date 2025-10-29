@@ -1480,23 +1480,17 @@ function showMedicionAusentismoContent(container, currentCompany, moduleName, su
   // Crear una instancia del componente y renderizarlo
   if (typeof window.MedicionAusentismoComponent === 'function') {
     try {
-      // SOLUCIÓN PROVISIONAL: Forzamos la empresa aquí
-      const hardcodedCompany = "TEMPOACTIVA"; 
-      console.warn(`[ADVERTENCIA] Usando empresa hardcodeada '${hardcodedCompany}' porque currentCompany es ${currentCompany}.`);
+      console.log(`[INFO] Cargando MedicionAusentismoComponent para la empresa: ${currentCompany}`);
 
       const medicionComponent = new window.MedicionAusentismoComponent(
         container, 
-        hardcodedCompany, // <-- Usamos el valor hardcodeado
+        currentCompany, // <-- CORREGIDO: Usar la variable dinámica
         moduleName, 
         submoduleName,
         () => {
           // Callback para volver al home del módulo
-          const mainCanvas = document.querySelector('.main-canvas');
-          if (mainCanvas && mainCanvas.parentElement) {
-            showModuleHome(mainCanvas.parentElement, moduleName);
-          } else {
-            showModuleHome(container, moduleName);
-          }
+          currentSubmodule = null; // Limpiar el estado del submódulo
+          showModuleContent(moduleName);
         }
       );
       medicionComponent.render();

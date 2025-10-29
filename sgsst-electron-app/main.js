@@ -1928,7 +1928,9 @@ module.exports = {
       // -------------------------------------------------------------------------
       // 12. Filtrar y limitar las filas de datos
       // -------------------------------------------------------------------------
-      const minFilledCells = Math.floor(headers.length / 2);
+      // Se reduce el umbral de filtrado para ser menos estricto.
+      // Una fila se considera válida si tiene al menos 4 celdas con datos.
+      const minFilledCells = 4; 
       const rows = allData
         .slice(headerRowIndex + 1)
         .filter(row => 

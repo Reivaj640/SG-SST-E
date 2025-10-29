@@ -216,6 +216,43 @@ img {
   text-decoration: underline;
 }
 
+/* 🔧 Solo para el dashboard de ausentismo */
+.dashboard-fullscreen .container {
+  width: 100% !important;
+  max-width: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Estilos específicos para corregir el ancho del módulo de ausentismo */
+.submodule-content.medicion-ausentismo .container,
+.submodule-content.medicion-ausentismo {
+  width: 100% !important;
+  max-width: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Asegurar que el área de contenido del módulo de ausentismo use todo el ancho */
+.module-content-area .submodule-content.medicion-ausentismo {
+  width: 100%;
+  max-width: none;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Asegurar que los layouts de dashboard del módulo de ausentismo ocupen todo el ancho */
+.submodule-content.medicion-ausentismo .remisiones-layout,
+.submodule-content.medicion-ausentismo .dashboard,
+.submodule-content.medicion-ausentismo .dashboard-layout {
+  width: 100% !important;
+  max-width: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  height: calc(100vh - 220px) !important;
+}
+
 /* Contenedores */
 .container {
   width: 100%;
@@ -223,30 +260,6 @@ img {
   padding-left: var(--spacer-sm);
   margin-right: auto;
   margin-left: auto;
-}
-
-@media (min-width: 576px) {
-  .container {
-    max-width: 540px;
-  }
-}
-
-@media (min-width: 768px) {
-  .container {
-    max-width: 720px;
-  }
-}
-
-@media (min-width: 992px) {
-  .container {
-    max-width: 960px;
-  }
-}
-
-@media (min-width: 1200px) {
-  .container {
-    max-width: 1140px;
-  }
 }
 
 /* Grid */
