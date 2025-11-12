@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-src 'self'; child-src 'self';">
   <title>SG-SST Electron App</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="development-styles.css">
@@ -70,6 +70,9 @@
     </div>
   </div>
 
+  <!-- Cargar la biblioteca para leer Excel -->
+  <script src="node_modules/xlsx/dist/xlsx.full.min.js"></script>
+
   <!-- Cargar los componentes -->
   <script src="reportes-accidentes.js"></script>
   <script src="restricciones-medicas.js"></script>
@@ -89,6 +92,7 @@
   <script src="curso-50-horas.js"></script>
   <script src="medicion-ausentismo.js"></script>
   <script src="registrar-ausentismo.js"></script>
+  <script src="presupuesto-gestion.js"></script>
   <script src="node_modules/vanilla-calendar-pro/index.js"></script>
   <script src="renderer.js"></script>
 </body>

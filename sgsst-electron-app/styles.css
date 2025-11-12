@@ -1370,16 +1370,25 @@ select.form-control {
   flex-direction: row; /* Asegura layout horizontal */
   gap: var(--spacer);
   align-items: flex-start; /* Alinear todos los hijos arriba */
+  height: 100%; /* CLAVE: Asegura que el canvas tenga altura */
 }
 
 /* Área de contenido principal (izquierda) */
 .module-content-area {
-  flex-grow: 1; /* Ocupa todo el espacio flexible */
-  /* Este contenedor puede ser flex y column si su contenido interno lo requiere */
+  flex-grow: 1; /* Ocupa todo el espacio flexible horizontal */
   display: flex;
   flex-direction: column;
   gap: var(--spacer);
   min-width: 0; /* Evita que el contenido empuje al calendario fuera de la pantalla */
+  height: 100%; /* CLAVE: Asegura que el área de contenido tenga altura */
+}
+
+/* Contenedor para el contenido específico de un submódulo */
+.submodule-content {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1; /* CLAVE: Hace que este contenedor crezca y llene el espacio vertical de .module-content-area */
+  min-height: 0; /* Buena práctica para el scroll en contenedores flex */
 }
 
 /* Grid de tarjetas de métricas */

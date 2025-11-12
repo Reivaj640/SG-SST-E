@@ -1095,9 +1095,15 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
   // ✅ Limpiar contenido anterior
   container.innerHTML = '';
 
-  // ✅ Crear contenedor principal del submódulo
+  // ✅ Crear contenedor principal del submódulo Y AÑADIRLO AL DOM INMEDIATAMENTE
   const submoduleContentDiv = document.createElement('div');
   submoduleContentDiv.className = 'submodule-content';
+  // Asignar estilos para que ocupe todo el espacio disponible, crucial para componentes hijos
+  submoduleContentDiv.style.height = '100%';
+  submoduleContentDiv.style.width = '100%';
+  submoduleContentDiv.style.display = 'flex';
+  submoduleContentDiv.style.flexDirection = 'column';
+  container.appendChild(submoduleContentDiv);
 
   try {
     // --- Callback genérico para volver al módulo limpiando el estado ---
@@ -1243,9 +1249,6 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
     console.error('⚠️ Error al renderizar el submódulo:', error);
     showErrorMessage(submoduleContentDiv, submoduleName, error.message);
   }
-
-  // ✅ Agregar contenido al contenedor principal
-  container.appendChild(submoduleContentDiv);
 }
 
 // Funciones para mostrar contenido específico de submódulos
@@ -1415,35 +1418,38 @@ function showControlRemisionesContent(container) {
 }
 
 function showAsignacionRecursosContent(container) {
-  // Crear tarjetas para las opciones del submódulo
-  const cardsContainer = document.createElement('div');
-  cardsContainer.className = 'module-cards';
-  
-  // Tarjeta 1: Mostrar Presupuesto
-  const card1 = createModuleCard(
-    'Mostrar Presupuesto',
-    'Visualiza el presupuesto actual del SG-SST.',
-    () => alert('Funcionalidad "Mostrar Presupuesto" en desarrollo.')
-  );
-  cardsContainer.appendChild(card1);
-  
-  // Tarjeta 2: Editar Presupuesto
-  const card2 = createModuleCard(
-    'Editar Presupuesto',
-    'Modifica o actualiza las partidas del presupuesto.',
-    () => alert('Funcionalidad "Editar Presupuesto" en desarrollo.')
-  );
-  cardsContainer.appendChild(card2);
-  
-  // Tarjeta 3: Próxima Función
-  const card3 = createModuleCard(
-    'Próxima Función',
-    'Una nueva funcionalidad estará disponible aquí pronto.',
-    () => alert('Próxima función en desarrollo.')
-  );
-  cardsContainer.appendChild(card3);
-  
-  container.appendChild(cardsContainer);
+    console.log('🔍 [showAsignacionRecursosContent] Iniciando renderizado del submódulo 1.1.3');
+    console.log('🔍 [showAsignacionRecursosContent] currentCompany:', currentCompany);
+    console.log('🔍 [showAsignacionRecursosContent] currentModule:', currentModule);
+    console.log('🔍 [showAsignacionRecursosContent] window.PresupuestoGestionComponent:', !!window.PresupuestoGestionComponent);
+    
+    if (window.PresupuestoGestionComponent) {
+        try {
+            console.log('✅ [showAsignacionRecursosContent] Creando instancia de PresupuestoGestionComponent');
+            const presupuestoComponent = new window.PresupuestoGestionComponent(
+                container,
+                currentCompany,
+                currentModule,
+                () => {
+                    console.log('🔙 [callback] Volviendo al módulo desde Asignación de Recursos');
+                    // Limpiar el estado del submódulo actual antes de volver
+                    currentSubmodule = null;
+                    showModuleContent(currentModule);
+                } // Callback para volver al módulo
+            );
+            console.log('🎨 [showAsignacionRecursosContent] Llamando a presupuestoComponent.render()');
+            presupuestoComponent.render();
+            console.log('✅ [showAsignacionRecursosContent] Renderizado completado');
+        } catch (error) {
+            console.error('❌ Error al crear PresupuestoGestionComponent:', error);
+            console.error('❌ Error stack:', error.stack);
+            showErrorMessage(container, "1.1.3 Asignación de Recursos", error.message);
+        }
+    } else {
+        console.error('❌ PresupuestoGestionComponent no encontrado en window');
+        console.log('📋 [DEBUG] Componentes disponibles en window:', Object.keys(window).filter(key => key.includes('Component')));
+        showDevelopmentMessage(container, "1.1.3 Asignación de Recursos");
+    }
 }
 
 function showInvestigacionAccidentesContent(container, currentCompany, moduleName, submoduleName) {

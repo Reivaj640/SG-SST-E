@@ -10,9 +10,47 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // --- Manejo de archivos y directorios ---
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
-  mapDirectory: (directoryPath) => ipcRenderer.invoke('map-directory', directoryPath),
-  readDirectory: (directoryPath) => ipcRenderer.invoke('read-directory', directoryPath),
-  openPath: (filePath) => ipcRenderer.invoke('open-path', filePath),
+  
+  mapDirectory: (directoryPath) => {
+    log('DEBUG', `mapDirectory llamado con: ${directoryPath}`);
+    return ipcRenderer.invoke('map-directory', directoryPath)
+      .then(result => {
+        log('DEBUG', 'mapDirectory resultado:', result);
+        return result;
+      })
+      .catch(error => {
+        log('ERROR', `Error en mapDirectory: ${error.message}`);
+        throw error;
+      });
+  },
+  
+  readDirectory: (directoryPath) => {
+    log('DEBUG', `readDirectory llamado con: ${directoryPath}`);
+    return ipcRenderer.invoke('read-directory', directoryPath)
+      .then(result => {
+        log('DEBUG', 'readDirectory resultado:', result);
+        return result;
+      })
+      .catch(error => {
+        log('ERROR', `Error en readDirectory: ${error.message}`);
+        throw error;
+      });
+  },
+  
+  openPath: (filePath) => {
+    log('DEBUG', `openPath llamado con: ${filePath}`);
+    return ipcRenderer.invoke('open-path', filePath)
+      .then(result => {
+        log('DEBUG', 'openPath resultado:', result);
+        return result;
+      })
+      .catch(error => {
+        log('ERROR', `Error en openPath: ${error.message}`);
+        throw error;
+      });
+  },
+
+  readExcelFile: (filePath) => ipcRenderer.invoke('read-excel-file', filePath),
 
   // --- Submódulos / rutas ---
   findSubmodulePath: (companyName, module, submodule) => 
@@ -36,6 +74,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateExcelCell: (data) => ipcRenderer.invoke('update-excel-cell', data),
   convertExcelToPdf: (filePath) => ipcRenderer.invoke('convertExcelToPdf', filePath),
 
+  // --- Presupuesto ---
+  getPresupuestoFiles: (companyName) => ipcRenderer.invoke('getPresupuestoFiles', companyName),
+  readPresupuestoData: (filePath) => ipcRenderer.invoke('readPresupuestoData', filePath),
+  savePresupuestoChanges: (filePath, changes, data) => ipcRenderer.invoke('savePresupuestoChanges', filePath, changes, data),
+  openBudgetWindow: (file) => ipcRenderer.invoke('open-budget-window', file),
+
   // --- Accidentes ---
   selectAccidentPdf: () => ipcRenderer.invoke('select-accident-pdf'),
   processAccidentPdf: (pdfPath) => ipcRenderer.invoke('process-accident-pdf', pdfPath),
@@ -46,8 +90,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('generate-accident-report', combinedData),
   readAusentismoData: (companyName) => 
     ipcRenderer.invoke('get-ausentismo-data', companyName),
-  procesarAusentismo: (empresa, rutaArchivo, formData) => 
-    ipcRenderer.invoke('procesar-ausentismo', empresa, rutaArchivo, formData),
 
   // --- Ausentismo ---
   buscarEmpleadoPorCedula: (cedula, empresa) => 

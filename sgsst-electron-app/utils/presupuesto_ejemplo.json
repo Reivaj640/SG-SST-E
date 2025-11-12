@@ -1,0 +1,57 @@
+{
+  "descripcion": "Presupuesto de Recursos para SG-SST",
+  "anio": 2025,
+  "items": [
+    {
+      "id": 1,
+      "concepto": "Personal de Seguridad",
+      "unidad": "Mes",
+      "cantidad": 12,
+      "valor_unitario": 3500000,
+      "total": 42000000,
+      "fuente_financiacion": "Empresa"
+    },
+    {
+      "id": 2,
+      "concepto": "Elementos de Protección Personal (EPP)",
+      "unidad": "Unidad",
+      "cantidad": 100,
+      "valor_unitario": 85000,
+      "total": 8500000,
+      "fuente_financiacion": "Empresa"
+    },
+    {
+      "id": 3,
+      "concepto": "Capacitaciones SST",
+      "unidad": "Persona",
+      "cantidad": 50,
+      "valor_unitario": 120000,
+      "total": 6000000,
+      "fuente_financiacion": "Empresa"
+    },
+    {
+      "id": 4,
+      "concepto": "Medicina Ocupacional",
+      "unidad": "Examen",
+      "cantidad": 30,
+      "valor_unitario": 180000,
+      "total": 5400000,
+      "fuente_financiacion": "ARL"
+    },
+    {
+      "id": 5,
+      "concepto": "Implementos de Limpieza",
+      "unidad": "Mes",
+      "cantidad": 12,
+      "valor_unitario": 450000,
+      "total": 5400000,
+      "fuente_financiacion": "Empresa"
+    }
+  ],
+  "totales": {
+    "presupuesto_total": 67300000,
+    "fuente_empresa": 57400000,
+    "fuente_arl": 5400000,
+    "fuente_terceros": 4500000
+  }
+}

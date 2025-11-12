@@ -13,6 +13,26 @@ const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
 const ExcelJS = require('exceljs');
 
+// Capturar promesas no manejadas globalmente
+process.on('unhandledRejection', (reason, promise) => {
+  const errorMessage = `
+Unhandled Rejection at: Promise ${promise}
+Reason: ${reason instanceof Error ? reason.stack : JSON.stringify(reason)}
+`;
+  console.error(errorMessage);
+  log.error(errorMessage); // Loguear a archivo
+
+  // Mostrar un diálogo de error solo si la app ya está lista
+  if (app.isReady()) {
+    dialog.showErrorBox(
+      'Error Inesperado en el Proceso Principal',
+      'Ha ocurrido un error no controlado. La aplicación podría estar inestable.\n\n' +
+      'Por favor, revise los logs para más detalles.\n\n' +
+      `Razón: ${reason instanceof Error ? reason.message : reason}`
+    );
+  }
+});
+
 // --- Configuración del Auto-Updater ---
 log.transports.file.level = 'info';
 autoUpdater.logger = log;
@@ -402,6 +422,123 @@ const createWindow = () => {
     } catch (error) {
       console.error('Error opening path:', error);
       return { success: false, error: error.message };
+    }
+  });
+
+  // Manejar lectura de archivo Excel como buffer
+  ipcMain.handle('read-excel-file', async (event, filePath) => {
+    try {
+      sendLog(`[MAIN] Leyendo archivo Excel desde: ${filePath}`, 'INFO');
+      
+      // Verificar que la ruta del archivo exista
+      await fsp.access(filePath);
+  
+      // Leer el archivo como un buffer
+      const buffer = await fsp.readFile(filePath);
+      
+      sendLog(`[MAIN] Archivo leído exitosamente. Tamaño del buffer: ${buffer.length} bytes`, 'INFO');
+      
+      return { success: true, data: buffer };
+    } catch (error) {
+      sendLog(`[MAIN] Error al leer el archivo Excel: ${error.message}`, 'ERROR');
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Manejador para obtener la lista de archivos de presupuesto
+  ipcMain.handle('getPresupuestoFiles', async (event, companyName) => {
+    sendLog(`[MAIN] Buscando archivos de presupuesto para: ${companyName} en el submódulo 1.1.3.`);
+    try {
+        const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+        const config = JSON.parse(configData);
+
+        // --- Lógica para encontrar la ruta del submódulo "1.1.3 Asignación de Recursos" ---
+        const normalizedCompanyName = companyName.toLowerCase();
+        const companyKey = Object.keys(config.companyPaths || {}).find(
+            key => key.toLowerCase() === normalizedCompanyName
+        );
+
+        const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+        
+        if (!companyConfig || !companyConfig.structure?.structure) {
+            throw new Error(`Empresa "${companyName}" no tiene estructura mapeada.`);
+        }
+
+        const actualCompanyStructure = companyConfig.structure.structure;
+        
+        // Corregido: searchInStructure devuelve una cadena de texto (la ruta) directamente.
+        const submodulePath = searchInStructure(actualCompanyStructure, "1.1.3");
+        
+        if (!submodulePath) {
+            throw new Error(`No se encontró la ruta para el submódulo '1.1.3 Asignación de Recursos' para la empresa "${companyName}".`);
+        }
+        
+        sendLog(`[MAIN] Ruta del submódulo '1.1.3 Asignación de Recursos' encontrada: ${submodulePath}`);
+        const searchPath = submodulePath;
+        // --- FIN Lógica para encontrar la ruta del submódulo ---
+
+        async function findBudgetFilesRecursive(dir) {
+            let files = [];
+            try {
+                const entries = await fsp.readdir(dir, { withFileTypes: true });
+                for (const entry of entries) {
+                    const fullPath = path.join(dir, entry.name);
+                    if (entry.isDirectory()) {
+                        files = files.concat(await findBudgetFilesRecursive(fullPath));
+                    } else if (
+                        (entry.name.toLowerCase().includes('presupuesto') ||
+                         entry.name.toLowerCase().includes('costo') ||
+                         entry.name.toLowerCase().includes('gasto') ||
+                         entry.name.toLowerCase().includes('recurso') ||
+                         entry.name.toLowerCase().includes('asignacion')) &&
+                        (entry.name.endsWith('.xlsx') || entry.name.endsWith('.xls'))
+                    ) {
+                        const stats = await fsp.stat(fullPath);
+                        files.push({
+                            name: entry.name,
+                            path: fullPath,
+                            size: stats.size,
+                            modified: stats.mtime
+                        });
+                    }
+                }
+            } catch (error) {
+                sendLog(`[WARN] No se pudo leer el directorio ${dir}: ${error.message}`);
+            }
+            return files;
+        }
+
+        let budgetFiles = await findBudgetFilesRecursive(searchPath); // Usar searchPath aquí
+        
+        if (budgetFiles.length > 0) {
+             sendLog(`[MAIN] Encontrados ${budgetFiles.length} archivos de presupuesto con búsqueda robusta.`);
+             return { success: true, files: budgetFiles };
+        }
+
+        // Fallback si no se encuentra nada
+        sendLog(`[MAIN] No se encontraron archivos de presupuesto con búsqueda robusta, intentando fallback a archivo de ejemplo.`);
+        const ejemploPath = path.join(__dirname, 'utils', 'Presupuesto SG-SST.xlsx');
+        if (fs.existsSync(ejemploPath)) {
+            const stats = fs.statSync(ejemploPath);
+            return {
+                success: true,
+                files: [{
+                    name: 'Ejemplo_Presupuesto_SG-SST.xlsx',
+                    path: ejemploPath,
+                    size: stats.size,
+                    modified: stats.mtime
+                }],
+                empty: true, // Indicar que es un ejemplo
+                message: 'No se encontraron archivos de presupuesto reales. Se muestra un archivo de ejemplo.'
+            };
+        }
+
+        // Si ni siquiera el ejemplo existe
+        return { success: true, files: [], empty: true, message: 'No se encontraron archivos de presupuesto y el archivo de ejemplo no está disponible.' };
+
+    } catch (error) {
+        sendLog(`[MAIN] Error en getPresupuestoFiles: ${error.message}`, 'ERROR');
+        return { success: false, error: error.message };
     }
   });
   
@@ -2856,6 +2993,325 @@ const registerIPCHandlers = () => {
   // Manejador para obtener la versión de la aplicación
   ipcMain.handle('get-app-version', () => {
     return app.getVersion();
+  });
+
+  // Leer datos de un archivo de presupuesto
+  async function readPresupuestoData(filePath) {
+    try {
+        const workbook = xlsx.readFile(filePath);
+        const sheetName = workbook.SheetNames[0]; // Usar la primera hoja
+        const worksheet = workbook.Sheets[sheetName];
+        
+        // Convertir los datos a formato JSON
+        const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
+        
+        // Extraer encabezados y filas
+        const headers = data[0];
+        const rows = data.slice(1).filter(row => row.length > 0);
+        
+        // Convertir a objetos
+        const budgetData = rows.map(row => {
+            const obj = {};
+            headers.forEach((header, index) => {
+                obj[header] = row[index] || '';
+            });
+            return obj;
+        });
+        
+        return {
+            success: true,
+            data: budgetData
+        };
+    } catch (error) {
+        console.error('Error al leer datos de presupuesto:', error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+  }
+
+  // Guardar cambios en un archivo de presupuesto
+  async function savePresupuestoChanges(filePath, changes, data) {
+    try {
+        // Crear un nuevo libro de trabajo
+        const workbook = xlsx.utils.book_new();
+        
+        // Convertir los datos a una hoja de trabajo
+        const worksheet = xlsx.utils.json_to_sheet(data);
+        
+        // Añadir la hoja de trabajo al libro
+        xlsx.utils.book_append_sheet(workbook, worksheet, 'PRESUPUESTO');
+        
+        // Escribir el archivo
+        xlsx.writeFile(workbook, filePath);
+        
+        return {
+            success: true
+        };
+    } catch (error) {
+        console.error('Error al guardar cambios:', error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+  }
+
+  // Leer datos de un archivo de presupuesto
+  async function readPresupuestoData(filePath) {
+    try {
+        const workbook = xlsx.readFile(filePath);
+        const sheetName = workbook.SheetNames[0]; // Usar la primera hoja
+        const worksheet = workbook.Sheets[sheetName];
+        
+        // Convertir los datos a formato JSON
+        const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
+        
+        // Extraer encabezados y filas
+        const headers = data[0];
+        const rows = data.slice(1).filter(row => row.length > 0);
+        
+        // Convertir a objetos
+        const budgetData = rows.map(row => {
+            const obj = {};
+            headers.forEach((header, index) => {
+                obj[header] = row[index] || '';
+            });
+            return obj;
+        });
+        
+        return {
+            success: true,
+            data: budgetData
+        };
+    } catch (error) {
+        console.error('Error al leer datos de presupuesto:', error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+  }
+
+  // Guardar cambios en un archivo de presupuesto
+  async function savePresupuestoChanges(filePath, changes, data) {
+    try {
+        // Crear un nuevo libro de trabajo
+        const workbook = xlsx.utils.book_new();
+        
+        // Convertir los datos a una hoja de trabajo
+        const worksheet = xlsx.utils.json_to_sheet(data);
+        
+        // Añadir la hoja de trabajo al libro
+        xlsx.utils.book_append_sheet(workbook, worksheet, 'PRESUPUESTO');
+        
+        // Escribir el archivo
+        xlsx.writeFile(workbook, filePath);
+        
+        return {
+            success: true
+        };
+    } catch (error) {
+        console.error('Error al guardar cambios:', error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+  }
+
+  async function getPresupuestoFiles(companyName) {
+    try {
+      // Cargar la configuración
+      const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+      const config = JSON.parse(configData);
+
+      // Buscar la ruta base de la empresa
+      let basePath = null;
+      
+      if (config.companyPaths && config.companyPaths[companyName]) {
+        basePath = config.companyPaths[companyName].root || config.companyPaths[companyName].ruta_base;
+      }
+
+      if (!basePath) {
+        const availableCompanies = config.companyPaths ? Object.keys(config.companyPaths) : [];
+        const error = `No se encontró configuración para la empresa "${companyName}". Empresas configuradas: [${availableCompanies.join(', ')}]`;
+        throw new Error(error);
+      }
+
+      // Buscar archivos de presupuesto en las rutas conocidas
+      // Buscar recursivamente archivos Excel relacionados con presupuesto
+      async function findBudgetFiles(dir) {
+        try {
+          const entries = await fsp.readdir(dir, { withFileTypes: true });
+          const files = [];
+          for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+              const subDirFiles = await findBudgetFiles(fullPath);
+              files.push(...subDirFiles);
+            } else if (
+              (entry.name.toLowerCase().includes('presupuesto') || 
+               entry.name.toLowerCase().includes('costo') || 
+               entry.name.toLowerCase().includes('gasto') || 
+               entry.name.toLowerCase().includes('recurso') ||
+               entry.name.toLowerCase().includes('asignacion')) && 
+              (entry.name.endsWith('.xlsx') || entry.name.endsWith('.xls'))
+            ) {
+              const stats = await fsp.stat(fullPath);
+              files.push({
+                name: entry.name,
+                path: fullPath,
+                size: stats.size,
+                modified: stats.mtime
+              });
+            }
+          }
+          return files;
+        } catch (error) {
+          sendLog(`[MAIN] Error buscando archivos de presupuesto en ${dir}: ` + error.message, 'WARN');
+          return [];
+        }
+      }
+
+      const budgetFiles = await findBudgetFiles(basePath);
+      
+      // Si no se encontraron archivos usando el método tradicional, buscar archivos Excel genéricos
+      if (budgetFiles.length === 0) {
+        async function findAllExcelFiles(dir) {
+          try {
+            const entries = await fsp.readdir(dir, { withFileTypes: true });
+            const files = [];
+            for (const entry of entries) {
+              const fullPath = path.join(dir, entry.name);
+              if (entry.isDirectory()) {
+                const subDirFiles = await findAllExcelFiles(fullPath);
+                files.push(...subDirFiles);
+              } else if (entry.name.endsWith('.xlsx') || entry.name.endsWith('.xls')) {
+                // Verificar si el nombre contiene palabras relacionadas con recursos o presupuesto
+                const lowerName = entry.name.toLowerCase();
+                if (
+                  lowerName.includes('presupuesto') || 
+                  lowerName.includes('costo') || 
+                  lowerName.includes('gasto') || 
+                  lowerName.includes('recurso') ||
+                  lowerName.includes('asignacion') ||
+                  lowerName.includes('sg-sst') ||
+                  lowerName.includes('gestion') ||
+                  lowerName.includes('presupuesto sg-sst') // Nombre específico del archivo de ejemplo
+                ) {
+                  const stats = await fsp.stat(fullPath);
+                  files.push({
+                    name: entry.name,
+                    path: fullPath,
+                    size: stats.size,
+                    modified: stats.mtime
+                  });
+                }
+              }
+            }
+            return files;
+          } catch (error) {
+            sendLog(`[MAIN] Error buscando archivos Excel en ${dir}: ` + error.message, 'WARN');
+            return [];
+          }
+        }
+
+        const allExcelFiles = await findAllExcelFiles(basePath);
+        if (allExcelFiles.length > 0) {
+          sendLog(`[MAIN] No se encontraron archivos con nombre específico de presupuesto, usando ${allExcelFiles.length} archivos Excel relacionados`, 'INFO');
+          return {
+            success: true,
+            files: allExcelFiles
+          };
+        }
+      }
+      
+      // Si no se encontraron archivos reales, incluir un archivo de ejemplo
+      if (budgetFiles.length === 0) {
+        sendLog(`[MAIN] No se encontraron archivos reales de presupuesto para ${companyName}, mostrando archivo de ejemplo`, 'INFO');
+        const ejemploPath = path.join(__dirname, 'utils', 'presupuesto_ejemplo.json');
+        if (fs.existsSync(ejemploPath)) {
+          const stats = fs.statSync(ejemploPath);
+          // Buscar el archivo real "Presupuesto SG-SST" si existe
+          const possibleExampleFiles = ['Presupuesto SG-SST.xlsx', 'Presupuesto SG-SST.xls', 'Presupuesto SG-SST.XLSX', 'Presupuesto SG-SST.XLS'];
+          for (const fileName of possibleExampleFiles) {
+            const realPath = path.join(__dirname, 'utils', fileName);
+            if (fs.existsSync(realPath)) {
+              const realStats = fs.statSync(realPath);
+              return {
+                success: true,
+                files: [{
+                  name: fileName,
+                  path: realPath,
+                  size: realStats.size,
+                  modified: realStats.mtime
+                }]
+              };
+            }
+          }
+          // Si no hay archivo real, usar el JSON de ejemplo
+          return {
+            success: true,
+            files: [{
+              name: 'Ejemplo_Presupuesto_SG-SST.xlsx',
+              path: ejemploPath,
+              size: stats.size,
+              modified: stats.mtime
+            }]
+          };
+        }
+      }
+      
+      return {
+        success: true,
+        files: budgetFiles
+      };
+    } catch (error) {
+      console.error('Error al obtener archivos de presupuesto:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  // El manejador para getPresupuestoFiles fue movido fuera de esta función para evitar duplicados.
+
+  ipcMain.handle('readPresupuestoData', async (event, filePath) => {
+    return await readPresupuestoData(filePath);
+  });
+
+  ipcMain.handle('savePresupuestoChanges', async (event, filePath, changes, data) => {
+    return await savePresupuestoChanges(filePath, changes, data);
+  });
+
+  ipcMain.handle('open-budget-window', async (event, file) => {
+    sendLog(`[MAIN] Abriendo ventana de gestión de presupuesto para: ${file.name}`);
+
+    const budgetWindow = new BrowserWindow({
+      width: 1200,
+      height: 800,
+      minWidth: 900,
+      minHeight: 600,
+      title: `Gestión de Presupuesto - ${file.name}`,
+      icon: path.join(__dirname, 'assets', 'icons8-adelante-100.ico'),
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        nodeIntegration: false,
+        contextIsolation: true,
+      },
+      parent: mainWindow,
+      modal: true
+    });
+
+    await budgetWindow.loadFile(path.join(__dirname, 'presupuesto-gestion.html'));
+
+    budgetWindow.webContents.on('did-finish-load', () => {
+      sendLog(`[MAIN] Enviando datos del archivo a la ventana de presupuesto: ${file.path}`);
+      budgetWindow.webContents.send('budget-file-data', file);
+    });
   });
 }
 

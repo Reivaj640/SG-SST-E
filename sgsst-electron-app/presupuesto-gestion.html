@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Presupuesto</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #4a6bdf;
+            --secondary-color: #f5f7ff;
+            --accent-color: #ff6b6b;
+            --text-color: #333;
+            --light-text: #777;
+            --border-color: #e0e6ed;
+            --success-color: #4caf50;
+            --warning-color: #ff9800;
+            --danger-color: #f44336;
+            --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --hover-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f8f9fa;
+            color: var(--text-color);
+            line-height: 1.6;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .dashboard-wrapper {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary-color), #6b8cff);
+            color: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo i {
+            font-size: 24px;
+        }
+
+        .logo h1 {
+            font-weight: 500;
+            font-size: 20px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background-color: white;
+            color: var(--primary-color);
+        }
+
+        .btn-primary:hover {
+            background-color: rgba(255, 255, 255, 0.9);
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background-color: var(--success-color);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background-color: #3d8b40;
+        }
+
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            padding: 20px;
+        }
+
+        .budget-summary {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: var(--card-shadow);
+            margin-bottom: 20px;
+            flex-shrink: 0;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .summary-card {
+            text-align: center;
+            padding: 15px;
+            border-radius: 8px;
+            background-color: var(--secondary-color);
+        }
+
+        .summary-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+
+        .summary-label {
+            font-size: 14px;
+            color: var(--light-text);
+            margin-top: 5px;
+        }
+
+        .budget-table-container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: var(--card-shadow);
+            flex: 1;
+            overflow: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background-color: #f8fafc;
+            font-weight: 500;
+            color: var(--text-color);
+        }
+
+        tr:hover {
+            background-color: #f8fafc;
+        }
+
+        .actions-column {
+            text-align: center;
+        }
+
+        .action-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 5px;
+            margin: 0 2px;
+        }
+
+        .edit-btn {
+            color: var(--primary-color);
+        }
+
+        .delete-btn {
+            color: var(--danger-color);
+        }
+
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: var(--hover-shadow);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transform: translateX(120%);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification-icon {
+            font-size: 20px;
+        }
+
+        .notification.success .notification-icon {
+            color: var(--success-color);
+        }
+
+        .notification.error .notification-icon {
+            color: var(--danger-color);
+        }
+
+        .notification.warning .notification-icon {
+            color: var(--warning-color);
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            padding: 40px;
+            color: var(--light-text);
+        }
+
+        .empty-state i {
+            font-size: 64px;
+            margin-bottom: 20px;
+            color: #e0e6ed;
+        }
+
+        .empty-state h3 {
+            color: var(--text-color);
+            margin-bottom: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .summary-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-wrapper">
+        <header>
+            <div class="logo">
+                <i class="fas fa-file-invoice-dollar"></i>
+                <h1>Gestión de Presupuesto</h1>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-primary" id="backBtn">
+                    <i class="fas fa-arrow-left"></i>
+                    Volver al Selector
+                </button>
+                <button class="btn btn-primary" id="addRowBtn">
+                    <i class="fas fa-plus"></i>
+                    Agregar Item
+                </button>
+                <button class="btn btn-success" id="saveBtn">
+                    <i class="fas fa-save"></i>
+                    Guardar
+                </button>
+            </div>
+        </header>
+
+        <div class="content">
+            <div class="budget-summary">
+                <div class="summary-grid">
+                    <div class="summary-card">
+                        <div class="summary-value" id="totalPresupuesto">$0</div>
+                        <div class="summary-label">Presupuesto Total</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-value" id="totalEmpresa">$0</div>
+                        <div class="summary-label">Aporte Empresa</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-value" id="totalArl">$0</div>
+                        <div class="summary-label">Aporte ARL</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-value" id="saldoDisponible">$0</div>
+                        <div class="summary-label">Saldo Disponible</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="budget-table-container">
+                <table id="budgetTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Concepto</th>
+                            <th>Unidad</th>
+                            <th>Cantidad</th>
+                            <th>Valor Unitario</th>
+                            <th>Total</th>
+                            <th>Fuente de Financiación</th>
+                            <th class="actions-column">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="budgetTableBody">
+                        <!-- Los datos se cargarán dinámicamente -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="notification" id="notification">
+        <i class="notification-icon fas fa-check-circle"></i>
+        <div class="notification-message">Operación completada con éxito</div>
+    </div>
+
+    <script>
+        // Variables globales
+        let budgetData = [];
+        let currentFile = null;
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', function() {
+            setupEventListeners();
+            
+            // Escuchar mensajes del padre
+            window.addEventListener('message', async (event) => {
+                if (event.data.file) {
+                    currentFile = event.data.file;
+                    updateFileInfo();
+                    await loadData();
+                } else if (event.data.budgetData) {
+                    budgetData = event.data.budgetData;
+                    renderBudgetTable();
+                    updateSummary();
+                }
+            });
+        });
+
+        // Configurar event listeners
+        function setupEventListeners() {
+            document.getElementById('backBtn').addEventListener('click', () => {
+                window.parent.postMessage({ action: 'backToSelector' }, '*');
+            });
+            
+            document.getElementById('addRowBtn').addEventListener('click', addNewRow);
+            document.getElementById('saveBtn').addEventListener('click', saveChanges);
+        }
+
+        // Actualizar información del archivo
+        function updateFileInfo() {
+            if (!currentFile) return;
+            
+            const year = extractYearFromFileName(currentFile.name);
+            document.querySelector('.logo h1').textContent = `Gestión de Presupuesto - ${year}`;
+        }
+
+        // Extraer año del nombre del archivo
+        function extractYearFromFileName(fileName) {
+            const yearMatch = fileName.match(/(20\d{2})/);
+            return yearMatch ? yearMatch[1] : 'Desconocido';
+        }
+
+        // Cargar datos
+        async function loadData() {
+            try {
+                showLoading();
+                
+                // Solicitar datos al padre
+                window.parent.postMessage({ 
+                    action: 'requestBudgetData', 
+                    file: currentFile 
+                }, '*');
+            } catch (error) {
+                console.error('Error al cargar datos:', error);
+                showNotification(`Error al cargar datos: ${error.message}`, 'error');
+                hideLoading();
+            }
+        }
+
+        // Renderizar la tabla de presupuesto
+        function renderBudgetTable() {
+            const tableBody = document.getElementById('budgetTableBody');
+            tableBody.innerHTML = '';
+            
+            budgetData.forEach((item, index) => {
+                const row = document.createElement('tr');
+                
+                row.innerHTML = `
+                    <td>${item.id || index + 1}</td>
+                    <td>${item.concepto || 'Sin concepto'}</td>
+                    <td>${item.unidad || 'Unidad'}</td>
+                    <td>${item.cantidad || 0}</td>
+                    <td>$${formatNumber(item.valor_unitario || 0)}</td>
+                    <td>$${formatNumber(item.total || 0)}</td>
+                    <td>${item.fuente_financiacion || 'Empresa'}</td>
+                    <td class="actions-column">
+                        <button class="action-btn edit-btn" onclick="editRow(${index})">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="action-btn delete-btn" onclick="deleteRow(${index})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+        }
+
+        // Actualizar los resúmenes
+        function updateSummary() {
+            const totalPresupuesto = budgetData.reduce((sum, item) => sum + (item.total || 0), 0);
+            const totalEmpresa = budgetData
+                .filter(item => (item.fuente_financiacion || '').toLowerCase() === 'empresa')
+                .reduce((sum, item) => sum + (item.total || 0), 0);
+            const totalArl = budgetData
+                .filter(item => (item.fuente_financiacion || '').toLowerCase() === 'arl')
+                .reduce((sum, item) => sum + (item.total || 0), 0);
+            
+            document.getElementById('totalPresupuesto').textContent = '$' + formatNumber(totalPresupuesto);
+            document.getElementById('totalEmpresa').textContent = '$' + formatNumber(totalEmpresa);
+            document.getElementById('totalArl').textContent = '$' + formatNumber(totalArl);
+            document.getElementById('saldoDisponible').textContent = '$' + formatNumber(totalPresupuesto - totalEmpresa - totalArl);
+        }
+
+        // Formatear números con separadores de miles
+        function formatNumber(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        }
+
+        // Función para añadir nueva fila
+        function addNewRow() {
+            const newItem = {
+                id: budgetData.length > 0 ? Math.max(...budgetData.map(item => item.id || 0)) + 1 : 1,
+                concepto: "Nuevo concepto",
+                unidad: "Unidad",
+                cantidad: 1,
+                valor_unitario: 0,
+                total: 0,
+                fuente_financiacion: "Empresa"
+            };
+            
+            budgetData.push(newItem);
+            renderBudgetTable();
+            updateSummary();
+            showNotification('Nuevo ítem agregado', 'success');
+        }
+
+        // Función para editar fila
+        function editRow(index) {
+            const item = budgetData[index];
+            const concepto = prompt('Concepto:', item.concepto) || item.concepto;
+            const unidad = prompt('Unidad:', item.unidad) || item.unidad;
+            const cantidad = parseFloat(prompt('Cantidad:', item.cantidad)) || item.cantidad;
+            const valorUnitario = parseFloat(prompt('Valor Unitario:', item.valor_unitario)) || item.valor_unitario;
+            const fuenteFinanciacion = prompt('Fuente de Financiación (Empresa/ARL):', item.fuente_financiacion) || item.fuente_financiacion;
+            
+            budgetData[index] = {
+                ...item,
+                concepto,
+                unidad,
+                cantidad,
+                valor_unitario: valorUnitario,
+                total: cantidad * valorUnitario,
+                fuente_financiacion: fuenteFinanciacion
+            };
+            
+            renderBudgetTable();
+            updateSummary();
+            showNotification('Ítem actualizado', 'success');
+        }
+
+        // Función para eliminar fila
+        function deleteRow(index) {
+            if (confirm('¿Estás seguro de que deseas eliminar este ítem?')) {
+                budgetData.splice(index, 1);
+                renderBudgetTable();
+                updateSummary();
+                showNotification('Ítem eliminado', 'warning');
+            }
+        }
+
+        // Función para guardar cambios
+        function saveChanges() {
+            // Enviar datos al padre para guardar en el archivo
+            window.parent.postMessage({ 
+                action: 'saveBudgetChanges', 
+                file: currentFile,
+                changes: 'Actualización de presupuesto',
+                data: budgetData
+            }, '*');
+            
+            showNotification('Guardando cambios...', 'info');
+        }
+
+        // Mostrar notificación
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            const messageElement = notification.querySelector('.notification-message');
+            const iconElement = notification.querySelector('.notification-icon');
+            
+            // Actualizar mensaje
+            messageElement.textContent = message;
+            
+            // Actualizar clase y icono según el tipo
+            notification.className = 'notification ' + type;
+            
+            if (type === 'success') {
+                iconElement.className = 'notification-icon fas fa-check-circle';
+            } else if (type === 'error') {
+                iconElement.className = 'notification-icon fas fa-times-circle';
+            } else if (type === 'warning') {
+                iconElement.className = 'notification-icon fas fa-exclamation-circle';
+            } else if (type === 'info') {
+                iconElement.className = 'notification-icon fas fa-info-circle';
+            }
+            
+            // Mostrar notificación
+            notification.classList.add('show');
+            
+            // Ocultar después de 3 segundos
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        // Mostrar indicador de carga
+        function showLoading() {
+            const tableBody = document.getElementById('budgetTableBody');
+            tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px;"><div class="spinner"></div><p>Cargando datos...</p></td></tr>';
+        }
+
+        // Ocultar indicador de carga
+        function hideLoading() {
+            // La función renderBudgetTable se encargará de actualizar el contenido
+        }
+
+        // Escuchar mensajes del padre para confirmar guardado
+        window.addEventListener('message', (event) => {
+            if (event.data.success) {
+                showNotification('Cambios guardados exitosamente', 'success');
+            } else if (event.data.error) {
+                showNotification(`Error al guardar: ${event.data.error}`, 'error');
+            }
+        });
+    </script>
+</body>
+</html>
