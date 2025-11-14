@@ -101,27 +101,21 @@ class PresupuestoGestionComponent {
             case 'requestBudgetData':
                 if (this.currentFile) {
                     try {
-                        this.log('DEBUG', `Solicitando lectura de archivo Excel a ElectronAPI para: ${this.currentFile.path}`);
-                        const result = await window.electronAPI.readExcelFile(this.currentFile.path);
-                        this.log('DEBUG', 'Resultado de readExcelFile:', result);
+                        this.log('DEBUG', `Solicitando datos procesados para: ${this.currentFile.path}`);
+                        const result = await window.electronAPI.initExcel(this.currentFile.path);
+                        this.log('DEBUG', 'Resultado de initExcel:', result);
 
                         if (result.success) {
-                            this.log('DEBUG', 'Archivo Excel leído correctamente. Parseando con XLSX...');
-                            const workbook = XLSX.read(result.data, { type: 'buffer' });
-                            const sheetName = workbook.SheetNames[0];
-                            const worksheet = workbook.Sheets[sheetName];
-                            const jsonData = XLSX.utils.sheet_to_json(worksheet);
-                            this.log('DEBUG', 'Datos JSON parseados:', jsonData);
-                            
                             const gestionIframe = this.container.querySelector('iframe');
                             if (gestionIframe) {
-                                this.log('DEBUG', 'Enviando budgetData al iframe de gestion.');
-                                gestionIframe.contentWindow.postMessage({ budgetData: jsonData }, '*');
-                            } else {
-                                this.log('WARN', 'No se encontró el iframe de gestion para enviar budgetData.');
+                                this.log('DEBUG', `Enviando datos, fórmulas y encabezados al iframe.`);
+                                gestionIframe.contentWindow.postMessage({ 
+                                    budgetData: result.data.processedData, // Pass processed data directly
+                                    formulaCells: result.data.formulaCells,
+                                    debugHeaders: result.data.headers
+                                }, '*');
                             }
                         } else {
-                            this.log('ERROR', `Error al leer archivo Excel: ${result.error}`);
                             throw new Error(result.error);
                         }
                     } catch (error) {
@@ -152,8 +146,31 @@ class PresupuestoGestionComponent {
 
             // El guardado es una funcionalidad más compleja, por ahora solo lo registramos
             case 'saveBudgetChanges':
-                this.log('INFO', 'Solicitud de guardado recibida. Funcionalidad pendiente de implementación completa.', event.data);
-                // Aquí iría la lógica para llamar a un nuevo handler en main.js que use xlsx.write
+                this.log('INFO', 'Solicitud de guardado recibida. Llamando a ElectronAPI para guardar el archivo.', event.data);
+                try {
+                    const filePath = event.data.file.path;
+                    const budgetDataToSave = event.data.data;
+                    
+                    // Call Electron API to save the file
+                    const saveResult = await window.electronAPI.saveBudgetFile(filePath, budgetDataToSave);
+
+                    const gestionIframe = this.container.querySelector('iframe');
+                    if (gestionIframe) {
+                        if (saveResult.success) {
+                            this.log('INFO', 'Archivo guardado exitosamente:', saveResult.message);
+                            gestionIframe.contentWindow.postMessage({ success: true, message: saveResult.message }, '*');
+                        } else {
+                            this.log('ERROR', 'Error al guardar el archivo:', saveResult.error);
+                            gestionIframe.contentWindow.postMessage({ error: saveResult.error }, '*');
+                        }
+                    }
+                } catch (error) {
+                    this.log('CRITICAL', `Error al procesar solicitud de guardado: ${error.message}`, error.stack);
+                    const gestionIframe = this.container.querySelector('iframe');
+                    if (gestionIframe) {
+                        gestionIframe.contentWindow.postMessage({ error: error.message }, '*');
+                    }
+                }
                 break;
         }
     }

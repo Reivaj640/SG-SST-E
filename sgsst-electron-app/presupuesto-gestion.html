@@ -33,7 +33,7 @@
             color: var(--text-color);
             line-height: 1.6;
             height: 100vh;
-            overflow: hidden;
+            overflow: auto; /* Cambiado de hidden a auto para permitir scroll en el body */
         }
 
         .dashboard-wrapper {
@@ -41,6 +41,7 @@
             flex-direction: column;
             height: 100%;
             width: 100%;
+            overflow: auto; /* Cambiado de hidden a auto para permitir scroll */
         }
 
         header {
@@ -109,7 +110,7 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            overflow: hidden;
+            overflow: auto; /* Cambiado de hidden a auto para permitir scroll */
             padding: 20px;
         }
 
@@ -157,8 +158,10 @@
         }
 
         table {
-            width: 100%;
+            width: auto; /* Cambiado de 100% a auto para permitir que min-width funcione */
             border-collapse: collapse;
+            table-layout: fixed; /* Añadido para respetar los anchos de columna */
+            min-width: 1500px; /* Añadido para asegurar un ancho mínimo y permitir scroll */
         }
 
         th, td {
@@ -168,9 +171,13 @@
         }
 
         th {
-            background-color: #f8fafc;
+            background-color: white; /* Asegura un fondo sólido y opaco */
             font-weight: 500;
             color: var(--text-color);
+            position: sticky;
+            top: 0; /* Revertido a 0 para que se pegue al borde superior del contenido del contenedor */
+            z-index: 10;
+            box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1); /* Sutil sombra para efecto de elevación */
         }
 
         tr:hover {
@@ -256,6 +263,16 @@
             margin-bottom: 10px;
         }
 
+        .formula-cell {
+            color: #777;
+            background-color: #f4f4f4;
+            cursor: not-allowed;
+            display: block;
+            width: 100%;
+            height: 100%;
+            padding: 12px; /* Asegurarse que el padding sea consistente */
+        }
+
         @media (max-width: 768px) {
             .summary-grid {
                 grid-template-columns: 1fr;
@@ -310,15 +327,45 @@
 
             <div class="budget-table-container">
                 <table id="budgetTable">
+                    <colgroup>
+                        <col style="width: 11%;">   <!-- Columna ID -->
+                        <col style="width: 35%;">  <!-- Columna Detalle -->
+                        <col style="width: 10%;">  <!-- Columna Asignación -->
+                        <col style="width: 10%;">  <!-- Columna Ejecutado Acumulado -->
+                        <col style="width: 8%;">   <!-- Columna % Eje. -->
+                        <col style="width: 10%;">   <!-- Columna Enero -->
+                        <col style="width: 10%;">   <!-- Columna Febrero -->
+                        <col style="width: 10%;">   <!-- Columna Marzo -->
+                        <col style="width: 10%;">   <!-- Columna Abril -->
+                        <col style="width: 10%;">   <!-- Columna Mayo -->
+                        <col style="width: 10%;">   <!-- Columna Junio -->
+                        <col style="width: 10%;">   <!-- Columna Julio -->
+                        <col style="width: 10%;">   <!-- Columna Agosto -->
+                        <col style="width: 10%;">   <!-- Columna Septiembre -->
+                        <col style="width: 10%;">   <!-- Columna Octubre -->
+                        <col style="width: 10%;">   <!-- Columna Noviembre -->
+                        <col style="width: 10%;">   <!-- Columna Diciembre -->
+                        <col style="width: 10%;">  <!-- Columna Acciones -->
+                    </colgroup>
                     <thead>
                         <tr>
                             <th>ID</th>
-                            <th>Concepto</th>
-                            <th>Unidad</th>
-                            <th>Cantidad</th>
-                            <th>Valor Unitario</th>
-                            <th>Total</th>
-                            <th>Fuente de Financiación</th>
+                            <th>Detalle</th>
+                            <th>Asignación</th>
+                            <th>Ejecutado Acumulado</th>
+                            <th>% Eje.</th>
+                            <th>Enero</th>
+                            <th>Febrero</th>
+                            <th>Marzo</th>
+                            <th>Abril</th>
+                            <th>Mayo</th>
+                            <th>Junio</th>
+                            <th>Julio</th>
+                            <th>Agosto</th>
+                            <th>Septiembre</th>
+                            <th>Octubre</th>
+                            <th>Noviembre</th>
+                            <th>Diciembre</th>
                             <th class="actions-column">Acciones</th>
                         </tr>
                     </thead>
@@ -336,62 +383,60 @@
     </div>
 
     <script>
-        // Variables globales
         let budgetData = [];
         let currentFile = null;
+        let formulaCells = [];
 
-        // Inicialización
         document.addEventListener('DOMContentLoaded', function() {
             setupEventListeners();
-            
-            // Escuchar mensajes del padre
+
+            // --- INICIO: MANEJADOR DE MENSAJES UNIFICADO ---
             window.addEventListener('message', async (event) => {
+                // Lógica de carga de datos
                 if (event.data.file) {
                     currentFile = event.data.file;
                     updateFileInfo();
                     await loadData();
                 } else if (event.data.budgetData) {
                     budgetData = event.data.budgetData;
+                    if (event.data.formulaCells) {
+                        formulaCells = event.data.formulaCells;
+                    }
                     renderBudgetTable();
                     updateSummary();
                 }
+
+                // Lógica de confirmación de guardado
+                if (event.data.success) {
+                    showNotification('Cambios guardados exitosamente', 'success');
+                } else if (event.data.error) {
+                    showNotification(`Error al guardar: ${event.data.error}`, 'error');
+                }
             });
+            // --- FIN: MANEJADOR DE MENSAJES UNIFICADO ---
         });
 
-        // Configurar event listeners
         function setupEventListeners() {
-            document.getElementById('backBtn').addEventListener('click', () => {
-                window.parent.postMessage({ action: 'backToSelector' }, '*');
-            });
-            
+            document.getElementById('backBtn').addEventListener('click', () => window.parent.postMessage({ action: 'backToSelector' }, '*'));
             document.getElementById('addRowBtn').addEventListener('click', addNewRow);
             document.getElementById('saveBtn').addEventListener('click', saveChanges);
         }
 
-        // Actualizar información del archivo
         function updateFileInfo() {
             if (!currentFile) return;
-            
             const year = extractYearFromFileName(currentFile.name);
             document.querySelector('.logo h1').textContent = `Gestión de Presupuesto - ${year}`;
         }
 
-        // Extraer año del nombre del archivo
         function extractYearFromFileName(fileName) {
             const yearMatch = fileName.match(/(20\d{2})/);
             return yearMatch ? yearMatch[1] : 'Desconocido';
         }
 
-        // Cargar datos
         async function loadData() {
             try {
                 showLoading();
-                
-                // Solicitar datos al padre
-                window.parent.postMessage({ 
-                    action: 'requestBudgetData', 
-                    file: currentFile 
-                }, '*');
+                window.parent.postMessage({ action: 'requestBudgetData', file: currentFile }, '*');
             } catch (error) {
                 console.error('Error al cargar datos:', error);
                 showNotification(`Error al cargar datos: ${error.message}`, 'error');
@@ -399,100 +444,90 @@
             }
         }
 
-        // Renderizar la tabla de presupuesto
+        function getCellAddress(rowIndex, propertyName) {
+            const row = rowIndex + 10;
+            const columnMap = {
+                'detalle': 'B', 'asignacion': 'C', 'ejecutado_acumulado': 'D', 'porcentaje_ejecutado': 'E',
+                'enero': 'F', 'febrero': 'G', 'marzo': 'H', 'abril': 'I', 'mayo': 'J', 'junio': 'K',
+                'julio': 'L', 'agosto': 'M', 'septiembre': 'N', 'octubre': 'O', 'noviembre': 'P', 'diciembre': 'Q'
+            };
+            const col = columnMap[propertyName];
+            return col ? `${col}${row}` : null;
+        }
+
         function renderBudgetTable() {
             const tableBody = document.getElementById('budgetTableBody');
             tableBody.innerHTML = '';
-            
+            const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
             budgetData.forEach((item, index) => {
                 const row = document.createElement('tr');
-                
+                let monthCellsHTML = '';
+                months.forEach(month => {
+                    const cellAddress = getCellAddress(index, month);
+                    const isFormula = formulaCells.includes(cellAddress);
+                    if (isFormula) {
+                        monthCellsHTML += `<td><span class="formula-cell">${formatNumber(item[month] || 0)}</span></td>`;
+                    } else {
+                        monthCellsHTML += `<td><span onclick="makeCellEditable(event, ${index}, '${month}')">${formatNumber(item[month] || 0)}</span></td>`;
+                    }
+                });
                 row.innerHTML = `
-                    <td>${item.id || index + 1}</td>
-                    <td>${item.concepto || 'Sin concepto'}</td>
-                    <td>${item.unidad || 'Unidad'}</td>
-                    <td>${item.cantidad || 0}</td>
-                    <td>$${formatNumber(item.valor_unitario || 0)}</td>
-                    <td>$${formatNumber(item.total || 0)}</td>
-                    <td>${item.fuente_financiacion || 'Empresa'}</td>
+                    <td>${item.id === 'TOTAL AÑO' ? 'TOTAL AÑO' : item.id === 'ANALISIS PRESUPUESTAL' ? 'IPC' : index + 1}</td>
+                    <td>${item.detalle || 'Sin detalle'}</td>
+                    <td>${item.asignacion || 0}</td>
+                    <td>$${formatNumber(item.ejecutado_acumulado || 0)}</td>
+                    <td>${item.porcentaje_ejecutado || 0}%</td>
+                    ${monthCellsHTML}
                     <td class="actions-column">
-                        <button class="action-btn edit-btn" onclick="editRow(${index})">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="action-btn delete-btn" onclick="deleteRow(${index})">
-                            <i class="fas fa-trash"></i>
-                        </button>
+                        <button class="action-btn edit-btn" onclick="editRow(${index})"><i class="fas fa-edit"></i></button>
+                        <button class="action-btn delete-btn" onclick="deleteRow(${index})"><i class="fas fa-trash"></i></button>
                     </td>
                 `;
-                
                 tableBody.appendChild(row);
             });
         }
 
-        // Actualizar los resúmenes
         function updateSummary() {
-            const totalPresupuesto = budgetData.reduce((sum, item) => sum + (item.total || 0), 0);
-            const totalEmpresa = budgetData
-                .filter(item => (item.fuente_financiacion || '').toLowerCase() === 'empresa')
-                .reduce((sum, item) => sum + (item.total || 0), 0);
-            const totalArl = budgetData
-                .filter(item => (item.fuente_financiacion || '').toLowerCase() === 'arl')
-                .reduce((sum, item) => sum + (item.total || 0), 0);
-            
+            const totalPresupuesto = budgetData.reduce((sum, item) => sum + (item.asignacion || 0), 0);
+            const totalEmpresa = 0, totalArl = 0;
             document.getElementById('totalPresupuesto').textContent = '$' + formatNumber(totalPresupuesto);
             document.getElementById('totalEmpresa').textContent = '$' + formatNumber(totalEmpresa);
             document.getElementById('totalArl').textContent = '$' + formatNumber(totalArl);
             document.getElementById('saldoDisponible').textContent = '$' + formatNumber(totalPresupuesto - totalEmpresa - totalArl);
         }
 
-        // Formatear números con separadores de miles
-        function formatNumber(num) {
-            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-        }
+        function formatNumber(num) { return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."); }
 
-        // Función para añadir nueva fila
         function addNewRow() {
             const newItem = {
-                id: budgetData.length > 0 ? Math.max(...budgetData.map(item => item.id || 0)) + 1 : 1,
-                concepto: "Nuevo concepto",
-                unidad: "Unidad",
-                cantidad: 1,
-                valor_unitario: 0,
-                total: 0,
-                fuente_financiacion: "Empresa"
+                detalle: "Unidad", asignacion: 0, ejecutado_acumulado: 0, porcentaje_ejecutado: 0,
+                enero: 0, febrero: 0, marzo: 0, abril: 0, mayo: 0, junio: 0,
+                julio: 0, agosto: 0, septiembre: 0, octubre: 0, noviembre: 0, diciembre: 0,
+                Total: 0, 'Fuente de Financiación': ''
             };
-            
             budgetData.push(newItem);
             renderBudgetTable();
             updateSummary();
             showNotification('Nuevo ítem agregado', 'success');
         }
 
-        // Función para editar fila
         function editRow(index) {
             const item = budgetData[index];
-            const concepto = prompt('Concepto:', item.concepto) || item.concepto;
-            const unidad = prompt('Unidad:', item.unidad) || item.unidad;
-            const cantidad = parseFloat(prompt('Cantidad:', item.cantidad)) || item.cantidad;
-            const valorUnitario = parseFloat(prompt('Valor Unitario:', item.valor_unitario)) || item.valor_unitario;
-            const fuenteFinanciacion = prompt('Fuente de Financiación (Empresa/ARL):', item.fuente_financiacion) || item.fuente_financiacion;
-            
+            const detalle = prompt('Detalle:', item.detalle) || item.detalle;
+            const asignacion = parseFloat(prompt('Asignación:', item.asignacion)) || item.asignacion;
+            const ejecutadoAcumulado = parseFloat(prompt('Ejecutado Acumulado:', item.ejecutado_acumulado)) || item.ejecutado_acumulado;
             budgetData[index] = {
                 ...item,
-                concepto,
-                unidad,
-                cantidad,
-                valor_unitario: valorUnitario,
-                total: cantidad * valorUnitario,
-                fuente_financiacion: fuenteFinanciacion
+                detalle: detalle,
+                asignacion: asignacion,
+                ejecutado_acumulado: ejecutadoAcumulado,
+                porcentaje_ejecutado: asignacion > 0 ? ((ejecutadoAcumulado / asignacion) * 100).toFixed(2) : 0,
             };
-            
             renderBudgetTable();
             updateSummary();
             showNotification('Ítem actualizado', 'success');
         }
 
-        // Función para eliminar fila
         function deleteRow(index) {
             if (confirm('¿Estás seguro de que deseas eliminar este ítem?')) {
                 budgetData.splice(index, 1);
@@ -502,69 +537,61 @@
             }
         }
 
-        // Función para guardar cambios
         function saveChanges() {
-            // Enviar datos al padre para guardar en el archivo
-            window.parent.postMessage({ 
-                action: 'saveBudgetChanges', 
+            window.parent.postMessage({
+                action: 'saveBudgetChanges',
                 file: currentFile,
                 changes: 'Actualización de presupuesto',
                 data: budgetData
             }, '*');
-            
             showNotification('Guardando cambios...', 'info');
         }
 
-        // Mostrar notificación
         function showNotification(message, type = 'success') {
             const notification = document.getElementById('notification');
             const messageElement = notification.querySelector('.notification-message');
             const iconElement = notification.querySelector('.notification-icon');
-            
-            // Actualizar mensaje
             messageElement.textContent = message;
-            
-            // Actualizar clase y icono según el tipo
             notification.className = 'notification ' + type;
-            
-            if (type === 'success') {
-                iconElement.className = 'notification-icon fas fa-check-circle';
-            } else if (type === 'error') {
-                iconElement.className = 'notification-icon fas fa-times-circle';
-            } else if (type === 'warning') {
-                iconElement.className = 'notification-icon fas fa-exclamation-circle';
-            } else if (type === 'info') {
-                iconElement.className = 'notification-icon fas fa-info-circle';
-            }
-            
-            // Mostrar notificación
+            if (type === 'success') iconElement.className = 'notification-icon fas fa-check-circle';
+            else if (type === 'error') iconElement.className = 'notification-icon fas fa-times-circle';
+            else if (type === 'warning') iconElement.className = 'notification-icon fas fa-exclamation-circle';
+            else if (type === 'info') iconElement.className = 'notification-icon fas fa-info-circle';
             notification.classList.add('show');
-            
-            // Ocultar después de 3 segundos
-            setTimeout(() => {
-                notification.classList.remove('show');
-            }, 3000);
+            setTimeout(() => notification.classList.remove('show'), 3000);
         }
 
-        // Mostrar indicador de carga
         function showLoading() {
             const tableBody = document.getElementById('budgetTableBody');
             tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px;"><div class="spinner"></div><p>Cargando datos...</p></td></tr>';
         }
 
-        // Ocultar indicador de carga
-        function hideLoading() {
-            // La función renderBudgetTable se encargará de actualizar el contenido
+        function hideLoading() {}
+
+        function makeCellEditable(event, index, propertyName) {
+            const span = event.target;
+            const currentValue = budgetData[index][propertyName];
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.value = currentValue;
+            input.className = 'editable-cell-input';
+            span.parentNode.replaceChild(input, span);
+            input.focus();
+            input.onblur = (e) => saveCellEdit(e, index, propertyName);
+            input.onkeydown = (e) => { if (e.key === 'Enter') input.blur(); };
         }
 
-        // Escuchar mensajes del padre para confirmar guardado
-        window.addEventListener('message', (event) => {
-            if (event.data.success) {
-                showNotification('Cambios guardados exitosamente', 'success');
-            } else if (event.data.error) {
-                showNotification(`Error al guardar: ${event.data.error}`, 'error');
-            }
-        });
+        function saveCellEdit(event, index, propertyName) {
+            const input = event.target;
+            const newValue = parseFloat(input.value) || 0;
+            budgetData[index][propertyName] = newValue;
+            const span = document.createElement('span');
+            span.textContent = formatNumber(newValue);
+            span.onclick = (e) => makeCellEditable(e, index, propertyName);
+            input.parentNode.replaceChild(span, input);
+            updateSummary();
+            showNotification('Celda actualizada', 'info');
+        }
     </script>
 </body>
 </html>

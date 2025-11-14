@@ -53,7 +53,7 @@ async function findPython() {
         // En Windows, 'where' es el comando para encontrar un ejecutable en el PATH
         const { stdout } = await execPromise('where python');
         const potentialPaths = stdout.split(/\r?\n/).filter(p => p.endsWith('python.exe'));
-        
+
         for (const p of potentialPaths) {
             const trimmedPath = p.trim();
             if (trimmedPath && fs.existsSync(trimmedPath)) {
@@ -126,6 +126,7 @@ let mainWindow;
 
 // --- Función de Logging Centralizada ---
 function sendLog(message, level = 'INFO') {
+  console.log(`[${level}] ${message}`); // Log to main process console
   if (mainWindow) {
     mainWindow.webContents.send('log-message', message, level);
   }
@@ -156,7 +157,7 @@ const createWindow = () => {
 
   // Cargar el archivo HTML principal
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
-  
+
   // Abrir DevTools en modo desarrollo
   // mainWindow.webContents.openDevTools();
 };
@@ -169,12 +170,12 @@ const createWindow = () => {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory']
     });
-    
+
     if (result.canceled) {
       console.log('Directory selection canceled');
       return null;
     }
-    
+
     console.log('Selected directory:', result.filePaths[0]);
     return result.filePaths[0];
   });
@@ -214,7 +215,7 @@ const createWindow = () => {
   // Manejar lectura de datos del archivo de control de remisiones
   ipcMain.handle('get-control-remisiones-data', async (event, companyName) => {
     sendLog(`[MAIN] Handler get-control-remisiones-data llamado para empresa: ${companyName}`);
-    
+
     try {
       // Función auxiliar para búsqueda recursiva
       async function findFileRecursive(dir, fileName) {
@@ -243,7 +244,7 @@ const createWindow = () => {
 
       // Buscar mapeo de empresa - USANDO LA ESTRUCTURA CORRECTA
       let basePath = null;
-      
+
       if (config.companyPaths && config.companyPaths[companyName]) {
         basePath = config.companyPaths[companyName].root || config.companyPaths[companyName].ruta_base;
         sendLog(`[MAIN] Usando ruta base de config.companyPaths[${companyName}]: ${basePath}`);
@@ -265,7 +266,7 @@ const createWindow = () => {
       const fileName = 'GI-FO-012 CONTROL DE REMISIONES.xlsx';
       sendLog(`[MAIN] Iniciando búsqueda recursiva de: ${fileName}`);
       const excelFilePath = await findFileRecursive(basePath, fileName);
-      
+
       if (!excelFilePath) {
         throw new Error(`Archivo "${fileName}" no encontrado para empresa "${companyName}" en la ruta "${basePath}"`);
       }
@@ -277,42 +278,42 @@ const createWindow = () => {
       const workbook = xlsx.readFile(excelFilePath);
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      
+
       // Obtener el rango de datos
       const range = xlsx.utils.decode_range(worksheet['!ref']);
       sendLog(`[MAIN] Rango de datos en la hoja: ${worksheet['!ref']}`);
-      
+
       // Definir el rango para leer desde la fila 7 (índice 6 en base 0)
       const startRow = 6; // Fila 7
       const endRow = range.e.r; // Última fila
-      
+
       // Crear un nuevo rango que comience desde la fila 7
       const newRange = {
         s: { c: range.s.c, r: startRow }, // Comenzar desde la columna 0, fila 7
         e: { c: range.e.c, r: endRow }    // Terminar en la última columna y fila
       };
-      
+
       // Convertir el rango a string
       const rangeStr = xlsx.utils.encode_range(newRange);
       sendLog(`[MAIN] Rango para lectura: ${rangeStr}`);
-      
+
       // Leer los datos desde la fila 7
       const allData = xlsx.utils.sheet_to_json(worksheet, {
         header: 1,
         range: rangeStr
       });
-      
+
       sendLog(`[MAIN] Datos extraídos. Total filas: ${allData.length}`);
 
       if (allData.length < 1) {
           sendLog('[MAIN] Archivo Excel no contiene datos suficientes.', 'WARN');
           return {
-              success: true, 
-              headers: [], 
-              rows: [], 
+              success: true,
+              headers: [],
+              rows: [],
               message: 'Archivo no contiene filas de datos.',
               filePath: excelFilePath,
-              companyName 
+              companyName
           };
       }
 
@@ -322,7 +323,7 @@ const createWindow = () => {
 
       sendLog(`[MAIN] Encabezados encontrados: ${headers.length} columnas`);
       sendLog(`[MAIN] Datos de remisiones encontrados. Total filas: ${rows.length}`);
-      
+
       // Validar y ajustar la longitud de las filas
       const expectedColumns = headers.length;
       for (let i = 0; i < rows.length; i++) {
@@ -342,22 +343,22 @@ const createWindow = () => {
       for(let i = 0; i < Math.min(3, rows.length); i++) {
         sendLog(`[MAIN] Fila ${i+1}: ${JSON.stringify(rows[i])}`, 'DEBUG');
       }
-      
+
       return {
-        success: true, 
+        success: true,
         headers: headers,
         rows: rows,
         filePath: excelFilePath,
-        companyName 
+        companyName
       };
-      
+
     } catch (error) {
       sendLog(`[MAIN] Error crítico en get-control-remisiones-data: ${error.message}`, 'ERROR');
       return {
-        success: false, 
+        success: false,
         error: error.message,
         stack: error.stack,
-        companyName 
+        companyName
       };
     }
   });
@@ -368,14 +369,14 @@ const createWindow = () => {
       console.log('Mapping directory:', directoryPath);
       const pythonPath = await getPython();
       const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'map_directory.py');
-      
+
       console.log(`Executing command: ${pythonPath} "${pythonScriptPath}" "${directoryPath}"`);
-      
+
       const { stdout, stderr } = await execFilePromise(pythonPath, [pythonScriptPath, directoryPath], { cwd: path.dirname(pythonScriptPath) });
-      
+
       const structure = JSON.parse(stdout);
       console.log('Directory mapping completed successfully');
-      
+
       return { success: true, structure: structure, log: stderr || 'Mapeo completado sin errores.' };
     } catch (error) {
       console.error('Error mapping directory:', error);
@@ -388,12 +389,12 @@ const createWindow = () => {
     try {
       console.log('Reading directory:', directoryPath);
       const items = await fsp.readdir(directoryPath, { withFileTypes: true });
-      
+
       const result = [];
       for (const item of items) {
         const itemPath = path.join(directoryPath, item.name);
         const stats = await fsp.stat(itemPath);
-        
+
         result.push({
           name: item.name,
           path: itemPath,
@@ -403,7 +404,7 @@ const createWindow = () => {
           modified: stats.mtime
         });
       }
-      
+
       console.log('Directory read successfully');
       return result;
     } catch (error) {
@@ -429,15 +430,15 @@ const createWindow = () => {
   ipcMain.handle('read-excel-file', async (event, filePath) => {
     try {
       sendLog(`[MAIN] Leyendo archivo Excel desde: ${filePath}`, 'INFO');
-      
+
       // Verificar que la ruta del archivo exista
       await fsp.access(filePath);
-  
+
       // Leer el archivo como un buffer
       const buffer = await fsp.readFile(filePath);
-      
+
       sendLog(`[MAIN] Archivo leído exitosamente. Tamaño del buffer: ${buffer.length} bytes`, 'INFO');
-      
+
       return { success: true, data: buffer };
     } catch (error) {
       sendLog(`[MAIN] Error al leer el archivo Excel: ${error.message}`, 'ERROR');
@@ -459,20 +460,20 @@ const createWindow = () => {
         );
 
         const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
-        
+
         if (!companyConfig || !companyConfig.structure?.structure) {
             throw new Error(`Empresa "${companyName}" no tiene estructura mapeada.`);
         }
 
         const actualCompanyStructure = companyConfig.structure.structure;
-        
+
         // Corregido: searchInStructure devuelve una cadena de texto (la ruta) directamente.
         const submodulePath = searchInStructure(actualCompanyStructure, "1.1.3");
-        
+
         if (!submodulePath) {
             throw new Error(`No se encontró la ruta para el submódulo '1.1.3 Asignación de Recursos' para la empresa "${companyName}".`);
         }
-        
+
         sendLog(`[MAIN] Ruta del submódulo '1.1.3 Asignación de Recursos' encontrada: ${submodulePath}`);
         const searchPath = submodulePath;
         // --- FIN Lógica para encontrar la ruta del submódulo ---
@@ -486,6 +487,7 @@ const createWindow = () => {
                     if (entry.isDirectory()) {
                         files = files.concat(await findBudgetFilesRecursive(fullPath));
                     } else if (
+                        !entry.name.startsWith('~$') &&
                         (entry.name.toLowerCase().includes('presupuesto') ||
                          entry.name.toLowerCase().includes('costo') ||
                          entry.name.toLowerCase().includes('gasto') ||
@@ -509,7 +511,7 @@ const createWindow = () => {
         }
 
         let budgetFiles = await findBudgetFilesRecursive(searchPath); // Usar searchPath aquí
-        
+
         if (budgetFiles.length > 0) {
              sendLog(`[MAIN] Encontrados ${budgetFiles.length} archivos de presupuesto con búsqueda robusta.`);
              return { success: true, files: budgetFiles };
@@ -541,7 +543,8 @@ const createWindow = () => {
         return { success: false, error: error.message };
     }
   });
-  
+
+
   // Manejar búsqueda de ruta de submódulo
   ipcMain.handle('find-submodule-path', async (event, companyName, module, submodule) => {
     try {
@@ -558,23 +561,23 @@ const createWindow = () => {
         console.log(`[ERROR] Company '${companyName}' not found. Available: [${availableCompanies.join(', ')}]`);
         throw new Error(`No configuration found for company: ${companyName}`);
       }
-      
+
       // Obtener la estructura para esta empresa - Nivel 1
       const companyStructureRoot = config.companyPaths[companyName];
       console.log(`[DEBUG] Company root keys: [${Object.keys(companyStructureRoot)}]`);
-      
+
       // Obtener la estructura real que contiene las carpetas - Nivel 2 (ESTE ES EL CORRECTO)
       // Según el config.json: config.companyPaths.Tempoactiva.structure.structure
       const actualCompanyStructure = companyStructureRoot.structure?.structure;
-      
+
       if (!actualCompanyStructure) {
           console.log(`[ERROR] Actual company structure (structure.structure) is missing or invalid.`, companyStructureRoot);
           throw new Error(`Invalid structure found for company: ${companyName}`);
       }
-      
+
       console.log(`[DEBUG] Actual structure name: '${actualCompanyStructure.name}', path: '${actualCompanyStructure.path}'`);
       console.log(`[DEBUG] Actual structure subdirectories keys: [${Object.keys(actualCompanyStructure.subdirectories || {}).join(', ')}]`);
-      
+
       // Extraer el código del nombre del submódulo (ej. "1.1.1 Responsable del SG" -> "1.1.1")
       const submoduleCode = submodule.match(/^[ -]+/);
       if (!submoduleCode) {
@@ -583,16 +586,16 @@ const createWindow = () => {
       }
       const code = submoduleCode[0];
       console.log(`[DEBUG] Extracted code: '${code}'`);
-      
+
       let foundPath = null;
-      
+
       // Para ciertos módulos conocidos, buscar primero el módulo y luego el submódulo dentro de él
       // Asumimos que "Recursos" es uno de ellos basado en el log anterior.
       if (module === "Recursos") {
         const resourcesFolderName = "1. Recursos"; // Nombre fijo esperado
-        
+
         console.log(`[DEBUG] Searching for module '${module}' (folder: '${resourcesFolderName}') containing code '${code}'`);
-        
+
         // Verificar si la carpeta "1. Recursos" existe en el nivel raíz de la estructura
         if (actualCompanyStructure.subdirectories && actualCompanyStructure.subdirectories[resourcesFolderName]) {
             const resourcesFolderNode = actualCompanyStructure.subdirectories[resourcesFolderName];
@@ -603,13 +606,13 @@ const createWindow = () => {
             console.log(`[WARN] Folder '${resourcesFolderName}' not found at root level. Available root folders: [${Object.keys(actualCompanyStructure.subdirectories || {}).join(', ')}]`);
         }
       }
-      
+
       // Si no se encontró en un módulo específico o no es un módulo conocido, buscar el código directamente en la raíz
       if (!foundPath) {
         console.log(`[DEBUG] Searching for code '${code}' directly in root structure...`);
         foundPath = searchInStructure(actualCompanyStructure, code);
       }
-      
+
       if (foundPath) {
         console.log(`[SUCCESS] Found path for '${companyName}' -> '${module}' -> '${submodule}': ${foundPath}`);
         return { success: true, path: foundPath };
@@ -631,11 +634,11 @@ const createWindow = () => {
       console.log(`[searchInStructure] Invalid directory node received. Type: ${typeof directoryNode}`);
       return null;
     }
-    
+
     const indent = "  ".repeat(depth);
     const nodeName = directoryNode.name || 'unnamed directory';
     console.log(`${indent}[searchInStructure] Searching in: ${nodeName} (path: ${directoryNode.path || 'N/A'})`);
-    
+
     // Verificar archivos en el directorio actual
     const files = directoryNode.files || [];
     for (const file of files) {
@@ -647,11 +650,11 @@ const createWindow = () => {
         }
       }
     }
-    
+
     // Verificar subdirectorios
     const subdirs = directoryNode.subdirectories || {};
     // console.log(`${indent}  [searchInStructure] Subdirectories found: [${Object.keys(subdirs).join(', ')}]`); // Demasiado verbose
-    
+
     for (const [subDirName, subDirNode] of Object.entries(subdirs)) {
       if (subDirName && subDirNode) {
         // console.log(`${indent}    [searchInStructure] Checking subdirectory: '${subDirName}' (includes '${code}')`); // Demasiado verbose
@@ -660,7 +663,7 @@ const createWindow = () => {
           console.log(`${indent}    [searchInStructure] Found DIRECTORY match: ${subDirNode.path}`);
           return subDirNode.path;
         }
-        
+
         // Si no, seguir buscando recursivamente dentro de ese subdirectorio
         const foundPath = searchInStructure(subDirNode, code, depth + 1);
         if (foundPath) {
@@ -668,7 +671,7 @@ const createWindow = () => {
         }
       }
     }
-    
+
     return null;
   }
 
@@ -678,10 +681,10 @@ const createWindow = () => {
     try {
       const pythonPath = await getPython();
       const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'process_pdf_cli.py');
-      
+
       sendLog(`Ejecutando script de Python: ${pythonPath} "${pythonScriptPath}" "${pdfPath}"`);
       const { stdout, stderr } = await execFilePromise(pythonPath, [pythonScriptPath, pdfPath], { cwd: path.dirname(pythonScriptPath) });
-      
+
       if (stderr) {
         sendLog(`Error en script de procesamiento de PDF: ${stderr}`, 'ERROR');
       }
@@ -725,7 +728,7 @@ const createWindow = () => {
     try {
       const pythonPath = await getPython();
       const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'convert_docx_to_pdf.py');
-      
+
       console.log(`Executing DOCX conversion for: ${docxPath}`);
       const { stdout, stderr } = await execFilePromise(pythonPath, [pythonScriptPath, docxPath], { cwd: path.dirname(pythonScriptPath) });
 
@@ -758,7 +761,7 @@ const createWindow = () => {
           throw new Error(`Error al parsear la salida JSON del script: ${e.message}. Salida recibida: ${stdout}`);
         }
       }
-      
+
       throw new Error(`No se encontró una respuesta JSON válida en la salida del script. Salida recibida: ${stdout}`);
 
     } catch (error) {
@@ -774,18 +777,18 @@ const createWindow = () => {
       properties: ['openFile'],
       filters: [{ name: 'PDF Files', extensions: ['pdf'] }]
     });
-    
+
     if (result.canceled) {
       console.log('PDF file selection canceled');
       return null;
     }
-    
+
     console.log('Selected PDF file:', result.filePaths[0]);
     return result.filePaths[0];
   });
-  
-  
-  
+
+
+
   // Manejar generación de documento de remisión
   ipcMain.handle('generate-remision-document', async (event, extractedData, empresa) => {
     sendLog(`IPC: generate-remision-document recibido para empresa: ${empresa}`);
@@ -793,17 +796,17 @@ const createWindow = () => {
       const pythonPath = await getPython();
       const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'remision_utils.py');
       const tempDataPath = path.join(app.getPath('temp'), `remision_data_${Date.now()}.json`);
-      
+
       sendLog(`Creando archivo de datos temporal: ${tempDataPath}`);
       await fsp.writeFile(tempDataPath, JSON.stringify({ data: extractedData, empresa: empresa }));
-      
+
       const commandArgs = [pythonScriptPath, '--generate-remision', tempDataPath];
-      
+
       sendLog(`Ejecutando script de generación de remisión...`);
       const { stdout, stderr } = await execFilePromise(pythonPath, commandArgs, { cwd: path.dirname(pythonScriptPath) });
-      
+
       await fsp.unlink(tempDataPath);
-      
+
       if (stderr) {
         sendLog(`Error en script de generación de remisión: ${stderr}`, 'ERROR');
       }
@@ -828,7 +831,7 @@ const createWindow = () => {
       }
 
       sendLog(`Resultado de la generación: ${JSON.stringify(finalResult)}`);
-      
+
       if (finalResult.success && finalResult.documentPath) {
         const docPath = finalResult.documentPath;
         try {
@@ -836,7 +839,7 @@ const createWindow = () => {
         } catch (accessError) {
           // Silencio
         }
-        
+
         try {
           const empresaPaths = {
             "Temposum": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\2. Temposum Est SAS\\3. Gestión de la Salud\\3.1.6 Restricciones y recomendaciones médicas\\3.1.6.1. Remisiones EPS",
@@ -844,24 +847,24 @@ const createWindow = () => {
             "Aseplus": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\3. Aseplus\\3. Gestión de la Salud\\3.1.6 Restricciones y recomendaciones médicas\\3.1.6.1. Remisiones EPS",
             "Asel": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\19. Asel S.A.S\\3. Gestión de la Salud\\3.1.6 Restricciones y recomendaciones médicas\\3.1.6.1. Remisiones EPS"
           };
-          
+
           const remisionesDir = empresaPaths[empresa] || empresaPaths["Temposum"];
           const files = await fsp.readdir(remisionesDir);
           const docxFiles = files.filter(file => file.endsWith('.docx') && file.includes('GI-OD-007 REMISION A EPS'));
-          
+
           if (docxFiles.length > 0) {
             const fileStats = await Promise.all(docxFiles.map(async (file) => {
               const filePath = path.join(remisionesDir, file);
               const stats = await fsp.stat(filePath);
               return { file, filePath, mtime: stats.mtime };
             }));
-            
+
             fileStats.sort((a, b) => b.mtime - a.mtime);
             const latestFile = fileStats[0];
-            
+
             const tempFileName = `temp_remision_${Date.now()}.docx`;
             const tempFilePath = path.join(app.getPath('temp'), tempFileName);
-            
+
             await fsp.copyFile(latestFile.filePath, tempFilePath);
             finalResult.documentPath = tempFilePath;
             finalResult.originalDocumentPath = latestFile.filePath;
@@ -873,7 +876,7 @@ const createWindow = () => {
           sendLog(`Error buscando el archivo más reciente para la copia: ${searchError.message}`, 'ERROR');
         }
       }
-      
+
       return finalResult;
     } catch (error) {
       sendLog(`Fallo en la ejecución del script de generación de remisión: ${error.message}`, 'ERROR');
@@ -889,26 +892,26 @@ const createWindow = () => {
       sendLog('Creando copia temporal del archivo para envío de correo...');
       const tempFileName = `temp_remision_${Date.now()}.docx`;
       const tempFilePath = path.join(app.getPath('temp'), tempFileName);
-      
+
       await fsp.copyFile(docPath, tempFilePath);
       sendLog(`Archivo copiado a: ${tempFilePath}`);
-      
+
       const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'remision_utils.py');
       const tempDataPath = path.join(app.getPath('temp'), `email_data_${Date.now()}.json`);
-      const tempData = { 
-        docPath: tempFilePath, 
-        data: extractedData, 
-        empresa: empresa 
+      const tempData = {
+        docPath: tempFilePath,
+        data: extractedData,
+        empresa: empresa
       };
-      
+
       sendLog(`Creando archivo de datos temporal para email: ${tempDataPath}`);
       await fsp.writeFile(tempDataPath, JSON.stringify(tempData), 'utf-8');
-      
+
       const commandArgs = [pythonScriptPath, '--send-email', tempDataPath];
-      
+
       sendLog(`Ejecutando script de envío de email...`);
       const { stdout, stderr } = await execFilePromise(pythonPath, commandArgs, { encoding: 'utf-8', cwd: path.dirname(pythonScriptPath) });
-      
+
       await fsp.unlink(tempFilePath);
       await fsp.unlink(tempDataPath);
 
@@ -943,24 +946,23 @@ const createWindow = () => {
       return { success: false, error: error.message };
     }
   });
-  
-  
+
+
 // Clase para manejar Excel en tiempo real - VERSIÓN SIMPLIFICADA Y ROBUSTA
 class RealTimeExcelManager {
   constructor(filePath) {
     sendLog(`[DEBUG] Constructor recibió filePath: "${filePath}"`);
     this.originalFilePath = filePath;
-    
-    // Obtenemos la ruta para PowerShell desde el inicio.
-    // Esta será la única ruta que usaremos.
     this.filePath = this.getPowerShellSafePath(filePath);
-    
-    this.workbook = new ExcelJS.Workbook();
+    this.workbook = null; // No inicializar aquí sino cuando se necesite
     this.worksheet = null;
     this.isUpdating = false;
     this.pendingUpdates = new Map();
     this.formulaCells = new Set();
     this.isInitialized = false;
+    this.propToColMap = {}; // Almacenará el mapa de columnas dinámico
+    this.lastWriteTime = 0;
+    this.writeLock = false; // Para prevenir operaciones concurrentes
 
     if (!fsSync.existsSync(this.filePath)) {
       throw new Error(`Archivo no encontrado en la ruta segura generada: "${this.filePath}"`);
@@ -968,493 +970,278 @@ class RealTimeExcelManager {
     sendLog(`[DEBUG] Usando ruta final segura: "${this.filePath}"`);
   }
 
-  async forceRecalculationFinal() {
-    try {
-      if (!fsSync.existsSync(this.filePath)) {
-        throw new Error(`Archivo no existe antes del recálculo: "${this.filePath}"`);
-      }
-
-      const psPath = this.getEscapedPathForScript();
-      sendLog(`[DEBUG] Usando ruta optimizada y escapada para PowerShell: "${psPath}"`);
-
-      const script = `
-$ErrorActionPreference = "Stop"
-
-Write-Host "=== EXCEL RECALCULATION SCRIPT (Encoded) ==="
-Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
-
-try {
-    $filePath = '${psPath}'
-    Write-Host "Archivo a procesar: $filePath"
-    
-    if (-not (Test-Path -LiteralPath $filePath)) {
-        throw "CRITICAL: Archivo no encontrado en ruta: $filePath"
-    }
-    
-    $fileInfo = Get-Item -LiteralPath $filePath
-    Write-Host "Archivo verificado: $($fileInfo.FullName)"
-    
-    Write-Host "Iniciando aplicación Excel..."
-    $excel = New-Object -ComObject Excel.Application -ErrorAction Stop
-    
-    $excel.Visible = $false
-    $excel.DisplayAlerts = $false
-    $excel.ScreenUpdating = $false
-    $excel.EnableEvents = $false
-    
-    Write-Host "Abriendo workbook..."
-    $workbook = $excel.Workbooks.Open($filePath, 0, $false, [Type]::Missing, [Type]::Missing, [Type]::Missing, $true)
-    
-    $excel.Calculation = -4105
-    Write-Host "Ejecutando CalculateFullRebuild..."
-    $excel.CalculateFullRebuild()
-    
-    Write-Host "Esperando finalización del cálculo..."
-    $maxWaitSeconds = 45
-    $checkIntervalMs = 200
-    $totalWaited = 0
-    
-    do {
-        Start-Sleep -Milliseconds $checkIntervalMs
-        $totalWaited += $checkIntervalMs
-        $waitedSeconds = $totalWaited / 1000
-        
-        if ($waitedSeconds -ge $maxWaitSeconds) {
-            Write-Host "ADVERTENCIA: Timeout alcanzado después de $maxWaitSeconds segundos"
-            break
+  async _buildColumnMap(worksheet) {  // Recibir worksheet como parámetro
+    const getCellValue = (cell) => {
+        if (!cell || cell.value === null || cell.value === undefined) return '';
+        let val = cell.value;
+        if (typeof val === 'object') {
+            if (val.result !== undefined) return val.result;
+            if (val.richText) return val.richText.map(rt => rt.text).join('').trim();
+            if (val instanceof Date) return val.toISOString();
+            const textVal = cell.text;
+            if (textVal && typeof textVal === 'object' && textVal.richText) {
+                return textVal.richText.map(rt => rt.text).join('').trim();
+            }
+            return textVal || '';
         }
-    } while ($excel.CalculationState -ne -4143)
-    
-    $workbook.Save()
-    $workbook.Close($false)
-    
-    Write-Output "SUCCESS - Excel recalculation completed"
-    
-} catch {
-    $errorMsg = $_.Exception.Message
-    $errorLine = $_.InvocationInfo.ScriptLineNumber
-    Write-Error "SCRIPT ERROR at line $errorLine\`: $errorMsg"
-    throw "Excel processing failed: $errorMsg"
-} finally {
-    if ($workbook) { try { $workbook.Close($false) } catch {} }
-    if ($excel) {
-        try {
-            $excel.Quit()
-            [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null
-        } catch {}}
-    [System.GC]::Collect()
-    [System.GC]::WaitForPendingFinalizers()
-}
-      `;
+        return String(val);
+    };
 
-      const encodedCommand = Buffer.from(script, 'utf16le').toString('base64');
+    const mainHeaderRow = worksheet.getRow(8);
+    const mainHeaders = [];
+    mainHeaderRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        mainHeaders[colNumber] = getCellValue(cell);
+    });
 
-      return await new Promise((resolve, reject) => {
-        const ps = spawn('powershell', [
-          '-NoProfile',
-          '-NonInteractive',
-          '-EncodedCommand',
-          encodedCommand
-        ], {
-          stdio: ['ignore', 'pipe', 'pipe'],
-          windowsHide: true,
-          env: { ...process.env, POWERSHELL_TELEMETRY_OPTOUT: '1' }
-        });
+    const monthHeaderRow = worksheet.getRow(9);
+    const monthHeaders = [];
+    monthHeaderRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        monthHeaders[colNumber] = getCellValue(cell);
+    });
 
-        let output = '';
-        let errorOutput = '';
+    const propToMainHeaderMap = {
+        'detalle': 'DETALLE',
+        'asignacion': 'ASIGNACION PRESUPUESTO ANUAL',
+        'ejecutado_acumulado': 'EJECUTADO ACUMULADO'
+    };
+    const propToMonthHeaderMap = {
+        'enero': 'ENERO', 'febrero': 'FEBRERO', 'marzo': 'MARZO', 'abril': 'ABRIL',
+        'mayo': 'MAYO', 'junio': 'JUNIO', 'julio': 'JULIO', 'agosto': 'AGOSTO',
+        'septiembre': 'SEPTIEMBRE', 'octubre': 'OCTUBRE', 'noviembre': 'NOVIEMBRE', 'diciembre': 'DICIEMBRE'
+    };
 
-        const timeout = setTimeout(() => {
-          ps.kill('SIGTERM');
-          setTimeout(() => ps.kill('SIGKILL'), 5000);
-          reject(new Error('Timeout: Excel recalculation took too long (60s)'));
-        }, 60000);
+    const propToColMap = {};
 
-        ps.stdout.on('data', (data) => {
-          const text = data.toString('utf8');
-          output += text;
-          sendLog(`[PS OUT] ${text.trim()}`);
-        });
+    for (const [prop, headerText] of Object.entries(propToMainHeaderMap)) {
+        const index = mainHeaders.findIndex(h => h && h.toUpperCase().trim().includes(headerText));
+        if (index !== -1) {
+            propToColMap[prop] = worksheet.getColumn(index).letter;
+        }
+    }
 
-        ps.stderr.on('data', (data) => {
-          const text = data.toString('utf8');
-          errorOutput += text;
-          sendLog(`[PS ERR] ${text.trim()}`, 'ERROR');
-        });
+    for (const [prop, headerText] of Object.entries(propToMonthHeaderMap)) {
+        const index = monthHeaders.findIndex(h => h && h.toUpperCase().trim() === headerText);
+        if (index !== -1) {
+            propToColMap[prop] = worksheet.getColumn(index).letter;
+        }
+    }
+    sendLog(`[DEBUG] Mapa de columnas dinámico construido: ${JSON.stringify(propToColMap)}`);
+    return propToColMap;
+  }
 
-        ps.on('close', (code) => {
-          clearTimeout(timeout);
-          if (code === 0 && output.includes('SUCCESS')) {
-            sendLog('[SUCCESS] Excel recálculo exitoso con -EncodedCommand');
-            resolve();
-          } else {
-            const errorMsg = `PowerShell failed with code ${code}. Error: ${errorOutput}`;
-            sendLog(`[ERROR] ${errorMsg}`, 'ERROR');
-            reject(new Error(errorMsg));
+  // Método para liberar completamente los recursos del manager
+  async releaseResources() {
+    if (this.worksheet) {
+      this.worksheet = null;
+    }
+    if (this.workbook) {
+      // Destruir la instancia actual para liberar recursos
+      this.workbook = null;
+    }
+    // Asegurar un delay mínimo entre operaciones de escritura
+    const now = Date.now();
+    if (now - this.lastWriteTime < 1500) { // 1.5 segundos de delay mínimo
+      await new Promise(resolve => setTimeout(resolve, 1500 - (now - this.lastWriteTime)));
+    }
+    this.lastWriteTime = Date.now();
+  }
+
+  async updateMultipleCellsAndRecalculate(updates) {
+    // Implementar lock para prevenir operaciones concurrentes
+    while (this.writeLock) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    this.writeLock = true;
+    let success = false;
+    let retries = 0;
+    const maxRetries = 3;
+
+    try {
+      sendLog(`[DEBUG] Actualizando ${updates.length} celdas.`);
+
+      // Crear un nuevo workbook exclusivo para esta operación para evitar locks persistentes
+      let tempWorkbook = new ExcelJS.Workbook();
+      let tempWorksheet = null;
+
+      // Cargar el archivo en el workbook temporal
+      await tempWorkbook.xlsx.readFile(this.filePath);
+      tempWorksheet = tempWorkbook.worksheets[0];
+
+      // Detectar celdas de fórmula en el worksheet temporal
+      const tempFormulaCells = new Set();
+      tempWorksheet.eachRow((row, rowNumber) => {
+        row.eachCell((cell, colNumber) => {
+          if (cell && cell.formula) {
+            tempFormulaCells.add(cell.address);
           }
-        });
-
-        ps.on('error', (err) => {
-          clearTimeout(timeout);
-          sendLog(`[ERROR] PowerShell process error: ${err.message}`, 'ERROR');
-          reject(err);
         });
       });
 
-    } catch (error) {
-      throw error;
+      let skippedUpdates = 0;
+      for (const update of updates) {
+        if (update.cellAddress && update.value !== undefined) {
+          if (tempFormulaCells.has(update.cellAddress)) {
+            skippedUpdates++;
+            continue;
+          }
+          tempWorksheet.getCell(update.cellAddress).value = update.value;
+        }
+      }
+
+      if (skippedUpdates > 0) {
+        sendLog(`[WARN] Se omitió la actualización de ${skippedUpdates} celdas porque contienen fórmulas.`);
+      }
+
+      // Guardar archivo con lógica de reintento
+      while (retries < maxRetries && !success) {
+        try {
+          await tempWorkbook.xlsx.writeFile(this.filePath);
+          success = true;
+        } catch (error) {
+          if ((error.code === 'EBUSY' || error.code === 'EPERM' || error.message.includes('locked')) && retries < maxRetries - 1) {
+            retries++;
+            sendLog(`[WARN] Intento #${retries} fallido debido a archivo bloqueado, esperando 2s...`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          } else {
+            throw error; // Relanzar error si no es de bloqueo o ya hicimos todos los reintentos
+          }
+        }
+      }
+
+      if (!success) {
+        throw new Error(`No se pudo guardar el archivo después de ${maxRetries} intentos. Puede estar siendo usado por Excel u otra aplicación.`);
+      }
+
+      sendLog(`[DEBUG] Archivo guardado exitosamente después de ${retries + 1} intentos.`);
+
+      // Liberar recursos del workbook temporal
+      tempWorksheet = null;
+      tempWorkbook = null;
+
+      // Forzar recálculo si es necesario
+      await this.forceRecalculationFinal();
+
+      // Devolver los datos actualizados obtenidos frescamente
+      return await this.getFreshData();
+    } finally {
+      this.writeLock = false;
+      // Liberar recursos principales
+      await this.releaseResources();
     }
   }
 
+  // Método para obtener datos frescos sin mantener locks
+  async getFreshData() {
+    const freshWorkbook = new ExcelJS.Workbook();
+    await freshWorkbook.xlsx.readFile(this.filePath);
+    const worksheet = freshWorkbook.worksheets[0];
 
+    const processedData = [];
+    const formulaCells = [];
 
-  /**
-   * Obtiene la ruta más segura para PowerShell.
-   * Estrategia: Prioriza la ruta corta nativa de Node.js. Si falla, usa la original.
-   */
-  getPowerShellSafePath(originalPath) {
-    // 1. La mejor y más eficiente estrategia: fs.realpathSync.native
-    try {
-      const nativeShortPath = fsSync.realpathSync.native(originalPath);
-      if (nativeShortPath && fsSync.existsSync(nativeShortPath)) {
-        sendLog(`[SUCCESS] Estrategia de ruta corta nativa funcionó: "${nativeShortPath}"`);
-        return nativeShortPath;
-      }
-    } catch (error) {
-      sendLog(`[WARN] Estrategia de ruta corta nativa falló: ${error.message}. Se intentará la normalización manual.`);
-    }
-
-    // 2. Fallback: Normalización manual de caracteres problemáticos.
-    // Esto es un parche necesario porque la ruta corta no está disponible (posiblemente por ser una unidad de red como Google Drive)
-    // y la cadena de ruta llega con la codificación dañada.
-    let normalizedPath = path.normalize(originalPath);
-    const corrections = {
-        'Gestio╠ün': 'Gestion',
-        'Medicio╠ün': 'Medicion',
-        'Administracio╠ün': 'Administracion',
-        'cio╠ün': 'cion',
-        'o╠ün': 'on',
-        'a╠ün': 'an',
-        'e╠ün': 'en',
-        'i╠ün': 'in',
-        'u╠ün': 'un'
+    const getCellValue = (cell) => {
+        if (!cell || cell.value === null || cell.value === undefined) return '';
+        let val = cell.value;
+        if (typeof val === 'object') {
+            if (val.result !== undefined) return val.result;
+            if (val.richText) return val.richText.map(rt => rt.text).join('').trim();
+            if (val instanceof Date) return val.toISOString();
+            const textVal = cell.text;
+            if (textVal && typeof textVal === 'object' && textVal.richText) {
+                return textVal.richText.map(rt => rt.text).join('').trim();
+            }
+            return textVal || '';
+        }
+        return String(val);
     };
-    
-    let appliedCorrections = false;
-    for (const [bad, good] of Object.entries(corrections)) {
-        if (normalizedPath.includes(bad)) {
-            normalizedPath = normalizedPath.replace(new RegExp(bad, 'g'), good);
-            appliedCorrections = true;
+
+    // Obtener el mapa de columnas desde el worksheet fresco
+    const propToColMap = await this._buildColumnMap(worksheet);
+
+    for (let i = 10; i <= 25; i++) {
+        const dataRow = worksheet.getRow(i);
+        const item = {};
+        let isEmptyRow = true;
+
+        for(const [prop, colLetter] of Object.entries(propToColMap)) {
+            if (!colLetter) continue;
+            const cell = dataRow.getCell(colLetter);
+            let value = getCellValue(cell);
+
+            // --- INICIO DE LA CORRECCIÓN ---
+            // Convertir a número las propiedades que deben ser numéricas
+            const numericProps = ['asignacion', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+            if (numericProps.includes(prop)) {
+                // Reemplazar puntos de miles y comas decimales si es necesario, luego convertir
+                const numericValue = parseFloat(String(value).replace(/\./g, '').replace(',', '.'));
+                value = isNaN(numericValue) ? 0 : numericValue;
+            }
+            // --- FIN DE LA CORRECCIÓN ---
+
+            item[prop] = value;
+            if (value !== '' && value !== null && value !== undefined) isEmptyRow = false;
+            if (cell.formula) {
+                formulaCells.push(cell.address);
+            }
+        }
+
+        if (!isEmptyRow) {
+            const allProps = Object.keys(propToColMap);
+            for (const prop of allProps) {
+                if (!item.hasOwnProperty(prop)) {
+                    item[prop] = '';
+                }
+            }
+            processedData.push(item);
         }
     }
 
-    if(appliedCorrections) {
-        sendLog(`[DEBUG] Ruta corregida manualmente: "${normalizedPath}"`);
-    }
+    // Destruir el workbook temporal para liberar recursos
+    worksheet.destroy();
+    freshWorkbook.destroy && freshWorkbook.destroy(); // Destruir workbook si el método existe
 
-    return normalizedPath;
+    return { processedData, formulaCells, timestamp: Date.now() };
   }
 
-  /**
-   * Prepara la ruta para ser insertada en el string del script de PowerShell.
-   * La única manipulación necesaria es escapar comillas simples.
-   */
+  // Simplificar el forceRecalculationFinal para no depender de Excel COM si no es estrictamente necesario
+  async forceRecalculationFinal() {
+    // En lugar de forzar recálculo pesado, simplemente esperar para permitir que Excel actualice
+    // los cálculos automáticos
+    await new Promise(resolve => setTimeout(resolve, 1500)); // Esperar 1.5 segundos
+  }
+
+  getPowerShellSafePath(originalPath) {
+    try {
+      const nativeShortPath = fsSync.realpathSync.native(originalPath);
+      if (nativeShortPath && fsSync.existsSync(nativeShortPath)) {
+        return nativeShortPath;
+      }
+    } catch (error) {
+      // Fallback
+    }
+    return originalPath;
+  }
+
   getEscapedPathForScript() {
     return this.filePath.replace(/'/g, "''");
   }
 
-  async debugPathResolution() {
-    console.log('\n=== DEBUGGING HÍBRIDO DE RUTAS v2 ===');
-    console.log(`1. Ruta original: "${this.originalFilePath}"`);
-    console.log(`2. Ruta final seleccionada: "${this.filePath}"`);
-    console.log(`3. Ruta para PowerShell (escapada): "${this.getEscapedPathForScript()}"`);
-    
-    console.log('\n=== VERIFICACIONES ===');
-    console.log(`7. Archivo existe (ruta final): ${fsSync.existsSync(this.filePath)}`);
-    console.log(`8. Ruta absoluta: ${path.isAbsolute(this.filePath)}`);
-    
-    if (fsSync.existsSync(this.filePath)) {
-      const stats = fsSync.statSync(this.filePath);
-      console.log(`9. Tamaño del archivo: ${stats.size} bytes`);
-      console.log(`10. Última modificación: ${stats.mtime}`);
-    }
-    
-    console.log('=== FIN DEBUGGING HÍBRIDO ===\n');
-  }
-
-  async forceExcelRecalculationWithTempScript() {
-    const tempScriptPath = path.join(os.tmpdir(), `excel_recalc_${Date.now()}.ps1`);
-    try {
-      if (!fsSync.existsSync(this.filePath)) {
-        throw new Error(`Archivo no existe antes del recálculo: "${this.filePath}"`);
-      }
-
-      const psPath = this.getEscapedPathForScript();
-      sendLog(`[DEBUG] Usando ruta optimizada para PowerShell: "${psPath}"`);
-
-      const script = `
-# Configuración de codificación mejorada
-[Console]::InputEncoding = [System.Text.Encoding]::UTF8
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
-
-$ErrorActionPreference = "Stop"
-
-Write-Host "=== EXCEL RECALCULATION SCRIPT ==="
-Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
-Write-Host "Current Encoding: $([System.Text.Encoding]::Default.EncodingName)"
-
-try {
-    $filePath = '${psPath}'
-    Write-Host "Archivo a procesar: $filePath"
-    
-    if (-not (Test-Path -LiteralPath $filePath)) {
-        throw "CRITICAL: Archivo no encontrado en ruta: $filePath"
-    }
-    
-    $fileInfo = Get-Item -LiteralPath $filePath
-    Write-Host "Archivo verificado: $($fileInfo.FullName)"
-    
-    Write-Host "Iniciando aplicación Excel..."
-    try {
-        $excel = New-Object -ComObject Excel.Application -ErrorAction Stop
-    } catch {
-        throw "ERROR: No se pudo crear Excel COM Object: $($_.Exception.Message)"
-    }
-    
-    $excel.Visible = $false
-    $excel.DisplayAlerts = $false
-    $excel.ScreenUpdating = $false
-    $excel.EnableEvents = $false
-    
-    Write-Host "Abriendo workbook..."
-    try {
-        $workbook = $excel.Workbooks.Open($filePath, 0, $false, [Type]::Missing, [Type]::Missing, [Type]::Missing, $true)
-    } catch {
-        throw "ERROR: No se pudo abrir el workbook: $($_.Exception.Message)"
-    }
-    
-    $excel.Calculation = -4105
-    Write-Host "Ejecutando CalculateFullRebuild..."
-    $excel.CalculateFullRebuild()
-    
-    Write-Host "Esperando finalización del cálculo..."
-    $maxWaitSeconds = 45
-    $checkIntervalMs = 200
-    $totalWaited = 0
-    
-    do {
-        Start-Sleep -Milliseconds $checkIntervalMs
-        $totalWaited += $checkIntervalMs
-        $waitedSeconds = $totalWaited / 1000
-        
-        if ($waitedSeconds -ge $maxWaitSeconds) {
-            Write-Host "ADVERTENCIA: Timeout alcanzado después de $maxWaitSeconds segundos"
-            break
-        }
-    } while ($excel.CalculationState -ne -4143)
-    
-    $workbook.Save()
-    $workbook.Close($false)
-    
-    Write-Output "SUCCESS - Excel recalculation completed"
-    
-} catch {
-    $errorMsg = $_.Exception.Message
-    $errorLine = $_.InvocationInfo.ScriptLineNumber
-    Write-Error "SCRIPT ERROR at line $errorLine\`: $errorMsg"
-    throw "Excel processing failed: $errorMsg"
-} finally {
-    if ($workbook) { try { $workbook.Close($false) } catch {} }
-    if ($excel) {
-        try {
-            $excel.Quit()
-            [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null
-        } catch {}
-    }
-    [System.GC]::Collect()
-    [System.GC]::WaitForPendingFinalizers()
-}
-      `;
-
-      await fsp.writeFile(tempScriptPath, script, { encoding: 'utf8' });
-
-      return await new Promise((resolve, reject) => {
-        const ps = spawn('powershell', [
-          '-ExecutionPolicy', 'Bypass',
-          '-NoProfile',
-          '-NoLogo',
-          '-NonInteractive',
-          '-File', tempScriptPath
-        ], {
-          stdio: ['ignore', 'pipe', 'pipe'],
-          windowsHide: true,
-          env: { 
-            ...process.env, 
-            POWERSHELL_TELEMETRY_OPTOUT: '1',
-            PYTHONIOENCODING: 'utf-8',
-            LC_ALL: 'en_US.UTF-8'
-          }
-        });
-
-        let output = '';
-        let errorOutput = '';
-
-        const timeout = setTimeout(() => {
-          ps.kill('SIGTERM');
-          setTimeout(() => ps.kill('SIGKILL'), 5000);
-          reject(new Error('Timeout: Excel recalculation took too long (60s)'));
-        }, 60000);
-
-        ps.stdout.on('data', (data) => {
-          const text = data.toString('utf8');
-          output += text;
-          sendLog(`[PS OUT] ${text.trim()}`);
-        });
-
-        ps.stderr.on('data', (data) => {
-          const text = data.toString('utf8');
-          errorOutput += text;
-          sendLog(`[PS ERR] ${text.trim()}`, 'ERROR');
-        });
-
-        ps.on('close', async (code) => {
-          clearTimeout(timeout);
-          try { await fsp.unlink(tempScriptPath); } catch (e) { /* ignore */ }
-
-          if (code === 0 && output.includes('SUCCESS')) {
-            sendLog('[SUCCESS] Excel recálculo exitoso con solución simplificada');
-            resolve();
-          } else {
-            const errorMsg = `PowerShell failed with code ${code}. Error: ${errorOutput}`;
-            sendLog(`[ERROR] ${errorMsg}`, 'ERROR');
-            reject(new Error(errorMsg));
-          }
-        });
-
-        ps.on('error', (err) => {
-          clearTimeout(timeout);
-          sendLog(`[ERROR] PowerShell process error: ${err.message}`, 'ERROR');
-          reject(err);
-        });
-      });
-
-    } catch (error) {
-      try { await fsp.unlink(tempScriptPath); } catch (e) {}
-      throw error;
-    }
-  }
-
   async initialize() {
-    if (this.isInitialized) {
-      sendLog(`[DEBUG] Excel Manager ya está inicializado para: ${this.filePath}`);
-      return;
-    }
-    sendLog(`[DEBUG] Inicializando Excel Manager para: ${this.filePath}`);
-    await this.debugPathResolution();
-    await this.loadWorkbook();
-    this.detectFormulaCells();
+    if (this.isInitialized) return;
+    // No necesitamos cargar el workbook aquí, se hará en cada operación
     this.isInitialized = true;
-    sendLog(`[DEBUG] Inicializado. Fórmulas detectadas: ${Array.from(this.formulaCells).join(', ')}`);
-  }
-
-  async loadWorkbook() {
-    await this.workbook.xlsx.readFile(this.filePath);
-    this.worksheet = this.workbook.worksheets[0];
-  }
-
-  detectFormulaCells() {
-    this.formulaCells.clear();
-    if (!this.worksheet) return;
-    this.worksheet.eachRow((row, rowNumber) => {
-      row.eachCell((cell, colNumber) => {
-        if (cell && cell.formula) {
-          const cellAddress = this.getCellAddress(rowNumber, colNumber);
-          this.formulaCells.add(cellAddress);
-        }
-      });
-    });
-  }
-
-  getCellAddress(row, col) {
-    return this.worksheet.getCell(row, col).address;
-  }
-
-  async updateCellAndRecalculate(cellAddress, value) {
-    if (this.isUpdating) {
-      this.pendingUpdates.set(cellAddress, value);
-      return await this.waitForCurrentUpdate();
-    }
-
-    this.isUpdating = true;
-    sendLog(`[DEBUG] Actualizando celda ${cellAddress} con valor: ${value}`);
-
-    try {
-      await this.loadWorkbook();
-      this.worksheet.getCell(cellAddress).value = value;
-      await this.workbook.xlsx.writeFile(this.filePath);
-      
-      await this.forceRecalculationFinal();
-      
-      const updatedData = await this.getCurrentData();
-      await this.processPendingUpdates();
-      return updatedData;
-    } catch (error) {
-      sendLog(`[ERROR] Error actualizando celda: ${error.message}`, 'ERROR');
-      throw error;
-    } finally {
-      this.isUpdating = false;
-    }
+    sendLog(`[DEBUG] Excel Manager inicializado.`);
   }
 
   async getCurrentData() {
-    await this.loadWorkbook();
-    const data = [];
-    const formulaResults = {};
-
-    this.worksheet.eachRow((row, rowNumber) => {
-      const rowData = [];
-      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-        const cellAddress = this.getCellAddress(rowNumber, colNumber);
-        let cellValue = cell.value;
-
-        if (cell && cell.formula) {
-          formulaResults[cellAddress] = {
-            formula: cell.formula,
-            value: cellValue,
-            calculated: true
-          };
-        }
-
-        if (cellValue && typeof cellValue === 'object') {
-          if (cellValue.formula) {
-            cellValue = cellValue.result || cellValue.value || '';
-          } else if (cellValue.text) {
-            cellValue = cellValue.text;
-          }
-        }
-
-        rowData.push(cellValue != null ? cellValue : '');
-      });
-      data.push(rowData);
-    });
-
-    return { data, formulaResults, timestamp: Date.now() };
-  }
-
-  async processPendingUpdates() {
-    if (this.pendingUpdates.size === 0) return;
-    const updates = new Map(this.pendingUpdates);
-    this.pendingUpdates.clear();
-    for (const [cellAddress, value] of updates) {
-      await this.updateCellAndRecalculate(cellAddress, value);
-    }
+    return await this.getFreshData();
   }
 
   async waitForCurrentUpdate() {
     return new Promise((resolve) => {
       const checkUpdate = () => {
-        if (!this.isUpdating) {
+        if (!this.writeLock) {  // Cambiado de isUpdating a writeLock
           resolve(this.getCurrentData());
         } else {
           setTimeout(checkUpdate, 100);
@@ -1526,10 +1313,14 @@ ipcMain.handle('init-excel', async (event, filePath) => {
     }
     const stats = fsSync.statSync(filePath);
     const manager = await excelRegistry.getOrCreateManager(filePath);
-    const data = await manager.getCurrentData();
+    const { processedData, formulaCells, headers } = await manager.getCurrentData();
     return {
       success: true,
-      data,
+      data: {
+          processedData: processedData,
+          formulaCells: formulaCells,
+          headers: headers
+      },
       fileInfo: { path: filePath, size: stats.size, modified: stats.mtime }
     };
   } catch (error) {
@@ -1549,6 +1340,80 @@ ipcMain.handle('update-excel-cell', async (event, { cellAddress, value }) => {
     sendLog(`Error actualizando celda: ${error.message}`, 'ERROR');
     return { success: false, error: error.message, stack: error.stack, cellAddress, value };
   }
+});
+
+ipcMain.handle('saveBudgetFile', async (event, filePath, budgetData) => {
+  const maxRetries = 8; // Aumentar el número de reintentos
+  const retryDelay = 2000; // Aumentar el retraso a 2 segundos
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      sendLog(`[INFO] Intento de guardado #${attempt} para ${path.basename(filePath)}`);
+
+      // Verificar si el archivo está accesible antes de intentar abrirlo
+      try {
+        await fsp.access(filePath, fs.constants.W_OK);
+      } catch (accessError) {
+        sendLog(`[WARN] Archivo no accesible para escritura en el intento ${attempt}: ${accessError.message}`);
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          continue;
+        }
+      }
+
+      const manager = await excelRegistry.getOrCreateManager(filePath);
+      if (!manager.isInitialized) await manager.initialize();
+
+      const updates = [];
+      const columnMapping = manager.propToColMap; // Usar el mapa dinámico del manager
+      const startRow = 10;
+
+      budgetData.forEach((item, index) => {
+        const currentRow = startRow + index;
+        for (const [prop, value] of Object.entries(item)) {
+          const columnLetter = columnMapping[prop];
+          if (columnLetter) {
+            updates.push({
+              cellAddress: `${columnLetter}${currentRow}`,
+              value: value
+            });
+          }
+        }
+      });
+
+      sendLog(`[INFO] Preparado para guardar ${updates.length} celdas en ${filePath} (intento ${attempt})`);
+      const result = await manager.updateMultipleCellsAndRecalculate(updates);
+      sendLog(`[SUCCESS] Presupuesto guardado exitosamente en ${path.basename(filePath)} en el intento ${attempt}`);
+      return { success: true, data: result, message: `Presupuesto guardado exitosamente en ${path.basename(filePath)} en el intento ${attempt}` };
+
+    } catch (error) {
+      lastError = error;
+      console.error(`Error al guardar archivo (intento ${attempt}):`, error.message);
+
+      // Si es un error de archivo bloqueado (EBUSY) y no es el último intento, esperar y reintentar
+      if (error.code === 'EBUSY' && attempt < maxRetries) {
+        console.log(`Archivo bloqueado (EBUSY), esperando ${retryDelay}ms antes del siguiente intento...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      } else if (error.message.includes('EBUSY') && attempt < maxRetries) {
+        // También verificar si el mensaje contiene EBUSY
+        console.log(`Archivo bloqueado (mensaje contiene EBUSY), esperando ${retryDelay}ms antes del siguiente intento...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      } else if (attempt < maxRetries) {
+        // Otros posibles errores temporales
+        console.log(`Error temporal, esperando ${retryDelay}ms antes del siguiente intento (intento ${attempt}):`, error.message);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      } else {
+        // Si es cualquier otro error o ya intentamos el máximo número de veces, devolver error
+        sendLog(`Error guardando el archivo de presupuesto después del intento ${attempt}: ${error.message}`, 'ERROR');
+        return { success: false, error: error.message, stack: error.stack, attempt: attempt, totalAttempts: maxRetries };
+      }
+    }
+  }
+
+  // Si llegamos aquí, todos los intentos fallaron
+  sendLog(`[CRITICAL] Fallaron todos los intentos de guardado (${maxRetries}) para ${path.basename(filePath)}`, 'ERROR');
+  return { success: false, error: lastError?.message || 'Todos los intentos de guardado fallaron', attempt: maxRetries, totalAttempts: maxRetries };
 });
 
 ipcMain.handle('diagnose-excel-path', async (event, filePath) => {
@@ -1583,7 +1448,7 @@ module.exports = {
 };
 
   // --- Nuevos manejadores IPC para procesamiento de accidentes ---
-  
+
   // Manejar selección de PDF de accidente
   ipcMain.handle('select-accident-pdf', async () => {
     try {
@@ -1592,12 +1457,12 @@ module.exports = {
         properties: ['openFile'],
         filters: [{ name: 'PDF Files', extensions: ['pdf'] }]
       });
-      
+
       if (result.canceled) {
         console.log('Accident PDF selection canceled');
         return null;
       }
-      
+
       console.log('Selected accident PDF:', result.filePaths[0]);
       return result.filePaths[0];
     } catch (error) {
@@ -1611,7 +1476,7 @@ module.exports = {
     const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_processor.py');
     return new Promise((resolve, reject) => {
       sendLog(`IPC: process-accident-pdf (extract) recibido para: ${pdfPath}`);
-      
+
       const pythonProcess = spawn(pythonPath, [pythonScriptPath, 'extract', '--pdf_path', pdfPath], { cwd: path.dirname(pythonScriptPath) });
 
       let stdoutData = '';
@@ -1660,7 +1525,7 @@ module.exports = {
     const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_processor.py');
     return new Promise((resolve, reject) => {
       sendLog(`IPC: analyze-accident recibido`);
-      
+
       const jsonData = JSON.stringify(extractedData);
       const pythonProcess = spawn(pythonPath, [pythonScriptPath, 'analyze', '--json_data', jsonData, '--contexto', contextoAdicional], { cwd: path.dirname(pythonScriptPath) });
 
@@ -1729,20 +1594,20 @@ module.exports = {
         const pythonPath = await getPython();
         // Crear archivo temporal con los datos
         tempDataPath = path.join(app.getPath('temp'), `accident_report_data_${Date.now()}.json`);
-        
+
         const reportData = {
           combinedData: combinedData,
           empresa: combinedData.empresa || 'TEMPOACTIVA'
         };
-        
+
         sendLog(`Creando archivo de datos temporal: ${tempDataPath}`);
         await fsp.writeFile(tempDataPath, JSON.stringify(reportData, null, 2));
-        
+
         const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_report_generator.py');
 
         // Verificar que el script existe
         await fsp.access(pythonScriptPath);
-        
+
         sendLog(`Ejecutando script con UTF-8 forzado: ${pythonPath} -X utf8 "${pythonScriptPath}"`);
 
         const pythonProcess = spawn(pythonPath, [
@@ -1767,7 +1632,7 @@ module.exports = {
 
         pythonProcess.on('close', async (code) => {
           sendLog(`Proceso de Python terminado con código: ${code}`);
-          
+
           // Limpiar archivo temporal
           if (tempDataPath) {
             await fsp.unlink(tempDataPath).catch(err => sendLog(`No se pudo limpiar el archivo temporal: ${err.message}`, 'WARN'));
@@ -1780,7 +1645,7 @@ module.exports = {
           // Procesar la salida estándar para encontrar el resultado JSON final
           let finalResult = null;
           const lines = stdoutData.split(/\r?\n/).filter(line => line.trim() !== '');
-          
+
           for (const line of lines) {
             try {
               const output = JSON.parse(line);
@@ -1891,7 +1756,7 @@ module.exports = {
       );
 
       const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
-      
+
       if (!companyConfig || !companyConfig.structure?.structure) {
         const available = Object.keys(config.companyPaths || {});
         throw new Error(
@@ -1907,7 +1772,7 @@ module.exports = {
       // -------------------------------------------------------------------------
       function findDirFlexible(subdirs, target) {
         if (!subdirs) return null;
-        
+
         const normalizedTarget = target
           .toLowerCase()
           .normalize('NFD')
@@ -1927,7 +1792,7 @@ module.exports = {
             return value;
           }
         }
-        
+
         return null;
       }
 
@@ -1938,7 +1803,7 @@ module.exports = {
         rootStructure.subdirectories,
         "3. Gestión de la Salud"
       );
-      
+
       if (!gestionSalud) {
         const keys = Object.keys(rootStructure.subdirectories || {});
         throw new Error(
@@ -1954,7 +1819,7 @@ module.exports = {
         gestionSalud.subdirectories,
         "3.3.6 Medición del ausentismo por causa médica"
       );
-      
+
       if (!ausentismoDir) {
         const keys = Object.keys(gestionSalud.subdirectories || {});
         throw new Error(
@@ -1969,7 +1834,7 @@ module.exports = {
       const excelFiles = (ausentismoDir.files || []).filter(
         f => f.extension?.toLowerCase() === '.xlsx'
       );
-      
+
       if (excelFiles.length === 0) {
         throw new Error('No hay archivos .xlsx en la carpeta de ausentismo.');
       }
@@ -2022,7 +1887,7 @@ module.exports = {
 
       sendLog(`[DEBUG] Total de filas en el archivo: ${allData.length}`);
       sendLog(`[DEBUG] Primeras 10 filas: ${JSON.stringify(allData.slice(0, 10))}`);
-      
+
       if (allData.length > 6) {
         sendLog(`[DEBUG] Fila 7 (índice 6): ${JSON.stringify(allData[6])}`);
       }
@@ -2067,10 +1932,10 @@ module.exports = {
       // -------------------------------------------------------------------------
       // Se reduce el umbral de filtrado para ser menos estricto.
       // Una fila se considera válida si tiene al menos 4 celdas con datos.
-      const minFilledCells = 4; 
+      const minFilledCells = 4;
       const rows = allData
         .slice(headerRowIndex + 1)
-        .filter(row => 
+        .filter(row =>
           row && row.filter(cell => cell !== null).length >= minFilledCells
         );
 
@@ -2080,7 +1945,7 @@ module.exports = {
       const limitedRows = rows.map(row => row.slice(0, maxColumnsToShow));
 
       sendLog(`[DEBUG] Total de filas filtradas: ${limitedRows.length}`);
-      
+
       if (limitedRows.length > 0) {
         sendLog(`[DEBUG] Primera fila de datos: ${JSON.stringify(limitedRows[0])}`);
       }
@@ -2196,7 +2061,7 @@ module.exports = {
   // Manejador para buscar descripción de CIE-10
   ipcMain.handle('buscar-cie10-descripcion', async (event, { companyName, cie10Code }) => {
     sendLog(`[MAIN] Handler buscar-cie10-descripcion llamado para empresa: ${companyName}, código: ${cie10Code}`);
-    
+
     try {
       const ausentismoFiles = {
         "TEMPOACTIVA": "G:/Mi unidad/2. Trabajo/1. SG-SST/2. Temporales Comfa/1. Tempoactiva Est SAS/3. Gestión de la Salud/3.3.6 Medición del ausentismo por causa médica/GI-FO-076 AUSENTISMO POR ARL Y EPS 2024.xlsx",
@@ -2210,7 +2075,7 @@ module.exports = {
       if (!excelFilePath) {
         throw new Error(`No se encontró la ruta del archivo de ausentismo para la empresa: ${companyName}`);
       }
-      
+
       sendLog(`[MAIN] Usando ruta directa para el archivo de ausentismo: ${excelFilePath}`);
 
       if (!fs.existsSync(excelFilePath)) {
@@ -2220,7 +2085,7 @@ module.exports = {
       // --- Ahora, llamar al script de Python ---
       const pythonPath = await getPython();
       const scriptPath = path.join(__dirname, 'Portear', 'src', 'actualizar_ausentismo.py');
-      
+
       const pythonProcess = spawn(pythonPath, [scriptPath, 'buscar_cie10', excelFilePath, cie10Code], {
         cwd: path.dirname(scriptPath),
         env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
@@ -2468,16 +2333,16 @@ async function obtenerRutaAusentismo(companyName) {
         // 2. Preparar para llamar al script de Python
         const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'copasst_acta_generator.py');
         const tempDataPath = path.join(app.getPath('temp'), `copasst_data_${Date.now()}.json`);
-        
+
         sendLog(`Creando archivo de datos temporal: ${tempDataPath}`);
         await fsp.writeFile(tempDataPath, JSON.stringify({ changes }, null, 2));
 
         // 3. Ejecutar el script de Python con la ruta del JSON y la ruta de salida
         const commandArgs = [pythonScriptPath, tempDataPath, filePath];
-        
+
         sendLog(`Ejecutando script de generación de acta...`);
         const { stdout, stderr } = await execFilePromise(pythonPath, commandArgs, { cwd: path.dirname(pythonScriptPath) });
-        
+
         // 4. Limpiar el archivo temporal
         await fsp.unlink(tempDataPath);
 
@@ -2536,16 +2401,16 @@ async function obtenerRutaAusentismo(companyName) {
         // 2. Preparar para llamar al script de Python
         const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'comite_convivencia_acta_generator.py');
         const tempDataPath = path.join(app.getPath('temp'), `convivencia_data_${Date.now()}.json`);
-        
+
         sendLog(`Creando archivo de datos temporal: ${tempDataPath}`);
         await fsp.writeFile(tempDataPath, JSON.stringify({ changes }, null, 2));
 
         // 3. Ejecutar el script de Python
         const commandArgs = [pythonScriptPath, tempDataPath, filePath];
-        
+
         sendLog(`Ejecutando script de generación de acta de convivencia...`);
         const { stdout, stderr } = await execFilePromise(pythonPath, commandArgs, { cwd: path.dirname(pythonScriptPath) });
-        
+
         // 4. Limpiar el archivo temporal
         await fsp.unlink(tempDataPath);
 
@@ -2587,7 +2452,7 @@ async function obtenerRutaAusentismo(companyName) {
       try {
           console.log('=== INICIO CONVERSIÓN EXCEL ===');
           console.log('Archivo original:', filePath);
-          
+
           // Normalizar ruta y manejar caracteres especiales
           const normalizedPath = path.resolve(filePath);
           console.log('Ruta normalizada:', normalizedPath);
@@ -2608,7 +2473,7 @@ async function obtenerRutaAusentismo(companyName) {
           }
 
           const fileNameWithoutExt = path.basename(normalizedPath, path.extname(normalizedPath));
-          
+
           // Limpiar nombre para evitar problemas con caracteres especiales
           const cleanFileName = fileNameWithoutExt
               .normalize('NFD')
@@ -2616,7 +2481,7 @@ async function obtenerRutaAusentismo(companyName) {
               .replace(/[^ - -퟿豈-﷏ﷰ-￯]/g, '_') // Reemplazar caracteres no ASCII
               .replace(/ +/g, '_') // Reemplazar espacios
               .substring(0, 50); // Limitar longitud
-          
+
           // Copiar archivo de entrada a temporal local
           const tempInputPath = path.join(tempDir, `${cleanFileName}.xlsx`);
           await fsp.copyFile(normalizedPath, tempInputPath);
@@ -2629,7 +2494,7 @@ async function obtenerRutaAusentismo(companyName) {
           if (fs.existsSync(outputPath)) {
               const excelStats = fs.statSync(normalizedPath);
               const pdfStats = fs.statSync(outputPath);
-              
+
               if (pdfStats.mtime > excelStats.mtime) {
                   console.log('PDF ya existe y está actualizado');
                   return {
@@ -2642,10 +2507,10 @@ async function obtenerRutaAusentismo(companyName) {
           // Convertir usando Microsoft Office
           console.log('Iniciando conversión con Microsoft Office...');
           const result = await convertWithMicrosoftOffice(tempInputPath, outputPath);
-          
+
           // Limpiar temporal input después de conversión
           await fsp.unlink(tempInputPath).catch(e => console.warn('No se pudo eliminar temp input:', e.message));
-          
+
           if (result.success) {
               console.log('Conversión exitosa');
               return {
@@ -2689,11 +2554,11 @@ async function cleanTempDir(dir) {
 function convertWithMicrosoftOffice(inputPath, outputPath) {
     return new Promise((resolve) => {
         console.log('Creando script PowerShell para conversión...');
-        
+
         // Codificar rutas en Base64 para evitar problemas de caracteres especiales
         const inputPathB64 = Buffer.from(inputPath, 'utf8').toString('base64');
         const outputPathB64 = Buffer.from(outputPath, 'utf8').toString('base64');
-        
+
         // Script PowerShell mejorado con correcciones
         const powershellScript = `
 # Establecer codificación UTF-8 para PowerShell
@@ -2702,26 +2567,26 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 
 try {
     Write-Host "=== INICIO CONVERSION EXCEL ===" -Encoding UTF8
-    
+
     # Decodificar rutas desde Base64
     $inputPath = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("${inputPathB64}"))
     $outputPath = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("${outputPathB64}"))
-    
+
     Write-Host "Ruta de entrada: $inputPath" -Encoding UTF8
     Write-Host "Ruta de salida: $outputPath" -Encoding UTF8
-    
+
     # Verificar que el archivo de entrada existe
     if (-not (Test-Path $inputPath)) {
         throw "Archivo de entrada no encontrado: $inputPath"
     }
-    
+
     # Crear directorio de salida si no existe
     $outputDir = Split-Path $outputPath -Parent
     if (-not (Test-Path $outputDir)) {
         New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
         Write-Host "Directorio creado: $outputDir" -Encoding UTF8
     }
-    
+
     Write-Host "Iniciando Excel..." -Encoding UTF8
     $excel = New-Object -ComObject Excel.Application
     $excel.Visible = $false
@@ -2729,9 +2594,9 @@ try {
     $excel.ScreenUpdating = $false
     $excel.EnableEvents = $false
     $excel.AskToUpdateLinks = $false
-    
+
     Write-Host "Abriendo archivo Excel..." -Encoding UTF8
-    
+
     # Parámetros para Open() con ReadOnly = $false
     $workbook = $excel.Workbooks.Open(
         $inputPath,
@@ -2748,18 +2613,18 @@ try {
         0,      # Converter
         $true   # AddToMru
     )
-    
+
     Write-Host "Archivo Excel abierto correctamente" -Encoding UTF8
-    
+
     # Activar el libro de trabajo para asegurar que es el foco
     $workbook.Activate()
     Write-Host "Libro de trabajo activado" -Encoding UTF8
 
     # Esperar un momento para que Excel procese completamente el archivo
     Start-Sleep -Seconds 7 # Aumentado a 7 segundos
-    
+
     Write-Host "Iniciando exportación a PDF..." -Encoding UTF8
-    
+
     # Usar SaveAs como método principal por su fiabilidad en este entorno.
     # ExportAsFixedFormat estaba fallando consistentemente.
     try {
@@ -2768,28 +2633,28 @@ try {
             57  # xlTypePDF
         )
         Write-Host "Exportación completada con SaveAs" -Encoding UTF8
-        
+
     } catch {
         Write-Host "La exportación con SaveAs falló: $($_.Exception.Message)" -Encoding UTF8
         throw "No se pudo exportar el archivo a PDF"
     }
-    
+
     Write-Host "Cerrando libro de trabajo..." -Encoding UTF8
     $workbook.Close($false)
-    
+
     Write-Host "Cerrando Excel..." -Encoding UTF8
     $excel.Quit()
-    
+
     # Liberar objetos COM
     Write-Host "Liberando recursos COM..." -Encoding UTF8
     if ($workbook) { [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($workbook); $workbook = $null }
     if ($excel) { [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($excel); $excel = $null }
-    
+
     # Forzar recolección de basura
     [System.GC]::Collect()
     [System.GC]::WaitForPendingFinalizers()
     [System.GC]::Collect()
-    
+
     # Verificar que el PDF se creó correctamente
     if (Test-Path $outputPath) {
         $pdfSize = (Get-Item $outputPath).Length
@@ -2802,57 +2667,57 @@ try {
     } else {
         throw "PDF no fue creado en la ruta esperada: $outputPath"
     }
-    
+
 } catch {
     $errorMsg = $_.Exception.Message
     Write-Host "=== ERROR EN CONVERSION ===" -Encoding UTF8
     Write-Host "ERROR: $errorMsg" -Encoding UTF8
     Write-Host "Tipo de excepción: $($_.Exception.GetType().Name)" -Encoding UTF8
-    
+
     # Información adicional de debugging
     if ($_.Exception.InnerException) {
         Write-Host "Error interno: $($_.Exception.InnerException.Message)" -Encoding UTF8
     }
-    
+
     # Cleanup forzado en caso de error
     Write-Host "Iniciando cleanup de emergencia..." -Encoding UTF8
     try {
-        if ($workbook -ne $null) { 
+        if ($workbook -ne $null) {
             Write-Host "Cerrando workbook..." -Encoding UTF8
             $workbook.Close($false)
             [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($workbook)
         }
     } catch { Write-Host "Error cerrando workbook: $($_.Exception.Message)" -Encoding UTF8 }
-    
+
     try {
-        if ($excel -ne $null) { 
+        if ($excel -ne $null) {
             Write-Host "Cerrando Excel..." -Encoding UTF8
             $excel.Quit()
             [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($excel)
         }
     } catch { Write-Host "Error cerrando Excel: $($_.Exception.Message)" -Encoding UTF8 }
-    
+
     # Forzar terminación de procesos Excel colgados
     Write-Host "Terminando procesos Excel residuales..." -Encoding UTF8
     try {
         Get-Process excel -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
         Start-Sleep -Seconds 1
     } catch { Write-Host "Sin procesos Excel para terminar" -Encoding UTF8 }
-    
+
     # Forzar recolección de basura final
     [System.GC]::Collect()
     [System.GC]::WaitForPendingFinalizers()
-    
+
     exit 1
 }
 `;
 
         console.log('=== EJECUTANDO POWERSHELL ===');
-        
+
         // Crear archivo temporal para el script PS1
         const tempPs1Path = path.join(app.getPath('temp'), `excel_convert_${Date.now()}.ps1`);
         console.log('Guardando script temporal en:', tempPs1Path);
-        
+
         fs.writeFileSync(tempPs1Path, powershellScript, 'utf8');
 
         // Ejecutar PowerShell con -File para evitar problemas con stdin
@@ -2893,12 +2758,12 @@ try {
                 await fsp.unlink(tempPs1Path);
                 console.log('Archivo temporal PS1 eliminado');
             } catch (e) { console.warn('No se pudo eliminar temp PS1:', e.message); }
-            
+
             console.log('=== RESULTADO POWERSHELL ===');
             console.log('Código de salida:', code);
             console.log('STDOUT longitud:', stdout.length);
             console.log('STDERR longitud:', stderr.length);
-            
+
             if (code !== 0) {
                 console.error('PowerShell falló con código:', code);
                 resolve({
@@ -2907,14 +2772,14 @@ try {
                 });
                 return;
             }
-            
+
             if (stdout.includes('CONVERSION_SUCCESS')) {
                 console.log('✅ Marcador de éxito encontrado');
-                
+
                 if (fs.existsSync(outputPath)) {
                     const stats = fs.statSync(outputPath);
                     console.log(`✅ PDF existe: ${stats.size} bytes`);
-                    
+
                     if (stats.size > 1024) { // PDF debe tener al menos 1KB
                         resolve({ success: true });
                     } else {
@@ -2934,7 +2799,7 @@ try {
                 const errorMatch = stdout.match(/ERROR:\s*(.+)/);
                 const specificError = errorMatch ? errorMatch[1].trim() : 'Error desconocido';
                 console.log('❌ Error detectado:', specificError);
-                
+
                 resolve({
                     success: false,
                     error: specificError
@@ -2943,7 +2808,7 @@ try {
                 console.log('❌ No se encontraron marcadores reconocibles');
                 console.log('Salida completa:', stdout);
                 console.log('Errores:', stderr);
-                
+
                 resolve({
                     success: false,
                     error: `Salida inesperada de PowerShell. Ver logs para detalles.`
@@ -2963,10 +2828,10 @@ try {
         const timeout = setTimeout(() => {
             console.log('⏱️ TIMEOUT ALCANZADO');
             console.log('Salida hasta el momento:', stdout);
-            
+
             try {
                 child.kill('SIGTERM');
-                
+
                 // Cleanup después de timeout
                 setTimeout(() => {
                     exec('taskkill /F /IM EXCEL.EXE /T', (error) => {
@@ -2974,7 +2839,7 @@ try {
                     });
                 }, 3000);
             } catch (e) { console.error('Error terminando proceso:', e); }
-            
+
             resolve({
                 success: false,
                 error: 'Timeout: La conversión tomó demasiado tiempo. Revisa si Excel está bloqueado.'
@@ -3001,14 +2866,14 @@ const registerIPCHandlers = () => {
         const workbook = xlsx.readFile(filePath);
         const sheetName = workbook.SheetNames[0]; // Usar la primera hoja
         const worksheet = workbook.Sheets[sheetName];
-        
+
         // Convertir los datos a formato JSON
         const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
-        
+
         // Extraer encabezados y filas
         const headers = data[0];
         const rows = data.slice(1).filter(row => row.length > 0);
-        
+
         // Convertir a objetos
         const budgetData = rows.map(row => {
             const obj = {};
@@ -3017,7 +2882,7 @@ const registerIPCHandlers = () => {
             });
             return obj;
         });
-        
+
         return {
             success: true,
             data: budgetData
@@ -3036,16 +2901,16 @@ const registerIPCHandlers = () => {
     try {
         // Crear un nuevo libro de trabajo
         const workbook = xlsx.utils.book_new();
-        
+
         // Convertir los datos a una hoja de trabajo
         const worksheet = xlsx.utils.json_to_sheet(data);
-        
+
         // Añadir la hoja de trabajo al libro
         xlsx.utils.book_append_sheet(workbook, worksheet, 'PRESUPUESTO');
-        
+
         // Escribir el archivo
         xlsx.writeFile(workbook, filePath);
-        
+
         return {
             success: true
         };
@@ -3064,14 +2929,14 @@ const registerIPCHandlers = () => {
         const workbook = xlsx.readFile(filePath);
         const sheetName = workbook.SheetNames[0]; // Usar la primera hoja
         const worksheet = workbook.Sheets[sheetName];
-        
+
         // Convertir los datos a formato JSON
         const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
-        
+
         // Extraer encabezados y filas
         const headers = data[0];
         const rows = data.slice(1).filter(row => row.length > 0);
-        
+
         // Convertir a objetos
         const budgetData = rows.map(row => {
             const obj = {};
@@ -3080,7 +2945,7 @@ const registerIPCHandlers = () => {
             });
             return obj;
         });
-        
+
         return {
             success: true,
             data: budgetData
@@ -3099,16 +2964,16 @@ const registerIPCHandlers = () => {
     try {
         // Crear un nuevo libro de trabajo
         const workbook = xlsx.utils.book_new();
-        
+
         // Convertir los datos a una hoja de trabajo
         const worksheet = xlsx.utils.json_to_sheet(data);
-        
+
         // Añadir la hoja de trabajo al libro
         xlsx.utils.book_append_sheet(workbook, worksheet, 'PRESUPUESTO');
-        
+
         // Escribir el archivo
         xlsx.writeFile(workbook, filePath);
-        
+
         return {
             success: true
         };
@@ -3121,6 +2986,48 @@ const registerIPCHandlers = () => {
     }
   }
 
+  // Guardar archivo de presupuesto con lógica de reintento para manejar archivos bloqueados
+  async function saveBudgetFile(filePath, data) {
+    const maxRetries = 5;
+    const retryDelay = 1000; // 1 segundo entre reintentos
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Crear un nuevo libro de trabajo
+        const workbook = xlsx.utils.book_new();
+
+        // Convertir los datos a una hoja de trabajo
+        const worksheet = xlsx.utils.json_to_sheet(data);
+
+        // Añadir la hoja de trabajo al libro
+        xlsx.utils.book_append_sheet(workbook, worksheet, 'PRESUPUESTO');
+
+        // Escribir el archivo
+        xlsx.writeFile(workbook, filePath);
+
+        return {
+            success: true,
+            message: `Archivo guardado exitosamente en el intento ${attempt}`
+        };
+      } catch (error) {
+        console.error(`Error al guardar archivo (intento ${attempt}):`, error);
+
+        // Si es un error de archivo bloqueado (EBUSY) y no es el último intento, esperar y reintentar
+        if (error.code === 'EBUSY' && attempt < maxRetries) {
+          console.log(`Archivo bloqueado, esperando ${retryDelay}ms antes del siguiente intento...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+        } else {
+          // Si es cualquier otro error o ya intentamos el máximo número de veces, devolver error
+          return {
+            success: false,
+            error: error.message,
+            attempt: attempt
+          };
+        }
+      }
+    }
+  }
+
   async function getPresupuestoFiles(companyName) {
     try {
       // Cargar la configuración
@@ -3129,7 +3036,7 @@ const registerIPCHandlers = () => {
 
       // Buscar la ruta base de la empresa
       let basePath = null;
-      
+
       if (config.companyPaths && config.companyPaths[companyName]) {
         basePath = config.companyPaths[companyName].root || config.companyPaths[companyName].ruta_base;
       }
@@ -3152,11 +3059,11 @@ const registerIPCHandlers = () => {
               const subDirFiles = await findBudgetFiles(fullPath);
               files.push(...subDirFiles);
             } else if (
-              (entry.name.toLowerCase().includes('presupuesto') || 
-               entry.name.toLowerCase().includes('costo') || 
-               entry.name.toLowerCase().includes('gasto') || 
+              (entry.name.toLowerCase().includes('presupuesto') ||
+               entry.name.toLowerCase().includes('costo') ||
+               entry.name.toLowerCase().includes('gasto') ||
                entry.name.toLowerCase().includes('recurso') ||
-               entry.name.toLowerCase().includes('asignacion')) && 
+               entry.name.toLowerCase().includes('asignacion')) &&
               (entry.name.endsWith('.xlsx') || entry.name.endsWith('.xls'))
             ) {
               const stats = await fsp.stat(fullPath);
@@ -3176,7 +3083,7 @@ const registerIPCHandlers = () => {
       }
 
       const budgetFiles = await findBudgetFiles(basePath);
-      
+
       // Si no se encontraron archivos usando el método tradicional, buscar archivos Excel genéricos
       if (budgetFiles.length === 0) {
         async function findAllExcelFiles(dir) {
@@ -3192,9 +3099,9 @@ const registerIPCHandlers = () => {
                 // Verificar si el nombre contiene palabras relacionadas con recursos o presupuesto
                 const lowerName = entry.name.toLowerCase();
                 if (
-                  lowerName.includes('presupuesto') || 
-                  lowerName.includes('costo') || 
-                  lowerName.includes('gasto') || 
+                  lowerName.includes('presupuesto') ||
+                  lowerName.includes('costo') ||
+                  lowerName.includes('gasto') ||
                   lowerName.includes('recurso') ||
                   lowerName.includes('asignacion') ||
                   lowerName.includes('sg-sst') ||
@@ -3227,7 +3134,7 @@ const registerIPCHandlers = () => {
           };
         }
       }
-      
+
       // Si no se encontraron archivos reales, incluir un archivo de ejemplo
       if (budgetFiles.length === 0) {
         sendLog(`[MAIN] No se encontraron archivos reales de presupuesto para ${companyName}, mostrando archivo de ejemplo`, 'INFO');
@@ -3263,7 +3170,7 @@ const registerIPCHandlers = () => {
           };
         }
       }
-      
+
       return {
         success: true,
         files: budgetFiles

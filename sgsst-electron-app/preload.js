@@ -77,7 +77,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // --- Presupuesto ---
   getPresupuestoFiles: (companyName) => ipcRenderer.invoke('getPresupuestoFiles', companyName),
   readPresupuestoData: (filePath) => ipcRenderer.invoke('readPresupuestoData', filePath),
-  savePresupuestoChanges: (filePath, changes, data) => ipcRenderer.invoke('savePresupuestoChanges', filePath, changes, data),
+  saveBudgetFile: (filePath, data) => ipcRenderer.invoke('saveBudgetFile', filePath, data),
   openBudgetWindow: (file) => ipcRenderer.invoke('open-budget-window', file),
 
   // --- Accidentes ---

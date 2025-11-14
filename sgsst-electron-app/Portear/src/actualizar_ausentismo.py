@@ -25,8 +25,8 @@ def buscar_empleado_por_cedula(cedula, empresa):
         # --- 1. Rutas de bases de datos ---
         BASES_DATOS = {
             "TEMPOACTIVA": "G:/Mi unidad/2. Trabajo/1. SG-SST/2. Temporales Comfa/1. Tempoactiva Est SAS/Base de Datos Personal Temporales.xlsx",
-            "TEMPOSUM": "G:/Mi unidad/2. Trabajo/1. SG-SST/2. Temporales Comfa/1. Temposum Est SAS/Base de Datos Personal Temporales.xlsx",
-            "ASEPLUS": "G:/Mi unidad/2. Trabajo/1. SG-SST/2. Temporales Comfa/1. Aseplus/Base de Datos Personal Temporales.xlsx",
+            "TEMPOSUM": "G:/Mi unidad/2. Trabajo/1. SG-SST/2. Temporales Comfa/1. Tempoactiva Est SAS/Base de Datos Personal Temporales.xlsx",
+            "ASEPLUS": "G:/Mi unidad/2. Trabajo/1. SG-SST/2. Temporales Comfa/1. Tempoactiva Est SAS/Base de Datos Personal Temporales.xlsx",
             "ASEL": "G:/Mi unidad/2. Trabajo/1. SG-SST/19. Asel S.A.S/Formato - Base de datos personal ASEL.xlsx"
         }
 
@@ -37,6 +37,14 @@ def buscar_empleado_por_cedula(cedula, empresa):
             log("ERROR: No existe ruta configurada para la empresa solicitada.")
             print(json.dumps({"type": "result", "payload": {"success": False, "error": "Ruta base de datos no configurada"}}))
             return None
+
+        log(f"DEBUG: Verificando ruta: {db_path}")
+        log(f"DEBUG: os.path.exists(db_path): {os.path.exists(db_path)}")
+        log(f"DEBUG: os.path.isfile(db_path): {os.path.isfile(db_path)}")
+        log(f"DEBUG: os.path.isdir(os.path.dirname(db_path)): {os.path.isdir(os.path.dirname(db_path))}")
+        log(f"DEBUG: os.getcwd(): {os.getcwd()}")
+        log(f"DEBUG: sys.version: {sys.version}")
+        log(f"DEBUG: sys.executable: {sys.executable}")
 
         if not os.path.exists(db_path):
             log(f"ERROR: Archivo no encontrado en ruta: {db_path}")
