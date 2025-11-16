@@ -340,6 +340,7 @@ function displayPDF(pdfData) {
 
     const viewerContainer = document.getElementById('viewerContainer');
     viewerContainer.style.display = 'block';
+    // Set initial src without hash, applyZoom will add it
     viewerContainer.innerHTML = `<iframe class="pdf-viewer" src="data:application/pdf;base64,${pdfData}"></iframe>`;
 
     currentViewer = 'pdf';
@@ -347,6 +348,12 @@ function displayPDF(pdfData) {
     currentPage = 1;
 
     updatePageInfo();
+
+    // Apply initial settings
+    // Use a small timeout to ensure the iframe is in the DOM before we manipulate its src
+    setTimeout(() => {
+        applyOrientation(); // This will also call applyZoom
+    }, 100);
 }
 
 // Mostrar Excel
@@ -437,8 +444,49 @@ function downloadDocument() {
     }
 }
 
-function applyZoom() { /* Lógica para aplicar zoom */ }
-function applyOrientation() { /* Lógica para aplicar orientación */ }
+function applyZoom() {
+    const iframe = document.querySelector('.pdf-viewer');
+    if (!iframe) return;
+
+    let src = iframe.src.split('#')[0]; // Get base src without any hash
+    let zoomParam = '';
+
+    switch (currentZoom) {
+        case 'page-width':
+            zoomParam = '#view=FitH'; // Fit horizontally
+            break;
+        case 'page-height':
+            zoomParam = '#view=FitV'; // Fit vertically
+            break;
+        case 'auto':
+            zoomParam = '#view=Fit'; // Fit whole page
+            break;
+        default: // For percentage values like "50%", "100%"
+            const percent = parseInt(currentZoom, 10);
+            if (!isNaN(percent)) {
+                zoomParam = `#zoom=${percent}`;
+            } else {
+                zoomParam = '#view=Fit';
+            }
+            break;
+    }
+    
+    console.log(`Applying zoom: ${zoomParam}`);
+    iframe.src = src + zoomParam;
+}
+
+function applyOrientation() {
+    // Link orientation to a zoom level for simplicity
+    if (currentOrientation === 'horizontal') {
+        document.getElementById('zoomLevel').value = 'page-width';
+        currentZoom = 'page-width';
+    } else {
+        document.getElementById('zoomLevel').value = 'auto';
+        currentZoom = 'auto';
+    }
+    applyZoom();
+}
+
 function previousPage() { /* Lógica para cambiar de página */ }
 function nextPage() { /* Lógica para cambiar de página */ }
 
