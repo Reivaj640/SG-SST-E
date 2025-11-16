@@ -286,6 +286,109 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   console.log('DOM elements found:', { contentArea, sidebarMenu, companyNameElement, companyLogoElement, companyLogoPlaceholder });
 
+  // --- BEGIN: Iframe Communication Logic ---
+  window.addEventListener('message', async (event) => {
+      // IMPORTANT: Validate the origin for security
+      // For file:// protocol, origin is 'file://'. We also check if the source is a contentWindow of an iframe within our app.
+      if (event.origin !== 'file://' || !event.source) {
+          return;
+      }
+
+      const { type, payload, requestId } = event.data;
+      console.log('RENDERER: Message received from iframe:', { type, payload, requestId });
+
+      // Find the iframe that sent the message
+      const iframes = document.querySelectorAll('iframe');
+      let sourceIframe = null;
+      for (const iframe of iframes) {
+          if (iframe.contentWindow === event.source) {
+              sourceIframe = iframe;
+              break;
+          }
+      }
+
+      if (!sourceIframe) {
+          console.warn('RENDERER: Message received from an unknown source. Ignoring.');
+          return;
+      }
+
+      let apiCallFunction;
+      let apiCallArgs;
+      let responseType = type.replace('-request', '-response');
+
+      try {
+          switch (type) {
+              case 'get-document-folders-request':
+                  // Lógica simplificada: Llama directamente al manejador unificado del proceso principal.
+                  apiCallFunction = window.electronAPI.getDocumentFolders;
+                  apiCallArgs = [payload];
+                  break;
+              case 'get-documents-in-folder-request':
+                  // --- SIMPLIFIED LOGIC ---
+                  // This now correctly points to a handler that just reads a directory.
+                  apiCallFunction = window.electronAPI.getFolderContents;
+                  apiCallArgs = [payload]; // payload is the folderPath string
+                  break;
+              case 'get-pdf-preview-request':
+                  apiCallFunction = window.electronAPI.getPDFPreview;
+                  apiCallArgs = [payload.filePath]; // Ensure payload is destructured
+                  break;
+              case 'get-excel-preview-request':
+                  apiCallFunction = window.electronAPI.getExcelPreview;
+                  apiCallArgs = [payload.filePath]; // Ensure payload is destructured
+                  break;
+              case 'get-word-preview-request':
+                  apiCallFunction = window.electronAPI.getWordPreview;
+                  apiCallArgs = [payload.filePath]; // Ensure payload is destructured
+                  break;
+              case 'download-document-request':
+                  apiCallFunction = window.electronAPI.downloadDocument; // Assuming this API exists
+                  apiCallArgs = [payload]; // payload is the filePath string
+                  break;
+              case 'back-to-module-request':
+                  // This is a UI navigation request, not an API call to main process
+                  // We handle it directly here and don't send a response back to iframe
+                  console.log('RENDERER: Received back-to-module-request from iframe.');
+                  // Assuming showModuleContent is available in renderer.js scope
+                  // and currentModule is correctly set.
+                  if (currentModule) {
+                      currentSubmodule = null; // Clear submodule state
+                      showModuleContent(currentModule);
+                  } else {
+                      showHomePage(); // Fallback to home if no current module
+                  }
+                  return; // Exit after handling navigation
+              default:
+                  console.warn(`RENDERER: Unknown message type received from iframe: ${type}`);
+                  sourceIframe.contentWindow.postMessage({
+                      type: responseType,
+                      payload: { success: false, error: `Unknown request type: ${type}` },
+                      requestId: requestId
+                  }, 'file://');
+                  return;
+          }
+
+          console.log(`RENDERER: 🗣️ Calling main process for ${type} with args:`, apiCallArgs);
+          const result = await apiCallFunction(...apiCallArgs);
+          console.log('RENDERER: 📥 Result from main process:', result);
+
+          sourceIframe.contentWindow.postMessage({
+              type: responseType,
+              payload: result,
+              requestId: requestId
+          }, 'file://');
+
+      } catch (error) {
+          console.error(`RENDERER: 😭 Error processing ${type}:`, error);
+          sourceIframe.contentWindow.postMessage({
+              type: responseType,
+              payload: { success: false, error: error.message },
+              requestId: requestId
+          }, 'file://');
+      }
+  });
+  // --- END: Iframe Communication Logic ---
+
   // --- BEGIN: Collapsible Sidebar Logic ---
   const sidebar = document.getElementById('sidebar');
   if (sidebar) {

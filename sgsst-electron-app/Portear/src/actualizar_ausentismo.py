@@ -27,6 +27,7 @@ def buscar_empleado_por_cedula(cedula, empresa):
             "TEMPOACTIVA": "G:/Mi unidad/2. Trabajo/1. SG-SST/2. Temporales Comfa/1. Tempoactiva Est SAS/Base de Datos Personal Temporales.xlsx",
             "TEMPOSUM": "G:/Mi unidad/2. Trabajo/1. SG-SST/2. Temporales Comfa/1. Tempoactiva Est SAS/Base de Datos Personal Temporales.xlsx",
             "ASEPLUS": "G:/Mi unidad/2. Trabajo/1. SG-SST/2. Temporales Comfa/1. Tempoactiva Est SAS/Base de Datos Personal Temporales.xlsx",
+            "ASEL": "G:/Mi unidad/2. Trabajo/1. SG-SST/19. Asel S.A.S/Formato - Base de datos personal ASEL.xlsx",
             "ASEL": "G:/Mi unidad/2. Trabajo/1. SG-SST/19. Asel S.A.S/Formato - Base de datos personal ASEL.xlsx"
         }
 
@@ -134,7 +135,7 @@ def buscar_empleado_por_cedula(cedula, empresa):
             log("WARNING: no se pudo serializar fila encontrada para preview")
 
         # Reconstruir nombre si necesario
-        posibles_nombres = ["Nombre Completo", "NOMBRE COMPLETO", "NOMBRE", "NOMBRES", "NOMBRES Y APELLIDOS"]
+        posibles_nombres = ["Nombre Completo", "NOMBRE COMPLETO", "NOMBRE", "NOMBRES", "NOMBRES Y APELLIDOS", "NOMBRES COMPLETOS FORMATO"]
         col_nombre = next((c for c in df.columns if c.strip().upper() in [p.upper() for p in posibles_nombres]), None)
         nombre_completo = row.get(col_nombre) if col_nombre else None
         if not nombre_completo or pd.isna(nombre_completo) or not str(nombre_completo).strip():
@@ -168,6 +169,14 @@ def buscar_empleado_por_cedula(cedula, empresa):
             "entidad": (row.get(col_entidad) or "") if col_entidad else "",  # EPS/SURA
             "_fila_index": int(row.name)
         }
+
+        # Lógica específica para la empresa ASEL
+        if str(empresa).upper() == "ASEL":
+            result["empresa_usuaria"] = "Comfamiliar"
+            col_sede = next((c for c in df.columns if 'SEDE' in str(c).upper()), None)
+            if col_sede:
+                result["area"] = row.get(col_sede) or ""
+            log(f"DEBUG ASEL: empresa_usuaria='{result['empresa_usuaria']}', area='{result['area']}'")
 
         # Emitir resultado final como JSON (línea única para que Node lo parsee)
         print(json.dumps({"type": "result", "payload": {"success": True, "datos": result}}, ensure_ascii=False))

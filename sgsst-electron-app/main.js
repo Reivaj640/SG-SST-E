@@ -162,3077 +162,679 @@ const createWindow = () => {
   // mainWindow.webContents.openDevTools();
 };
 
+// Función para buscar rutas en la estructura mapeada
+function searchInStructure(node, searchTerm) {
+  // Si el nombre del nodo contiene el término de búsqueda, devolver la ruta
+  if (node.name && node.name.includes(searchTerm)) {
+    return node.path;
+  }
 
-
-  // Manejar selección de directorio
-  ipcMain.handle('select-directory', async () => {
-    console.log('Handling select-directory request');
-    const result = await dialog.showOpenDialog({
-      properties: ['openDirectory']
-    });
-
-    if (result.canceled) {
-      console.log('Directory selection canceled');
-      return null;
+  // Si tiene subdirectorios, buscar recursivamente en ellos
+  if (node.subdirectories) {
+    for (const key in node.subdirectories) {
+      const result = searchInStructure(node.subdirectories[key], searchTerm);
+      if (result) {
+        return result; // Devolver la primera coincidencia encontrada
+      }
     }
+  }
 
-    console.log('Selected directory:', result.filePaths[0]);
-    return result.filePaths[0];
+  // Si no se encuentra en este nodo ni en sus hijos, devolver null
+  return null;
+}
+
+// Manejar selección de directorio
+ipcMain.handle('select-directory', async () => {
+  console.log('Handling select-directory request');
+  const result = await dialog.showOpenDialog({
+    properties: ['openDirectory']
   });
 
-  // Manejar guardado de configuración
-  ipcMain.handle('save-config', async (event, config) => {
-    try {
-      console.log('Saving config:', config);
-      await fsp.writeFile(configPath, JSON.stringify(config, null, 2));
-      console.log('Config saved successfully');
-      return { success: true };
-    } catch (error) {
-      console.error('Error saving config:', error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  // Manejar carga de configuración
-  ipcMain.handle('load-config', async () => {
-    try {
-      console.log('Loading config from:', configPath);
-      const data = await fsp.readFile(configPath, 'utf8');
-      const config = JSON.parse(data);
-      console.log('Config loaded successfully');
-      return config;
-    } catch (error) {
-      // Si el archivo no existe, devolver objeto vacío
-      if (error.code === 'ENOENT') {
-        console.log('Config file not found, returning empty object');
-        return {};
-      }
-      console.error('Error loading config:', error);
-      return {};
-    }
-  });
-
-  // Manejar lectura de datos del archivo de control de remisiones
-  ipcMain.handle('get-control-remisiones-data', async (event, companyName) => {
-    sendLog(`[MAIN] Handler get-control-remisiones-data llamado para empresa: ${companyName}`);
-
-    try {
-      // Función auxiliar para búsqueda recursiva
-      async function findFileRecursive(dir, fileName) {
-        try {
-          const entries = await fsp.readdir(dir, { withFileTypes: true });
-          for (const entry of entries) {
-            const fullPath = path.join(dir, entry.name);
-            if (entry.isDirectory()) {
-              const result = await findFileRecursive(fullPath, fileName);
-              if (result) return result;
-            } else if (entry.name.toLowerCase() === fileName.toLowerCase()) {
-              return fullPath;
-            }
-          }
-        } catch (error) {
-          sendLog(`[MAIN] Error walking directory ${dir}: ` + error.message, 'WARN');
-        }
-        return null;
-      }
-
-      // Cargar configuración
-      sendLog(`[MAIN] Cargando configuración desde: ${configPath}`);
-      const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
-      const config = JSON.parse(configData);
-      sendLog(`[MAIN] Configuración cargada.`);
-
-      // Buscar mapeo de empresa - USANDO LA ESTRUCTURA CORRECTA
-      let basePath = null;
-
-      if (config.companyPaths && config.companyPaths[companyName]) {
-        basePath = config.companyPaths[companyName].root || config.companyPaths[companyName].ruta_base;
-        sendLog(`[MAIN] Usando ruta base de config.companyPaths[${companyName}]: ${basePath}`);
-      }
-
-      if (!basePath) {
-        const availableCompanies = config.companyPaths ? Object.keys(config.companyPaths) : [];
-        const error = `No se encontró configuración para la empresa "${companyName}". Empresas configuradas: [${availableCompanies.join(', ')}]`;
-        throw new Error(error);
-      }
-
-      sendLog(`[MAIN] Ruta base encontrada: ${basePath}`);
-
-      // Verificar que la ruta base exista
-      await fsp.access(basePath);
-      sendLog(`[MAIN] Ruta base verificada exitosamente`);
-
-      // Buscar archivo recursivamente
-      const fileName = 'GI-FO-012 CONTROL DE REMISIONES.xlsx';
-      sendLog(`[MAIN] Iniciando búsqueda recursiva de: ${fileName}`);
-      const excelFilePath = await findFileRecursive(basePath, fileName);
-
-      if (!excelFilePath) {
-        throw new Error(`Archivo "${fileName}" no encontrado para empresa "${companyName}" en la ruta "${basePath}"`);
-      }
-
-      sendLog(`[MAIN] Archivo Excel encontrado: ${excelFilePath}`);
-
-      // Leer y procesar Excel
-      sendLog(`[MAIN] Leyendo archivo Excel...`);
-      const workbook = xlsx.readFile(excelFilePath);
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-
-      // Obtener el rango de datos
-      const range = xlsx.utils.decode_range(worksheet['!ref']);
-      sendLog(`[MAIN] Rango de datos en la hoja: ${worksheet['!ref']}`);
-
-      // Definir el rango para leer desde la fila 7 (índice 6 en base 0)
-      const startRow = 6; // Fila 7
-      const endRow = range.e.r; // Última fila
-
-      // Crear un nuevo rango que comience desde la fila 7
-      const newRange = {
-        s: { c: range.s.c, r: startRow }, // Comenzar desde la columna 0, fila 7
-        e: { c: range.e.c, r: endRow }    // Terminar en la última columna y fila
-      };
-
-      // Convertir el rango a string
-      const rangeStr = xlsx.utils.encode_range(newRange);
-      sendLog(`[MAIN] Rango para lectura: ${rangeStr}`);
-
-      // Leer los datos desde la fila 7
-      const allData = xlsx.utils.sheet_to_json(worksheet, {
-        header: 1,
-        range: rangeStr
-      });
-
-      sendLog(`[MAIN] Datos extraídos. Total filas: ${allData.length}`);
-
-      if (allData.length < 1) {
-          sendLog('[MAIN] Archivo Excel no contiene datos suficientes.', 'WARN');
-          return {
-              success: true,
-              headers: [],
-              rows: [],
-              message: 'Archivo no contiene filas de datos.',
-              filePath: excelFilePath,
-              companyName
-          };
-      }
-
-      // La primera fila ahora será los encabezados (fila 7 del Excel original)
-      const headers = allData[0]; // Fila 7 del Excel
-      const rows = allData.slice(1); // Filas 8 en adelante del Excel
-
-      sendLog(`[MAIN] Encabezados encontrados: ${headers.length} columnas`);
-      sendLog(`[MAIN] Datos de remisiones encontrados. Total filas: ${rows.length}`);
-
-      // Validar y ajustar la longitud de las filas
-      const expectedColumns = headers.length;
-      for (let i = 0; i < rows.length; i++) {
-        if (rows[i].length < expectedColumns) {
-          // Rellenar con cadenas vacías si faltan columnas
-          while (rows[i].length < expectedColumns) {
-            rows[i].push('');
-          }
-        } else if (rows[i].length > expectedColumns) {
-          // Truncar si hay demasiadas columnas
-          rows[i] = rows[i].slice(0, expectedColumns);
-        }
-      }
-
-      // Log para depuración
-      sendLog(`[MAIN] Primeras 3 filas de datos:`, 'DEBUG');
-      for(let i = 0; i < Math.min(3, rows.length); i++) {
-        sendLog(`[MAIN] Fila ${i+1}: ${JSON.stringify(rows[i])}`, 'DEBUG');
-      }
-
-      return {
-        success: true,
-        headers: headers,
-        rows: rows,
-        filePath: excelFilePath,
-        companyName
-      };
-
-    } catch (error) {
-      sendLog(`[MAIN] Error crítico en get-control-remisiones-data: ${error.message}`, 'ERROR');
-      return {
-        success: false,
-        error: error.message,
-        stack: error.stack,
-        companyName
-      };
-    }
-  });
-
-  // Manejar mapeo de directorio
-  ipcMain.handle('map-directory', async (event, directoryPath) => {
-    try {
-      console.log('Mapping directory:', directoryPath);
-      const pythonPath = await getPython();
-      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'map_directory.py');
-
-      console.log(`Executing command: ${pythonPath} "${pythonScriptPath}" "${directoryPath}"`);
-
-      const { stdout, stderr } = await execFilePromise(pythonPath, [pythonScriptPath, directoryPath], { cwd: path.dirname(pythonScriptPath) });
-
-      const structure = JSON.parse(stdout);
-      console.log('Directory mapping completed successfully');
-
-      return { success: true, structure: structure, log: stderr || 'Mapeo completado sin errores.' };
-    } catch (error) {
-      console.error('Error mapping directory:', error);
-      throw error;
-    }
-  });
-
-  // Manejar lectura de contenido de directorio
-  ipcMain.handle('read-directory', async (event, directoryPath) => {
-    try {
-      console.log('Reading directory:', directoryPath);
-      const items = await fsp.readdir(directoryPath, { withFileTypes: true });
-
-      const result = [];
-      for (const item of items) {
-        const itemPath = path.join(directoryPath, item.name);
-        const stats = await fsp.stat(itemPath);
-
-        result.push({
-          name: item.name,
-          path: itemPath,
-          isDirectory: item.isDirectory(),
-          size: stats.size,
-          created: stats.birthtime,
-          modified: stats.mtime
-        });
-      }
-
-      console.log('Directory read successfully');
-      return result;
-    } catch (error) {
-      console.error('Error reading directory:', error);
-      throw error;
-    }
-  });
-
-  // Manejar apertura de archivo o carpeta
-  ipcMain.handle('open-path', async (event, pathToOpen) => {
-    try {
-      console.log('Opening path:', pathToOpen);
-      await shell.openPath(pathToOpen);
-      console.log('Path opened successfully');
-      return { success: true };
-    } catch (error) {
-      console.error('Error opening path:', error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  // Manejar lectura de archivo Excel como buffer
-  ipcMain.handle('read-excel-file', async (event, filePath) => {
-    try {
-      sendLog(`[MAIN] Leyendo archivo Excel desde: ${filePath}`, 'INFO');
-
-      // Verificar que la ruta del archivo exista
-      await fsp.access(filePath);
-
-      // Leer el archivo como un buffer
-      const buffer = await fsp.readFile(filePath);
-
-      sendLog(`[MAIN] Archivo leído exitosamente. Tamaño del buffer: ${buffer.length} bytes`, 'INFO');
-
-      return { success: true, data: buffer };
-    } catch (error) {
-      sendLog(`[MAIN] Error al leer el archivo Excel: ${error.message}`, 'ERROR');
-      return { success: false, error: error.message };
-    }
-  });
-
-  // Manejador para obtener la lista de archivos de presupuesto
-  ipcMain.handle('getPresupuestoFiles', async (event, companyName) => {
-    sendLog(`[MAIN] Buscando archivos de presupuesto para: ${companyName} en el submódulo 1.1.3.`);
-    try {
-        const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
-        const config = JSON.parse(configData);
-
-        // --- Lógica para encontrar la ruta del submódulo "1.1.3 Asignación de Recursos" ---
-        const normalizedCompanyName = companyName.toLowerCase();
-        const companyKey = Object.keys(config.companyPaths || {}).find(
-            key => key.toLowerCase() === normalizedCompanyName
-        );
-
-        const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
-
-        if (!companyConfig || !companyConfig.structure?.structure) {
-            throw new Error(`Empresa "${companyName}" no tiene estructura mapeada.`);
-        }
-
-        const actualCompanyStructure = companyConfig.structure.structure;
-
-        // Corregido: searchInStructure devuelve una cadena de texto (la ruta) directamente.
-        const submodulePath = searchInStructure(actualCompanyStructure, "1.1.3");
-
-        if (!submodulePath) {
-            throw new Error(`No se encontró la ruta para el submódulo '1.1.3 Asignación de Recursos' para la empresa "${companyName}".`);
-        }
-
-        sendLog(`[MAIN] Ruta del submódulo '1.1.3 Asignación de Recursos' encontrada: ${submodulePath}`);
-        const searchPath = submodulePath;
-        // --- FIN Lógica para encontrar la ruta del submódulo ---
-
-        async function findBudgetFilesRecursive(dir) {
-            let files = [];
-            try {
-                const entries = await fsp.readdir(dir, { withFileTypes: true });
-                for (const entry of entries) {
-                    const fullPath = path.join(dir, entry.name);
-                    if (entry.isDirectory()) {
-                        files = files.concat(await findBudgetFilesRecursive(fullPath));
-                    } else if (
-                        !entry.name.startsWith('~$') &&
-                        (entry.name.toLowerCase().includes('presupuesto') ||
-                         entry.name.toLowerCase().includes('costo') ||
-                         entry.name.toLowerCase().includes('gasto') ||
-                         entry.name.toLowerCase().includes('recurso') ||
-                         entry.name.toLowerCase().includes('asignacion')) &&
-                        (entry.name.endsWith('.xlsx') || entry.name.endsWith('.xls'))
-                    ) {
-                        const stats = await fsp.stat(fullPath);
-                        files.push({
-                            name: entry.name,
-                            path: fullPath,
-                            size: stats.size,
-                            modified: stats.mtime
-                        });
-                    }
-                }
-            } catch (error) {
-                sendLog(`[WARN] No se pudo leer el directorio ${dir}: ${error.message}`);
-            }
-            return files;
-        }
-
-        let budgetFiles = await findBudgetFilesRecursive(searchPath); // Usar searchPath aquí
-
-        if (budgetFiles.length > 0) {
-             sendLog(`[MAIN] Encontrados ${budgetFiles.length} archivos de presupuesto con búsqueda robusta.`);
-             return { success: true, files: budgetFiles };
-        }
-
-        // Fallback si no se encuentra nada
-        sendLog(`[MAIN] No se encontraron archivos de presupuesto con búsqueda robusta, intentando fallback a archivo de ejemplo.`);
-        const ejemploPath = path.join(__dirname, 'utils', 'Presupuesto SG-SST.xlsx');
-        if (fs.existsSync(ejemploPath)) {
-            const stats = fs.statSync(ejemploPath);
-            return {
-                success: true,
-                files: [{
-                    name: 'Ejemplo_Presupuesto_SG-SST.xlsx',
-                    path: ejemploPath,
-                    size: stats.size,
-                    modified: stats.mtime
-                }],
-                empty: true, // Indicar que es un ejemplo
-                message: 'No se encontraron archivos de presupuesto reales. Se muestra un archivo de ejemplo.'
-            };
-        }
-
-        // Si ni siquiera el ejemplo existe
-        return { success: true, files: [], empty: true, message: 'No se encontraron archivos de presupuesto y el archivo de ejemplo no está disponible.' };
-
-    } catch (error) {
-        sendLog(`[MAIN] Error en getPresupuestoFiles: ${error.message}`, 'ERROR');
-        return { success: false, error: error.message };
-    }
-  });
-
-
-  // Manejar búsqueda de ruta de submódulo
-  ipcMain.handle('find-submodule-path', async (event, companyName, module, submodule) => {
-    try {
-      console.log(`[INFO] Finding path for company: ${companyName}, module: ${module}, submodule: ${submodule}`);
-
-      // Cargar la configuración
-      const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
-      const config = JSON.parse(configData);
-      console.log(`[DEBUG] Full config keys: [${Object.keys(config)}]`);
-
-      // Verificar si tenemos rutas de empresa para la empresa especificada
-      if (!config.companyPaths || !config.companyPaths[companyName]) {
-        const availableCompanies = config.companyPaths ? Object.keys(config.companyPaths) : [];
-        console.log(`[ERROR] Company '${companyName}' not found. Available: [${availableCompanies.join(', ')}]`);
-        throw new Error(`No configuration found for company: ${companyName}`);
-      }
-
-      // Obtener la estructura para esta empresa - Nivel 1
-      const companyStructureRoot = config.companyPaths[companyName];
-      console.log(`[DEBUG] Company root keys: [${Object.keys(companyStructureRoot)}]`);
-
-      // Obtener la estructura real que contiene las carpetas - Nivel 2 (ESTE ES EL CORRECTO)
-      // Según el config.json: config.companyPaths.Tempoactiva.structure.structure
-      const actualCompanyStructure = companyStructureRoot.structure?.structure;
-
-      if (!actualCompanyStructure) {
-          console.log(`[ERROR] Actual company structure (structure.structure) is missing or invalid.`, companyStructureRoot);
-          throw new Error(`Invalid structure found for company: ${companyName}`);
-      }
-
-      console.log(`[DEBUG] Actual structure name: '${actualCompanyStructure.name}', path: '${actualCompanyStructure.path}'`);
-      console.log(`[DEBUG] Actual structure subdirectories keys: [${Object.keys(actualCompanyStructure.subdirectories || {}).join(', ')}]`);
-
-      // Extraer el código del nombre del submódulo (ej. "1.1.1 Responsable del SG" -> "1.1.1")
-      const submoduleCode = submodule.match(/^[ -]+/);
-      if (!submoduleCode) {
-        console.log(`[ERROR] Invalid submodule name format: ${submodule}`);
-        throw new Error(`Invalid submodule name format: ${submodule}`);
-      }
-      const code = submoduleCode[0];
-      console.log(`[DEBUG] Extracted code: '${code}'`);
-
-      let foundPath = null;
-
-      // Para ciertos módulos conocidos, buscar primero el módulo y luego el submódulo dentro de él
-      // Asumimos que "Recursos" es uno de ellos basado en el log anterior.
-      if (module === "Recursos") {
-        const resourcesFolderName = "1. Recursos"; // Nombre fijo esperado
-
-        console.log(`[DEBUG] Searching for module '${module}' (folder: '${resourcesFolderName}') containing code '${code}'`);
-
-        // Verificar si la carpeta "1. Recursos" existe en el nivel raíz de la estructura
-        if (actualCompanyStructure.subdirectories && actualCompanyStructure.subdirectories[resourcesFolderName]) {
-            const resourcesFolderNode = actualCompanyStructure.subdirectories[resourcesFolderName];
-            console.log(`[DEBUG] Found '${resourcesFolderName}' folder. Searching inside it for code '${code}'...`);
-            // Buscar el submódulo (ej. "1.1.1 Responsable del SG") DENTRO de la carpeta "1. Recursos"
-            foundPath = searchInStructure(resourcesFolderNode, code);
-        } else {
-            console.log(`[WARN] Folder '${resourcesFolderName}' not found at root level. Available root folders: [${Object.keys(actualCompanyStructure.subdirectories || {}).join(', ')}]`);
-        }
-      }
-
-      // Si no se encontró en un módulo específico o no es un módulo conocido, buscar el código directamente en la raíz
-      if (!foundPath) {
-        console.log(`[DEBUG] Searching for code '${code}' directly in root structure...`);
-        foundPath = searchInStructure(actualCompanyStructure, code);
-      }
-
-      if (foundPath) {
-        console.log(`[SUCCESS] Found path for '${companyName}' -> '${module}' -> '${submodule}': ${foundPath}`);
-        return { success: true, path: foundPath };
-      } else {
-        console.log(`[WARN] Path not found for code: ${code} under module '${module}' or root.`);
-        return { success: false, error: `Path not found for module: ${module}, submodule: ${submodule} (code: ${code})` };
-      }
-    } catch (error) {
-      console.error('[CRITICAL ERROR] Error in find-submodule-path:', error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  // Función auxiliar para buscar una ruta en la estructura de directorio
-  // Busca coincidencias parciales del 'code' (ej. "1.1.1") en el 'name' de los directorios o archivos.
-  function searchInStructure(directoryNode, code, depth = 0) {
-    // Verificar que directoryNode no sea undefined, null o vacío
-    if (!directoryNode || typeof directoryNode !== 'object') {
-      console.log(`[searchInStructure] Invalid directory node received. Type: ${typeof directoryNode}`);
-      return null;
-    }
-
-    const indent = "  ".repeat(depth);
-    const nodeName = directoryNode.name || 'unnamed directory';
-    console.log(`${indent}[searchInStructure] Searching in: ${nodeName} (path: ${directoryNode.path || 'N/A'})`);
-
-    // Verificar archivos en el directorio actual
-    const files = directoryNode.files || [];
-    for (const file of files) {
-      if (file && file.name) {
-        // console.log(`${indent}  [searchInStructure] Checking file: ${file.name} (includes ${code})`); // Demasiado verbose
-        if (file.name.includes(code)) {
-          console.log(`${indent}  [searchInStructure] Found FILE match: ${file.path}`);
-          return file.path;
-        }
-      }
-    }
-
-    // Verificar subdirectorios
-    const subdirs = directoryNode.subdirectories || {};
-    // console.log(`${indent}  [searchInStructure] Subdirectories found: [${Object.keys(subdirs).join(', ')}]`); // Demasiado verbose
-
-    for (const [subDirName, subDirNode] of Object.entries(subdirs)) {
-      if (subDirName && subDirNode) {
-        // console.log(`${indent}    [searchInStructure] Checking subdirectory: '${subDirName}' (includes '${code}')`); // Demasiado verbose
-        // ✅ Buscar coincidencia parcial en el nombre de la carpeta (subDirName)
-        if (subDirName.includes(code)) {
-          console.log(`${indent}    [searchInStructure] Found DIRECTORY match: ${subDirNode.path}`);
-          return subDirNode.path;
-        }
-
-        // Si no, seguir buscando recursivamente dentro de ese subdirectorio
-        const foundPath = searchInStructure(subDirNode, code, depth + 1);
-        if (foundPath) {
-          return foundPath;
-        }
-      }
-    }
-
+  if (result.canceled) {
+    console.log('Directory selection canceled');
     return null;
   }
 
-  // Manejar procesamiento de PDF
-  ipcMain.handle('process-remision-pdf', async (event, pdfPath) => {
-    sendLog(`IPC: process-remision-pdf recibido para: ${pdfPath}`);
-    try {
-      const pythonPath = await getPython();
-      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'process_pdf_cli.py');
+  console.log('Selected directory:', result.filePaths[0]);
+  return result.filePaths[0];
+});
 
-      sendLog(`Ejecutando script de Python: ${pythonPath} "${pythonScriptPath}" "${pdfPath}"`);
-      const { stdout, stderr } = await execFilePromise(pythonPath, [pythonScriptPath, pdfPath], { cwd: path.dirname(pythonScriptPath) });
+// Manejar guardado de configuración
+ipcMain.handle('save-config', async (event, config) => {
+  try {
+    console.log('Saving config:', config);
+    await fsp.writeFile(configPath, JSON.stringify(config, null, 2));
+    console.log('Config saved successfully');
+    return { success: true };
+  } catch (error) {
+    console.error('Error saving config:', error);
+    return { success: false, error: error.message };
+  }
+});
 
-      if (stderr) {
-        sendLog(`Error en script de procesamiento de PDF: ${stderr}`, 'ERROR');
+// Manejar carga de configuración
+ipcMain.handle('load-config', async () => {
+  try {
+    console.log('Loading config from:', configPath);
+    const data = await fsp.readFile(configPath, 'utf8');
+    const config = JSON.parse(data);
+    console.log('Config loaded successfully');
+    return config;
+  } catch (error) {
+    // Si el archivo no existe, devolver objeto vacío
+    if (error.code === 'ENOENT') {
+      console.log('Config file not found, returning empty object');
+      return {};
+    }
+    console.error('Error loading config:', error);
+    return {};
+  }
+});
+
+// Manejar la obtención de la versión de la aplicación
+ipcMain.handle('get-app-version', async () => {
+  try {
+    console.log('Handling get-app-version request');
+    return app.getVersion();
+  } catch (error) {
+    console.error('Error getting app version:', error);
+    return '1.0.0'; // Valor por defecto en caso de error
+  }
+});
+
+// Manejar lectura de carpetas de documentos (versión corregida y unificada)
+ipcMain.handle('get-document-folders', async (event, payload) => {
+  const { companyName, moduleName, submoduleName } = payload;
+  sendLog(`[MAIN][get-document-folders] Solicitud unificada para: Empresa=${companyName}, Módulo=${moduleName}, Submódulo=${submoduleName}`, 'INFO');
+
+  try {
+    // --- 1. Encontrar la ruta del submódulo (lógica de 'find-submodule-path') ---
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+
+    if (!config.companyPaths || !config.companyPaths[companyName]) {
+      throw new Error(`No se encontró configuración para la empresa: ${companyName}`);
+    }
+    const actualCompanyStructure = config.companyPaths[companyName]?.structure?.structure;
+    if (!actualCompanyStructure) {
+        throw new Error(`La estructura de directorios para la empresa '${companyName}' es inválida o no está mapeada.`);
+    }
+
+    const submoduleCodeMatch = submoduleName.match(/^[0-9.]+/);
+    if (!submoduleCodeMatch) {
+      throw new Error(`Formato de nombre de submódulo inválido: ${submoduleName}`);
+    }
+    const code = submoduleCodeMatch[0];
+    sendLog(`[MAIN][get-document-folders] Código de submódulo extraído: '${code}'`, 'DEBUG');
+
+    let submodulePath = null;
+    // Búsqueda específica para módulos que actúan como carpetas contenedoras
+    if (moduleName === "Recursos") {
+      const resourcesFolderName = "1. Recursos";
+      if (actualCompanyStructure.subdirectories && actualCompanyStructure.subdirectories[resourcesFolderName]) {
+          const resourcesFolderNode = actualCompanyStructure.subdirectories[resourcesFolderName];
+          submodulePath = searchInStructure(resourcesFolderNode, code);
+          if(submodulePath) sendLog(`[MAIN][get-document-folders] Ruta encontrada dentro de '${resourcesFolderName}': ${submodulePath}`, 'DEBUG');
       }
+    }
+    // Fallback: buscar en toda la estructura si no se encontró antes
+    if (!submodulePath) {
+      submodulePath = searchInStructure(actualCompanyStructure, code);
+      if(submodulePath) sendLog(`[MAIN][get-document-folders] Ruta encontrada en la estructura raíz: ${submodulePath}`, 'DEBUG');
+    }
 
-      // Procesar el stream de logs y el resultado final
-      let finalResult = null;
-      const lines = stdout.split(/\r?\n/).filter(line => line.trim() !== '');
-      lines.forEach(line => {
-        try {
-          const output = JSON.parse(line);
-          if (output.type === 'log') {
-            sendLog(`[Python] ${output.message}`, output.level);
-          } else if (output.type === 'result') {
-            finalResult = output.payload; // Estandarizado para usar siempre el payload
-          }
-        } catch (e) {
-          sendLog(`No se pudo parsear la línea de salida de Python: ${line}`, 'WARN');
-        }
-      });
+    if (!submodulePath) {
+      throw new Error(`No se pudo encontrar la ruta para el submódulo '${submoduleName}' en la estructura de la empresa.`);
+    }
+    sendLog(`[MAIN][get-document-folders] Ruta resuelta: ${submodulePath}`, 'INFO');
 
-      if (finalResult) {
-        // Log del texto completo del PDF si está presente en el resultado
-        if (finalResult.debug_full_text) {
-          sendLog(`Texto extraído del PDF ${path.basename(pdfPath)}:\n---\nINICIO ---\n${finalResult.debug_full_text}\n--- FIN ---`, 'DEBUG');
-          delete finalResult.debug_full_text;
-        }
-        sendLog('Procesamiento de PDF completado exitosamente.');
-        return finalResult;
+    // --- 2. Leer el contenido de la ruta encontrada (lógica de 'get-document-folders' original) ---
+    const fullPath = submodulePath; // La ruta del mapeo ya es absoluta
+
+    if (!fs.existsSync(fullPath)) {
+      sendLog(`[MAIN][get-document-folders] La ruta resuelta no existe en el sistema de archivos: ${fullPath}`, 'ERROR');
+      return { success: false, error: `La ruta no existe: ${fullPath}` };
+    }
+
+    const items = await fsp.readdir(fullPath, { withFileTypes: true });
+    const result = { success: true, folders: [], files: [], path: fullPath };
+
+    for (const item of items) {
+      const itemPath = path.join(fullPath, item.name);
+      if (item.isDirectory()) {
+        result.folders.push({ name: item.name, path: itemPath });
       } else {
-        throw new Error("El script de Python no devolvió un resultado final.");
+        const stats = await fsp.stat(itemPath);
+        result.files.push({
+          name: item.name,
+          path: itemPath,
+          size: stats.size,
+          modified: stats.mtime,
+          extension: path.extname(item.name).substring(1) // Extensión para el icono en el frontend
+        });
       }
-
-    } catch (error) {
-      sendLog(`Fallo en la ejecución del script de procesamiento de PDF: ${error.message}`, 'ERROR');
-      return { success: false, error: error.message, traceback: error.stack };
     }
-  });
 
-  // Manejar conversión de DOCX a PDF para previsualización
-  ipcMain.handle('convert-docx-to-pdf', async (event, docxPath) => {
-    try {
-      const pythonPath = await getPython();
-      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'convert_docx_to_pdf.py');
+    sendLog(`[MAIN][get-document-folders] Encontrados ${result.folders.length} carpetas y ${result.files.length} archivos en ${fullPath}`, 'INFO');
+    return result;
 
-      console.log(`Executing DOCX conversion for: ${docxPath}`);
-      const { stdout, stderr } = await execFilePromise(pythonPath, [pythonScriptPath, docxPath], { cwd: path.dirname(pythonScriptPath) });
+  } catch (error) {
+    sendLog(`[MAIN][get-document-folders] Error crítico: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
 
-      // Si stderr contiene nuestro error JSON específico, lo procesamos como error.
-      if (stderr && stderr.includes('"success": false')) {
-        try {
-          const errJsonMatch = stderr.match(/\{.*\}/s);
-          if (errJsonMatch && errJsonMatch[0]) {
-            return JSON.parse(errJsonMatch[0]);
+// Manejar lectura de datos del archivo de control de remisiones
+ipcMain.handle('get-control-remisiones-data', async (event, companyName) => {
+  sendLog(`[MAIN] Handler get-control-remisiones-data llamado para empresa: ${companyName}`);
+
+  try {
+    // Función auxiliar para búsqueda recursiva
+    async function findFileRecursive(dir, fileName) {
+      try {
+        const entries = await fsp.readdir(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            const result = await findFileRecursive(fullPath, fileName);
+            if (result) return result;
+          } else if (entry.name.toLowerCase() === fileName.toLowerCase()) {
+            return fullPath;
           }
-          // Fallback si la expresión regular falla
-          throw new Error(`Error en script (no se pudo parsear JSON de error): ${stderr}`);
-        } catch (e) {
-          throw new Error(`Error al procesar error del script: ${stderr}`);
         }
+      } catch (error) {
+        sendLog(`[MAIN] Error walking directory ${dir}: ` + error.message, 'WARN');
       }
-
-      // Si stderr solo contenía la barra de progreso, lo ignoramos y confiamos en stdout.
-      if (!stdout) {
-        const errorMessage = stderr ? `El script produjo un error o mensaje inesperado: ${stderr}` : 'El script de conversión no produjo ninguna salida.';
-        throw new Error(errorMessage);
-      }
-
-      // Buscamos el JSON de éxito en stdout.
-      const jsonMatch = stdout.match(/\{.*\}/s);
-      if (jsonMatch && jsonMatch[0]) {
-        try {
-          return JSON.parse(jsonMatch[0]);
-        } catch (e) {
-          throw new Error(`Error al parsear la salida JSON del script: ${e.message}. Salida recibida: ${stdout}`);
-        }
-      }
-
-      throw new Error(`No se encontró una respuesta JSON válida en la salida del script. Salida recibida: ${stdout}`);
-
-    } catch (error) {
-      console.error('Error executing DOCX conversion script:', error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  // Manejar selección de archivo PDF
-  ipcMain.handle('select-pdf-file', async () => {
-    console.log('Handling select-pdf-file request');
-    const result = await dialog.showOpenDialog({
-      properties: ['openFile'],
-      filters: [{ name: 'PDF Files', extensions: ['pdf'] }]
-    });
-
-    if (result.canceled) {
-      console.log('PDF file selection canceled');
       return null;
     }
 
-    console.log('Selected PDF file:', result.filePaths[0]);
-    return result.filePaths[0];
-  });
+    // Cargar configuración
+    sendLog(`[MAIN] Cargando configuración desde: ${configPath}`);
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+    sendLog(`[MAIN] Configuración cargada.`);
 
+    // Buscar mapeo de empresa - USANDO LA ESTRUCTURA CORRECTA
+    let basePath = null;
 
-
-  // Manejar generación de documento de remisión
-  ipcMain.handle('generate-remision-document', async (event, extractedData, empresa) => {
-    sendLog(`IPC: generate-remision-document recibido para empresa: ${empresa}`);
-    try {
-      const pythonPath = await getPython();
-      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'remision_utils.py');
-      const tempDataPath = path.join(app.getPath('temp'), `remision_data_${Date.now()}.json`);
-
-      sendLog(`Creando archivo de datos temporal: ${tempDataPath}`);
-      await fsp.writeFile(tempDataPath, JSON.stringify({ data: extractedData, empresa: empresa }));
-
-      const commandArgs = [pythonScriptPath, '--generate-remision', tempDataPath];
-
-      sendLog(`Ejecutando script de generación de remisión...`);
-      const { stdout, stderr } = await execFilePromise(pythonPath, commandArgs, { cwd: path.dirname(pythonScriptPath) });
-
-      await fsp.unlink(tempDataPath);
-
-      if (stderr) {
-        sendLog(`Error en script de generación de remisión: ${stderr}`, 'ERROR');
-      }
-
-      let finalResult = null;
-      const lines = stdout.split(/\r?\n/).filter(line => line.trim() !== '');
-      lines.forEach(line => {
-        try {
-          const output = JSON.parse(line);
-          if (output.type === 'log') {
-            sendLog(`[Python] ${output.message}`, output.level);
-          } else if (output.type === 'result') {
-            finalResult = output.payload; // Estandarizado para usar siempre el payload
-          }
-        } catch (e) {
-          sendLog(`No se pudo parsear la línea de salida de Python: ${line}`, 'WARN');
-        }
-      });
-
-      if (!finalResult) {
-        throw new Error("El script de Python no devolvió un resultado final.");
-      }
-
-      sendLog(`Resultado de la generación: ${JSON.stringify(finalResult)}`);
-
-      if (finalResult.success && finalResult.documentPath) {
-        const docPath = finalResult.documentPath;
-        try {
-          await fsp.access(docPath);
-        } catch (accessError) {
-          // Silencio
-        }
-
-        try {
-          const empresaPaths = {
-            "Temposum": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\2. Temposum Est SAS\\3. Gestión de la Salud\\3.1.6 Restricciones y recomendaciones médicas\\3.1.6.1. Remisiones EPS",
-            "Tempoactiva": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\1. Tempoactiva Est SAS\\3. Gestión de la Salud\\3.1.6 Restricciones y recomendaciones médicas\\3.1.6.1. Remisiones EPS",
-            "Aseplus": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\3. Aseplus\\3. Gestión de la Salud\\3.1.6 Restricciones y recomendaciones médicas\\3.1.6.1. Remisiones EPS",
-            "Asel": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\19. Asel S.A.S\\3. Gestión de la Salud\\3.1.6 Restricciones y recomendaciones médicas\\3.1.6.1. Remisiones EPS"
-          };
-
-          const remisionesDir = empresaPaths[empresa] || empresaPaths["Temposum"];
-          const files = await fsp.readdir(remisionesDir);
-          const docxFiles = files.filter(file => file.endsWith('.docx') && file.includes('GI-OD-007 REMISION A EPS'));
-
-          if (docxFiles.length > 0) {
-            const fileStats = await Promise.all(docxFiles.map(async (file) => {
-              const filePath = path.join(remisionesDir, file);
-              const stats = await fsp.stat(filePath);
-              return { file, filePath, mtime: stats.mtime };
-            }));
-
-            fileStats.sort((a, b) => b.mtime - a.mtime);
-            const latestFile = fileStats[0];
-
-            const tempFileName = `temp_remision_${Date.now()}.docx`;
-            const tempFilePath = path.join(app.getPath('temp'), tempFileName);
-
-            await fsp.copyFile(latestFile.filePath, tempFilePath);
-            finalResult.documentPath = tempFilePath;
-            finalResult.originalDocumentPath = latestFile.filePath;
-            sendLog(`Documento copiado a ruta temporal: ${tempFilePath}`);
-          } else {
-            sendLog('No se encontraron archivos de remisión para la copia de seguridad.', 'WARN');
-          }
-        } catch (searchError) {
-          sendLog(`Error buscando el archivo más reciente para la copia: ${searchError.message}`, 'ERROR');
-        }
-      }
-
-      return finalResult;
-    } catch (error) {
-      sendLog(`Fallo en la ejecución del script de generación de remisión: ${error.message}`, 'ERROR');
-      return { success: false, error: error.message };
+    if (config.companyPaths && config.companyPaths[companyName]) {
+      basePath = config.companyPaths[companyName].root || config.companyPaths[companyName].ruta_base;
+      sendLog(`[MAIN] Usando ruta base de config.companyPaths[${companyName}]: ${basePath}`);
     }
-  });
 
-  // Manejar envío de remisión por email
-  ipcMain.handle('send-remision-by-email', async (event, docPath, extractedData, empresa) => {
-    sendLog(`IPC: send-remision-by-email recibido para: ${docPath}`);
-    try {
-      const pythonPath = await getPython();
-      sendLog('Creando copia temporal del archivo para envío de correo...');
-      const tempFileName = `temp_remision_${Date.now()}.docx`;
-      const tempFilePath = path.join(app.getPath('temp'), tempFileName);
-
-      await fsp.copyFile(docPath, tempFilePath);
-      sendLog(`Archivo copiado a: ${tempFilePath}`);
-
-      const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'remision_utils.py');
-      const tempDataPath = path.join(app.getPath('temp'), `email_data_${Date.now()}.json`);
-      const tempData = {
-        docPath: tempFilePath,
-        data: extractedData,
-        empresa: empresa
-      };
-
-      sendLog(`Creando archivo de datos temporal para email: ${tempDataPath}`);
-      await fsp.writeFile(tempDataPath, JSON.stringify(tempData), 'utf-8');
-
-      const commandArgs = [pythonScriptPath, '--send-email', tempDataPath];
-
-      sendLog(`Ejecutando script de envío de email...`);
-      const { stdout, stderr } = await execFilePromise(pythonPath, commandArgs, { encoding: 'utf-8', cwd: path.dirname(pythonScriptPath) });
-
-      await fsp.unlink(tempFilePath);
-      await fsp.unlink(tempDataPath);
-
-      if (stderr) {
-        sendLog(`Error en script de email (stderr): ${stderr}`, 'ERROR');
-      }
-
-      let finalResult = null;
-      const lines = stdout.split(/\r?\n/).filter(line => line.trim() !== '');
-      lines.forEach(line => {
-        try {
-          const output = JSON.parse(line);
-          if (output.type === 'log') {
-            sendLog(`[Python] ${output.message}`, output.level);
-          } else if (output.type === 'result') {
-            finalResult = output.payload;
-          }
-        } catch (e) {
-          sendLog(`No se pudo parsear la línea de salida de Python: ${line}`, 'WARN');
-        }
-      });
-
-      if (finalResult) {
-        sendLog(`Resultado del envío de email: ${JSON.stringify(finalResult)}`);
-        return finalResult;
-      } else {
-        throw new Error("El script de Python no devolvió un resultado final.");
-      }
-
-    } catch (error) {
-      sendLog(`Fallo en la ejecución del script de email: ${error.message}`, 'ERROR');
-      return { success: false, error: error.message };
+    if (!basePath) {
+      const availableCompanies = config.companyPaths ? Object.keys(config.companyPaths) : [];
+      const error = `No se encontró configuración para la empresa "${companyName}". Empresas configuradas: [${availableCompanies.join(', ')}]`;
+      throw new Error(error);
     }
-  });
 
+    sendLog(`[MAIN] Ruta base encontrada: ${basePath}`);
 
-// Clase para manejar Excel en tiempo real - VERSIÓN SIMPLIFICADA Y ROBUSTA
-class RealTimeExcelManager {
-  constructor(filePath) {
-    sendLog(`[DEBUG] Constructor recibió filePath: "${filePath}"`);
-    this.originalFilePath = filePath;
-    this.filePath = this.getPowerShellSafePath(filePath);
-    this.workbook = null; // No inicializar aquí sino cuando se necesite
-    this.worksheet = null;
-    this.isUpdating = false;
-    this.pendingUpdates = new Map();
-    this.formulaCells = new Set();
-    this.isInitialized = false;
-    this.propToColMap = {}; // Almacenará el mapa de columnas dinámico
-    this.lastWriteTime = 0;
-    this.writeLock = false; // Para prevenir operaciones concurrentes
+    // Verificar que la ruta base exista
+    await fsp.access(basePath);
+    sendLog(`[MAIN] Ruta base verificada exitosamente`);
 
-    if (!fsSync.existsSync(this.filePath)) {
-      throw new Error(`Archivo no encontrado en la ruta segura generada: "${this.filePath}"`);
+    // Buscar archivo recursivamente
+    const fileName = 'GI-FO-012 CONTROL DE REMISIONES.xlsx';
+    sendLog(`[MAIN] Iniciando búsqueda recursiva de: ${fileName}`);
+    const excelFilePath = await findFileRecursive(basePath, fileName);
+
+    if (!excelFilePath) {
+      throw new Error(`Archivo "${fileName}" no encontrado para empresa "${companyName}" en la ruta "${basePath}"`);
     }
-    sendLog(`[DEBUG] Usando ruta final segura: "${this.filePath}"`);
-  }
 
-  async _buildColumnMap(worksheet) {  // Recibir worksheet como parámetro
-    const getCellValue = (cell) => {
-        if (!cell || cell.value === null || cell.value === undefined) return '';
-        let val = cell.value;
-        if (typeof val === 'object') {
-            if (val.result !== undefined) return val.result;
-            if (val.richText) return val.richText.map(rt => rt.text).join('').trim();
-            if (val instanceof Date) return val.toISOString();
-            const textVal = cell.text;
-            if (textVal && typeof textVal === 'object' && textVal.richText) {
-                return textVal.richText.map(rt => rt.text).join('').trim();
-            }
-            return textVal || '';
-        }
-        return String(val);
+    sendLog(`[MAIN] Archivo Excel encontrado: ${excelFilePath}`);
+
+    // Leer y procesar Excel
+    sendLog(`[MAIN] Leyendo archivo Excel...`);
+    const workbook = xlsx.readFile(excelFilePath);
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+
+    // Obtener el rango de datos
+    const range = xlsx.utils.decode_range(worksheet['!ref']);
+    sendLog(`[MAIN] Rango de datos en la hoja: ${worksheet['!ref']}`);
+
+    // Definir el rango para leer desde la fila 7 (índice 6 en base 0)
+    const startRow = 6; // Fila 7
+    const endRow = range.e.r; // Última fila
+
+    // Crear un nuevo rango que comience desde la fila 7
+    const newRange = {
+      s: { c: range.s.c, r: startRow }, // Comenzar desde la columna 0, fila 7
+      e: { c: range.e.c, r: endRow }    // Terminar en la última columna y fila
     };
 
-    const mainHeaderRow = worksheet.getRow(8);
-    const mainHeaders = [];
-    mainHeaderRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-        mainHeaders[colNumber] = getCellValue(cell);
+    // Convertir el rango a string
+    const rangeStr = xlsx.utils.encode_range(newRange);
+    sendLog(`[MAIN] Rango para lectura: ${rangeStr}`);
+
+    // Leer los datos desde la fila 7
+    const allData = xlsx.utils.sheet_to_json(worksheet, {
+      header: 1,
+      range: rangeStr
     });
 
-    const monthHeaderRow = worksheet.getRow(9);
-    const monthHeaders = [];
-    monthHeaderRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-        monthHeaders[colNumber] = getCellValue(cell);
-    });
+    sendLog(`[MAIN] Datos extraídos. Total filas: ${allData.length}`);
 
-    const propToMainHeaderMap = {
-        'detalle': 'DETALLE',
-        'asignacion': 'ASIGNACION PRESUPUESTO ANUAL',
-        'ejecutado_acumulado': 'EJECUTADO ACUMULADO'
-    };
-    const propToMonthHeaderMap = {
-        'enero': 'ENERO', 'febrero': 'FEBRERO', 'marzo': 'MARZO', 'abril': 'ABRIL',
-        'mayo': 'MAYO', 'junio': 'JUNIO', 'julio': 'JULIO', 'agosto': 'AGOSTO',
-        'septiembre': 'SEPTIEMBRE', 'octubre': 'OCTUBRE', 'noviembre': 'NOVIEMBRE', 'diciembre': 'DICIEMBRE'
-    };
-
-    const propToColMap = {};
-
-    for (const [prop, headerText] of Object.entries(propToMainHeaderMap)) {
-        const index = mainHeaders.findIndex(h => h && h.toUpperCase().trim().includes(headerText));
-        if (index !== -1) {
-            propToColMap[prop] = worksheet.getColumn(index).letter;
-        }
-    }
-
-    for (const [prop, headerText] of Object.entries(propToMonthHeaderMap)) {
-        const index = monthHeaders.findIndex(h => h && h.toUpperCase().trim() === headerText);
-        if (index !== -1) {
-            propToColMap[prop] = worksheet.getColumn(index).letter;
-        }
-    }
-    sendLog(`[DEBUG] Mapa de columnas dinámico construido: ${JSON.stringify(propToColMap)}`);
-    return propToColMap;
-  }
-
-  // Método para liberar completamente los recursos del manager
-  async releaseResources() {
-    if (this.worksheet) {
-      this.worksheet = null;
-    }
-    if (this.workbook) {
-      // Destruir la instancia actual para liberar recursos
-      this.workbook = null;
-    }
-    // Asegurar un delay mínimo entre operaciones de escritura
-    const now = Date.now();
-    if (now - this.lastWriteTime < 1500) { // 1.5 segundos de delay mínimo
-      await new Promise(resolve => setTimeout(resolve, 1500 - (now - this.lastWriteTime)));
-    }
-    this.lastWriteTime = Date.now();
-  }
-
-  async updateMultipleCellsAndRecalculate(updates) {
-    // Implementar lock para prevenir operaciones concurrentes
-    while (this.writeLock) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-
-    this.writeLock = true;
-    let success = false;
-    let retries = 0;
-    const maxRetries = 3;
-
-    try {
-      sendLog(`[DEBUG] Actualizando ${updates.length} celdas.`);
-
-      // Crear un nuevo workbook exclusivo para esta operación para evitar locks persistentes
-      let tempWorkbook = new ExcelJS.Workbook();
-      let tempWorksheet = null;
-
-      // Cargar el archivo en el workbook temporal
-      await tempWorkbook.xlsx.readFile(this.filePath);
-      tempWorksheet = tempWorkbook.worksheets[0];
-
-      // Detectar celdas de fórmula en el worksheet temporal
-      const tempFormulaCells = new Set();
-      tempWorksheet.eachRow((row, rowNumber) => {
-        row.eachCell((cell, colNumber) => {
-          if (cell && cell.formula) {
-            tempFormulaCells.add(cell.address);
-          }
-        });
-      });
-
-      let skippedUpdates = 0;
-      for (const update of updates) {
-        if (update.cellAddress && update.value !== undefined) {
-          if (tempFormulaCells.has(update.cellAddress)) {
-            skippedUpdates++;
-            continue;
-          }
-          tempWorksheet.getCell(update.cellAddress).value = update.value;
-        }
-      }
-
-      if (skippedUpdates > 0) {
-        sendLog(`[WARN] Se omitió la actualización de ${skippedUpdates} celdas porque contienen fórmulas.`);
-      }
-
-      // Guardar archivo con lógica de reintento
-      while (retries < maxRetries && !success) {
-        try {
-          await tempWorkbook.xlsx.writeFile(this.filePath);
-          success = true;
-        } catch (error) {
-          if ((error.code === 'EBUSY' || error.code === 'EPERM' || error.message.includes('locked')) && retries < maxRetries - 1) {
-            retries++;
-            sendLog(`[WARN] Intento #${retries} fallido debido a archivo bloqueado, esperando 2s...`);
-            await new Promise(resolve => setTimeout(resolve, 2000));
-          } else {
-            throw error; // Relanzar error si no es de bloqueo o ya hicimos todos los reintentos
-          }
-        }
-      }
-
-      if (!success) {
-        throw new Error(`No se pudo guardar el archivo después de ${maxRetries} intentos. Puede estar siendo usado por Excel u otra aplicación.`);
-      }
-
-      sendLog(`[DEBUG] Archivo guardado exitosamente después de ${retries + 1} intentos.`);
-
-      // Liberar recursos del workbook temporal
-      tempWorksheet = null;
-      tempWorkbook = null;
-
-      // Forzar recálculo si es necesario
-      await this.forceRecalculationFinal();
-
-      // Devolver los datos actualizados obtenidos frescamente
-      return await this.getFreshData();
-    } finally {
-      this.writeLock = false;
-      // Liberar recursos principales
-      await this.releaseResources();
-    }
-  }
-
-  // Método para obtener datos frescos sin mantener locks
-  async getFreshData() {
-    const freshWorkbook = new ExcelJS.Workbook();
-    await freshWorkbook.xlsx.readFile(this.filePath);
-    const worksheet = freshWorkbook.worksheets[0];
-
-    const processedData = [];
-    const formulaCells = [];
-
-    const getCellValue = (cell) => {
-        if (!cell || cell.value === null || cell.value === undefined) return '';
-        let val = cell.value;
-        if (typeof val === 'object') {
-            if (val.result !== undefined) return val.result;
-            if (val.richText) return val.richText.map(rt => rt.text).join('').trim();
-            if (val instanceof Date) return val.toISOString();
-            const textVal = cell.text;
-            if (textVal && typeof textVal === 'object' && textVal.richText) {
-                return textVal.richText.map(rt => rt.text).join('').trim();
-            }
-            return textVal || '';
-        }
-        return String(val);
-    };
-
-    // Obtener el mapa de columnas desde el worksheet fresco
-    const propToColMap = await this._buildColumnMap(worksheet);
-
-    for (let i = 10; i <= 25; i++) {
-        const dataRow = worksheet.getRow(i);
-        const item = {};
-        let isEmptyRow = true;
-
-        for(const [prop, colLetter] of Object.entries(propToColMap)) {
-            if (!colLetter) continue;
-            const cell = dataRow.getCell(colLetter);
-            let value = getCellValue(cell);
-
-            // --- INICIO DE LA CORRECCIÓN ---
-            // Convertir a número las propiedades que deben ser numéricas
-            const numericProps = ['asignacion', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-            if (numericProps.includes(prop)) {
-                // Reemplazar puntos de miles y comas decimales si es necesario, luego convertir
-                const numericValue = parseFloat(String(value).replace(/\./g, '').replace(',', '.'));
-                value = isNaN(numericValue) ? 0 : numericValue;
-            }
-            // --- FIN DE LA CORRECCIÓN ---
-
-            item[prop] = value;
-            if (value !== '' && value !== null && value !== undefined) isEmptyRow = false;
-            if (cell.formula) {
-                formulaCells.push(cell.address);
-            }
-        }
-
-        if (!isEmptyRow) {
-            const allProps = Object.keys(propToColMap);
-            for (const prop of allProps) {
-                if (!item.hasOwnProperty(prop)) {
-                    item[prop] = '';
-                }
-            }
-            processedData.push(item);
-        }
-    }
-
-    // Destruir el workbook temporal para liberar recursos
-    worksheet.destroy();
-    freshWorkbook.destroy && freshWorkbook.destroy(); // Destruir workbook si el método existe
-
-    return { processedData, formulaCells, timestamp: Date.now() };
-  }
-
-  // Simplificar el forceRecalculationFinal para no depender de Excel COM si no es estrictamente necesario
-  async forceRecalculationFinal() {
-    // En lugar de forzar recálculo pesado, simplemente esperar para permitir que Excel actualice
-    // los cálculos automáticos
-    await new Promise(resolve => setTimeout(resolve, 1500)); // Esperar 1.5 segundos
-  }
-
-  getPowerShellSafePath(originalPath) {
-    try {
-      const nativeShortPath = fsSync.realpathSync.native(originalPath);
-      if (nativeShortPath && fsSync.existsSync(nativeShortPath)) {
-        return nativeShortPath;
-      }
-    } catch (error) {
-      // Fallback
-    }
-    return originalPath;
-  }
-
-  getEscapedPathForScript() {
-    return this.filePath.replace(/'/g, "''");
-  }
-
-  async initialize() {
-    if (this.isInitialized) return;
-    // No necesitamos cargar el workbook aquí, se hará en cada operación
-    this.isInitialized = true;
-    sendLog(`[DEBUG] Excel Manager inicializado.`);
-  }
-
-  async getCurrentData() {
-    return await this.getFreshData();
-  }
-
-  async waitForCurrentUpdate() {
-    return new Promise((resolve) => {
-      const checkUpdate = () => {
-        if (!this.writeLock) {  // Cambiado de isUpdating a writeLock
-          resolve(this.getCurrentData());
-        } else {
-          setTimeout(checkUpdate, 100);
-        }
-      };
-      checkUpdate();
-    });
-  }
-}
-
-// ----------------------
-// ExcelManagerRegistry
-// ----------------------
-class ExcelManagerRegistry {
-  constructor() {
-    this.instances = new Map(); // resolvedPath -> manager
-    this.activeManager = null;
-  }
-
-  async getOrCreateManager(filePath) {
-    const resolvedPath = path.resolve(filePath);
-
-    if (this.instances.has(resolvedPath)) {
-      sendLog(`[DEBUG] Reutilizando instancia existente para: ${resolvedPath}`);
-      const existingManager = this.instances.get(resolvedPath);
-      this.activeManager = existingManager;
-      if (!existingManager.isInitialized) {
-        await existingManager.initialize();
-      }
-      return existingManager;
-    }
-
-    sendLog(`[DEBUG] Creando nueva instancia para: ${resolvedPath}`);
-    const manager = new RealTimeExcelManager(resolvedPath);
-    await manager.initialize();
-    this.instances.set(resolvedPath, manager);
-    this.activeManager = manager;
-    return manager;
-  }
-
-  getActiveManager() {
-    return this.activeManager;
-  }
-
-  clearInstances() {
-    this.instances.clear();
-    this.activeManager = null;
-  }
-}
-
-const excelRegistry = new ExcelManagerRegistry();
-
-// ----------------------
-// IPC Handlers
-// ----------------------
-
-// limpiar manejadores previos (si existían)
-try {
-  ipcMain.removeHandler('init-excel');
-  ipcMain.removeHandler('update-excel-cell');
-  ipcMain.removeHandler('diagnose-excel-path');
-} catch (e) { /* ignore */ }
-
-ipcMain.handle('init-excel', async (event, filePath) => {
-  try {
-    sendLog(`[DEBUG] init-excel ruta: ${filePath}`);
-    if (!fsSync.existsSync(filePath)) {
-      throw new Error(`El archivo no existe en la ruta especificada: ${filePath}`);
-    }
-    const stats = fsSync.statSync(filePath);
-    const manager = await excelRegistry.getOrCreateManager(filePath);
-    const { processedData, formulaCells, headers } = await manager.getCurrentData();
-    return {
-      success: true,
-      data: {
-          processedData: processedData,
-          formulaCells: formulaCells,
-          headers: headers
-      },
-      fileInfo: { path: filePath, size: stats.size, modified: stats.mtime }
-    };
-  } catch (error) {
-    sendLog(`Error inicializando Excel: ${error.message}`, 'ERROR');
-    return { success: false, error: error.message, stack: error.stack };
-  }
-});
-
-ipcMain.handle('update-excel-cell', async (event, { cellAddress, value }) => {
-  try {
-    let manager = excelRegistry.getActiveManager();
-    if (!manager) throw new Error('Excel Manager no está inicializado. Llama a init-excel primero.');
-    if (!manager.isInitialized) await manager.initialize();
-    const result = await manager.updateCellAndRecalculate(cellAddress, value);
-    return { success: true, data: result, cellAddress, value, timestamp: Date.now() };
-  } catch (error) {
-    sendLog(`Error actualizando celda: ${error.message}`, 'ERROR');
-    return { success: false, error: error.message, stack: error.stack, cellAddress, value };
-  }
-});
-
-ipcMain.handle('saveBudgetFile', async (event, filePath, budgetData) => {
-  const maxRetries = 8; // Aumentar el número de reintentos
-  const retryDelay = 2000; // Aumentar el retraso a 2 segundos
-  let lastError = null;
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      sendLog(`[INFO] Intento de guardado #${attempt} para ${path.basename(filePath)}`);
-
-      // Verificar si el archivo está accesible antes de intentar abrirlo
-      try {
-        await fsp.access(filePath, fs.constants.W_OK);
-      } catch (accessError) {
-        sendLog(`[WARN] Archivo no accesible para escritura en el intento ${attempt}: ${accessError.message}`);
-        if (attempt < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, retryDelay));
-          continue;
-        }
-      }
-
-      const manager = await excelRegistry.getOrCreateManager(filePath);
-      if (!manager.isInitialized) await manager.initialize();
-
-      const updates = [];
-      const columnMapping = manager.propToColMap; // Usar el mapa dinámico del manager
-      const startRow = 10;
-
-      budgetData.forEach((item, index) => {
-        const currentRow = startRow + index;
-        for (const [prop, value] of Object.entries(item)) {
-          const columnLetter = columnMapping[prop];
-          if (columnLetter) {
-            updates.push({
-              cellAddress: `${columnLetter}${currentRow}`,
-              value: value
-            });
-          }
-        }
-      });
-
-      sendLog(`[INFO] Preparado para guardar ${updates.length} celdas en ${filePath} (intento ${attempt})`);
-      const result = await manager.updateMultipleCellsAndRecalculate(updates);
-      sendLog(`[SUCCESS] Presupuesto guardado exitosamente en ${path.basename(filePath)} en el intento ${attempt}`);
-      return { success: true, data: result, message: `Presupuesto guardado exitosamente en ${path.basename(filePath)} en el intento ${attempt}` };
-
-    } catch (error) {
-      lastError = error;
-      console.error(`Error al guardar archivo (intento ${attempt}):`, error.message);
-
-      // Si es un error de archivo bloqueado (EBUSY) y no es el último intento, esperar y reintentar
-      if (error.code === 'EBUSY' && attempt < maxRetries) {
-        console.log(`Archivo bloqueado (EBUSY), esperando ${retryDelay}ms antes del siguiente intento...`);
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-      } else if (error.message.includes('EBUSY') && attempt < maxRetries) {
-        // También verificar si el mensaje contiene EBUSY
-        console.log(`Archivo bloqueado (mensaje contiene EBUSY), esperando ${retryDelay}ms antes del siguiente intento...`);
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-      } else if (attempt < maxRetries) {
-        // Otros posibles errores temporales
-        console.log(`Error temporal, esperando ${retryDelay}ms antes del siguiente intento (intento ${attempt}):`, error.message);
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-      } else {
-        // Si es cualquier otro error o ya intentamos el máximo número de veces, devolver error
-        sendLog(`Error guardando el archivo de presupuesto después del intento ${attempt}: ${error.message}`, 'ERROR');
-        return { success: false, error: error.message, stack: error.stack, attempt: attempt, totalAttempts: maxRetries };
-      }
-    }
-  }
-
-  // Si llegamos aquí, todos los intentos fallaron
-  sendLog(`[CRITICAL] Fallaron todos los intentos de guardado (${maxRetries}) para ${path.basename(filePath)}`, 'ERROR');
-  return { success: false, error: lastError?.message || 'Todos los intentos de guardado fallaron', attempt: maxRetries, totalAttempts: maxRetries };
-});
-
-ipcMain.handle('diagnose-excel-path', async (event, filePath) => {
-  try {
-    const resolvedPath = path.resolve(filePath);
-    const exists = fsSync.existsSync(resolvedPath);
-    let fileInfo = null;
-    if (exists) {
-      const stats = fsSync.statSync(resolvedPath);
-      fileInfo = { size: stats.size, modified: stats.mtime, isFile: stats.isFile(), isDirectory: stats.isDirectory() };
-    }
-    const hasInstance = excelRegistry.instances.has(resolvedPath);
-    const activeManager = excelRegistry.getActiveManager();
-    return {
-      originalPath: filePath,
-      resolvedPath,
-      exists,
-      fileInfo,
-      pathSeparator: path.sep,
-      platform: process.platform,
-      registry: { hasInstance, hasActiveManager: !!activeManager, totalInstances: excelRegistry.instances.size }
-    };
-  } catch (error) {
-    return { error: error.message, originalPath: filePath };
-  }
-});
-
-module.exports = {
-  RealTimeExcelManager,
-  ExcelManagerRegistry,
-  excelRegistry
-};
-
-  // --- Nuevos manejadores IPC para procesamiento de accidentes ---
-
-  // Manejar selección de PDF de accidente
-  ipcMain.handle('select-accident-pdf', async () => {
-    try {
-      console.log('Handling select-accident-pdf request');
-      const result = await dialog.showOpenDialog({
-        properties: ['openFile'],
-        filters: [{ name: 'PDF Files', extensions: ['pdf'] }]
-      });
-
-      if (result.canceled) {
-        console.log('Accident PDF selection canceled');
-        return null;
-      }
-
-      console.log('Selected accident PDF:', result.filePaths[0]);
-      return result.filePaths[0];
-    } catch (error) {
-      console.error('Error selecting accident PDF:', error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  ipcMain.handle('process-accident-pdf', async (event, pdfPath) => {
-    const pythonPath = await getPython();
-    const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_processor.py');
-    return new Promise((resolve, reject) => {
-      sendLog(`IPC: process-accident-pdf (extract) recibido para: ${pdfPath}`);
-
-      const pythonProcess = spawn(pythonPath, [pythonScriptPath, 'extract', '--pdf_path', pdfPath], { cwd: path.dirname(pythonScriptPath) });
-
-      let stdoutData = '';
-      let stderrData = '';
-
-      pythonProcess.stdout.on('data', (data) => {
-        stdoutData += data.toString();
-        const lines = stdoutData.split('\n');
-        stdoutData = lines.pop();
-
-        lines.forEach(line => {
-          if (line) {
-            try {
-              const json = JSON.parse(line);
-              if (json.type === 'progress') {
-                event.sender.send('accident-processing-progress', json);
-              } else if (json.type === 'result') {
-                resolve(json.payload);
-              }
-            } catch (e) {
-              sendLog(`Error parsing python output: ${e.message}`, 'WARN');
-            }
-          }
-        });
-      });
-
-      pythonProcess.stderr.on('data', (data) => {
-        stderrData += data.toString();
-        sendLog(`Python stderr: ${data}`, 'ERROR');
-      });
-
-      pythonProcess.on('close', (code) => {
-        if (code !== 0) {
-          reject(new Error(`Python script exited with code ${code}: ${stderrData}`));
-        }
-      });
-
-      pythonProcess.on('error', (err) => {
-        reject(err);
-      });
-    });
-  });
-
-  ipcMain.handle('analyze-accident', async (event, extractedData, contextoAdicional) => {
-    const pythonPath = await getPython();
-    const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_processor.py');
-    return new Promise((resolve, reject) => {
-      sendLog(`IPC: analyze-accident recibido`);
-
-      const jsonData = JSON.stringify(extractedData);
-      const pythonProcess = spawn(pythonPath, [pythonScriptPath, 'analyze', '--json_data', jsonData, '--contexto', contextoAdicional], { cwd: path.dirname(pythonScriptPath) });
-
-      let stdoutData = '';
-      let stderrData = '';
-
-      pythonProcess.stdout.on('data', (data) => {
-        stdoutData += data.toString();
-        const lines = stdoutData.split('\n');
-        stdoutData = lines.pop();
-
-        lines.forEach(line => {
-          if (line) {
-            try {
-              const json = JSON.parse(line);
-              if (json.type === 'progress') {
-                event.sender.send('accident-processing-progress', json);
-              } else if (json.type === 'result') {
-                resolve(json.payload);
-              }
-            } catch (e) {
-              sendLog(`Error parsing python output: ${e.message}`, 'WARN');
-            }
-          }
-        });
-      });
-
-      pythonProcess.stderr.on('data', (data) => {
-        stderrData += data.toString();
-        sendLog(`Python stderr: ${data}`, 'ERROR');
-      });
-
-      pythonProcess.on('close', (code) => {
-        if (code !== 0) {
-          reject(new Error(`Python script exited with code ${code}: ${stderrData}`));
-        }
-      });
-
-      pythonProcess.on('error', (err) => {
-        reject(err);
-      });
-    });
-  });
-  // En main.js, dentro de registerIPCHandlers()
-  ipcMain.handle('start-model-loading', async () => {
-      try {
-          console.log('Iniciando carga del modelo LLM en segundo plano...');
-          // Aquí podrías ejecutar un script que inicie un proceso Python separado
-          // o simplemente lanzar el comando de carga con un tiempo de espera.
-          // Por simplicidad, vamos a simularlo con un timeout.
-          await new Promise(resolve => setTimeout(resolve, 5000)); // Simula 5 segundos de carga
-          console.log('Modelo LLM cargado en segundo plano.');
-          return { success: true };
-      } catch (error) {
-          console.error('Error al iniciar la carga del modelo:', error);
-          return { success: false, error: error.message };
-      }
-  });
-
-  // --- Manejar generación de informe de accidente ---
-  ipcMain.handle('generate-accident-report', (event, combinedData) => {
-    return new Promise(async (resolve, reject) => {
-      sendLog(`IPC: generate-accident-report recibido`);
-      let tempDataPath;
-      try {
-        const pythonPath = await getPython();
-        // Crear archivo temporal con los datos
-        tempDataPath = path.join(app.getPath('temp'), `accident_report_data_${Date.now()}.json`);
-
-        const reportData = {
-          combinedData: combinedData,
-          empresa: combinedData.empresa || 'TEMPOACTIVA'
-        };
-
-        sendLog(`Creando archivo de datos temporal: ${tempDataPath}`);
-        await fsp.writeFile(tempDataPath, JSON.stringify(reportData, null, 2));
-
-        const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_report_generator.py');
-
-        // Verificar que el script existe
-        await fsp.access(pythonScriptPath);
-
-        sendLog(`Ejecutando script con UTF-8 forzado: ${pythonPath} -X utf8 "${pythonScriptPath}"`);
-
-        const pythonProcess = spawn(pythonPath, [
-          '-X', 'utf8',
-          pythonScriptPath,
-          tempDataPath
-        ], { cwd: path.dirname(pythonScriptPath) });
-
-        let stdoutData = '';
-        let stderrData = '';
-
-        pythonProcess.stdout.on('data', (data) => {
-          stdoutData += data.toString();
-        });
-
-        pythonProcess.stderr.on('data', (data) => {
-          // Loguear errores de Python en tiempo real
-          const stderrLine = data.toString();
-          stderrData += stderrLine;
-          sendLog(`[Python STDERR] ${stderrLine}`, 'ERROR');
-        });
-
-        pythonProcess.on('close', async (code) => {
-          sendLog(`Proceso de Python terminado con código: ${code}`);
-
-          // Limpiar archivo temporal
-          if (tempDataPath) {
-            await fsp.unlink(tempDataPath).catch(err => sendLog(`No se pudo limpiar el archivo temporal: ${err.message}`, 'WARN'));
-          }
-
-          if (code !== 0) {
-            return reject(new Error(`El script de Python falló con código ${code}. Revisa los logs de STDERR.`));
-          }
-
-          // Procesar la salida estándar para encontrar el resultado JSON final
-          let finalResult = null;
-          const lines = stdoutData.split(/\r?\n/).filter(line => line.trim() !== '');
-
-          for (const line of lines) {
-            try {
-              const output = JSON.parse(line);
-              if (output.type === 'progress') {
-                sendLog(`[Python Progress] ${output.message}`, 'INFO');
-              } else if (output.success !== undefined) {
-                finalResult = output;
-              }
-            } catch (e) {
-              sendLog(`No se pudo parsear la línea de salida de Python (stdout): ${line}`, 'WARN');
-            }
-          }
-
-          if (finalResult) {
-            // Limpiar el prefijo de ruta larga de Windows si existe, para que sea usable por el frontend.
-            if (finalResult.documentPath && finalResult.documentPath.startsWith('\\\\?\\')) {
-              finalResult.documentPath = finalResult.documentPath.substring(4);
-              console.log('Path corregido:', finalResult.documentPath);
-            }
-            // Asegurar que los separadores de ruta son los correctos para el OS actual.
-            finalResult.documentPath = finalResult.documentPath.replace(/[\\\/]/g, path.sep);
-
-            sendLog(`Resultado de la generación: ${JSON.stringify(finalResult)}`);
-            resolve(finalResult);
-          } else {
-            reject(new Error(`El script de Python no devolvió un resultado JSON válido en stdout.`));
-          }
-        });
-
-        pythonProcess.on('error', (err) => {
-          sendLog(`Fallo al iniciar el proceso de Python: ${err.message}`, 'CRITICAL');
-          reject(err);
-        });
-
-      } catch (error) {
-        sendLog(`Fallo en la ejecución del script de generación de informe: ${error.message}`, 'ERROR');
-        if (tempDataPath) {
-          await fsp.unlink(tempDataPath).catch(err => sendLog(`No se pudo limpiar el archivo temporal tras error: ${err.message}`, 'WARN'));
-        }
-        reject(error);
-      }
-    });
-  });
-
-  ipcMain.handle('get-config', async (event, empresa) => {
-      const pythonPath = await getPython();
-      const investAppPath = path.join(__dirname, 'Portear', 'src', 'Invest_APP_V_3.py');
-      const { stdout } = await execFilePromise(pythonPath, [investAppPath, '--get-config', empresa], { cwd: path.dirname(investAppPath) });
-      return JSON.parse(stdout.trim());
-  });
-
-  // Manejador para leer la plantilla de acta de COPASST
-  ipcMain.handle('get-acta-data', async () => {
-    try {
-        // Ruta a la plantilla de Excel
-        const templatePath = path.join(__dirname, 'utils', 'ACT-FO-029 Acta de Reunión Copasst Enero.xlsx');
-        console.log(`[INFO] Leyendo plantilla de acta desde: ${templatePath}`);
-
-        // Verificar que el archivo existe
-        await fsp.access(templatePath);
-
-        // Leer el archivo Excel
-        const workbook = xlsx.readFile(templatePath);
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-
-        // Convertir la hoja a un arreglo de datos
-        const data = xlsx.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: '' });
-
-        // Obtener las celdas combinadas (merges)
-        const merges = worksheet['!merges'] || [];
-
-        console.log(`[SUCCESS] Plantilla cargada. Filas: ${data.length}, Merges: ${merges.length}`);
+    if (allData.length < 1) {
+        sendLog('[MAIN] Archivo Excel no contiene datos suficientes.', 'WARN');
         return {
             success: true,
-            data,
-            merges
-        };
-    } catch (error) {
-        console.error('[ERROR] Error al cargar la plantilla del acta:', error);
-        return {
-            success: false,
-            error: error.message
+            headers: [],
+            rows: [],
+            message: 'Archivo no contiene filas de datos.',
+            filePath: excelFilePath,
+            companyName
         };
     }
-  });
 
-  // =============================================================================
-  // Handler: Leer datos de ausentismo desde Excel
-  // =============================================================================
-  ipcMain.handle('get-ausentismo-data', async (event, companyName) => {
-    sendLog(`[DEBUG] Handler get-ausentismo-data llamado para empresa: ${companyName}`);
-    sendLog(`[TEST] Este log debería aparecer si el handler se llama.`);
+    // La primera fila ahora será los encabezados (fila 7 del Excel original)
+    const headers = allData[0]; // Fila 7 del Excel
+    const rows = allData.slice(1); // Filas 8 en adelante del Excel
 
+    sendLog(`[MAIN] Encabezados encontrados: ${headers.length} columnas`);
+    sendLog(`[MAIN] Datos de remisiones encontrados. Total filas: ${rows.length}`);
+
+    // Validar y ajustar la longitud de las filas
+    const expectedColumns = headers.length;
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i].length < expectedColumns) {
+        // Rellenar con cadenas vacías si faltan columnas
+        while (rows[i].length < expectedColumns) {
+          rows[i].push('');
+        }
+      } else if (rows[i].length > expectedColumns) {
+        // Truncar si hay demasiadas columnas
+        rows[i] = rows[i].slice(0, expectedColumns);
+      }
+    }
+
+    // Log para depuración
+    sendLog(`[MAIN] Primeras 3 filas de datos:`, 'DEBUG');
+    for(let i = 0; i < Math.min(3, rows.length); i++) {
+      sendLog(`[MAIN] Fila ${i+1}: ${JSON.stringify(rows[i])}`, 'DEBUG');
+    }
+
+    return {
+      success: true,
+      headers: headers,
+      rows: rows,
+      filePath: excelFilePath,
+      companyName
+    };
+
+  } catch (error) {
+    sendLog(`[MAIN] Error crítico en get-control-remisiones-data: ${error.message}`, 'ERROR');
+    return {
+      success: false,
+      error: error.message,
+      stack: error.stack,
+      companyName
+    };
+  }
+});
+
+// Manejar mapeo de directorio
+ipcMain.handle('map-directory', async (event, directoryPath) => {
+  try {
+    console.log('Mapping directory:', directoryPath);
+    const pythonPath = await getPython();
+    const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'map_directory.py');
+
+    console.log(`Executing command: ${pythonPath} "${pythonScriptPath}" "${directoryPath}"`);
+
+    const { stdout, stderr } = await execFilePromise(pythonPath, [pythonScriptPath, directoryPath], { cwd: path.dirname(pythonScriptPath) });
+
+    const structure = JSON.parse(stdout);
+    console.log('Directory mapping completed successfully');
+
+    return { success: true, structure: structure, log: stderr || 'Mapeo completado sin errores.' };
+  } catch (error) {
+    console.error('Error mapping directory:', error);
+    throw error;
+  }
+});
+
+// Manejar lectura de contenido de directorio
+ipcMain.handle('read-directory', async (event, directoryPath) => {
+  try {
+    console.log('Reading directory:', directoryPath);
+    const items = await fsp.readdir(directoryPath, { withFileTypes: true });
+
+    const files = [];
+    const folders = [];
+    for (const item of items) {
+      const itemPath = path.join(directoryPath, item.name);
+      if (item.isDirectory()) {
+          folders.push({
+              name: item.name,
+              path: itemPath,
+          });
+      } else {
+          const stats = await fsp.stat(itemPath);
+          files.push({
+            name: item.name,
+            path: itemPath,
+            size: stats.size,
+            modified: stats.mtime,
+            extension: path.extname(item.name).substring(1)
+          });
+      }
+    }
+
+    console.log('Directory read successfully');
+    return { success: true, files: files, folders: folders }; // Devolver objeto estructurado
+  } catch (error) {
+    console.error('Error reading directory:', error);
+    return { success: false, error: error.message }; // Devolver objeto de error
+  }
+});
+
+// Manejar apertura de archivo o carpeta
+ipcMain.handle('open-path', async (event, pathToOpen) => {
+  try {
+    console.log('Opening path:', pathToOpen);
+    await shell.openPath(pathToOpen);
+    console.log('Path opened successfully');
+    return { success: true };
+  } catch (error) {
+    console.error('Error opening path:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Manejar lectura de archivo Excel como buffer
+ipcMain.handle('read-excel-file', async (event, filePath) => {
+  try {
+    sendLog(`[MAIN] Leyendo archivo Excel desde: ${filePath}`, 'INFO');
+
+    // Verificar que la ruta del archivo exista
+    await fsp.access(filePath);
+
+    // Leer el archivo como un buffer
+    const buffer = await fsp.readFile(filePath);
+
+    sendLog(`[MAIN] Archivo leído exitosamente. Tamaño del buffer: ${buffer.length} bytes`, 'INFO');
+
+    return { success: true, data: buffer };
+  } catch (error) {
+    sendLog(`[MAIN] Error al leer el archivo Excel: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// --- Manejadores para el Visor de Documentos ---
+
+ipcMain.handle('get-pdf-preview', async (event, filePath) => {
+  sendLog(`[MAIN][get-pdf-preview] Solicitud recibida para filePath: ${filePath}`, 'INFO');
+  try {
+    // Verificar que el archivo existe y es accesible
     try {
-      // -------------------------------------------------------------------------
-      // 1. Cargar configuración
-      // -------------------------------------------------------------------------
+      await fsp.access(filePath, fs.constants.R_OK);
+      sendLog(`[MAIN][get-pdf-preview] Archivo accesible: ${filePath}`, 'DEBUG');
+    } catch (accessError) {
+      sendLog(`[MAIN][get-pdf-preview] Error de acceso al archivo ${filePath}: ${accessError.message}`, 'ERROR');
+      return { success: false, error: `El archivo no es accesible o no existe: ${filePath}. Error: ${accessError.message}` };
+    }
+
+    const buffer = await fsp.readFile(filePath);
+    sendLog(`[MAIN][get-pdf-preview] PDF leído exitosamente. Tamaño: ${buffer.length} bytes`, 'INFO');
+    return { success: true, data: buffer.toString('base64') };
+  } catch (error) {
+    sendLog(`[MAIN][get-pdf-preview] Error al leer el archivo PDF: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-word-preview', async (event, filePath) => {
+  sendLog(`[MAIN][get-word-preview] Solicitud recibida para filePath: ${filePath}`, 'INFO');
+  let tempPdfPath = '';
+  try {
+    // Verificar que el archivo de entrada existe y es accesible
+    try {
+      await fsp.access(filePath, fs.constants.R_OK);
+      sendLog(`[MAIN][get-word-preview] Archivo DOCX accesible: ${filePath}`, 'DEBUG');
+    } catch (accessError) {
+      sendLog(`[MAIN][get-word-preview] Error de acceso al archivo DOCX ${filePath}: ${accessError.message}`, 'ERROR');
+      return { success: false, error: `El archivo DOCX no es accesible o no existe: ${filePath}. Error: ${accessError.message}` };
+    }
+
+    sendLog(`[MAIN][get-word-preview] Iniciando conversión de Word a PDF para: ${filePath}`, 'INFO');
+
+    // 1. Obtener ruta de Python
+    const pythonPath = await getPython();
+    sendLog(`[MAIN][get-word-preview] Usando Python de: ${pythonPath}`, 'DEBUG');
+
+    // 2. Definir rutas de script y archivo temporal
+    const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'convert_docx_to_pdf.py');
+    tempPdfPath = path.join(os.tmpdir(), `preview-${Date.now()}.pdf`);
+    
+    sendLog(`[MAIN][get-word-preview] Script de conversión: ${pythonScriptPath}`, 'DEBUG');
+    sendLog(`[MAIN][get-word-preview] Archivo de entrada: ${filePath}`, 'DEBUG');
+    sendLog(`[MAIN][get-word-preview] Archivo de salida temporal: ${tempPdfPath}`, 'DEBUG');
+
+    // 3. Ejecutar el script de conversión
+    const { stdout, stderr } = await execFilePromise(pythonPath, [pythonScriptPath, filePath, tempPdfPath]);
+    if (stdout) sendLog(`[MAIN][get-word-preview] Python stdout: ${stdout}`, 'DEBUG');
+    if (stderr) sendLog(`[MAIN][get-word-preview] Python stderr: ${stderr}`, 'WARN');
+    
+    sendLog(`[MAIN][get-word-preview] Conversión a PDF completada exitosamente.`, 'INFO');
+
+    // 4. Leer el PDF generado
+    try {
+      await fsp.access(tempPdfPath, fs.constants.R_OK);
+      sendLog(`[MAIN][get-word-preview] PDF temporal accesible: ${tempPdfPath}`, 'DEBUG');
+    } catch (accessError) {
+      sendLog(`[MAIN][get-word-preview] Error de acceso al PDF temporal ${tempPdfPath}: ${accessError.message}`, 'ERROR');
+      return { success: false, error: `El PDF temporal no es accesible o no existe: ${tempPdfPath}. Error: ${accessError.message}` };
+    }
+    const buffer = await fsp.readFile(tempPdfPath);
+    sendLog(`[MAIN][get-word-preview] PDF temporal leído. Tamaño: ${buffer.length} bytes`, 'INFO');
+
+    return { success: true, data: buffer.toString('base64') };
+
+  } catch (error) {
+    sendLog(`[MAIN][get-word-preview] Error durante la conversión de Word a PDF: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  } finally {
+    // 5. Limpiar el archivo temporal
+    if (tempPdfPath && fs.existsSync(tempPdfPath)) {
+      try {
+        await fsp.unlink(tempPdfPath);
+        sendLog(`[MAIN][get-word-preview] Archivo PDF temporal eliminado: ${tempPdfPath}`, 'INFO');
+      } catch (cleanupError) {
+        sendLog(`[MAIN][get-word-preview] Error al eliminar el archivo PDF temporal: ${cleanupError.message}`, 'WARN');
+      }
+    }
+  }
+});
+
+// Manejador para obtener la lista de archivos de presupuesto
+ipcMain.handle('getPresupuestoFiles', async (event, companyName) => {
+  sendLog(`[MAIN] Buscando archivos de presupuesto para: ${companyName} en el submódulo 1.1.3.`);
+  try {
       const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
       const config = JSON.parse(configData);
 
-      // -------------------------------------------------------------------------
-      // 2. Obtener la estructura real de la empresa
-      // -------------------------------------------------------------------------
+      // --- Lógica para encontrar la ruta del submódulo "1.1.3 Asignación de Recursos" ---
       const normalizedCompanyName = companyName.toLowerCase();
       const companyKey = Object.keys(config.companyPaths || {}).find(
-        key => key.toLowerCase() === normalizedCompanyName
+          key => key.toLowerCase() === normalizedCompanyName
       );
 
       const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
 
       if (!companyConfig || !companyConfig.structure?.structure) {
-        const available = Object.keys(config.companyPaths || {});
-        throw new Error(
-          `Empresa "${companyName}" no tiene estructura mapeada. ` +
-          `Disponibles: [${available.join(', ')}]`
-        );
+          throw new Error(`Empresa "${companyName}" no tiene estructura mapeada.`);
       }
 
-      const rootStructure = companyConfig.structure.structure;
+      const actualCompanyStructure = companyConfig.structure.structure;
 
-      // -------------------------------------------------------------------------
-      // 3. Función auxiliar: Buscar carpeta de forma flexible
-      // -------------------------------------------------------------------------
-      function findDirFlexible(subdirs, target) {
-        if (!subdirs) return null;
+      // Corregido: searchInStructure devuelve una cadena de texto (la ruta) directamente.
+      const submodulePath = searchInStructure(actualCompanyStructure, "1.1.3");
 
-        const normalizedTarget = target
-          .toLowerCase()
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .replace(/\s+/g, ' ')
-          .trim();
-
-        for (const [key, value] of Object.entries(subdirs)) {
-          const normalizedKey = key
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .replace(/\s+/g, ' ')
-            .trim();
-
-          if (normalizedKey === normalizedTarget) {
-            return value;
-          }
-        }
-
-        return null;
+      if (!submodulePath) {
+          throw new Error(`No se encontró la ruta para el submódulo '1.1.3 Asignación de Recursos' para la empresa "${companyName}".`);
       }
 
-      // -------------------------------------------------------------------------
-      // 4. Buscar carpeta "3. Gestión de la Salud"
-      // -------------------------------------------------------------------------
-      const gestionSalud = findDirFlexible(
-        rootStructure.subdirectories,
-        "3. Gestión de la Salud"
-      );
+      sendLog(`[MAIN] Ruta del submódulo '1.1.3 Asignación de Recursos' encontrada: ${submodulePath}`);
+      const searchPath = submodulePath;
+      // --- FIN Lógica para encontrar la ruta del submódulo ---
 
-      if (!gestionSalud) {
-        const keys = Object.keys(rootStructure.subdirectories || {});
-        throw new Error(
-          `No se encontró "3. Gestión de la Salud". ` +
-          `Carpetas disponibles: [${keys.join(', ')}]`
-        );
-      }
-
-      // -------------------------------------------------------------------------
-      // 5. Buscar el submódulo de ausentismo
-      // -------------------------------------------------------------------------
-      const ausentismoDir = findDirFlexible(
-        gestionSalud.subdirectories,
-        "3.3.6 Medición del ausentismo por causa médica"
-      );
-
-      if (!ausentismoDir) {
-        const keys = Object.keys(gestionSalud.subdirectories || {});
-        throw new Error(
-          `No se encontró submódulo de ausentismo. ` +
-          `Carpetas disponibles: [${keys.join(', ')}]`
-        );
-      }
-
-      // -------------------------------------------------------------------------
-      // 6. Obtener el primer archivo .xlsx
-      // -------------------------------------------------------------------------
-      const excelFiles = (ausentismoDir.files || []).filter(
-        f => f.extension?.toLowerCase() === '.xlsx'
-      );
-
-      if (excelFiles.length === 0) {
-        throw new Error('No hay archivos .xlsx en la carpeta de ausentismo.');
-      }
-
-      const excelFile = excelFiles[0];
-      sendLog(`[DEBUG] Archivo de ausentismo encontrado: ${excelFile.path}`);
-
-      // -------------------------------------------------------------------------
-      // 7. Leer archivo Excel
-      // -------------------------------------------------------------------------
-      const workbook = xlsx.readFile(excelFile.path);
-      console.log('[DEBUG] Nombres de hojas en el archivo:', workbook.SheetNames);
-
-      // Buscar la hoja que contiene los datos según el nombre de la empresa
-      const normalizedCompanyForSheet = companyName.toLowerCase().replace(/\s+/g, '');
-      const sheetName = workbook.SheetNames.find(name =>
-        name.toLowerCase().includes(normalizedCompanyForSheet) &&
-        name.toLowerCase().includes('2024')
-      ) || workbook.SheetNames[0]; // Si no encuentra, usa la primera
-
-      console.log('[DEBUG] Hoja seleccionada:', sheetName);
-      const worksheet = workbook.Sheets[sheetName];
-      console.log('[DEBUG] !ref de la hoja:', worksheet['!ref']);
-
-      // -------------------------------------------------------------------------
-      // 8. Validar que la hoja no esté vacía
-      // -------------------------------------------------------------------------
-      if (!worksheet['!ref']) {
-        sendLog('[WARN] La hoja de cálculo de ausentismo parece estar vacía (sin !ref).');
-        return {
-          success: true,
-          headers: [],
-          rows: [],
-          filePath: excelFile.path,
-          companyName
-        };
-      }
-
-      // -------------------------------------------------------------------------
-      // 9. Leer todos los datos de la hoja
-      // -------------------------------------------------------------------------
-      const allData = xlsx.utils.sheet_to_json(worksheet, {
-        header: 1,
-        raw: false,
-        defval: null
-      });
-
-      console.log('[DEBUG] Total de filas leídas:', allData.length);
-      console.log('[DEBUG] Primeras 5 filas:', allData.slice(0, 5));
-
-      sendLog(`[DEBUG] Total de filas en el archivo: ${allData.length}`);
-      sendLog(`[DEBUG] Primeras 10 filas: ${JSON.stringify(allData.slice(0, 10))}`);
-
-      if (allData.length > 6) {
-        sendLog(`[DEBUG] Fila 7 (índice 6): ${JSON.stringify(allData[6])}`);
-      }
-
-      // -------------------------------------------------------------------------
-      // 10. Verificar que haya suficientes filas
-      // -------------------------------------------------------------------------
-      if (allData.length <= 6) {
-        sendLog('[WARN] No hay suficientes filas para encontrar el encabezado en la fila 7.');
-        return {
-          success: true,
-          headers: [],
-          rows: [],
-          filePath: excelFile.path,
-          companyName
-        };
-      }
-
-      // -------------------------------------------------------------------------
-      // 11. Extraer encabezado de la fila 7 (índice 6)
-      // -------------------------------------------------------------------------
-      const headerRowIndex = 6;
-      const headers = allData[headerRowIndex];
-
-      // Validar que tenga al menos 4 columnas
-      if (!headers || headers.filter(cell => cell !== null).length < 4) {
-        sendLog('[WARN] La fila 7 no parece ser un encabezado válido (menos de 4 columnas).');
-        return {
-          success: true,
-          headers: [],
-          rows: [],
-          filePath: excelFile.path,
-          companyName
-        };
-      }
-
-      sendLog(`[INFO] Encabezado fijo tomado de la fila 7 (índice ${headerRowIndex}).`);
-      sendLog(`[DEBUG] Encabezado detectado: ${JSON.stringify(headers)}`);
-
-      // -------------------------------------------------------------------------
-      // 12. Filtrar y limitar las filas de datos
-      // -------------------------------------------------------------------------
-      // Se reduce el umbral de filtrado para ser menos estricto.
-      // Una fila se considera válida si tiene al menos 4 celdas con datos.
-      const minFilledCells = 4;
-      const rows = allData
-        .slice(headerRowIndex + 1)
-        .filter(row =>
-          row && row.filter(cell => cell !== null).length >= minFilledCells
-        );
-
-      // Limitar columnas hasta la columna S (índice 18)
-      const maxColumnsToShow = 19; // Columna S = índice 18 (0-based)
-      const limitedHeaders = headers.slice(0, maxColumnsToShow);
-      const limitedRows = rows.map(row => row.slice(0, maxColumnsToShow));
-
-      sendLog(`[DEBUG] Total de filas filtradas: ${limitedRows.length}`);
-
-      if (limitedRows.length > 0) {
-        sendLog(`[DEBUG] Primera fila de datos: ${JSON.stringify(limitedRows[0])}`);
-      }
-
-      // -------------------------------------------------------------------------
-      // 13. Retornar datos procesados
-      // -------------------------------------------------------------------------
-      return {
-        success: true,
-        headers: limitedHeaders,
-        rows: limitedRows,
-        filePath: excelFile.path,
-        companyName
-      };
-
-    } catch (error) {
-      sendLog(`[ERROR] Error crítico en get-ausentismo-data: ${error.message}`, 'ERROR');
-      return {
-        success: false,
-        error: error.message,
-        companyName
-      };
-    }
-  });
-
-  // ===============================
-  // 🔍 Manejador para buscar empleado por cédula
-  // ===============================
-  ipcMain.handle('buscar-empleado-por-cedula', async (event, { cedula, empresa }) => {
-    const { spawn } = require('child_process');
-    const path = require('path');
-
-    const scriptPath = path.join(__dirname, 'Portear', 'src', 'actualizar_ausentismo.py');
-
-    return new Promise((resolve, reject) => {
-      sendLog(`IPC: buscar-empleado-por-cedula recibido. Empresa: ${empresa}, Cédula: ${cedula}`);
-
-      const python = spawn('python', [scriptPath, 'buscar_empleado', cedula, empresa], {
-        cwd: path.dirname(scriptPath),
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
-      });
-
-      let buffer = '';
-
-      python.stdout.on('data', (data) => {
-        buffer += data.toString();
-
-        // Procesar por líneas completas
-        const lines = buffer.split('\n');
-        // Mantener la última línea si está incompleta en buffer
-        buffer = lines.pop();
-
-        lines.forEach((line) => {
-          line = line.trim();
-          if (!line) return;
-
+      async function findBudgetFilesRecursive(dir) {
+          let files = [];
           try {
-            const obj = JSON.parse(line);
-            if (obj.type === 'log') {
-              sendLog(`[Python Ausentismo] ${obj.message}`);
-            } else if (obj.type === 'result') {
-              // Entregamos el payload al renderer
-              sendLog('[Python Ausentismo] Resultado recibido (payload).');
-              resolve(obj.payload);
-            } else {
-              sendLog(`[Python Ausentismo] Mensaje sin tipo esperado: ${line}`, 'DEBUG');
-            }
-          } catch (err) {
-            // Línea no JSON -> la mostramos cruda para debug
-            sendLog(`[Python Ausentismo - RAW] ${line}`, 'DEBUG');
-          }
-        });
-      });
-
-      python.stderr.on('data', (data) => {
-        const txt = data.toString();
-        sendLog(`[Python Ausentismo - STDERR] ${txt}`, 'ERROR');
-      });
-
-      python.on('close', (code) => {
-        // Si cerró sin haber resuelto, resolvemos con null (o reject si prefieres)
-        sendLog(`[Python Ausentismo] Proceso cerrado con código ${code}`);
-        // Si buffer tiene algo pendiente, intentar parsearlo
-        if (buffer && buffer.trim()) {
-          try {
-            const last = JSON.parse(buffer.trim());
-            if (last.type === 'result') return resolve(last.payload);
-          } catch (e) {
-            sendLog(`[Python Ausentismo] Buffer final no parseable: ${buffer}`, 'DEBUG');
-          }
-        }
-        // Si llegamos aquí sin resultado, devolvemos null (no encontrado o error ya logueado)
-        resolve(null);
-      });
-
-      python.on('error', (err) => {
-        sendLog(`Error al iniciar proceso Python: ${err.message}`, 'CRITICAL');
-        reject(err);
-      });
-
-      // Timeout opcional: si quieres evitar procesos colgados
-      const TIMEOUT_MS = 15_000; // 15s
-      const killTimer = setTimeout(() => {
-        sendLog('Timeout: matando proceso Python por demora (>15s)', 'WARN');
-        try { python.kill(); } catch (e) {}
-        resolve(null);
-      }, TIMEOUT_MS);
-
-      python.on('exit', () => clearTimeout(killTimer));
-    });
-  });
-
-  // Manejador para buscar descripción de CIE-10
-  ipcMain.handle('buscar-cie10-descripcion', async (event, { companyName, cie10Code }) => {
-    sendLog(`[MAIN] Handler buscar-cie10-descripcion llamado para empresa: ${companyName}, código: ${cie10Code}`);
-
-    try {
-      const ausentismoFiles = {
-        "TEMPOACTIVA": "G:/Mi unidad/2. Trabajo/1. SG-SST/2. Temporales Comfa/1. Tempoactiva Est SAS/3. Gestión de la Salud/3.3.6 Medición del ausentismo por causa médica/GI-FO-076 AUSENTISMO POR ARL Y EPS 2024.xlsx",
-        "TEMPOSUM": "G:/Mi unidad/2. Trabajo/1. SG-SST/2. Temporales Comfa/2. Temposum Est SAS/3. Gestión de la Salud/3.3.6 Medición del ausentismo por causa médica/3 AUSENTISMO POR ARL Y EPS (TEMPOSUM) 2024.XLSX",
-        "ASEPLUS": "G:/Mi unidad/2. Trabajo/1. SG-SST/2. Temporales Comfa/3. Aseplus/3. Gestión de la Salud/3.3.6 Medición del ausentismo por causa médica/PI-FO-076 AUSENTISMO POR ARL Y EPS (ASEPLUS).XLSX",
-        "ASEL": "G:/Mi unidad/2. Trabajo/1. SG-SST/19. Asel S.A.S/3. Gestión de la Salud/3.3.6 Medición del ausentismo por causa médica/A-FR-31 Ausentismo Laboral.xlsx"
-      };
-
-      const excelFilePath = ausentismoFiles[companyName.toUpperCase()];
-
-      if (!excelFilePath) {
-        throw new Error(`No se encontró la ruta del archivo de ausentismo para la empresa: ${companyName}`);
-      }
-
-      sendLog(`[MAIN] Usando ruta directa para el archivo de ausentismo: ${excelFilePath}`);
-
-      if (!fs.existsSync(excelFilePath)) {
-        throw new Error(`El archivo de ausentismo no se encontró en la ruta esperada: ${excelFilePath}`);
-      }
-
-      // --- Ahora, llamar al script de Python ---
-      const pythonPath = await getPython();
-      const scriptPath = path.join(__dirname, 'Portear', 'src', 'actualizar_ausentismo.py');
-
-      const pythonProcess = spawn(pythonPath, [scriptPath, 'buscar_cie10', excelFilePath, cie10Code], {
-        cwd: path.dirname(scriptPath),
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
-      });
-
-      return new Promise((resolve, reject) => {
-        let buffer = '';
-        pythonProcess.stdout.on('data', (data) => {
-          buffer += data.toString();
-          const lines = buffer.split('\n');
-          buffer = lines.pop();
-          lines.forEach((line) => {
-            line = line.trim();
-            if (!line) return;
-            try {
-              const obj = JSON.parse(line);
-              if (obj.type === 'log') {
-                sendLog(`[Python CIE-10] ${obj.message}`);
-              } else if (obj.type === 'result') {
-                sendLog('[Python CIE-10] Resultado recibido.');
-                resolve(obj.payload);
+              const entries = await fsp.readdir(dir, { withFileTypes: true });
+              for (const entry of entries) {
+                  const fullPath = path.join(dir, entry.name);
+                  if (entry.isDirectory()) {
+                      files = files.concat(await findBudgetFilesRecursive(fullPath));
+                  } else if (
+                      !entry.name.startsWith('~$') &&
+                      (entry.name.toLowerCase().includes('presupuesto') ||
+                       entry.name.toLowerCase().includes('costo') ||
+                       entry.name.toLowerCase().includes('gasto') ||
+                       entry.name.toLowerCase().includes('recurso') ||
+                       entry.name.toLowerCase().includes('asignacion')) &&
+                      (entry.name.endsWith('.xlsx') || entry.name.endsWith('.xls'))
+                  ) {
+                      const stats = await fsp.stat(fullPath);
+                      files.push({
+                          name: entry.name,
+                          path: fullPath,
+                          size: stats.size,
+                          modified: stats.mtime
+                      });
+                  }
               }
-            } catch (err) {
-              sendLog(`[Python CIE-10 - RAW] ${line}`, 'DEBUG');
-            }
-          });
-        });
-
-        pythonProcess.stderr.on('data', (data) => {
-          sendLog(`[Python CIE-10 - STDERR] ${data.toString()}`, 'ERROR');
-        });
-
-        pythonProcess.on('close', (code) => {
-          sendLog(`[Python CIE-10] Proceso cerrado con código ${code}`);
-          if (buffer && buffer.trim()) {
-            try {
-              const last = JSON.parse(buffer.trim());
-              if (last.type === 'result') return resolve(last.payload);
-            } catch (e) { /* ignore */ }
-          }
-          resolve({ success: false, error: 'No se recibió resultado del script de Python.' });
-        });
-
-        pythonProcess.on('error', (err) => {
-          sendLog(`Error al iniciar proceso Python para CIE-10: ${err.message}`, 'CRITICAL');
-          reject(err);
-        });
-      });
-
-    } catch (error) {
-      sendLog(`[MAIN] Error crítico en buscar-cie10-descripcion: ${error.message}`, 'ERROR');
-      return { success: false, error: error.message };
-    }
-  });
-
-async function obtenerRutaAusentismo(companyName) {
-  const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
-  const config = JSON.parse(configData);
-
-  const normalizedCompanyName = companyName.toLowerCase();
-  const companyKey = Object.keys(config.companyPaths || {}).find(
-    key => key.toLowerCase() === normalizedCompanyName
-  );
-
-  const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
-  if (!companyConfig || !companyConfig.structure?.structure) {
-    throw new Error(`Empresa "${companyName}" no tiene estructura mapeada.`);
-  }
-
-  const rootStructure = companyConfig.structure.structure;
-
-  function findDirFlexible(subdirs, target) {
-    if (!subdirs) return null;
-    const normalizedTarget = target
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    for (const [key, value] of Object.entries(subdirs)) {
-      const normalizedKey = key
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-      if (normalizedKey === normalizedTarget) return value;
-    }
-    return null;
-  }
-
-  const gestionSalud = findDirFlexible(rootStructure.subdirectories, "3. Gestión de la Salud");
-  if (!gestionSalud) throw new Error("No se encontró '3. Gestión de la Salud'");
-
-  const ausentismoDir = findDirFlexible(gestionSalud.subdirectories, "3.3.6 Medición del ausentismo por causa médica");
-  if (!ausentismoDir) throw new Error("No se encontró submódulo de ausentismo");
-
-  const excelFiles = (ausentismoDir.files || []).filter(f => f.extension?.toLowerCase() === '.xlsx');
-  if (excelFiles.length === 0) throw new Error('No hay archivos .xlsx en la carpeta de ausentismo.');
-
-  return excelFiles[0].path;
-}
-
- // =============================================================================
-// Handler: Registrar nueva incapacidad en archivo de ausentismo
-// =============================================================================
-// ✅ Manejador actualizado para procesar y registrar ausentismo
-  ipcMain.handle('procesar-ausentismo', async (event, empresa, formData) => {
-    sendLog(`[MAIN] Registrando nueva incapacidad para empresa: ${empresa}`, 'INFO');
-
-    try {
-      // ✅ Obtener la ruta del archivo de ausentismo de manera dinámica
-      const filePath = await obtenerRutaAusentismo(empresa);
-      sendLog(`[MAIN] Archivo de ausentismo seleccionado: ${filePath}`, 'INFO');
-
-      const { spawn } = require('child_process');
-      const scriptPath = path.join(__dirname, 'Portear', 'src', 'actualizar_ausentismo.py');
-      const pythonPath = await getPython();
-
-      // ✅ Convertir formData en string seguro para pasar a Python
-      const formDataJson = JSON.stringify(formData);
-
-      return new Promise((resolve, reject) => {
-        const python = spawn(pythonPath, [
-          scriptPath,
-          'registrar_incapacidad',
-          empresa,      // ARG 1
-          filePath,     // ARG 2
-          formDataJson  // ARG 3
-        ], {
-          cwd: path.dirname(scriptPath),
-          env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
-        });
-
-        let buffer = '';
-
-        // ✅ Captura de salida estándar
-        python.stdout.on('data', (data) => {
-          buffer += data.toString();
-          const lines = buffer.split('\n');
-          buffer = lines.pop();
-          lines.forEach(line => {
-            line = line.trim();
-            if (!line) return;
-
-            try {
-              const obj = JSON.parse(line);
-              if (obj.type === 'log') {
-                sendLog(`[Python Registrar] ${obj.message}`, 'INFO');
-              } else if (obj.type === 'result') {
-                resolve(obj.payload);
-              }
-            } catch (e) {
-              sendLog(`[Python Registrar - RAW] ${line}`, 'DEBUG');
-            }
-          });
-        });
-
-        // ✅ Captura de errores del proceso Python
-        python.stderr.on('data', (data) => {
-          sendLog(`[Python Registrar - STDERR] ${data.toString()}`, 'ERROR');
-        });
-
-        // ✅ Evento al cerrar el proceso
-        python.on('close', (code) => {
-          if (buffer?.trim()) {
-            try {
-              const last = JSON.parse(buffer.trim());
-              if (last.type === 'result') return resolve(last.payload);
-            } catch { /* Ignorar errores menores */ }
-          }
-          resolve({ success: false, error: 'Proceso cerrado sin resultado.' });
-        });
-
-        // ✅ Captura de errores al iniciar Python
-        python.on('error', (err) => {
-          sendLog(`Error al iniciar Python para registrar incapacidad: ${err.message}`, 'CRITICAL');
-          reject(err);
-        });
-      });
-
-    } catch (error) {
-      sendLog(`[ERROR] Falló procesar-ausentismo: ${error.message}`, 'ERROR');
-      return { success: false, error: error.message };
-    }
-  });
-
-
-  // Manejador para leer la plantilla de acta de Comité de Convivencia
-  ipcMain.handle('getConvivenciaActaData', async () => {
-    try {
-        // Ruta a la plantilla de Excel
-        const templatePath = path.join(__dirname, 'utils', 'GI-FO-029 ACTA DE REUNION CONVIVENCIA Mayo.xlsx');
-        console.log(`[INFO] Leyendo plantilla de acta de convivencia desde: ${templatePath}`);
-
-        // Verificar que el archivo existe
-        await fsp.access(templatePath);
-
-        // Leer el archivo Excel
-        const workbook = xlsx.readFile(templatePath);
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-
-        // Convertir la hoja a un arreglo de datos
-        const data = xlsx.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: '' });
-
-        // Obtener las celdas combinadas (merges)
-        const merges = worksheet['!merges'] || [];
-
-        console.log(`[SUCCESS] Plantilla de convivencia cargada. Filas: ${data.length}, Merges: ${merges.length}`);
-        return {
-            success: true,
-            data,
-            merges
-        };
-    } catch (error) {
-        console.error('[ERROR] Error al cargar la plantilla del acta de convivencia:', error);
-        return {
-            success: false,
-            error: `No se encontró o no se pudo cargar la plantilla para el Comité de Convivencia. Asegúrate de que el archivo 'PLANTILLA_CONVIVENCIA_POR_DEFINIR.xlsx' existe en la carpeta 'utils'. Detalle: ${error.message}`
-        };
-    }
-  });
-
-  // Manejador para generar el acta de COPASST usando el script de Python
-  ipcMain.handle('generate-copasst-acta', async (event, changes) => {
-    sendLog(`IPC: generate-copasst-acta recibido con ${changes.length} cambios`);
-    try {
-        const pythonPath = await getPython();
-        // 1. Pedir al usuario la ruta para guardar el archivo
-        const { canceled, filePath } = await dialog.showSaveDialog({
-            title: 'Guardar Acta de COPASST',
-            defaultPath: `Acta-COPASST-${new Date().toISOString().split('T')[0]}.xlsx`,
-            filters: [
-                { name: 'Archivos de Excel', extensions: ['xlsx'] }
-            ]
-        });
-
-        if (canceled) {
-            sendLog('El usuario canceló el guardado del acta.');
-            return { success: false, canceled: true };
-        }
-
-        // 2. Preparar para llamar al script de Python
-        const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'copasst_acta_generator.py');
-        const tempDataPath = path.join(app.getPath('temp'), `copasst_data_${Date.now()}.json`);
-
-        sendLog(`Creando archivo de datos temporal: ${tempDataPath}`);
-        await fsp.writeFile(tempDataPath, JSON.stringify({ changes }, null, 2));
-
-        // 3. Ejecutar el script de Python con la ruta del JSON y la ruta de salida
-        const commandArgs = [pythonScriptPath, tempDataPath, filePath];
-
-        sendLog(`Ejecutando script de generación de acta...`);
-        const { stdout, stderr } = await execFilePromise(pythonPath, commandArgs, { cwd: path.dirname(pythonScriptPath) });
-
-        // 4. Limpiar el archivo temporal
-        await fsp.unlink(tempDataPath);
-
-        if (stderr) {
-            sendLog(`Error en script de generación de acta: ${stderr}`, 'ERROR');
-        }
-
-        // 5. Procesar la respuesta del script
-        let finalResult = null;
-        const lines = stdout.split(/\r?\n/).filter(line => line.trim() !== '');
-        lines.forEach(line => {
-            try {
-                const output = JSON.parse(line);
-                if (output.type === 'log') {
-                    sendLog(`[Python] ${output.message}`, output.level);
-                } else if (output.type === 'result') {
-                    finalResult = output.payload;
-                }
-            } catch (e) {
-                sendLog(`No se pudo parsear la línea de salida de Python: ${line}`, 'WARN');
-            }
-        });
-
-        if (finalResult) {
-            sendLog(`Resultado de la generación: ${JSON.stringify(finalResult)}`);
-            return finalResult;
-        } else {
-            throw new Error("El script de Python no devolvió un resultado final.");
-        }
-
-    } catch (error) {
-        sendLog(`Fallo en la ejecución del script de acta: ${error.message}`, 'ERROR');
-        return { success: false, error: error.message };
-    }
-  });
-
-  // Manejador para generar el acta de Comité de Convivencia usando el script de Python
-  ipcMain.handle('generateConvivenciaActa', async (event, changes) => {
-    sendLog(`IPC: generateConvivenciaActa recibido con ${changes.length} cambios`);
-    try {
-        const pythonPath = await getPython();
-        // 1. Pedir al usuario la ruta para guardar el archivo
-        const { canceled, filePath } = await dialog.showSaveDialog({
-            title: 'Guardar Acta de Comité de Convivencia',
-            defaultPath: `Acta-Convivencia-${new Date().toISOString().split('T')[0]}.xlsx`,
-            filters: [
-                { name: 'Archivos de Excel', extensions: ['xlsx'] }
-            ]
-        });
-
-        if (canceled) {
-            sendLog('El usuario canceló el guardado del acta de convivencia.');
-            return { success: false, canceled: true };
-        }
-
-        // 2. Preparar para llamar al script de Python
-        const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'comite_convivencia_acta_generator.py');
-        const tempDataPath = path.join(app.getPath('temp'), `convivencia_data_${Date.now()}.json`);
-
-        sendLog(`Creando archivo de datos temporal: ${tempDataPath}`);
-        await fsp.writeFile(tempDataPath, JSON.stringify({ changes }, null, 2));
-
-        // 3. Ejecutar el script de Python
-        const commandArgs = [pythonScriptPath, tempDataPath, filePath];
-
-        sendLog(`Ejecutando script de generación de acta de convivencia...`);
-        const { stdout, stderr } = await execFilePromise(pythonPath, commandArgs, { cwd: path.dirname(pythonScriptPath) });
-
-        // 4. Limpiar el archivo temporal
-        await fsp.unlink(tempDataPath);
-
-        if (stderr) {
-            sendLog(`Error en script de generación de acta de convivencia: ${stderr}`, 'ERROR');
-        }
-
-        // 5. Procesar la respuesta del script
-        let finalResult = null;
-        const lines = stdout.split(/\r?\n/).filter(line => line.trim() !== '');
-        lines.forEach(line => {
-            try {
-                const output = JSON.parse(line);
-                if (output.type === 'log') {
-                    sendLog(`[Python] ${output.message}`, output.level);
-                } else if (output.type === 'result') {
-                    finalResult = output.payload;
-                }
-            } catch (e) {
-                sendLog(`No se pudo parsear la línea de salida de Python: ${line}`, 'WARN');
-            }
-        });
-
-        if (finalResult) {
-            sendLog(`Resultado de la generación: ${JSON.stringify(finalResult)}`);
-            return finalResult;
-        } else {
-            throw new Error("El script de Python no devolvió un resultado final.");
-        }
-
-    } catch (error) {
-        sendLog(`Fallo en la ejecución del script de acta de convivencia: ${error.message}`, 'ERROR');
-        return { success: false, error: error.message };
-    }
-  });
-
-  // Convertir Excel a PDF usando Microsoft Office'''
-  ipcMain.handle('convertExcelToPdf', async (event, filePath) => {
-      try {
-          console.log('=== INICIO CONVERSIÓN EXCEL ===');
-          console.log('Archivo original:', filePath);
-
-          // Normalizar ruta y manejar caracteres especiales
-          const normalizedPath = path.resolve(filePath);
-          console.log('Ruta normalizada:', normalizedPath);
-
-          // Verificar que el archivo existe
-          if (!fs.existsSync(normalizedPath)) {
-              console.error('Archivo no encontrado');
-              return {
-                  success: false,
-                  error: `Archivo no encontrado: ${normalizedPath}`
-              };
-          }
-
-          // Usar directorio temporal local para evitar problemas con unidades de red
-          const tempDir = path.join(app.getPath('temp'), 'excel_pdf_conversions');
-          if (!fs.existsSync(tempDir)) {
-              fs.mkdirSync(tempDir, { recursive: true });
-          }
-
-          const fileNameWithoutExt = path.basename(normalizedPath, path.extname(normalizedPath));
-
-          // Limpiar nombre para evitar problemas con caracteres especiales
-          const cleanFileName = fileNameWithoutExt
-              .normalize('NFD')
-              .replace(/[̀-ͯ]/g, '') // Remover acentos
-              .replace(/[^ - -퟿豈-﷏ﷰ-￯]/g, '_') // Reemplazar caracteres no ASCII
-              .replace(/ +/g, '_') // Reemplazar espacios
-              .substring(0, 50); // Limitar longitud
-
-          // Copiar archivo de entrada a temporal local
-          const tempInputPath = path.join(tempDir, `${cleanFileName}.xlsx`);
-          await fsp.copyFile(normalizedPath, tempInputPath);
-          console.log('Archivo copiado a temporal:', tempInputPath);
-
-          const outputPath = path.join(tempDir, `${cleanFileName}.pdf`);
-          console.log('Archivo PDF destino:', outputPath);
-
-          // Verificar si ya existe PDF actualizado
-          if (fs.existsSync(outputPath)) {
-              const excelStats = fs.statSync(normalizedPath);
-              const pdfStats = fs.statSync(outputPath);
-
-              if (pdfStats.mtime > excelStats.mtime) {
-                  console.log('PDF ya existe y está actualizado');
-                  return {
-                      success: true,
-                      pdf_path: outputPath
-                  };
-              }
-          }
-
-          // Convertir usando Microsoft Office
-          console.log('Iniciando conversión con Microsoft Office...');
-          const result = await convertWithMicrosoftOffice(tempInputPath, outputPath);
-
-          // Limpiar temporal input después de conversión
-          await fsp.unlink(tempInputPath).catch(e => console.warn('No se pudo eliminar temp input:', e.message));
-
-          if (result.success) {
-              console.log('Conversión exitosa');
-              return {
-                  success: true,
-                  pdf_path: outputPath
-              };
-          } else {
-              console.error('Error en conversión:', result.error);
-              return result;
-          }
-
-      } catch (error) {
-          console.error('Error crítico en convertExcelToPdf:', error);
-          return {
-              success: false,
-              error: `Error crítico: ${error.message}`
-          };
-      } finally {
-          // Opcional: Limpiar directorio temp después de un tiempo
-          setTimeout(() => cleanTempDir(tempDir), 300000); // 5 minutos
-      }
-  });
-
-// Función para limpiar directorio temporal
-async function cleanTempDir(dir) {
-    try {
-        const files = await fsp.readdir(dir);
-        for (const file of files) {
-            const filePath = path.join(dir, file);
-            const stats = await fsp.stat(filePath);
-            if (Date.now() - stats.mtimeMs > 3600000) { // 1 hora
-                await fsp.unlink(filePath);
-            }
-        }
-    } catch (e) {
-        console.warn('Error limpiando temp dir:', e.message);
-    }
-}
-
-// Función mejorada para convertir usando Microsoft Office COM
-function convertWithMicrosoftOffice(inputPath, outputPath) {
-    return new Promise((resolve) => {
-        console.log('Creando script PowerShell para conversión...');
-
-        // Codificar rutas en Base64 para evitar problemas de caracteres especiales
-        const inputPathB64 = Buffer.from(inputPath, 'utf8').toString('base64');
-        const outputPathB64 = Buffer.from(outputPath, 'utf8').toString('base64');
-
-        // Script PowerShell mejorado con correcciones
-        const powershellScript = `
-# Establecer codificación UTF-8 para PowerShell
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
-
-try {
-    Write-Host "=== INICIO CONVERSION EXCEL ===" -Encoding UTF8
-
-    # Decodificar rutas desde Base64
-    $inputPath = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("${inputPathB64}"))
-    $outputPath = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("${outputPathB64}"))
-
-    Write-Host "Ruta de entrada: $inputPath" -Encoding UTF8
-    Write-Host "Ruta de salida: $outputPath" -Encoding UTF8
-
-    # Verificar que el archivo de entrada existe
-    if (-not (Test-Path $inputPath)) {
-        throw "Archivo de entrada no encontrado: $inputPath"
-    }
-
-    # Crear directorio de salida si no existe
-    $outputDir = Split-Path $outputPath -Parent
-    if (-not (Test-Path $outputDir)) {
-        New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
-        Write-Host "Directorio creado: $outputDir" -Encoding UTF8
-    }
-
-    Write-Host "Iniciando Excel..." -Encoding UTF8
-    $excel = New-Object -ComObject Excel.Application
-    $excel.Visible = $false
-    $excel.DisplayAlerts = $false
-    $excel.ScreenUpdating = $false
-    $excel.EnableEvents = $false
-    $excel.AskToUpdateLinks = $false
-
-    Write-Host "Abriendo archivo Excel..." -Encoding UTF8
-
-    # Parámetros para Open() con ReadOnly = $false
-    $workbook = $excel.Workbooks.Open(
-        $inputPath,
-        0,      # UpdateLinks: 0 = No
-        $false, # ReadOnly: $false para permitir guardar/exportar
-        5,      # Format: 5 = CSV, pero para XLSX es ignorado
-        "",     # Password
-        "",     # WriteResPassword
-        $true,  # IgnoreReadOnlyRecommended
-        2,      # Origin: xlWindows
-        "",     # Delimiter
-        $false, # Editable
-        $false, # Notify
-        0,      # Converter
-        $true   # AddToMru
-    )
-
-    Write-Host "Archivo Excel abierto correctamente" -Encoding UTF8
-
-    # Activar el libro de trabajo para asegurar que es el foco
-    $workbook.Activate()
-    Write-Host "Libro de trabajo activado" -Encoding UTF8
-
-    # Esperar un momento para que Excel procese completamente el archivo
-    Start-Sleep -Seconds 7 # Aumentado a 7 segundos
-
-    Write-Host "Iniciando exportación a PDF..." -Encoding UTF8
-
-    # Usar SaveAs como método principal por su fiabilidad en este entorno.
-    # ExportAsFixedFormat estaba fallando consistentemente.
-    try {
-        $workbook.SaveAs(
-            $outputPath,
-            57  # xlTypePDF
-        )
-        Write-Host "Exportación completada con SaveAs" -Encoding UTF8
-
-    } catch {
-        Write-Host "La exportación con SaveAs falló: $($_.Exception.Message)" -Encoding UTF8
-        throw "No se pudo exportar el archivo a PDF"
-    }
-
-    Write-Host "Cerrando libro de trabajo..." -Encoding UTF8
-    $workbook.Close($false)
-
-    Write-Host "Cerrando Excel..." -Encoding UTF8
-    $excel.Quit()
-
-    # Liberar objetos COM
-    Write-Host "Liberando recursos COM..." -Encoding UTF8
-    if ($workbook) { [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($workbook); $workbook = $null }
-    if ($excel) { [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($excel); $excel = $null }
-
-    # Forzar recolección de basura
-    [System.GC]::Collect()
-    [System.GC]::WaitForPendingFinalizers()
-    [System.GC]::Collect()
-
-    # Verificar que el PDF se creó correctamente
-    if (Test-Path $outputPath) {
-        $pdfSize = (Get-Item $outputPath).Length
-        if ($pdfSize -gt 1024) { # PDF debe tener al menos 1KB
-            Write-Host "PDF creado exitosamente. Tamaño: $pdfSize bytes" -Encoding UTF8
-            Write-Host "CONVERSION_SUCCESS" -Encoding UTF8
-        } else {
-            throw "PDF creado pero parece estar vacío o corrupto (tamaño: $pdfSize bytes)"
-        }
-    } else {
-        throw "PDF no fue creado en la ruta esperada: $outputPath"
-    }
-
-} catch {
-    $errorMsg = $_.Exception.Message
-    Write-Host "=== ERROR EN CONVERSION ===" -Encoding UTF8
-    Write-Host "ERROR: $errorMsg" -Encoding UTF8
-    Write-Host "Tipo de excepción: $($_.Exception.GetType().Name)" -Encoding UTF8
-
-    # Información adicional de debugging
-    if ($_.Exception.InnerException) {
-        Write-Host "Error interno: $($_.Exception.InnerException.Message)" -Encoding UTF8
-    }
-
-    # Cleanup forzado en caso de error
-    Write-Host "Iniciando cleanup de emergencia..." -Encoding UTF8
-    try {
-        if ($workbook -ne $null) {
-            Write-Host "Cerrando workbook..." -Encoding UTF8
-            $workbook.Close($false)
-            [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($workbook)
-        }
-    } catch { Write-Host "Error cerrando workbook: $($_.Exception.Message)" -Encoding UTF8 }
-
-    try {
-        if ($excel -ne $null) {
-            Write-Host "Cerrando Excel..." -Encoding UTF8
-            $excel.Quit()
-            [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($excel)
-        }
-    } catch { Write-Host "Error cerrando Excel: $($_.Exception.Message)" -Encoding UTF8 }
-
-    # Forzar terminación de procesos Excel colgados
-    Write-Host "Terminando procesos Excel residuales..." -Encoding UTF8
-    try {
-        Get-Process excel -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 1
-    } catch { Write-Host "Sin procesos Excel para terminar" -Encoding UTF8 }
-
-    # Forzar recolección de basura final
-    [System.GC]::Collect()
-    [System.GC]::WaitForPendingFinalizers()
-
-    exit 1
-}
-`;
-
-        console.log('=== EJECUTANDO POWERSHELL ===');
-
-        // Crear archivo temporal para el script PS1
-        const tempPs1Path = path.join(app.getPath('temp'), `excel_convert_${Date.now()}.ps1`);
-        console.log('Guardando script temporal en:', tempPs1Path);
-
-        fs.writeFileSync(tempPs1Path, powershellScript, 'utf8');
-
-        // Ejecutar PowerShell con -File para evitar problemas con stdin
-        const child = spawn('powershell.exe', [
-            '-ExecutionPolicy', 'Bypass',
-            '-NoProfile',
-            '-NoLogo',
-            '-File', tempPs1Path
-        ], {
-            stdio: ['ignore', 'pipe', 'pipe'],
-            windowsHide: false, // Mostrar ventana para debugging si es necesario
-            shell: false,
-            cwd: path.dirname(inputPath) // Establecer directorio de trabajo
-        });
-
-        let stdout = '';
-        let stderr = '';
-
-        child.stdout.on('data', (data) => {
-            const output = data.toString('utf8').trim();
-            if (output) {
-                stdout += output + '\n';
-                console.log('📋 PowerShell OUT:', output);
-            }
-        });
-
-        child.stderr.on('data', (data) => {
-            const error = data.toString('utf8').trim();
-            if (error) {
-                stderr += error + '\n';
-                console.log('❌ PowerShell ERR:', error);
-            }
-        });
-
-        child.on('close', async (code) => {
-            // Limpiar archivo temporal
-            try {
-                await fsp.unlink(tempPs1Path);
-                console.log('Archivo temporal PS1 eliminado');
-            } catch (e) { console.warn('No se pudo eliminar temp PS1:', e.message); }
-
-            console.log('=== RESULTADO POWERSHELL ===');
-            console.log('Código de salida:', code);
-            console.log('STDOUT longitud:', stdout.length);
-            console.log('STDERR longitud:', stderr.length);
-
-            if (code !== 0) {
-                console.error('PowerShell falló con código:', code);
-                resolve({
-                    success: false,
-                    error: `PowerShell falló (código ${code}): ${stderr || stdout || 'Sin salida'}`
-                });
-                return;
-            }
-
-            if (stdout.includes('CONVERSION_SUCCESS')) {
-                console.log('✅ Marcador de éxito encontrado');
-
-                if (fs.existsSync(outputPath)) {
-                    const stats = fs.statSync(outputPath);
-                    console.log(`✅ PDF existe: ${stats.size} bytes`);
-
-                    if (stats.size > 1024) { // PDF debe tener al menos 1KB
-                        resolve({ success: true });
-                    } else {
-                        resolve({
-                            success: false,
-                            error: `PDF generado pero muy pequeño: ${stats.size} bytes`
-                        });
-                    }
-                } else {
-                    resolve({
-                        success: false,
-                        error: 'Marcador de éxito encontrado pero PDF no existe'
-                    });
-                }
-            } else if (stdout.includes('ERROR')) {
-                // Extraer error específico
-                const errorMatch = stdout.match(/ERROR:\s*(.+)/);
-                const specificError = errorMatch ? errorMatch[1].trim() : 'Error desconocido';
-                console.log('❌ Error detectado:', specificError);
-
-                resolve({
-                    success: false,
-                    error: specificError
-                });
-            } else {
-                console.log('❌ No se encontraron marcadores reconocibles');
-                console.log('Salida completa:', stdout);
-                console.log('Errores:', stderr);
-
-                resolve({
-                    success: false,
-                    error: `Salida inesperada de PowerShell. Ver logs para detalles.`
-                });
-            }
-        });
-
-        child.on('error', (error) => {
-            console.error('❌ Error ejecutando PowerShell:', error);
-            resolve({
-                success: false,
-                error: `Error ejecutando PowerShell: ${error.message}`
-            });
-        });
-
-        // Timeout con mejor logging
-        const timeout = setTimeout(() => {
-            console.log('⏱️ TIMEOUT ALCANZADO');
-            console.log('Salida hasta el momento:', stdout);
-
-            try {
-                child.kill('SIGTERM');
-
-                // Cleanup después de timeout
-                setTimeout(() => {
-                    exec('taskkill /F /IM EXCEL.EXE /T', (error) => {
-                        if (!error) { console.log('🧹 Procesos Excel terminados'); }
-                    });
-                }, 3000);
-            } catch (e) { console.error('Error terminando proceso:', e); }
-
-            resolve({
-                success: false,
-                error: 'Timeout: La conversión tomó demasiado tiempo. Revisa si Excel está bloqueado.'
-            });
-        }, 120000);
-
-        // Limpiar timeout si el proceso termina normally
-        child.on('close', () => {
-            clearTimeout(timeout);
-        });
-    });
-}
-
-// Función para registrar los manejadores IPC
-const registerIPCHandlers = () => {
-  // Manejador para obtener la versión de la aplicación
-  ipcMain.handle('get-app-version', () => {
-    return app.getVersion();
-  });
-
-  // Leer datos de un archivo de presupuesto
-  async function readPresupuestoData(filePath) {
-    try {
-        const workbook = xlsx.readFile(filePath);
-        const sheetName = workbook.SheetNames[0]; // Usar la primera hoja
-        const worksheet = workbook.Sheets[sheetName];
-
-        // Convertir los datos a formato JSON
-        const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
-
-        // Extraer encabezados y filas
-        const headers = data[0];
-        const rows = data.slice(1).filter(row => row.length > 0);
-
-        // Convertir a objetos
-        const budgetData = rows.map(row => {
-            const obj = {};
-            headers.forEach((header, index) => {
-                obj[header] = row[index] || '';
-            });
-            return obj;
-        });
-
-        return {
-            success: true,
-            data: budgetData
-        };
-    } catch (error) {
-        console.error('Error al leer datos de presupuesto:', error);
-        return {
-            success: false,
-            error: error.message
-        };
-    }
-  }
-
-  // Guardar cambios en un archivo de presupuesto
-  async function savePresupuestoChanges(filePath, changes, data) {
-    try {
-        // Crear un nuevo libro de trabajo
-        const workbook = xlsx.utils.book_new();
-
-        // Convertir los datos a una hoja de trabajo
-        const worksheet = xlsx.utils.json_to_sheet(data);
-
-        // Añadir la hoja de trabajo al libro
-        xlsx.utils.book_append_sheet(workbook, worksheet, 'PRESUPUESTO');
-
-        // Escribir el archivo
-        xlsx.writeFile(workbook, filePath);
-
-        return {
-            success: true
-        };
-    } catch (error) {
-        console.error('Error al guardar cambios:', error);
-        return {
-            success: false,
-            error: error.message
-        };
-    }
-  }
-
-  // Leer datos de un archivo de presupuesto
-  async function readPresupuestoData(filePath) {
-    try {
-        const workbook = xlsx.readFile(filePath);
-        const sheetName = workbook.SheetNames[0]; // Usar la primera hoja
-        const worksheet = workbook.Sheets[sheetName];
-
-        // Convertir los datos a formato JSON
-        const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
-
-        // Extraer encabezados y filas
-        const headers = data[0];
-        const rows = data.slice(1).filter(row => row.length > 0);
-
-        // Convertir a objetos
-        const budgetData = rows.map(row => {
-            const obj = {};
-            headers.forEach((header, index) => {
-                obj[header] = row[index] || '';
-            });
-            return obj;
-        });
-
-        return {
-            success: true,
-            data: budgetData
-        };
-    } catch (error) {
-        console.error('Error al leer datos de presupuesto:', error);
-        return {
-            success: false,
-            error: error.message
-        };
-    }
-  }
-
-  // Guardar cambios en un archivo de presupuesto
-  async function savePresupuestoChanges(filePath, changes, data) {
-    try {
-        // Crear un nuevo libro de trabajo
-        const workbook = xlsx.utils.book_new();
-
-        // Convertir los datos a una hoja de trabajo
-        const worksheet = xlsx.utils.json_to_sheet(data);
-
-        // Añadir la hoja de trabajo al libro
-        xlsx.utils.book_append_sheet(workbook, worksheet, 'PRESUPUESTO');
-
-        // Escribir el archivo
-        xlsx.writeFile(workbook, filePath);
-
-        return {
-            success: true
-        };
-    } catch (error) {
-        console.error('Error al guardar cambios:', error);
-        return {
-            success: false,
-            error: error.message
-        };
-    }
-  }
-
-  // Guardar archivo de presupuesto con lógica de reintento para manejar archivos bloqueados
-  async function saveBudgetFile(filePath, data) {
-    const maxRetries = 5;
-    const retryDelay = 1000; // 1 segundo entre reintentos
-
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        // Crear un nuevo libro de trabajo
-        const workbook = xlsx.utils.book_new();
-
-        // Convertir los datos a una hoja de trabajo
-        const worksheet = xlsx.utils.json_to_sheet(data);
-
-        // Añadir la hoja de trabajo al libro
-        xlsx.utils.book_append_sheet(workbook, worksheet, 'PRESUPUESTO');
-
-        // Escribir el archivo
-        xlsx.writeFile(workbook, filePath);
-
-        return {
-            success: true,
-            message: `Archivo guardado exitosamente en el intento ${attempt}`
-        };
-      } catch (error) {
-        console.error(`Error al guardar archivo (intento ${attempt}):`, error);
-
-        // Si es un error de archivo bloqueado (EBUSY) y no es el último intento, esperar y reintentar
-        if (error.code === 'EBUSY' && attempt < maxRetries) {
-          console.log(`Archivo bloqueado, esperando ${retryDelay}ms antes del siguiente intento...`);
-          await new Promise(resolve => setTimeout(resolve, retryDelay));
-        } else {
-          // Si es cualquier otro error o ya intentamos el máximo número de veces, devolver error
-          return {
-            success: false,
-            error: error.message,
-            attempt: attempt
-          };
-        }
-      }
-    }
-  }
-
-  async function getPresupuestoFiles(companyName) {
-    try {
-      // Cargar la configuración
-      const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
-      const config = JSON.parse(configData);
-
-      // Buscar la ruta base de la empresa
-      let basePath = null;
-
-      if (config.companyPaths && config.companyPaths[companyName]) {
-        basePath = config.companyPaths[companyName].root || config.companyPaths[companyName].ruta_base;
-      }
-
-      if (!basePath) {
-        const availableCompanies = config.companyPaths ? Object.keys(config.companyPaths) : [];
-        const error = `No se encontró configuración para la empresa "${companyName}". Empresas configuradas: [${availableCompanies.join(', ')}]`;
-        throw new Error(error);
-      }
-
-      // Buscar archivos de presupuesto en las rutas conocidas
-      // Buscar recursivamente archivos Excel relacionados con presupuesto
-      async function findBudgetFiles(dir) {
-        try {
-          const entries = await fsp.readdir(dir, { withFileTypes: true });
-          const files = [];
-          for (const entry of entries) {
-            const fullPath = path.join(dir, entry.name);
-            if (entry.isDirectory()) {
-              const subDirFiles = await findBudgetFiles(fullPath);
-              files.push(...subDirFiles);
-            } else if (
-              (entry.name.toLowerCase().includes('presupuesto') ||
-               entry.name.toLowerCase().includes('costo') ||
-               entry.name.toLowerCase().includes('gasto') ||
-               entry.name.toLowerCase().includes('recurso') ||
-               entry.name.toLowerCase().includes('asignacion')) &&
-              (entry.name.endsWith('.xlsx') || entry.name.endsWith('.xls'))
-            ) {
-              const stats = await fsp.stat(fullPath);
-              files.push({
-                name: entry.name,
-                path: fullPath,
-                size: stats.size,
-                modified: stats.mtime
-              });
-            }
+          } catch (error) {
+              sendLog(`[WARN] No se pudo leer el directorio ${dir}: ${error.message}`);
           }
           return files;
-        } catch (error) {
-          sendLog(`[MAIN] Error buscando archivos de presupuesto en ${dir}: ` + error.message, 'WARN');
-          return [];
-        }
       }
 
-      const budgetFiles = await findBudgetFiles(basePath);
+      let budgetFiles = await findBudgetFilesRecursive(searchPath); // Usar searchPath aquí
 
-      // Si no se encontraron archivos usando el método tradicional, buscar archivos Excel genéricos
-      if (budgetFiles.length === 0) {
-        async function findAllExcelFiles(dir) {
-          try {
-            const entries = await fsp.readdir(dir, { withFileTypes: true });
-            const files = [];
-            for (const entry of entries) {
-              const fullPath = path.join(dir, entry.name);
-              if (entry.isDirectory()) {
-                const subDirFiles = await findAllExcelFiles(fullPath);
-                files.push(...subDirFiles);
-              } else if (entry.name.endsWith('.xlsx') || entry.name.endsWith('.xls')) {
-                // Verificar si el nombre contiene palabras relacionadas con recursos o presupuesto
-                const lowerName = entry.name.toLowerCase();
-                if (
-                  lowerName.includes('presupuesto') ||
-                  lowerName.includes('costo') ||
-                  lowerName.includes('gasto') ||
-                  lowerName.includes('recurso') ||
-                  lowerName.includes('asignacion') ||
-                  lowerName.includes('sg-sst') ||
-                  lowerName.includes('gestion') ||
-                  lowerName.includes('presupuesto sg-sst') // Nombre específico del archivo de ejemplo
-                ) {
-                  const stats = await fsp.stat(fullPath);
-                  files.push({
-                    name: entry.name,
-                    path: fullPath,
-                    size: stats.size,
-                    modified: stats.mtime
-                  });
-                }
-              }
-            }
-            return files;
-          } catch (error) {
-            sendLog(`[MAIN] Error buscando archivos Excel en ${dir}: ` + error.message, 'WARN');
-            return [];
-          }
-        }
-
-        const allExcelFiles = await findAllExcelFiles(basePath);
-        if (allExcelFiles.length > 0) {
-          sendLog(`[MAIN] No se encontraron archivos con nombre específico de presupuesto, usando ${allExcelFiles.length} archivos Excel relacionados`, 'INFO');
-          return {
-            success: true,
-            files: allExcelFiles
-          };
-        }
+      if (budgetFiles.length > 0) {
+           sendLog(`[MAIN] Encontrados ${budgetFiles.length} archivos de presupuesto con búsqueda robusta.`);
+           return { success: true, files: budgetFiles };
       }
 
-      // Si no se encontraron archivos reales, incluir un archivo de ejemplo
-      if (budgetFiles.length === 0) {
-        sendLog(`[MAIN] No se encontraron archivos reales de presupuesto para ${companyName}, mostrando archivo de ejemplo`, 'INFO');
-        const ejemploPath = path.join(__dirname, 'utils', 'presupuesto_ejemplo.json');
-        if (fs.existsSync(ejemploPath)) {
+      // Fallback si no se encuentra nada
+      sendLog(`[MAIN] No se encontraron archivos de presupuesto con búsqueda robusta, intentando fallback a archivo de ejemplo.`);
+      const ejemploPath = path.join(__dirname, 'utils', 'Presupuesto SG-SST.xlsx');
+      if (fs.existsSync(ejemploPath)) {
           const stats = fs.statSync(ejemploPath);
-          // Buscar el archivo real "Presupuesto SG-SST" si existe
-          const possibleExampleFiles = ['Presupuesto SG-SST.xlsx', 'Presupuesto SG-SST.xls', 'Presupuesto SG-SST.XLSX', 'Presupuesto SG-SST.XLS'];
-          for (const fileName of possibleExampleFiles) {
-            const realPath = path.join(__dirname, 'utils', fileName);
-            if (fs.existsSync(realPath)) {
-              const realStats = fs.statSync(realPath);
-              return {
-                success: true,
-                files: [{
-                  name: fileName,
-                  path: realPath,
-                  size: realStats.size,
-                  modified: realStats.mtime
-                }]
-              };
-            }
-          }
-          // Si no hay archivo real, usar el JSON de ejemplo
           return {
-            success: true,
-            files: [{
-              name: 'Ejemplo_Presupuesto_SG-SST.xlsx',
-              path: ejemploPath,
-              size: stats.size,
-              modified: stats.mtime
-            }]
+              success: true,
+              files: [{
+                  name: 'Ejemplo_Presupuesto_SG-SST.xlsx',
+                  path: ejemploPath,
+                  size: stats.size,
+                  modified: stats.mtime
+              }],
+              empty: true, // Indicar que es un ejemplo
+              message: 'No se encontraron archivos de presupuesto reales. Se muestra un archivo de ejemplo.'
           };
-        }
       }
 
-      return {
-        success: true,
-        files: budgetFiles
-      };
-    } catch (error) {
-      console.error('Error al obtener archivos de presupuesto:', error);
-      return {
-        success: false,
-        error: error.message
-      };
-    }
+      // Si ni siquiera el ejemplo existe
+      return { success: true, files: [], empty: true, message: 'No se encontraron archivos de presupuesto y el archivo de ejemplo no está disponible.' };
+
+  } catch (error) {
+      sendLog(`[MAIN] Error en getPresupuestoFiles: ${error.message}`, 'ERROR');
+      return { success: false, error: error.message };
   }
+});
 
-  // El manejador para getPresupuestoFiles fue movido fuera de esta función para evitar duplicados.
 
-  ipcMain.handle('readPresupuestoData', async (event, filePath) => {
-    return await readPresupuestoData(filePath);
-  });
+// Manejar búsqueda de ruta de submódulo
+ipcMain.handle('find-submodule-path', async (event, companyName, module, submodule) => {
+  try {
+    console.log(`[INFO] Finding path for company: ${companyName}, module: ${module}, submodule: ${submodule}`);
 
-  ipcMain.handle('savePresupuestoChanges', async (event, filePath, changes, data) => {
-    return await savePresupuestoChanges(filePath, changes, data);
-  });
+    // Cargar la configuración
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+    console.log(`[DEBUG] Full config keys: [${Object.keys(config)}]`);
 
-  ipcMain.handle('open-budget-window', async (event, file) => {
-    sendLog(`[MAIN] Abriendo ventana de gestión de presupuesto para: ${file.name}`);
+    // Verificar si tenemos rutas de empresa para la empresa especificada
+    if (!config.companyPaths || !config.companyPaths[companyName]) {
+      const availableCompanies = config.companyPaths ? Object.keys(config.companyPaths) : [];
+      console.log(`[ERROR] Company '${companyName}' not found. Available: [${availableCompanies.join(', ')}]`);
+      throw new Error(`No configuration found for company: ${companyName}`);
+    }
 
-    const budgetWindow = new BrowserWindow({
-      width: 1200,
-      height: 800,
-      minWidth: 900,
-      minHeight: 600,
-      title: `Gestión de Presupuesto - ${file.name}`,
-      icon: path.join(__dirname, 'assets', 'icons8-adelante-100.ico'),
-      webPreferences: {
-        preload: path.join(__dirname, 'preload.js'),
-        nodeIntegration: false,
-        contextIsolation: true,
-      },
-      parent: mainWindow,
-      modal: true
-    });
+    // Obtener la estructura para esta empresa - Nivel 1
+    const companyStructureRoot = config.companyPaths[companyName];
+    console.log(`[DEBUG] Company root keys: [${Object.keys(companyStructureRoot)}]`);
 
-    await budgetWindow.loadFile(path.join(__dirname, 'presupuesto-gestion.html'));
+    // Obtener la estructura real que contiene las carpetas - Nivel 2 (ESTE ES EL CORRECTO)
+    // Según el config.json: config.companyPaths.Tempoactiva.structure.structure
+    const actualCompanyStructure = companyStructureRoot.structure?.structure;
 
-    budgetWindow.webContents.on('did-finish-load', () => {
-      sendLog(`[MAIN] Enviando datos del archivo a la ventana de presupuesto: ${file.path}`);
-      budgetWindow.webContents.send('budget-file-data', file);
-    });
-  });
-}
+    if (!actualCompanyStructure) {
+        console.log(`[ERROR] Actual company structure (structure.structure) is missing or invalid.`, companyStructureRoot);
+        throw new Error(`Invalid structure found for company: ${companyName}`);
+    }
 
-// --- Ciclo de vida de la aplicación ---
+    console.log(`[DEBUG] Actual structure name: '${actualCompanyStructure.name}', path: '${actualCompanyStructure.path}'`);
+    console.log(`[DEBUG] Actual structure subdirectories keys: [${Object.keys(actualCompanyStructure.subdirectories || {}).join(', ')}]`);
 
-// Este método se llamará cuando Electron haya terminado la inicialización
-// y esté listo para crear ventanas de navegador.
-// Algunas API solo se pueden usar después de que ocurra este evento.
+    // Extraer el código del nombre del submódulo (ej. "1.1.1 Responsable del SG" -> "1.1.1")
+    const submoduleCode = submodule.match(/^[0-9.]+/);
+    if (!submoduleCode) {
+      console.log(`[ERROR] Invalid submodule name format: ${submodule}`);
+      throw new Error(`Invalid submodule name format: ${submodule}`);
+    }
+    const code = submoduleCode[0];
+    console.log(`[DEBUG] Extracted code: '${code}'`);
+
+    let foundPath = null;
+
+    // Para ciertos módulos conocidos, buscar primero el módulo y luego el submódulo dentro de él
+    // Asumimos que "Recursos" es uno de ellos basado en el log anterior.
+    if (module === "Recursos") {
+      const resourcesFolderName = "1. Recursos"; // Nombre fijo esperado
+
+      console.log(`[DEBUG] Searching for module '${module}' (folder: '${resourcesFolderName}') containing code '${code}'`);
+
+      // Verificar si la carpeta "1. Recursos" existe en el nivel raíz de la estructura
+      if (actualCompanyStructure.subdirectories && actualCompanyStructure.subdirectories[resourcesFolderName]) {
+          const resourcesFolderNode = actualCompanyStructure.subdirectories[resourcesFolderName];
+          console.log(`[DEBUG] Found '${resourcesFolderName}' folder. Searching inside it for code '${code}'...`);
+          // Buscar el submódulo (ej. "1.1.1 Responsable del SG") DENTRO de la carpeta "1. Recursos"
+          foundPath = searchInStructure(resourcesFolderNode, code);
+      } else {
+          console.log(`[WARN] Folder '${resourcesFolderName}' not found at root level. Available root folders: [${Object.keys(actualCompanyStructure.subdirectories || {}).join(', ')}]`);
+      }
+    }
+
+    // Si no se encontró en un módulo específico o no es un módulo conocido, buscar el código directamente en la raíz
+    if (!foundPath) {
+      console.log(`[DEBUG] Searching for code '${code}' directly in root structure...`);
+      foundPath = searchInStructure(actualCompanyStructure, code);
+    }
+
+    if (foundPath) {
+      console.log(`[SUCCESS] Path found for '${submodule}': ${foundPath}`);
+      return { success: true, path: foundPath };
+    } else {
+      console.log(`[ERROR] Path for '${submodule}' not found in structure.`);
+      return { success: false, error: `No se encontró la ruta para el submódulo '${submodule}'` };
+    }
+  } catch (error) {
+    console.error(`[ERROR] Error in find-submodule-path: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+});
+
+// Manejar la creación de la ventana principal
 app.whenReady().then(() => {
-  log.info(`Ruta de datos del usuario (userData) para config.json: ${app.getPath('userData')}`);
-  registerIPCHandlers(); // Registrar todos los manejadores de eventos
-  createWindow(); // Crear la ventana principal
+  createWindow();
 
-  // Iniciar la búsqueda de actualizaciones una vez que la app está lista
+  // Iniciar la búsqueda de actualizaciones una vez que la app esté lista
   autoUpdater.checkForUpdatesAndNotify();
 
   app.on('activate', () => {

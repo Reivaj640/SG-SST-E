@@ -52,6 +52,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   readExcelFile: (filePath) => ipcRenderer.invoke('read-excel-file', filePath),
 
+  // --- New Document Viewer ---
+  getDocumentFolders: (payload) => ipcRenderer.invoke('get-document-folders', payload),
+  getFolderContents: (folderPath) => ipcRenderer.invoke('read-directory', folderPath),
+  getDocumentsInFolder: (folderPath) => ipcRenderer.invoke('read-directory', folderPath), // REMAPPED
+  getPDFPreview: (filePath) => ipcRenderer.invoke('get-pdf-preview', filePath),
+  getWordPreview: (filePath) => ipcRenderer.invoke('get-word-preview', filePath),
+  getExcelPreview: (filePath) => ipcRenderer.invoke('get-excel-preview', filePath),
+
   // --- Submódulos / rutas ---
   findSubmodulePath: (companyName, module, submodule) => 
     ipcRenderer.invoke('find-submodule-path', companyName, module, submodule),
