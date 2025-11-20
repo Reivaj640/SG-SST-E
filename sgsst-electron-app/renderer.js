@@ -1251,6 +1251,20 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         console.error('❌ RolesResponsabilidadesComponent no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
+    } else if (submoduleName === "1.1.4 Afiliación al SSSI") {
+      if (window.AfiliacionComponent) {
+        const afiliacionComponent = new window.AfiliacionComponent(
+          submoduleContentDiv,
+          currentCompany,
+          moduleName,
+          submoduleName,
+          safeBackToModuleCallback // <-- USAR EL CALLBACK SEGURO
+        );
+        afiliacionComponent.render();
+      } else {
+        console.error('❌ AfiliacionComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
     } else if (submoduleName === "1.1.6 Conformación de Copasst") {
       if (window.CopasstComponent) {
         const copasstComponent = new window.CopasstComponent(
