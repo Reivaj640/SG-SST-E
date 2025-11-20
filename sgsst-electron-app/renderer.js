@@ -1309,7 +1309,35 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         console.error('❌ CursoVirtualComponent no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
+    } else if (submoduleName === "2.1.1 Politica del SG-SST") {
+      if (window.PoliticaComponent) {
+        const politicaComponent = new window.PoliticaComponent(
+          submoduleContentDiv,
+          currentCompany,
+          moduleName,
+          submoduleName,
+          safeBackToModuleCallback // <-- USAR EL CALLBACK SEGURO
+        );
+        politicaComponent.render();
+      } else {
+        console.error('❌ PoliticaComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
 
+    } else if (submoduleName === "3.1.1 Descripción Sociodemografica y diagnostico de condiciones de salud") {
+      if (window.SociodemograficaComponent) {
+        const sociodemograficaComponent = new window.SociodemograficaComponent(
+          submoduleContentDiv,
+          currentCompany,
+          moduleName,
+          submoduleName,
+          safeBackToModuleCallback // <-- USAR EL CALLBACK SEGURO
+        );
+        sociodemograficaComponent.render();
+      } else {
+        console.error('❌ SociodemograficaComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
     } else if (submoduleName === "3.1.6 Restricciones y recomendaciones médicas") {
       if (window.RestriccionesMedicasComponent) {
         const restriccionesComponent = new window.RestriccionesMedicasComponent(

@@ -32,7 +32,7 @@ class EvaluacionesMedicasComponent {
         const card1 = this.createModuleCard(
             'Ver Evaluaciones Realizadas',
             'Visualizar, buscar y previsualizar certificados de aptitud médica.',
-            () => this.showVerEvaluacionesPage()
+            () => this.showNewDocumentViewer()
         );
         cardsContainer.appendChild(card1);
 
@@ -60,76 +60,45 @@ class EvaluacionesMedicasComponent {
         this.container.appendChild(cardsContainer);
     }
 
-    showVerEvaluacionesPage() {
+    showNewDocumentViewer() {
         this.container.innerHTML = '';
 
+        // Crear iframe para el nuevo visualizador de documentos
+        const iframe = document.createElement('iframe');
+        iframe.style.width = '100%';
+        iframe.style.height = '100vh';
+        iframe.style.border = 'none';
+
+        // Pasar parámetros a la nueva interfaz a través de la URL
+        const viewerUrl = `evaluaciones-viewer.html?company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
+        iframe.src = viewerUrl;
+
+        // Crear un contenedor superior con botón de volver
         const header = document.createElement('div');
         header.className = 'submodule-header';
-        
+        header.style.display = 'flex';
+        header.style.alignItems = 'center';
+        header.style.padding = '10px';
+        header.style.backgroundColor = '#f8f9fa';
+        header.style.borderBottom = '1px solid #dee2e6';
+        header.style.marginBottom = '20px';
+
         const backButton = document.createElement('button');
         backButton.className = 'btn btn-back';
         backButton.innerHTML = '&#8592; Volver';
+        backButton.style.marginRight = '10px';
         backButton.addEventListener('click', () => this.render());
         header.appendChild(backButton);
-        
+
         const title = document.createElement('h3');
         title.textContent = 'Ver Evaluaciones Médicas';
         title.style.flexGrow = '1';
         title.style.textAlign = 'center';
+        title.style.margin = '0';
         header.appendChild(title);
-        
-        const openButton = document.createElement('button');
-        openButton.id = 'open-current-doc-btn';
-        openButton.className = 'btn btn-back';
-        openButton.textContent = 'Abrir';
-        openButton.style.display = 'none';
-        openButton.addEventListener('click', () => {
-            const currentPreview = document.querySelector('#preview-col iframe') || document.querySelector('#preview-col [data-file-path]');
-            if (currentPreview) {
-                const filePath = currentPreview.getAttribute('data-file-path') || currentPreview.src;
-                if (filePath) this.openDocument(filePath);
-            }
-        });
-        header.appendChild(openButton);
-        
+
         this.container.appendChild(header);
-
-        const controls = document.createElement('div');
-        controls.className = 'document-controls';
-        
-        const searchInput = document.createElement('input');
-        searchInput.type = 'text';
-        searchInput.placeholder = 'Buscar por nombre de archivo o empleado...';
-        searchInput.className = 'form-control';
-        searchInput.style.flexGrow = '1';
-        searchInput.addEventListener('input', (e) => this.filterAndDisplayFiles(e.target.value));
-        controls.appendChild(searchInput);
-
-        const manualSelectButton = document.createElement('button');
-        manualSelectButton.className = 'btn btn-secondary';
-        manualSelectButton.textContent = 'Seleccionar Manualmente';
-        manualSelectButton.addEventListener('click', () => this.handleManualSelect());
-        controls.appendChild(manualSelectButton);
-        
-        this.container.appendChild(controls);
-
-        const mainLayout = document.createElement('div');
-        mainLayout.className = 'remisiones-layout'; // Reutilizamos la clase de layout
-
-        const resultsCol = document.createElement('div');
-        resultsCol.id = 'search-results-col';
-        resultsCol.className = 'search-results-col';
-        mainLayout.appendChild(resultsCol);
-
-        const previewCol = document.createElement('div');
-        previewCol.id = 'preview-col';
-        previewCol.className = 'preview-col';
-        previewCol.innerHTML = `<div class="preview-placeholder">Seleccione un documento para previsualizarlo.</div>`;
-        mainLayout.appendChild(previewCol);
-
-        this.container.appendChild(mainLayout);
-
-        this.loadInitialFiles();
+        this.container.appendChild(iframe);
     }
 
     async loadInitialFiles() {

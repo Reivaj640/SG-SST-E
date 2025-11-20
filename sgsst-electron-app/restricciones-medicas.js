@@ -30,7 +30,7 @@ class RestriccionesMedicasComponent {
         const cardsContainer = document.createElement('div');
         cardsContainer.className = 'module-cards';
 
-        cardsContainer.appendChild(this.createModuleCard('Ver Remisiones Médicas', 'Navegar, visualizar y previsualizar el historial de remisiones.', () => this.showVerRemisionesPage()));
+        cardsContainer.appendChild(this.createModuleCard('Ver Remisiones Médicas', 'Visualizar historial de remisiones y recomendaciones médicas.', () => this.showNewDocumentViewer()));
         cardsContainer.appendChild(this.createModuleCard('Enviar Remisiones', 'Crear y enviar nuevas remisiones y recomendaciones.', () => this.showEnviarRemisionPage()));
         cardsContainer.appendChild(this.createModuleCard('Control de Remisiones', 'Realizar seguimiento al estado de las remisiones enviadas.', () => this._renderControlRemisionesView()));
         cardsContainer.appendChild(this.createModuleCard('Próxima Función', 'Una nueva funcionalidad estará disponible aquí pronto.', () => this.showPlaceholder('Próxima Función')));
@@ -787,4 +787,48 @@ style.textContent = `
         overflow-y: auto;
     }
 `;
+
+// Adjuntar estilos al documento
 document.head.appendChild(style);
+
+// Definir el método showNewDocumentViewer correctamente como método del prototipo
+RestriccionesMedicasComponent.prototype.showNewDocumentViewer = function() {
+    this.container.innerHTML = '';
+
+    // Crear un contenedor superior con botón de volver
+    const header = document.createElement('div');
+    header.className = 'submodule-header';
+    header.style.display = 'flex';
+    header.style.alignItems = 'center';
+    header.style.padding = '10px';
+    header.style.backgroundColor = '#f8f9fa';
+    header.style.borderBottom = '1px solid #dee2e6';
+    header.style.marginBottom = '20px';
+
+    const backButton = document.createElement('button');
+    backButton.className = 'btn btn-back';
+    backButton.innerHTML = '&#8592; Volver';
+    backButton.style.marginRight = '10px';
+    backButton.addEventListener('click', () => this.render());
+    header.appendChild(backButton);
+
+    const title = document.createElement('h3');
+    title.textContent = 'Ver Remisiones Médicas';
+    title.style.flexGrow = '1';
+    title.style.textAlign = 'center';
+    title.style.margin = '0';
+    header.appendChild(title);
+
+    // Crear un iframe para el nuevo visualizador de documentos
+    const iframe = document.createElement('iframe');
+    iframe.style.width = '100%';
+    iframe.style.height = 'calc(100vh - 150px)'; // Ajustar altura para dejar espacio para el encabezado
+    iframe.style.border = 'none';
+
+    // Pasar parámetros a la nueva interfaz a través de la URL
+    const viewerUrl = `restricciones-viewer.html?company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
+    iframe.src = viewerUrl;
+
+    this.container.appendChild(header);
+    this.container.appendChild(iframe);
+};
