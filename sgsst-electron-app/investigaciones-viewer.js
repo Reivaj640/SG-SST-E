@@ -1,4 +1,4 @@
-// evaluaciones-viewer.js
+// investigaciones-viewer.js
 
 // Variables globales
 let currentDocument = null;
@@ -19,7 +19,7 @@ let folderPath = '';
  * @returns {Promise<any>} - A promise that resolves with the payload from the parent's response.
  */
 function callParentAPI(type, payload) {
-    console.log(`[evaluaciones-viewer.js][callParentAPI] Enviando solicitud al padre. Tipo: ${type}, Payload:`, payload);
+    console.log(`[investigaciones-viewer.js][callParentAPI] Enviando solicitud al padre. Tipo: ${type}, Payload:`, payload);
     return new Promise((resolve, reject) => {
         // Unique ID for this request to match it with a response
         const requestId = `req-${Date.now()}-${Math.random()}`;
@@ -35,13 +35,13 @@ function callParentAPI(type, payload) {
             if (response.type === `${type}-response` && response.requestId === requestId) {
                 // Clean up the event listener
                 window.removeEventListener('message', handleResponse);
-                console.log(`[evaluaciones-viewer.js][callParentAPI] Respuesta recibida del padre para requestId ${requestId}. Success: ${response.payload && response.payload.success}`);
+                console.log(`[investigaciones-viewer.js][callParentAPI] Respuesta recibida del padre para requestId ${requestId}. Success: ${response.payload && response.payload.success}`);
 
                 if (response.payload && response.payload.success) {
                     resolve(response.payload);
                 } else {
                     const errorMessage = (response.payload && response.payload.error) || 'Unknown error from parent process';
-                    console.error(`[evaluaciones-viewer.js][callParentAPI] Error recibido para la solicitud '${type}':`, errorMessage);
+                    console.error(`[investigaciones-viewer.js][callParentAPI] Error recibido para la solicitud '${type}':`, errorMessage);
                     reject(new Error(errorMessage));
                 }
             }
@@ -247,7 +247,7 @@ async function selectDocument(doc) {
         document.getElementById('documentTitle').textContent = doc.name;
 
         const extension = doc.extension.toLowerCase();
-        console.log(`[evaluaciones-viewer.js][selectDocument] Documento seleccionado: ${doc.name}, Path: ${doc.path}, Extensión: ${extension}`);
+        console.log(`[investigaciones-viewer.js][selectDocument] Documento seleccionado: ${doc.name}, Path: ${doc.path}, Extensión: ${extension}`);
 
         showLoading();
 
@@ -278,7 +278,7 @@ async function selectDocument(doc) {
 
 // Cargar PDF
 async function loadPDF(filePath) {
-    console.log(`[evaluaciones-viewer.js][loadPDF] Solicitando previsualización de PDF para: ${filePath}`);
+    console.log(`[investigaciones-viewer.js][loadPDF] Solicitando previsualización de PDF para: ${filePath}`);
     try {
         const result = await callParentAPI('get-pdf-preview', { filePath: filePath }); // Pass filePath in an object
         if (result.success) {
@@ -295,7 +295,7 @@ async function loadPDF(filePath) {
 
 // Cargar Excel
 async function loadExcel(filePath) {
-    console.log(`[evaluaciones-viewer.js][loadExcel] Solicitando previsualización de Excel para: ${filePath}`);
+    console.log(`[investigaciones-viewer.js][loadExcel] Solicitando previsualización de Excel para: ${filePath}`);
     try {
         const result = await callParentAPI('get-excel-preview', { filePath: filePath }); // Pass filePath in an object
         if (result.success) {
@@ -320,7 +320,7 @@ async function loadExcel(filePath) {
 
 // Cargar Word
 async function loadWord(filePath) {
-    console.log(`[evaluaciones-viewer.js][loadWord] Solicitando previsualización de Word para: ${filePath}`);
+    console.log(`[investigaciones-viewer.js][loadWord] Solicitando previsualización de Word para: ${filePath}`);
     try {
         const result = await callParentAPI('get-word-preview', { filePath: filePath }); // Pass filePath in an object
         if (result.success) {
@@ -378,12 +378,6 @@ function displayExcel(excelData) { // excelData is expected to be base64 PDF dat
     currentPage = 1;
 
     updatePageInfo();
-}
-
-// Mostrar Word (This function is not called directly anymore but kept for reference)
-function displayWord(wordData) {
-    hideLoading();
-    // ... (implementation remains the same)
 }
 
 // Actualizar información de página
@@ -508,7 +502,7 @@ function applyZoom() {
             break;
     }
 
-    console.log(`Applying zoom: ${zoomParam}`);
+    console.log(`Aplicando zoom: ${zoomParam}`);
     iframe.src = src + zoomParam;
 }
 

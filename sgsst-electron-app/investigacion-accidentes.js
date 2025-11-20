@@ -38,7 +38,7 @@ class InvestigacionAccidentesComponent {
         // Encabezado
         const header = document.createElement('div');
         header.className = 'submodule-header';
-        
+
         const title = document.createElement('h2');
         title.textContent = this.submoduleName;
         header.appendChild(title);
@@ -62,7 +62,7 @@ class InvestigacionAccidentesComponent {
         // Crear tarjetas para las opciones del submódulo
         const cardsContainer = document.createElement('div');
         cardsContainer.className = 'module-cards';
-        
+
         // Tarjeta 1: Ver investigación
         const card1 = this.createModuleCard(
             'Ver investigación',
@@ -70,7 +70,7 @@ class InvestigacionAccidentesComponent {
             () => this.handleViewInvestigation()
         );
         cardsContainer.appendChild(card1);
-        
+
         // Tarjeta 2: Realizar investigación
         const card2 = this.createModuleCard(
             'Realizar investigación',
@@ -78,7 +78,7 @@ class InvestigacionAccidentesComponent {
             () => this.handlePerformInvestigation()
         );
         cardsContainer.appendChild(card2);
-        
+
         // Tarjeta 3: Próximo a implementar
         const card3 = this.createModuleCard(
             'Próximo a implementar',
@@ -86,7 +86,7 @@ class InvestigacionAccidentesComponent {
             () => this.handleComingSoon()
         );
         cardsContainer.appendChild(card3);
-        
+
         container.appendChild(cardsContainer);
 
         // Área de notificaciones
@@ -142,7 +142,7 @@ class InvestigacionAccidentesComponent {
     renderFallbackView(container) {
         const header = document.createElement('div');
         header.className = 'submodule-header';
-        
+
         const title = document.createElement('h2');
         title.textContent = 'Realizar Investigación';
         header.appendChild(title);
@@ -166,40 +166,39 @@ class InvestigacionAccidentesComponent {
     createModuleCard(title, description, onClick) {
         const card = document.createElement('div');
         card.className = 'card module-card';
-        
+
         // Contenedor para el ícono y el título
         const headerDiv = document.createElement('div');
         headerDiv.className = 'card-header';
-        
+
         // Placeholder para el ícono
         const iconDiv = document.createElement('div');
         iconDiv.className = 'card-icon-placeholder';
         headerDiv.appendChild(iconDiv);
-        
+
         const cardTitle = document.createElement('h3');
         cardTitle.textContent = title;
         cardTitle.className = 'card-title';
         headerDiv.appendChild(cardTitle);
-        
+
         card.appendChild(headerDiv);
-        
+
         const cardDescription = document.createElement('p');
         cardDescription.textContent = description;
         cardDescription.className = 'card-description';
         card.appendChild(cardDescription);
-        
+
         const cardButton = document.createElement('button');
         cardButton.className = 'btn btn-primary';
         cardButton.textContent = 'Abrir';
         cardButton.addEventListener('click', onClick);
         card.appendChild(cardButton);
-        
+
         return card;
     }
 
     handleViewInvestigation() {
-        this.currentView = 'ver-investigacion';
-        this.render();
+        this.showNewDocumentViewer();
     }
 
     handlePerformInvestigation() {
@@ -220,16 +219,16 @@ class InvestigacionAccidentesComponent {
         const descripcion = form.querySelector('#descripcion').value;
         const departamento = form.querySelector('#departamento').value;
         const trabajador = form.querySelector('#trabajador').value;
-        
+
         // Validar campos requeridos
         if (!tipoInvestigacion || !fechaOcurrencia || !descripcion || !departamento) {
             alert('Por favor complete todos los campos marcados con *');
             return;
         }
-        
+
         // Mostrar mensaje de confirmación
         alert(`Investigación iniciada correctamente:\n\nTipo: ${tipoInvestigacion}\nFecha: ${fechaOcurrencia}\nDepartamento: ${departamento}\n\nLa investigación se ha registrado en el sistema y está lista para ser procesada.`);
-        
+
         // Volver a la vista principal
         this.currentView = 'main';
         this.render();
@@ -344,7 +343,7 @@ class InvestigacionAccidentesComponent {
             if (extension === '.pdf') icon = '📕';
             else if (extension === '.doc' || extension === '.docx') icon = '📘';
             else if (extension === '.xlsx' || extension === '.xls') icon = '📊';
-            
+
             li.innerHTML = `${icon} ${file.name}`;
             li.addEventListener('click', () => this.previewDocument(file.path));
             list.appendChild(li);
@@ -368,7 +367,7 @@ class InvestigacionAccidentesComponent {
             previewCol.innerHTML = `<iframe src="file:///${safePath}?t=${new Date().getTime()}" width="100%" height="100%" style="border: none;"></iframe>`;
         } else if (['doc', 'docx', 'xlsx', 'xls'].includes(fileExtension)) {
             try {
-                const result = fileExtension.startsWith('doc') 
+                const result = fileExtension.startsWith('doc')
                     ? await window.electronAPI.convertDocxToPdf(filePath)
                     : await window.electronAPI.convertExcelToPdf(filePath);
 
@@ -405,7 +404,7 @@ class InvestigacionAccidentesComponent {
         header.appendChild(title);
         return header;
     }
-    
+
     createBackButton(text, onClick) {
         const backButton = document.createElement('button');
         backButton.className = 'btn btn-back';
@@ -414,6 +413,51 @@ class InvestigacionAccidentesComponent {
         return backButton;
     }
 }
+
+// Definir el método showNewDocumentViewer correctamente como método del prototipo
+InvestigacionAccidentesComponent.prototype.showNewDocumentViewer = function() {
+    this.container.innerHTML = '';
+
+    // Crear un contenedor superior con botón de volver
+    const header = document.createElement('div');
+    header.className = 'submodule-header';
+    header.style.display = 'flex';
+    header.style.alignItems = 'center';
+    header.style.padding = '10px';
+    header.style.backgroundColor = '#f8f9fa';
+    header.style.borderBottom = '1px solid #dee2e6';
+    header.style.marginBottom = '20px';
+
+    const backButton = document.createElement('button');
+    backButton.className = 'btn btn-back';
+    backButton.innerHTML = '&#8592; Volver';
+    backButton.style.marginRight = '10px';
+    backButton.addEventListener('click', () => {
+        this.currentView = 'main';
+        this.render();
+    });
+    header.appendChild(backButton);
+
+    const title = document.createElement('h3');
+    title.textContent = 'Ver Investigaciones de Accidentes';
+    title.style.flexGrow = '1';
+    title.style.textAlign = 'center';
+    title.style.margin = '0';
+    header.appendChild(title);
+
+    // Crear un iframe para el nuevo visualizador de documentos
+    const iframe = document.createElement('iframe');
+    iframe.style.width = '100%';
+    iframe.style.height = 'calc(100vh - 150px)'; // Ajustar altura para dejar espacio para el encabezado
+    iframe.style.border = 'none';
+
+    // Pasar parámetros a la nueva interfaz a través de la URL
+    const viewerUrl = `investigaciones-viewer.html?company=${encodeURIComponent(this.currentCompany)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
+    iframe.src = viewerUrl;
+
+    this.container.appendChild(header);
+    this.container.appendChild(iframe);
+};
 
 // Hacer la clase disponible globalmente
 window.InvestigacionAccidentesComponent = InvestigacionAccidentesComponent;
