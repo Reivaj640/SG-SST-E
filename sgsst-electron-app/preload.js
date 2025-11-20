@@ -2,6 +2,11 @@
 
 const { contextBridge, ipcRenderer } = require('electron');
 
+// Función de logging para el renderer
+function log(level, message) {
+  console.log(`[${level}] ${message}`);
+}
+
 contextBridge.exposeInMainWorld('electronAPI', {
   // --- App & Configuración ---
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
@@ -10,7 +15,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // --- Manejo de archivos y directorios ---
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
-  
+
   mapDirectory: (directoryPath) => {
     log('DEBUG', `mapDirectory llamado con: ${directoryPath}`);
     return ipcRenderer.invoke('map-directory', directoryPath)
@@ -23,7 +28,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         throw error;
       });
   },
-  
+
   readDirectory: (directoryPath) => {
     log('DEBUG', `readDirectory llamado con: ${directoryPath}`);
     return ipcRenderer.invoke('read-directory', directoryPath)
@@ -36,7 +41,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         throw error;
       });
   },
-  
+
   openPath: (filePath) => {
     log('DEBUG', `openPath llamado con: ${filePath}`);
     return ipcRenderer.invoke('open-path', filePath)
@@ -61,20 +66,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getExcelPreview: (filePath) => ipcRenderer.invoke('get-excel-preview', filePath),
 
   // --- Submódulos / rutas ---
-  findSubmodulePath: (companyName, module, submodule) => 
+  findSubmodulePath: (companyName, module, submodule) =>
     ipcRenderer.invoke('find-submodule-path', companyName, module, submodule),
 
   // --- Remisiones ---
-  getControlRemisionesData: (companyName) => 
+  getControlRemisionesData: (companyName) =>
     ipcRenderer.invoke('get-control-remisiones-data', companyName),
   processRemisionPdf: (pdfPath) => ipcRenderer.invoke('process-remision-pdf', pdfPath),
   convertDocxToPdf: (docxPath) => ipcRenderer.invoke('convert-docx-to-pdf', docxPath),
   selectPdfFile: () => ipcRenderer.invoke('select-pdf-file'),
-  generateRemisionDocument: (extractedData, empresa) => 
+  generateRemisionDocument: (extractedData, empresa) =>
     ipcRenderer.invoke('generate-remision-document', extractedData, empresa),
-  sendRemisionByEmail: (docPath, extractedData, empresa) => 
+  sendRemisionByEmail: (docPath, extractedData, empresa) =>
     ipcRenderer.invoke('send-remision-by-email', docPath, extractedData, empresa),
-  sendRemisionByWhatsapp: (docPath, extractedData, empresa) => 
+  sendRemisionByWhatsapp: (docPath, extractedData, empresa) =>
     ipcRenderer.invoke('send-remision-by-whatsapp', docPath, extractedData, empresa),
 
   // --- Excel ---
@@ -91,22 +96,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // --- Accidentes ---
   selectAccidentPdf: () => ipcRenderer.invoke('select-accident-pdf'),
   processAccidentPdf: (pdfPath) => ipcRenderer.invoke('process-accident-pdf', pdfPath),
-  analyzeAccident: (extractedData, contextoAdicional) => 
+  analyzeAccident: (extractedData, contextoAdicional) =>
     ipcRenderer.invoke('analyze-accident', extractedData, contextoAdicional),
   startModelLoading: () => ipcRenderer.invoke('start-model-loading'),
-  generateAccidentReport: (combinedData) => 
+  generateAccidentReport: (combinedData) =>
     ipcRenderer.invoke('generate-accident-report', combinedData),
-  readAusentismoData: (companyName) => 
+  readAusentismoData: (companyName) =>
     ipcRenderer.invoke('get-ausentismo-data', companyName),
 
   // --- Ausentismo ---
-  buscarEmpleadoPorCedula: (cedula, empresa) => 
+  buscarEmpleadoPorCedula: (cedula, empresa) =>
     ipcRenderer.invoke('buscar-empleado-por-cedula', { cedula, empresa }),
-  buscarCie10Descripcion: (companyName, cie10Code) => 
+  buscarCie10Descripcion: (companyName, cie10Code) =>
     ipcRenderer.invoke('buscar-cie10-descripcion', { companyName, cie10Code }),
-  procesarAusentismo: (empresa, formData) => 
+  procesarAusentismo: (empresa, formData) =>
     ipcRenderer.invoke('procesar-ausentismo', empresa, formData),
-  
+
   // --- Actas ---
   getActaData: () => ipcRenderer.invoke('get-acta-data'),
   getConvivenciaActaData: () => ipcRenderer.invoke('getConvivenciaActaData'),
@@ -116,6 +121,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // --- Eventos IPC ---
   onIpcMessage: (channel, listener) => {
     ipcRenderer.on(channel, (event, ...args) => listener(...args));
+  },
+  removeIpcMessageListener: (channel, listener) => {
+    ipcRenderer.removeListener(channel, listener);
   },
   onUpdateAvailable: (callback) => ipcRenderer.on('update_available', callback),
   onUpdateDownloaded: (callback) => ipcRenderer.on('update_downloaded', callback),
