@@ -567,6 +567,138 @@ ipcMain.handle('read-excel-file', async (event, filePath) => {
   }
 });
 
+// --- Manejadores para funcionalidad Excel ---
+ipcMain.handle('init-excel', async (event, filePath) => {
+  try {
+    sendLog(`[MAIN] Inicializando archivo Excel desde: ${filePath}`, 'INFO');
+
+    // Verificar que el archivo existe
+    await fsp.access(filePath);
+
+    // Leer el archivo Excel usando exceljs
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+
+    // Obtener la primera hoja
+    const worksheet = workbook.getWorksheet(1);
+
+    let processedData = [];
+    let headers = [];
+    let formulaCells = [];
+
+    // Leer todas las filas y extraer datos
+    worksheet.eachRow((row, rowNumber) => {
+      const rowData = [];
+      row.eachCell((cell, colNumber) => {
+        rowData.push({
+          value: cell.value,
+          formula: cell.formula ? cell.formula : undefined,
+          type: cell.type,
+          address: cell.address
+        });
+
+        // Si es una fórmula, almacenarla para seguimiento
+        if (cell.formula) {
+          formulaCells.push({
+            address: cell.address,
+            formula: cell.formula,
+            result: cell.value
+          });
+        }
+      });
+
+      if (rowNumber === 1) {
+        // Suponemos que la primera fila son los encabezados
+        headers = rowData.map(cell => cell.value);
+      }
+
+      processedData.push(rowData);
+    });
+
+    sendLog(`[MAIN] Archivo Excel procesado exitosamente. Filas: ${processedData.length}`, 'INFO');
+
+    return {
+      success: true,
+      data: {
+        processedData,
+        headers,
+        formulaCells
+      }
+    };
+  } catch (error) {
+    sendLog(`[MAIN] Error al inicializar el archivo Excel: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('update-excel-cell', async (event, data) => {
+  try {
+    const { filePath, cellAddress, newValue, sheetName } = data;
+    sendLog(`[MAIN] Actualizando celda ${cellAddress} en archivo Excel: ${filePath}`, 'INFO');
+
+    // Verificar que el archivo existe
+    await fsp.access(filePath);
+
+    // Leer el archivo Excel
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+
+    // Obtener la hoja específica o la primera hoja
+    const worksheet = sheetName ? workbook.getWorksheet(sheetName) : workbook.getWorksheet(1);
+
+    if (!worksheet) {
+      throw new Error(`Hoja '${sheetName || '1'}' no encontrada en el archivo Excel`);
+    }
+
+    // Actualizar la celda
+    const cell = worksheet.getCell(cellAddress);
+    cell.value = newValue;
+
+    // Guardar el archivo
+    await workbook.xlsx.writeFile(filePath);
+
+    sendLog(`[MAIN] Celda ${cellAddress} actualizada exitosamente`, 'INFO');
+
+    return { success: true, message: `Celda ${cellAddress} actualizada correctamente` };
+  } catch (error) {
+    sendLog(`[MAIN] Error al actualizar celda en archivo Excel: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('convertExcelToPdf', async (event, filePath) => {
+  try {
+    sendLog(`[MAIN] Convirtiendo archivo Excel a PDF: ${filePath}`, 'INFO');
+
+    // Verificar que el archivo existe
+    await fsp.access(filePath);
+
+    // Para la conversión Excel a PDF, usaríamos un script Python similar al de Word
+    const pythonPath = await getPython();
+    const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'convert_xlsx_to_pdf.py');
+
+    // Verificar si el script de conversión existe
+    try {
+      await fsp.access(pythonScriptPath);
+    } catch {
+      // Si no existe el script específico, podríamos usar la conversión de ExcelJS a PDF
+      // pero por ahora lanzamos un error para indicar la funcionalidad faltante
+      throw new Error(`Script de conversión Excel a PDF no encontrado: ${pythonScriptPath}`);
+    }
+
+    // Ejecutar el script de conversión
+    const outputPdfPath = filePath.replace(/\.[^/.]+$/, '.pdf');
+    const { stdout, stderr } = await execFilePromise(pythonPath, [pythonScriptPath, filePath, outputPdfPath]);
+
+    sendLog(`[MAIN] Archivo Excel convertido a PDF exitosamente: ${outputPdfPath}`, 'INFO');
+
+    return { success: true, pdfPath: outputPdfPath };
+  } catch (error) {
+    sendLog(`[MAIN] Error al convertir Excel a PDF: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
 // --- Manejadores para el Visor de Documentos ---
 
 ipcMain.handle('get-pdf-preview', async (event, filePath) => {
@@ -650,6 +782,29 @@ ipcMain.handle('get-word-preview', async (event, filePath) => {
         sendLog(`[MAIN][get-word-preview] Error al eliminar el archivo PDF temporal: ${cleanupError.message}`, 'WARN');
       }
     }
+  }
+});
+
+// Manejador para descargar documentos
+ipcMain.handle('download-document', async (event, filePath) => {
+  sendLog(`[MAIN][download-document] Solicitud para descargar archivo: ${filePath}`, 'INFO');
+
+  try {
+    // Verificar que el archivo existe
+    await fsp.access(filePath, fs.constants.R_OK);
+    sendLog(`[MAIN][download-document] Archivo verificado: ${filePath}`, 'DEBUG');
+
+    // Enviar el archivo al renderer como base64
+    const fileBuffer = await fsp.readFile(filePath);
+    const base64Data = fileBuffer.toString('base64');
+
+    // Obtener el nombre del archivo desde la ruta
+    const fileName = path.basename(filePath);
+
+    return { success: true, fileName, base64Data };
+  } catch (error) {
+    sendLog(`[MAIN][download-document] Error al descargar archivo: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
   }
 });
 

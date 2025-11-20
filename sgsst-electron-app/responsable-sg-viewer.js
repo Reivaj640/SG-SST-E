@@ -76,6 +76,7 @@ function setupEventListeners() {
         }
     });
     document.getElementById('downloadBtn').addEventListener('click', downloadDocument);
+    document.getElementById('printBtn').addEventListener('click', printDocument);
     document.getElementById('zoomLevel').addEventListener('change', (e) => {
         currentZoom = e.target.value;
         applyZoom();
@@ -432,13 +433,41 @@ function getNotificationIcon(type) {
     }
 }
 
-function downloadDocument() {
+async function downloadDocument() {
     if (currentDocument) {
-        // This will also need to be refactored if it uses an electronAPI call
-        showNotification('Descargando documento...');
-        callParentAPI('download-document', currentDocument.path)
-            .then(() => showNotification('Descarga iniciada.', 'success'))
-            .catch(err => showNotification(`Error en la descarga: ${err.message}`, 'error'));
+        try {
+            showNotification('Preparando descarga...');
+            const result = await callParentAPI('download-document', currentDocument.path);
+
+            if (result.success) {
+                // Crear un blob a partir de los datos base64
+                const binaryData = atob(result.base64Data);
+                const bytes = new Uint8Array(binaryData.length);
+                for (let i = 0; i < binaryData.length; i++) {
+                    bytes[i] = binaryData.charCodeAt(i);
+                }
+
+                const blob = new Blob([bytes], { type: 'application/octet-stream' });
+                const url = URL.createObjectURL(blob);
+
+                // Crear un enlace de descarga
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = result.fileName;
+                document.body.appendChild(link);
+                link.click();
+
+                // Limpiar
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+
+                showNotification('Documento descargado exitosamente.', 'success');
+            } else {
+                showNotification(`Error en la descarga: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            showNotification(`Error en la descarga: ${error.message}`, 'error');
+        }
     } else {
         showNotification('No hay documento seleccionado', 'warning');
     }
@@ -496,4 +525,68 @@ function formatFileSize(bytes) {
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Función para imprimir el documento
+function printDocument() {
+    if (currentDocument) {
+        const extension = currentDocument.extension.toLowerCase();
+
+        if (extension === 'pdf') {
+            // Para PDFs, intentamos imprimir directamente el iframe
+            const iframe = document.querySelector('.pdf-viewer');
+            if (iframe && iframe.contentWindow) {
+                iframe.contentWindow.print();
+            } else {
+                showNotification('No se puede imprimir el PDF en este momento', 'warning');
+            }
+        } else if (extension === 'doc' || extension === 'docx' || extension === 'xls' || extension === 'xlsx') {
+            // Para Word y Excel, primero convertimos a PDF y luego imprimimos
+            printConvertedDocument(currentDocument.path, extension);
+        } else {
+            // Para otros tipos de archivos, abrir con la aplicación predeterminada y dejar que el usuario imprima desde allí
+            callParentAPI('open-path', currentDocument.path)
+                .then(() => showNotification('Documento abierto en aplicación predeterminada', 'info'))
+                .catch(err => showNotification(`Error al abrir documento: ${err.message}`, 'error'));
+        }
+    } else {
+        showNotification('No hay documento seleccionado', 'warning');
+    }
+}
+
+// Función para imprimir documentos que necesitan conversión
+async function printConvertedDocument(filePath, extension) {
+    try {
+        showNotification('Preparando impresión...');
+
+        let result;
+        if (extension === 'doc' || extension === 'docx') {
+            result = await callParentAPI('get-word-preview', { filePath: filePath });
+        } else if (extension === 'xls' || extension === 'xlsx') {
+            result = await callParentAPI('get-excel-preview', { filePath: filePath });
+        }
+
+        if (result.success) {
+            // Crear un iframe temporal con el PDF base64 para imprimirlo
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <html>
+                    <head>
+                        <title>Imprimir Documento</title>
+                    </head>
+                    <body style="margin: 0; padding: 0;">
+                        <iframe src="data:application/pdf;base64,${result.data}"
+                                style="width: 100%; height: 100vh; border: none;"
+                                onload="window.print(); window.onafterprint = function() { window.close(); }">
+                        </iframe>
+                    </body>
+                </html>
+            `);
+            printWindow.document.close();
+        } else {
+            showNotification(`Error al preparar documento para impresión: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        showNotification(`Error al imprimir documento: ${error.message}`, 'error');
+    }
 }

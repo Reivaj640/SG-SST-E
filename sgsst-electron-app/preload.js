@@ -64,6 +64,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getPDFPreview: (filePath) => ipcRenderer.invoke('get-pdf-preview', filePath),
   getWordPreview: (filePath) => ipcRenderer.invoke('get-word-preview', filePath),
   getExcelPreview: (filePath) => ipcRenderer.invoke('get-excel-preview', filePath),
+  downloadDocument: (filePath) => ipcRenderer.invoke('download-document', filePath),
 
   // --- Submódulos / rutas ---
   findSubmodulePath: (companyName, module, submodule) =>

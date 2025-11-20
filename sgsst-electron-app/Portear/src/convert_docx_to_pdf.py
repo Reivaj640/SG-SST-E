@@ -6,7 +6,7 @@ from pathlib import Path
 import tempfile
 from contextlib import redirect_stderr
 
-def main(doc_path_str):
+def main(doc_path_str, output_path=None):
     try:
         # Usar rutas absolutas para mayor compatibilidad con COM
         doc_path = Path(doc_path_str).resolve()
@@ -15,13 +15,16 @@ def main(doc_path_str):
         # 1. Validar que el archivo existe y es un formato compatible
         if not doc_path.exists() or not doc_path.is_file():
             raise FileNotFoundError(f"El archivo no se encuentra: {doc_path}")
-            
+
         if file_suffix not in ['.doc', '.docx']:
             raise ValueError(f"Formato '{file_suffix}' no compatible. Solo se admiten .doc y .docx.")
 
-        # 2. Crear ruta para el PDF temporal
-        temp_dir = Path(tempfile.gettempdir())
-        pdf_path = (temp_dir / f"{doc_path.stem}_{os.urandom(4).hex()}.pdf").resolve()
+        # 2. Crear ruta para el PDF, usando la ruta de salida si se proporciona
+        if output_path:
+            pdf_path = Path(output_path).resolve()
+        else:
+            temp_dir = Path(tempfile.gettempdir())
+            pdf_path = (temp_dir / f"{doc_path.stem}_{os.urandom(4).hex()}.pdf").resolve()
 
         # 3. Realizar la conversión según el tipo de archivo
         
@@ -64,8 +67,10 @@ def main(doc_path_str):
         sys.exit(1)
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print(json.dumps({"success": False, "error": "Uso incorrecto: se requiere la ruta al archivo."}), file=sys.stderr)
+    if len(sys.argv) < 2 or len(sys.argv) > 3:
+        print(json.dumps({"success": False, "error": "Uso incorrecto: se requiere la ruta al archivo y opcionalmente la ruta de salida."}), file=sys.stderr)
         sys.exit(1)
-    
-    main(sys.argv[1])
+
+    input_path = sys.argv[1]
+    output_path = sys.argv[2] if len(sys.argv) == 3 else None
+    main(input_path, output_path)
