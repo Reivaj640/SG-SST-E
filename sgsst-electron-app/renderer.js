@@ -1296,17 +1296,17 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
       }
 
     } else if (submoduleName === "1.2.3 Curso Virtual 50 Horas") {
-      if (window.Curso50HorasComponent) {
-        const cursoComponent = new window.Curso50HorasComponent(
+      if (window.CursoVirtualComponent) {
+        const cursoComponent = new window.CursoVirtualComponent(
           submoduleContentDiv,
           currentCompany,
           moduleName,
           submoduleName,
-          backToModuleCallback
+          safeBackToModuleCallback // <-- USAR EL CALLBACK SEGURO
         );
         cursoComponent.render();
       } else {
-        console.error('❌ Curso50HorasComponent no encontrado');
+        console.error('❌ CursoVirtualComponent no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 
