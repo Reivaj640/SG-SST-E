@@ -701,6 +701,75 @@ ipcMain.handle('convertExcelToPdf', async (event, filePath) => {
 
 // --- Manejadores para el Visor de Documentos ---
 
+ipcMain.handle('get-excel-preview', async (event, filePath) => {
+  sendLog(`[MAIN][get-excel-preview] Solicitud recibida para filePath: ${filePath}`, 'INFO');
+
+  let tempPdfPath = null; // Variable para el archivo temporal
+
+  try {
+    // 1. Verificar que el archivo es accesible
+    try {
+      await fsp.access(filePath, fs.constants.R_OK);
+      sendLog(`[MAIN][get-excel-preview] Archivo XLSX accesible: ${filePath}`, 'DEBUG');
+    } catch (accessError) {
+      sendLog(`[MAIN][get-excel-preview] Error de acceso al archivo XLSX ${filePath}: ${accessError.message}`, 'ERROR');
+      return { success: false, error: `El archivo XLSX no es accesible o no existe: ${filePath}. Error: ${accessError.message}` };
+    }
+
+    sendLog(`[MAIN][get-excel-preview] Iniciando conversión de Excel a PDF para: ${filePath}`, 'INFO');
+
+    // 2. Obtener ruta de Python
+    const pythonPath = await getPython();
+    sendLog(`[MAIN][get-excel-preview] Usando Python de: ${pythonPath}`, 'DEBUG');
+
+    // 3. Definir rutas de script y archivo temporal
+    const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'convert_xlsx_to_pdf.py');
+    tempPdfPath = path.join(os.tmpdir(), `preview-${Date.now()}.pdf`);
+
+    sendLog(`[MAIN][get-excel-preview] Script de conversión: ${pythonScriptPath}`, 'DEBUG');
+    sendLog(`[MAIN][get-excel-preview] Archivo de entrada: ${filePath}`, 'DEBUG');
+    sendLog(`[MAIN][get-excel-preview] Archivo de salida temporal: ${tempPdfPath}`, 'DEBUG');
+
+    // 4. Ejecutar el script de conversión
+    const { stdout, stderr } = await execFilePromise(pythonPath, [pythonScriptPath, filePath, tempPdfPath]);
+    if (stdout) sendLog(`[MAIN][get-excel-preview] Python stdout: ${stdout}`, 'DEBUG');
+    if (stderr) sendLog(`[MAIN][get-excel-preview] Python stderr: ${stderr}`, 'WARN');
+
+    sendLog(`[MAIN][get-excel-preview] Conversión a PDF completada exitosamente.`, 'INFO');
+
+    // 5. Leer el PDF generado
+    try {
+      await fsp.access(tempPdfPath, fs.constants.R_OK);
+      sendLog(`[MAIN][get-excel-preview] PDF temporal accesible: ${tempPdfPath}`, 'DEBUG');
+    } catch (accessError) {
+      sendLog(`[MAIN][get-excel-preview] Error de acceso al PDF temporal ${tempPdfPath}: ${accessError.message}`, 'ERROR');
+      return { success: false, error: `El PDF temporal no es accesible o no existe: ${tempPdfPath}. Error: ${accessError.message}` };
+    }
+    const buffer = await fsp.readFile(tempPdfPath);
+    sendLog(`[MAIN][get-excel-preview] PDF temporal leído. Tamaño: ${buffer.length} bytes`, 'INFO');
+
+    return { success: true, data: buffer.toString('base64') };
+
+  } catch (error) {
+    if (error.message.includes('no such file')) {
+      sendLog(`[MAIN][get-excel-preview] El script de conversión de Excel no existe: ${path.join(__dirname, 'Portear', 'src', 'convert_xlsx_to_pdf.py')}`, 'ERROR');
+      return { success: false, error: "No se encontró el script de conversión para archivos Excel. Contacte al administrador." };
+    }
+    sendLog(`[MAIN][get-excel-preview] Error durante la conversión de Excel a PDF: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  } finally {
+    // 5. Limpiar el archivo temporal
+    if (tempPdfPath && fs.existsSync(tempPdfPath)) {
+      try {
+        await fsp.unlink(tempPdfPath);
+        sendLog(`[MAIN][get-excel-preview] Archivo PDF temporal eliminado: ${tempPdfPath}`, 'INFO');
+      } catch (cleanupError) {
+        sendLog(`[MAIN][get-excel-preview] Error al eliminar el archivo PDF temporal: ${cleanupError.message}`, 'WARN');
+      }
+    }
+  }
+});
+
 ipcMain.handle('get-pdf-preview', async (event, filePath) => {
   sendLog(`[MAIN][get-pdf-preview] Solicitud recibida para filePath: ${filePath}`, 'INFO');
   try {
