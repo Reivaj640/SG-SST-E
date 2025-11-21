@@ -13,41 +13,41 @@
   --dark-color: #33383d;
   --white-color: #ffffff;
   --black-color: #000000;
-  
+
   /* Colores de texto */
   --text-color: #212529;
   --text-light-color: #6c757d;
   --text-lighter-color: #adb5bd;
   --heading-color: #495057;
-  
+
   /* Colores de fondo */
   --bg-color: #f8f9fa;
   --widget-bg-color: #ffffff;
   --border-color: #dee2e6;
-  
+
   /* Colores de botones */
   --button-bg-color: var(--primary-color);
   --button-text-color: var(--white-color);
   --button-hover-bg-color: var(--primary-hover-color);
   --button-border-color: var(--primary-color);
-  
+
   /* Colores de enlaces */
   --link-color: var(--primary-color);
   --link-hover-color: var(--primary-hover-color);
-  
+
   /* Sombras */
   --box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
   --box-shadow-lg: 0 1rem 3rem rgba(0, 0, 0, 0.175);
-  
+
   /* Bordes */
   --border-radius-sm: 0.2rem;
   --border-radius-md: 0.375rem;
   --border-radius-lg: 0.5rem;
-  
+
   /* Transiciones */
   --transition-fast: 0.15s ease-in-out;
   --transition-normal: 0.3s ease-in-out;
-  
+
   /* Espaciado */
   --spacer: 1rem;
   --spacer-xs: calc(var(--spacer) * 0.25);
@@ -55,22 +55,22 @@
   --spacer-md: var(--spacer);
   --spacer-lg: calc(var(--spacer) * 1.5);
   --spacer-xl: calc(var(--spacer) * 3);
-  
+
   /* Tipografía */
   --font-family-sans-serif: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
   --font-family-monospace: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   --font-family-base: var(--font-family-sans-serif);
-  
+
   --font-size-base: 1rem;
   --font-size-lg: calc(var(--font-size-base) * 1.25);
   --font-size-sm: calc(var(--font-size-base) * 0.875);
-  
+
   --font-weight-light: 300;
   --font-weight-normal: 400;
   --font-weight-bold: 700;
-  
+
   --line-height-base: 1.5;
-  
+
   /* Otros */
   --sidebar-width: 180px; /* Reducido de 200px */
   --header-height: 60px;
@@ -527,6 +527,7 @@ select.form-control {
   gap: calc(var(--spacer) * 0.75);
   padding: var(--spacer-sm);
   width: 100%;
+  overflow: hidden; /* Contiene el contenido para evitar desbordamiento */
 }
 
 .module-card {
@@ -538,11 +539,13 @@ select.form-control {
   border-radius: var(--border-radius-md);
   box-shadow: var(--box-shadow);
   padding: var(--spacer-sm);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: all 0.2s ease;
+  overflow: hidden; /* Contiene cualquier contenido que podría desbordar */
 }
 
 .module-card:hover {
-  transform: translateY(-2px);
+  outline: 2px solid var(--primary-color);
+  outline-offset: -1px;
   box-shadow: var(--box-shadow-lg);
 }
 
@@ -1127,9 +1130,9 @@ select.form-control {
 }
 
 @keyframes progressAnimation {
-  0% { width: 0%; } 
-  50% { width: 70%; } 
-  100% { width: 100%; } 
+  0% { width: 0%; }
+  50% { width: 70%; }
+  100% { width: 100%; }
 }
 
 .progress-status {
@@ -1314,9 +1317,9 @@ select.form-control {
 
 /* Ajustar animación de progreso */
  @keyframes progressAnimation {
-    0% { width: 0%; } 
-    50% { width: 60%; } 
-    100% { width: 100%; } 
+    0% { width: 0%; }
+    50% { width: 60%; }
+    100% { width: 100%; }
 }
 
 /* Asegurar que las tarjetas del análisis 5M se vean bien */
@@ -1635,11 +1638,11 @@ select.form-control {
     flex: 1 0 100%;
     min-width: 100%;
   }
-  
+
   .form-actions {
     flex-direction: column;
   }
-  
+
   .btn-primary,
   .btn-secondary {
     width: 100%;

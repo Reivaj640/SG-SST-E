@@ -1,4 +1,4 @@
-// investigacion-accidente.js - Componente para la vista de realizar investigación con IA (Estilo Tkinter)
+// investigacion-accidente.js - Componente para la vista de realizar investigación con IA (Estilo Modernizado)
 
 class InvestigacionAccidenteComponent {
     constructor(container, currentCompany, moduleName, submoduleName, onBack) {
@@ -24,18 +24,18 @@ class InvestigacionAccidenteComponent {
                 this.logToActivity('Advertencia: No se pudo iniciar la carga del modelo en segundo plano.');
             });
         }
+
         const mainContainer = document.createElement('div');
         mainContainer.className = 'submodule-content';
-        mainContainer.style.padding = '10px'; // Añadir algo de padding general
 
         // Encabezado
         const header = document.createElement('div');
         header.className = 'submodule-header';
         const title = document.createElement('h2');
-        title.textContent = 'Realizar Investigación de Accidente con IA';
+        title.textContent = 'Realizar Investigación de Accidente';
         const backButton = document.createElement('button');
-        backButton.className = 'btn';
-        backButton.textContent = '← Volver';
+        backButton.className = 'btn btn-secondary';
+        backButton.innerHTML = '<i class="fas fa-arrow-left"></i> Volver';
         backButton.addEventListener('click', this.onBack);
         header.appendChild(title);
         header.appendChild(backButton);
@@ -43,20 +43,23 @@ class InvestigacionAccidenteComponent {
 
         // --- Grid Principal (2 Columnas) ---
         const mainGrid = document.createElement('div');
+        mainGrid.className = 'main-grid';
         mainGrid.style.display = 'grid';
         mainGrid.style.gridTemplateColumns = '3fr 4fr'; // Izquierda más estrecha
-        mainGrid.style.gap = '10px';
+        mainGrid.style.gap = '20px';
         mainGrid.style.marginTop = '10px';
 
         // --- Columna Izquierda (Config, Datos, Logs) ---
         const leftColumn = document.createElement('div');
+        leftColumn.className = 'left-column';
         leftColumn.style.display = 'flex';
         leftColumn.style.flexDirection = 'column';
-        leftColumn.style.gap = '30px';
+        leftColumn.style.gap = '5px'; // Disminuir espacio entre tarjetas
 
         // 1. Tarjeta de Configuración
-        this.configCard = this.createCard('1. Configuración');
+        this.configCard = this.createCard('1. Configuración', 'fas fa-cog');
         const configContent = document.createElement('div');
+        configContent.className = 'file-selection-area';
         configContent.innerHTML = `
             <div class="form-group">
                 <label class="form-label">Archivo PDF:</label>
@@ -71,14 +74,14 @@ class InvestigacionAccidenteComponent {
         leftColumn.appendChild(this.configCard);
 
         // 2. Tarjeta de Datos del Accidente
-        this.dataCard = this.createCard('2. Datos del Accidente');
+        this.dataCard = this.createCard('2. Datos del Accidente', 'fas fa-clipboard-list');
         this.dataCardContent = document.createElement('div');
         this.dataCardContent.innerHTML = '<p>Selecciona un PDF para extraer los datos.</p>';
         this.dataCard.appendChild(this.dataCardContent);
         leftColumn.appendChild(this.dataCard);
 
         // 5. Tarjeta de Registro de Actividad (Logs)
-        this.logCard = this.createCard('5. Registro de Actividad');
+        this.logCard = this.createCard('5. Registro de Actividad', 'fas fa-terminal');
         const logContent = document.createElement('div');
         logContent.innerHTML = `
             <textarea class="form-control" id="activity-log" rows="8" readonly style="font-family: monospace; font-size: 0.9em;"></textarea>
@@ -90,13 +93,15 @@ class InvestigacionAccidenteComponent {
 
         // --- Columna Derecha (Contexto, Análisis) ---
         const rightColumn = document.createElement('div');
+        rightColumn.className = 'right-column';
         rightColumn.style.display = 'flex';
         rightColumn.style.flexDirection = 'column';
         rightColumn.style.gap = '20px';
 
         // 3. Tarjeta de Contexto Adicional
-        this.contextCard = this.createCard('3. Contexto Adicional (Opcional)');
+        this.contextCard = this.createCard('3. Contexto Adicional (Opcional)', 'fas fa-info-circle');
         const contextContent = document.createElement('div');
+        contextContent.className = 'context-area';
         contextContent.innerHTML = `
             <textarea class="form-control" id="context-input" rows="4" placeholder="Añade aquí cualquier detalle no presente en el FURAT...">Añade aquí cualquier detalle no presente en el FURAT...</textarea>
         `;
@@ -105,20 +110,15 @@ class InvestigacionAccidenteComponent {
         rightColumn.appendChild(this.contextCard);
 
         // 4. Tarjeta de Análisis de Causa Raíz
-        this.analysisCard = this.createCard('4. Análisis de Causa Raíz');
+        this.analysisCard = this.createCard('4. Análisis de Causa Raíz', 'fas fa-search');
         this.analysisCardContent = document.createElement('div');
         this.analysisCardContent.innerHTML = '<p>Los resultados del análisis se mostrarán aquí.</p>';
         this.analysisCard.appendChild(this.analysisCardContent);
         rightColumn.appendChild(this.analysisCard);
 
-        // --- Botones de Acción (Fuera del grid, abajo) ---
+        // --- Botones de Acción ---
         const actionArea = document.createElement('div');
-        actionArea.className = 'form-group';
-        actionArea.style.marginTop = '15px';
-        actionArea.style.display = 'flex';
-        actionArea.style.justifyContent = 'space-between';
-        actionArea.style.alignItems = 'center';
-        actionArea.style.gap = '15px';
+        actionArea.className = 'action-area';
 
         const progressContainer = document.createElement('div');
         progressContainer.id = 'progress-container';
@@ -126,11 +126,10 @@ class InvestigacionAccidenteComponent {
         actionArea.appendChild(progressContainer);
 
         const buttonContainer = document.createElement('div');
-        buttonContainer.style.display = 'flex';
-        buttonContainer.style.gap = '10px';
+        buttonContainer.className = 'button-container';
         buttonContainer.innerHTML = `
-            <button type="button" class="btn btn-success" id="process-btn" disabled>PROCESAR Y GENERAR INFORME</button>
-            <button type="button" class="btn btn-secondary" id="clear-btn">LIMPIAR</button>
+            <button type="button" class="btn btn-success" id="process-btn" disabled><i class="fas fa-play"></i> PROCESAR Y GENERAR INFORME</button>
+            <button type="button" class="btn btn-secondary" id="clear-btn"><i class="fas fa-trash"></i> LIMPIAR</button>
         `;
         actionArea.appendChild(buttonContainer);
 
@@ -299,7 +298,7 @@ class InvestigacionAccidenteComponent {
             const value = data[field] || 'N/A';
             const itemDiv = document.createElement('div');
             itemDiv.className = 'summary-item';
-            itemDiv.innerHTML = 
+            itemDiv.innerHTML =
                 `<label style="font-weight:bold; display:block;">${field}:</label>
                 <span>${this.escapeHtml(value)}</span>`;
             gridContainer.appendChild(itemDiv);
@@ -311,7 +310,7 @@ class InvestigacionAccidenteComponent {
             const descDiv = document.createElement('div');
             descDiv.className = 'form-group';
             descDiv.style.gridColumn = '1 / -1';
-            descDiv.innerHTML = 
+            descDiv.innerHTML =
                 `<label class="form-label" style="font-weight:bold;">${descripcionKey}:</label>
                 <textarea class="form-control" rows="4" readonly>${this.escapeHtml(descripcion)}</textarea>`;
             gridContainer.appendChild(descDiv);
@@ -379,7 +378,7 @@ class InvestigacionAccidenteComponent {
     async generateAccidentReport(combinedData) {
         try {
             this.logToActivity('Solicitando generación del informe al proceso principal...');
-            
+
             const generationResult = await window.electronAPI.generateAccidentReport({
                 ...combinedData,
                 empresa: this.currentCompany

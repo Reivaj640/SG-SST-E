@@ -177,7 +177,8 @@
 }
 
 .module-card:hover {
-  transform: translateY(-3px); /* Efecto hover más sutil */
+  outline: 2px solid var(--primary-color); /* Efecto hover sin desplazar la tarjeta */
+  outline-offset: -1px;
   box-shadow: var(--box-shadow-lg); /* Sombra más pronunciada al hacer hover */
 }
 
@@ -432,22 +433,22 @@
   .settings-cards {
     grid-template-columns: 1fr;
   }
-  
+
   #company-selection {
     flex-direction: column;
     align-items: center;
   }
-  
+
   .company-row {
     flex-direction: column;
     align-items: flex-start;
   }
-  
+
   .company-row input[type="text"] {
     width: 100%;
     margin-top: 10px;
   }
-  
+
   .chat-input-area {
     flex-direction: column;
   }
@@ -652,18 +653,18 @@
     .excel-table {
         font-size: 11px;
     }
-    
+
     .excel-table th,
     .excel-table td {
         padding: 4px 8px;
         max-width: 120px;
     }
-    
+
     .excel-tabs {
         overflow-x: auto;
         white-space: nowrap;
     }
-    
+
     .excel-tab {
         flex-shrink: 0;
     }
@@ -696,22 +697,22 @@
   .settings-cards {
     grid-template-columns: 1fr;
   }
-  
+
   #company-selection {
     flex-direction: column;
     align-items: center;
   }
-  
+
   .company-row {
     flex-direction: column;
     align-items: flex-start;
   }
-  
+
   .company-row input[type="text"] {
     width: 100%;
     margin-top: 10px;
   }
-  
+
   .chat-input-area {
     flex-direction: column;
   }
