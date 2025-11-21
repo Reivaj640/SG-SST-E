@@ -1,4 +1,4 @@
-// afiliacion-viewer.js
+// reportes-accidentes-viewer.js
 
 // Variables globales
 let currentDocument = null;
@@ -20,7 +20,7 @@ let pathHistory = [];
  * @returns {Promise<any>} - A promise that resolves with the payload from the parent's response.
  */
 function callParentAPI(type, payload) {
-    console.log(`[afiliacion-viewer.js][callParentAPI] Enviando solicitud al padre. Tipo: ${type}, Payload:`, payload);
+    console.log(`[reportes-accidentes-viewer.js][callParentAPI] Enviando solicitud al padre. Tipo: ${type}, Payload:`, payload);
     return new Promise((resolve, reject) => {
         // Unique ID for this request to match it with a response
         const requestId = `req-${Date.now()}-${Math.random()}`;
@@ -36,13 +36,13 @@ function callParentAPI(type, payload) {
             if (response.type === `${type}-response` && response.requestId === requestId) {
                 // Clean up the event listener
                 window.removeEventListener('message', handleResponse);
-                console.log(`[afiliacion-viewer.js][callParentAPI] Respuesta recibida del padre para requestId ${requestId}. Success: ${response.payload && response.payload.success}`);
+                console.log(`[reportes-accidentes-viewer.js][callParentAPI] Respuesta recibida del padre para requestId ${requestId}. Success: ${response.payload && response.payload.success}`);
 
                 if (response.payload && response.payload.success) {
                     resolve(response.payload);
                 } else {
                     const errorMessage = (response.payload && response.payload.error) || 'Unknown error from parent process';
-                    console.error(`[afiliacion-viewer.js][callParentAPI] Error recibido para la solicitud '${type}':`, errorMessage);
+                    console.error(`[reportes-accidentes-viewer.js][callParentAPI] Error recibido para la solicitud '${type}':`, errorMessage);
                     reject(new Error(errorMessage));
                 }
             }
@@ -112,6 +112,7 @@ async function loadFolders() {
         currentFolderPath = result.basePath; // Guardar la ruta base
         pathHistory = []; // Inicializar historial vacío en la raíz
         updateUpLevelButton(); // Actualizar estado del botón de subir nivel
+        renderBreadcrumbs(); // Renderizar breadcrumbs
         renderFolders(result.folders);
         renderDocuments(result.files); // <-- AÑADIDO: Renderizar también los archivos en la raíz
     } catch (error) {
@@ -120,6 +121,11 @@ async function loadFolders() {
     } finally {
         hideLoading();
     }
+}
+
+// Renderizar breadcrumbs - ahora vacío porque quitamos la visualización de la ruta actual
+function renderBreadcrumbs() {
+    // Esta función ya no es necesaria ya que quitamos la visualización de la ruta actual
 }
 
 // Renderizar carpetas
@@ -173,7 +179,8 @@ async function selectFolder(path) {
             selectedItem.classList.add('active');
         }
 
-        await loadDocuments(path);
+        await loadFolderContents(path);
+        renderBreadcrumbs(); // Actualizar la ruta mostrada
         updateUpLevelButton(); // Actualizar estado del botón de subir nivel
 
     } catch (error) {
@@ -181,15 +188,33 @@ async function selectFolder(path) {
     }
 }
 
-// Cargar documentos de una carpeta
-async function loadDocuments(folderPath) {
+// Cargar contenido de una carpeta
+async function loadFolderContents(folderPath) {
     try {
-        console.log(`VIEWER: Cargando documentos para la ruta: ${folderPath}`);
+        console.log(`VIEWER: Cargando contenido para la ruta: ${folderPath}`);
         const result = await callParentAPI('get-documents-in-folder', folderPath);
-        renderDocuments(result.files); // <-- CORREGIDO: usar result.files
+        renderFolders(result.folders); // Renderizar subcarpetas
+        renderDocuments(result.files); // Renderizar documentos en la carpeta
     } catch (error) {
-        showNotification(`Error al cargar documentos: ${error.message}`, 'error');
-        console.error('VIEWER: Error en loadDocuments:', error);
+        showNotification(`Error al cargar contenido: ${error.message}`, 'error');
+        console.error('VIEWER: Error en loadFolderContents:', error);
+    }
+}
+
+// Actualizar estado del botón de subir nivel
+function updateUpLevelButton() {
+    const upLevelBtn = document.getElementById('upLevelBtn');
+    if (upLevelBtn) {
+        upLevelBtn.disabled = pathHistory.length === 0;
+    }
+}
+
+// Subir un nivel en la jerarquía de carpetas
+async function goUpLevel() {
+    if (pathHistory.length > 0) {
+        const previousPath = pathHistory.pop();
+        await selectFolder(previousPath);
+        updateUpLevelButton(); // Actualizar estado del botón
     }
 }
 
@@ -200,7 +225,7 @@ function renderDocuments(documents) {
     documentList.innerHTML = '';
 
     if (!documents || documents.length === 0) {
-        documentList.innerHTML = '<p>No hay documentos en esta carpeta.</p>';
+        documentList.innerHTML = '<p>No hay reportes en esta carpeta.</p>';
         return;
     }
 
@@ -250,7 +275,7 @@ async function selectDocument(doc) {
         document.getElementById('documentTitle').textContent = doc.name;
 
         const extension = doc.extension.toLowerCase();
-        console.log(`[afiliacion-viewer.js][selectDocument] Documento seleccionado: ${doc.name}, Path: ${doc.path}, Extensión: ${extension}`);
+        console.log(`[reportes-accidentes-viewer.js][selectDocument] Documento seleccionado: ${doc.name}, Path: ${doc.path}, Extensión: ${extension}`);
 
         showLoading();
 
@@ -281,7 +306,7 @@ async function selectDocument(doc) {
 
 // Cargar PDF
 async function loadPDF(filePath) {
-    console.log(`[afiliacion-viewer.js][loadPDF] Solicitando previsualización de PDF para: ${filePath}`);
+    console.log(`[reportes-accidentes-viewer.js][loadPDF] Solicitando previsualización de PDF para: ${filePath}`);
     try {
         const result = await callParentAPI('get-pdf-preview', { filePath: filePath }); // Pass filePath in an object
         if (result.success) {
@@ -298,7 +323,7 @@ async function loadPDF(filePath) {
 
 // Cargar Excel
 async function loadExcel(filePath) {
-    console.log(`[afiliacion-viewer.js][loadExcel] Solicitando previsualización de Excel para: ${filePath}`);
+    console.log(`[reportes-accidentes-viewer.js][loadExcel] Solicitando previsualización de Excel para: ${filePath}`);
     try {
         const result = await callParentAPI('get-excel-preview', { filePath: filePath }); // Pass filePath in an object
         if (result.success) {
@@ -323,7 +348,7 @@ async function loadExcel(filePath) {
 
 // Cargar Word
 async function loadWord(filePath) {
-    console.log(`[afiliacion-viewer.js][loadWord] Solicitando previsualización de Word para: ${filePath}`);
+    console.log(`[reportes-accidentes-viewer.js][loadWord] Solicitando previsualización de Word para: ${filePath}`);
     try {
         const result = await callParentAPI('get-word-preview', { filePath: filePath }); // Pass filePath in an object
         if (result.success) {
@@ -383,47 +408,9 @@ function displayExcel(excelData) { // excelData is expected to be base64 PDF dat
     updatePageInfo();
 }
 
-// Mostrar Word (This function is not called directly anymore but kept for reference)
-function displayWord(wordData) {
-    hideLoading();
-    // ... (implementation remains the same)
-}
-
-// Actualizar estado del botón de subir nivel
-function updateUpLevelButton() {
-    const upLevelBtn = document.getElementById('upLevelBtn');
-    if (upLevelBtn) {
-        upLevelBtn.disabled = pathHistory.length === 0;
-    }
-}
-
-// Subir un nivel en la jerarquía de carpetas
-async function goUpLevel() {
-    if (pathHistory.length > 0) {
-        const previousPath = pathHistory.pop();
-        await selectFolder(previousPath);
-        updateUpLevelButton(); // Actualizar estado del botón
-    }
-}
-
 // Actualizar información de página
 function updatePageInfo() {
-    const pageInfo = document.querySelector('.page-info');
-    if (pageInfo) {
-        pageInfo.innerHTML = `
-            <div class="page-controls">
-                <button class="page-btn" onclick="previousPage()" ${currentPage === 1 ? 'disabled' : ''}>
-                    <i class="fas fa-chevron-left"></i>
-                </button>
-                <div class="page-info">
-                    <span class="page-info">Página ${currentPage} de ${totalPages}</span>
-                </div>
-                <button class="page-btn" onclick="nextPage()" ${currentPage === totalPages ? 'disabled' : ''}>
-                    <i class="fas fa-chevron-right"></i>
-                </button>
-            </div>
-        `;
-    }
+    // No se implementa en este caso ya que no se usan controles de página
 }
 
 // --- Funciones de utilidad ---
@@ -543,9 +530,6 @@ function applyOrientation() {
     }
     applyZoom();
 }
-
-function previousPage() { /* Lógica para cambiar de página */ }
-function nextPage() { /* Lógica para cambiar de página */ }
 
 function formatFileSize(bytes) {
     if (bytes === 0) return '0 Bytes';

@@ -7,7 +7,8 @@ let currentZoom = 'auto';
 let currentOrientation = 'vertical';
 let totalPages = 0;
 let currentPage = 1;
-let folderPath = '';
+let currentFolderPath = '';
+let pathHistory = [];
 
 // --- START: Refactored Communication Logic ---
 
@@ -77,6 +78,7 @@ function setupEventListeners() {
     });
     document.getElementById('downloadBtn').addEventListener('click', downloadDocument);
     document.getElementById('printBtn').addEventListener('click', printDocument);
+    document.getElementById('upLevelBtn').addEventListener('click', () => goUpLevel());
     document.getElementById('zoomLevel').addEventListener('change', (e) => {
         currentZoom = e.target.value;
         applyZoom();
@@ -107,6 +109,9 @@ async function loadFolders() {
     try {
         const result = await callParentAPI('get-document-folders', { companyName, moduleName, submoduleName });
         console.log('VIEWER: La carga de carpetas y archivos raíz fue exitosa. Renderizando...');
+        currentFolderPath = result.basePath; // Guardar la ruta base
+        pathHistory = []; // Inicializar historial vacío en la raíz
+        updateUpLevelButton(); // Actualizar estado del botón de subir nivel
         renderFolders(result.folders);
         renderDocuments(result.files); // <-- AÑADIDO: Renderizar también los archivos en la raíz
     } catch (error) {
@@ -152,7 +157,12 @@ function renderFolders(folders) {
 // Seleccionar carpeta
 async function selectFolder(path) {
     try {
-        folderPath = path;
+        // Guardar la ruta actual en el historial antes de cambiar
+        if (currentFolderPath !== path) {
+            pathHistory.push(currentFolderPath);
+        }
+
+        currentFolderPath = path;
 
         document.querySelectorAll('.folder-item').forEach(item => {
             item.classList.remove('active');
@@ -164,7 +174,8 @@ async function selectFolder(path) {
         }
 
         // Cargar carpetas y documentos dentro de la carpeta seleccionada
-        loadFolderContents(path);
+        await loadFolderContents(path);
+        updateUpLevelButton(); // Actualizar estado del botón de subir nivel
 
     } catch (error) {
         showNotification('Error al seleccionar carpeta', 'error');
@@ -378,6 +389,23 @@ function displayExcel(excelData) { // excelData is expected to be base64 PDF dat
     currentPage = 1;
 
     updatePageInfo();
+}
+
+// Actualizar estado del botón de subir nivel
+function updateUpLevelButton() {
+    const upLevelBtn = document.getElementById('upLevelBtn');
+    if (upLevelBtn) {
+        upLevelBtn.disabled = pathHistory.length === 0;
+    }
+}
+
+// Subir un nivel en la jerarquía de carpetas
+async function goUpLevel() {
+    if (pathHistory.length > 0) {
+        const previousPath = pathHistory.pop();
+        await selectFolder(previousPath);
+        updateUpLevelButton(); // Actualizar estado del botón
+    }
 }
 
 // Actualizar información de página
