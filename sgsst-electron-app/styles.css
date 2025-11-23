@@ -570,6 +570,7 @@ select.form-control {
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 3; /* Limitar a 3 líneas */
+  line-clamp: 3; /* Propiedad estándar para compatibilidad */
   -webkit-box-orient: vertical;
 }
 

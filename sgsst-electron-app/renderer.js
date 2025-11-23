@@ -536,6 +536,16 @@ function showCalendarModal() {
   // Crear el contenedor del calendario
   const calendarContainer = document.createElement('div');
   calendarContainer.id = 'calendar-container';
+  // Calcular la posición para que el calendario no se salga de la pantalla
+  let calendarLeftPosition = rect.left + rect.width + 5; // Posición normal a la derecha del botón
+  const calendarWidth = 300; // Ancho del calendario
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+
+  // Si el calendario se saldría de la pantalla a la derecha, posicionarlo a la izquierda del botón
+  if (calendarLeftPosition + calendarWidth > viewportWidth) {
+    calendarLeftPosition = Math.max(0, rect.left - calendarWidth - 5); // Posicionar a la izquierda con margen
+  }
+
   calendarContainer.style.cssText = `
     background-color: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
@@ -546,7 +556,7 @@ function showCalendarModal() {
     height: 300px;
     position: fixed;
     top: ${rect.bottom + 5}px;
-    left: ${rect.left + rect.width + 5}px; /* Posicionar al lado derecho del botón */
+    left: ${calendarLeftPosition}px; /* Posición calculada para evitar desbordamiento */
     opacity: 0;
     transform: scale(0.8);
     transition: all 0.2s ease-out;
