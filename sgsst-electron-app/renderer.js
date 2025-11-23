@@ -82,7 +82,7 @@ const RESOURCES_SUBMODULES = {
     "4.2.3 Evaluación de procedimientos, instructivos internos de seguridad y salud en el trabajo",
     "4.2.4 Realización de inspecciones sistematicas a las instalaciones, maquinas o equipos",
     "4.2.5 Mantenimiento periodico de equipos, instalaciones herramientas",
-    "4.2.6 Entrega de EPP",   
+    "4.2.6 Entrega de EPP",
   ],
   "Gestión de Amenazas": [
     "5.1.1 Plan de Prevención de Emergencias",
@@ -137,19 +137,19 @@ function showCalendarInModule(parentContainer) {
     console.log(`🔍 [showCalendarInModule] === INICIO DE FUNCIÓN ===`);
     console.log(`🔍 [showCalendarInModule] currentSubmodule: "${currentSubmodule}"`);
     console.log(`🔍 [showCalendarInModule] currentModule: "${currentModule}"`);
-    
+
     // ✅ VALIDACIÓN: No mostrar calendario si estamos en un submódulo
     if (currentSubmodule) {
         console.log(`❌ [showCalendarInModule] CANCELANDO: No se creará calendario porque estamos en submódulo: "${currentSubmodule}"`);
         return;
     }
-    
+
     // Verificar si el módulo actual requiere calendario
     if (!currentModule || !MODULES_WITH_CALENDAR.includes(currentModule)) {
         console.log(`❌ [showCalendarInModule] CANCELANDO: Módulo "${currentModule}" no requiere calendario`);
         return;
     }
-    
+
     console.log(`✅ [showCalendarInModule] PROCEDIENDO: Creando calendario para módulo "${currentModule}"`);
     console.log(`🔹 [showCalendarInModule] parentContainer:`, parentContainer);
 
@@ -242,7 +242,7 @@ function hideCalendar() {
 function logMessage(message, level = 'INFO') {
   const timestamp = new Date().toLocaleTimeString();
   const formattedMessage = `[${timestamp}] [${level}] ${message}`;
-  
+
   // Guardar siempre en el búfer
   logBuffer.push(formattedMessage);
 
@@ -473,10 +473,181 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error('LLM button NOT found in DOM.');
   }
 
-  
+  // Botón de calendario
+  const calendarButton = document.getElementById('calendar-button');
+  if (calendarButton) {
+    console.log('Found calendar button, attaching event listener.');
+    calendarButton.addEventListener('click', function(event) {
+      console.log('Calendar button clicked.');
+      event.preventDefault(); // Prevenir comportamiento por defecto
+      toggleCalendarModal(); // Esta función mostrará/ocultará el calendario
+    });
+  } else {
+    console.error('Calendar button NOT found in DOM.');
+  }
 
   initializeApp();
 });
+
+// Variable para controlar el estado del modal del calendario
+let isCalendarModalVisible = false;
+let calendarModalElement = null;
+
+// Función para mostrar/ocultar el modal del calendario
+function toggleCalendarModal() {
+  if (isCalendarModalVisible) {
+    hideCalendarModal();
+  } else {
+    showCalendarModal();
+  }
+}
+
+// Función para mostrar el modal del calendario
+function showCalendarModal() {
+  // Eliminar el modal anterior si existe
+  if (calendarModalElement && document.body.contains(calendarModalElement)) {
+    document.body.removeChild(calendarModalElement);
+  }
+
+  // Obtener la posición del botón de calendario
+  const calendarButton = document.getElementById('calendar-button');
+  if (!calendarButton) {
+    console.error('Botón de calendario no encontrado');
+    return;
+  }
+
+  const rect = calendarButton.getBoundingClientRect();
+
+  // Crear el contenedor principal del modal
+  calendarModalElement = document.createElement('div');
+  calendarModalElement.id = 'calendar-modal';
+  calendarModalElement.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.1);
+    display: flex;
+    z-index: 9999;
+    pointer-events: auto;
+  `;
+
+  // Crear el contenedor del calendario
+  const calendarContainer = document.createElement('div');
+  calendarContainer.id = 'calendar-container';
+  calendarContainer.style.cssText = `
+    background-color: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    padding: 15px;
+    width: 300px;
+    height: 300px;
+    position: fixed;
+    top: ${rect.bottom + 5}px;
+    left: ${rect.left + rect.width + 5}px; /* Posicionar al lado derecho del botón */
+    opacity: 0;
+    transform: scale(0.8);
+    transition: all 0.2s ease-out;
+    z-index: 10000;
+    border: 1px solid rgba(255, 255, 255, 0.3); /* Borde blanco semi-transparente */
+  `;
+
+  // Botón de cierre
+  const closeButton = document.createElement('button');
+  closeButton.innerHTML = '&times;';
+  closeButton.style.cssText = `
+    position: absolute;
+    top: 5px;
+    right: 8px;
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    color: #666;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10001;
+    font-weight: bold;
+  `;
+  closeButton.addEventListener('click', hideCalendarModal);
+  calendarContainer.appendChild(closeButton);
+
+  // Contenido del calendario
+  const calendarContent = document.createElement('div');
+  calendarContent.id = 'calendar-content';
+  calendarContent.style.cssText = `
+    margin-top: 5px;
+    height: calc(100% - 10px);
+  `;
+  calendarContainer.appendChild(calendarContent);
+
+  // Agregar el contenedor del calendario al modal
+  calendarModalElement.appendChild(calendarContainer);
+
+  // Agregar el modal al body
+  document.body.appendChild(calendarModalElement);
+
+  // Inicializar el calendario en el contenedor
+  try {
+    if (window.VanillaCalendarPro) {
+      const { Calendar } = window.VanillaCalendarPro;
+      const calendar = new Calendar('#calendar-content', {
+        settings: {
+          selection: {
+            day: 'single',
+          },
+          visibility: {
+            theme: 'light',
+          }
+        }
+      });
+      calendar.init();
+    } else {
+      calendarContent.innerHTML = '<p style="color: #666; font-size: 14px; text-align: center; margin-top: 20px;">Error: Calendario no disponible.</p>';
+    }
+  } catch (error) {
+    console.error('Error al inicializar el calendario:', error);
+    calendarContent.innerHTML = '<p style="color: #666; font-size: 14px; text-align: center; margin-top: 20px;">Error al cargar el calendario.</p>';
+  }
+
+  // Activar la visibilidad con animación
+  setTimeout(() => {
+    calendarContainer.style.opacity = '1';
+    calendarContainer.style.transform = 'scale(1)';
+  }, 10);
+
+  isCalendarModalVisible = true;
+}
+
+// Función para ocultar el modal del calendario
+function hideCalendarModal() {
+  if (calendarModalElement && document.body.contains(calendarModalElement)) {
+    const calendarContainer = calendarModalElement.querySelector('#calendar-container');
+
+    // Aplicar animación de salida
+    if (calendarContainer) {
+      calendarContainer.style.transform = 'translateY(-10px) scale(0.95)';
+      calendarContainer.style.opacity = '0';
+      calendarModalElement.style.backgroundColor = 'rgba(0, 0, 0, 0)';
+
+      // Eliminar el modal después de la animación
+      setTimeout(() => {
+        if (document.body.contains(calendarModalElement)) {
+          document.body.removeChild(calendarModalElement);
+        }
+      }, 300);
+    } else {
+      document.body.removeChild(calendarModalElement);
+    }
+  }
+  isCalendarModalVisible = false;
+}
 
 // Variable para mantener el botón activo del sidebar
 let activeSidebarButton = null;
@@ -496,16 +667,16 @@ function createSidebarButtons() {
   // Limpiar el menú existente
   sidebarMenu.innerHTML = '';
   console.log('Cleared sidebar menu');
-  
+
   SIDEBAR_BUTTONS.forEach((item, index) => {
     console.log(`Creating button ${index} for ${item.name}`);
     const li = document.createElement('li');
     li.className = 'sidebar-menu-item';
-    
+
     const button = document.createElement('button');
     button.className = 'sidebar-menu-button';
     button.textContent = item.name;
-    
+
     button.addEventListener('click', () => {
       if (item.name === "Salir") {
         handleLogout();
@@ -515,7 +686,7 @@ function createSidebarButtons() {
           console.log(`ℹ️ Ignorando click en "${item.name}" porque estamos en submódulo: "${currentSubmodule}"`);
           return;
         }
-        
+
         setActiveSidebarButton(button);
         showModuleContent(item.name);
       } else {
@@ -534,7 +705,7 @@ function createSidebarButtons() {
     sidebarMenu.appendChild(li);
     console.log(`Added button ${index} to sidebar`);
   });
-  
+
   console.log('Sidebar buttons created.');
 }
 
@@ -543,7 +714,7 @@ function setActiveSidebarButton(buttonElement) {
   if (window.activeSidebarButton) {
     window.activeSidebarButton.classList.remove('active');
   }
-  
+
   // Agregar la clase 'active' al nuevo botón
   buttonElement.classList.add('active');
   window.activeSidebarButton = buttonElement;
@@ -590,17 +761,17 @@ function showHomePage() {
         waveSpeed: 1.20,
         zoom: 0.68
       });
-      
+
       // Función para actualizar la animación cuando cambia el tamaño
       window.updateVantaEffect = function() {
         if (window.vantaEffect && typeof window.vantaEffect.resize === 'function') {
           window.vantaEffect.resize();
         }
       };
-      
+
       // Escuchar cambios de tamaño en la ventana
       window.addEventListener('resize', window.updateVantaEffect);
-      
+
       console.log('Animación de Vanta aplicada correctamente');
     } else {
       console.error('VANTA no está disponible. Puede que los scripts no se hayan cargado correctamente.');
@@ -648,7 +819,7 @@ function showHomePage() {
 
   uiContainer.appendChild(companySelectionDiv);
   homePageDiv.appendChild(uiContainer);
-  
+
   contentArea.appendChild(homePageDiv);
   console.log('Added home page to contentArea');
 }
@@ -680,7 +851,7 @@ function selectCompany(companyName, buttonElement) {
   // Aquí se podría notificar al proceso principal para que inicie
   // el backend Python asociado a esta empresa.
   console.log(`Empresa seleccionada: ${companyName}`);
-  
+
   // Destruir la animación de Vanta antes de cambiar de página
   if (window.vantaEffect && typeof window.vantaEffect.destroy === 'function') {
     window.vantaEffect.destroy();
@@ -691,7 +862,7 @@ function selectCompany(companyName, buttonElement) {
     window.removeEventListener('resize', window.updateVantaEffect);
     window.updateVantaEffect = null;
   }
-  
+
   // Después de seleccionar empresa, mostrar el home de la empresa
   showCompanyHomePage();
 }
@@ -700,7 +871,7 @@ function handleLogout() {
   console.log('Handling logout...');
   currentCompany = null;
   currentModule = null;
-  
+
   // Resetear UI
   if (companyNameElement) {
     companyNameElement.textContent = 'Empresa';
@@ -711,11 +882,11 @@ function handleLogout() {
   if (companyLogoPlaceholder) {
     companyLogoPlaceholder.style.display = 'none';
   }
-  
+
   document.querySelectorAll('.company-select-button').forEach(btn => {
     btn.classList.remove('selected');
   });
-  
+
   // Destruir la animación de Vanta si existe antes de volver al home
   if (window.vantaEffect && typeof window.vantaEffect.destroy === 'function') {
     window.vantaEffect.destroy();
@@ -726,16 +897,16 @@ function handleLogout() {
     window.removeEventListener('resize', window.updateVantaEffect);
     window.updateVantaEffect = null;
   }
-  
+
   // Limpiar el contenido y volver a la página de inicio
   showHomePage();
-  
+
   // Desactivar botón de sidebar
   if (window.activeSidebarButton) {
     window.activeSidebarButton.classList.remove('active');
     window.activeSidebarButton = null;
   }
-  
+
   console.log('Usuario desconectado.');
 }
 
@@ -848,13 +1019,13 @@ function showModuleContent(moduleName) {
   // ✅ LIMPIAR ESTADO: Al cambiar de módulo, ya no estamos en un submódulo
   currentSubmodule = null;
   console.log(`🔍 [showModuleContent] currentModule actualizado a: ${currentModule}`);
-  
+
   // Verificar que contentArea exista
   if (!contentArea) {
     console.error('contentArea is not defined');
     return;
   }
-  
+
   contentArea.innerHTML = ''; // Limpiar contenido anterior
 
   // Crear el contenedor principal del canvas
@@ -866,7 +1037,7 @@ function showModuleContent(moduleName) {
 
   // 2. Llenar el contenedor (que ya está en el DOM).
   const submodules = RESOURCES_SUBMODULES[moduleName];
-  
+
   if (submodules && submodules.length > 0) {
     // Mostrar directamente el home del módulo, que asignará la clase a mainCanvas
     showModuleHome(mainCanvas, moduleName);
@@ -875,15 +1046,15 @@ function showModuleContent(moduleName) {
     mainCanvas.className = 'main-canvas'; // Asignar clase aquí si no se va a showModuleHome
     const moduleDiv = document.createElement('div');
     moduleDiv.className = 'module-content';
-    
+
     const title = document.createElement('h2');
     title.textContent = `Módulo: ${moduleName}`;
     moduleDiv.appendChild(title);
-    
+
     const info = document.createElement('p');
     info.textContent = `Contenido del módulo "${moduleName}" se cargará aquí.`;
     moduleDiv.appendChild(info);
-    
+
     // Placeholder para funcionalidades futuras
     const placeholderCard = document.createElement('div');
     placeholderCard.className = 'card';
@@ -892,7 +1063,7 @@ function showModuleContent(moduleName) {
       <p>Esta sección está en construcción.</p>
     `;
     moduleDiv.appendChild(placeholderCard);
-    
+
     mainCanvas.appendChild(moduleDiv);
   }
 }
@@ -901,18 +1072,18 @@ function showModuleWelcomeScreen(container, moduleName) {
   // Contenedor para la pantalla de bienvenida
   const welcomeContainer = document.createElement('div');
   welcomeContainer.className = 'module-welcome-content';
-  
+
   // Título
   const title = document.createElement('h2');
   title.textContent = `Bienvenido al módulo: ${moduleName}`;
   welcomeContainer.appendChild(title);
-  
+
   // Mensaje de bienvenida
   const welcomeText = document.createElement('p');
   welcomeText.textContent = `Has seleccionado el módulo '${moduleName}'. Este módulo contiene herramientas y recursos para gestionar eficazmente los aspectos relacionados con ${moduleName.toLowerCase()} en tu organización. Explora las diferentes secciones utilizando el menú desplegable para acceder a funcionalidades específicas.`;
   welcomeText.className = 'module-welcome-text';
   welcomeContainer.appendChild(welcomeText);
-  
+
   // Botón para continuar al módulo
   const continueButton = document.createElement('button');
   continueButton.className = 'btn btn-primary';
@@ -921,7 +1092,7 @@ function showModuleWelcomeScreen(container, moduleName) {
     showModuleHome(container, moduleName);
   });
   welcomeContainer.appendChild(continueButton);
-  
+
   container.appendChild(welcomeContainer);
 }
 
@@ -989,15 +1160,8 @@ function showModuleHome(container, moduleName) { // 'container' ya es el <div cl
     moduleContentContainer.className = 'module-content-area';
     container.appendChild(moduleContentContainer); // moduleContentContainer es hijo directo de main-canvas
 
-    // 3. ✅ VALIDACIÓN MEJORADA: Solo mostrar calendario si NO estamos en un submódulo
-    if (MODULES_WITH_CALENDAR.includes(moduleName) && !currentSubmodule) {
-        console.log(`✅ [showModuleHome] Mostrando calendario para: ${moduleName} (no hay submódulo activo)`);
-        showCalendarInModule(container);
-    } else if (currentSubmodule) {
-        console.log(`ℹ️ [showModuleHome] NO se mostrará calendario para: ${moduleName} porque estamos en submódulo: ${currentSubmodule}`);
-    } else {
-        console.log(`ℹ️ [showModuleHome] NO se mostrará calendario para: ${moduleName} (módulo no requiere calendario)`);
-    }
+    // ELIMINACIÓN DEL CALENDARIO: Ya no se muestra el calendario en los módulos principales
+    // Los módulos ahora tendrán más espacio disponible
 
     // 4. Renderizar el contenido del módulo DENTRO del 'moduleContentContainer'
     const submodules = RESOURCES_SUBMODULES[moduleName];
@@ -1074,24 +1238,24 @@ function showModuleHome(container, moduleName) { // 'container' ya es el <div cl
 // Para otros módulos, usar el componente base
 function showGenericModuleHome(container, moduleName, submodules) {
   console.log(`Showing generic home for module: ${moduleName}`);
-  
+
   // Verificar que container no sea null
   if (!container) {
     console.error('Container is null in showGenericModuleHome');
     return;
   }
-  
+
   // Limpiar el contenedor
   container.innerHTML = '';
-  
+
   const title = document.createElement('h2');
   title.textContent = `Módulo: ${moduleName}`;
   container.appendChild(title);
-  
+
   const info = document.createElement('p');
   info.textContent = `Contenido del módulo "${moduleName}" se cargará aquí.`;
   container.appendChild(info);
-  
+
   // Crear tarjetas para los submódulos con límite de rendimiento
   const cardsContainer = document.createElement('div');
   cardsContainer.className = 'module-cards';
@@ -1099,17 +1263,17 @@ function showGenericModuleHome(container, moduleName, submodules) {
   displaySubmodules.forEach(submoduleName => {
     const card = document.createElement('div');
     card.className = 'card module-card';
-    
+
     const cardTitle = document.createElement('h3');
     cardTitle.className = 'card-title';
     cardTitle.textContent = submoduleName;
     card.appendChild(cardTitle);
-    
+
     const cardDescription = document.createElement('p');
     cardDescription.className = 'card-description';
     cardDescription.textContent = `Contenido para el submódulo "${submoduleName}".`;
     card.appendChild(cardDescription);
-    
+
     const cardButton = document.createElement('button');
     cardButton.className = 'btn btn-primary';
     cardButton.textContent = 'Abrir';
@@ -1117,34 +1281,34 @@ function showGenericModuleHome(container, moduleName, submodules) {
       showSubmoduleContent(container, moduleName, submoduleName);
     });
     card.appendChild(cardButton);
-    
+
     cardsContainer.appendChild(card);
   });
-  
+
   container.appendChild(cardsContainer);
 }
 
 // Para otros módulos, usar el componente base
 function showGenericModuleHome(container, moduleName, submodules) {
   console.log(`Showing generic home for module: ${moduleName}`);
-  
+
   // Verificar que container no sea null
   if (!container) {
     console.error('Container is null in showGenericModuleHome');
     return;
   }
-  
+
   // Limpiar el contenedor
   container.innerHTML = '';
-  
+
   const title = document.createElement('h2');
   title.textContent = `Módulo: ${moduleName}`;
   container.appendChild(title);
-  
+
   const info = document.createElement('p');
   info.textContent = `Contenido del módulo "${moduleName}" se cargará aquí.`;
   container.appendChild(info);
-  
+
   // Crear tarjetas para los submódulos con límite de rendimiento
   const cardsContainer = document.createElement('div');
   cardsContainer.className = 'module-cards';
@@ -1152,17 +1316,17 @@ function showGenericModuleHome(container, moduleName, submodules) {
   displaySubmodules.forEach(submoduleName => {
     const card = document.createElement('div');
     card.className = 'card module-card';
-    
+
     const cardTitle = document.createElement('h3');
     cardTitle.className = 'card-title';
     cardTitle.textContent = submoduleName;
     card.appendChild(cardTitle);
-    
+
     const cardDescription = document.createElement('p');
     cardDescription.className = 'card-description';
     cardDescription.textContent = `Contenido para el submódulo "${submoduleName}".`;
     card.appendChild(cardDescription);
-    
+
     const cardButton = document.createElement('button');
     cardButton.className = 'btn btn-primary';
     cardButton.textContent = 'Abrir';
@@ -1170,10 +1334,10 @@ function showGenericModuleHome(container, moduleName, submodules) {
       showSubmoduleContent(container, moduleName, submoduleName);
     });
     card.appendChild(cardButton);
-    
+
     cardsContainer.appendChild(card);
   });
-  
+
   container.appendChild(cardsContainer);
 }
 
@@ -1416,9 +1580,9 @@ function showVerAusentismoContent(container, currentCompany, moduleName, submodu
   if (typeof window.VerAusentismoComponent === 'function') {
     try {
       const verAusentismoComponent = new window.VerAusentismoComponent(
-        container, 
-        currentCompany, 
-        moduleName, 
+        container,
+        currentCompany,
+        moduleName,
         submoduleName,
         () => {
           // Callback para volver al home del módulo
@@ -1446,9 +1610,9 @@ function showRegistrarAusentismoContent(container, currentCompany, moduleName, s
   if (typeof window.RegistrarAusentismoComponent === 'function') {
     try {
       const registrarAusentismoComponent = new window.RegistrarAusentismoComponent(
-        container, 
-        currentCompany, 
-        moduleName, 
+        container,
+        currentCompany,
+        moduleName,
         submoduleName,
         () => {
           // Callback para volver al home del módulo
@@ -1507,7 +1671,7 @@ async function showGenericSubmoduleContent(container, moduleName, submoduleName)
 
     // Resto de tu código para buscar el submódulo...
     const submodulePathResult = await window.electronAPI.findSubmodulePath(currentCompany, moduleName, submoduleName);
-    
+
     if (!submodulePathResult.success) {
       container.innerHTML = `
         <div class="development-message">
@@ -1564,7 +1728,7 @@ function showControlRemisionesContent(container) {
   const title = document.createElement('h3');
   title.textContent = 'Control de Remisiones';
   container.appendChild(title);
-  
+
   // Placeholder para la tabla de control de remisiones
   const tablePlaceholder = document.createElement('div');
   tablePlaceholder.className = 'control-remisiones-table';
@@ -1581,7 +1745,7 @@ function showAsignacionRecursosContent(container) {
     console.log('🔍 [showAsignacionRecursosContent] currentCompany:', currentCompany);
     console.log('🔍 [showAsignacionRecursosContent] currentModule:', currentModule);
     console.log('🔍 [showAsignacionRecursosContent] window.PresupuestoGestionComponent:', !!window.PresupuestoGestionComponent);
-    
+
     if (window.PresupuestoGestionComponent) {
         try {
             console.log('✅ [showAsignacionRecursosContent] Creando instancia de PresupuestoGestionComponent');
@@ -1616,9 +1780,9 @@ function showInvestigacionAccidentesContent(container, currentCompany, moduleNam
   if (typeof window.InvestigacionAccidentesComponent === 'function') {
     try {
       const investigacionComponent = new window.InvestigacionAccidentesComponent(
-        container, 
-        currentCompany, 
-        moduleName, 
+        container,
+        currentCompany,
+        moduleName,
         submoduleName,
         () => {
           // Callback para volver al home del módulo
@@ -1648,9 +1812,9 @@ function showMedicionAusentismoContent(container, currentCompany, moduleName, su
       console.log(`[INFO] Cargando MedicionAusentismoComponent para la empresa: ${currentCompany}`);
 
       const medicionComponent = new window.MedicionAusentismoComponent(
-        container, 
+        container,
         currentCompany, // <-- CORREGIDO: Usar la variable dinámica
-        moduleName, 
+        moduleName,
         submoduleName,
         () => {
           // Callback para volver al home del módulo
@@ -1674,33 +1838,33 @@ function createModuleCard(title, description, onClick) {
     // Contenedor para el ícono y el título
     const headerDiv = document.createElement('div');
     headerDiv.className = 'card-header';
-    
+
     // Placeholder para el ícono
     const iconDiv = document.createElement('div');
     iconDiv.className = 'card-icon-placeholder';
     headerDiv.appendChild(iconDiv);
-    
+
     const cardTitle = document.createElement('h3');
     cardTitle.textContent = title;
     cardTitle.className = 'card-title';
     headerDiv.appendChild(cardTitle);
-    
+
     card.appendChild(headerDiv);
-    
+
     const cardDescription = document.createElement('p');
     cardDescription.textContent = description;
     cardDescription.className = 'card-description';
     card.appendChild(cardDescription);
-    
+
     const cardButton = document.createElement('button');
     cardButton.className = 'btn btn-primary';
     cardButton.textContent = 'Abrir';
     cardButton.addEventListener('click', onClick);
     card.appendChild(cardButton);
-    
+
     return card;
   }
-  
+
   function showSettingsPage() {
     // ✅ Pasar contentArea a hideCalendar
     hideCalendar(contentArea);
@@ -1719,55 +1883,55 @@ function createModuleCard(title, description, onClick) {
         return;
       }
     }
-    
+
     contentArea.innerHTML = ''; // Limpiar contenido anterior
-  
+
     // Crear el contenedor principal del canvas
     const mainCanvas = document.createElement('div');
     mainCanvas.className = 'main-canvas';
-  
+
     const settingsDiv = document.createElement('div');
     settingsDiv.className = 'settings-content';
-    
+
     const title = document.createElement('h2');
     title.textContent = 'Panel de Configuraciones';
     settingsDiv.appendChild(title);
-    
+
     // Botón para volver al inicio
     const backButton = document.createElement('button');
     backButton.className = 'btn';
     backButton.textContent = '< Volver al Inicio';
     backButton.addEventListener('click', showHomePage);
     settingsDiv.appendChild(backButton);
-    
+
     // Crear tarjetas de configuración
     const cardsContainer = document.createElement('div');
     cardsContainer.className = 'settings-cards';
-    
+
     // Tarjeta para vincular empresas
     const pathCard = createSettingsCard(
-      'Vincular Empresas', 
+      'Vincular Empresas',
       'Conecta las carpetas de cada empresa para el análisis.',
       showPathLinkingPage
     );
     cardsContainer.appendChild(pathCard);
-    
+
     // Tarjeta para ajustes de chat
     const chatCard = createSettingsCard(
-      'Ajustes de Chat', 
+      'Ajustes de Chat',
       'Configura el comportamiento y la apariencia del asistente LLM.',
       showChatSettingsPage
     );
     cardsContainer.appendChild(chatCard);
-    
+
     // Tarjeta para ajustes de usuario
     const userCard = createSettingsCard(
-      'Ajustes de Usuario', 
+      'Ajustes de Usuario',
       'Gestiona la información y preferencias del usuario.',
       showUserSettingsPage
     );
     cardsContainer.appendChild(userCard);
-    
+
     settingsDiv.appendChild(cardsContainer);
     mainCanvas.appendChild(settingsDiv);
     contentArea.appendChild(mainCanvas);
@@ -1775,23 +1939,23 @@ function createModuleCard(title, description, onClick) {
 function createSettingsCard(title, description, onClick) {
   const card = document.createElement('div');
   card.className = 'card settings-card';
-  
+
   const cardTitle = document.createElement('h3');
   cardTitle.textContent = title;
   cardTitle.className = 'card-title';
   card.appendChild(cardTitle);
-  
+
   const cardDescription = document.createElement('p');
   cardDescription.textContent = description;
   cardDescription.className = 'card-description';
   card.appendChild(cardDescription);
-  
+
   const cardButton = document.createElement('button');
   cardButton.className = 'btn btn-primary';
   cardButton.textContent = 'Abrir';
   cardButton.addEventListener('click', onClick);
   card.appendChild(cardButton);
-  
+
   return card;
 }
 
@@ -1801,42 +1965,42 @@ function showPathLinkingPage() {
     console.error('contentArea is not defined');
     return;
   }
-  
+
   contentArea.innerHTML = '';
-  
+
   const mainCanvas = document.createElement('div');
   mainCanvas.className = 'main-canvas';
-  
+
   const pathLinkingDiv = document.createElement('div');
   pathLinkingDiv.className = 'path-linking-content';
-  
+
   // Botón para volver
   const backButton = document.createElement('button');
   backButton.className = 'btn';
   backButton.textContent = '< Volver';
   backButton.addEventListener('click', showSettingsPage);
   pathLinkingDiv.appendChild(backButton);
-  
+
   const title = document.createElement('h2');
   title.textContent = 'Vincular Rutas de Archivos por Empresa';
   pathLinkingDiv.appendChild(title);
-  
+
   // Crear filas para cada empresa
   COMPANY_BUTTONS.forEach(companyName => {
     const companyRow = document.createElement('div');
     companyRow.className = 'company-row';
-    
+
     const label = document.createElement('label');
     label.textContent = companyName;
     companyRow.appendChild(label);
-    
+
     const pathInput = document.createElement('input');
     pathInput.type = 'text';
     pathInput.placeholder = 'No se ha seleccionado ninguna ruta...';
     pathInput.disabled = true;
     pathInput.id = `path-input-${companyName}`;
     companyRow.appendChild(pathInput);
-    
+
     const selectButton = document.createElement('button');
     selectButton.className = 'btn';
     selectButton.textContent = 'Seleccionar Ruta...';
@@ -1846,7 +2010,7 @@ function showPathLinkingPage() {
         if (!window.electronAPI || !window.electronAPI.selectDirectory) {
           throw new Error('Electron API not available');
         }
-        
+
         const selectedPath = await window.electronAPI.selectDirectory();
         if (selectedPath) {
           pathInput.value = selectedPath;
@@ -1859,7 +2023,7 @@ function showPathLinkingPage() {
       }
     });
     companyRow.appendChild(selectButton);
-    
+
     const loadButton = document.createElement('button');
     loadButton.className = 'btn';
     loadButton.textContent = 'Cargar Vínculo';
@@ -1871,7 +2035,7 @@ function showPathLinkingPage() {
         alert('Por favor, seleccione una ruta primero.');
         return;
       }
-      
+
       // Get the textarea element right when it's needed.
       const logTextarea = document.querySelector('.log-area textarea');
 
@@ -1882,14 +2046,14 @@ function showPathLinkingPage() {
           logTextarea.value = `Iniciando mapeo para ${companyName} en la ruta ${path}...
 `;
         }
-        
+
         // Verificar que window.electronAPI exista
         if (!window.electronAPI || !window.electronAPI.mapDirectory) {
           throw new Error('Electron API not available');
         }
-        
+
         const result = await window.electronAPI.mapDirectory(path);
-        
+
         if (logTextarea) {
           logTextarea.value += `Resultado del proceso Python:
 ${result.log}
@@ -1908,12 +2072,12 @@ ${result.log}
         if (checkmark) {
           checkmark.style.display = 'inline';
         }
-        
+
         // Verificar que window.electronAPI exista
         if (!window.electronAPI || !window.electronAPI.loadConfig || !window.electronAPI.saveConfig) {
           throw new Error('Electron API not available');
         }
-        
+
         const config = await window.electronAPI.loadConfig();
         if (!config.companyPaths) {
           config.companyPaths = {};
@@ -1923,7 +2087,7 @@ ${result.log}
           structure: result.structure
         };
         await window.electronAPI.saveConfig(config);
-        
+
         if (logTextarea) {
           logTextarea.value += `
 --- Proceso Finalizado ---
@@ -1946,17 +2110,17 @@ Error al mapear el directorio: ${error.message}`;
       }
     });
     companyRow.appendChild(loadButton);
-    
+
     const checkmark = document.createElement('span');
     checkmark.className = 'checkmark';
     checkmark.textContent = '✔';
     checkmark.style.display = 'none';
     checkmark.id = `checkmark-${companyName}`;
     companyRow.appendChild(checkmark);
-    
+
     pathLinkingDiv.appendChild(companyRow);
   });
-  
+
   // Área de registro
   const logArea = document.createElement('div');
   logArea.className = 'log-area';
@@ -1967,7 +2131,7 @@ Error al mapear el directorio: ${error.message}`;
   const logTextarea = logArea.querySelector('textarea');
   logTextarea.value = logBuffer.join('\n');
   logTextarea.scrollTop = logTextarea.scrollHeight;
-  
+
   // Botón para asegurar configuración
   const saveButton = document.createElement('button');
   saveButton.className = 'btn btn-primary';
@@ -1983,14 +2147,14 @@ Error al mapear el directorio: ${error.message}`;
           break;
         }
       }
-      
+
       if (!allMapped) {
         alert('Por favor, asegúrese de que todas las empresas tengan una ruta de archivo vinculada y cargada.');
         return;
       }
-      
+
       alert('Configuración guardada exitosamente.');
-      
+
       // Deshabilitar botones después de guardar
       COMPANY_BUTTONS.forEach(companyName => {
         const selectButton = document.querySelector(`.company-row button:nth-child(3)`); // Ajustar selector si es necesario
@@ -1999,7 +2163,7 @@ Error al mapear el directorio: ${error.message}`;
         if (loadButton) loadButton.disabled = true;
       });
       saveButton.disabled = true;
-      
+
       // Volver al menú de configuraciones
       showSettingsPage();
     } catch (error) {
@@ -2008,10 +2172,10 @@ Error al mapear el directorio: ${error.message}`;
     }
   });
   pathLinkingDiv.appendChild(saveButton);
-  
+
   mainCanvas.appendChild(pathLinkingDiv);
   contentArea.appendChild(mainCanvas);
-  
+
   // Cargar configuraciones existentes
   loadExistingPaths();
 }
@@ -2023,7 +2187,7 @@ async function loadExistingPaths() {
       console.error('Electron API not available');
       return;
     }
-    
+
     const config = await window.electronAPI.loadConfig();
     if (config.companyPaths) {
       for (const companyName in config.companyPaths) {
@@ -2042,56 +2206,56 @@ async function loadExistingPaths() {
 
 function showChatSettingsPage() {
   contentArea.innerHTML = '';
-  
+
   const mainCanvas = document.createElement('div');
   mainCanvas.className = 'main-canvas';
-  
+
   const chatSettingsDiv = document.createElement('div');
   chatSettingsDiv.className = 'chat-settings-content';
-  
+
   // Botón para volver
   const backButton = document.createElement('button');
   backButton.className = 'btn';
   backButton.textContent = '< Volver';
   backButton.addEventListener('click', showSettingsPage);
   chatSettingsDiv.appendChild(backButton);
-  
+
   const title = document.createElement('h2');
   title.textContent = 'Ajustes de Chat';
   chatSettingsDiv.appendChild(title);
-  
+
   const placeholder = document.createElement('p');
   placeholder.textContent = 'Esta sección estará disponible próximamente.';
   chatSettingsDiv.appendChild(placeholder);
-  
+
   mainCanvas.appendChild(chatSettingsDiv);
   contentArea.appendChild(mainCanvas);
 }
 
 function showUserSettingsPage() {
   contentArea.innerHTML = '';
-  
+
   const mainCanvas = document.createElement('div');
   mainCanvas.className = 'main-canvas';
-  
+
   const userSettingsDiv = document.createElement('div');
   userSettingsDiv.className = 'user-settings-content';
-  
+
   // Botón para volver
   const backButton = document.createElement('button');
   backButton.className = 'btn';
   backButton.textContent = '< Volver';
   backButton.addEventListener('click', showSettingsPage);
   userSettingsDiv.appendChild(backButton);
-  
+
   const title = document.createElement('h2');
   title.textContent = 'Ajustes de Usuario';
   userSettingsDiv.appendChild(title);
-  
+
   const placeholder = document.createElement('p');
   placeholder.textContent = 'Esta sección estará disponible próximamente.';
   userSettingsDiv.appendChild(placeholder);
-  
+
   mainCanvas.appendChild(userSettingsDiv);
   contentArea.appendChild(mainCanvas);
 }
@@ -2115,7 +2279,7 @@ function showLLMChatPage() {
       return;
     }
   }
-  
+
   contentArea.innerHTML = ''; // Limpiar contenido anterior
 
   // Crear el contenedor principal del canvas
@@ -2124,21 +2288,21 @@ function showLLMChatPage() {
 
   const chatDiv = document.createElement('div');
   chatDiv.className = 'llm-chat-content';
-  
+
   const title = document.createElement('h2');
   title.textContent = 'Asistente LLM';
   chatDiv.appendChild(title);
-  
+
   // Área de historial del chat
   const chatHistory = document.createElement('div');
   chatHistory.className = 'chat-history';
   chatHistory.innerHTML = '<p>Bienvenido al asistente LLM. ¿En qué puedo ayudarte?</p>';
   chatDiv.appendChild(chatHistory);
-  
+
   // Área de entrada de usuario
   const inputArea = document.createElement('div');
   inputArea.className = 'chat-input-area';
-  
+
   const userInput = document.createElement('input');
   userInput.type = 'text';
   userInput.placeholder = 'Escribe tu pregunta...';
@@ -2149,7 +2313,7 @@ function showLLMChatPage() {
     }
   });
   inputArea.appendChild(userInput);
-  
+
   const sendButton = document.createElement('button');
   sendButton.className = 'btn';
   sendButton.textContent = 'Enviar';
@@ -2158,7 +2322,7 @@ function showLLMChatPage() {
     userInput.value = '';
   });
   inputArea.appendChild(sendButton);
-  
+
   chatDiv.appendChild(inputArea);
   mainCanvas.appendChild(chatDiv);
   contentArea.appendChild(mainCanvas);
@@ -2166,24 +2330,24 @@ function showLLMChatPage() {
 
 function sendMessage(message, chatHistory) {
   if (!message.trim()) return;
-  
+
   // Agregar mensaje del usuario
   const userMessage = document.createElement('div');
   userMessage.className = 'user-message';
   userMessage.textContent = message;
   chatHistory.appendChild(userMessage);
-  
+
   // Simular respuesta del asistente
   setTimeout(() => {
     const botMessage = document.createElement('div');
     botMessage.className = 'bot-message';
     botMessage.textContent = `Entendido. Has dicho: "${message}". Esta es una respuesta simulada del asistente LLM.`;
     chatHistory.appendChild(botMessage);
-    
+
     // Desplazar hacia abajo
     chatHistory.scrollTop = chatHistory.scrollHeight;
   }, 1000);
-  
+
   // Desplazar hacia abajo
   chatHistory.scrollTop = chatHistory.scrollHeight;
 }
@@ -2222,13 +2386,13 @@ function formatStructureForLog(node, indent = '') {
     let logString = '';
     if (node && node.name) {
         logString += `${indent}[DIR] ${node.name}\n`;
-        
+
         if (node.subdirectories) {
             for (const dirName in node.subdirectories) {
                 logString += formatStructureForLog(node.subdirectories[dirName], indent + '  ');
             }
       }
-        
+
         if (node.files) {
             for (const file of node.files) {
                 logString += `${indent}  - [FILE] ${file.name} (${file.size} bytes)\n`;

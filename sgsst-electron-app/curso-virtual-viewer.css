@@ -172,6 +172,8 @@ header {
     flex: 1;
     display: flex;
     min-height: 0;
+    overflow: auto; /* Add scroll if content overflows */
+    position: relative;
 }
 .toolbar {
     background-color: #f8f9fa;
@@ -273,6 +275,10 @@ header {
     border: none;
     margin: 0;
     padding: 0;
+    max-width: 100%; /* Ensure viewers don't exceed container */
+    max-height: 100%; /* Ensure viewers don't exceed container */
+    display: block;
+    box-sizing: border-box;
 }
 .loading {
     display: flex;

@@ -60,22 +60,51 @@
 }
 
 /* Estilos para el home de la empresa seleccionada */
-.main-canvas {
+.main-canvas.company-home-canvas {
   background-color: var(--widget-bg-color);
   border-radius: var(--border-radius-lg);
   box-shadow: var(--box-shadow);
   padding: var(--spacer-lg);
   margin: var(--spacer);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0; /* Para que los contenedores hijos no desborden */
+}
+
+/* NO DEFINIR ESTILOS GENERALES PARA .main-canvas que afecten módulos principales */
+/* Los estilos generales para .main-canvas están en styles.css */
+
+/* Solo estilos específicos para el canvas de la página de inicio de empresa */
+.main-canvas.company-home-canvas {
+  background-color: var(--widget-bg-color);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--box-shadow);
+  padding: var(--spacer-lg);
+  margin: var(--spacer);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0; /* Para que los contenedores hijos no desborden */
 }
 
 .company-home-content {
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  overflow: hidden; /* Evita desbordamiento del contenido */
+  max-width: 100%;
+  align-self: flex-start; /* Asegura alineación para evitar estiramiento */
 }
 
 .company-home-title {
   color: var(--heading-color);
   margin-bottom: var(--spacer);
   font-size: 1.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .company-home-text {
@@ -83,11 +112,16 @@
   color: var(--text-light-color);
   margin-bottom: var(--spacer-lg);
   line-height: 1.6;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3; /* Limitar a 3 líneas */
+  -webkit-box-orient: vertical;
 }
 
 /* Estilos para la sección de métricas */
 .metrics-section {
   margin-bottom: var(--spacer-lg);
+  overflow: hidden;
 }
 
 .metrics-grid {
@@ -95,6 +129,8 @@
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: var(--spacer);
   margin-bottom: var(--spacer-lg);
+  width: 100%;
+  max-width: 100%;
 }
 
 .metric-card {
@@ -106,6 +142,8 @@
   border-radius: var(--border-radius-md);
   box-shadow: var(--box-shadow);
   transition: transform var(--transition-fast);
+  min-width: 0; /* Previene que el card empuje el contenedor */
+  max-width: 100%; /* Asegura que no exceda el ancho disponible */
 }
 
 .metric-card:hover {
@@ -122,17 +160,23 @@
 
 .metric-info {
   text-align: left;
+  overflow: hidden;
+  min-width: 0; /* Permite que se contraiga si es necesario */
 }
 
 .metric-value {
   font-size: 1.5rem;
   font-weight: var(--font-weight-bold);
   color: var(--primary-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .metric-label {
   font-size: var(--font-size-sm);
   color: var(--text-light-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .modules-info {
@@ -141,20 +185,29 @@
   padding: var(--spacer);
   border-radius: var(--border-radius-md);
   margin-top: var(--spacer-lg);
+  overflow: hidden;
+  max-width: 100%;
+  align-self: stretch; /* Asegura que no exceda el ancho del contenedor padre */
 }
 
 .modules-info h3 {
   color: var(--heading-color);
   margin-bottom: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .modules-info ul {
   padding-left: 20px;
+  margin: 0;
+  overflow-x: auto; /* Permite desplazamiento horizontal si es necesario */
 }
 
 .modules-info li {
   margin-bottom: 10px;
   line-height: 1.5;
+  word-break: break-word; /* Rompe palabras largas si es necesario */
 }
 
 /* Estilos para las tarjetas de módulo */

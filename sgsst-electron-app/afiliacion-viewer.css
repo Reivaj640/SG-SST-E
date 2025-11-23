@@ -172,6 +172,8 @@ header {
     flex: 1;
     display: flex;
     min-height: 0;
+    overflow: auto; /* Add scroll if content overflows */
+    position: relative;
 }
 .toolbar {
     background-color: #f8f9fa;

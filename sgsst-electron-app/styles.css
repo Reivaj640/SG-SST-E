@@ -520,14 +520,15 @@ select.form-control {
 }
 
 /* Tarjetas de módulo */
-/* Tarjetas de módulo */
 .module-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: calc(var(--spacer) * 0.75);
   padding: var(--spacer-sm);
   width: 100%;
+  max-width: 100%;
   overflow: hidden; /* Contiene el contenido para evitar desbordamiento */
+  align-self: flex-start; /* Asegura que el grid se alinee arriba y no se estire */
 }
 
 .module-card {
@@ -541,6 +542,8 @@ select.form-control {
   padding: var(--spacer-sm);
   transition: all 0.2s ease;
   overflow: hidden; /* Contiene cualquier contenido que podría desbordar */
+  min-width: 0; /* Evita que el card empuje el contenedor */
+  max-width: 100%; /* Asegura que el card no exceda su contenedor */
 }
 
 .module-card:hover {
@@ -554,6 +557,9 @@ select.form-control {
   margin-bottom: var(--spacer-xs);
   color: var(--text-color);
   font-weight: var(--font-weight-bold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .module-card .card-description {
@@ -561,10 +567,16 @@ select.form-control {
   margin-bottom: var(--spacer-sm);
   font-size: var(--font-size-sm);
   color: var(--text-muted);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3; /* Limitar a 3 líneas */
+  -webkit-box-orient: vertical;
 }
 
 .module-card .btn {
   align-self: flex-end; /* Alinea el botón al final del card */
+  max-width: 100%; /* Asegura que el botón no exceda el ancho del card */
+  word-break: break-word; /* Rompe palabras largas si es necesario */
 }
 
 /* Submódulo */
@@ -785,19 +797,21 @@ select.form-control {
 
 .header-buttons {
   display: flex;
-  gap: var(--spacer);
+  gap: var(--spacer-sm);
 }
 
 .header-btn {
   display: flex;
   align-items: center;
-  gap: 5px;
+  justify-content: center;
   background-color: var(--light-color);
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-md);
-  padding: 8px 12px;
+  padding: 8px;
   cursor: pointer;
   transition: background-color var(--transition-fast);
+  min-width: 40px;
+  min-height: 40px;
 }
 
 .header-btn:hover {
@@ -807,6 +821,11 @@ select.form-control {
 
 .icon-placeholder {
   font-size: 1.2rem;
+}
+
+.header-btn-text {
+  margin-left: 6px;
+  font-size: 0.85rem;
 }
 
 .main-container {

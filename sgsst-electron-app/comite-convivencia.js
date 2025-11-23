@@ -49,34 +49,31 @@ class ComiteConvivenciaComponent {
     }
 
     showVerActasPage() {
+        // Crear iframe para el visualizador estándar de Comité de Convivencia
+        const viewerFrame = document.createElement('iframe');
+        viewerFrame.id = 'comite-convivencia-actas-viewer';
+        viewerFrame.style.width = '100%';
+        viewerFrame.style.height = 'calc(100vh - 100px)'; // Altura menos el encabezado
+        viewerFrame.style.border = 'none';
+        viewerFrame.scrolling = 'no';
+
+        // Construir la URL con parámetros para el visualizador
+        const viewerUrl = `comite-convivencia-viewer.html?company=${encodeURIComponent(this.currentCompany)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
+        viewerFrame.src = viewerUrl;
+
         this.container.innerHTML = '';
-        this.currentPath = null;
-        this.pathHistory = [];
 
         const header = this.createHeader('Ver Actas del Comité de Convivencia', () => this.render());
         this.container.appendChild(header);
 
-        const navBar = document.createElement('div');
-        navBar.className = 'file-nav-bar';
-        this.container.appendChild(navBar);
+        this.container.appendChild(viewerFrame);
 
-        const mainLayout = document.createElement('div');
-        mainLayout.className = 'remisiones-layout'; // Re-using class for layout
-
-        const resultsCol = document.createElement('div');
-        resultsCol.id = 'search-results-col';
-        resultsCol.className = 'search-results-col';
-        mainLayout.appendChild(resultsCol);
-
-        const previewCol = document.createElement('div');
-        previewCol.id = 'preview-col';
-        previewCol.className = 'preview-col';
-        previewCol.innerHTML = `<div class="preview-placeholder">Seleccione un acta para previsualizarla.</div>`;
-        mainLayout.appendChild(previewCol);
-
-        this.container.appendChild(mainLayout);
-
-        this.navigateToInitialPath();
+        // Establecer comunicación entre frames
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'back-to-module-request') {
+                this.render();
+            }
+        });
     }
 
     async navigateToInitialPath() {
