@@ -33,6 +33,9 @@ class MedicionAusentismoComponent {
             case 'registrar-ausentismo':
                 this.renderRegistrarAusentismoView(this.container);
                 break;
+            case 'seguimiento-incapacidades':
+                this.renderSeguimientoIncapacidadesView(this.container);
+                break;
             default:
                 this.renderMainView(this.container);
         }
@@ -85,9 +88,9 @@ class MedicionAusentismoComponent {
 
         cardsContainer.appendChild(
             this.createModuleCard(
-                'Próximo a implementar',
-                'Nuevas funcionalidades estarán disponibles próximamente.',
-                () => this.handleComingSoon()
+                'Seguimiento de Incapacidades',
+                'Gestiona y sigue el estado de las incapacidades médicas de los empleados.',
+                () => this.handleSeguimientoIncapacidades()
             )
         );
 
@@ -178,6 +181,61 @@ class MedicionAusentismoComponent {
 
     handleComingSoon() {
         alert('Esta funcionalidad estará disponible próximamente.');
+    }
+
+    handleSeguimientoIncapacidades() {
+        // Crear un iframe o contenedor para la nueva funcionalidad
+        this.currentView = 'seguimiento-incapacidades';
+        this.render();
+    }
+
+    async renderSeguimientoIncapacidadesView(container) {
+        // Limpiar el contenedor principal
+        container.style.padding = '0'; // Eliminar padding para que la interfaz ocupe todo el ancho
+
+        const header = this.createHeader('Seguimiento de Incapacidades', () => {
+            this.currentView = 'main';
+            container.style.padding = ''; // Restaurar padding al volver
+            this.render();
+        });
+        container.appendChild(header);
+
+        // Crear el contenedor para la interfaz de seguimiento de incapacidades
+        const seguimientoLayout = document.createElement('div');
+        seguimientoLayout.style.cssText = `
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 220px);
+            width: 100%;
+            max-width: none;
+            overflow: hidden;
+        `;
+
+        // Crear iframe para cargar la interfaz de seguimiento de incapacidades
+        const iframe = document.createElement('iframe');
+        iframe.src = 'seguimiento-incapacidades.html';
+        iframe.style.cssText = `
+            width: 100%;
+            height: 100%;
+            border: none;
+            max-width: none;
+        `;
+
+        // Pasar contexto de empresa al iframe cuando cargue
+        iframe.onload = () => {
+            try {
+                // Intentar pasar el contexto de la empresa al iframe
+                iframe.contentWindow.postMessage({
+                    type: 'SET_COMPANY_CONTEXT',
+                    company: this.currentCompany
+                }, '*');
+            } catch (error) {
+                console.error('Error al enviar contexto al iframe:', error);
+            }
+        };
+
+        seguimientoLayout.appendChild(iframe);
+        container.appendChild(seguimientoLayout);
     }
 
     async renderRegistrarAusentismoView(container) {

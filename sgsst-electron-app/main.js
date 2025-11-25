@@ -1619,6 +1619,204 @@ ipcMain.handle('procesar-ausentismo', async (event, empresa, formData) => {
   }
 });
 
+// Manejador para guardar seguimiento de incapacidades
+ipcMain.handle('save-follow-up', async (event, followUpData, companyName) => {
+  sendLog(`[MAIN] Guardando seguimiento de incapacidad para empresa: ${companyName}`, 'INFO');
+
+  try {
+    // Obtener la ruta del archivo de ausentismo
+    const filePath = await obtenerRutaAusentismo(companyName);
+    sendLog(`[MAIN] Archivo de ausentismo encontrado: ${filePath}`, 'INFO');
+
+    const { spawn } = require('child_process');
+    const scriptPath = path.join(__dirname, 'Portear', 'src', 'actualizar_ausentismo.py');
+    const pythonPath = await getPython();
+
+    // Convertir followUpData en string seguro para pasar a Python
+    const followUpDataJson = JSON.stringify(followUpData);
+
+    return new Promise((resolve, reject) => {
+      const python = spawn(pythonPath, [
+        scriptPath,
+        'guardar_seguimiento',
+        companyName,    // ARG 1
+        filePath,       // ARG 2
+        followUpDataJson // ARG 3
+      ], {
+        cwd: path.dirname(scriptPath),
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+      });
+
+      let buffer = '';
+
+      python.stdout.on('data', (data) => {
+        buffer += data.toString();
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        lines.forEach(line => {
+          line = line.trim();
+          if (!line) return;
+
+          try {
+            const obj = JSON.parse(line);
+            if (obj.type === 'log') {
+              sendLog(`[Python Seguimiento] ${obj.message}`, 'INFO');
+            } else if (obj.type === 'result') {
+              resolve(obj.payload);
+            }
+          } catch (e) {
+            sendLog(`[Python Seguimiento - RAW] ${line}`, 'DEBUG');
+          }
+        });
+      });
+
+      python.stderr.on('data', (data) => {
+        sendLog(`[Python Seguimiento - STDERR] ${data.toString()}`, 'ERROR');
+      });
+
+      python.on('close', (code) => {
+        if (buffer?.trim()) {
+          try {
+            const last = JSON.parse(buffer.trim());
+            if (last.type === 'result') return resolve(last.payload);
+          } catch { /* Ignorar errores menores */ }
+        }
+        resolve({ success: false, error: 'Proceso cerrado sin resultado.' });
+      });
+
+      python.on('error', (err) => {
+        sendLog(`Error al iniciar Python para guardar seguimiento: ${err.message}`, 'CRITICAL');
+        reject(err);
+      });
+    });
+
+  } catch (error) {
+    sendLog(`[ERROR] Falló save-follow-up: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// Manejador para exportar datos de incapacidades
+ipcMain.handle('export-incapacity-data', async (event, companyName) => {
+  sendLog(`[MAIN] Exportando datos de incapacidades para empresa: ${companyName}`, 'INFO');
+
+  try {
+    // Obtener la ruta del archivo de ausentismo
+    const filePath = await obtenerRutaAusentismo(companyName);
+    sendLog(`[MAIN] Archivo de origen: ${filePath}`, 'INFO');
+
+    // Crear una ruta para el archivo exportado
+    const exportDir = path.join(app.getPath('downloads'), 'Exportados_Incapacidades');
+    if (!fs.existsSync(exportDir)) {
+      fs.mkdirSync(exportDir, { recursive: true });
+    }
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').split('_')[0];
+    const exportFileName = `incapacidades_${companyName}_${timestamp}.xlsx`;
+    const exportPath = path.join(exportDir, exportFileName);
+
+    // Copiar el archivo original al directorio de exportación
+    fs.copyFileSync(filePath, exportPath);
+
+    sendLog(`[MAIN] Datos exportados exitosamente a: ${exportPath}`, 'INFO');
+
+    return {
+      success: true,
+      path: exportPath,
+      message: `Datos exportados exitosamente a: ${exportPath}`
+    };
+
+  } catch (error) {
+    sendLog(`[ERROR] Falló export-incapacity-data: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// Manejador para obtener historial de seguimientos de una incapacidad
+ipcMain.handle('get-follow-up-history', async (event, caseId, companyName) => {
+  sendLog(`[MAIN] Obteniendo historial de seguimientos para caso: ${caseId}, empresa: ${companyName}`, 'INFO');
+
+  try {
+    // Obtener la ruta del archivo de ausentismo
+    const filePath = await obtenerRutaAusentismo(companyName);
+    sendLog(`[MAIN] Buscando historial en archivo: ${filePath}`, 'INFO');
+
+    // En este ejemplo simple, creamos datos de historial simulados
+    // En una implementación real, esto leería del archivo de datos
+    const { spawn } = require('child_process');
+    const scriptPath = path.join(__dirname, 'Portear', 'src', 'actualizar_ausentismo.py');
+    const pythonPath = await getPython();
+
+    const params = {
+      caseId,
+      filePath
+    };
+
+    return new Promise((resolve, reject) => {
+      const python = spawn(pythonPath, [
+        scriptPath,
+        'obtener_historial',
+        companyName,
+        caseId,
+        filePath
+      ], {
+        cwd: path.dirname(scriptPath),
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+      });
+
+      let buffer = '';
+
+      python.stdout.on('data', (data) => {
+        buffer += data.toString();
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        lines.forEach(line => {
+          line = line.trim();
+          if (!line) return;
+
+          try {
+            const obj = JSON.parse(line);
+            if (obj.type === 'log') {
+              sendLog(`[Python Historial] ${obj.message}`, 'INFO');
+            } else if (obj.type === 'result') {
+              resolve(obj.payload);
+            }
+          } catch (e) {
+            sendLog(`[Python Historial - RAW] ${line}`, 'DEBUG');
+          }
+        });
+      });
+
+      python.stderr.on('data', (data) => {
+        sendLog(`[Python Historial - STDERR] ${data.toString()}`, 'ERROR');
+      });
+
+      python.on('close', (code) => {
+        if (buffer?.trim()) {
+          try {
+            const last = JSON.parse(buffer.trim());
+            if (last.type === 'result') return resolve(last.payload);
+          } catch { /* Ignorar errores menores */ }
+        }
+        // Si no hay resultado del proceso Python, devolver un historial vacío
+        resolve({
+          success: true,
+          followUps: []
+        });
+      });
+
+      python.on('error', (err) => {
+        sendLog(`Error al iniciar Python para obtener historial: ${err.message}`, 'CRITICAL');
+        reject(err);
+      });
+    });
+
+  } catch (error) {
+    sendLog(`[ERROR] Falló get-follow-up-history: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message, followUps: [] };
+  }
+});
+
 // --- Manejador para reiniciar la aplicación ---
 ipcMain.on('restart_app', () => {
   log.info('El usuario ha aceptado la actualización. Reiniciando para instalar...');

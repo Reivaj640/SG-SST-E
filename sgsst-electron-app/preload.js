@@ -119,6 +119,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   generateCopasstActa: (changes) => ipcRenderer.invoke('generate-copasst-acta', changes),
   generateConvivenciaActa: (changes) => ipcRenderer.invoke('generateConvivenciaActa', changes),
 
+  // --- Seguimiento de Incapacidades ---
+  saveFollowUp: (followUpData, companyName) => ipcRenderer.invoke('save-follow-up', followUpData, companyName),
+  exportIncapacityData: (companyName) => ipcRenderer.invoke('export-incapacity-data', companyName),
+  getFollowUpHistory: (caseId, companyName) => ipcRenderer.invoke('get-follow-up-history', caseId, companyName),
+
   // --- Eventos IPC ---
   onIpcMessage: (channel, listener) => {
     ipcRenderer.on(channel, (event, ...args) => listener(...args));

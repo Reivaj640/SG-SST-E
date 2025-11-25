@@ -1,0 +1,1335 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seguimiento de Incapacidades - TEMPOACTIVA</title>
+    <!-- Font Awesome para iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght @300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-color: #6366f1;
+            --primary-light: #e0e7ff;
+            --primary-dark: #4f46e5;
+            --secondary-color: #8b5cf6;
+            --accent-color: #ec4899;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --info-color: #3b82f6;
+            --light-color: #f8fafc;
+            --dark-color: #1e293b;
+            --gray-color: #64748b;
+            --white-color: #ffffff;
+            --border-color: #e2e8f0;
+            --border-radius-sm: 8px;
+            --border-radius-md: 12px;
+            --border-radius-lg: 16px;
+            --border-radius-xl: 20px;
+            --box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --box-shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            --box-shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            --transition-fast: 0.15s ease;
+            --transition-normal: 0.3s ease;
+            --transition-slow: 0.5s ease;
+            --text-color: #334155;
+            --text-light-color: #64748b;
+            --heading-color: #1e293b;
+            --card-bg: #ffffff;
+            --header-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: var(--text-color);
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Contenedor principal */
+        .app-container {
+            min-height: 100vh;
+            background: var(--light-color);
+        }
+
+        /* Header */
+        .app-header {
+            background: var(--header-bg);
+            color: var(--white-color);
+            padding: 20px 30px;
+            box-shadow: var(--box-shadow-lg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .app-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="%23ffffff" fill-opacity="0.1" d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,122.7C672,117,768,139,864,138.7C960,139,1056,117,1152,106.7C1248,96,1344,96,1392,96L1440,96L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>') no-repeat bottom;
+            background-size: cover;
+        }
+
+        .header-content {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .header-logo {
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: var(--border-radius-lg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            backdrop-filter: blur(10px);
+            transition: var(--transition-normal);
+        }
+
+        .header-logo:hover {
+            transform: scale(1.05);
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .header-title {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .header-subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-top: 4px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        /* Contenido principal */
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            padding: 30px;
+            gap: 25px;
+        }
+
+        /* Dashboard de estadísticas */
+        .stats-dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--box-shadow);
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transition: var(--transition-normal);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--box-shadow-lg);
+        }
+
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: var(--border-radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: var(--white-color);
+        }
+
+        .stat-icon.primary {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+        }
+
+        .stat-icon.success {
+            background: linear-gradient(135deg, var(--success-color), #059669);
+        }
+
+        .stat-icon.warning {
+            background: linear-gradient(135deg, var(--warning-color), #d97706);
+        }
+
+        .stat-icon.danger {
+            background: linear-gradient(135deg, var(--danger-color), #dc2626);
+        }
+
+        .stat-content {
+            flex: 1;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--heading-color);
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: var(--text-light-color);
+        }
+
+        /* Controles de búsqueda y filtros */
+        .controls-section {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .search-container {
+            flex: 1;
+            min-width: 300px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 20px 12px 50px;
+            border: 2px solid var(--border-color);
+            border-radius: var(--border-radius-xl);
+            font-size: 15px;
+            transition: var(--transition-normal);
+            background: var(--white-color);
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-light-color);
+            font-size: 18px;
+        }
+
+        .filter-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .filter-btn {
+            padding: 12px 20px;
+            border: 2px solid var(--border-color);
+            background: var(--white-color);
+            border-radius: var(--border-radius-lg);
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: var(--transition-normal);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .filter-btn:hover {
+            border-color: var(--primary-color);
+            background: var(--primary-light);
+            transform: translateY(-2px);
+        }
+
+        .filter-btn.active {
+            background: var(--primary-color);
+            color: var(--white-color);
+            border-color: var(--primary-color);
+        }
+
+        .action-btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: var(--border-radius-lg);
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: var(--transition-normal);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .action-btn.primary {
+            background: var(--primary-color);
+            color: var(--white-color);
+        }
+
+        .action-btn.primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: var(--box-shadow);
+        }
+
+        /* Tabla de casos */
+        .cases-table-container {
+            background: var(--card-bg);
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--box-shadow);
+            overflow: hidden;
+        }
+
+        .table-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .table-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--heading-color);
+        }
+
+        .table-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        .cases-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .cases-table th {
+            background: var(--light-color);
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--heading-color);
+            font-size: 14px;
+            position: sticky;
+            top: 0;
+        }
+
+        .cases-table td {
+            padding: 15px;
+            border-top: 1px solid var(--border-color);
+            font-size: 14px;
+        }
+
+        .cases-table tr:hover {
+            background: var(--light-color);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-badge.active {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success-color);
+        }
+
+        .status-badge.pending {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning-color);
+        }
+
+        .status-badge.closed {
+            background: rgba(100, 116, 139, 0.1);
+            color: var(--gray-color);
+        }
+
+        .table-actions-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-light-color);
+            font-size: 16px;
+            margin-right: 10px;
+            transition: var(--transition-fast);
+        }
+
+        .table-actions-btn:hover {
+            color: var(--primary-color);
+        }
+
+        /* Modal de seguimiento */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background-color: var(--white-color);
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--box-shadow-xl);
+            width: 800px;
+            max-width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            padding: 25px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--heading-color);
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-light-color);
+            transition: var(--transition-fast);
+        }
+
+        .modal-close:hover {
+            color: var(--danger-color);
+        }
+
+        .modal-body {
+            padding: 25px;
+        }
+
+        .modal-footer {
+            padding: 20px 25px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        /* Formularios */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text-color);
+            font-size: 14px;
+        }
+
+        .form-control {
+            display: block;
+            width: 100%;
+            padding: 12px 15px;
+            font-size: 14px;
+            line-height: 1.5;
+            color: var(--text-color);
+            background-color: var(--white-color);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius-md);
+            transition: var(--transition-normal);
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        textarea.form-control {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        /* Historial de seguimientos */
+        .follow-up-history {
+            margin-top: 30px;
+        }
+
+        .follow-up-item {
+            background: var(--light-color);
+            border-radius: var(--border-radius-md);
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .follow-up-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .follow-up-date {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .follow-up-author {
+            color: var(--text-light-color);
+            font-size: 14px;
+        }
+
+        .follow-up-content {
+            color: var(--text-color);
+            line-height: 1.5;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .stats-dashboard {
+                grid-template-columns: 1fr;
+            }
+            
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .controls-section {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .search-container {
+                min-width: 100%;
+            }
+            
+            .filter-buttons {
+                justify-content: center;
+            }
+        }
+
+        /* Animaciones */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in-up {
+            animation: fadeInUp 0.6s ease;
+        }
+
+        /* Notificación */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: var(--border-radius-md);
+            color: var(--white-color);
+            font-weight: 500;
+            box-shadow: var(--box-shadow);
+            transform: translateX(120%);
+            transition: transform 0.3s ease;
+            z-index: 1001;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            background-color: var(--success-color);
+        }
+
+        .notification.error {
+            background-color: var(--danger-color);
+        }
+
+        .notification i {
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="header-left">
+                    <div class="header-logo">
+                        <i class="fas fa-user-clock"></i>
+                    </div>
+                    <div>
+                        <h1 class="header-title">Seguimiento de Incapacidades</h1>
+                        <p class="header-subtitle">Gestión y seguimiento de casos médicos</p>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <button class="filter-btn" onclick="exportData()">
+                        <i class="fas fa-download"></i> Exportar
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Contenido principal -->
+        <main class="main-content">
+            <!-- Dashboard de estadísticas -->
+            <div class="stats-dashboard fade-in-up">
+                <div class="stat-card">
+                    <div class="stat-icon primary">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="totalIncapacidades">0</div>
+                        <div class="stat-label">Total de Incapacidades</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon success">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="casosActivos">0</div>
+                        <div class="stat-label">Casos Activos</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon warning">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="seguimientosPendientes">0</div>
+                        <div class="stat-label">Seguimientos Pendientes</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon danger">
+                        <i class="fas fa-calendar-times"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="casosCriticos">0</div>
+                        <div class="stat-label">Casos Críticos</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controles de búsqueda y filtros -->
+            <div class="controls-section fade-in-up">
+                <div class="search-container">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" class="search-input" placeholder="Buscar por empleado, diagnóstico o ID..." id="searchInput">
+                </div>
+                
+                <div class="filter-buttons">
+                    <button class="filter-btn active" data-filter="all">
+                        <i class="fas fa-list"></i> Todos
+                    </button>
+                    <button class="filter-btn" data-filter="active">
+                        <i class="fas fa-user-check"></i> Activos
+                    </button>
+                    <button class="filter-btn" data-filter="pending">
+                        <i class="fas fa-hourglass-half"></i> Pendientes
+                    </button>
+                    <button class="filter-btn" data-filter="critical">
+                        <i class="fas fa-exclamation-triangle"></i> Críticos
+                    </button>
+                </div>
+
+                <button class="action-btn primary" onclick="openFollowUpModal()">
+                    <i class="fas fa-plus"></i> Nuevo Seguimiento
+                </button>
+            </div>
+
+            <!-- Tabla de casos -->
+            <div class="cases-table-container fade-in-up">
+                <div class="table-header">
+                    <h2 class="table-title">Casos de Incapacidad</h2>
+                    <div class="table-actions">
+                        <button class="filter-btn" onclick="refreshTable()">
+                            <i class="fas fa-sync-alt"></i> Actualizar
+                        </button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="cases-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Empleado</th>
+                                <th>Diagnóstico</th>
+                                <th>Fecha Inicio</th>
+                                <th>Días Transcurridos</th>
+                                <th>Último Seguimiento</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="casesTableBody">
+                            <!-- Las filas se generarán dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal de seguimiento -->
+    <div class="modal" id="followUpModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Nuevo Seguimiento de Incapacidad</h2>
+                <button class="modal-close" onclick="closeFollowUpModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="followUpForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="employeeId">ID del Empleado</label>
+                            <input type="text" class="form-control" id="employeeId" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="employeeName">Nombre del Empleado</label>
+                            <input type="text" class="form-control" id="employeeName" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="diagnosis">Diagnóstico</label>
+                            <input type="text" class="form-control" id="diagnosis" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="followUpDate">Fecha de Seguimiento</label>
+                            <input type="date" class="form-control" id="followUpDate" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="followUpType">Tipo de Seguimiento</label>
+                        <select class="form-control" id="followUpType" required>
+                            <option value="">Seleccionar...</option>
+                            <option value="telefonico">Telefónico</option>
+                            <option value="presencial">Presencial</option>
+                            <option value="virtual">Virtual</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="evolution">Evolución del Paciente</label>
+                        <textarea class="form-control" id="evolution" rows="4" placeholder="Describa la evolución del paciente..."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="recommendations">Recomendaciones Médicas</label>
+                        <textarea class="form-control" id="recommendations" rows="4" placeholder="Ingrese las recomendaciones médicas..."></textarea>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="nextFollowUp">Próximo Seguimiento</label>
+                            <input type="date" class="form-control" id="nextFollowUp">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="caseStatus">Estado del Caso</label>
+                            <select class="form-control" id="caseStatus" required>
+                                <option value="">Seleccionar...</option>
+                                <option value="active">Activo</option>
+                                <option value="improving">Mejorando</option>
+                                <option value="recovered">Recuperado</option>
+                                <option value="extended">Prórroga</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+                
+                <!-- Historial de seguimientos -->
+                <div class="follow-up-history" id="followUpHistory" style="display: none;">
+                    <h3>Historial de Seguimientos</h3>
+                    <div id="followUpHistoryList">
+                        <!-- Los seguimientos se cargarán dinámicamente -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="filter-btn" onclick="closeFollowUpModal()">Cancelar</button>
+                <button class="action-btn primary" onclick="saveFollowUp()">
+                    <i class="fas fa-save"></i> Guardar Seguimiento
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notificación -->
+    <div class="notification" id="notification">
+        <i class="fas fa-check-circle"></i>
+        <span id="notification-message">Operación completada con éxito</span>
+    </div>
+
+    <script>
+        // Estado de la aplicación
+        let currentFilter = 'all';
+        let searchTerm = '';
+        let currentCaseId = null;
+        let currentCompany = null;
+        let allCasesData = [];
+        let allFollowUpsData = {};
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+
+        // Inicializar la aplicación
+        async function initializeApp() {
+            // Esperar a que electronAPI esté disponible
+            if (typeof window.electronAPI !== 'undefined') {
+                // Obtener la empresa actual desde el contexto global o esperar mensaje del contenedor
+                currentCompany = window.currentCompany || window.ELECTRON_COMPANY_CONTEXT;
+
+                if (!currentCompany) {
+                    // Si no está disponible, intentar obtenerla de alguna otra manera
+                    console.warn('No se pudo obtener la empresa actual, esperando mensaje del contenedor...');
+                }
+
+                console.log('Inicializando seguimiento de incapacidades para:', currentCompany);
+
+                try {
+                    // Cargar los datos iniciales si ya tenemos la empresa
+                    if (currentCompany) {
+                        await loadData();
+                    }
+                } catch (error) {
+                    console.error('Error inicializando la aplicación:', error);
+                    showNotification('Error al cargar los datos iniciales', 'error');
+                }
+            } else {
+                console.error('electronAPI no está disponible');
+                showNotification('Error: API de la aplicación no disponible', 'error');
+            }
+
+            initializeEventListeners();
+            setCurrentDate();
+        }
+
+        // Manejar mensajes del contenedor principal
+        window.addEventListener('message', function(event) {
+            // Verificar que el mensaje venga del contenedor principal
+            if (event.data && event.data.type === 'SET_COMPANY_CONTEXT') {
+                currentCompany = event.data.company;
+                console.log('Contexto de empresa recibido:', currentCompany);
+
+                // Si recibimos la empresa y aún no se han cargado datos, cargarlos ahora
+                if (currentCompany && allCasesData.length === 0) {
+                    loadData();
+                }
+            }
+        });
+
+        // Inicializar event listeners
+        function initializeEventListeners() {
+            // Búsqueda
+            document.getElementById('searchInput').addEventListener('input', function(e) {
+                searchTerm = e.target.value.toLowerCase();
+                filterCases();
+            });
+
+            // Filtros
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    if (this.dataset.filter) {
+                        // Actualizar botón activo
+                        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                        this.classList.add('active');
+                        
+                        currentFilter = this.dataset.filter;
+                        filterCases();
+                    }
+                });
+            });
+        }
+
+        // Cargar datos desde la API
+        async function loadData() {
+            try {
+                console.log('Cargando datos de incapacidades...');
+                
+                // Obtener datos de ausentismo desde la API existente
+                const result = await window.electronAPI.readAusentismoData(currentCompany);
+                
+                if (result.success) {
+                    allCasesData = processAusentismoData(result.rows, result.headers);
+                    
+                    // Cargar también los datos de seguimientos si existen
+                    await loadFollowUpData();
+                    
+                    updateStats();
+                    renderCasesTable();
+                } else {
+                    console.error('Error al leer datos:', result.error);
+                    showNotification('Error al cargar los datos: ' + result.error, 'error');
+                }
+            } catch (error) {
+                console.error('Error en loadData:', error);
+                showNotification('Error al cargar los datos: ' + error.message, 'error');
+            }
+        }
+
+        // Procesar datos de ausentismo para el formato de casos
+        function processAusentismoData(rows, headers) {
+            if (!rows || !headers) return [];
+            
+            // Mapear los encabezados a índices
+            const headerMap = {};
+            headers.forEach((header, index) => {
+                const cleanHeader = header ? header.trim().toUpperCase() : '';
+                headerMap[cleanHeader] = index;
+            });
+
+            return rows.map((row, rowIndex) => {
+                // Extraer información de la fila
+                const id = `INC-${currentCompany.substring(0, 3).toUpperCase()}-${String(rowIndex + 1).padStart(3, '0')}`;
+                const nombre = row[headerMap['NOMBRE']] || row[headerMap['NOMBRES']] || '';
+                const cedula = row[headerMap['CEDULA']] || row[headerMap['CÉDULA']] || '';
+                const cargo = row[headerMap['CARGO']] || '';
+                const fechaInicio = row[headerMap['FECHA INICIO']] || row[headerMap['FECHA_INICIO']] || '';
+                const dias = row[headerMap['N° DIAS DE INCAPACIDAD']] || row[headerMap['DIAS']] || 0;
+                const diagnostico = row[headerMap['DESCRIPCIÓN']] || row[headerMap['DIAGNOSTICO']] || row[headerMap['CIE-10']] || '';
+                const claseIncapacidad = row[headerMap['CLASE DE INCAPACIDAD']] || row[headerMap['CLASE']] || '';
+                const tipoIncapacidad = row[headerMap['TIPO DE INCAPACIDAD']] || row[headerMap['TIPO']] || '';
+                
+                // Calcular días transcurridos desde la fecha de inicio
+                let daysElapsed = 0;
+                if (fechaInicio) {
+                    const startDate = new Date(fechaInicio);
+                    const today = new Date();
+                    const diffTime = Math.abs(today - startDate);
+                    daysElapsed = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                }
+
+                // Determinar estado basado en la información disponible
+                let status = 'active';
+                if (tipoIncapacidad && tipoIncapacidad.toLowerCase().includes('licencia')) {
+                    status = 'extended';
+                } else if (dias > 180) {
+                    status = 'extended';
+                } else if (dias > 100) {
+                    status = 'improving';
+                }
+
+                // Fecha del último seguimiento (a determinar según datos disponibles)
+                const lastFollowUp = fechaInicio; // Usar fecha de inicio como referencia temporal
+
+                return {
+                    id,
+                    employeeName: nombre,
+                    employeeId: cedula,
+                    job: cargo,
+                    diagnosis: diagnostico,
+                    startDate: fechaInicio,
+                    daysElapsed: parseInt(dias) || daysElapsed,
+                    lastFollowUp: lastFollowUp,
+                    status,
+                    claseIncapacidad,
+                    tipoIncapacidad
+                };
+            });
+        }
+
+        // Cargar datos de seguimientos (simulación - en la práctica podría venir de otro lugar)
+        async function loadFollowUpData() {
+            // En una implementación real, esto podría cargar datos de una base de datos específica
+            // Por ahora, creamos algunos datos de ejemplo basados en los casos existentes
+            allFollowUpsData = {};
+            
+            allCasesData.forEach(caseItem => {
+                if (Math.random() > 0.3) { // Agregar seguimientos a algunos casos
+                    allFollowUpsData[caseItem.id] = [
+                        {
+                            date: new Date(new Date(caseItem.startDate).getTime() + Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                            type: ['telefonico', 'presencial', 'virtual'][Math.floor(Math.random() * 3)],
+                            author: `Dr. ${['Pérez', 'Gómez', 'Rodríguez', 'Martínez'][Math.floor(Math.random() * 4)]}`,
+                            content: 'Evaluación inicial del paciente. Buena evolución general. Se continúa con el tratamiento planificado.',
+                            recommendations: 'Continuar con medicación actual y fisioterapia. Reevaluación en 10 días.'
+                        }
+                    ];
+                    
+                    // Añadir más seguimientos aleatoriamente
+                    if (Math.random() > 0.5) {
+                        allFollowUpsData[caseItem.id].push({
+                            date: new Date(new Date(caseItem.startDate).getTime() + (Math.random() * 14 + 7) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                            type: ['telefonico', 'presencial', 'virtual'][Math.floor(Math.random() * 3)],
+                            author: `Dr. ${['López', 'Hernández', 'Díaz', 'Sánchez'][Math.floor(Math.random() * 4)]}`,
+                            content: 'Paciente reporta mejoría significativa. Dolor reducido y mayor movilidad.',
+                            recommendations: 'Ajuste en medicación. Continuar con terapia física.'
+                        });
+                    }
+                }
+            });
+        }
+
+        // Establecer fecha actual
+        function setCurrentDate() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('followUpDate').value = today;
+        }
+
+        // Actualizar estadísticas
+        function updateStats() {
+            const total = allCasesData.length;
+            const activos = allCasesData.filter(c => c.status === 'active' || c.status === 'improving').length;
+            const pendientes = allCasesData.filter(c => c.daysElapsed > 30 && (c.status === 'active' || c.status === 'extended')).length;
+            const criticos = allCasesData.filter(c => c.daysElapsed > 90 && c.status === 'active').length;
+
+            document.getElementById('totalIncapacidades').textContent = total.toLocaleString();
+            document.getElementById('casosActivos').textContent = activos.toLocaleString();
+            document.getElementById('seguimientosPendientes').textContent = pendientes.toLocaleString();
+            document.getElementById('casosCriticos').textContent = criticos.toLocaleString();
+        }
+
+        // Renderizar tabla de casos
+        function renderCasesTable() {
+            const tableBody = document.getElementById('casesTableBody');
+            tableBody.innerHTML = '';
+            
+            const filteredCases = getFilteredCases();
+            
+            filteredCases.forEach(caseItem => {
+                const row = document.createElement('tr');
+                
+                // Determinar clase de estado
+                let statusClass = '';
+                if (caseItem.status === 'active') statusClass = 'active';
+                else if (caseItem.status === 'improving' || caseItem.status === 'extended') statusClass = 'pending';
+                else statusClass = 'closed';
+                
+                // Determinar texto de estado
+                let statusText = '';
+                if (caseItem.status === 'active') statusText = 'Activo';
+                else if (caseItem.status === 'improving') statusText = 'Mejorando';
+                else if (caseItem.status === 'extended') statusText = 'Prórroga';
+                else statusText = 'Cerrado';
+                
+                row.innerHTML = `
+                    <td>${caseItem.id}</td>
+                    <td>${caseItem.employeeName}</td>
+                    <td>${caseItem.diagnosis}</td>
+                    <td>${formatDate(caseItem.startDate)}</td>
+                    <td>${caseItem.daysElapsed} días</td>
+                    <td>${formatDate(caseItem.lastFollowUp)}</td>
+                    <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                    <td>
+                        <button class="table-actions-btn" onclick="viewCase('${caseItem.id}')" title="Ver detalles">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="table-actions-btn" onclick="editCase('${caseItem.id}')" title="Editar seguimiento">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    </td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+        }
+
+        // Filtrar casos
+        function filterCases() {
+            renderCasesTable();
+        }
+
+        // Obtener casos filtrados
+        function getFilteredCases() {
+            return allCasesData.filter(caseItem => {
+                const matchesFilter = currentFilter === 'all' || 
+                    (currentFilter === 'active' && caseItem.status === 'active') ||
+                    (currentFilter === 'pending' && (caseItem.status === 'improving' || caseItem.daysElapsed > 30)) ||
+                    (currentFilter === 'critical' && caseItem.daysElapsed > 90 && caseItem.status === 'active');
+                
+                const matchesSearch = searchTerm === '' || 
+                    caseItem.id.toLowerCase().includes(searchTerm) || 
+                    caseItem.employeeName.toLowerCase().includes(searchTerm) || 
+                    caseItem.diagnosis.toLowerCase().includes(searchTerm) ||
+                    caseItem.employeeId.toLowerCase().includes(searchTerm);
+                
+                return matchesFilter && matchesSearch;
+            });
+        }
+
+        // Ver detalles del caso
+        function viewCase(caseId) {
+            currentCaseId = caseId;
+            const caseItem = allCasesData.find(c => c.id === caseId);
+            
+            if (caseItem) {
+                // Llenar formulario con datos del caso
+                document.getElementById('employeeId').value = caseItem.employeeId || caseItem.id;
+                document.getElementById('employeeName').value = caseItem.employeeName;
+                document.getElementById('diagnosis').value = caseItem.diagnosis;
+                
+                // Mostrar historial de seguimientos
+                showFollowUpHistory(caseId);
+                
+                // Abrir modal
+                document.getElementById('followUpModal').classList.add('active');
+            }
+        }
+
+        // Editar caso
+        function editCase(caseId) {
+            viewCase(caseId);
+        }
+
+        // Mostrar historial de seguimientos
+        function showFollowUpHistory(caseId) {
+            const followUps = allFollowUpsData[caseId] || [];
+            const historyContainer = document.getElementById('followUpHistory');
+            const historyList = document.getElementById('followUpHistoryList');
+            
+            if (followUps.length > 0) {
+                historyList.innerHTML = '';
+                
+                // Ordenar seguimientos por fecha (más reciente primero)
+                const sortedFollowUps = [...followUps].sort((a, b) => new Date(b.date) - new Date(a.date));
+                
+                sortedFollowUps.forEach(followUp => {
+                    const followUpItem = document.createElement('div');
+                    followUpItem.className = 'follow-up-item';
+                    
+                    const typeText = followUp.type === 'telefonico' ? 'Telefónico' : 
+                                     followUp.type === 'presencial' ? 'Presencial' : 'Virtual';
+                    
+                    followUpItem.innerHTML = `
+                        <div class="follow-up-header">
+                            <div class="follow-up-date">${formatDate(followUp.date)} - ${typeText}</div>
+                            <div class="follow-up-author">${followUp.author}</div>
+                        </div>
+                        <div class="follow-up-content">${followUp.content}</div>
+                        <div class="follow-up-content"><strong>Recomendaciones:</strong> ${followUp.recommendations}</div>
+                    `;
+                    
+                    historyList.appendChild(followUpItem);
+                });
+                
+                historyContainer.style.display = 'block';
+            } else {
+                historyContainer.style.display = 'none';
+            }
+        }
+
+        // Abrir modal de seguimiento
+        function openFollowUpModal() {
+            currentCaseId = null;
+            document.getElementById('followUpForm').reset();
+            document.getElementById('followUpHistory').style.display = 'none';
+            setCurrentDate();
+            document.getElementById('followUpModal').classList.add('active');
+        }
+
+        // Cerrar modal de seguimiento
+        function closeFollowUpModal() {
+            document.getElementById('followUpModal').classList.remove('active');
+        }
+
+        // Guardar seguimiento
+        async function saveFollowUp() {
+            const form = document.getElementById('followUpForm');
+            
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+            
+            // Recopilar datos del formulario
+            const followUpData = {
+                employeeId: document.getElementById('employeeId').value,
+                employeeName: document.getElementById('employeeName').value,
+                diagnosis: document.getElementById('diagnosis').value,
+                followUpDate: document.getElementById('followUpDate').value,
+                followUpType: document.getElementById('followUpType').value,
+                evolution: document.getElementById('evolution').value,
+                recommendations: document.getElementById('recommendations').value,
+                nextFollowUp: document.getElementById('nextFollowUp').value,
+                caseStatus: document.getElementById('caseStatus').value,
+                timestamp: new Date().toISOString()
+            };
+            
+            try {
+                console.log('Guardando seguimiento:', followUpData);
+                
+                // Enviar datos a la API de la aplicación
+                const result = await window.electronAPI.saveFollowUp(followUpData, currentCompany);
+                
+                if (result.success) {
+                    // Actualizar datos locales
+                    if (currentCaseId) {
+                        // Si es una actualización de caso existente
+                        const caseIndex = allCasesData.findIndex(c => c.id === currentCaseId);
+                        if (caseIndex !== -1) {
+                            allCasesData[caseIndex].status = followUpData.caseStatus;
+                            allCasesData[caseIndex].lastFollowUp = followUpData.followUpDate;
+                        }
+                        
+                        // Agregar el seguimiento al historial
+                        if (!allFollowUpsData[currentCaseId]) {
+                            allFollowUpsData[currentCaseId] = [];
+                        }
+                        
+                        allFollowUpsData[currentCaseId].push({
+                            date: followUpData.followUpDate,
+                            type: followUpData.followUpType,
+                            author: 'Sistema', // En una implementación real, podría ser el nombre del usuario
+                            content: followUpData.evolution,
+                            recommendations: followUpData.recommendations
+                        });
+                    }
+                    
+                    // Cerrar modal
+                    closeFollowUpModal();
+                    
+                    // Actualizar tabla y estadísticas
+                    updateStats();
+                    renderCasesTable();
+                    
+                    showNotification('Seguimiento guardado correctamente', 'success');
+                } else {
+                    showNotification('Error al guardar seguimiento: ' + result.error, 'error');
+                }
+            } catch (error) {
+                console.error('Error guardando seguimiento:', error);
+                showNotification('Error al guardar seguimiento: ' + error.message, 'error');
+            }
+        }
+
+        // Refrescar tabla
+        async function refreshTable() {
+            await loadData();
+            showNotification('Datos actualizados', 'success');
+        }
+
+        // Exportar datos
+        async function exportData() {
+            try {
+                const result = await window.electronAPI.exportIncapacityData(currentCompany);
+                if (result.success) {
+                    showNotification('Datos exportados exitosamente a: ' + result.path, 'success');
+                } else {
+                    showNotification('Error al exportar: ' + result.error, 'error');
+                }
+            } catch (error) {
+                console.error('Error exportando datos:', error);
+                showNotification('Error al exportar datos: ' + error.message, 'error');
+            }
+        }
+
+        // Formatear fecha
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return dateString; // Si no es una fecha válida, devolver el string original
+            
+            return date.toLocaleDateString('es-ES', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        }
+
+        // Mostrar notificación
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            const notificationMessage = document.getElementById('notification-message');
+            const icon = notification.querySelector('i');
+            
+            // Actualizar mensaje
+            notificationMessage.textContent = message;
+            
+            // Actualizar tipo y icono
+            notification.className = `notification ${type}`;
+            if (type === 'success') {
+                icon.className = 'fas fa-check-circle';
+            } else if (type === 'error') {
+                icon.className = 'fas fa-exclamation-circle';
+            } else if (type === 'warning') {
+                icon.className = 'fas fa-exclamation-triangle';
+            }
+            
+            // Mostrar notificación
+            notification.classList.add('show');
+            
+            // Ocultar después de 4 segundos
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 4000);
+        }
+    </script>
+</body>
+</html>
