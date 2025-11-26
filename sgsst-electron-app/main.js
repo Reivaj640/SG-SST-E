@@ -1817,6 +1817,98 @@ ipcMain.handle('get-follow-up-history', async (event, caseId, companyName) => {
   }
 });
 
+// Manejador para cargar datos de seguimientos desde el archivo externo
+ipcMain.handle('load-follow-up-data', async (event, companyName) => {
+  sendLog(`[MAIN][DEBUG] El handler 'load-follow-up-data' ha sido invocado para la empresa: ${companyName}.`);
+  sendLog(`[MAIN] Cargando datos de seguimientos para empresa: ${companyName}`, 'INFO');
+
+  try {
+    // Ruta al archivo de seguimientos
+    const seguimientoFilePath = path.join(app.getPath('documents'), 'Seguimiento Casos Medicos.xlsx');
+    sendLog(`[MAIN] Archivo de seguimientos buscado en: ${seguimientoFilePath}`, 'INFO');
+
+    // Verificar si existe en la ruta predeterminada, si no, probar ruta en Google Drive
+    let filePathToUse = seguimientoFilePath;
+    if (!fs.existsSync(seguimientoFilePath)) {
+      const googleDrivePath = "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\Seguimiento Casos Medicos.xlsx";
+      if (fs.existsSync(googleDrivePath)) {
+        filePathToUse = googleDrivePath;
+        sendLog(`[MAIN] Usando ruta de Google Drive: ${filePathToUse}`, 'INFO');
+      } else {
+        sendLog(`[MAIN] Archivo de seguimientos no encontrado en ninguna ubicación`, 'WARN');
+        return { success: true, followUps: {}, message: 'Archivo de seguimientos no encontrado' };
+      }
+    }
+
+    // Usar pandas para leer el archivo de seguimientos
+    const { spawn } = require('child_process');
+    const scriptPath = path.join(__dirname, 'Portear', 'src', 'actualizar_ausentismo.py');
+    const pythonPath = await getPython();
+
+    return new Promise((resolve, reject) => {
+      const python = spawn(pythonPath, [
+        scriptPath,
+        'cargar_seguimientos',
+        companyName,
+        filePathToUse
+      ], {
+        cwd: path.dirname(scriptPath),
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+      });
+
+      let buffer = '';
+
+      python.stdout.on('data', (data) => {
+        buffer += data.toString();
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        lines.forEach(line => {
+          line = line.trim();
+          if (!line) return;
+
+          try {
+            const obj = JSON.parse(line);
+            if (obj.type === 'log') {
+              sendLog(`[Python Carga Seguimientos] ${obj.message}`, 'INFO');
+            } else if (obj.type === 'result') {
+              resolve(obj.payload);
+            }
+          } catch (e) {
+            sendLog(`[Python Carga Seguimientos - RAW] ${line}`, 'DEBUG');
+          }
+        });
+      });
+
+      python.stderr.on('data', (data) => {
+        sendLog(`[Python Carga Seguimientos - STDERR] ${data.toString()}`, 'ERROR');
+      });
+
+      python.on('close', (code) => {
+        if (buffer?.trim()) {
+          try {
+            const last = JSON.parse(buffer.trim());
+            if (last.type === 'result') return resolve(last.payload);
+          } catch { /* Ignorar errores menores */ }
+        }
+        // Si no hay resultado del proceso Python, devolver un objeto vacío
+        resolve({
+          success: true,
+          followUps: {}
+        });
+      });
+
+      python.on('error', (err) => {
+        sendLog(`Error al iniciar Python para cargar seguimientos: ${err.message}`, 'CRITICAL');
+        reject(err);
+      });
+    });
+
+  } catch (error) {
+    sendLog(`[ERROR] Falló load-follow-up-data: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message, followUps: {} };
+  }
+});
+
 // --- Manejador para reiniciar la aplicación ---
 ipcMain.on('restart_app', () => {
   log.info('El usuario ha aceptado la actualización. Reiniciando para instalar...');

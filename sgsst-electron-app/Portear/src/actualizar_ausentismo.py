@@ -212,31 +212,31 @@ def buscar_cie10_descripcion(file_path, cie10_code):
             df = pd.read_excel(file_path, sheet_name=sheet_name, dtype=str, header=None)
         except Exception as e:
             log(f"ERROR al leer hoja '{sheet_name}': {e}")
-            
+
             # --- 2. Intentar detectar la hoja correcta ---
             try:
                 from openpyxl import load_workbook as _load_wb
                 wb_tmp = _load_wb(file_path, read_only=True)
                 hojas = wb_tmp.sheetnames
                 log(f"Hojas detectadas en el archivo: {hojas}")
-                
+
                 # Buscar hoja que contenga "CIE", "CIE-10", "DIAGNOSTICO", "DIAGNÓSTICO"
                 sheet_candidates = [s for s in hojas if any(keyword in s.upper() for keyword in ["CIE", "DIAGNOST", "DIAGNÓST", "ENFERM"])]
                 log(f"Candidatos para hoja CIE-10: {sheet_candidates}")
-                
+
                 if sheet_candidates:
                     # Tomar el primer candidato que contenga "CIE"
                     cie_candidates = [s for s in sheet_candidates if "CIE" in s.upper()]
                     sheet_name = cie_candidates[0] if cie_candidates else sheet_candidates[0]
                     log(f"Usando hoja detectada: {sheet_name}")
-                    
+
                     df = pd.read_excel(file_path, sheet_name=sheet_name, dtype=str, header=None)
                 else:
                     # Si no encontramos hoja candidata, intentar leer la primera hoja
                     log("No se encontraron hojas candidatas para CIE-10, intentando primera hoja")
                     df = pd.read_excel(file_path, sheet_name=hojas[0], dtype=str, header=None)
                     sheet_name = hojas[0]
-                    
+
             except Exception as e2:
                 log(f"ERROR al leer archivo Excel con detección automática: {e2}")
                 print(json.dumps({"type": "result", "payload": {"success": False, "error": f"Error leyendo hoja {sheet_name}: {str(e2)}"}}))
@@ -256,7 +256,7 @@ def buscar_cie10_descripcion(file_path, cie10_code):
         # Normalizar código de búsqueda
         codigo_limpio = str(cie10_code).strip().upper()
         log(f"Código CIE-10 de búsqueda normalizado: '{codigo_limpio}'")
-        
+
         # Normalizar columna de códigos en el dataframe
         df['codigo_norm'] = df['codigo'].astype(str).str.strip().str.upper()
 
@@ -268,7 +268,7 @@ def buscar_cie10_descripcion(file_path, cie10_code):
             codigo_limpio_puntos = codigo_limpio.replace('.', '')
             coinc = df[df['codigo_norm'].str.replace('.', '') == codigo_limpio_puntos]
             log(f"Intentando con código sin puntos, coincidencias: {len(coinc)}")
-            
+
             if coinc.empty:
                 log(f"No se encontró registro con código CIE-10 {codigo_limpio} (ni sin puntos)")
                 print(json.dumps({"type": "result", "payload": {"success": False, "error": f"No encontrado: {codigo_limpio}"}}))
@@ -312,7 +312,7 @@ def actualizar_ausentismo(empresa, input_path):
         # Asegurar que "N° DIAS DE INCAPACIDAD" sea numérico
         if 'N° DIAS DE INCAPACIDAD' in df.columns:
             df['N° DIAS DE INCAPACIDAD'] = pd.to_numeric(
-                df['N° DIAS DE INCAPACIDAD'].astype(str).str.replace(',', ''), 
+                df['N° DIAS DE INCAPACIDAD'].astype(str).str.replace(',', ''),
                 errors='coerce'
             ).fillna(0).astype(int)
 
@@ -367,7 +367,7 @@ def actualizar_ausentismo(empresa, input_path):
         # --- 5. Actualizar posibles totales o resúmenes en otras partes de la hoja ---
         # Actualizar celdas específicas que normalmente contendrían fórmulas de resumen
         # Por ejemplo, si hay totales en celdas específicas, aquí puedes actualizarlos
-        
+
         # Ejemplo: Actualizar celda con total de días (ajusta según tu archivo)
         try:
             # Buscar y actualizar celda de totales si están en posiciones fijas
@@ -414,6 +414,80 @@ def buscar_empleado_main(cedula, empresa):
             "success": False,
             "error": str(e)
         }
+
+def guardar_seguimiento(empresa, file_path, datos):
+    """
+    Guarda un seguimiento de incapacidad en un archivo específico de seguimientos,
+    siempre en una hoja llamada 'Seguimientos'.
+    """
+    try:
+        # Usar el archivo específico para seguimientos
+        seguimiento_file_path = r"G:\Mi unidad\2. Trabajo\1. SG-SST\2. Temporales Comfa\Seguimiento Casos Medicos.xlsx"
+        log(f"Guardando seguimiento en archivo específico: {seguimiento_file_path}")
+        log(f"Datos de seguimiento recibidos: {datos}")
+
+        SHEET_NAME = "Seguimientos"
+
+        # Verificar si el archivo de seguimiento existe, si no, crearlo
+        if not os.path.exists(seguimiento_file_path):
+            from openpyxl import Workbook
+            wb = Workbook()
+            ws = wb.active
+            ws.title = SHEET_NAME
+            headers = ["Empresa", "ID Empleado", "Nombre Empleado", "Diagnóstico", "Fecha Seguimiento",
+                       "Tipo Seguimiento", "Evolución", "Recomendaciones", "Próximo Seguimiento",
+                       "Estado Caso", "Fecha Registro"]
+            ws.append(headers)
+            wb.save(seguimiento_file_path)
+            log(f"✅ Archivo de seguimiento creado con hoja '{SHEET_NAME}'.")
+        
+        # Cargar el libro de trabajo
+        wb = load_workbook(seguimiento_file_path)
+
+        # Asegurar que la hoja "Seguimientos" exista, si no, crearla con encabezados
+        if SHEET_NAME not in wb.sheetnames:
+            ws = wb.create_sheet(SHEET_NAME)
+            headers = ["Empresa", "ID Empleado", "Nombre Empleado", "Diagnóstico", "Fecha Seguimiento",
+                       "Tipo Seguimiento", "Evolución", "Recomendaciones", "Próximo Seguimiento",
+                       "Estado Caso", "Fecha Registro"]
+            ws.append(headers)
+        else:
+            ws = wb[SHEET_NAME]
+
+        # Extraer y normalizar información del seguimiento
+        empleado_id_raw = datos.get("employeeId", "")
+        empleado_id = str(empleado_id_raw).replace(',', '').replace('.', '').replace(' ', '').strip() if empleado_id_raw else ""
+
+        # Construir la fila de datos
+        nueva_fila = [
+            empresa,
+            empleado_id,
+            datos.get("employeeName", ""),
+            datos.get("diagnosis", ""),
+            datos.get("followUpDate", ""),
+            datos.get("followUpType", ""),
+            datos.get("evolution", ""),
+            datos.get("recommendations", ""),
+            datos.get("nextFollowUp", ""),
+            datos.get("caseStatus", ""),
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ]
+        
+        ws.append(nueva_fila)
+        wb.save(seguimiento_file_path)
+        log(f"✅ Seguimiento guardado correctamente en la hoja '{SHEET_NAME}' en la fila {ws.max_row}")
+
+        return {
+            "success": True, "message": "Seguimiento guardado.",
+            **datos # Devolver los datos originales para consistencia del frontend
+        }
+
+    except Exception as e:
+        log(f"❌ Error al guardar seguimiento: {str(e)}")
+        import traceback
+        log(traceback.format_exc())
+        return {"success": False, "error": str(e)}
+
 
 def registrar_incapacidad(empresa, file_path, datos):
     """
@@ -551,15 +625,15 @@ if __name__ == "__main__":
         sys.exit(1)
 
     comando = sys.argv[1]
-    
+
     if comando == "actualizar":
         if len(sys.argv) != 4:
             print(json.dumps({"type": "result", "payload": {"success": False, "error": "Uso: python actualizar_ausentismo.py actualizar <empresa> <ruta_archivo>"}}))
             sys.exit(1)
-        
+
         empresa = sys.argv[2]
         archivo = sys.argv[3]
-        
+
         try:
             output_file = actualizar_ausentismo(empresa, archivo)
             print(json.dumps({
@@ -577,15 +651,15 @@ if __name__ == "__main__":
                     "error": str(e)
                 }
             }))
-    
+
     elif comando == "buscar_empleado":
         if len(sys.argv) != 4:
             print(json.dumps({"type": "result", "payload": {"success": False, "error": "Uso: python actualizar_ausentismo.py buscar_empleado <cedula> <empresa>"}}))
             sys.exit(1)
-        
+
         cedula = sys.argv[2]
         empresa = sys.argv[3]
-        
+
         try:
             resultado = buscar_empleado_por_cedula(cedula, empresa)
             if resultado:
@@ -617,10 +691,10 @@ if __name__ == "__main__":
         if len(sys.argv) != 4:
             print(json.dumps({"type": "result", "payload": {"success": False, "error": "Uso: python actualizar_ausentismo.py buscar_cie10 <ruta_archivo> <codigo_cie10>"}}))
             sys.exit(1)
-        
+
         file_path = sys.argv[2]
         cie10_code = sys.argv[3]
-        
+
         try:
             resultado = buscar_cie10_descripcion(file_path, cie10_code)
             # The result is already printed inside the function
@@ -632,12 +706,12 @@ if __name__ == "__main__":
                     "error": str(e)
                 }
             }))
-    
+
     elif comando == "registrar_incapacidad":
         if len(sys.argv) != 5:
             print(json.dumps({"type": "result", "payload": {"success": False, "error": "Uso: python actualizar_ausentismo.py registrar_incapacidad <empresa> <ruta_archivo> <json_datos>"}}))
             sys.exit(1)
-        
+
         empresa = sys.argv[2]
         file_path = sys.argv[3]
         datos_json = sys.argv[4]
@@ -647,6 +721,87 @@ if __name__ == "__main__":
             print(json.dumps({"type": "result", "payload": resultado}, ensure_ascii=False))
         except Exception as e:
             print(json.dumps({"type": "result", "payload": {"success": False, "error": f"Error parsing JSON: {str(e)}"}}))
+    elif comando == "guardar_seguimiento":
+        if len(sys.argv) != 5:
+            print(json.dumps({"type": "result", "payload": {"success": False, "error": "Uso: python actualizar_ausentismo.py guardar_seguimiento <empresa> <ruta_archivo> <json_datos_seguimiento>"}}))
+            sys.exit(1)
+
+        empresa = sys.argv[2]
+        file_path = sys.argv[3]
+        datos_json = sys.argv[4]
+        try:
+            datos = json.loads(datos_json)
+            resultado = guardar_seguimiento(empresa, file_path, datos)
+            print(json.dumps({"type": "result", "payload": resultado}, ensure_ascii=False))
+        except Exception as e:
+            print(json.dumps({"type": "result", "payload": {"success": False, "error": f"Error parsing JSON: {str(e)}"}}))
+    elif comando == "cargar_seguimientos":
+        if len(sys.argv) != 4:
+            print(json.dumps({"type": "result", "payload": {"success": False, "error": "Uso: python actualizar_ausentismo.py cargar_seguimientos <empresa> <ruta_archivo_seguimientos>"}}))
+            sys.exit(1)
+
+        empresa = sys.argv[2]
+        seguimiento_file_path = sys.argv[3]
+
+        try:
+            log(f"Cargando seguimientos desde: {seguimiento_file_path}")
+            SHEET_NAME = "Seguimientos"
+            
+            if not os.path.exists(seguimiento_file_path):
+                log(f"ADVERTENCIA: El archivo de seguimientos no existe en '{seguimiento_file_path}'. No se cargarán datos.")
+                print(json.dumps({"type": "result", "payload": {"success": True, "followUps": {}}}))
+                sys.exit(0)
+
+            workbook = load_workbook(seguimiento_file_path, read_only=True)
+            log(f"Hojas encontradas en el archivo: {workbook.sheetnames}")
+
+            if SHEET_NAME not in workbook.sheetnames:
+                log(f"ERROR: No se encontró la hoja '{SHEET_NAME}' en el archivo de seguimientos.")
+                print(json.dumps({"type": "result", "payload": {"success": False, "error": f"No se encontró la hoja '{SHEET_NAME}'."}}))
+                sys.exit(1)
+
+            sheet = workbook[SHEET_NAME]
+            
+            # Leer encabezados (primera fila)
+            headers = [cell.value for cell in sheet[1]]
+            if not headers or not any(headers):
+                log("ERROR: La hoja de seguimientos no tiene encabezados en la primera fila.")
+                print(json.dumps({"type": "result", "payload": {"success": False, "error": "La hoja de seguimientos no tiene encabezados."}}))
+                sys.exit(1)
+            log(f"Encabezados leídos: {headers}")
+
+            # Encontrar el índice de la columna "ID Empleado"
+            try:
+                id_empleado_col_name = "ID Empleado"
+                id_empleado_col_index = headers.index(id_empleado_col_name)
+                log(f"Índice de la columna '{id_empleado_col_name}' es: {id_empleado_col_index}")
+            except ValueError:
+                log(f"ERROR: No se encontró la columna '{id_empleado_col_name}' en los encabezados.")
+                print(json.dumps({"type": "result", "payload": {"success": False, "error": f"Columna '{id_empleado_col_name}' no encontrada."}}))
+                sys.exit(1)
+
+            # Leer datos y agrupar por ID de empleado
+            follow_up_data = {}
+            for row in sheet.iter_rows(min_row=2, values_only=True):
+                row_dict = dict(zip(headers, row))
+                case_id = row_dict.get(id_empleado_col_name)
+                
+                if case_id:
+                    case_id_str = str(case_id).strip()
+                    if case_id_str not in follow_up_data:
+                        follow_up_data[case_id_str] = []
+                    follow_up_data[case_id_str].append(row_dict)
+                else:
+                    log(f"ADVERTENCIA: Fila encontrada sin ID de empleado. Saltando.")
+
+            log(f"Carga de seguimientos completada. {len(follow_up_data)} empleados con seguimiento encontrados.")
+            print(json.dumps({"type": "result", "payload": {"success": True, "followUps": follow_up_data}}, ensure_ascii=False, default=str))
+
+        except Exception as e:
+            log(f"Error crítico al leer archivo de seguimientos: {str(e)}")
+            import traceback
+            log(traceback.format_exc())
+            print(json.dumps({"type": "result", "payload": {"success": False, "error": f"Error al leer archivo de seguimientos: {str(e)}"}}))
     else:
-        print(json.dumps({"type": "result", "payload": {"success": False, "error": f"Comando desconocido: {comando}. Comandos válidos: 'actualizar', 'buscar_empleado', 'buscar_cie10', 'registrar_incapacidad'"}}))
+        print(json.dumps({"type": "result", "payload": {"success": False, "error": f"Comando desconocido: {comando}. Comandos válidos: 'actualizar', 'buscar_empleado', 'buscar_cie10', 'registrar_incapacidad', 'guardar_seguimiento', 'cargar_seguimientos'"}}))
         sys.exit(1)

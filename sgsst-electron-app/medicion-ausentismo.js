@@ -166,7 +166,7 @@ class MedicionAusentismoComponent {
             alert('Error: El componente de registro de ausentismo no está disponible.');
             return;
         }
-        
+
         // Aquí debemos cargar el componente de RegistrarAusentismoComponent
         // pero primero necesitamos crear una nueva vista para esto
         this.currentView = 'registrar-ausentismo';
@@ -221,6 +221,100 @@ class MedicionAusentismoComponent {
             max-width: none;
         `;
 
+        // Manejar mensajes desde el iframe
+        const handleIframeMessage = async (event) => {
+            if (event.source !== iframe.contentWindow) return; // Asegurar que el mensaje viene del iframe correcto
+
+            try {
+                if (event.data.type === 'GET_AUSENTISMO_DATA') {
+                    // Llamar a la API de Electron para obtener los datos de ausentismo
+                    const result = await window.electronAPI.readAusentismoData(this.currentCompany);
+                    // Enviar la respuesta de vuelta al iframe
+                    iframe.contentWindow.postMessage({
+                        type: 'AUSENTISMO_DATA_RESPONSE',
+                        id: event.data.id, // Para emparejar la solicitud con la respuesta
+                        data: result
+                    }, '*');
+                } else if (event.data.type === 'SAVE_FOLLOW_UP') {
+                    // Llamar a la API de Electron para guardar el seguimiento
+                    const result = await window.electronAPI.saveFollowUp(event.data.followUpData, this.currentCompany);
+                    // Enviar la respuesta de vuelta al iframe
+                    iframe.contentWindow.postMessage({
+                        type: 'FOLLOW_UP_SAVE_RESPONSE',
+                        id: event.data.id,
+                        data: result
+                    }, '*');
+                } else if (event.data.type === 'EXPORT_INCAPACITY_DATA') {
+                    // Llamar a la API de Electron para exportar datos
+                    const result = await window.electronAPI.exportIncapacityData(this.currentCompany);
+                    // Enviar la respuesta de vuelta al iframe
+                    iframe.contentWindow.postMessage({
+                        type: 'EXPORT_DATA_RESPONSE',
+                        id: event.data.id,
+                        data: result
+                    }, '*');
+                } else if (event.data.type === 'BUSCAR_EMPLEADO_CEDULA') {
+                    // Llamar a la API de Electron para buscar empleado por cédula
+                    const result = await window.electronAPI.buscarEmpleadoPorCedula(
+                        event.data.cedula,
+                        event.data.empresa
+                    );
+                    // Enviar la respuesta de vuelta al iframe
+                    iframe.contentWindow.postMessage({
+                        type: 'BUSCAR_EMPLEADO_RESPONSE',
+                        id: event.data.id,
+                        data: result
+                    }, '*');
+                } else if (event.data.type === 'BUSCAR_CIE10_DESCRIPCION') {
+                    // Llamar a la API de Electron para buscar descripción CIE-10
+                    const result = await window.electronAPI.buscarCie10Descripcion(
+                        event.data.companyName,
+                        event.data.cie10Code
+                    );
+                    // Enviar la respuesta de vuelta al iframe
+                    iframe.contentWindow.postMessage({
+                        type: 'BUSCAR_CIE10_RESPONSE',
+                        id: event.data.id,
+                        data: result
+                    }, '*');
+                } else if (event.data.type === 'PROCESAR_AUSENTISMO') {
+                    // Llamar a la API de Electron para procesar ausentismo
+                    const result = await window.electronAPI.procesarAusentismo(
+                        event.data.empresa,
+                        event.data.formData
+                    );
+                    // Enviar la respuesta de vuelta al iframe
+                    iframe.contentWindow.postMessage({
+                        type: 'PROCESAR_AUSENTISMO_RESPONSE',
+                        id: event.data.id,
+                        data: result
+                    }, '*');
+                } else if (event.data.type === 'LOAD_FOLLOW_UP_DATA') {
+                    // Llamar a la API de Electron para cargar datos de seguimiento
+                    const result = await window.electronAPI.loadFollowUpData(
+                        event.data.companyName
+                    );
+                    // Enviar la respuesta de vuelta al iframe
+                    iframe.contentWindow.postMessage({
+                        type: 'LOAD_FOLLOW_UP_DATA_RESPONSE',
+                        id: event.data.id,
+                        data: result
+                    }, '*');
+                }
+            } catch (error) {
+                console.error('Error procesando mensaje del iframe:', error);
+                // Enviar error de vuelta al iframe
+                iframe.contentWindow.postMessage({
+                    type: 'ERROR_RESPONSE',
+                    id: event.data.id,
+                    error: error.message
+                }, '*');
+            }
+        };
+
+        // Agregar listener para mensajes desde el iframe
+        window.addEventListener('message', handleIframeMessage);
+
         // Pasar contexto de empresa al iframe cuando cargue
         iframe.onload = () => {
             try {
@@ -233,6 +327,17 @@ class MedicionAusentismoComponent {
                 console.error('Error al enviar contexto al iframe:', error);
             }
         };
+
+        // Limpiar listener cuando el componente se desmonte
+        const cleanup = () => {
+            window.removeEventListener('message', handleIframeMessage);
+        };
+
+        // Si hay un cleanup anterior, ejecutarlo
+        if (this.iframeMessageCleanup) {
+            this.iframeMessageCleanup();
+        }
+        this.iframeMessageCleanup = cleanup;
 
         seguimientoLayout.appendChild(iframe);
         container.appendChild(seguimientoLayout);
@@ -269,7 +374,7 @@ class MedicionAusentismoComponent {
         form.className = 'registrar-ausentismo-form';
         form.innerHTML = `
             <h3>Formulario de Registro de Incapacidad</h3>
-            
+
             <div class="form-row">
                 <div class="form-group">
                     <label for="cedula-input">Cédula:</label>
@@ -353,7 +458,7 @@ class MedicionAusentismoComponent {
                     <input type="text" id="codigo-input" class="form-control" placeholder="Ej: Z34.0">
                 </div>
             </div>
-            
+
             <div class="form-row">
                 <div class="form-group full-width">
                     <label for="descripcion-input">Descripción Diagnóstico:</label>
@@ -369,12 +474,12 @@ class MedicionAusentismoComponent {
         contentDiv.appendChild(form);
 
         // --- Lógica de los Eventos ---
-        
+
         // Usamos setTimeout para asegurarnos de que el DOM esté completamente renderizado
         setTimeout(() => {
             console.log('Event listeners setup started');
             console.log('Current company:', this.currentCompany);
-            
+
             // 1. Autocompletar al salir del campo Cédula
             const cedulaInput = document.getElementById('cedula-input');
             if (cedulaInput) {
@@ -383,7 +488,7 @@ class MedicionAusentismoComponent {
                     console.log('Blur event triggered');
                     const cedula = cedulaInput.value.trim();
                     console.log('Cédula value:', cedula);
-                    
+
                     if (!cedula) {
                         console.log('Cédula is empty, skipping search');
                         return;
@@ -395,14 +500,14 @@ class MedicionAusentismoComponent {
                         console.log('Calling buscarEmpleadoPorCedula with:', { cedula, empresa: this.currentCompany });
                         const result = await window.electronAPI.buscarEmpleadoPorCedula(cedula, this.currentCompany);
                         console.log('Search result:', result);
-                        
+
                         if (result && result.success) {
                             document.getElementById('nombre-input').value = result.datos.nombre || '';
                             document.getElementById('cargo-input').value = result.datos.cargo || '';
                             document.getElementById('departamento-input').value = result.datos.area || '';
                             document.getElementById('empresa-usuaria-input').value = result.datos.empresa_usuaria || '';
                             document.getElementById('entidad-input').value = result.datos.entidad || '';
-                            
+
                             // ¡Importante! Actualizar la empresa actual si el empleado pertenece a otra.
                             if (result.datos.empresa && this.currentCompany.toUpperCase() !== result.datos.empresa.toUpperCase()) {
                                 console.log(`[CONTEXT SWITCH] La empresa cambió de ${this.currentCompany} a ${result.datos.empresa}`);
@@ -437,7 +542,7 @@ class MedicionAusentismoComponent {
                     console.log('Blur event triggered on codigo-input');
                     const cie10Code = codigoInput.value.trim();
                     console.log('CIE-10 Code value:', cie10Code);
-                    
+
                     if (!cie10Code) {
                         console.log('CIE-10 Code is empty, skipping search');
                         return;
@@ -449,7 +554,7 @@ class MedicionAusentismoComponent {
                         console.log('Calling buscarCie10Descripcion with:', { companyName: this.currentCompany, cie10Code });
                         const result = await window.electronAPI.buscarCie10Descripcion(this.currentCompany, cie10Code);
                         console.log('Search result:', result);
-                        
+
                         if (result && result.success) {
                             document.getElementById('descripcion-input').value = result.datos.descripcion || '';
                             this.showStatus(statusDiv, 'Descripción de diagnóstico encontrada.', 'success');
@@ -633,7 +738,7 @@ class MedicionAusentismoComponent {
             try {
                 console.log(`[Dashboard Host] Solicitando datos de ausentismo para ${this.currentCompany}`);
                 const result = await window.electronAPI.readAusentismoData(this.currentCompany);
-                
+
                 if (result.success) {
                     console.log(`[Dashboard Host] Datos leídos correctamente. Filas encontradas: ${result.rows ? result.rows.length : 0}. Enviando al iframe...`);
                     iframe.contentWindow.postMessage({ headers: result.headers, rows: result.rows }, '*');
@@ -642,13 +747,13 @@ class MedicionAusentismoComponent {
                     iframe.contentWindow.postMessage({ error: result.error }, '*');
                 }
 
-                
+
             } catch (error) {
                 console.error('[Dashboard Host] Error crítico al intentar cargar datos para el dashboard:', error);
                 iframe.contentWindow.postMessage({ error: error.message }, '*');
             }
         };
-        
+
         // Añadir el iframe al contenedor del layout
         dashboardLayout.appendChild(iframe);
 
@@ -666,11 +771,11 @@ class MedicionAusentismoComponent {
             if (result.success) {
                 this.navigateToPath(result.path);
             } else {
-                document.getElementById('search-results-col').innerHTML = 
+                document.getElementById('search-results-col').innerHTML =
                     `<p>Error al encontrar la ruta inicial: ${result.error}</p>`;
             }
         } catch (error) {
-            document.getElementById('search-results-col').innerHTML = 
+            document.getElementById('search-results-col').innerHTML =
                 `<p>Error crítico al buscar ruta: ${error.message}</p>`;
         }
     }
@@ -719,7 +824,7 @@ class MedicionAusentismoComponent {
         const allowedExtensions = ['.pdf', '.doc', '.docx', '.xlsx', '.xls'];
         const folders = items.filter(item => item.isDirectory);
         const files = items.filter(
-            item => !item.isDirectory && 
+            item => !item.isDirectory &&
             allowedExtensions.includes(item.name.slice(item.name.lastIndexOf('.')).toLowerCase())
         );
 
@@ -818,7 +923,7 @@ class MedicionAusentismoComponent {
     // Método para saber qué columnas son editables
     isEditableColumn(colIndex) {
         // Asumiendo que las columnas editables son:
-        // Cédula (índice 3), Género (índice 8), Clase de incapacidad (índice 11), 
+        // Cédula (índice 3), Género (índice 8), Clase de incapacidad (índice 11),
         // Tipo de incapacidad (índice 12), F. inicio (índice 15), F. final (índice 16), Código (índice 17)
         const editableColumns = [3, 8, 11, 12, 15, 16, 17];
         return editableColumns.includes(colIndex);

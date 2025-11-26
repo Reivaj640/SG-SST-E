@@ -123,6 +123,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveFollowUp: (followUpData, companyName) => ipcRenderer.invoke('save-follow-up', followUpData, companyName),
   exportIncapacityData: (companyName) => ipcRenderer.invoke('export-incapacity-data', companyName),
   getFollowUpHistory: (caseId, companyName) => ipcRenderer.invoke('get-follow-up-history', caseId, companyName),
+  loadFollowUpData: (companyName) => ipcRenderer.invoke('load-follow-up-data', companyName),
 
   // --- Eventos IPC ---
   onIpcMessage: (channel, listener) => {

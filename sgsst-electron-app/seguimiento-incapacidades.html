@@ -7,8 +7,8 @@
     <!-- Font Awesome para iconos -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght @300;400;500;600;700&display=swap" rel="stylesheet">
-    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
     <style>
         :root {
             --primary-color: #6366f1;
@@ -546,20 +546,20 @@
             .stats-dashboard {
                 grid-template-columns: 1fr;
             }
-            
+
             .form-row {
                 grid-template-columns: 1fr;
             }
-            
+
             .controls-section {
                 flex-direction: column;
                 align-items: stretch;
             }
-            
+
             .search-container {
                 min-width: 100%;
             }
-            
+
             .filter-buttons {
                 justify-content: center;
             }
@@ -686,7 +686,7 @@
                     <i class="fas fa-search search-icon"></i>
                     <input type="text" class="search-input" placeholder="Buscar por empleado, diagnóstico o ID..." id="searchInput">
                 </div>
-                
+
                 <div class="filter-buttons">
                     <button class="filter-btn active" data-filter="all">
                         <i class="fas fa-list"></i> Todos
@@ -697,9 +697,35 @@
                     <button class="filter-btn" data-filter="pending">
                         <i class="fas fa-hourglass-half"></i> Pendientes
                     </button>
+                    <button class="filter-btn" data-filter="longterm">
+                        <i class="fas fa-calendar-plus"></i> Largo Plazo
+                    </button>
                     <button class="filter-btn" data-filter="critical">
                         <i class="fas fa-exclamation-triangle"></i> Críticos
                     </button>
+                </div>
+
+                <div class="period-filters" style="display: flex; gap: 10px; align-items: center;">
+                    <select id="yearFilter" class="filter-btn" style="padding: 12px 15px; border-radius: 8px; min-width: 150px;">
+                        <option value="all">Todos los años</option>
+                        <!-- Las opciones se llenarán dinámicamente -->
+                    </select>
+
+                    <select id="monthFilter" class="filter-btn" style="padding: 12px 15px; border-radius: 8px; min-width: 150px;">
+                        <option value="all">Todos los meses</option>
+                        <option value="01">Enero</option>
+                        <option value="02">Febrero</option>
+                        <option value="03">Marzo</option>
+                        <option value="04">Abril</option>
+                        <option value="05">Mayo</option>
+                        <option value="06">Junio</option>
+                        <option value="07">Julio</option>
+                        <option value="08">Agosto</option>
+                        <option value="09">Septiembre</option>
+                        <option value="10">Octubre</option>
+                        <option value="11">Noviembre</option>
+                        <option value="12">Diciembre</option>
+                    </select>
                 </div>
 
                 <button class="action-btn primary" onclick="openFollowUpModal()">
@@ -761,7 +787,7 @@
                             <input type="text" class="form-control" id="employeeName" required>
                         </div>
                     </div>
-                    
+
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label" for="diagnosis">Diagnóstico</label>
@@ -772,7 +798,7 @@
                             <input type="date" class="form-control" id="followUpDate" required>
                         </div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="form-label" for="followUpType">Tipo de Seguimiento</label>
                         <select class="form-control" id="followUpType" required>
@@ -782,17 +808,17 @@
                             <option value="virtual">Virtual</option>
                         </select>
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="form-label" for="evolution">Evolución del Paciente</label>
                         <textarea class="form-control" id="evolution" rows="4" placeholder="Describa la evolución del paciente..."></textarea>
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="form-label" for="recommendations">Recomendaciones Médicas</label>
                         <textarea class="form-control" id="recommendations" rows="4" placeholder="Ingrese las recomendaciones médicas..."></textarea>
                     </div>
-                    
+
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label" for="nextFollowUp">Próximo Seguimiento</label>
@@ -810,7 +836,7 @@
                         </div>
                     </div>
                 </form>
-                
+
                 <!-- Historial de seguimientos -->
                 <div class="follow-up-history" id="followUpHistory" style="display: none;">
                     <h3>Historial de Seguimientos</h3>
@@ -836,12 +862,14 @@
 
     <script>
         // Estado de la aplicación
-        let currentFilter = 'all';
+        let currentFilter = 'longterm';  // Changed default to 'longterm' to show only cases with >15 days initially
         let searchTerm = '';
         let currentCaseId = null;
         let currentCompany = null;
         let allCasesData = [];
         let allFollowUpsData = {};
+        let filteredByYear = 'all';
+        let filteredByMonth = 'all';
 
         // Inicialización
         document.addEventListener('DOMContentLoaded', function() {
@@ -850,34 +878,10 @@
 
         // Inicializar la aplicación
         async function initializeApp() {
-            // Esperar a que electronAPI esté disponible
-            if (typeof window.electronAPI !== 'undefined') {
-                // Obtener la empresa actual desde el contexto global o esperar mensaje del contenedor
-                currentCompany = window.currentCompany || window.ELECTRON_COMPANY_CONTEXT;
-
-                if (!currentCompany) {
-                    // Si no está disponible, intentar obtenerla de alguna otra manera
-                    console.warn('No se pudo obtener la empresa actual, esperando mensaje del contenedor...');
-                }
-
-                console.log('Inicializando seguimiento de incapacidades para:', currentCompany);
-
-                try {
-                    // Cargar los datos iniciales si ya tenemos la empresa
-                    if (currentCompany) {
-                        await loadData();
-                    }
-                } catch (error) {
-                    console.error('Error inicializando la aplicación:', error);
-                    showNotification('Error al cargar los datos iniciales', 'error');
-                }
-            } else {
-                console.error('electronAPI no está disponible');
-                showNotification('Error: API de la aplicación no disponible', 'error');
+            // Esperar a recibir el contexto de la empresa desde el contenedor principal
+            if (!currentCompany) {
+                console.warn('No se ha recibido la empresa aún, esperando mensaje...');
             }
-
-            initializeEventListeners();
-            setCurrentDate();
         }
 
         // Manejar mensajes del contenedor principal
@@ -892,87 +896,316 @@
                     loadData();
                 }
             }
+            // Manejar la respuesta de datos de ausentismo
+            else if (event.data && event.data.type === 'AUSENTISMO_DATA_RESPONSE') {
+                // Manejar tanto el formato anterior (event.data.data) como el nuevo (event.data.payload)
+                const responseData = event.data.payload || event.data.data;
+
+                if (responseData && responseData.success === true) {
+                    allCasesData = processAusentismoData(responseData.rows, responseData.headers);
+
+                    // Cargar también los datos de seguimientos si existen
+                    // Asegurar que se actualicen los estados después de cargar los seguimientos
+                    loadFollowUpData().then(() => {
+                        // Llenar los filtros de año y mes con las opciones disponibles
+                        populateYearMonthFilters();
+
+                        updateStats();
+                        renderCasesTable();
+                    }).catch(error => {
+                        console.error('Error al cargar datos de seguimiento:', error);
+                        // Aún así mostrar los datos básicos aunque no se hayan actualizado los estados
+                        populateYearMonthFilters();
+                        updateStats();
+                        renderCasesTable();
+                    });
+                } else {
+                    const errorMsg = responseData ?
+                        (responseData.error || responseData.message || 'Datos insuficientes o inválidos en la respuesta') :
+                        'Mensaje de respuesta inválido';
+                    console.error('Error al leer datos:', errorMsg);
+                    console.log('Mensaje de respuesta completo:', event.data);
+                    showNotification('Error al cargar los datos: ' + errorMsg, 'error');
+                }
+            }
+            // Manejar la respuesta de guardar seguimiento
+            else if (event.data && event.data.type === 'FOLLOW_UP_SAVE_RESPONSE') {
+                // El renderer envía el resultado en event.data.payload, no en event.data.data
+                const responsePayload = event.data.payload || event.data.data;
+
+                if (responsePayload && responsePayload.success === true) {
+                    // Actualizar datos locales
+                    if (currentCaseId) {
+                        // Si es una actualización de caso existente
+                        const caseIndex = allCasesData.findIndex(c => c.id === currentCaseId);
+                        if (caseIndex !== -1) {
+                            allCasesData[caseIndex].status = responsePayload.caseStatus || allCasesData[caseIndex].status;
+                            allCasesData[caseIndex].lastFollowUp = responsePayload.followUpDate || allCasesData[caseIndex].lastFollowUp;
+                        }
+
+                        // Agregar el seguimiento al historial
+                        if (!allFollowUpsData[currentCaseId]) {
+                            allFollowUpsData[currentCaseId] = [];
+                        }
+
+                        allFollowUpsData[currentCaseId].push({
+                            date: responsePayload.followUpDate,
+                            type: responsePayload.followUpType,
+                            author: 'Sistema', // En una implementación real, podría ser el nombre del usuario
+                            content: responsePayload.evolution,
+                            recommendations: responsePayload.recommendations
+                        });
+                    }
+
+                    // Cerrar modal
+                    closeFollowUpModal();
+
+                    // Actualizar tabla y estadísticas
+                    updateStats();
+                    renderCasesTable();
+
+                    showNotification('Seguimiento guardado correctamente', 'success');
+                } else {
+                    const errorMsg = responsePayload && responsePayload.error ? responsePayload.error : 'Error desconocido al guardar seguimiento';
+                    showNotification('Error al guardar seguimiento: ' + errorMsg, 'error');
+                }
+            }
+            // Manejar la respuesta de exportación de datos
+            else if (event.data && event.data.type === 'EXPORT_DATA_RESPONSE') {
+                if (event.data.data && event.data.data.success === true) {
+                    showNotification('Datos exportados exitosamente a: ' + event.data.data.path, 'success');
+                } else {
+                    const errorMsg = event.data.data && event.data.data.error ? event.data.data.error : 'Error desconocido al exportar datos';
+                    showNotification('Error al exportar: ' + errorMsg, 'error');
+                }
+            }
+            // Manejar respuesta de error
+            else if (event.data && event.data.type === 'ERROR_RESPONSE') {
+                showNotification('Error en la operación: ' + event.data.error, 'error');
+            }
         });
 
-        // Inicializar event listeners
-        function initializeEventListeners() {
-            // Búsqueda
-            document.getElementById('searchInput').addEventListener('input', function(e) {
-                searchTerm = e.target.value.toLowerCase();
-                filterCases();
-            });
-
-            // Filtros
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    if (this.dataset.filter) {
-                        // Actualizar botón activo
-                        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-                        this.classList.add('active');
-                        
-                        currentFilter = this.dataset.filter;
-                        filterCases();
-                    }
-                });
-            });
+        // Enviar mensaje al contenedor principal para solicitar datos
+        function sendMessageToParent(message) {
+            // Enviar mensaje al proceso principal a través de la API de Electron o al contenedor
+            if (typeof window.parent !== 'undefined') {
+                // Usar postMessage para comunicarse con el contenedor principal (iframe)
+                window.parent.postMessage(message, '*');
+            } else {
+                console.error('[ERROR_FE] No se puede enviar mensaje: window.parent no está disponible');
+            }
         }
 
         // Cargar datos desde la API
         async function loadData() {
             try {
                 console.log('Cargando datos de incapacidades...');
-                
-                // Obtener datos de ausentismo desde la API existente
-                const result = await window.electronAPI.readAusentismoData(currentCompany);
-                
-                if (result.success) {
-                    allCasesData = processAusentismoData(result.rows, result.headers);
-                    
-                    // Cargar también los datos de seguimientos si existen
-                    await loadFollowUpData();
-                    
-                    updateStats();
-                    renderCasesTable();
-                } else {
-                    console.error('Error al leer datos:', result.error);
-                    showNotification('Error al cargar los datos: ' + result.error, 'error');
-                }
+
+                // Enviar solicitud al contenedor principal para obtener datos de ausentismo
+                sendMessageToParent({
+                    type: 'GET_AUSENTISMO_DATA',
+                    id: Date.now() // ID único para emparejar la solicitud con la respuesta
+                });
             } catch (error) {
                 console.error('Error en loadData:', error);
                 showNotification('Error al cargar los datos: ' + error.message, 'error');
             }
         }
 
+        // Llenar los filtros de año y mes con las opciones disponibles
+        function populateYearMonthFilters() {
+            if (!allCasesData || allCasesData.length === 0) {
+                console.warn('No hay datos para llenar los filtros de año y mes');
+                // Aseguramos que al menos se muestre la opción "Todos los años"
+                const yearSelect = document.getElementById('yearFilter');
+                if (yearSelect) {
+                    yearSelect.innerHTML = '<option value="all">Todos los años</option>';
+                } else {
+                    console.error('No se encontró el elemento yearFilter');
+                }
+                return;
+            }
+
+            console.log('Llenando filtros de año y mes con', allCasesData.length, 'casos');
+            console.log('Primeros 3 casos para depuración:', allCasesData.slice(0, 3));
+
+            // Obtener años únicos de las incapacidades
+            const years = new Set();
+            allCasesData.forEach(caseItem => {
+                if (caseItem.startDate) {
+                    const date = new Date(caseItem.startDate);
+                    if (!isNaN(date.getTime())) { // Verificar que la fecha sea válida
+                        const yearStr = date.getFullYear().toString();
+                        years.add(yearStr);
+                    } else {
+                        console.warn('Fecha inválida encontrada:', caseItem.startDate, 'para el caso:', caseItem.id);
+                        console.warn('Valor original:', caseItem.startDate, 'Tipo:', typeof caseItem.startDate);
+                    }
+                } else {
+                    console.log('No hay fecha de inicio para el caso:', caseItem.id);
+                }
+            });
+
+            console.log('Años encontrados:', Array.from(years));
+
+            // Limpiar y llenar el select de años
+            const yearSelect = document.getElementById('yearFilter');
+            if (!yearSelect) {
+                console.error('No se encontró el elemento yearFilter');
+                return;
+            }
+
+            yearSelect.innerHTML = '<option value="all">Todos los años</option>';
+
+            const sortedYears = Array.from(years).sort().reverse();
+            console.log('Años ordenados:', sortedYears);
+
+            sortedYears.forEach(year => {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                yearSelect.appendChild(option);
+            });
+
+            // Agregar event listener para el filtro de año
+            yearSelect.removeEventListener('change', window.yearFilterHandler || (() => {}));
+            window.yearFilterHandler = function() {
+                filteredByYear = this.value;
+                console.log('Filtro de año cambiado a:', this.value);
+                console.log('Aplicando filtro a', allCasesData.length, 'casos');
+
+                // Mostrar detalles de filtrado para depuración
+                if (this.value !== 'all') {
+                    const filteredCount = allCasesData.filter(caseItem => {
+                        if (caseItem.startDate) {
+                            const date = new Date(caseItem.startDate);
+                            return !isNaN(date.getTime()) && date.getFullYear().toString() === this.value;
+                        }
+                        return false;
+                    }).length;
+                    console.log(`Filtro aplicado: ${filteredCount} casos coinciden con el año ${this.value}`);
+                }
+
+                filterCases();
+            };
+            yearSelect.addEventListener('change', window.yearFilterHandler);
+
+            // Agregar event listener para el filtro de mes
+            const monthSelect = document.getElementById('monthFilter');
+            if (!monthSelect) {
+                console.error('No se encontró el elemento monthFilter');
+                return;
+            }
+
+            monthSelect.removeEventListener('change', window.monthFilterHandler || (() => {}));
+            window.monthFilterHandler = function() {
+                filteredByMonth = this.value;
+                console.log('Filtro de mes cambiado a:', this.value);
+
+                // Mostrar detalles de filtrado para depuración
+                if (this.value !== 'all') {
+                    const filteredCount = allCasesData.filter(caseItem => {
+                        if (caseItem.startDate) {
+                            const date = new Date(caseItem.startDate);
+                            if (!isNaN(date.getTime())) {
+                                const month = String(date.getMonth() + 1).padStart(2, '0');
+                                return month === this.value;
+                            }
+                        }
+                        return false;
+                    }).length;
+                    console.log(`Filtro aplicado: ${filteredCount} casos coinciden con el mes ${this.value}`);
+                }
+
+                filterCases();
+            };
+            monthSelect.addEventListener('change', window.monthFilterHandler);
+
+            console.log('Filtros de año y mes actualizados correctamente');
+        }
+
         // Procesar datos de ausentismo para el formato de casos
         function processAusentismoData(rows, headers) {
             if (!rows || !headers) return [];
-            
-            // Mapear los encabezados a índices
-            const headerMap = {};
-            headers.forEach((header, index) => {
-                const cleanHeader = header ? header.trim().toUpperCase() : '';
-                headerMap[cleanHeader] = index;
+
+            console.log('Encabezados recibidos:', headers);
+
+            // Función auxiliar para encontrar índice de encabezado con varias variaciones
+            function findHeaderIndex(possibleNames) {
+                for (const name of possibleNames) {
+                    for (let i = 0; i < headers.length; i++) {
+                        if (headers[i] && headers[i].toString().trim().toLowerCase().includes(name.toLowerCase())) {
+                            return i;
+                        }
+                    }
+                }
+                return -1; // No encontrado
+            }
+
+            // Buscar índices de columnas con varias variantes posibles
+            const nombreIndex = findHeaderIndex(['NOMBRE', 'NOMBRES', 'EMPLEADO', 'TRABAJADOR']);
+            const cedulaIndex = findHeaderIndex(['CEDULA', 'CÉDULA', 'IDENTIFICACION', 'DOCUMENTO', 'ID']);
+            const cargoIndex = findHeaderIndex(['CARGO', 'PUESTO', 'FUNCION', 'ROL']);
+            const fechaInicioIndex = findHeaderIndex(['FECHA INICIO', 'FECHA_INICIO', 'F. INICIO', 'INICIO', 'FECHA DE INICIO', 'START', 'BEGIN']);
+            const diasIndex = findHeaderIndex(['N° DIAS', 'DIAS', 'DIAS DE INCAPACIDAD', 'DIAS INCAPACIDAD', 'CANTIDAD DIAS']);
+            const diagnosticoIndex = findHeaderIndex(['DESCRIPCION', 'DIAGNOSTICO', 'DESCRIPCIÓN', 'CIE-10', 'DIAGNOSIS', 'CAUSA']);
+            const claseIncapacidadIndex = findHeaderIndex(['CLASE DE INCAPACIDAD', 'CLASE', 'TIPO INCAPACIDAD', 'CLASIFICACION']);
+            const tipoIncapacidadIndex = findHeaderIndex(['TIPO DE INCAPACIDAD', 'TIPO', 'MODALIDAD', 'FORMA']);
+
+            console.log('Mapeo de índices:', {
+                nombreIndex,
+                cedulaIndex,
+                cargoIndex,
+                fechaInicioIndex,
+                diasIndex,
+                diagnosticoIndex,
+                claseIncapacidadIndex,
+                tipoIncapacidadIndex
             });
 
             return rows.map((row, rowIndex) => {
-                // Extraer información de la fila
+                // Extraer información de la fila usando los índices encontrados
                 const id = `INC-${currentCompany.substring(0, 3).toUpperCase()}-${String(rowIndex + 1).padStart(3, '0')}`;
-                const nombre = row[headerMap['NOMBRE']] || row[headerMap['NOMBRES']] || '';
-                const cedula = row[headerMap['CEDULA']] || row[headerMap['CÉDULA']] || '';
-                const cargo = row[headerMap['CARGO']] || '';
-                const fechaInicio = row[headerMap['FECHA INICIO']] || row[headerMap['FECHA_INICIO']] || '';
-                const dias = row[headerMap['N° DIAS DE INCAPACIDAD']] || row[headerMap['DIAS']] || 0;
-                const diagnostico = row[headerMap['DESCRIPCIÓN']] || row[headerMap['DIAGNOSTICO']] || row[headerMap['CIE-10']] || '';
-                const claseIncapacidad = row[headerMap['CLASE DE INCAPACIDAD']] || row[headerMap['CLASE']] || '';
-                const tipoIncapacidad = row[headerMap['TIPO DE INCAPACIDAD']] || row[headerMap['TIPO']] || '';
-                
+
+                const nombre = (nombreIndex !== -1 && row[nombreIndex]) ? row[nombreIndex].toString() : '';
+                const cedula = (cedulaIndex !== -1 && row[cedulaIndex]) ? row[cedulaIndex].toString() : '';
+                const cargo = (cargoIndex !== -1 && row[cargoIndex]) ? row[cargoIndex].toString() : '';
+
+                let fechaInicio = '';
+                if (fechaInicioIndex !== -1 && row[fechaInicioIndex]) {
+                    fechaInicio = row[fechaInicioIndex].toString();
+                    // Intentar normalizar la fecha si es un número (como en Excel)
+                    if (!isNaN(Date.parse(fechaInicio))) {
+                        // La fecha ya está en formato correcto
+                    } else {
+                        // Intentar convertir desde formato de Excel (número de serie de fecha)
+                        const fechaNum = parseFloat(fechaInicio);
+                        if (!isNaN(fechaNum) && fechaNum > 1) {
+                            // Convertir desde número de serie de Excel a fecha (base 1900 o 1904 dependiendo de Excel)
+                            const excelDate = new Date((fechaNum - 25569) * 86400 * 1000); // Base 1900
+                            fechaInicio = excelDate.toISOString().split('T')[0];
+                        }
+                    }
+                }
+
+                const diasRaw = (diasIndex !== -1 && row[diasIndex]) ? row[diasIndex] : 0;
+                const dias = isNaN(diasRaw) ? 0 : parseInt(diasRaw);
+
+                const diagnostico = (diagnosticoIndex !== -1 && row[diagnosticoIndex]) ? row[diagnosticoIndex].toString() : '';
+                const claseIncapacidad = (claseIncapacidadIndex !== -1 && row[claseIncapacidadIndex]) ? row[claseIncapacidadIndex].toString() : '';
+                const tipoIncapacidad = (tipoIncapacidadIndex !== -1 && row[tipoIncapacidadIndex]) ? row[tipoIncapacidadIndex].toString() : '';
+
                 // Calcular días transcurridos desde la fecha de inicio
                 let daysElapsed = 0;
                 if (fechaInicio) {
                     const startDate = new Date(fechaInicio);
-                    const today = new Date();
-                    const diffTime = Math.abs(today - startDate);
-                    daysElapsed = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    if (!isNaN(startDate.getTime())) { // Verificar que la fecha sea válida
+                        const today = new Date();
+                        const diffTime = Math.abs(today - startDate);
+                        daysElapsed = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    } else {
+                        console.warn(`Fecha inválida para el caso ${id}: "${fechaInicio}"`);
+                    }
                 }
 
                 // Determinar estado basado en la información disponible
@@ -984,6 +1217,9 @@
                 } else if (dias > 100) {
                     status = 'improving';
                 }
+
+                // Marcar como largo plazo si tiene más de 15 días
+                const isLongTerm = (parseInt(dias) || daysElapsed) > 15;
 
                 // Fecha del último seguimiento (a determinar según datos disponibles)
                 const lastFollowUp = fechaInicio; // Usar fecha de inicio como referencia temporal
@@ -999,7 +1235,8 @@
                     lastFollowUp: lastFollowUp,
                     status,
                     claseIncapacidad,
-                    tipoIncapacidad
+                    tipoIncapacidad,
+                    isLongTerm  // Indicador para incapacidades de largo plazo (>15 días)
                 };
             });
         }
@@ -1009,29 +1246,185 @@
             // En una implementación real, esto podría cargar datos de una base de datos específica
             // Por ahora, creamos algunos datos de ejemplo basados en los casos existentes
             allFollowUpsData = {};
-            
+
+            // También cargar datos de seguimientos desde el archivo externo
+            await loadFollowUpDataFromFile();
+
+            // Actualizar estados después de cargar los datos de seguimiento
             allCasesData.forEach(caseItem => {
-                if (Math.random() > 0.3) { // Agregar seguimientos a algunos casos
-                    allFollowUpsData[caseItem.id] = [
-                        {
-                            date: new Date(new Date(caseItem.startDate).getTime() + Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                            type: ['telefonico', 'presencial', 'virtual'][Math.floor(Math.random() * 3)],
-                            author: `Dr. ${['Pérez', 'Gómez', 'Rodríguez', 'Martínez'][Math.floor(Math.random() * 4)]}`,
-                            content: 'Evaluación inicial del paciente. Buena evolución general. Se continúa con el tratamiento planificado.',
-                            recommendations: 'Continuar con medicación actual y fisioterapia. Reevaluación en 10 días.'
+                if (!allFollowUpsData[caseItem.id]) {
+                    // Si no hay datos del archivo, crear datos de ejemplo
+                    if (Math.random() > 0.3 && caseItem.startDate && !isNaN(Date.parse(caseItem.startDate))) { // Agregar seguimientos solo si hay una fecha válida
+                        const startDate = new Date(caseItem.startDate);
+
+                        allFollowUpsData[caseItem.id] = [
+                            {
+                                date: new Date(startDate.getTime() + Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                                type: ['telefonico', 'presencial', 'virtual'][Math.floor(Math.random() * 3)],
+                                author: `Dr. ${['Pérez', 'Gómez', 'Rodríguez', 'Martínez'][Math.floor(Math.random() * 4)]}`,
+                                content: 'Evaluación inicial del paciente. Buena evolución general. Se continúa con el tratamiento planizado.',
+                                recommendations: 'Continuar con medicación actual y fisioterapia. Reevaluación en 10 días.'
+                            }
+                        ];
+
+                        // Añadir más seguimientos aleatoriamente
+                        if (Math.random() > 0.5) {
+                            allFollowUpsData[caseItem.id].push({
+                                date: new Date(startDate.getTime() + (Math.random() * 14 + 7) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                                type: ['telefonico', 'presencial', 'virtual'][Math.floor(Math.random() * 3)],
+                                author: `Dr. ${['López', 'Hernández', 'Díaz', 'Sánchez'][Math.floor(Math.random() * 4)]}`,
+                                content: 'Paciente reporta mejoría significativa. Dolor reducido y mayor movilidad.',
+                                recommendations: 'Ajuste en medicación. Continuar con terapia física.'
+                            });
                         }
-                    ];
-                    
-                    // Añadir más seguimientos aleatoriamente
-                    if (Math.random() > 0.5) {
-                        allFollowUpsData[caseItem.id].push({
-                            date: new Date(new Date(caseItem.startDate).getTime() + (Math.random() * 14 + 7) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                            type: ['telefonico', 'presencial', 'virtual'][Math.floor(Math.random() * 3)],
-                            author: `Dr. ${['López', 'Hernández', 'Díaz', 'Sánchez'][Math.floor(Math.random() * 4)]}`,
-                            content: 'Paciente reporta mejoría significativa. Dolor reducido y mayor movilidad.',
-                            recommendations: 'Ajuste en medicación. Continuar con terapia física.'
-                        });
+                    } else if (Math.random() > 0.3) {
+                        // Si no hay fecha válida, crear datos de ejemplo con una fecha actual
+                        const currentDate = new Date();
+
+                        allFollowUpsData[caseItem.id] = [
+                            {
+                                date: currentDate.toISOString().split('T')[0],
+                                type: ['telefonico', 'presencial', 'virtual'][Math.floor(Math.random() * 3)],
+                                author: `Dr. ${['Pérez', 'Gómez', 'Rodríguez', 'Martínez'][Math.floor(Math.random() * 4)]}`,
+                                content: 'Evaluación inicial del paciente. Buena evolución general. Se continúa con el tratamiento planizado.',
+                                recommendations: 'Continuar con medicación actual y fisioterapia. Reevaluación en 10 días.'
+                            }
+                        ];
                     }
+                }
+            });
+
+            // Re-renderizar la UI después de actualizar los estados
+            console.log('[DEBUG_FE] Re-renderizando tabla y estadísticas con estados actualizados.');
+            updateStats();
+            renderCasesTable();
+
+            // Retornar una promesa resuelta para que el .then() funcione correctamente
+            return Promise.resolve();
+        }
+
+        // Cargar datos de seguimientos desde el archivo externo
+        function loadFollowUpDataFromFile() {
+            return new Promise((resolve, reject) => {
+                try {
+                    console.log(`[DEBUG_FE] Iniciando loadFollowUpDataFromFile. Empresa actual: ${currentCompany}`);
+                    if (!currentCompany) {
+                        console.error('[ERROR_FE] No se puede cargar el historial, la empresa no está definida.');
+                        resolve(); // Resolvemos para permitir el flujo
+                        return;
+                    }
+
+                    // Enviar solicitud al contenedor principal para cargar los datos de seguimiento
+                    // usando el mecanismo de mensajes ya implementado
+                    const messageId = Date.now();
+                    const message = {
+                        type: 'LOAD_FOLLOW_UP_DATA',
+                        id: messageId,
+                        companyName: currentCompany
+                    };
+
+                    // Escuchar la respuesta específica para esta solicitud
+                    const handleMessage = (event) => {
+                        if (event.data && event.data.type === 'LOAD_FOLLOW_UP_DATA_RESPONSE' && event.data.id === messageId) {
+                            // Dejar de escuchar este evento específico
+                            window.removeEventListener('message', handleMessage);
+
+                            const response = event.data.payload || event.data.data;
+                            console.log('[DEBUG_FE] Respuesta de LOAD_FOLLOW_UP_DATA recibida:', response);
+
+                            if (response && response.success && response.followUps) {
+                                const latestStatuses = {}; // Objeto para guardar el estado más reciente por ID de empleado
+                                const followUpHistory = {}; // Objeto para guardar todo el historial por ID de empleado
+
+                                // 1. Procesar todos los seguimientos
+                                for (const employeeId in response.followUps) {
+                                    const followUps = response.followUps[employeeId];
+                                    if (followUps && followUps.length > 0) {
+                                        // Ordenar para encontrar el más reciente
+                                        const sorted = [...followUps].sort((a, b) => new Date(b['Fecha Seguimiento']) - new Date(a['Fecha Seguimiento']));
+                                        const latestFollowUp = sorted[0];
+                                        const status = latestFollowUp['Estado Caso'];
+
+                                        // Guardar el estado más reciente
+                                        if (status) {
+                                            latestStatuses[employeeId] = status;
+                                        }
+
+                                        // Guardar todo el historial para la vista de detalle
+                                        followUpHistory[employeeId] = sorted.map(f => ({
+                                            date: f["Fecha Seguimiento"],
+                                            type: f["Tipo Seguimiento"],
+                                            author: f["Nombre Empleado"],
+                                            content: f["Evolución"],
+                                            recommendations: f["Recomendaciones"],
+                                            nextFollowUp: f["Próximo Seguimiento"],
+                                            caseStatus: f["Estado Caso"]
+                                        }));
+                                    }
+                                }
+                                console.log('[DEBUG_FE] Últimos estados de seguimiento encontrados:', latestStatuses);
+
+                                // 2. Asociar el historial completo con el ID de caso interno
+                                allCasesData.forEach(caseItem => {
+                                    const cleanEmployeeId = caseItem.employeeId?.replace(/,/g, '').replace(/\./g, '').replace(/\s/g, '');
+                                    if (cleanEmployeeId && followUpHistory[cleanEmployeeId]) {
+                                        allFollowUpsData[caseItem.id] = followUpHistory[cleanEmployeeId];
+                                    }
+                                });
+
+                                // 3. Actualizar `allCasesData` con los estados más recientes
+                                allCasesData.forEach(caseItem => {
+                                    const cleanEmployeeId = caseItem.employeeId?.replace(/,/g, '').replace(/\./g, '').replace(/\s/g, '');
+                                    if (cleanEmployeeId && latestStatuses[cleanEmployeeId]) {
+                                        const newStatus = latestStatuses[cleanEmployeeId];
+                                        if (caseItem.status !== newStatus) {
+                                            console.log(`[DEBUG_FE] Actualizando estado para empleado ${cleanEmployeeId}: de '${caseItem.status}' a '${newStatus}'`);
+                                            caseItem.status = newStatus;
+                                        }
+                                    }
+                                });
+                            } else {
+                                console.log('[DEBUG_FE] No se encontraron datos de seguimiento o la respuesta no fue exitosa.');
+                            }
+
+                            resolve(); // Resolver la promesa al finalizar
+                        }
+                    };
+
+                    // Agregar listener para la respuesta
+                    window.addEventListener('message', handleMessage);
+
+                    // Enviar mensaje al contenedor principal
+                    sendMessageToParent(message);
+
+                } catch (error) {
+                    console.error('[ERROR_FE] Error al cargar y procesar datos de seguimiento desde archivo:', error);
+                    reject(error); // Rechazar la promesa en caso de error
+                }
+            });
+        }
+
+        // Inicializar event listeners
+        function initializeEventListeners() {
+            // Búsqueda
+            document.getElementById('searchInput').addEventListener('input', function(e) {
+                searchTerm = e.target.value.toLowerCase();
+                filterCases();
+            });
+
+            // Filtros
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                if (!btn.id) { // Solo para los botones de filtro existentes, no los nuevos select
+                    btn.addEventListener('click', function() {
+                        if (this.dataset.filter) {
+                            // Actualizar botón activo
+                            document.querySelectorAll('.filter-btn:not([id])').forEach(b => b.classList.remove('active'));
+                            this.classList.add('active');
+
+                            currentFilter = this.dataset.filter;
+                            filterCases();
+                        }
+                    });
                 }
             });
         }
@@ -1059,25 +1452,41 @@
         function renderCasesTable() {
             const tableBody = document.getElementById('casesTableBody');
             tableBody.innerHTML = '';
-            
+
             const filteredCases = getFilteredCases();
-            
+
             filteredCases.forEach(caseItem => {
                 const row = document.createElement('tr');
-                
+
                 // Determinar clase de estado
                 let statusClass = '';
-                if (caseItem.status === 'active') statusClass = 'active';
-                else if (caseItem.status === 'improving' || caseItem.status === 'extended') statusClass = 'pending';
-                else statusClass = 'closed';
-                
-                // Determinar texto de estado
-                let statusText = '';
-                if (caseItem.status === 'active') statusText = 'Activo';
-                else if (caseItem.status === 'improving') statusText = 'Mejorando';
-                else if (caseItem.status === 'extended') statusText = 'Prórroga';
-                else statusText = 'Cerrado';
-                
+                let statusText = caseItem.status || 'desconocido'; // Fallback por si el estado es nulo
+
+                switch (statusText.toLowerCase()) {
+                    case 'active':
+                    case 'activo':
+                        statusClass = 'active';
+                        statusText = 'Activo';
+                        break;
+                    case 'improving':
+                    case 'mejorando':
+                        statusClass = 'pending';
+                        statusText = 'Mejorando';
+                        break;
+                    case 'extended':
+                    case 'prórroga':
+                        statusClass = 'pending';
+                        statusText = 'Prórroga';
+                        break;
+                    case 'recovered':
+                    case 'recuperado':
+                        statusClass = 'closed';
+                        statusText = 'Recuperado';
+                        break;
+                    default:
+                        statusClass = 'closed';
+                }
+
                 row.innerHTML = `
                     <td>${caseItem.id}</td>
                     <td>${caseItem.employeeName}</td>
@@ -1095,7 +1504,7 @@
                         </button>
                     </td>
                 `;
-                
+
                 tableBody.appendChild(row);
             });
         }
@@ -1108,18 +1517,47 @@
         // Obtener casos filtrados
         function getFilteredCases() {
             return allCasesData.filter(caseItem => {
-                const matchesFilter = currentFilter === 'all' || 
+                // Filtros de estado existentes - CORREGIDO: Por defecto mostrar solo casos de largo plazo (>15 días)
+                // Se cambió la lógica para que 'all' muestre solo casos de largo plazo (>15 días)
+                // y se agregó un nuevo filtro 'all_cases' para mostrar todos los casos sin importar los días
+                const matchesFilter = (currentFilter === 'all' && caseItem.isLongTerm) ||  // 'all' ahora muestra solo casos de largo plazo
+                    (currentFilter === 'all_cases' && true) ||  // Mostrar todos los casos con un nuevo filtro
                     (currentFilter === 'active' && caseItem.status === 'active') ||
                     (currentFilter === 'pending' && (caseItem.status === 'improving' || caseItem.daysElapsed > 30)) ||
+                    (currentFilter === 'longterm' && caseItem.isLongTerm) ||  // Filtro exclusivo para incapacidades de largo plazo (>15 días)
                     (currentFilter === 'critical' && caseItem.daysElapsed > 90 && caseItem.status === 'active');
-                
-                const matchesSearch = searchTerm === '' || 
-                    caseItem.id.toLowerCase().includes(searchTerm) || 
-                    caseItem.employeeName.toLowerCase().includes(searchTerm) || 
+
+                // Filtro de búsqueda textual
+                const matchesSearch = searchTerm === '' ||
+                    caseItem.id.toLowerCase().includes(searchTerm) ||
+                    caseItem.employeeName.toLowerCase().includes(searchTerm) ||
                     caseItem.diagnosis.toLowerCase().includes(searchTerm) ||
                     caseItem.employeeId.toLowerCase().includes(searchTerm);
-                
-                return matchesFilter && matchesSearch;
+
+                // Filtro por año
+                let matchesYear = true;
+                if (filteredByYear !== 'all' && caseItem.startDate) {
+                    const date = new Date(caseItem.startDate);
+                    if (!isNaN(date.getTime())) {
+                        matchesYear = date.getFullYear().toString() === filteredByYear;
+                    } else {
+                        matchesYear = false;
+                    }
+                }
+
+                // Filtro por mes
+                let matchesMonth = true;
+                if (filteredByMonth !== 'all' && caseItem.startDate) {
+                    const date = new Date(caseItem.startDate);
+                    if (!isNaN(date.getTime())) {
+                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                        matchesMonth = month === filteredByMonth;
+                    } else {
+                        matchesMonth = false;
+                    }
+                }
+
+                return matchesFilter && matchesSearch && matchesYear && matchesMonth;
             });
         }
 
@@ -1127,16 +1565,16 @@
         function viewCase(caseId) {
             currentCaseId = caseId;
             const caseItem = allCasesData.find(c => c.id === caseId);
-            
+
             if (caseItem) {
                 // Llenar formulario con datos del caso
                 document.getElementById('employeeId').value = caseItem.employeeId || caseItem.id;
                 document.getElementById('employeeName').value = caseItem.employeeName;
                 document.getElementById('diagnosis').value = caseItem.diagnosis;
-                
+
                 // Mostrar historial de seguimientos
                 showFollowUpHistory(caseId);
-                
+
                 // Abrir modal
                 document.getElementById('followUpModal').classList.add('active');
             }
@@ -1152,20 +1590,20 @@
             const followUps = allFollowUpsData[caseId] || [];
             const historyContainer = document.getElementById('followUpHistory');
             const historyList = document.getElementById('followUpHistoryList');
-            
+
             if (followUps.length > 0) {
                 historyList.innerHTML = '';
-                
+
                 // Ordenar seguimientos por fecha (más reciente primero)
                 const sortedFollowUps = [...followUps].sort((a, b) => new Date(b.date) - new Date(a.date));
-                
+
                 sortedFollowUps.forEach(followUp => {
                     const followUpItem = document.createElement('div');
                     followUpItem.className = 'follow-up-item';
-                    
-                    const typeText = followUp.type === 'telefonico' ? 'Telefónico' : 
+
+                    const typeText = followUp.type === 'telefonico' ? 'Telefónico' :
                                      followUp.type === 'presencial' ? 'Presencial' : 'Virtual';
-                    
+
                     followUpItem.innerHTML = `
                         <div class="follow-up-header">
                             <div class="follow-up-date">${formatDate(followUp.date)} - ${typeText}</div>
@@ -1174,10 +1612,10 @@
                         <div class="follow-up-content">${followUp.content}</div>
                         <div class="follow-up-content"><strong>Recomendaciones:</strong> ${followUp.recommendations}</div>
                     `;
-                    
+
                     historyList.appendChild(followUpItem);
                 });
-                
+
                 historyContainer.style.display = 'block';
             } else {
                 historyContainer.style.display = 'none';
@@ -1201,12 +1639,12 @@
         // Guardar seguimiento
         async function saveFollowUp() {
             const form = document.getElementById('followUpForm');
-            
+
             if (!form.checkValidity()) {
                 form.reportValidity();
                 return;
             }
-            
+
             // Recopilar datos del formulario
             const followUpData = {
                 employeeId: document.getElementById('employeeId').value,
@@ -1220,48 +1658,19 @@
                 caseStatus: document.getElementById('caseStatus').value,
                 timestamp: new Date().toISOString()
             };
-            
+
             try {
                 console.log('Guardando seguimiento:', followUpData);
-                
-                // Enviar datos a la API de la aplicación
-                const result = await window.electronAPI.saveFollowUp(followUpData, currentCompany);
-                
-                if (result.success) {
-                    // Actualizar datos locales
-                    if (currentCaseId) {
-                        // Si es una actualización de caso existente
-                        const caseIndex = allCasesData.findIndex(c => c.id === currentCaseId);
-                        if (caseIndex !== -1) {
-                            allCasesData[caseIndex].status = followUpData.caseStatus;
-                            allCasesData[caseIndex].lastFollowUp = followUpData.followUpDate;
-                        }
-                        
-                        // Agregar el seguimiento al historial
-                        if (!allFollowUpsData[currentCaseId]) {
-                            allFollowUpsData[currentCaseId] = [];
-                        }
-                        
-                        allFollowUpsData[currentCaseId].push({
-                            date: followUpData.followUpDate,
-                            type: followUpData.followUpType,
-                            author: 'Sistema', // En una implementación real, podría ser el nombre del usuario
-                            content: followUpData.evolution,
-                            recommendations: followUpData.recommendations
-                        });
+
+                // Enviar solicitud al contenedor principal para guardar el seguimiento
+                sendMessageToParent({
+                    type: 'SAVE_FOLLOW_UP',
+                    id: Date.now(), // ID único para emparejar la solicitud con la respuesta
+                    payload: {
+                        followUpData: followUpData,
+                        companyName: currentCompany
                     }
-                    
-                    // Cerrar modal
-                    closeFollowUpModal();
-                    
-                    // Actualizar tabla y estadísticas
-                    updateStats();
-                    renderCasesTable();
-                    
-                    showNotification('Seguimiento guardado correctamente', 'success');
-                } else {
-                    showNotification('Error al guardar seguimiento: ' + result.error, 'error');
-                }
+                });
             } catch (error) {
                 console.error('Error guardando seguimiento:', error);
                 showNotification('Error al guardar seguimiento: ' + error.message, 'error');
@@ -1277,12 +1686,12 @@
         // Exportar datos
         async function exportData() {
             try {
-                const result = await window.electronAPI.exportIncapacityData(currentCompany);
-                if (result.success) {
-                    showNotification('Datos exportados exitosamente a: ' + result.path, 'success');
-                } else {
-                    showNotification('Error al exportar: ' + result.error, 'error');
-                }
+                // Enviar solicitud al contenedor principal para exportar datos
+                sendMessageToParent({
+                    type: 'EXPORT_INCAPACITY_DATA',
+                    id: Date.now(), // ID único para emparejar la solicitud con la respuesta
+                    companyName: currentCompany
+                });
             } catch (error) {
                 console.error('Error exportando datos:', error);
                 showNotification('Error al exportar datos: ' + error.message, 'error');
@@ -1292,10 +1701,10 @@
         // Formatear fecha
         function formatDate(dateString) {
             if (!dateString) return 'N/A';
-            
+
             const date = new Date(dateString);
             if (isNaN(date.getTime())) return dateString; // Si no es una fecha válida, devolver el string original
-            
+
             return date.toLocaleDateString('es-ES', {
                 year: 'numeric',
                 month: 'short',
@@ -1308,10 +1717,10 @@
             const notification = document.getElementById('notification');
             const notificationMessage = document.getElementById('notification-message');
             const icon = notification.querySelector('i');
-            
+
             // Actualizar mensaje
             notificationMessage.textContent = message;
-            
+
             // Actualizar tipo y icono
             notification.className = `notification ${type}`;
             if (type === 'success') {
@@ -1321,15 +1730,21 @@
             } else if (type === 'warning') {
                 icon.className = 'fas fa-exclamation-triangle';
             }
-            
+
             // Mostrar notificación
             notification.classList.add('show');
-            
+
             // Ocultar después de 4 segundos
             setTimeout(() => {
                 notification.classList.remove('show');
             }, 4000);
         }
+
+        // Llamar a initializeEventListeners después de que el DOM esté completamente cargado
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeEventListeners();
+            setCurrentDate();
+        });
     </script>
 </body>
 </html>

@@ -294,8 +294,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           return;
       }
 
-      const { type, payload, requestId } = event.data;
-      console.log('RENDERER: Message received from iframe:', { type, payload, requestId });
+      const { type, payload, id } = event.data; // <-- CORRECTLY DESTRUCTURE `id`
+      console.log('RENDERER: Message received from iframe:', { type, payload, id });
 
       // Find the iframe that sent the message
       const iframes = document.querySelectorAll('iframe');
@@ -358,12 +358,36 @@ document.addEventListener('DOMContentLoaded', async () => {
                       showHomePage(); // Fallback to home if no current module
                   }
                   return; // Exit after handling navigation
+              case 'GET_AUSENTISMO_DATA':
+                  // Handle request to get absenteeism data
+                  apiCallFunction = window.electronAPI.readAusentismoData;
+                  apiCallArgs = [currentCompany]; // Use current company for the request
+                  responseType = 'AUSENTISMO_DATA_RESPONSE';
+                  break;
+              case 'SAVE_FOLLOW_UP':
+                  // Handle request to save follow-up data
+                  apiCallFunction = window.electronAPI.saveFollowUp;
+                  apiCallArgs = [payload.followUpData, currentCompany]; // Use current company for the request
+                  responseType = 'FOLLOW_UP_SAVE_RESPONSE';
+                  break;
+              case 'EXPORT_INCAPACITY_DATA':
+                  // Handle request to export incapacity data
+                  apiCallFunction = window.electronAPI.exportIncapacityData;
+                  apiCallArgs = [currentCompany]; // Use current company for the request
+                  responseType = 'EXPORT_DATA_RESPONSE';
+                  break;
+              case 'LOAD_FOLLOW_UP_DATA':
+                  // Handle request to load follow-up data
+                  apiCallFunction = window.electronAPI.loadFollowUpData;
+                  apiCallArgs = [payload.companyName];
+                  responseType = 'FOLLOW_UP_LOAD_RESPONSE';
+                  break;
               default:
                   console.warn(`RENDERER: Unknown message type received from iframe: ${type}`);
                   sourceIframe.contentWindow.postMessage({
                       type: responseType,
                       payload: { success: false, error: `Unknown request type: ${type}` },
-                      requestId: requestId
+                      id: id // <-- Pass back the original ID
                   }, 'file://');
                   return;
           }
@@ -375,7 +399,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           sourceIframe.contentWindow.postMessage({
               type: responseType,
               payload: result,
-              requestId: requestId
+              id: id // <-- FIX: Use 'id' to match what the iframe is waiting for
           }, 'file://');
 
       } catch (error) {
@@ -383,7 +407,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           sourceIframe.contentWindow.postMessage({
               type: responseType,
               payload: { success: false, error: error.message },
-              requestId: requestId
+              id: id // <-- Pass back the original ID on error too
           }, 'file://');
       }
   });
@@ -691,7 +715,7 @@ function createSidebarButtons() {
       if (item.name === "Salir") {
         handleLogout();
       } else if (currentCompany) {
-        // ✅ NUEVA VALIDACIÓN: No cambiar módulo si estamos en submódulo
+        // ✅ NUEVA VALIDACIÓN: No cambiar módulo si estamos en un submódulo
         if (currentSubmodule && currentModule !== item.name) {
           console.log(`ℹ️ Ignorando click en "${item.name}" porque estamos en submódulo: "${currentSubmodule}"`);
           return;
@@ -1106,7 +1130,7 @@ function showModuleWelcomeScreen(container, moduleName) {
   container.appendChild(welcomeContainer);
 }
 
-function showSubmoduleSelectorAndContent(container, moduleName) {
+function showSubmoduleSelectorAndContent(container, moduleName, submoduleName) {
     // Limpiar el contenedores
     container.innerHTML = '';
     // Obtener los submódulos para este módulo
@@ -1356,12 +1380,7 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
   currentSubmodule = submoduleName;
 
   // Inspeccionar el DOM antes de limpiar
-  console.log('🔍 [showSubmoduleContent] Inspeccionando DOM antes de limpiar:', container.innerHTML);
-  console.log(`🔍 [showSubmoduleContent] currentModule es: ${currentModule}`);
-  console.log(`🔍 [showSubmoduleContent] currentSubmodule es: ${currentSubmodule}`); // ✅ NUEVO LOG
-
   hideCalendar(); // No necesita argumento con la nueva implementación
-  console.log(`🔹 Mostrando contenido para el submódulo: ${submoduleName}`);
 
   // ✅ Verificar que container no sea null
   if (!container) {
