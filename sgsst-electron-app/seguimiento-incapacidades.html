@@ -1003,8 +1003,13 @@
             // Enviar mensaje al proceso principal a través de la API de Electron o al contenedor
             if (typeof window.parent !== 'undefined') {
                 // Usar postMessage para comunicarse con el contenedor principal (iframe)
-                // Solo enviar a window.parent, no a '*' para mayor seguridad
-                window.parent.postMessage(message, window.location.origin);
+                // Añadir una propiedad especial para identificar que es un mensaje específico del seguimiento
+                const enhancedMessage = {
+                    ...message,
+                    source: 'SEGUIMIENTO_INCAPACIDADES',
+                    target: 'MEDICION_AUSENTISMO_CONTAINER'
+                };
+                window.parent.postMessage(enhancedMessage, window.location.origin);
             } else {
                 console.error('[ERROR_FE] No se puede enviar mensaje: window.parent no está disponible');
             }
@@ -1340,6 +1345,8 @@
                     // Escuchar la respuesta específica para esta solicitud
                     const handleMessage = (event) => {
                         // Verificación más robusta para evitar errores
+                        // Asegurarse de que el origen es el contenedor principal esperado
+                        // y que el mensaje es específico para esta solicitud
                         if (event.data &&
                             event.data.type === 'LOAD_FOLLOW_UP_DATA_RESPONSE' &&
                             event.data.id === messageId) {

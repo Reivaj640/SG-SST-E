@@ -205,7 +205,6 @@ function showCalendarInModule(parentContainer) {
  * @param {HTMLElement} contextElement - Un elemento dentro del contexto del módulo para encontrar el main-canvas.
  */
 function hideCalendar() {
-    console.log('🔸 [hideCalendar] Intentando ocultar y destruir cualquier calendario existente.');
 
     let hidden = false;
     // 1. Intentar eliminar usando la referencia directa (método más fiable)
@@ -228,7 +227,7 @@ function hideCalendar() {
     }
 
     if (!hidden) {
-        console.log('ℹ️ [hideCalendar] No se encontraron contenedores de calendario para eliminar.');
+        // Mensaje eliminado: No se encontraron contenedores de calendario para eliminar.
     }
 
     // Limpiar la referencia global de la instancia del calendario para estar seguros
@@ -703,7 +702,6 @@ function createSidebarButtons() {
   console.log('Cleared sidebar menu');
 
   SIDEBAR_BUTTONS.forEach((item, index) => {
-    console.log(`Creating button ${index} for ${item.name}`);
     const li = document.createElement('li');
     li.className = 'sidebar-menu-item';
 
@@ -737,7 +735,6 @@ function createSidebarButtons() {
 
     li.appendChild(button);
     sidebarMenu.appendChild(li);
-    console.log(`Added button ${index} to sidebar`);
   });
 
   console.log('Sidebar buttons created.');

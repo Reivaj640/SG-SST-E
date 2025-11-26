@@ -289,7 +289,9 @@ class MedicionAusentismoComponent {
                         id: event.data.id,
                         data: result
                     }, '*');
-                } else if (event.data && event.data.type === 'LOAD_FOLLOW_UP_DATA') {
+                } else if (event.data && event.data.type === 'LOAD_FOLLOW_UP_DATA' &&
+                          (event.data.source === 'SEGUIMIENTO_INCAPACIDADES' ||
+                           event.data.target === 'MEDICION_AUSENTISMO_CONTAINER')) {
                     // Llamar a la API de Electron para cargar datos de seguimiento
                     const companyName = event.data.companyName || this.currentCompany;
                     const result = await window.electronAPI.loadFollowUpData(companyName);
