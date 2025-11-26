@@ -192,6 +192,10 @@
             background: linear-gradient(135deg, var(--danger-color), #dc2626);
         }
 
+        .stat-icon.recovery {
+            background: linear-gradient(135deg, #10b981, #059669); /* Verde similar al success pero más distintivo */
+        }
+
         .stat-content {
             flex: 1;
         }
@@ -661,6 +665,15 @@
                     </div>
                 </div>
                 <div class="stat-card">
+                    <div class="stat-icon recovery">
+                        <i class="fas fa-heartbeat"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="casosRecuperados">0</div>
+                        <div class="stat-label">Casos Recuperados</div>
+                    </div>
+                </div>
+                <div class="stat-card">
                     <div class="stat-icon warning">
                         <i class="fas fa-clock"></i>
                     </div>
@@ -990,7 +1003,8 @@
             // Enviar mensaje al proceso principal a través de la API de Electron o al contenedor
             if (typeof window.parent !== 'undefined') {
                 // Usar postMessage para comunicarse con el contenedor principal (iframe)
-                window.parent.postMessage(message, '*');
+                // Solo enviar a window.parent, no a '*' para mayor seguridad
+                window.parent.postMessage(message, window.location.origin);
             } else {
                 console.error('[ERROR_FE] No se puede enviar mensaje: window.parent no está disponible');
             }
@@ -1325,7 +1339,11 @@
 
                     // Escuchar la respuesta específica para esta solicitud
                     const handleMessage = (event) => {
-                        if (event.data && event.data.type === 'LOAD_FOLLOW_UP_DATA_RESPONSE' && event.data.id === messageId) {
+                        // Verificación más robusta para evitar errores
+                        if (event.data &&
+                            event.data.type === 'LOAD_FOLLOW_UP_DATA_RESPONSE' &&
+                            event.data.id === messageId) {
+
                             // Dejar de escuchar este evento específico
                             window.removeEventListener('message', handleMessage);
 
@@ -1389,6 +1407,7 @@
 
                             resolve(); // Resolver la promesa al finalizar
                         }
+                        // Si es un mensaje de otro tipo o con otro ID, simplemente lo ignoramos
                     };
 
                     // Agregar listener para la respuesta
@@ -1437,13 +1456,17 @@
 
         // Actualizar estadísticas
         function updateStats() {
-            const total = allCasesData.length;
-            const activos = allCasesData.filter(c => c.status === 'active' || c.status === 'improving').length;
-            const pendientes = allCasesData.filter(c => c.daysElapsed > 30 && (c.status === 'active' || c.status === 'extended')).length;
-            const criticos = allCasesData.filter(c => c.daysElapsed > 90 && c.status === 'active').length;
+            // Usar los mismos datos filtrados que la tabla
+            const filteredCases = getFilteredCases();
+            const total = filteredCases.length;
+            const activos = filteredCases.filter(c => c.status === 'active' || c.status === 'improving').length;
+            const recuperados = filteredCases.filter(c => c.status === 'recovered' || c.status === 'Recuperado' || c.status === 'recuperado').length;
+            const pendientes = filteredCases.filter(c => c.daysElapsed > 30 && (c.status === 'active' || c.status === 'extended')).length;
+            const criticos = filteredCases.filter(c => c.daysElapsed > 90 && c.status === 'active').length;
 
             document.getElementById('totalIncapacidades').textContent = total.toLocaleString();
             document.getElementById('casosActivos').textContent = activos.toLocaleString();
+            document.getElementById('casosRecuperados').textContent = recuperados.toLocaleString();
             document.getElementById('seguimientosPendientes').textContent = pendientes.toLocaleString();
             document.getElementById('casosCriticos').textContent = criticos.toLocaleString();
         }
@@ -1511,6 +1534,7 @@
 
         // Filtrar casos
         function filterCases() {
+            updateStats();  // Actualizar estadísticas cuando se aplican filtros
             renderCasesTable();
         }
 

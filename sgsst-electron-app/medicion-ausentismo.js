@@ -289,11 +289,10 @@ class MedicionAusentismoComponent {
                         id: event.data.id,
                         data: result
                     }, '*');
-                } else if (event.data.type === 'LOAD_FOLLOW_UP_DATA') {
+                } else if (event.data && event.data.type === 'LOAD_FOLLOW_UP_DATA') {
                     // Llamar a la API de Electron para cargar datos de seguimiento
-                    const result = await window.electronAPI.loadFollowUpData(
-                        event.data.companyName
-                    );
+                    const companyName = event.data.companyName || this.currentCompany;
+                    const result = await window.electronAPI.loadFollowUpData(companyName);
                     // Enviar la respuesta de vuelta al iframe
                     iframe.contentWindow.postMessage({
                         type: 'LOAD_FOLLOW_UP_DATA_RESPONSE',
