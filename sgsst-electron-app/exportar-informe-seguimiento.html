@@ -1,0 +1,1778 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exportar Informe de Seguimiento - TEMPOACTIVA</title>
+    <!-- Font Awesome para iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- SheetJS para Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- jsPDF para PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <style>
+        :root {
+            --primary-color: #6366f1;
+            --primary-light: #e0e7ff;
+            --primary-dark: #4f46e5;
+            --secondary-color: #8b5cf6;
+            --accent-color: #ec4899;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --info-color: #3b82f6;
+            --light-color: #f8fafc;
+            --dark-color: #1e293b;
+            --gray-color: #64748b;
+            --white-color: #ffffff;
+            --border-color: #e2e8f0;
+            --border-radius-sm: 8px;
+            --border-radius-md: 12px;
+            --border-radius-lg: 16px;
+            --border-radius-xl: 20px;
+            --box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --box-shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            --box-shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            --transition-fast: 0.15s ease;
+            --transition-normal: 0.3s ease;
+            --transition-slow: 0.5s ease;
+            --text-color: #334155;
+            --text-light-color: #64748b;
+            --heading-color: #1e293b;
+            --card-bg: #ffffff;
+            --header-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: var(--text-color);
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Contenedor principal */
+        .app-container {
+            min-height: 100vh;
+            background: var(--light-color);
+        }
+
+        /* Header */
+        .app-header {
+            background: var(--header-bg);
+            color: var(--white-color);
+            padding: 20px 30px;
+            box-shadow: var(--box-shadow-lg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .app-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="%23ffffff" fill-opacity="0.1" d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,122.7C672,117,768,139,864,138.7C960,139,1056,117,1152,106.7C1248,96,1344,96,1392,96L1440,96L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>') no-repeat bottom;
+            background-size: cover;
+        }
+
+        .header-content {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .header-logo {
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: var(--border-radius-lg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            backdrop-filter: blur(10px);
+            transition: var(--transition-normal);
+        }
+
+        .header-logo:hover {
+            transform: scale(1.05);
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .header-title {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .header-subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-top: 4px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        /* Contenido principal */
+        .main-content {
+            display: flex;
+            padding: 30px;
+            gap: 30px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        /* Panel de configuración */
+        .config-panel {
+            background: var(--card-bg);
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--box-shadow);
+            padding: 25px;
+            width: 350px;
+            height: fit-content;
+            position: sticky;
+            top: 30px;
+        }
+
+        .panel-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--heading-color);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text-color);
+            font-size: 14px;
+        }
+
+        .form-control {
+            display: block;
+            width: 100%;
+            padding: 12px 15px;
+            font-size: 14px;
+            line-height: 1.5;
+            color: var(--text-color);
+            background-color: var(--white-color);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius-md);
+            transition: var(--transition-normal);
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .checkbox-group label {
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        /* Selector de período */
+        .period-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .period-selector select {
+            flex: 1;
+        }
+
+        .period-selector button {
+            padding: 12px 15px;
+            background: var(--primary-color);
+            color: var(--white-color);
+            border: none;
+            border-radius: var(--border-radius-md);
+            cursor: pointer;
+            transition: var(--transition-normal);
+        }
+
+        .period-selector button:hover {
+            background: var(--primary-dark);
+        }
+
+        /* Botones de exportación */
+        .export-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .export-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 15px 20px;
+            border: none;
+            border-radius: var(--border-radius-md);
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition-normal);
+            text-decoration: none;
+        }
+
+        .export-btn.excel {
+            background: linear-gradient(135deg, #217346, #107c41);
+            color: var(--white-color);
+        }
+
+        .export-btn.excel:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--box-shadow-lg);
+        }
+
+        .export-btn.pdf {
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+            color: var(--white-color);
+        }
+
+        .export-btn.pdf:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--box-shadow-lg);
+        }
+
+        /* Contenedor de vista previa */
+        .preview-container {
+            flex: 1;
+            background: var(--card-bg);
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--box-shadow);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .preview-header {
+            background: var(--light-color);
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .preview-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--heading-color);
+        }
+
+        .preview-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .preview-btn {
+            padding: 8px 15px;
+            border: 1px solid var(--border-color);
+            background: var(--white-color);
+            border-radius: var(--border-radius-sm);
+            cursor: pointer;
+            font-size: 13px;
+            transition: var(--transition-fast);
+        }
+
+        .preview-btn:hover {
+            background: var(--primary-light);
+            border-color: var(--primary-color);
+        }
+
+        .preview-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0;
+        }
+
+        /* Estilo del informe */
+        .report-container {
+            background: var(--white-color);
+            min-height: 842px; /* Tamaño A4 */
+            position: relative;
+        }
+
+        .report-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: var(--white-color);
+            padding: 40px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .report-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+        }
+
+        .report-logo {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            margin: 0 auto 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .report-title {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .report-subtitle {
+            font-size: 18px;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }
+
+        .report-meta {
+            background: var(--light-color);
+            padding: 25px 40px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        .meta-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .meta-label {
+            font-size: 12px;
+            color: var(--text-light-color);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+
+        .meta-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--heading-color);
+        }
+
+        .report-content {
+            padding: 40px;
+        }
+
+        .report-section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title i {
+            font-size: 18px;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .summary-card {
+            background: var(--light-color);
+            border-radius: var(--border-radius-md);
+            padding: 20px;
+            text-align: center;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .summary-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 5px;
+        }
+
+        .summary-label {
+            font-size: 14px;
+            color: var(--text-light-color);
+        }
+
+        .cases-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+
+        .cases-table th,
+        .cases-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .cases-table th {
+            background: var(--light-color);
+            font-weight: 600;
+            color: var(--heading-color);
+            font-size: 14px;
+        }
+
+        .cases-table td {
+            font-size: 14px;
+        }
+
+        .cases-table tr:hover {
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-badge.active {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success-color);
+        }
+
+        .status-badge.pending {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning-color);
+        }
+
+        .status-badge.critical {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger-color);
+        }
+
+        /* Sección de seguimientos agrupados */
+        .follow-ups-grouped {
+            margin-bottom: 30px;
+        }
+
+        .status-group {
+            margin-bottom: 25px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius-lg);
+            overflow: hidden;
+        }
+
+        .status-group-header {
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .status-group-header.active {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success-color);
+        }
+
+        .status-group-header.pending {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning-color);
+        }
+
+        .status-group-header.critical {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger-color);
+        }
+
+        .status-group-content {
+            padding: 0;
+        }
+
+        .follow-up-item {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border-color);
+            transition: var(--transition-normal);
+        }
+
+        .follow-up-item:last-child {
+            border-bottom: none;
+        }
+
+        .follow-up-item:hover {
+            background: var(--light-color);
+        }
+
+        .follow-up-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .follow-up-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .follow-up-id {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .follow-up-employee {
+            color: var(--text-color);
+        }
+
+        .follow-up-meta {
+            display: flex;
+            gap: 15px;
+            font-size: 12px;
+            color: var(--text-light-color);
+        }
+
+        .follow-up-content {
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+
+        .follow-up-details {
+            display: flex;
+            gap: 20px;
+            font-size: 13px;
+        }
+
+        .follow-up-detail {
+            flex: 1;
+        }
+
+        .follow-up-detail strong {
+            color: var(--text-color);
+            display: block;
+            margin-bottom: 3px;
+        }
+
+        .follow-up-detail span {
+            color: var(--text-light-color);
+        }
+
+        .report-footer {
+            background: var(--light-color);
+            padding: 30px 40px;
+            text-align: center;
+            border-top: 2px solid var(--border-color);
+            margin-top: 40px;
+        }
+
+        .footer-text {
+            font-size: 14px;
+            color: var(--text-light-color);
+        }
+
+        /* Loading overlay */
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .loading-content {
+            background: var(--white-color);
+            padding: 30px;
+            border-radius: var(--border-radius-lg);
+            text-align: center;
+            box-shadow: var(--box-shadow-xl);
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid var(--border-color);
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .main-content {
+                flex-direction: column;
+            }
+            
+            .config-panel {
+                width: 100%;
+                position: static;
+            }
+            
+            .summary-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .meta-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .summary-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .cases-table {
+                font-size: 12px;
+            }
+            
+            .cases-table th,
+            .cases-table td {
+                padding: 8px 10px;
+            }
+            
+            .follow-up-details {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="header-left">
+                    <div class="header-logo">
+                        <i class="fas fa-file-export"></i>
+                    </div>
+                    <div>
+                        <h1 class="header-title">Exportar Informe de Seguimiento</h1>
+                        <p class="header-subtitle">Generar informe para gerencia</p>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <button class="preview-btn" onclick="window.close() || history.back()">
+                        <i class="fas fa-arrow-left"></i> Volver
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Contenido principal -->
+        <main class="main-content">
+            <!-- Panel de configuración -->
+            <aside class="config-panel">
+                <h2 class="panel-title">
+                    <i class="fas fa-cog"></i> Configuración del Informe
+                </h2>
+                
+                <div class="form-group">
+                    <label class="form-label" for="reportTitle">Título del Informe</label>
+                    <input type="text" class="form-control" id="reportTitle" value="Informe de Seguimiento de Incapacidades">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Período del Informe</label>
+                    <div class="period-selector">
+                        <select class="form-control" id="reportMonth">
+                            <option value="enero">Enero</option>
+                            <option value="febrero">Febrero</option>
+                            <option value="marzo">Marzo</option>
+                            <option value="abril">Abril</option>
+                            <option value="mayo">Mayo</option>
+                            <option value="junio">Junio</option>
+                            <option value="julio">Julio</option>
+                            <option value="agosto">Agosto</option>
+                            <option value="septiembre">Septiembre</option>
+                            <option value="octubre" selected>Octubre</option>
+                            <option value="noviembre">Noviembre</option>
+                            <option value="diciembre">Diciembre</option>
+                        </select>
+                        <select class="form-control" id="reportYear">
+                            <option value="2023" selected>2023</option>
+                            <option value="2024">2024</option>
+                            <option value="2025">2025</option>
+                        </select>
+                    </div>
+                    <input type="text" class="form-control" id="reportPeriod" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="preparedBy">Preparado por</label>
+                    <input type="text" class="form-control" id="preparedBy" value="Departamento de Salud Ocupacional">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Secciones a incluir</label>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="includeSummary" checked>
+                        <label for="includeSummary">Resumen Ejecutivo</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="includeStatistics" checked>
+                        <label for="includeStatistics">Estadísticas Generales</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="includeCases" checked>
+                        <label for="includeCases">Listado de Casos</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="includeCharts" checked>
+                        <label for="includeCharts">Gráficos y Análisis</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="includeFollowUps" checked>
+                        <label for="includeFollowUps">Seguimientos Detallados</label>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="reportFormat">Formato de Fecha</label>
+                    <select class="form-control" id="reportFormat">
+                        <option value="dd/mm/yyyy">DD/MM/YYYY</option>
+                        <option value="mm/dd/yyyy">MM/DD/YYYY</option>
+                        <option value="yyyy-mm-dd">YYYY-MM-DD</option>
+                    </select>
+                </div>
+                
+                <!-- Botones de exportación -->
+                <div class="export-buttons">
+                    <button class="export-btn excel" onclick="exportToExcel()">
+                        <i class="fas fa-file-excel"></i> Exportar a Excel
+                    </button>
+                    <button class="export-btn pdf" onclick="exportToPDF()">
+                        <i class="fas fa-file-pdf"></i> Exportar a PDF
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Contenedor de vista previa -->
+            <div class="preview-container">
+                <div class="preview-header">
+                    <h2 class="preview-title">Vista Previa del Informe</h2>
+                    <div class="preview-actions">
+                        <button class="preview-btn" onclick="refreshPreview()">
+                            <i class="fas fa-sync-alt"></i> Actualizar
+                        </button>
+                        <button class="preview-btn" onclick="printPreview()">
+                            <i class="fas fa-print"></i> Imprimir
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="preview-content">
+                    <div class="report-container" id="reportContent">
+                        <!-- Cabecera del informe -->
+                        <div class="report-header">
+                            <div class="report-logo">
+                                <i class="fas fa-heartbeat"></i>
+                            </div>
+                            <h1 class="report-title" id="previewTitle">Informe de Seguimiento de Incapacidades</h1>
+                            <p class="report-subtitle">Sistema de Gestión de Salud Ocupacional</p>
+                        </div>
+                        
+                        <!-- Metadatos del informe -->
+                        <div class="report-meta">
+                            <div class="meta-grid">
+                                <div class="meta-item">
+                                    <span class="meta-label">Período</span>
+                                    <span class="meta-value" id="previewPeriod">Octubre 2023</span>
+                                </div>
+                                <div class="meta-item">
+                                    <span class="meta-label">Fecha de Generación</span>
+                                    <span class="meta-value" id="previewDate">25 de octubre de 2023</span>
+                                </div>
+                                <div class="meta-item">
+                                    <span class="meta-label">Preparado por</span>
+                                    <span class="meta-value" id="previewPreparedBy">Departamento de Salud Ocupacional</span>
+                                </div>
+                                <div class="meta-item">
+                                    <span class="meta-label">Empresa</span>
+                                    <span class="meta-value">TEMPOACTIVA S.A.S.</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Contenido del informe -->
+                        <div class="report-content">
+                            <!-- Resumen ejecutivo -->
+                            <div class="report-section" id="summarySection">
+                                <h3 class="section-title">
+                                    <i class="fas fa-chart-line"></i> Resumen Ejecutivo
+                                </h3>
+                                <div class="summary-grid">
+                                    <div class="summary-card">
+                                        <div class="summary-value">1,199</div>
+                                        <div class="summary-label">Total de Incapacidades</div>
+                                    </div>
+                                    <div class="summary-card">
+                                        <div class="summary-value">847</div>
+                                        <div class="summary-label">Casos Activos</div>
+                                    </div>
+                                    <div class="summary-card">
+                                        <div class="summary-value">352</div>
+                                        <div class="summary-label">Seguimientos Realizados</div>
+                                    </div>
+                                    <div class="summary-card">
+                                        <div class="summary-value">28</div>
+                                        <div class="summary-label">Casos Críticos</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Estadísticas generales -->
+                            <div class="report-section" id="statisticsSection">
+                                <h3 class="section-title">
+                                    <i class="fas fa-chart-bar"></i> Estadísticas Generales
+                                </h3>
+                                <p style="margin-bottom: 20px; line-height: 1.6;">
+                                    Durante el período analizado, se ha registrado un total de 1,199 incapacidades, 
+                                    de las cuales 847 se encuentran actualmente activas. Se han realizado 352 seguimientos 
+                                    médicos, con un promedio de 2.4 seguimientos por caso. Los casos críticos representan 
+                                    el 2.3% del total, requiriendo atención prioritaria por parte del departamento de salud ocupacional.
+                                </p>
+                                <div class="summary-grid">
+                                    <div class="summary-card">
+                                        <div class="summary-value">6,799</div>
+                                        <div class="summary-label">Días Totales de Incapacidad</div>
+                                    </div>
+                                    <div class="summary-card">
+                                        <div class="summary-value">12.5</div>
+                                        <div class="summary-label">Días Promedio por Caso</div>
+                                    </div>
+                                    <div class="summary-card">
+                                        <div class="summary-value">89%</div>
+                                        <div class="summary-label">Tasa de Seguimiento</div>
+                                    </div>
+                                    <div class="summary-card">
+                                        <div class="summary-value">94%</div>
+                                        <div class="summary-label">Tasa de Recuperación</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Listado de casos -->
+                            <div class="report-section" id="casesSection">
+                                <h3 class="section-title">
+                                    <i class="fas fa-list"></i> Listado de Casos Activos
+                                </h3>
+                                <table class="cases-table">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Empleado</th>
+                                            <th>Diagnóstico</th>
+                                            <th>Fecha Inicio</th>
+                                            <th>Días</th>
+                                            <th>Estado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>INC-2023-001</td>
+                                            <td>Juan Pérez Martínez</td>
+                                            <td>Lumbalgia aguda</td>
+                                            <td>15/10/2023</td>
+                                            <td>12</td>
+                                            <td><span class="status-badge active">Activo</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>INC-2023-002</td>
+                                            <td>María López García</td>
+                                            <td>Fractura de muñeca</td>
+                                            <td>28/09/2023</td>
+                                            <td>29</td>
+                                            <td><span class="status-badge pending">Mejorando</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>INC-2023-003</td>
+                                            <td>Carlos Ruiz Sánchez</td>
+                                            <td>Neumonía</td>
+                                            <td>05/10/2023</td>
+                                            <td>22</td>
+                                            <td><span class="status-badge active">Activo</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>INC-2023-004</td>
+                                            <td>Ana Martínez Díaz</td>
+                                            <td>Dolor lumbar crónico</td>
+                                            <td>12/08/2023</td>
+                                            <td>76</td>
+                                            <td><span class="status-badge critical">Crítico</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>INC-2023-005</td>
+                                            <td>Pedro Gómez López</td>
+                                            <td>Tendinitis en hombro</td>
+                                            <td>18/10/2023</td>
+                                            <td>9</td>
+                                            <td><span class="status-badge active">Activo</span></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <!-- Seguimientos agrupados por estado -->
+                            <div class="report-section" id="followUpsSection">
+                                <h3 class="section-title">
+                                    <i class="fas fa-clipboard-list"></i> Seguimientos Detallados por Estado
+                                </h3>
+                                <div class="follow-ups-grouped" id="followUpsGrouped">
+                                    <!-- Los seguimientos se generarán dinámicamente -->
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Pie del informe -->
+                        <div class="report-footer">
+                            <p class="footer-text">
+                                Este informe ha sido generado automáticamente por el Sistema de Gestión de Salud Ocupacional de TEMPOACTIVA S.A.S.<br>
+                                Para cualquier consulta o aclaración, contacte al Departamento de Salud Ocupacional.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Loading overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <h3>Generando informe...</h3>
+            <p>Por favor espere un momento</p>
+        </div>
+    </div>
+
+    <script>
+        // Función para cargar datos reales desde el sistema
+        function loadRealData() {
+            return new Promise((resolve, reject) => {
+                try {
+                    // Intentar obtener datos del sistema a través de la API de Electron si está disponible
+                    if (window.opener && window.opener.window && window.opener.window.electronAPI) {
+                        // Si estamos en una ventana hija del sistema principal, usar la API directamente
+                        window.opener.window.electronAPI.exportIncapacityData(window.opener.currentCompany || 'Tempoactiva')
+                            .then(result => {
+                                if (result && result.success) {
+                                    // Procesar los datos reales obtenidos
+                                    const realReportData = processRealData(result);
+                                    resolve(realReportData);
+                                } else {
+                                    console.warn('No se pudieron obtener datos reales, usando datos de ejemplo');
+                                    resolve(reportData);
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error obteniendo datos reales:', error);
+                                resolve(reportData); // Usar datos de ejemplo como fallback
+                            });
+                    } else if (window.parent && window.parent !== window) {
+                        // Si estamos en un iframe, comunicarnos con el padre
+                        const messageId = Date.now();
+                        const message = {
+                            type: 'REQUEST_REAL_DATA_FOR_EXPORT',
+                            id: messageId,
+                            target: 'export-interface'
+                        };
+
+                        // Esperar respuesta del padre
+                        const handleMessage = (event) => {
+                            if (event.data && event.data.type === 'REAL_DATA_FOR_EXPORT' && event.data.id === messageId) {
+                                window.removeEventListener('message', handleMessage);
+                                if (event.data.data) {
+                                    const processedData = processRealData(event.data.data);
+                                    resolve(processedData);
+                                } else {
+                                    resolve(reportData); // Fallback a datos de ejemplo
+                                }
+                            }
+                        };
+
+                        window.addEventListener('message', handleMessage);
+                        window.parent.postMessage(message, '*');
+
+                        // Timeout después de 10 segundos
+                        setTimeout(() => {
+                            window.removeEventListener('message', handleMessage);
+                            resolve(reportData); // Usar datos de ejemplo como fallback
+                        }, 10000);
+                    } else {
+                        // Si no estamos en una relación de padre/hijo, usar datos de ejemplo
+                        resolve(reportData);
+                    }
+                } catch (error) {
+                    console.error('Error en loadRealData:', error);
+                    reject(error);
+                }
+            });
+        }
+
+        // Función para procesar datos reales del sistema
+        function processRealData(rawData) {
+            // Esta función procesa los datos crudos del sistema y los convierte al formato necesario
+            // para la interfaz de exportación
+
+            // Si ya están en el formato correcto, simplemente retornarlos
+            if (rawData.cases && rawData.summary) {
+                return rawData;
+            }
+
+            // Si son datos crudos del archivo de ausentismo, procesarlos
+            let processedData = { ...reportData };
+
+            // Si hay datos del archivo de seguimiento, usarlos
+            if (rawData.followUps) {
+                processedData.cases = [];
+
+                // Procesar los datos de seguimiento
+                for (const empId in rawData.followUps) {
+                    const followUps = rawData.followUps[empId];
+                    if (followUps && followUps.length > 0) {
+                        // Tomar el último seguimiento como el estado actual
+                        const latestFollowUp = followUps[followUps.length - 1];
+
+                        // Mapear al formato esperado
+                        const caseItem = {
+                            id: `INC-${empId.substring(0, 6)}`,
+                            employeeName: latestFollowUp["Nombre Empleado"] || `Empleado ${empId}`,
+                            diagnosis: latestFollowUp["Diagnóstico"] || latestFollowUp.Diagnosis || '',
+                            startDate: latestFollowUp["Fecha Seguimiento"] || new Date().toISOString().split('T')[0],
+                            daysElapsed: calculateDaysElapsed(latestFollowUp["Fecha Seguimiento"]),
+                            status: latestFollowUp["Estado Caso"]?.toLowerCase() || 'active',
+                            lastFollowUp: latestFollowUp["Fecha Seguimiento"],
+                            evolution: latestFollowUp["Evolución"] || latestFollowUp.Evolution || '',
+                            recommendations: latestFollowUp["Recomendaciones"] || latestFollowUp.Recommendations || ''
+                        };
+
+                        processedData.cases.push(caseItem);
+                    }
+                }
+            }
+
+            // Actualizar resumen si hay información
+            processedData.summary.totalIncapacities = processedData.cases.length;
+            processedData.summary.activeCases = processedData.cases.filter(c => c.status === 'active' || c.status === 'improving').length;
+            processedData.summary.criticalCases = processedData.cases.filter(c => c.status === 'critical').length;
+
+            return processedData;
+        }
+
+        // Función para calcular días transcurridos
+        function calculateDaysElapsed(startDate) {
+            try {
+                const date = new Date(startDate);
+                if (isNaN(date.getTime())) return 0;
+
+                const today = new Date();
+                const diffTime = Math.abs(today - date);
+                return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            } catch (error) {
+                return 0;
+            }
+        }
+
+        // Datos de ejemplo para el informe
+        const reportData = {
+            title: 'Informe de Seguimiento de Incapacidades',
+            month: 'octubre',
+            year: '2023',
+            preparedBy: 'Departamento de Salud Ocupacional',
+            company: 'TEMPOACTIVA S.A.S.',
+            generationDate: new Date().toLocaleDateString('es-ES', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            }),
+            summary: {
+                totalIncapacities: 1199,
+                activeCases: 847,
+                followUps: 352,
+                criticalCases: 28,
+                totalDays: 6799,
+                averageDays: 12.5,
+                followUpRate: 89,
+                recoveryRate: 94
+            },
+            cases: [
+                {
+                    id: 'INC-2023-001',
+                    employeeName: 'Juan Pérez Martínez',
+                    diagnosis: 'Lumbalgia aguda',
+                    startDate: '15/10/2023',
+                    daysElapsed: 12,
+                    status: 'active',
+                    lastFollowUp: '24/10/2023',
+                    evolution: 'Paciente refiere mejoría con el tratamiento. Dolor disminuido de 7/10 a 4/10.',
+                    recommendations: 'Continuar con fisioterapia y medicación actual. Próxima revisión en 5 días.'
+                },
+                {
+                    id: 'INC-2023-002',
+                    employeeName: 'María López García',
+                    diagnosis: 'Fractura de muñeca',
+                    startDate: '28/09/2023',
+                    daysElapsed: 29,
+                    status: 'improving',
+                    lastFollowUp: '22/10/2023',
+                    evolution: 'Radiografía de control muestra buena consolidación ósea. Paciente puede iniciar movimientos de rehabilitación.',
+                    recommendations: 'Comenzar con terapia física. Retirar inmovilización parcial.'
+                },
+                {
+                    id: 'INC-2023-003',
+                    employeeName: 'Carlos Ruiz Sánchez',
+                    diagnosis: 'Neumonía',
+                    startDate: '05/10/2023',
+                    daysElapsed: 22,
+                    status: 'active',
+                    lastFollowUp: '20/10/2023',
+                    evolution: 'Paciente mostrando buena respuesta al tratamiento antibiótico. Síntomas respiratorios en mejora.',
+                    recommendations: 'Completar tratamiento antibiótico. Control radiográfico de seguimiento.'
+                },
+                {
+                    id: 'INC-2023-004',
+                    employeeName: 'Ana Martínez Díaz',
+                    diagnosis: 'Dolor lumbar crónico',
+                    startDate: '12/08/2023',
+                    daysElapsed: 76,
+                    status: 'critical',
+                    lastFollowUp: '25/10/2023',
+                    evolution: 'Paciente con 76 días de incapacidad, presenta mejoría mínima a pesar del tratamiento. Limitación funcional persistente.',
+                    recommendations: 'Evaluación por especialista. Considerar incapacidad permanente. Reubicación laboral.'
+                },
+                {
+                    id: 'INC-2023-005',
+                    employeeName: 'Pedro Gómez López',
+                    diagnosis: 'Tendinitis en hombro',
+                    startDate: '18/10/2023',
+                    daysElapsed: 9,
+                    status: 'active',
+                    lastFollowUp: '26/10/2023',
+                    evolution: 'Paciente refiere dolor al movimiento de abducción. Mejoría con antiinflamatorios.',
+                    recommendations: 'Fisioterapia específica. Modificar actividades laborales temporales.'
+                },
+                {
+                    id: 'INC-2023-006',
+                    employeeName: 'Laura Fernández Martín',
+                    diagnosis: 'Migraña crónica',
+                    startDate: '02/10/2023',
+                    daysElapsed: 25,
+                    status: 'improving',
+                    lastFollowUp: '23/10/2023',
+                    evolution: 'Paciente con disminución de frecuencia de crisis. Tratamiento profiláctico efectivo.',
+                    recommendations: 'Mantener tratamiento preventivo. Seguimiento neurológico en 3 meses.'
+                },
+                {
+                    id: 'INC-2023-007',
+                    employeeName: 'Miguel Ángel Torres',
+                    diagnosis: 'Hernia discal lumbar',
+                    startDate: '20/09/2023',
+                    daysElapsed: 37,
+                    status: 'critical',
+                    lastFollowUp: '24/10/2023',
+                    evolution: 'Dolor refractario a tratamiento conservador. Limitación funcional severa. No responde a fisioterapia.',
+                    recommendations: 'Evaluación quirúrgica. Considerar intervención neuroquirúrgica. Valoración por cirujano de columna.'
+                },
+                {
+                    id: 'INC-2023-008',
+                    employeeName: 'Sofía Ramírez Díaz',
+                    diagnosis: 'Epicondilitis codo derecho',
+                    startDate: '10/10/2023',
+                    daysElapsed: 17,
+                    status: 'active',
+                    lastFollowUp: '25/10/2023',
+                    evolution: 'Mejoría con tratamiento fisioterápico y modificación de actividades. Dolor disminuido.',
+                    recommendations: 'Continuar rehabilitación. Progresión gradual de actividades. Reevaluación en 2 semanas.'
+                }
+            ]
+        };
+
+        // Listener para recibir datos del padre
+        window.addEventListener('message', function(event) {
+            // Verificar que el mensaje provenga del mismo origen o del padre
+            if (event.data && event.data.type === 'INITIALIZE_EXPORT_DATA') {
+                // Procesar los datos recibidos y actualizar la interfaz
+                if (event.data.data) {
+                    const processedData = processRealData(event.data.data);
+                    // Actualizar los datos globales con la información recibida
+                    Object.assign(reportData, processedData);
+                    updatePreview();
+                    renderFollowUpsGrouped();
+                    showNotification('Datos recibidos y cargados correctamente', 'success');
+                }
+
+                if (event.data.companyName) {
+                    // Actualizar el nombre de la empresa en el informe si es necesario
+                    const metaItems = document.querySelectorAll('.meta-item');
+                    metaItems.forEach(item => {
+                        const label = item.querySelector('.meta-label');
+                        if (label && label.textContent.includes('Empresa')) {
+                            item.querySelector('.meta-value').textContent = event.data.companyName;
+                        }
+                    });
+                }
+            }
+        });
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', function() {
+            // Intentar cargar datos reales o usar los de ejemplo
+            loadRealData().then((data) => {
+                // Puede que aquí se actualicen los datos con los reales del sistema
+                updatePreview();
+                setupEventListeners();
+                renderFollowUpsGrouped();
+            }).catch(() => {
+                // Si hay error, usar los datos de ejemplo
+                updatePreview();
+                setupEventListeners();
+                renderFollowUpsGrouped();
+            });
+
+            // Si no se recibieron datos del padre, intentar cargar directamente del sistema
+            if (window.opener) {
+                // Enviar solicitud para intentar cargar datos si somos una ventana hija
+                setTimeout(() => {
+                    if (window.opener && typeof window.opener.window !== 'undefined') {
+                        // Intentar obtener datos directamente del sistema si tenemos acceso al opener
+                        try {
+                            if (window.opener.window.electronAPI) {
+                                // Intentar cargar datos directamente a través del opener
+                                // Solo si no hay datos previamente recibidos
+                            }
+                        } catch (e) {
+                            console.log('No se pudo acceder directamente al API del opener:', e);
+                        }
+                    }
+                }, 1000); // Esperar 1 segundo para dar tiempo a establecer comunicación
+            }
+        });
+
+        // Configurar event listeners
+        function setupEventListeners() {
+            // Actualizar período cuando cambian los selectores
+            document.getElementById('reportMonth').addEventListener('change', updatePeriodDisplay);
+            document.getElementById('reportYear').addEventListener('change', updatePeriodDisplay);
+            
+            // Actualizar vista previa cuando cambian los campos
+            document.getElementById('reportTitle').addEventListener('input', updatePreview);
+            document.getElementById('preparedBy').addEventListener('input', updatePreview);
+            
+            // Mostrar/ocultar secciones
+            document.getElementById('includeSummary').addEventListener('change', toggleSection);
+            document.getElementById('includeStatistics').addEventListener('change', toggleSection);
+            document.getElementById('includeCases').addEventListener('change', toggleSection);
+            document.getElementById('includeCharts').addEventListener('change', toggleSection);
+            document.getElementById('includeFollowUps').addEventListener('change', toggleSection);
+        }
+
+        // Actualizar display del período
+        function updatePeriodDisplay() {
+            const month = document.getElementById('reportMonth').value;
+            const year = document.getElementById('reportYear').value;
+            
+            // Capitalizar primera letra del mes
+            const capitalizedMonth = month.charAt(0).toUpperCase() + month.slice(1);
+            
+            document.getElementById('reportPeriod').value = `${capitalizedMonth} ${year}`;
+            updatePreview();
+        }
+
+        // Actualizar vista previa
+        function updatePreview() {
+            document.getElementById('previewTitle').textContent = document.getElementById('reportTitle').value;
+            document.getElementById('previewPeriod').textContent = document.getElementById('reportPeriod').value;
+            document.getElementById('previewPreparedBy').textContent = document.getElementById('preparedBy').value;
+            document.getElementById('previewDate').textContent = reportData.generationDate;
+        }
+
+        // Mostrar/ocultar secciones
+        function toggleSection() {
+            const sectionId = this.id.replace('include', '').toLowerCase();
+            const section = document.getElementById(`${sectionId}Section`);
+            
+            if (section) {
+                section.style.display = this.checked ? 'block' : 'none';
+            }
+        }
+
+        // Renderizar seguimientos agrupados por estado
+        function renderFollowUpsGrouped() {
+            const container = document.getElementById('followUpsGrouped');
+            container.innerHTML = '';
+            
+            // Agrupar casos por estado
+            const groupedCases = {
+                active: [],
+                improving: [],
+                critical: []
+            };
+            
+            reportData.cases.forEach(caseItem => {
+                groupedCases[caseItem.status].push(caseItem);
+            });
+            
+            // Renderizar cada grupo
+            Object.keys(groupedCases).forEach(status => {
+                if (groupedCases[status].length > 0) {
+                    const statusGroup = createStatusGroup(status, groupedCases[status]);
+                    container.appendChild(statusGroup);
+                }
+            });
+        }
+
+        // Crear grupo de estado
+        function createStatusGroup(status, cases) {
+            const statusConfig = {
+                active: {
+                    label: 'Casos Activos',
+                    color: 'success',
+                    icon: 'user-check'
+                },
+                improving: {
+                    label: 'Casos en Mejora',
+                    color: 'warning',
+                    icon: 'arrow-trend-up'
+                },
+                critical: {
+                    label: 'Casos Críticos',
+                    color: 'danger',
+                    icon: 'exclamation-triangle'
+                }
+            };
+            
+            const config = statusConfig[status];
+            
+            const group = document.createElement('div');
+            group.className = 'status-group';
+            
+            // Header del grupo
+            const header = document.createElement('div');
+            header.className = `status-group-header ${status}`;
+            header.innerHTML = `
+                <i class="fas fa-${config.icon}"></i>
+                ${config.label} (${cases.length})
+            `;
+            group.appendChild(header);
+            
+            // Contenido del grupo
+            const content = document.createElement('div');
+            content.className = 'status-group-content';
+            
+            cases.forEach(caseItem => {
+                const followUpItem = createFollowUpItem(caseItem);
+                content.appendChild(followUpItem);
+            });
+            
+            group.appendChild(content);
+            return group;
+        }
+
+        // Crear item de seguimiento
+        function createFollowUpItem(caseItem) {
+            const item = document.createElement('div');
+            item.className = 'follow-up-item';
+            
+            const statusText = caseItem.status === 'active' ? 'Activo' : 
+                             caseItem.status === 'improving' ? 'Mejorando' : 'Crítico';
+            
+            item.innerHTML = `
+                <div class="follow-up-header">
+                    <div class="follow-up-info">
+                        <span class="follow-up-id">${caseItem.id}</span>
+                        <span class="follow-up-employee">${caseItem.employeeName}</span>
+                    </div>
+                    <span class="status-badge ${caseItem.status}">${statusText}</span>
+                </div>
+                <div class="follow-up-content">
+                    <strong>Diagnóstico:</strong> ${caseItem.diagnosis}<br>
+                    <strong>Evolución:</strong> ${caseItem.evolution}
+                </div>
+                <div class="follow-up-details">
+                    <div class="follow-up-detail">
+                        <strong>Fecha Inicio:</strong>
+                        <span>${caseItem.startDate}</span>
+                    </div>
+                    <div class="follow-up-detail">
+                        <strong>Días Transcurridos:</strong>
+                        <span>${caseItem.daysElapsed}</span>
+                    </div>
+                    <div class="follow-up-detail">
+                        <strong>Último Seguimiento:</strong>
+                        <span>${caseItem.lastFollowUp}</span>
+                    </div>
+                    <div class="follow-up-detail">
+                        <strong>Recomendaciones:</strong>
+                        <span>${caseItem.recommendations}</span>
+                    </div>
+                </div>
+            `;
+            
+            return item;
+        }
+
+        // Exportar a Excel
+        async function exportToExcel() {
+            showLoading(true);
+            
+            try {
+                // Crear workbook
+                const wb = XLSX.utils.book_new();
+                
+                // Hoja de resumen
+                const summaryData = [
+                    ['INFORME DE SEGUIMIENTO DE INCAPACIDADES'],
+                    [],
+                    ['Empresa', reportData.company],
+                    ['Período', document.getElementById('reportPeriod').value],
+                    ['Fecha de Generación', reportData.generationDate],
+                    ['Preparado por', document.getElementById('preparedBy').value],
+                    [],
+                    ['RESUMEN EJECUTIVO'],
+                    ['Total de Incapacidades', reportData.summary.totalIncapacities],
+                    ['Casos Activos', reportData.summary.activeCases],
+                    ['Seguimientos Realizados', reportData.summary.followUps],
+                    ['Casos Críticos', reportData.summary.criticalCases],
+                    ['Días Totales', reportData.summary.totalDays],
+                    ['Días Promedio', reportData.summary.averageDays],
+                    ['Tasa de Seguimiento', reportData.summary.followUpRate + '%'],
+                    ['Tasa de Recuperación', reportData.summary.recoveryRate + '%']
+                ];
+                
+                const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+                XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumen');
+                
+                // Hoja de casos
+                if (document.getElementById('includeCases').checked) {
+                    const casesData = [
+                        ['ID', 'Empleado', 'Diagnóstico', 'Fecha Inicio', 'Días Transcurridos', 'Estado', 'Último Seguimiento', 'Evolución', 'Recomendaciones'],
+                        ...reportData.cases.map(c => [
+                            c.id,
+                            c.employeeName,
+                            c.diagnosis,
+                            c.startDate,
+                            c.daysElapsed,
+                            c.status === 'active' ? 'Activo' : 
+                            c.status === 'improving' ? 'Mejorando' : 'Crítico',
+                            c.lastFollowUp,
+                            c.evolution,
+                            c.recommendations
+                        ])
+                    ];
+                    
+                    const wsCases = XLSX.utils.aoa_to_sheet(casesData);
+                    XLSX.utils.book_append_sheet(wb, wsCases, 'Casos');
+                }
+                
+                // Hoja de seguimientos agrupados
+                if (document.getElementById('includeFollowUps').checked) {
+                    const followUpsData = [
+                        ['Estado', 'ID', 'Empleado', 'Diagnóstico', 'Fecha Inicio', 'Días Transcurridos', 'Último Seguimiento', 'Evolución', 'Recomendaciones']
+                    ];
+                    
+                    // Agrupar por estado
+                    const groupedCases = {
+                        active: [],
+                        improving: [],
+                        critical: []
+                    };
+                    
+                    reportData.cases.forEach(caseItem => {
+                        groupedCases[caseItem.status].push(caseItem);
+                    });
+                    
+                    // Agregar casos activos
+                    if (groupedCases.active.length > 0) {
+                        followUpsData.push(['CASOS ACTIVOS']);
+                        groupedCases.active.forEach(c => {
+                            followUpsData.push([
+                                'Activo',
+                                c.id,
+                                c.employeeName,
+                                c.diagnosis,
+                                c.startDate,
+                                c.daysElapsed,
+                                c.lastFollowUp,
+                                c.evolution,
+                                c.recommendations
+                            ]);
+                        });
+                    }
+                    
+                    // Agregar casos en mejora
+                    if (groupedCases.improving.length > 0) {
+                        followUpsData.push(['CASOS EN MEJORA']);
+                        groupedCases.improving.forEach(c => {
+                            followUpsData.push([
+                                'Mejorando',
+                                c.id,
+                                c.employeeName,
+                                c.diagnosis,
+                                c.startDate,
+                                c.daysElapsed,
+                                c.lastFollowUp,
+                                c.evolution,
+                                c.recommendations
+                            ]);
+                        });
+                    }
+                    
+                    // Agregar casos críticos
+                    if (groupedCases.critical.length > 0) {
+                        followUpsData.push(['CASOS CRÍTICOS']);
+                        groupedCases.critical.forEach(c => {
+                            followUpsData.push([
+                                'Crítico',
+                                c.id,
+                                c.employeeName,
+                                c.diagnosis,
+                                c.startDate,
+                                c.daysElapsed,
+                                c.lastFollowUp,
+                                c.evolution,
+                                c.recommendations
+                            ]);
+                        });
+                    }
+                    
+                    const wsFollowUps = XLSX.utils.aoa_to_sheet(followUpsData);
+                    XLSX.utils.book_append_sheet(wb, wsFollowUps, 'Seguimientos');
+                }
+                
+                // Generar nombre de archivo
+                const fileName = `Informe_Seguimiento_${document.getElementById('reportMonth').value}_${document.getElementById('reportYear').value}.xlsx`;
+                
+                // Descargar archivo
+                XLSX.writeFile(wb, fileName);
+                
+                showNotification('Informe exportado a Excel correctamente', 'success');
+            } catch (error) {
+                console.error('Error al exportar a Excel:', error);
+                showNotification('Error al exportar a Excel', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Exportar a PDF
+        async function exportToPDF() {
+            showLoading(true);
+            
+            try {
+                const { jsPDF } = window.jspdf;
+                
+                // Obtener el contenido del informe
+                const element = document.getElementById('reportContent');
+                
+                // Usar html2canvas para convertir el HTML a imagen
+                const canvas = await html2canvas(element, {
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true
+                });
+                
+                const imgData = canvas.toDataURL('image/png');
+                
+                // Calcular dimensiones
+                const imgWidth = 210; // Ancho A4 en mm
+                const pageHeight = 297; // Altura A4 en mm
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                let heightLeft = imgHeight;
+                let position = 0;
+                
+                // Crear instancia de jsPDF
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                
+                // Agregar imagen al PDF
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+                
+                // Agregar páginas adicionales si es necesario
+                while (heightLeft >= 0) {
+                    position = heightLeft - imgHeight;
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                    heightLeft -= pageHeight;
+                }
+                
+                // Generar nombre de archivo
+                const fileName = `Informe_Seguimiento_${document.getElementById('reportMonth').value}_${document.getElementById('reportYear').value}.pdf`;
+                
+                // Descargar PDF
+                pdf.save(fileName);
+                
+                showNotification('Informe exportado a PDF correctamente', 'success');
+            } catch (error) {
+                console.error('Error al exportar a PDF:', error);
+                showNotification('Error al exportar a PDF', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Refrescar vista previa
+        function refreshPreview() {
+            updatePreview();
+            renderFollowUpsGrouped();
+            showNotification('Vista previa actualizada', 'success');
+        }
+
+        // Imprimir vista previa
+        function printPreview() {
+            const printContent = document.getElementById('reportContent').innerHTML;
+            const originalContent = document.body.innerHTML;
+            
+            document.body.innerHTML = printContent;
+            window.print();
+            document.body.innerHTML = originalContent;
+            
+            // Recargar event listeners
+            location.reload();
+        }
+
+        // Mostrar/ocultar loading
+        function showLoading(show) {
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            if (show) {
+                loadingOverlay.classList.add('active');
+            } else {
+                loadingOverlay.classList.remove('active');
+            }
+        }
+
+        // Mostrar notificación
+        function showNotification(message, type = 'success') {
+            // Crear elemento de notificación
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 20px;
+                background: ${type === 'success' ? 'var(--success-color)' : 'var(--danger-color)'};
+                color: white;
+                border-radius: var(--border-radius-md);
+                box-shadow: var(--box-shadow-lg);
+                z-index: 1001;
+                transform: translateX(120%);
+                transition: transform 0.3s ease;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            `;
+            
+            notification.innerHTML = `
+                <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
+                <span>${message}</span>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Mostrar animación
+            setTimeout(() => {
+                notification.style.transform = 'translateX(0)';
+            }, 100);
+            
+            // Ocultar después de 4 segundos
+            setTimeout(() => {
+                notification.style.transform = 'translateX(120%)';
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 4000);
+        }
+    </script>
+</body>
+</html>
