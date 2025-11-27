@@ -124,6 +124,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   exportIncapacityData: (companyName) => ipcRenderer.invoke('export-incapacity-data', companyName),
   getFollowUpHistory: (caseId, companyName) => ipcRenderer.invoke('get-follow-up-history', caseId, companyName),
   loadFollowUpData: (companyName) => ipcRenderer.invoke('load-follow-up-data', companyName),
+  saveDebugHtml: (htmlContent) => ipcRenderer.invoke('save-debug-html', htmlContent),
 
   // --- Eventos IPC ---
   onIpcMessage: (channel, listener) => {

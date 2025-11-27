@@ -9,6 +9,13 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
+    <!-- jsPDF and jsPDF-Autotable for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <!-- html2canvas for converting HTML to image -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
     <style>
         :root {
             --primary-color: #6366f1;
@@ -1339,7 +1346,9 @@
                     const message = {
                         type: 'LOAD_FOLLOW_UP_DATA',
                         id: messageId,
-                        companyName: currentCompany
+                        payload: {
+                            companyName: currentCompany
+                        }
                     };
 
                     // Escuchar la respuesta específica para esta solicitud
@@ -1722,7 +1731,9 @@
                 const requestData = {
                     type: 'LOAD_FOLLOW_UP_DATA',
                     id: messageId,
-                    companyName: currentCompany
+                    payload: {
+                        companyName: currentCompany
+                    }
                 };
 
                 // Enviar solicitud al contenedor principal con las propiedades necesarias
@@ -1896,9 +1907,6 @@
                             </div>
                         </div>
                         <div class="modal-footer">
-                            <button class="export-btn excel" onclick="exportToExcelFromModal(null)">
-                                <i class="fas fa-file-excel"></i> Exportar a Excel
-                            </button>
                             <button class="export-btn pdf" onclick="exportToPDFFromModal(null)">
                                 <i class="fas fa-file-pdf"></i> Exportar a PDF
                             </button>
@@ -2474,16 +2482,300 @@
             }
         }
 
-        // Función para exportar a Excel desde el modal
-        function exportToExcelFromModal(data) {
-            // Similar a la función exportToExcel existente pero adaptada para el modal
-            alert('Funcionalidad de exportación a Excel desde modal lista para implementación');
+
+
+        // Función para exportar a PDF desde el modal manteniendo el diseño visual
+        // Función para exportar a PDF desde el modal manteniendo el diseño visual
+        async function exportToPDFFromModal() {
+            // 1. Crear y mostrar una capa de superposición
+            const overlay = document.createElement('div');
+            overlay.style.position = 'fixed';
+            overlay.style.top = '0';
+            overlay.style.left = '0';
+            overlay.style.width = '100%';
+            overlay.style.height = '100%';
+            overlay.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+            overlay.style.zIndex = '10000';
+            overlay.style.display = 'flex';
+            overlay.style.justifyContent = 'center';
+            overlay.style.alignItems = 'center';
+            overlay.innerHTML = `<div style="text-align: center; font-family: 'Inter', sans-serif; color: #333;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 48px; margin-bottom: 20px;"></i>
+                <h2 style="font-size: 24px; font-weight: 600;">Generando PDF...</h2>
+                <p>Por favor, espere.</p>
+            </div>`;
+            document.body.appendChild(overlay);
+
+            try {
+                // 2. Crear el contenido del informe para que se renderice dentro de la capa
+                const reportContent = createReportContentForPDF({
+                    title: document.getElementById('exportReportTitle').value,
+                    month: document.getElementById('exportReportMonth').value,
+                    year: document.getElementById('exportReportYear').value,
+                    preparedBy: document.getElementById('exportPreparedBy').value,
+                    includeSummary: document.getElementById('exportIncludeSummary').checked,
+                    includeStatistics: document.getElementById('exportIncludeStatistics').checked,
+                    includeCases: document.getElementById('exportIncludeCases').checked,
+                    includeFollowUps: document.getElementById('exportIncludeFollowUps').checked
+                });
+
+                // Ocultar la capa de carga y añadir el contenido del reporte para la captura
+                overlay.innerHTML = ''; // Limpiar el mensaje de carga
+                overlay.style.backgroundColor = '#FFFFFF'; // Fondo blanco sólido para el PDF
+                overlay.style.overflow = 'auto'; // Permitir scroll si el contenido es muy grande
+                overlay.appendChild(reportContent);
+                
+                // Dar un pequeño respiro para que el DOM se actualice con el contenido del informe
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+
+                const fileName = `Informe_Seguimiento_${document.getElementById('exportReportMonth').value}_${document.getElementById('exportReportYear').value}.pdf`;
+
+                const opt = {
+                    margin: [10, 10, 10, 10],
+                    filename: fileName,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: {
+                        scale: 2,
+                        useCORS: true,
+                        logging: true // Habilitar logging para depuración
+                    },
+                    jsPDF: {
+                        unit: 'mm',
+                        format: 'a4',
+                        orientation: 'portrait'
+                    },
+                    pageBreak: { mode: ['avoid-all', 'css', 'legacy'] }
+                };
+
+                // 3. Generar PDF desde el contenido ahora visible
+                await html2pdf().set(opt).from(reportContent).save();
+
+                showNotification('Informe exportado a PDF correctamente', 'success');
+
+            } catch (error) {
+                console.error('Error en la función exportToPDFFromModal:', error);
+                showNotification('Error al generar el PDF: ' + error.message, 'error');
+            } finally {
+                // 4. Eliminar la capa de superposición
+                if (overlay.parentNode) {
+                    overlay.parentNode.removeChild(overlay);
+                }
+            }
         }
 
-        // Función para exportar a PDF desde el modal
-        function exportToPDFFromModal(data) {
-            // Similar a la función exportToPDF existente pero adaptada para el modal
-            alert('Funcionalidad de exportación a PDF desde modal lista para implementación');
+        // Función para crear el contenido HTML del informe para PDF
+        function createReportContentForPDF(options) {
+            const {
+                title,
+                month,
+                year,
+                preparedBy
+            } = options;
+
+            // FORZAR RENDERIZADO SOLO DEL RESUMEN Y CASOS PARA DIAGNÓSTICO
+            const includeSummary = true;
+            const includeStatistics = false;
+            const includeCases = true;
+            const includeFollowUps = false;
+
+            console.log('[DIAGNÓSTICO] Forzando renderizado de Resumen y Listado de Casos.');
+
+            const filteredCases = getFilteredCases();
+            console.log('[DIAGNÓSTICO] Casos filtrados para PDF:', JSON.stringify(filteredCases, null, 2));
+
+
+            // Crear un elemento temporal para contener el HTML
+            const tempContainer = document.createElement('div');
+
+            // Estilos para mantener el diseño visual (con valores hardcodeados)
+            tempContainer.style.width = '794px';
+            tempContainer.style.backgroundColor = '#ffffff';
+            tempContainer.style.fontFamily = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+            tempContainer.style.color = '#334155';
+            tempContainer.style.fontSize = '12px'; // Reducir un poco para que quepa mejor
+            tempContainer.style.lineHeight = '1.4';
+
+
+            // Generar el HTML del informe con estilos inline y valores fijos
+            tempContainer.innerHTML = `
+                <div class="report-container" style="padding: 20mm 15mm;">
+                    <!-- Cabecera del informe -->
+                    <div class="report-header" style="background-color: #667eea; color: #ffffff; padding: 25px; text-align: center; border-radius: 8px;">
+                        <h1 class="report-title" style="font-size: 28px; font-weight: 700; margin: 0;">${title}</h1>
+                        <p class="report-subtitle" style="font-size: 16px; opacity: 0.9; margin: 5px 0 0 0;">Sistema de Gestión de Salud Ocupacional</p>
+                    </div>
+
+                    <!-- Metadatos del informe -->
+                    <div class="report-meta" style="padding: 20px 0; border-bottom: 1px solid #e2e8f0; margin-bottom: 20px;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                            <tr>
+                                <td style="padding: 5px;"><strong>Período:</strong> ${month} ${year}</td>
+                                <td style="padding: 5px;"><strong>Fecha de Generación:</strong> ${new Date().toLocaleDateString('es-ES', {year: 'numeric', month: 'long', day: 'numeric'})}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 5px;"><strong>Preparado por:</strong> ${preparedBy}</td>
+                                <td style="padding: 5px;"><strong>Empresa:</strong> TEMPOACTIVA S.A.S.</td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <!-- Contenido del informe -->
+                    <div class="report-content">
+                        ${includeSummary ? `
+                            <div class="report-section" style="margin-bottom: 20px;">
+                                <h3 style="font-size: 18px; font-weight: 600; color: #4f46e5; margin-bottom: 15px;">Resumen Ejecutivo</h3>
+                                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">
+                                    <div style="background: #f8fafc; border-radius: 8px; padding: 15px; text-align: center; border-left: 4px solid #6366f1;">
+                                        <div style="font-size: 24px; font-weight: 700; color: #6366f1;">${document.getElementById('totalIncapacidades').textContent}</div>
+                                        <div style="font-size: 12px; color: #64748b;">Total de Incapacidades</div>
+                                    </div>
+                                    <div style="background: #f8fafc; border-radius: 8px; padding: 15px; text-align: center; border-left: 4px solid #10b981;">
+                                        <div style="font-size: 24px; font-weight: 700; color: #10b981;">${document.getElementById('casosActivos').textContent}</div>
+                                        <div style="font-size: 12px; color: #64748b;">Casos Activos</div>
+                                    </div>
+                                    <div style="background: #f8fafc; border-radius: 8px; padding: 15px; text-align: center; border-left: 4px solid #f59e0b;">
+                                        <div style="font-size: 24px; font-weight: 700; color: #f59e0b;">${document.getElementById('seguimientosPendientes').textContent}</div>
+                                        <div style="font-size: 12px; color: #64748b;">Seguimientos Pendientes</div>
+                                    </div>
+                                    <div style="background: #f8fafc; border-radius: 8px; padding: 15px; text-align: center; border-left: 4px solid #ef4444;">
+                                        <div style="font-size: 24px; font-weight: 700; color: #ef4444;">${document.getElementById('casosCriticos').textContent}</div>
+                                        <div style="font-size: 12px; color: #64748b;">Casos Críticos</div>
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        ${includeCases ? `
+                            <!-- Listado de casos -->
+                            <div class="report-section" style="margin-bottom: 20px;">
+                                <h3 class="section-title" style="font-size: 18px; font-weight: 600; color: #4f46e5; margin-bottom: 10px; border-bottom: 2px solid #4f46e5; padding-bottom: 5px;">Listado de Casos</h3>
+                                <table class="cases-table" style="width: 100%; border-collapse: collapse; font-size: 9px;">
+                                    <thead>
+                                        <tr style="background-color: #f8fafc;">
+                                            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #e2e8f0;">ID</th>
+                                            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #e2e8f0;">Empleado</th>
+                                            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #e2e8f0;">Diagnóstico</th>
+                                            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #e2e8f0;">Fecha Inicio</th>
+                                            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #e2e8f0;">Días</th>
+                                            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #e2e8f0;">Estado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${filteredCases.map(caseItem => `
+                                            <tr>
+                                                <td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">${caseItem.id}</td>
+                                                <td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">${caseItem.employeeName}</td>
+                                                <td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">${caseItem.diagnosis}</td>
+                                                <td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">${formatDate(caseItem.startDate)}</td>
+                                                <td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">${caseItem.daysElapsed}</td>
+                                                <td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">${caseItem.status}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ` : ''}
+
+                    </div>
+
+                    <div class="report-footer" style="padding-top: 20px; text-align: center; font-size: 10px; color: #64748b; border-top: 1px solid #e2e8f0; margin-top: 20px;">
+                        <p>Informe generado por SG-SST App.</p>
+                    </div>
+                </div>
+            `;
+            return tempContainer;
+        }
+
+        // Función para renderizar seguimientos agrupados para PDF
+        function renderFollowUpsGroupedForPDF() {
+            // Agrupar casos por estado
+            const groupedCases = {
+                active: [],
+                improving: [],
+                critical: []
+            };
+
+            const filteredCases = getFilteredCases();
+            if (filteredCases && Array.isArray(filteredCases)) {
+                filteredCases.forEach(caseItem => {
+                    if (caseItem && caseItem.status) {
+                        const statusKey = caseItem.status.toLowerCase();
+                        if (groupedCases.hasOwnProperty(statusKey)) {
+                            groupedCases[statusKey].push(caseItem);
+                        } else {
+                            // Si el estado no coincide exactamente, agregar a 'active' como fallback
+                            groupedCases['active'].push(caseItem);
+                        }
+                    }
+                });
+            }
+
+            // Renderizar cada grupo
+            let html = '';
+            Object.keys(groupedCases).forEach(status => {
+                if (groupedCases[status] && groupedCases[status].length > 0) {
+                    const statusConfig = {
+                        active: { label: 'Casos Activos', color: '#10b981', icon: 'user-check' },
+                        improving: { label: 'Casos en Mejora', color: '#f59e0b', icon: 'arrow-trend-up' },
+                        critical: { label: 'Casos Críticos', color: '#ef4444', icon: 'exclamation-triangle' }
+                    };
+
+                    const config = statusConfig[status] || statusConfig.active; // Usar 'active' como fallback
+
+                    html += `
+                        <div class="status-group" style="margin-bottom: 25px; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;">
+                            <div class="status-group-header ${status}" style="padding: 15px 20px; display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 16px; background: ${config.color === '#10b981' ? 'rgba(16, 185, 129, 0.1)' : config.color === '#f59e0b' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)'}; color: ${config.color};">
+                                <i class="fas fa-${config.icon}"></i>
+                                ${config.label} (${groupedCases[status] ? groupedCases[status].length : 0})
+                            </div>
+                            <div class="status-group-content" style="padding: 0;">
+                                ${(groupedCases[status] || []).map(item => {
+                                    if (!item) return '';
+                                    const statusText = item.status === 'active' ? 'Activo' :
+                                                     item.status === 'improving' ? 'Mejorando' : 'Crítico';
+
+                                    return `
+                                        <div class="follow-up-item" style="padding: 15px 20px; border-bottom: 1px solid #e2e8f0; transition: all 0.3s ease;">
+                                            <div class="follow-up-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                                <div class="follow-up-info" style="display: flex; align-items: center; gap: 15px;">
+                                                    <span class="follow-up-id" style="font-weight: 600; color: #6366f1;">${item.id || 'N/A'}</span>
+                                                    <span class="follow-up-employee" style="color: #334155;">${item.employeeName || 'N/A'}</span>
+                                                </div>
+                                                <span class="status-badge ${item.status || 'active'}" style="display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase; background: ${item.status === 'active' ? 'rgba(16, 185, 129, 0.1)' : item.status === 'improving' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)'}; color: ${item.status === 'active' ? '#10b981' : item.status === 'improving' ? '#f59e0b' : '#ef4444'};">${statusText}</span>
+                                            </div>
+                                            <div class="follow-up-content" style="margin-bottom: 10px; line-height: 1.5;">
+                                                <strong>Diagnóstico:</strong> ${item.diagnosis || 'N/A'}<br>
+                                                <strong>Evolución:</strong> ${item.evolution || 'N/A'}
+                                            </div>
+                                            <div class="follow-up-details" style="display: flex; gap: 20px; font-size: 13px;">
+                                                <div class="follow-up-detail" style="flex: 1;">
+                                                    <strong>Fecha Inicio:</strong>
+                                                    <span>${formatDate(item.startDate) || 'N/A'}</span>
+                                                </div>
+                                                <div class="follow-up-detail" style="flex: 1;">
+                                                    <strong>Días Transcurridos:</strong>
+                                                    <span>${item.daysElapsed || '0'}</span>
+                                                </div>
+                                                <div class="follow-up-detail" style="flex: 1;">
+                                                    <strong>Último Seguimiento:</strong>
+                                                    <span>${formatDate(item.lastFollowUp) || 'N/A'}</span>
+                                                </div>
+                                                <div class="follow-up-detail" style="flex: 1;">
+                                                    <strong>Recomendaciones:</strong>
+                                                    <span>${item.recommendations || 'N/A'}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+
+            return html;
         }
 
         // Función para actualizar preview si el modal existe
@@ -2500,6 +2792,48 @@
                 titleElements.forEach(el => {
                     el.textContent = titleInput.value;
                 });
+            }
+        }
+
+        // Función para mostrar/ocultar loading
+        function showLoading(show) {
+            const modal = document.getElementById('export-modal');
+            if (!modal) return;
+
+            let loadingElement = modal.querySelector('.loading-overlay');
+            if (show) {
+                if (!loadingElement) {
+                    loadingElement = document.createElement('div');
+                    loadingElement.className = 'loading-overlay';
+                    loadingElement.style.position = 'absolute';
+                    loadingElement.style.top = '0';
+                    loadingElement.style.left = '0';
+                    loadingElement.style.width = '100%';
+                    loadingElement.style.height = '100%';
+                    loadingElement.style.background = 'rgba(255, 255, 255, 0.8)';
+                    loadingElement.style.display = 'flex';
+                    loadingElement.style.justifyContent = 'center';
+                    loadingElement.style.alignItems = 'center';
+                    loadingElement.style.zIndex = '9999';
+                    loadingElement.innerHTML = `
+                        <div style="text-align: center;">
+                            <div class="spinner" style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #6366f1; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 10px;"></div>
+                            <p style="color: #334155; font-weight: 500;">Generando PDF...</p>
+                        </div>
+                        <style>
+                            @keyframes spin {
+                                0% { transform: rotate(0deg); }
+                                100% { transform: rotate(360deg); }
+                            }
+                        </style>
+                    `;
+                    modal.style.position = 'relative';
+                    modal.appendChild(loadingElement);
+                } else {
+                    loadingElement.style.display = 'flex';
+                }
+            } else if (loadingElement) {
+                loadingElement.style.display = 'none';
             }
         }
 
