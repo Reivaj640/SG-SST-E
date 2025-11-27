@@ -2524,7 +2524,7 @@
                 overlay.style.backgroundColor = '#FFFFFF'; // Fondo blanco sólido para el PDF
                 overlay.style.overflow = 'auto'; // Permitir scroll si el contenido es muy grande
                 overlay.appendChild(reportContent);
-                
+
                 // Dar un pequeño respiro para que el DOM se actualice con el contenido del informe
                 await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -2573,11 +2573,11 @@
                 preparedBy
             } = options;
 
-            // FORZAR RENDERIZADO SOLO DEL RESUMEN Y CASOS PARA DIAGNÓSTICO
-            const includeSummary = true;
-            const includeStatistics = false;
-            const includeCases = true;
-            const includeFollowUps = false;
+            // Activar las secciones según las opciones del usuario
+            const includeSummary = options.includeSummary !== undefined ? options.includeSummary : true;
+            const includeStatistics = options.includeStatistics !== undefined ? options.includeStatistics : true;
+            const includeCases = options.includeCases !== undefined ? options.includeCases : true;
+            const includeFollowUps = options.includeFollowUps !== undefined ? options.includeFollowUps : true;
 
             console.log('[DIAGNÓSTICO] Forzando renderizado de Resumen y Listado de Casos.');
 
@@ -2674,6 +2674,119 @@
                                         `).join('')}
                                     </tbody>
                                 </table>
+                            </div>
+                        ` : ''}
+
+                        ${includeFollowUps ? `
+                            <!-- Seguimientos detallados -->
+                            <div class="report-section" style="margin-bottom: 20px;">
+                                <h3 class="section-title" style="font-size: 18px; font-weight: 600; color: #4f46e5; margin-bottom: 10px; border-bottom: 2px solid #4f46e5; padding-bottom: 5px;">Seguimientos Detallados</h3>
+
+                                ${(() => {
+                                    // Agrupar casos por estado para mostrar en el informe
+                                    const groupedCases = {
+                                        active: [],
+                                        improving: [],
+                                        critical: []
+                                    };
+
+                                    filteredCases.forEach(caseItem => {
+                                        if (caseItem && caseItem.status) {
+                                            const statusKey = caseItem.status.toLowerCase();
+                                            if (groupedCases.hasOwnProperty(statusKey)) {
+                                                groupedCases[statusKey].push(caseItem);
+                                            } else {
+                                                groupedCases['active'].push(caseItem);
+                                            }
+                                        }
+                                    });
+
+                                    let followUpsHtml = '';
+                                    Object.keys(groupedCases).forEach(status => {
+                                        if (groupedCases[status] && groupedCases[status].length > 0) {
+                                            const statusConfig = {
+                                                active: { label: 'Casos Activos', color: '#10b981', icon: 'user-check' },
+                                                improving: { label: 'Casos en Mejora', color: '#f59e0b', icon: 'arrow-trend-up' },
+                                                critical: { label: 'Casos Críticos', color: '#ef4444', icon: 'exclamation-triangle' }
+                                            };
+
+                                            const config = statusConfig[status] || statusConfig.active;
+
+                                            followUpsHtml += `
+                                                <div class="status-group" style="margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+                                                    <div class="status-group-header ${status}" style="padding: 12px 15px; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; background: ${config.color === '#10b981' ? 'rgba(16, 185, 129, 0.1)' : config.color === '#f59e0b' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)'}; color: ${config.color};">
+                                                        <i class="fas fa-${config.icon}"></i>
+                                                        ${config.label} (${groupedCases[status].length})
+                                                    </div>
+                                                    <div class="status-group-content" style="padding: 15px;">
+                                            `;
+
+                                            groupedCases[status].forEach(item => {
+                                                const statusText = item.status === 'active' ? 'Activo' :
+                                                                 item.status === 'improving' ? 'Mejorando' : 'Crítico';
+                                                const followUps = allFollowUpsData[item.id] || [];
+
+                                                followUpsHtml += `
+                                                    <div class="follow-up-item" style="padding: 12px; margin-bottom: 12px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #f8fafc;">
+                                                        <div class="follow-up-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                                            <div class="follow-up-info" style="display: flex; align-items: center; gap: 10px;">
+                                                                <span class="follow-up-id" style="font-weight: 600; color: #6366f1;">${item.id || 'N/A'}</span>
+                                                                <span class="follow-up-employee" style="color: #334155;">${item.employeeName || 'N/A'}</span>
+                                                            </div>
+                                                            <span class="status-badge ${item.status || 'active'}" style="display: inline-block; padding: 3px 8px; border-radius: 15px; font-size: 11px; font-weight: 600; text-transform: uppercase; background: ${item.status === 'active' ? 'rgba(16, 185, 129, 0.1)' : item.status === 'improving' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)'}; color: ${item.status === 'active' ? '#10b981' : item.status === 'improving' ? '#f59e0b' : '#ef4444'};">${statusText}</span>
+                                                        </div>
+                                                        <div class="follow-up-content" style="margin-bottom: 8px; line-height: 1.4;">
+                                                            <strong>Diagnóstico:</strong> ${item.diagnosis || 'N/A'}<br>
+                                                            <strong>Evolución:</strong> ${item.evolution || followUps.length > 0 ? followUps[followUps.length - 1].content : 'N/A'}<br>
+                                                            <strong>Recomendaciones:</strong> ${item.recommendations || followUps.length > 0 ? followUps[followUps.length - 1].recommendations : 'N/A'}
+                                                        </div>
+                                                        <div class="follow-up-details" style="display: flex; gap: 15px; font-size: 12px;">
+                                                            <div class="follow-up-detail" style="flex: 1;">
+                                                                <strong>Fecha Inicio:</strong>
+                                                                <span>${formatDate(item.startDate) || 'N/A'}</span>
+                                                            </div>
+                                                            <div class="follow-up-detail" style="flex: 1;">
+                                                                <strong>Días Transcurridos:</strong>
+                                                                <span>${item.daysElapsed || '0'}</span>
+                                                            </div>
+                                                            <div class="follow-up-detail" style="flex: 1;">
+                                                                <strong>Último Seguimiento:</strong>
+                                                                <span>${formatDate(item.lastFollowUp) || 'N/A'}</span>
+                                                            </div>
+                                                        </div>
+
+                                                        ${followUps.length > 0 ? `
+                                                        <div class="follow-up-history" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e2e8f0;">
+                                                            <strong>Historial de Seguimientos:</strong>
+                                                            <div style="margin-top: 8px;">
+                                                                ${followUps.map(followUp => `
+                                                                    <div style="padding: 8px 10px; margin-bottom: 6px; background: white; border-radius: 6px; border-left: 3px solid ${config.color};">
+                                                                        <div style="display: flex; justify-content: space-between; font-weight: 500; font-size: 12px;">
+                                                                            <span>${formatDate(followUp.date)}</span>
+                                                                            <span style="color: #64748b;">${followUp.type === 'telefonico' ? 'Telefónico' : followUp.type === 'presencial' ? 'Presencial' : 'Virtual'}</span>
+                                                                        </div>
+                                                                        <div style="margin-top: 4px; font-size: 12px;">
+                                                                            <div><strong>Evolución:</strong> ${followUp.content}</div>
+                                                                            <div><strong>Recomendaciones:</strong> ${followUp.recommendations}</div>
+                                                                        </div>
+                                                                    </div>
+                                                                `).join('')}
+                                                            </div>
+                                                        </div>
+                                                        ` : ''}
+                                                    </div>
+                                                `;
+                                            });
+
+                                            followUpsHtml += `
+                                                    </div>
+                                                </div>
+                                            `;
+                                        }
+                                    });
+
+                                    return followUpsHtml;
+                                })()}
                             </div>
                         ` : ''}
 
