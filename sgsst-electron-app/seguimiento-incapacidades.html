@@ -1863,9 +1863,9 @@
                                             <option value="diciembre">Diciembre</option>
                                         </select>
                                         <select class="form-control" id="exportReportYear">
-                                            <option value="2023" selected>2023</option>
+                                            <option value="2023">2023</option>
                                             <option value="2024">2024</option>
-                                            <option value="2025">2025</option>
+                                            <option value="2025" selected>2025</option>
                                         </select>
                                     </div>
                                 </div>
@@ -1914,6 +1914,30 @@
                         </div>
                     </div>
                 `;
+
+                // Establecer los valores actuales de los filtros de año y mes
+                const yearFilter = document.getElementById('yearFilter');
+                const monthFilter = document.getElementById('monthFilter');
+
+                if (yearFilter && yearFilter.value !== 'all') {
+                    const exportYearSelect = document.getElementById('exportReportYear');
+                    if (exportYearSelect) {
+                        exportYearSelect.value = yearFilter.value;
+                    }
+                }
+
+                if (monthFilter && monthFilter.value !== 'all') {
+                    const exportMonthSelect = document.getElementById('exportReportMonth');
+                    if (exportMonthSelect) {
+                        // Convertir el valor numérico del mes a su nombre en español
+                        const monthNames = {
+                            '01': 'enero', '02': 'febrero', '03': 'marzo', '04': 'abril',
+                            '05': 'mayo', '06': 'junio', '07': 'julio', '08': 'agosto',
+                            '09': 'septiembre', '10': 'octubre', '11': 'noviembre', '12': 'diciembre'
+                        };
+                        exportMonthSelect.value = monthNames[monthFilter.value] || monthFilter.value;
+                    }
+                }
 
                 document.body.appendChild(modal);
 
@@ -2230,16 +2254,29 @@
         // Función para actualizar la vista previa del informe
         function updateReportPreview(data) {
             const previewElement = document.getElementById('reportPreview');
-            if (!previewElement || !data) return;
+            if (!previewElement) return;
 
-            // Generar el contenido del informe
-            let content = '';
+            // Obtener los casos filtrados actuales que se están mostrando en la tabla
+            const filteredCases = getFilteredCases();
 
-            // Preparar datos para usar en toda la función
-            const followUpData = data ? (data.followUps || {}) : {};
+            // Obtener los años y meses seleccionados actualmente
+            const currentYearFilter = document.getElementById('yearFilter')?.value || 'all';
+            const currentMonthFilter = document.getElementById('monthFilter')?.value || 'all';
+            const currentSearchTerm = document.getElementById('searchInput')?.value || '';
+            const exportReportYear = document.getElementById('exportReportYear')?.value || new Date().getFullYear();
+            const exportReportMonth = document.getElementById('exportReportMonth')?.value || 'enero';
+
+            // Formatear nombre del mes para mostrar
+            const monthNames = {
+                'enero': 'Enero', 'febrero': 'Febrero', 'marzo': 'Marzo', 'abril': 'Abril',
+                'mayo': 'Mayo', 'junio': 'Junio', 'julio': 'Julio', 'agosto': 'Agosto',
+                'septiembre': 'Septiembre', 'octubre': 'Octubre', 'noviembre': 'Noviembre', 'diciembre': 'Diciembre'
+            };
+
+            const monthDisplayName = monthNames[exportReportMonth] || exportReportMonth;
 
             // Parte del encabezado
-            content += `
+            let content = `
                 <div class="report-header" style="background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); color: var(--white-color); padding: 40px; text-align: center;">
                     <div class="report-logo" style="width: 80px; height: 80px; background: rgba(255, 255, 255, 0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 36px; margin: 0 auto 20px;">
                         <i class="fas fa-heartbeat"></i>
@@ -2252,7 +2289,7 @@
                     <div class="meta-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
                         <div class="meta-item">
                             <span class="meta-label" style="font-size: 12px; color: var(--text-light-color); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px;">Período</span>
-                            <span class="meta-value" id="previewPeriod" style="font-size: 16px; font-weight: 600; color: var(--heading-color);">Octubre 2023</span>
+                            <span class="meta-value" id="previewPeriod" style="font-size: 16px; font-weight: 600; color: var(--heading-color);">${monthDisplayName} ${exportReportYear}</span>
                         </div>
                         <div class="meta-item">
                             <span class="meta-label" style="font-size: 12px; color: var(--text-light-color); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px;">Fecha de Generación</span>
@@ -2272,203 +2309,199 @@
                 <div class="report-content" style="padding: 40px;">
             `;
 
-            // Sección de resumen si está incluida
-            if (document.getElementById('exportIncludeSummary') && document.getElementById('exportIncludeSummary').checked) {
-                content += `
-                    <div class="report-section" id="summarySection" style="margin-bottom: 30px;">
-                        <h3 class="section-title" style="font-size: 20px; font-weight: 600; color: var(--primary-color); margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
-                            <i class="fas fa-chart-line" style="font-size: 18px;"></i> Resumen Ejecutivo
-                        </h3>
-                        <div class="summary-grid">
-                            <div class="summary-card">
-                                <div class="summary-value">1,199</div>
-                                <div class="summary-label">Total de Incapacidades</div>
-                            </div>
-                            <div class="summary-card">
-                                <div class="summary-value">847</div>
-                                <div class="summary-label">Casos Activos</div>
-                            </div>
-                            <div class="summary-card">
-                                <div class="summary-value">352</div>
-                                <div class="summary-label">Seguimientos Realizados</div>
-                            </div>
-                            <div class="summary-card">
-                                <div class="summary-value">28</div>
-                                <div class="summary-label">Casos Críticos</div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }
-
-            // Sección de casos si está incluida
-            if (document.getElementById('exportIncludeCases') && document.getElementById('exportIncludeCases').checked) {
-                content += `
-                    <div class="report-section" id="casesSection" style="margin-bottom: 30px;">
-                        <h3 class="section-title" style="font-size: 20px; font-weight: 600; color: var(--primary-color); margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
-                            <i class="fas fa-list" style="font-size: 18px;"></i> Listado de Casos Activos
-                        </h3>
-                        <table class="cases-table">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Empleado</th>
-                                    <th>Diagnóstico</th>
-                                    <th>Fecha Inicio</th>
-                                    <th>Días</th>
-                                    <th>Estado</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                `;
-
-                // Agregar casos de ejemplo o reales
-                let count = 0;
-                for (const empId in followUpData) {
-                    if (count >= 5) break; // Solo mostrar 5 casos como ejemplo
-                    const followUps = followUpData[empId];
-                    if (followUps && followUps.length > 0) {
-                        const latestFollowUp = followUps[followUps.length - 1];
-                        const status = latestFollowUp['Estado Caso'] || 'Activo';
-                        const statusClass = status.toLowerCase().includes('recuper') ? 'active' :
-                                          status.toLowerCase().includes('mejor') ? 'pending' : 'active';
-
-                        content += `
-                            <tr>
-                                <td>${empId.substring(0, 8)}</td>
-                                <td>${latestFollowUp['Nombre Empleado'] || `Empleado ${empId}`}</td>
-                                <td>${latestFollowUp['Diagnóstico'] || 'N/A'}</td>
-                                <td>${latestFollowUp['Fecha Seguimiento'] || 'N/A'}</td>
-                                <td>${followUps.length}</td>
-                                <td><span class="status-badge ${statusClass}">${status}</span></td>
-                            </tr>
-                        `;
-                        count++;
-                    }
-                }
-
-                content += `
-                            </tbody>
-                        </table>
-                    </div>
-                `;
-            }
-
-            // Sección de seguimientos agrupados si está incluida
-            if (document.getElementById('exportIncludeFollowUps') && document.getElementById('exportIncludeFollowUps').checked) {
-                content += `
-                    <div class="report-section" id="followUpsSection" style="margin-bottom: 30px;">
-                        <h3 class="section-title" style="font-size: 20px; font-weight: 600; color: var(--primary-color); margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
-                            <i class="fas fa-clipboard-list" style="font-size: 18px;"></i> Seguimientos Detallados por Estado
-                        </h3>
-                        <div class="follow-ups-grouped" id="followUpsGrouped">
-                `;
-
-                // Agrupar casos por estado
-                const groupedCases = {
-                    active: [],
-                    improving: [],
-                    critical: []
-                };
-
-                for (const empId in followUpData) {
-                    const followUps = followUpData[empId];
-                    if (followUps && followUps.length > 0) {
-                        const latestFollowUp = followUps[followUps.length - 1];
-                        const status = latestFollowUp['Estado Caso']?.toLowerCase() || 'active';
-                        let statusGroup = 'active';
-
-                        if (status.includes('recuper')) statusGroup = 'active';
-                        else if (status.includes('mejor')) statusGroup = 'improving';
-                        else if (status.includes('critic')) statusGroup = 'critical';
-
-                        groupedCases[statusGroup].push({
-                            id: empId,
-                            followUp: latestFollowUp,
-                            followUps: followUps
-                        });
-                    }
-                }
-
-                // Renderizar cada grupo
-                Object.keys(groupedCases).forEach(status => {
-                    if (groupedCases[status].length > 0) {
-                        const statusConfig = {
-                            active: { label: 'Casos Activos', color: 'success' },
-                            improving: { label: 'Casos en Mejora', color: 'warning' },
-                            critical: { label: 'Casos Críticos', color: 'danger' }
-                        };
-
-                        const config = statusConfig[status];
-
-                        content += `
-                            <div class="status-group">
-                                <div class="status-group-header ${status}">
-                                    <i class="fas fa-${status === 'active' ? 'user-check' : status === 'improving' ? 'arrow-trend-up' : 'exclamation-triangle'}"></i>
-                                    ${config.label} (${groupedCases[status].length})
-                                </div>
-                                <div class="status-group-content">
-                        `;
-
-                        groupedCases[status].forEach(item => {
-                            content += `
-                                <div class="follow-up-item">
-                                    <div class="follow-up-header">
-                                        <div class="follow-up-info">
-                                            <span class="follow-up-id">ID: ${item.id.substring(0, 8)}</span>
-                                            <span class="follow-up-employee">${item.followUp['Nombre Empleado'] || 'N/A'}</span>
-                                        </div>
-                                        <span class="status-badge ${status}">${item.followUp['Estado Caso'] || 'Activo'}</span>
-                                    </div>
-                                    <div class="follow-up-content">
-                                        <strong>Diagnóstico:</strong> ${item.followUp['Diagnóstico'] || 'N/A'}<br>
-                                        <strong>Evolución:</strong> ${item.followUp['Evolución'] || 'N/A'}
-                                    </div>
-                                    <div class="follow-up-details">
-                                        <div class="follow-up-detail">
-                                            <strong>Fecha Inicio:</strong>
-                                            <span>${item.followUp['Fecha Seguimiento'] || 'N/A'}</span>
-                                        </div>
-                                        <div class="follow-up-detail">
-                                            <strong>Días Transcurridos:</strong>
-                                            <span>${item.followUps.length || '0'}</span>
-                                        </div>
-                                        <div class="follow-up-detail">
-                                            <strong>Último Seguimiento:</strong>
-                                            <span>${item.followUp['Fecha Seguimiento'] || 'N/A'}</span>
-                                        </div>
-                                        <div class="follow-up-detail">
-                                            <strong>Recomendaciones:</strong>
-                                            <span>${item.followUp['Recomendaciones'] || 'N/A'}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            `;
-                        });
-
-                        content += `
-                                </div>
-                            </div>
-                        `;
-                    }
-                });
-
-                content += `
-                        </div>
-                    </div>
-                `;
-            }
+            // Sección de resumen ejecutivo con estadísticas reales
+            const activeCases = filteredCases.filter(c => c.status === 'active' || c.status === 'improving').length;
+            const criticalCases = filteredCases.filter(c =>
+                c.status === 'critical' || (c.daysElapsed > 90 && c.status === 'active')
+            ).length;
+            const pendingFollowUps = filteredCases.filter(c => c.daysElapsed > 30 && (c.status === 'active' || c.status === 'extended')).length;
 
             content += `
+                <div class="report-section" id="summarySection" style="margin-bottom: 30px;">
+                    <h3 class="section-title" style="font-size: 20px; font-weight: 600; color: var(--primary-color); margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-chart-line" style="font-size: 18px;"></i> Resumen Ejecutivo
+                    </h3>
+                    <div class="summary-grid">
+                        <div class="summary-card">
+                            <div class="summary-value">${filteredCases.length}</div>
+                            <div class="summary-label">Total de Casos</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-value">${activeCases}</div>
+                            <div class="summary-label">Casos Activos</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-value">${pendingFollowUps}</div>
+                            <div class="summary-label">Seguimientos Pendientes</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-value">${criticalCases}</div>
+                            <div class="summary-label">Casos Críticos</div>
+                        </div>
                     </div>
+                </div>
+            `;
 
-                    <div class="report-footer" style="background: var(--light-color); padding: 30px 40px; text-align: center; border-top: 2px solid var(--border-color); margin-top: 40px;">
-                        <p class="footer-text" style="font-size: 14px; color: var(--text-light-color);">
-                            Este informe ha sido generado automáticamente por el Sistema de Gestión de Salud Ocupacional de TEMPOACTIVA S.A.S.<br>
-                            Para cualquier consulta o aclaración, contacte al Departamento de Salud Ocupacional.
-                        </p>
-                    </div>
+            // Sección de casos con los casos filtrados reales
+            content += `
+                <div class="report-section" id="casesSection" style="margin-bottom: 30px;">
+                    <h3 class="section-title" style="font-size: 20px; font-weight: 600; color: var(--primary-color); margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-list" style="font-size: 18px;"></i> Listado de Casos (${filteredCases.length})
+                    </h3>
+                    <table class="cases-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Empleado</th>
+                                <th>Diagnóstico</th>
+                                <th>Fecha Inicio</th>
+                                <th>Días</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            // Agregar los casos filtrados reales
+            filteredCases.forEach(caseItem => {
+                const statusClass = caseItem.status === 'active' ? 'active' :
+                                  caseItem.status === 'improving' ? 'pending' :
+                                  caseItem.status === 'recovered' ? 'closed' : 'critical';
+
+                const statusText = caseItem.status === 'active' ? 'Activo' :
+                                  caseItem.status === 'improving' ? 'Mejorando' :
+                                  caseItem.status === 'recovered' ? 'Recuperado' : 'Crítico';
+
+                content += `
+                    <tr>
+                        <td>${caseItem.id}</td>
+                        <td>${caseItem.employeeName || caseItem.employeeId}</td>
+                        <td>${caseItem.diagnosis}</td>
+                        <td>${formatDate(caseItem.startDate)}</td>
+                        <td>${caseItem.daysElapsed}</td>
+                        <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                    </tr>
                 `;
+            });
+
+            content += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            // Agrupar casos por estado para la sección de seguimientos
+            const casesByStatus = {
+                active: filteredCases.filter(c => c.status === 'active' || c.status === 'active'),
+                improving: filteredCases.filter(c => c.status === 'improving' || c.status === 'mejorando'),
+                critical: filteredCases.filter(c => c.status === 'critical' || c.status === 'critical')
+            };
+
+            // Sección de seguimientos agrupados por estado
+            content += `
+                <div class="report-section" id="followUpsSection" style="margin-bottom: 30px;">
+                    <h3 class="section-title" style="font-size: 20px; font-weight: 600; color: var(--primary-color); margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-clipboard-list" style="font-size: 18px;"></i> Seguimientos Detallados por Estado
+                    </h3>
+                    <div class="follow-ups-grouped" id="followUpsGrouped">
+            `;
+
+            // Renderizar cada grupo de estado
+            Object.entries(casesByStatus).forEach(([status, cases]) => {
+                if (cases.length > 0) {
+                    const statusConfig = {
+                        active: { label: 'Casos Activos', color: '#10b981', icon: 'user-check', cssClass: 'active' },
+                        improving: { label: 'Casos en Mejora', color: '#f59e0b', icon: 'arrow-trend-up', cssClass: 'pending' },
+                        critical: { label: 'Casos Críticos', color: '#ef4444', icon: 'exclamation-triangle', cssClass: 'critical' }
+                    };
+
+                    const config = statusConfig[status] || statusConfig.active;
+
+                    content += `
+                        <div class="status-group" style="margin-bottom: 25px; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+                            <div class="status-group-header ${config.cssClass}" style="padding: 15px 20px; display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 16px; background: ${config.color === '#10b981' ? 'rgba(16, 185, 129, 0.1)' : config.color === '#f59e0b' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)'}; color: ${config.color};">
+                                <i class="fas fa-${config.icon}"></i>
+                                ${config.label} (${cases.length})
+                            </div>
+                            <div class="status-group-content" style="padding: 0;">
+                    `;
+
+                    cases.forEach(caseItem => {
+                        // Obtener últimos seguimientos para este caso específico
+                        const caseFollowUps = allFollowUpsData[caseItem.id] || [];
+
+                        // Mostrar el caso con su información principal
+                        content += `
+                            <div class="follow-up-item" style="padding: 15px 20px; border-bottom: 1px solid #e2e8f0;">
+                                <div class="follow-up-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <div class="follow-up-info" style="display: flex; align-items: center; gap: 15px;">
+                                        <span class="follow-up-id" style="font-weight: 600; color: #6366f1;">${caseItem.id}</span>
+                                        <span class="follow-up-employee" style="color: #334155;">${caseItem.employeeName || caseItem.employeeId}</span>
+                                    </div>
+                                    <span class="status-badge ${status}" style="display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase; background: ${status === 'active' ? 'rgba(16, 185, 129, 0.1)' : status === 'improving' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)'}; color: ${status === 'active' ? '#10b981' : status === 'improving' ? '#f59e0b' : '#ef4444'};">${status === 'active' ? 'Activo' : status === 'improving' ? 'Mejorando' : 'Crítico'}</span>
+                                </div>
+                                <div class="follow-up-content" style="margin-bottom: 10px; line-height: 1.5;">
+                                    <strong>Diagnóstico:</strong> ${caseItem.diagnosis || 'N/A'}<br>
+                                    <strong>Fecha Inicio:</strong> ${formatDate(caseItem.startDate) || 'N/A'}<br>
+                                    <strong>Días Transcurridos:</strong> ${caseItem.daysElapsed || '0'}<br>
+                                    <strong>Último Seguimiento:</strong> ${formatDate(caseItem.lastFollowUp) || 'N/A'}
+                                </div>
+                        `;
+
+                        // Si hay seguimientos para este caso, mostrarlos
+                        if (caseFollowUps && caseFollowUps.length > 0) {
+                            // Ordenar seguimientos por fecha (más reciente primero)
+                            const sortedFollowUps = [...caseFollowUps].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 2); // Mostrar solo los 2 más recientes
+
+                            content += `<div class="follow-up-history" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0;">`;
+
+                            sortedFollowUps.forEach(followUp => {
+                                const typeText = followUp.type === 'telefonico' ? 'Telefónico' :
+                                               followUp.type === 'presencial' ? 'Presencial' : 'Virtual';
+                                content += `
+                                    <div class="follow-up-record" style="padding: 10px; margin-bottom: 8px; background: #f8fafc; border-radius: 8px; border-left: 3px solid ${config.color};">
+                                        <div style="display: flex; justify-content: space-between; font-weight: 500; font-size: 13px; margin-bottom: 5px;">
+                                            <span>${formatDate(followUp.date)}</span>
+                                            <span style="color: #64748b;">${typeText}</span>
+                                        </div>
+                                        <div style="font-size: 13px;">
+                                            <div><strong>Evolución:</strong> ${followUp.content || 'N/A'}</div>
+                                            <div><strong>Recomendaciones:</strong> ${followUp.recommendations || 'N/A'}</div>
+                                        </div>
+                                    </div>
+                                `;
+                            });
+
+                            content += `</div>`;
+                        } else {
+                            content += `<div style="font-style: italic; color: #64748b; padding: 5px 0;">No hay seguimientos registrados para este caso.</div>`;
+                        }
+
+                        content += `
+                            </div>
+                        `;
+                    });
+
+                    content += `
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+
+            content += `
+                        </div>
+                    </div>
+                </div>
+
+                <div class="report-footer" style="background: var(--light-color); padding: 30px 40px; text-align: center; border-top: 2px solid var(--border-color); margin-top: 40px;">
+                    <p class="footer-text" style="font-size: 14px; color: var(--text-light-color);">
+                        Este informe ha sido generado automáticamente por el Sistema de Gestión de Salud Ocupacional de TEMPOACTIVA S.A.S.<br>
+                        Para cualquier consulta o aclaración, contacte al Departamento de Salud Ocupacional.
+                    </p>
+                </div>
+            </div>
+            `;
 
             previewElement.innerHTML = content;
         }
