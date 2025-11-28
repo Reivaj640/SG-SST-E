@@ -74,11 +74,20 @@ header {
   color: white;
   padding: 15px 20px;
   box-shadow: var(--box-shadow);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   height: var(--header-height);
   flex-shrink: 0;
+}
+
+.header-content {
+  justify-content: flex-start !important;
+  gap: 20px; /* opcional para separar */
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex: 0 0 auto;
 }
 
 .logo {
@@ -93,8 +102,35 @@ header {
 
 .logo h1 {
   font-weight: 500;
-  font-size: 20px;
+  font-size: 16px;
   letter-spacing: 0.3px;
+  margin: 0;
+}
+
+.app-title {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex: 0;
+  text-align: left;
+  margin: 0 20px;
+}
+
+.app-title h1 {
+  font-weight: 400;
+  font-size: 14px;
+  letter-spacing: 0.2px;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 0 auto;
 }
 
 .header-actions {
@@ -258,9 +294,15 @@ header {
 .document-title {
   font-size: 18px;
   font-weight: 500;
+  text-align: left;
+  flex-grow: 1;
   color: var(--text-color);
 }
 
+.header-title-left {
+  text-align: left;
+  flex-grow: 1;
+}
 .document-actions {
   display: flex;
   gap: 10px;

@@ -2029,10 +2029,88 @@ ipcMain.handle('save-debug-html', async (event, htmlContent) => {
 
 
 
+// --- Manejador para generar acta de COPASST ---
+ipcMain.handle('generate-copasst-acta', async (event, changes) => {
+  sendLog(`[MAIN][generate-copasst-acta] Handler invocado con ${changes.length} cambios`, 'INFO');
+
+  try {
+    // Validar que los cambios se hayan enviado correctamente
+    if (!Array.isArray(changes)) {
+      throw new Error('El parámetro "changes" debe ser un array de cambios para aplicar al Excel.');
+    }
+
+    // Obtener la ruta de Python
+    const pythonPath = await getPython();
+    sendLog(`[MAIN][generate-copasst-acta] Usando Python de: ${pythonPath}`, 'DEBUG');
+
+    // Definir rutas necesarias
+    const scriptPath = path.join(__dirname, 'Portear', 'src', 'copasst_acta_generator.py');
+    const tempDir = app.getPath('temp'); // Directorio temporal del sistema
+    const tempJsonPath = path.join(tempDir, `temp_acta_data_${Date.now()}.json`);
+    const outputDir = path.join(app.getPath('documents'), 'SG-SST', 'Actas_COPASST');
+
+    // Asegurar que el directorio de salida exista
+    if (!fs.existsSync(outputDir)) {
+      await fsp.mkdir(outputDir, { recursive: true });
+      sendLog(`[MAIN][generate-copasst-acta] Directorio de salida creado: ${outputDir}`, 'INFO');
+    }
+
+    // Definir nombre de archivo con timestamp
+    const fileName = `ACTA_COPASST_${new Date().toISOString().slice(0, 10)}_${Date.now()}.xlsx`;
+    const outputPath = path.join(outputDir, fileName);
+
+    // Guardar los datos temporales en un archivo JSON
+    const tempData = {
+      changes: changes,
+      timestamp: new Date().toISOString()
+    };
+
+    await fsp.writeFile(tempJsonPath, JSON.stringify(tempData, null, 2), 'utf8');
+    sendLog(`[MAIN][generate-copasst-acta] Datos temporales guardados en: ${tempJsonPath}`, 'DEBUG');
+
+    // Ejecutar el script Python
+    const { stdout, stderr } = await execFilePromise(pythonPath, [scriptPath, tempJsonPath, outputPath]);
+
+    // Verificar el resultado del script
+    if (stderr) {
+      sendLog(`[MAIN][generate-copasst-acta] Python stderr: ${stderr}`, 'WARN');
+    }
+
+    sendLog(`[MAIN][generate-copasst-acta] stdout del script Python: ${stdout}`, 'DEBUG');
+
+    // Verificar que el archivo de salida haya sido creado
+    if (!fs.existsSync(outputPath)) {
+      throw new Error(`El archivo de salida no se creó correctamente en: ${outputPath}`);
+    }
+
+    sendLog(`[MAIN][generate-copasst-acta] Acta generada exitosamente en: ${outputPath}`, 'INFO');
+
+    // Limpiar el archivo temporal
+    try {
+      await fsp.unlink(tempJsonPath);
+      sendLog(`[MAIN][generate-copasst-acta] Archivo temporal eliminado: ${tempJsonPath}`, 'INFO');
+    } catch (cleanupError) {
+      sendLog(`[MAIN][generate-copasst-acta] Error al eliminar archivo temporal: ${cleanupError.message}`, 'WARN');
+    }
+
+    return {
+      success: true,
+      documentPath: outputPath,
+      message: 'Acta de COPASST generada exitosamente'
+    };
+
+  } catch (error) {
+    sendLog(`[MAIN][generate-copasst-acta] Error: ${error.message}`, 'ERROR');
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+});
+
 // --- Manejador para reiniciar la aplicación ---
 
 ipcMain.on('restart_app', () => {
-
   log.info('El usuario ha aceptado la actualización. Reiniciando para instalar...');
 
   autoUpdater.quitAndInstall();

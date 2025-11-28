@@ -216,7 +216,6 @@ class CopasstComponent {
         const style = document.createElement('style');
         style.textContent = `
             /* --- Estilos homogéneos con la interfaz principal de la app --- */
-            @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 
             :root {
                 /* Paleta de colores basada en la interfaz principal de la app */
@@ -283,7 +282,7 @@ class CopasstComponent {
 
             .header-content {
                 display: flex;
-                flex-direction: column;
+                flex-direction: felx-start;
                 align-items: center;
                 gap: 0.5rem;
             }
@@ -721,8 +720,8 @@ class CopasstComponent {
         ];
 
         const initialDesarrollo = [
-            { tema: 'Revisión del Acta Anterior, se continúan realizando las inspecciones programadas...', compromisos: 'Ninguno', fecha: 'Ninguno', responsable: 'Ninguno' },
-            { tema: 'Accidente laboral de Armando Cervantes Perez', compromisos: 'Realizar seguimiento del plan de acción del AT.', fecha: '2024/12/31', responsable: 'Miembros del Copasst y Asesor SST' }
+            { tema: 'Revisión del Acta Anterior, se continúan realizando las inspecciones programadas...', compromisos: 'Ninguno', fecha: '', responsable: 'Ninguno' },
+            { tema: 'Accidente laboral de Armando Cervantes Perez', compromisos: 'Realizar seguimiento del plan de acción del AT.', fecha: '2024-12-31', responsable: 'Miembros del Copasst y Asesor SST' }
         ];
 
         // --- Funciones para Crear Elementos Dinámicos ---
@@ -835,6 +834,9 @@ class CopasstComponent {
             // });
         });
 
+        // Almacenar referencia a la instancia actual del componente
+        const componentInstance = this;
+
         exportExcelBtn.addEventListener('click', () => {
             // Recolección de datos del formulario
             const actaNumber = document.getElementById('acta-number').value;
@@ -869,17 +871,28 @@ class CopasstComponent {
             });
 
             // Enviar datos a la función de exportación existente
-            window.CopasstComponent.exportToExcel({
+            componentInstance.exportToExcel({
                 actaNumber, fecha, inicia, termina, topic, lugar, agendaItems, desarrolloItems
             });
         });
 
         // Add method to export to Excel
-        window.CopasstComponent.exportToExcel = async (data) => {
+        this.exportToExcel = async (data) => {
             try {
+                console.log('[COPASST] Datos recibidos para exportar:', data); // Mensaje de depuración
                 // Call the existing Electron API to generate the acta
                 const changes = this.prepareExcelData(data);
+
+                if (!changes || changes.length === 0) {
+                    alert('No hay cambios para aplicar a la plantilla. Verifique que haya ingresado datos en el formulario.');
+                    console.error('[COPASST] No se generaron cambios para aplicar a la plantilla');
+                    return;
+                }
+
+                console.log('[COPASST] Enviando cambios al API:', changes); // Mensaje de depuración
                 const result = await window.electronAPI.generateCopasstActa(changes);
+                console.log('[COPASST] Resultado del API:', result); // Mensaje de depuración
+
                 if (result.success) {
                     alert(`Acta guardada exitosamente en: ${result.documentPath}`);
                 } else {
@@ -896,30 +909,55 @@ class CopasstComponent {
     prepareExcelData(data) {
         const changes = [];
 
-        // Add the general meeting information
-        changes.push({ row: 1, col: 0, value: `Acta N° ${data.actaNumber}` });
-        changes.push({ row: 2, col: 0, value: `Fecha: ${data.fecha}` });
-        changes.push({ row: 3, col: 0, value: `Hora Inicio: ${data.inicia}` });
-        changes.push({ row: 4, col: 0, value: `Hora Fin: ${data.termina}` });
-        changes.push({ row: 5, col: 0, value: `Tema: ${data.topic}` });
-        changes.push({ row: 6, col: 0, value: `Lugar: ${data.lugar}` });
+        // --- Información General ---
+        // Basado en la estructura de la plantilla, ajustamos las coordenadas
+        changes.push({ row: 4, col: 6, value: data.actaNumber });    // Celda C5 para N° de Acta
+        changes.push({ row: 5, col: 6, value: data.topic });         // Celda C6 para Tema Principal
+        changes.push({ row: 7, col: 6, value: data.fecha });         // Celda C8 para Fecha
+        changes.push({ row: 8, col: 6, value: data.lugar });         // Celda C9 para Lugar
+        changes.push({ row: 9, col: 6, value: data.inicia });        // Celda C10 para Hora Inicio
+        changes.push({ row: 10, col: 6, value: data.termina });      // Celda C11 para Hora Fin
 
-        // Add agenda items
-        changes.push({ row: 8, col: 0, value: 'Agenda de la Reunión' });
+        // --- Agenda de la Reunión ---
+        // La agenda comienza en la fila 20 (índice 19)
+        let currentRow = 25;
+        
+        // Título de la agenda
+        changes.push({ row: currentRow - 1, col: 1, value: 'AGENDA DE LA REUNIÓN' });
+
+        // Encabezados de la tabla de agenda
+        changes.push({ row: currentRow, col: 3, value: 'TEMA' });
+        changes.push({ row: currentRow, col: 5, value: 'DURACIÓN' });
+        changes.push({ row: currentRow, col: 6, value: 'LÍDER' });
+
+        // Datos de la agenda
         data.agendaItems.forEach((item, index) => {
-            changes.push({ row: 9 + index, col: 0, value: item.tema });
-            changes.push({ row: 9 + index, col: 1, value: item.duracion });
-            changes.push({ row: 9 + index, col: 2, value: item.lider });
+            const itemRow = currentRow + 1 + index;
+            changes.push({ row: itemRow, col: 3, value: item.tema });      // Temas en la columna B
+            changes.push({ row: itemRow, col: 5, value: item.duracion });   // Duración en la columna D
+            changes.push({ row: itemRow, col: 6, value: item.lider });      // Líder en la columna F
         });
 
-        // Add development items
-        const startRowDesarrollo = 10 + data.agendaItems.length;
-        changes.push({ row: startRowDesarrollo, col: 0, value: 'Desarrollo y Compromisos' });
+        // --- Desarrollo y Compromisos ---
+        // Inicia unas filas después de que termine la agenda
+        let desarrolloRow = currentRow + data.agendaItems.length + 5;
+        changes.push({ row: desarrolloRow - 1, col: 1, value: 'DESARROLLO DE LA REUNIÓN' });
+
+        // Encabezados de la tabla de desarrollo
+        changes.push({ row: desarrolloRow, col: 1, value: 'N°' });
+        changes.push({ row: desarrolloRow, col: 2, value: 'TEMAS TRATADOS' });
+        changes.push({ row: desarrolloRow, col: 4, value: 'COMPROMISOS' });
+        changes.push({ row: desarrolloRow, col: 6, value: 'FECHA' });
+        changes.push({ row: desarrolloRow, col: 7, value: 'RESPONSABLE' });
+
+        // Datos de desarrollo
         data.desarrolloItems.forEach((item, index) => {
-            changes.push({ row: startRowDesarrollo + 1 + index, col: 0, value: item.tema });
-            changes.push({ row: startRowDesarrollo + 1 + index, col: 1, value: item.compromisos });
-            changes.push({ row: startRowDesarrollo + 1 + index, col: 2, value: item.fecha });
-            changes.push({ row: startRowDesarrollo + 1 + index, col: 3, value: item.responsable });
+            const itemRow = desarrolloRow + 1 + index;
+            changes.push({ row: itemRow, col: 1, value: index + 1 });        // Número
+            changes.push({ row: itemRow, col: 2, value: item.tema });        // Tema tratado
+            changes.push({ row: itemRow, col: 4, value: item.compromisos }); // Compromisos
+            changes.push({ row: itemRow, col: 6, value: item.fecha });       // Fecha
+            changes.push({ row: itemRow, col: 7, value: item.responsable });  // Responsable
         });
 
         return changes;
