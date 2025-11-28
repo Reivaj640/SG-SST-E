@@ -293,8 +293,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           return;
       }
 
-      const { type, payload, id } = event.data; // <-- CORRECTLY DESTRUCTURE `id`
-      console.log('RENDERER: Message received from iframe:', { type, payload, id });
+      const { type, payload, requestId } = event.data; // <-- CORRECTLY DESTRUCTURE `requestId`
+      console.log('RENDERER: Message received from iframe:', { type, payload, requestId });
 
       // Find the iframe that sent the message
       const iframes = document.querySelectorAll('iframe');
@@ -386,7 +386,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                   sourceIframe.contentWindow.postMessage({
                       type: responseType,
                       payload: { success: false, error: `Unknown request type: ${type}` },
-                      id: id // <-- Pass back the original ID
+                      requestId: requestId // <-- Pass back the original ID
                   }, 'file://');
                   return;
           }
@@ -398,7 +398,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           sourceIframe.contentWindow.postMessage({
               type: responseType,
               payload: result,
-              id: id // <-- FIX: Use 'id' to match what the iframe is waiting for
+              requestId: requestId // <-- FIX: Use 'requestId' to match what the iframe is waiting for
           }, 'file://');
 
       } catch (error) {
@@ -406,7 +406,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           sourceIframe.contentWindow.postMessage({
               type: responseType,
               payload: { success: false, error: error.message },
-              id: id // <-- Pass back the original ID on error too
+              requestId: requestId // <-- Pass back the original ID on error too
           }, 'file://');
       }
   });

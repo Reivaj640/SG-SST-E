@@ -392,6 +392,8 @@ select.form-control {
   font-size: 1.5rem;
   font-weight: var(--font-weight-bold);
   margin: 0;
+  text-align: left;
+  flex-grow: 1;
   color: var(--heading-color);
 }
 
@@ -794,6 +796,11 @@ select.form-control {
   font-weight: bold;
   color: var(--text-light-color);
   margin-right: var(--spacer);
+}
+
+.header-title-left {
+  text-align: left;
+  flex-grow: 1;
 }
 
 .header-buttons {
