@@ -53,16 +53,16 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "assets/icons8-adelante-100.ico"
+      "icon": "assets/Blanco.ico"
     },
     "mac": {
       "target": "dmg",
-      "icon": "assets/icon.icns",
+      "icon": "assets/Blanco.icns",
       "category": "public.app-category.business"
     },
     "linux": {
       "target": "AppImage",
-      "icon": "assets/icon.png",
+      "icon": "assets/Blanco.png",
       "category": "Business"
     },
     "publish": [

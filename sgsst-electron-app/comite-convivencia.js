@@ -1,6 +1,6 @@
-// comite-convivencia.js - Componente para la vista de actas de Comité de Convivencia con soporte para Excel
+// copasst.js - Componente para la vista de actas de CopassT con soporte para Excel
 
-class ComiteConvivenciaComponent {
+ComiteConvivenciaComponent {
     constructor(container, currentCompany, moduleName, submoduleName, backToModuleCallback) {
         this.container = container;
         this.currentCompany = currentCompany;
@@ -49,7 +49,7 @@ class ComiteConvivenciaComponent {
     }
 
     showVerActasPage() {
-        // Crear iframe para el visualizador estándar de Comité de Convivencia
+        // Crear iframe para el visualizador estándar de COPASST
         const viewerFrame = document.createElement('iframe');
         viewerFrame.id = 'comite-convivencia-actas-viewer';
         viewerFrame.style.width = '100%';
@@ -151,7 +151,7 @@ class ComiteConvivenciaComponent {
             if (extension === '.pdf') icon = '📕';
             else if (extension === '.doc' || extension === '.docx') icon = '📘';
             else if (extension === '.xlsx' || extension === '.xls') icon = '📊';
-            
+
             li.innerHTML = `${icon} ${file.name}`;
             li.addEventListener('click', () => this.previewDocument(file.path));
             list.appendChild(li);
@@ -166,30 +166,30 @@ class ComiteConvivenciaComponent {
     async previewDocument(filePath) {
         const previewCol = document.getElementById('preview-col');
         const fileExtension = filePath.split('.').pop().toLowerCase();
-        const escapedPath = filePath.replace(/\\/g, '\\');
+        const escapedPath = filePath.replace(/\/g, '\\');
 
         previewCol.innerHTML = `<div class="preview-placeholder">Cargando previsualización...</div>`;
 
         if (fileExtension === 'pdf') {
-            const safePath = filePath.replace(/\\/g, '/');
+            const safePath = filePath.replace(/\/g, '/');
             previewCol.innerHTML = `<iframe src="file:///${safePath}?t=${new Date().getTime()}" width="100%" height="100%" style="border: none;"></iframe>`;
         } else if (['doc', 'docx', 'xlsx', 'xls'].includes(fileExtension)) {
             try {
-                const result = fileExtension.startsWith('doc') 
+                const result = fileExtension.startsWith('doc')
                     ? await window.electronAPI.convertDocxToPdf(filePath)
                     : await window.electronAPI.convertExcelToPdf(filePath);
 
                 if (result.success) {
-                    const safePath = result.pdf_path.replace(/\\/g, '/');
+                    const safePath = result.pdf_path.replace(/\/g, '/');
                     previewCol.innerHTML = `<iframe src="file:///${safePath}?t=${new Date().getTime()}" width="100%" height="100%" style="border: none;"></iframe>`;
                 } else {
-                    previewCol.innerHTML = `<div class="preview-error"><h3>Error de Conversión</h3><p>${result.error}</p><button class="btn btn-primary" onclick="window.currentComiteConvivenciaComponent.openDocument('${escapedPath}')">Abrir con aplicación externa</button></div>`;
+                    previewCol.innerHTML = `<div class="preview-error"><h3>Error de Conversión</h3><p>${result.error}</p><button class="btn btn-primary" onclick="window.currentCopasstComponent.openDocument('${escapedPath}')">Abrir con aplicación externa</button></div>`;
                 }
             } catch (error) {
-                previewCol.innerHTML = `<div class="preview-error"><h3>Error Inesperado</h3><p>${error.message}</p><button class="btn btn-primary" onclick="window.currentComiteConvivenciaComponent.openDocument('${escapedPath}')">Abrir con aplicación externa</button></div>`;
+                previewCol.innerHTML = `<div class="preview-error"><h3>Error Inesperado</h3><p>${error.message}</p><button class="btn btn-primary" onclick="window.currentCopasstComponent.openDocument('${escapedPath}')">Abrir con aplicación externa</button></div>`;
             }
         } else {
-            previewCol.innerHTML = `<div class="preview-error"><h3>Previsualización no disponible</h3><p>La previsualización para archivos <strong>.${fileExtension}</strong> no está soportada.</p><button class="btn btn-primary" onclick="window.currentComiteConvivenciaComponent.openDocument('${escapedPath}')">Abrir con aplicación externa</button></div>`;
+            previewCol.innerHTML = `<div class="preview-error"><h3>Previsualización no disponible</h3><p>La previsualización para archivos <strong>.${fileExtension}</strong> no está soportada.</p><button class="btn btn-primary" onclick="window.currentCopasstComponent.openDocument('${escapedPath}')">Abrir con aplicación externa</button></div>`;
         }
     }
 
@@ -208,24 +208,765 @@ class ComiteConvivenciaComponent {
         const header = this.createHeader('Realizar Acta de Reunión', () => this.render());
         this.container.appendChild(header);
 
+        // Create the main container
         const editorContainer = document.createElement('div');
         editorContainer.className = 'acta-editor-container';
-        editorContainer.innerHTML = `
-            <div class="acta-editor-placeholder">
-                <p>Cargue la plantilla de Excel para empezar a editar el acta.</p>
-                <button id="load-acta-template-btn" class="btn btn-primary">Cargar Plantilla de Acta</button>
-            </div>
+
+        // Add CSS styles programmatically
+        const style = document.createElement('style');
+        style.textContent = `
+            /* --- Estilos homogéneos con la interfaz principal de la app --- */
+
+            :root {
+                /* Paleta de colores basada en la interfaz principal de la app */
+                --primary-color: #206A5D;         /* Color principal de la app */
+                --primary-hover-color: #1A564B;   /* Hover del color principal */
+                --secondary-color: #6c757d;       /* Color secundario */
+                --success-color: #28a745;         /* Color de éxito */
+                --danger-color: #dc3545;          /* Color de peligro */
+                --warning-color: #ffc107;         /* Color de advertencia */
+                --info-color: #17a2b8;           /* Color de información */
+                --light-color: #f8f9fa;          /* Color claro */
+                --dark-color: #33383d;           /* Color oscuro */
+                --white-color: #ffffff;          /* Blanco */
+                --black-color: #000000;          /* Negro */
+
+                /* Colores de texto */
+                --text-color: #212529;           /* Color de texto principal */
+                --text-light-color: #6c757d;     /* Color de texto claro */
+                --text-lighter-color: #adb5bd;   /* Color de texto más claro */
+                --heading-color: #495057;        /* Color de encabezados */
+
+                /* Colores de fondo */
+                --bg-color: #f8f9fa;             /* Fondo principal */
+                --widget-bg-color: #ffffff;      /* Fondo de widgets */
+                --border-color: #dee2e6;         /* Color de bordes */
+
+                /* Colores de botones */
+                --button-bg-color: var(--primary-color);
+                --button-text-color: var(--white-color);
+                --button-hover-bg-color: var(--primary-hover-color);
+                --button-border-color: var(--primary-color);
+
+                /* Tipografía */
+                --font-family: 'Poppins', sans-serif;
+                --border-radius-md: 0.375rem;     /* Radio de borde mediano */
+                --border-radius-lg: 0.5rem;       /* Radio de borde grande */
+                --box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+                --box-shadow-lg: 0 1rem 3rem rgba(0, 0, 0, 0.175);
+            }
+
+            * {
+                box-sizing: border-box;
+            }
+
+            .app-container {
+                font-family: var(--font-family);
+                color: var(--text-color);
+                margin: 0;
+                min-height: 100vh;
+                -webkit-font-smoothing: antialiased;
+                -moz-osx-font-smoothing: grayscale;
+                background: var(--bg-color);
+                padding: 2rem 1.5rem;
+                max-width: 1100px;
+                margin: 0 auto;
+                min-height: 100vh;
+            }
+
+            /* --- Header --- */
+            .app-header {
+                text-align: center;
+                margin-bottom: 3rem;
+            }
+
+            .header-content {
+                display: flex;
+                flex-direction: felx-start;
+                align-items: center;
+                gap: 0.5rem;
+            }
+
+            .header-content .app-title {
+                font-size: 2rem; /* Reducido del tamaño exagerado */
+                font-weight: 700;
+                margin: 0;
+                color: var(--primary-color);
+            }
+
+            .header-content .app-subtitle {
+                font-size: 1.2rem;
+                font-weight: 400;
+                color: var(--text-light-color);
+                margin: 0;
+            }
+
+            /* --- Cards --- */
+            .card {
+                background: var(--widget-bg-color);
+                border-radius: var(--border-radius-lg);
+                border: 1px solid var(--border-color);
+                box-shadow: var(--box-shadow);
+                padding: 2rem;
+                margin-bottom: 2rem;
+                transition: transform 0.2s ease, box-shadow 0.2s ease;
+            }
+
+            .card:hover {
+                transform: translateY(-2px);
+                box-shadow: var(--box-shadow-lg);
+            }
+
+            .card-title {
+                font-size: 1.5rem;
+                font-weight: 600;
+                margin-top: 0;
+                margin-bottom: 1.5rem;
+                color: var(--heading-color);
+                border-bottom: 2px solid var(--primary-color);
+                padding-bottom: 0.5rem;
+            }
+
+            /* --- Form Grid & Inputs --- */
+            .form-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 1.5rem;
+            }
+
+            .form-group {
+                display: flex;
+                flex-direction: column;
+            }
+
+            .form-group.full-width {
+                grid-column: 1 / -1;
+            }
+
+            .form-group label {
+                font-size: 0.9rem;
+                font-weight: 500;
+                color: var(--text-light-color);
+                margin-bottom: 0.5rem;
+            }
+
+            .form-group input,
+            .form-group textarea {
+                font-family: var(--font-family);
+                font-size: 1rem;
+                padding: 0.5rem 0.75rem;
+                border: 1px solid var(--border-color);
+                border-radius: var(--border-radius-md);
+                background: var(--widget-bg-color);
+                color: var(--text-color);
+                transition: all 0.2s ease;
+            }
+
+            .form-group input::placeholder,
+            .form-group textarea::placeholder {
+                color: var(--text-lighter-color);
+            }
+
+            .form-group input:focus,
+            .form-group textarea:focus {
+                outline: 0;
+                border-color: var(--primary-color);
+                background: var(--widget-bg-color);
+                box-shadow: 0 0 0 0.2rem rgba(32, 106, 93, 0.25);
+            }
+
+            /* --- Dynamic Lists --- */
+            .dynamic-list {
+                display: flex;
+                flex-direction: column;
+                gap: 1.5rem;
+            }
+
+            .dynamic-item {
+                background: var(--light-color);
+                border: 1px solid var(--border-color);
+                border-radius: var(--border-radius-md);
+                padding: 1.5rem;
+                display: grid;
+                gap: 1rem;
+                align-items: end;
+                transition: all 0.2s ease;
+            }
+
+            .dynamic-item:hover {
+                background: var(--widget-bg-color);
+                border-color: var(--primary-color);
+                transform: translateY(-1px);
+            }
+
+            .dynamic-item.agenda-item {
+                grid-template-columns: 2fr 1fr 1fr auto;
+            }
+
+            .dynamic-item.desarrollo-item {
+                grid-template-columns: 1fr 1fr auto;
+            }
+
+            .dynamic-item label {
+                font-size: 0.8rem;
+                font-weight: 600;
+                color: var(--text-light-color);
+                margin-bottom: 0.25rem;
+            }
+
+            .dynamic-item input,
+            .dynamic-item textarea {
+                width: 100%;
+                padding: 0.5rem;
+                border: 1px solid var(--border-color);
+                background: var(--widget-bg-color);
+                border-radius: var(--border-radius-md);
+                font-size: 0.9rem;
+                color: var(--text-color);
+            }
+
+            .dynamic-item textarea {
+                resize: vertical;
+                min-height: 80px;
+            }
+
+            .dynamic-item .actions {
+                display: flex;
+                align-items: center;
+            }
+
+            .btn-remove {
+                background: var(--danger-color);
+                border: none;
+                color: white;
+                cursor: pointer;
+                padding: 0.6rem;
+                border-radius: var(--border-radius-md);
+                transition: all 0.2s ease;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .btn-remove:hover {
+                background: #c82333;
+                transform: scale(1.05);
+            }
+
+            /* --- Add Item Button --- */
+            .btn-add-item {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 0.5rem;
+                width: 100%;
+                margin-top: 1rem;
+                padding: 0.75rem;
+                background: var(--primary-color);
+                border: 1px solid var(--primary-color);
+                border-radius: var(--border-radius-md);
+                color: white;
+                font-weight: 500;
+                font-size: 1rem;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+
+            .btn-add-item:hover {
+                background: var(--primary-hover-color);
+                border-color: var(--primary-hover-color);
+                transform: translateY(-1px);
+                box-shadow: var(--box-shadow);
+            }
+
+            /* --- Footer & Action Buttons --- */
+            .app-footer {
+                display: flex;
+                justify-content: center;
+                gap: 1.5rem;
+                margin-top: 2rem;
+                padding: 2rem 0;
+                background: var(--bg-color);
+            }
+
+            .btn {
+                padding: 0.5rem 1rem;
+                border-radius: var(--border-radius-md);
+                font-size: 1rem;
+                font-weight: 500;
+                cursor: pointer;
+                border: 1px solid transparent;
+                transition: all 0.2s ease;
+                text-transform: none;
+                letter-spacing: normal;
+            }
+
+            .btn:active {
+                transform: scale(0.98);
+            }
+
+            .btn-primary {
+                background: var(--primary-color);
+                color: white;
+                border: 1px solid var(--primary-color);
+            }
+
+            .btn-primary:hover {
+                background: var(--primary-hover-color);
+                border-color: var(--primary-hover-color);
+                transform: translateY(-1px);
+            }
+
+            .btn-secondary {
+                background: var(--light-color);
+                color: var(--text-color);
+                border: 1px solid var(--border-color);
+            }
+
+            .btn-secondary:hover {
+                background: var(--secondary-color);
+                color: white;
+                border-color: var(--secondary-color);
+                transform: translateY(-1px);
+            }
         `;
+        document.head.appendChild(style);
+
+        // Create the app container
+        const appContainer = document.createElement('div');
+        appContainer.className = 'app-container';
+
+
+
+        // Create main content
+        const mainContent = document.createElement('main');
+        mainContent.className = 'main-content';
+
+        // Create Información de la Reunión card
+        const infoCard = document.createElement('section');
+        infoCard.className = 'card';
+        const infoCardTitle = document.createElement('h2');
+        infoCardTitle.className = 'card-title';
+        infoCardTitle.textContent = 'Información de la Reunión';
+
+        const formGrid = document.createElement('div');
+        formGrid.className = 'form-grid';
+
+        // Create form groups for meeting information
+        const actaNumberGroup = document.createElement('div');
+        actaNumberGroup.className = 'form-group';
+        const actaNumberLabel = document.createElement('label');
+        actaNumberLabel.setAttribute('for', 'acta-number');
+        actaNumberLabel.textContent = 'N° de Acta';
+        const actaNumberInput = document.createElement('input');
+        actaNumberInput.type = 'number';
+        actaNumberInput.id = 'acta-number';
+        actaNumberInput.value = '108';
+        actaNumberGroup.appendChild(actaNumberLabel);
+        actaNumberGroup.appendChild(actaNumberInput);
+
+        const fechaGroup = document.createElement('div');
+        fechaGroup.className = 'form-group';
+        const fechaLabel = document.createElement('label');
+        fechaLabel.setAttribute('for', 'fecha');
+        fechaLabel.textContent = 'Fecha';
+        const fechaInput = document.createElement('input');
+        fechaInput.type = 'date';
+        fechaInput.id = 'fecha';
+        fechaInput.value = '2025-01-09';
+        fechaGroup.appendChild(fechaLabel);
+        fechaGroup.appendChild(fechaInput);
+
+        const iniciaGroup = document.createElement('div');
+        iniciaGroup.className = 'form-group';
+        const iniciaLabel = document.createElement('label');
+        iniciaLabel.setAttribute('for', 'inicia');
+        iniciaLabel.textContent = 'Hora Inicio';
+        const iniciaInput = document.createElement('input');
+        iniciaInput.type = 'time';
+        iniciaInput.id = 'inicia';
+        iniciaInput.value = '08:00';
+        iniciaGroup.appendChild(iniciaLabel);
+        iniciaGroup.appendChild(iniciaInput);
+
+        const terminaGroup = document.createElement('div');
+        terminaGroup.className = 'form-group';
+        const terminaLabel = document.createElement('label');
+        terminaLabel.setAttribute('for', 'termina');
+        terminaLabel.textContent = 'Hora Fin';
+        const terminaInput = document.createElement('input');
+        terminaInput.type = 'time';
+        terminaInput.id = 'termina';
+        terminaInput.value = '09:00';
+        terminaGroup.appendChild(terminaLabel);
+        terminaGroup.appendChild(terminaInput);
+
+        const topicGroup = document.createElement('div');
+        topicGroup.className = 'form-group full-width';
+        const topicLabel = document.createElement('label');
+        topicLabel.setAttribute('for', 'topic');
+        topicLabel.textContent = 'Tema';
+        const topicInput = document.createElement('input');
+        topicInput.type = 'text';
+        topicInput.id = 'topic';
+        topicInput.value = 'Reunión del COPASST';
+        topicGroup.appendChild(topicLabel);
+        topicGroup.appendChild(topicInput);
+
+        const lugarGroup = document.createElement('div');
+        lugarGroup.className = 'form-group full-width';
+        const lugarLabel = document.createElement('label');
+        lugarLabel.setAttribute('for', 'ciudad-lugar');
+        lugarLabel.textContent = 'Lugar';
+        const lugarInput = document.createElement('input');
+        lugarInput.type = 'text';
+        lugarInput.id = 'ciudad-lugar';
+        lugarInput.value = 'Barranquilla, Oficinas Tempoactiva';
+        lugarGroup.appendChild(lugarLabel);
+        lugarGroup.appendChild(lugarInput);
+
+        formGrid.appendChild(actaNumberGroup);
+        formGrid.appendChild(fechaGroup);
+        formGrid.appendChild(iniciaGroup);
+        formGrid.appendChild(terminaGroup);
+        formGrid.appendChild(topicGroup);
+        formGrid.appendChild(lugarGroup);
+
+        infoCard.appendChild(infoCardTitle);
+        infoCard.appendChild(formGrid);
+        mainContent.appendChild(infoCard);
+
+        // Create Agenda card
+        const agendaCard = document.createElement('section');
+        agendaCard.className = 'card';
+        const agendaCardTitle = document.createElement('h2');
+        agendaCardTitle.className = 'card-title';
+        agendaCardTitle.textContent = 'Agenda de la Reunión';
+
+        const agendaList = document.createElement('div');
+        agendaList.id = 'agenda-list';
+        agendaList.className = 'dynamic-list';
+
+        const addAgendaBtn = document.createElement('button');
+        addAgendaBtn.id = 'add-agenda-btn';
+        addAgendaBtn.className = 'btn-add-item';
+        addAgendaBtn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Agregar tema
+        `;
+
+        agendaCard.appendChild(agendaCardTitle);
+        agendaCard.appendChild(agendaList);
+        agendaCard.appendChild(addAgendaBtn);
+        mainContent.appendChild(agendaCard);
+
+        // Create Desarrollo card
+        const desarrolloCard = document.createElement('section');
+        desarrolloCard.className = 'card';
+        const desarrolloCardTitle = document.createElement('h2');
+        desarrolloCardTitle.className = 'card-title';
+        desarrolloCardTitle.textContent = 'Desarrollo y Compromisos';
+
+        const desarrolloList = document.createElement('div');
+        desarrolloList.id = 'desarrollo-list';
+        desarrolloList.className = 'dynamic-list';
+
+        const addDesarrolloBtn = document.createElement('button');
+        addDesarrolloBtn.id = 'add-desarrollo-btn';
+        addDesarrolloBtn.className = 'btn-add-item';
+        addDesarrolloBtn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Agregar punto tratado
+        `;
+
+        desarrolloCard.appendChild(desarrolloCardTitle);
+        desarrolloCard.appendChild(desarrolloList);
+        desarrolloCard.appendChild(addDesarrolloBtn);
+        mainContent.appendChild(desarrolloCard);
+
+        appContainer.appendChild(mainContent);
+
+        // Create footer
+        const footer = document.createElement('footer');
+        footer.className = 'app-footer';
+        const saveDraftBtn = document.createElement('button');
+        saveDraftBtn.id = 'save-draft-btn';
+        saveDraftBtn.className = 'btn btn-secondary';
+        saveDraftBtn.textContent = 'Guardar Borrador';
+        const exportExcelBtn = document.createElement('button');
+        exportExcelBtn.id = 'export-excel-btn';
+        exportExcelBtn.className = 'btn btn-secondary';
+        exportExcelBtn.textContent = 'Exportar a Excel';
+
+        footer.appendChild(saveDraftBtn);
+        footer.appendChild(exportExcelBtn);
+
+        appContainer.appendChild(footer);
+        editorContainer.appendChild(appContainer);
         this.container.appendChild(editorContainer);
 
-        const loadButton = editorContainer.querySelector('#load-acta-template-btn');
-        loadButton.addEventListener('click', () => this.loadAndRenderActaEditor(editorContainer));
+        // --- LÓGICA DE INTERACCIÓN ---
+        // Datos iniciales para que no esté vacío
+        const initialAgenda = [
+            { tema: 'Revisión del acta anterior N° 107', duracion: '00:10 Minutos', lider: 'Representante del Copasst' },
+            { tema: 'Revisión de Accidentes del Mes de Diciembre', duracion: '00:10 Minutos', lider: 'Representante del Copasst' },
+            { tema: 'Revisión Avance del Plan de Trabajo Anual', duracion: '00:30 Minutos', lider: 'Representante del Copasst' }
+        ];
+
+        const initialDesarrollo = [
+            { tema: 'Revisión del Acta Anterior, se continúan realizando las inspecciones programadas...', compromisos: 'Ninguno', fecha: '', responsable: 'Ninguno' },
+            { tema: 'Accidente laboral de Armando Cervantes Perez', compromisos: 'Realizar seguimiento del plan de acción del AT.', fecha: '2024-12-31', responsable: 'Miembros del Comité y Asesor Externo' }
+        ];
+
+        // --- Funciones para Crear Elementos Dinámicos ---
+        function createAgendaItem(data = {}) {
+            const item = document.createElement('div');
+            item.className = 'dynamic-item agenda-item';
+            item.innerHTML = `
+                <div>
+                    <label>Tema</label>
+                    <input type="text" placeholder="Descripción del tema" value="${data.tema || ''}">
+                </div>
+                <div>
+                    <label>Duración</label>
+                    <input type="text" placeholder="Ej: 00:10 Minutos" value="${data.duracion || ''}">
+                </div>
+                <div>
+                    <label>Líder</label>
+                    <input type="text" placeholder="Nombre del líder" value="${data.lider || ''}">
+                </div>
+                <div class="actions">
+                    <button class="btn-remove" title="Eliminar">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </button>
+                </div>
+            `;
+            item.querySelector('.btn-remove').addEventListener('click', () => item.remove());
+            return item;
+        }
+
+        function createDesarrolloItem(data = {}) {
+            const item = document.createElement('div');
+            item.className = 'dynamic-item desarrollo-item';
+            item.innerHTML = `
+                <div>
+                    <label>Temas Tratados</label>
+                    <textarea placeholder="Descripción del tema" rows="9">${data.tema || ''}</textarea>
+                </div>
+                <div>
+                    <label>Compromisos</label>
+                    <textarea placeholder="Describir los compromisos" rows="5">${data.compromisos || ''}</textarea>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                        <div>
+                            <label>Fecha</label>
+                            <input type="date" value="${data.fecha || ''}">
+                        </div>
+                        <div>
+                            <label>Responsable</label>
+                            <input type="text" placeholder="Nombre del responsable" value="${data.responsable || ''}">
+                        </div>
+                    </div>
+                </div>
+                <div class="actions">
+                    <button class="btn-remove" title="Eliminar">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </button>
+                </div>
+            `;
+            item.querySelector('.btn-remove').addEventListener('click', () => item.remove());
+            return item;
+        }
+
+        // --- Cargar Datos Iniciales ---
+        initialAgenda.forEach(data => agendaList.appendChild(createAgendaItem(data)));
+        initialDesarrollo.forEach(data => desarrolloList.appendChild(createDesarrolloItem(data)));
+
+        // --- Event Listeners para Agregar Items ---
+        addAgendaBtn.addEventListener('click', () => agendaList.appendChild(createAgendaItem()));
+        addDesarrolloBtn.addEventListener('click', () => desarrolloList.appendChild(createDesarrolloItem()));
+
+        // --- Acciones de los botones principales (conexión con la funcionalidad existente del Electron) ---
+        saveDraftBtn.addEventListener('click', () => {
+            // Recolección de datos del formulario
+            const actaNumber = document.getElementById('acta-number').value;
+            const fecha = document.getElementById('fecha').value;
+            const inicia = document.getElementById('inicia').value;
+            const termina = document.getElementById('termina').value;
+            const topic = document.getElementById('topic').value;
+            const lugar = document.getElementById('ciudad-lugar').value;
+
+            // Recolección de datos de la agenda
+            const agendaItems = [];
+            document.querySelectorAll('#agenda-list .dynamic-item').forEach(item => {
+                const inputs = item.querySelectorAll('input');
+                agendaItems.push({
+                    tema: inputs[0].value,
+                    duracion: inputs[1].value,
+                    lider: inputs[2].value
+                });
+            });
+
+            // Recolección de datos de desarrollo
+            const desarrolloItems = [];
+            document.querySelectorAll('#desarrollo-list .dynamic-item').forEach(item => {
+                const textareas = item.querySelectorAll('textarea');
+                const inputs = item.querySelectorAll('input');
+                desarrolloItems.push({
+                    tema: textareas[0].value,
+                    compromisos: textareas[1].value,
+                    fecha: inputs[0].value,
+                    responsable: inputs[1].value
+                });
+            });
+
+            // Simular guardado - en tu aplicación real conecta con electronAPI
+            alert('Función de guardar borrador. En la app real, esto guardaría los datos en un archivo o base de datos.');
+
+            // En una implementación real, podrías hacer:
+            // window.electronAPI.saveDraft({
+            //     actaNumber, fecha, inicia, termina, topic, lugar, agendaItems, desarrolloItems
+            // });
+        });
+
+        // Almacenar referencia a la instancia actual del componente
+        const componentInstance = this;
+
+        exportExcelBtn.addEventListener('click', () => {
+            // Recolección de datos del formulario
+            const actaNumber = document.getElementById('acta-number').value;
+            const fecha = document.getElementById('fecha').value;
+            const inicia = document.getElementById('inicia').value;
+            const termina = document.getElementById('termina').value;
+            const topic = document.getElementById('topic').value;
+            const lugar = document.getElementById('ciudad-lugar').value;
+
+            // Recolección de datos de la agenda
+            const agendaItems = [];
+            document.querySelectorAll('#agenda-list .dynamic-item').forEach(item => {
+                const inputs = item.querySelectorAll('input');
+                agendaItems.push({
+                    tema: inputs[0].value,
+                    duracion: inputs[1].value,
+                    lider: inputs[2].value
+                });
+            });
+
+            // Recolección de datos de desarrollo
+            const desarrolloItems = [];
+            document.querySelectorAll('#desarrollo-list .dynamic-item').forEach(item => {
+                const textareas = item.querySelectorAll('textarea');
+                const inputs = item.querySelectorAll('input');
+                desarrolloItems.push({
+                    tema: textareas[0].value,
+                    compromisos: textareas[1].value,
+                    fecha: inputs[0].value,
+                    responsable: inputs[1].value
+                });
+            });
+
+            // Enviar datos a la función de exportación existente
+            componentInstance.exportToExcel({
+                actaNumber, fecha, inicia, termina, topic, lugar, agendaItems, desarrolloItems
+            });
+        });
+
+        // Add method to export to Excel
+        this.exportToExcel = async (data) => {
+            try {
+                console.log('[COPASST] Datos recibidos para exportar:', data); // Mensaje de depuración
+                // Call the existing Electron API to generate the acta
+                const changes = this.prepareExcelData(data);
+
+                if (!changes || changes.length === 0) {
+                    alert('No hay cambios para aplicar a la plantilla. Verifique que haya ingresado datos en el formulario.');
+                    console.error('[COPASST] No se generaron cambios para aplicar a la plantilla');
+                    return;
+                }
+
+                console.log('[COPASST] Enviando cambios al API:', changes); // Mensaje de depuración
+                const result = await window.electronAPI.generateCopasstActa(changes);
+                console.log('[COPASST] Resultado del API:', result); // Mensaje de depuración
+
+                if (result.success) {
+                    alert(`Acta guardada exitosamente en: ${result.documentPath}`);
+                } else {
+                    alert(`Error al guardar el acta: ${result.error}`);
+                }
+            } catch (error) {
+                console.error('Error al exportar a Excel:', error);
+                alert(`Error fatal al exportar el acta: ${error.message}`);
+            }
+        };
+    }
+
+    // Helper method to prepare data for Excel export
+    prepareExcelData(data) {
+        const changes = [];
+
+        // --- Información General ---
+        // Basado en la estructura de la plantilla, ajustamos las coordenadas
+        changes.push({ row: 4, col: 6, value: data.actaNumber });    // Celda C5 para N° de Acta
+        changes.push({ row: 5, col: 6, value: data.topic });         // Celda C6 para Tema Principal
+        changes.push({ row: 7, col: 6, value: data.fecha });         // Celda C8 para Fecha
+        changes.push({ row: 8, col: 6, value: data.lugar });         // Celda C9 para Lugar
+        changes.push({ row: 9, col: 6, value: data.inicia });        // Celda C10 para Hora Inicio
+        changes.push({ row: 10, col: 6, value: data.termina });      // Celda C11 para Hora Fin
+
+        // --- Agenda de la Reunión ---
+        // La agenda comienza en la fila 20 (índice 19)
+        let currentRow = 25;
+        
+        // Título de la agenda
+        changes.push({ row: currentRow - 1, col: 1, value: 'AGENDA DE LA REUNIÓN' });
+
+        // Encabezados de la tabla de agenda
+        changes.push({ row: currentRow, col: 3, value: 'TEMA' });
+        changes.push({ row: currentRow, col: 5, value: 'DURACIÓN' });
+        changes.push({ row: currentRow, col: 6, value: 'LÍDER' });
+
+        // Datos de la agenda
+        data.agendaItems.forEach((item, index) => {
+            const itemRow = currentRow + 1 + index;
+            changes.push({ row: itemRow, col: 3, value: item.tema });      // Temas en la columna B
+            changes.push({ row: itemRow, col: 5, value: item.duracion });   // Duración en la columna D
+            changes.push({ row: itemRow, col: 6, value: item.lider });      // Líder en la columna F
+        });
+
+        // --- Desarrollo y Compromisos ---
+        // Inicia unas filas después de que termine la agenda
+        let desarrolloRow = currentRow + data.agendaItems.length + 5;
+        changes.push({ row: desarrolloRow - 1, col: 1, value: 'DESARROLLO DE LA REUNIÓN' });
+
+        // Encabezados de la tabla de desarrollo
+        changes.push({ row: desarrolloRow, col: 1, value: 'N°' });
+        changes.push({ row: desarrolloRow, col: 2, value: 'TEMAS TRATADOS' });
+        changes.push({ row: desarrolloRow, col: 4, value: 'COMPROMISOS' });
+        changes.push({ row: desarrolloRow, col: 6, value: 'FECHA' });
+        changes.push({ row: desarrolloRow, col: 7, value: 'RESPONSABLE' });
+
+        // Datos de desarrollo
+        data.desarrolloItems.forEach((item, index) => {
+            const itemRow = desarrolloRow + 1 + index;
+            changes.push({ row: itemRow, col: 1, value: index + 1 });        // Número
+            changes.push({ row: itemRow, col: 2, value: item.tema });        // Tema tratado
+            changes.push({ row: itemRow, col: 4, value: item.compromisos }); // Compromisos
+            changes.push({ row: itemRow, col: 6, value: item.fecha });       // Fecha
+            changes.push({ row: itemRow, col: 7, value: item.responsable });  // Responsable
+        });
+
+        return changes;
     }
 
     async loadAndRenderActaEditor(container) {
         container.innerHTML = '<p>Cargando datos de la plantilla...</p>';
         try {
-            const result = await window.electronAPI.getConvivenciaActaData();
+            const result = await window.electronAPI.getActaData();
             console.log('Datos recibidos:', result); // Para depuración
             if (result.success) {
                 if (!result.data || !Array.isArray(result.data) || result.data.length === 0) {
@@ -316,46 +1057,46 @@ class ComiteConvivenciaComponent {
         const table = this.container.querySelector('.editable-acta-table');
         if (!table) {
             alert('Error: No se encontró la tabla de datos del acta.');
-            console.error('[CONVIVENCIA] No se encontró la tabla editable');
+            console.error('[COPASST] No se encontró la tabla editable');
             return;
         }
 
         const changes = [];
         const cells = table.querySelectorAll('td[contenteditable="true"]');
-        console.log('[CONVIVENCIA] Total celdas editables encontradas:', cells.length);
-        
+        console.log('[COPASST] Total celdas editables encontradas:', cells.length);
+
         cells.forEach(cell => {
             const row = parseInt(cell.getAttribute('data-row'));
             const col = parseInt(cell.getAttribute('data-col'));
             const value = cell.textContent.trim();
-            
+
             if (!isNaN(row) && !isNaN(col) && value) {
                 // Ajustar índice para alinearse con Excel (0-based en frontend, +1 para bajar una fila)
                 changes.push({ row: row + 1, col: col, value });
-                console.log(`[CONVIVENCIA] Cambio detectado: row=${row} (Excel row=${row + 2}), col=${col} (Excel col=${col + 1}), value="${value}"`);
+                console.log(`[COPASST] Cambio detectado: row=${row} (Excel row=${row + 2}), col=${col} (Excel col=${col + 1}), value="${value}"`);
             } else {
-                console.warn(`[CONVIVENCIA] Celda ignorada: row=${row}, col=${col}, value="${value}"`);
+                console.warn(`[COPASST] Celda ignorada: row=${row}, col=${col}, value="${value}"`);
             }
         });
 
         if (changes.length === 0) {
             alert('No hay datos para guardar.');
-            console.warn('[CONVIVENCIA] No se encontraron cambios para guardar');
+            console.warn('[COPASST] No se encontraron cambios para guardar');
             return;
         }
 
         try {
-            console.log('[CONVIVENCIA] Enviando cambios al IPC:', JSON.stringify(changes, null, 2));
-            const result = await window.electronAPI.generateConvivenciaActa(changes);
+            console.log('[COPASST] Enviando cambios al IPC:', JSON.stringify(changes, null, 2));
+            const result = await window.electronAPI.generateCopasstActa(changes);
             if (result.success) {
                 alert(`Acta guardada exitosamente en: ${result.documentPath}`);
-                console.log('[CONVIVENCIA] Acta guardada:', result.documentPath);
+                console.log('[COPASST] Acta guardada:', result.documentPath);
             } else {
                 alert(`Error al guardar el acta: ${result.error}`);
-                console.error('[CONVIVENCIA] Error en IPC:', result.error);
+                console.error('[COPASST] Error en IPC:', result.error);
             }
         } catch (error) {
-            console.error('[CONVIVENCIA] Error al invocar la generación del acta:', error);
+            console.error('[COPASST] Error al invocar la generación del acta:', error);
             alert(`Error fatal al guardar el acta: ${error.message}`);
         }
     }
@@ -371,7 +1112,7 @@ class ComiteConvivenciaComponent {
         header.appendChild(title);
         return header;
     }
-    
+
     createBackButton(text, onClick) {
         const backButton = document.createElement('button');
         backButton.className = 'btn btn-back';
@@ -389,4 +1130,4 @@ class ComiteConvivenciaComponent {
     }
 }
 
-window.ComiteConvivenciaComponent = ComiteConvivenciaComponent;
+window.CopasstComponent = CopasstComponent;

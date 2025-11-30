@@ -2108,6 +2108,85 @@ ipcMain.handle('generate-copasst-acta', async (event, changes) => {
   }
 });
 
+// --- Manejador para generar acta de Comité de Convivencia desde formulario ---
+ipcMain.handle('generate-convivencia-acta-from-form', async (event, actaData) => {
+  sendLog(`[MAIN][generate-convivencia-acta-from-form] Handler invocado con datos de acta`, 'INFO');
+
+  try {
+    // Validar que los datos se hayan enviado correctamente
+    if (!actaData || typeof actaData !== 'object') {
+      throw new Error('El parámetro "actaData" debe ser un objeto con los datos del acta.');
+    }
+
+    // Obtener la ruta de Python
+    const pythonPath = await getPython();
+    sendLog(`[MAIN][generate-convivencia-acta-from-form] Usando Python de: ${pythonPath}`, 'DEBUG');
+
+    // Definir rutas necesarias
+    const scriptPath = path.join(__dirname, 'Portear', 'src', 'comite_convivencia_acta_form_generator.py');
+    const tempDir = app.getPath('temp'); // Directorio temporal del sistema
+    const tempJsonPath = path.join(tempDir, `temp_convivencia_form_data_${Date.now()}.json`);
+    const outputDir = path.join(app.getPath('documents'), 'SG-SST', 'Actas_Convivencia');
+
+    // Asegurar que el directorio de salida exista
+    if (!fs.existsSync(outputDir)) {
+      await fsp.mkdir(outputDir, { recursive: true });
+      sendLog(`[MAIN][generate-convivencia-acta-from-form] Directorio de salida creado: ${outputDir}`, 'INFO');
+    }
+
+    // Definir nombre de archivo con timestamp
+    const fileName = `ACTA_CONVIVENCIA_${new Date().toISOString().slice(0, 10)}_${Date.now()}.xlsx`;
+    const outputPath = path.join(outputDir, fileName);
+
+    // Guardar los datos temporales en un archivo JSON
+    const tempData = {
+      ...actaData,
+      timestamp: new Date().toISOString()
+    };
+
+    await fsp.writeFile(tempJsonPath, JSON.stringify(tempData, null, 2), 'utf8');
+    sendLog(`[MAIN][generate-convivencia-acta-from-form] Datos temporales guardados en: ${tempJsonPath}`, 'DEBUG');
+
+    // Ejecutar el script Python
+    const { stdout, stderr } = await execFilePromise(pythonPath, [scriptPath, tempJsonPath, outputPath]);
+
+    // Verificar el resultado del script
+    if (stderr) {
+      sendLog(`[MAIN][generate-convivencia-acta-from-form] Python stderr: ${stderr}`, 'WARN');
+    }
+
+    sendLog(`[MAIN][generate-convivencia-acta-from-form] stdout del script Python: ${stdout}`, 'DEBUG');
+
+    // Verificar que el archivo de salida haya sido creado
+    if (!fs.existsSync(outputPath)) {
+      throw new Error(`El archivo de salida no se creó correctamente en: ${outputPath}`);
+    }
+
+    sendLog(`[MAIN][generate-convivencia-acta-from-form] Acta de Comité de Convivencia generada exitosamente en: ${outputPath}`, 'INFO');
+
+    // Limpiar el archivo temporal
+    try {
+      await fsp.unlink(tempJsonPath);
+      sendLog(`[MAIN][generate-convivencia-acta-from-form] Archivo temporal eliminado: ${tempJsonPath}`, 'INFO');
+    } catch (cleanupError) {
+      sendLog(`[MAIN][generate-convivencia-acta-from-form] Error al eliminar archivo temporal: ${cleanupError.message}`, 'WARN');
+    }
+
+    return {
+      success: true,
+      documentPath: outputPath,
+      message: 'Acta de Comité de Convivencia generada exitosamente'
+    };
+
+  } catch (error) {
+    sendLog(`[MAIN][generate-convivencia-acta-from-form] Error: ${error.message}`, 'ERROR');
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+});
+
 // --- Manejador para reiniciar la aplicación ---
 
 ipcMain.on('restart_app', () => {

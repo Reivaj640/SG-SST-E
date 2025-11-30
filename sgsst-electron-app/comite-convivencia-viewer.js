@@ -94,10 +94,10 @@ async function loadFolders() {
     console.log('VIEWER: Iniciando loadFolders...');
     showLoading();
 
-    const urlSearchParams = new URLSearchParams(window.location.search);
-    const companyName = decodeURIComponent(urlSearchParams.get('company') || '');
-    const moduleName = decodeURIComponent(urlSearchParams.get('module') || '');
-    const submoduleName = decodeURIComponent(urlSearchParams.get('submodule') || '');
+    const urlParams = new URLSearchParams(window.location.search);
+    const companyName = decodeURIComponent(urlParams.get('company') || '');
+    const moduleName = decodeURIComponent(urlParams.get('module') || '');
+    const submoduleName = decodeURIComponent(urlParams.get('submodule') || '');
 
     if (!companyName || !moduleName || !submoduleName) {
         showNotification('Faltan parámetros en la URL', 'error');
@@ -381,6 +381,21 @@ function displayPDF(pdfData) {
     }, 100);
 }
 
+// Mostrar Excel
+function displayExcel(excelData) { // excelData is expected to be base64 PDF data
+    hideLoading();
+
+    const viewerContainer = document.getElementById('viewerContainer');
+    viewerContainer.style.display = 'block';
+    viewerContainer.innerHTML = `<iframe class="excel-viewer" src="data:application/pdf;base64,${excelData}"></iframe>`;
+
+    currentViewer = 'excel';
+    totalPages = 1;
+    currentPage = 1;
+
+    updatePageInfo();
+}
+
 // Actualizar estado del botón de subir nivel
 function updateUpLevelButton() {
     const upLevelBtn = document.getElementById('upLevelBtn');
@@ -528,6 +543,15 @@ function applyOrientation() {
     applyZoom();
 }
 
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Función para imprimir el documento
 function printDocument() {
     if (currentDocument) {
         const extension = currentDocument.extension.toLowerCase();
