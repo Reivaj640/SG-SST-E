@@ -202,6 +202,28 @@ ipcMain.handle('select-directory', async () => {
   return result.filePaths[0];
 });
 
+// Manejar diálogo para guardar archivo
+ipcMain.handle('save-file-dialog', async (event, options = {}) => {
+  console.log('Handling save-file-dialog request');
+
+  const result = await dialog.showSaveDialog({
+    title: options.title || 'Guardar archivo',
+    defaultPath: options.defaultPath || undefined,
+    filters: options.filters || [
+      { name: 'Archivos de Excel', extensions: ['xlsx', 'xls'] },
+      { name: 'Todos los archivos', extensions: ['*'] }
+    ]
+  });
+
+  if (result.canceled) {
+    console.log('File save dialog canceled');
+    return null;
+  }
+
+  console.log('Selected file path:', result.filePath);
+  return result.filePath;
+});
+
 // Manejar guardado de configuración
 ipcMain.handle('save-config', async (event, config) => {
   try {
@@ -2030,7 +2052,7 @@ ipcMain.handle('save-debug-html', async (event, htmlContent) => {
 
 
 // --- Manejador para generar acta de COPASST ---
-ipcMain.handle('generate-copasst-acta', async (event, changes) => {
+ipcMain.handle('generate-copasst-acta', async (event, changes, savePath = null) => {
   sendLog(`[MAIN][generate-copasst-acta] Handler invocado con ${changes.length} cambios`, 'INFO');
 
   try {
@@ -2047,17 +2069,23 @@ ipcMain.handle('generate-copasst-acta', async (event, changes) => {
     const scriptPath = path.join(__dirname, 'Portear', 'src', 'copasst_acta_generator.py');
     const tempDir = app.getPath('temp'); // Directorio temporal del sistema
     const tempJsonPath = path.join(tempDir, `temp_acta_data_${Date.now()}.json`);
-    const outputDir = path.join(app.getPath('documents'), 'SG-SST', 'Actas_COPASST');
 
-    // Asegurar que el directorio de salida exista
-    if (!fs.existsSync(outputDir)) {
-      await fsp.mkdir(outputDir, { recursive: true });
-      sendLog(`[MAIN][generate-copasst-acta] Directorio de salida creado: ${outputDir}`, 'INFO');
+    // Determinar la ruta de salida basada en si se proporcionó savePath
+    let outputPath;
+    if (savePath) {
+      outputPath = savePath;
+    } else {
+      const outputDir = path.join(app.getPath('documents'), 'SG-SST', 'Actas_COPASST');
+      // Asegurar que el directorio de salida exista
+      if (!fs.existsSync(outputDir)) {
+        await fsp.mkdir(outputDir, { recursive: true });
+        sendLog(`[MAIN][generate-copasst-acta] Directorio de salida creado: ${outputDir}`, 'INFO');
+      }
+
+      // Definir nombre de archivo con timestamp
+      const fileName = `ACTA_COPASST_${new Date().toISOString().slice(0, 10)}_${Date.now()}.xlsx`;
+      outputPath = path.join(outputDir, fileName);
     }
-
-    // Definir nombre de archivo con timestamp
-    const fileName = `ACTA_COPASST_${new Date().toISOString().slice(0, 10)}_${Date.now()}.xlsx`;
-    const outputPath = path.join(outputDir, fileName);
 
     // Guardar los datos temporales en un archivo JSON
     const tempData = {
@@ -2109,7 +2137,7 @@ ipcMain.handle('generate-copasst-acta', async (event, changes) => {
 });
 
 // --- Manejador para generar acta de Comité de Convivencia ---
-ipcMain.handle('generate-convivencia-acta', async (event, changes) => {
+ipcMain.handle('generate-convivencia-acta', async (event, changes, savePath = null) => {
   sendLog(`[MAIN][generate-convivencia-acta] Handler invocado con ${changes.length} cambios`, 'INFO');
 
   try {
@@ -2126,17 +2154,23 @@ ipcMain.handle('generate-convivencia-acta', async (event, changes) => {
     const scriptPath = path.join(__dirname, 'Portear', 'src', 'comite_convivencia_acta_generator.py');
     const tempDir = app.getPath('temp'); // Directorio temporal del sistema
     const tempJsonPath = path.join(tempDir, `temp_convivencia_acta_changes_${Date.now()}.json`);
-    const outputDir = path.join(app.getPath('documents'), 'SG-SST', 'Actas_Convivencia');
 
-    // Asegurar que el directorio de salida exista
-    if (!fs.existsSync(outputDir)) {
-      await fsp.mkdir(outputDir, { recursive: true });
-      sendLog(`[MAIN][generate-convivencia-acta] Directorio de salida creado: ${outputDir}`, 'INFO');
+    // Determinar la ruta de salida basada en si se proporcionó savePath
+    let outputPath;
+    if (savePath) {
+      outputPath = savePath;
+    } else {
+      const outputDir = path.join(app.getPath('documents'), 'SG-SST', 'Actas_Convivencia');
+      // Asegurar que el directorio de salida exista
+      if (!fs.existsSync(outputDir)) {
+        await fsp.mkdir(outputDir, { recursive: true });
+        sendLog(`[MAIN][generate-convivencia-acta] Directorio de salida creado: ${outputDir}`, 'INFO');
+      }
+
+      // Definir nombre de archivo con timestamp
+      const fileName = `ACTA_CONVIVENCIA_${new Date().toISOString().slice(0, 10)}_${Date.now()}.xlsx`;
+      outputPath = path.join(outputDir, fileName);
     }
-
-    // Definir nombre de archivo con timestamp
-    const fileName = `ACTA_CONVIVENCIA_${new Date().toISOString().slice(0, 10)}_${Date.now()}.xlsx`;
-    const outputPath = path.join(outputDir, fileName);
 
     // Guardar los datos temporales en un archivo JSON
     const tempData = {

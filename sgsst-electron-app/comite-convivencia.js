@@ -890,7 +890,26 @@ class ComiteConvivenciaComponent {
                 }
 
                 console.log('[COMITE CONVIVENCIA] Enviando cambios al API:', changes); // Mensaje de depuración
-                const result = await window.electronAPI.generateConvivenciaActa(changes);
+
+                // Show the save file dialog to let user choose where to save the file
+                const savePath = await window.electronAPI.showSaveDialog({
+                    title: 'Guardar Acta de Comité de Convivencia',
+                    defaultPath: `ACTA_CONVIVENCIA_${data.fecha || new Date().toISOString().slice(0, 10)}.xlsx`,
+                    filters: [
+                        { name: 'Archivos de Excel', extensions: ['xlsx'] },
+                        { name: 'Todos los archivos', extensions: ['*'] }
+                    ]
+                });
+
+                // If user canceled the dialog, don't proceed
+                if (!savePath) {
+                    console.log('[COMITE CONVIVENCIA] Diálogo de guardado cancelado por el usuario');
+                    return;
+                }
+
+                // Modify the generateConvivenciaActa function to save to the selected path
+                // First, let's get the new version of the function that accepts savePath
+                const result = await window.electronAPI.generateConvivenciaActa(changes, savePath);
                 console.log('[COMITE CONVIVENCIA] Resultado del API:', result); // Mensaje de depuración
 
                 if (result.success) {

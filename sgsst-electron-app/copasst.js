@@ -890,7 +890,25 @@ class CopasstComponent {
                 }
 
                 console.log('[COPASST] Enviando cambios al API:', changes); // Mensaje de depuración
-                const result = await window.electronAPI.generateCopasstActa(changes);
+
+                // Show the save file dialog to let user choose where to save the file
+                const savePath = await window.electronAPI.showSaveDialog({
+                    title: 'Guardar Acta de COPASST',
+                    defaultPath: `ACTA_COPASST_${data.fecha || new Date().toISOString().slice(0, 10)}.xlsx`,
+                    filters: [
+                        { name: 'Archivos de Excel', extensions: ['xlsx'] },
+                        { name: 'Todos los archivos', extensions: ['*'] }
+                    ]
+                });
+
+                // If user canceled the dialog, don't proceed
+                if (!savePath) {
+                    console.log('[COPASST] Diálogo de guardado cancelado por el usuario');
+                    return;
+                }
+
+                // Call the generateCopasstActa function with the selected save path
+                const result = await window.electronAPI.generateCopasstActa(changes, savePath);
                 console.log('[COPASST] Resultado del API:', result); // Mensaje de depuración
 
                 if (result.success) {
@@ -921,7 +939,7 @@ class CopasstComponent {
         // --- Agenda de la Reunión ---
         // La agenda comienza en la fila 20 (índice 19)
         let currentRow = 25;
-        
+
         // Título de la agenda
         changes.push({ row: currentRow - 1, col: 1, value: 'AGENDA DE LA REUNIÓN' });
 

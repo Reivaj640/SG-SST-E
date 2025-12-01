@@ -119,6 +119,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   generateCopasstActa: (changes) => ipcRenderer.invoke('generate-copasst-acta', changes),
   generateConvivenciaActa: (changes) => ipcRenderer.invoke('generate-convivencia-acta', changes),
 
+  // --- Diálogo de guardado ---
+  showSaveDialog: (options) => ipcRenderer.invoke('save-file-dialog', options),
+
   // --- Seguimiento de Incapacidades ---
   saveFollowUp: (followUpData, companyName) => ipcRenderer.invoke('save-follow-up', followUpData, companyName),
   exportIncapacityData: (companyName) => ipcRenderer.invoke('export-incapacity-data', companyName),
