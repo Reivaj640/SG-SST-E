@@ -1,6 +1,6 @@
-// copasst.js - Componente para la vista de actas de CopassT con soporte para Excel
+// comite-convivencia.js - Componente para la vista de actas del Comité de Convivencia con soporte para Excel
 
-ComiteConvivenciaComponent {
+class ComiteConvivenciaComponent {
     constructor(container, currentCompany, moduleName, submoduleName, backToModuleCallback) {
         this.container = container;
         this.currentCompany = currentCompany;
@@ -49,7 +49,7 @@ ComiteConvivenciaComponent {
     }
 
     showVerActasPage() {
-        // Crear iframe para el visualizador estándar de COPASST
+        // Crear iframe para el visualizador estándar de Comité de Convivencia
         const viewerFrame = document.createElement('iframe');
         viewerFrame.id = 'comite-convivencia-actas-viewer';
         viewerFrame.style.width = '100%';
@@ -166,12 +166,12 @@ ComiteConvivenciaComponent {
     async previewDocument(filePath) {
         const previewCol = document.getElementById('preview-col');
         const fileExtension = filePath.split('.').pop().toLowerCase();
-        const escapedPath = filePath.replace(/\/g, '\\');
+        const escapedPath = filePath.replace(/\\/g, '\\');
 
         previewCol.innerHTML = `<div class="preview-placeholder">Cargando previsualización...</div>`;
 
         if (fileExtension === 'pdf') {
-            const safePath = filePath.replace(/\/g, '/');
+            const safePath = filePath.replace(/\\/g, '/');
             previewCol.innerHTML = `<iframe src="file:///${safePath}?t=${new Date().getTime()}" width="100%" height="100%" style="border: none;"></iframe>`;
         } else if (['doc', 'docx', 'xlsx', 'xls'].includes(fileExtension)) {
             try {
@@ -180,16 +180,16 @@ ComiteConvivenciaComponent {
                     : await window.electronAPI.convertExcelToPdf(filePath);
 
                 if (result.success) {
-                    const safePath = result.pdf_path.replace(/\/g, '/');
+                    const safePath = result.pdf_path.replace(/\\/g, '/');
                     previewCol.innerHTML = `<iframe src="file:///${safePath}?t=${new Date().getTime()}" width="100%" height="100%" style="border: none;"></iframe>`;
                 } else {
-                    previewCol.innerHTML = `<div class="preview-error"><h3>Error de Conversión</h3><p>${result.error}</p><button class="btn btn-primary" onclick="window.currentCopasstComponent.openDocument('${escapedPath}')">Abrir con aplicación externa</button></div>`;
+                    previewCol.innerHTML = `<div class="preview-error"><h3>Error de Conversión</h3><p>${result.error}</p><button class="btn btn-primary" onclick="window.currentComiteConvivenciaComponent.openDocument('${escapedPath}')">Abrir con aplicación externa</button></div>`;
                 }
             } catch (error) {
-                previewCol.innerHTML = `<div class="preview-error"><h3>Error Inesperado</h3><p>${error.message}</p><button class="btn btn-primary" onclick="window.currentCopasstComponent.openDocument('${escapedPath}')">Abrir con aplicación externa</button></div>`;
+                previewCol.innerHTML = `<div class="preview-error"><h3>Error Inesperado</h3><p>${error.message}</p><button class="btn btn-primary" onclick="window.currentComiteConvivenciaComponent.openDocument('${escapedPath}')">Abrir con aplicación externa</button></div>`;
             }
         } else {
-            previewCol.innerHTML = `<div class="preview-error"><h3>Previsualización no disponible</h3><p>La previsualización para archivos <strong>.${fileExtension}</strong> no está soportada.</p><button class="btn btn-primary" onclick="window.currentCopasstComponent.openDocument('${escapedPath}')">Abrir con aplicación externa</button></div>`;
+            previewCol.innerHTML = `<div class="preview-error"><h3>Previsualización no disponible</h3><p>La previsualización para archivos <strong>.${fileExtension}</strong> no está soportada.</p><button class="btn btn-primary" onclick="window.currentComiteConvivenciaComponent.openDocument('${escapedPath}')">Abrir con aplicación externa</button></div>`;
         }
     }
 
@@ -561,7 +561,7 @@ ComiteConvivenciaComponent {
         const actaNumberInput = document.createElement('input');
         actaNumberInput.type = 'number';
         actaNumberInput.id = 'acta-number';
-        actaNumberInput.value = '108';
+        actaNumberInput.value = '001';
         actaNumberGroup.appendChild(actaNumberLabel);
         actaNumberGroup.appendChild(actaNumberInput);
 
@@ -609,7 +609,7 @@ ComiteConvivenciaComponent {
         const topicInput = document.createElement('input');
         topicInput.type = 'text';
         topicInput.id = 'topic';
-        topicInput.value = 'Reunión del COPASST';
+        topicInput.value = 'Reunión del Comité de Convivencia Laboral';
         topicGroup.appendChild(topicLabel);
         topicGroup.appendChild(topicInput);
 
@@ -621,7 +621,7 @@ ComiteConvivenciaComponent {
         const lugarInput = document.createElement('input');
         lugarInput.type = 'text';
         lugarInput.id = 'ciudad-lugar';
-        lugarInput.value = 'Barranquilla, Oficinas Tempoactiva';
+        lugarInput.value = 'Barranquilla, Oficinas';
         lugarGroup.appendChild(lugarLabel);
         lugarGroup.appendChild(lugarInput);
 
@@ -714,14 +714,14 @@ ComiteConvivenciaComponent {
         // --- LÓGICA DE INTERACCIÓN ---
         // Datos iniciales para que no esté vacío
         const initialAgenda = [
-            { tema: 'Revisión del acta anterior N° 107', duracion: '00:10 Minutos', lider: 'Representante del Copasst' },
-            { tema: 'Revisión de Accidentes del Mes de Diciembre', duracion: '00:10 Minutos', lider: 'Representante del Copasst' },
-            { tema: 'Revisión Avance del Plan de Trabajo Anual', duracion: '00:30 Minutos', lider: 'Representante del Copasst' }
+            { tema: 'Verificación del Quórum', duracion: '00:10 Minutos', lider: 'Representante del Comité de Convivencia' },
+            { tema: 'Saludos e inicio de reunión', duracion: '00:10 Minutos', lider: 'Representante del Comité de Convivencia' },
+            { tema: 'Programa de bienestar y Temas Varios', duracion: '00:30 Minutos', lider: 'Representante del Comité de Convivencia' }
         ];
 
         const initialDesarrollo = [
-            { tema: 'Revisión del Acta Anterior, se continúan realizando las inspecciones programadas...', compromisos: 'Ninguno', fecha: '', responsable: 'Ninguno' },
-            { tema: 'Accidente laboral de Armando Cervantes Perez', compromisos: 'Realizar seguimiento del plan de acción del AT.', fecha: '2024-12-31', responsable: 'Miembros del Comité y Asesor Externo' }
+            { tema: 'Verificación del Quórum', compromisos: 'Ninguno', fecha: '', responsable: 'Presidente del Comité de Convivencia' },
+            { tema: 'Temas Varios: Se revisan la existencia de solicitudes o quejas sobre Acoso Laboral, se evidencia una queja registrada en el link de Reporte de Queja por Presunto Acoso (Respuestas). Se procedio en activar el protocolo de prevención de acoso laboral, Se brindo apoyo y soporte psicologico con la Asesoria de la ARL Colmenay se brindo orientación sobre el el debido proceso. ', compromisos: 'Solicitar a la profesional de la ARL soporte de atencion y orientacíon sobre el caso presentado.', fecha: '', responsable: 'Presidente del Comité de Convivencia' }
         ];
 
         // --- Funciones para Crear Elementos Dinámicos ---
@@ -879,19 +879,19 @@ ComiteConvivenciaComponent {
         // Add method to export to Excel
         this.exportToExcel = async (data) => {
             try {
-                console.log('[COPASST] Datos recibidos para exportar:', data); // Mensaje de depuración
+                console.log('[COMITE CONVIVENCIA] Datos recibidos para exportar:', data); // Mensaje de depuración
                 // Call the existing Electron API to generate the acta
                 const changes = this.prepareExcelData(data);
 
                 if (!changes || changes.length === 0) {
                     alert('No hay cambios para aplicar a la plantilla. Verifique que haya ingresado datos en el formulario.');
-                    console.error('[COPASST] No se generaron cambios para aplicar a la plantilla');
+                    console.error('[COMITE CONVIVENCIA] No se generaron cambios para aplicar a la plantilla');
                     return;
                 }
 
-                console.log('[COPASST] Enviando cambios al API:', changes); // Mensaje de depuración
-                const result = await window.electronAPI.generateCopasstActa(changes);
-                console.log('[COPASST] Resultado del API:', result); // Mensaje de depuración
+                console.log('[COMITE CONVIVENCIA] Enviando cambios al API:', changes); // Mensaje de depuración
+                const result = await window.electronAPI.generateConvivenciaActa(changes);
+                console.log('[COMITE CONVIVENCIA] Resultado del API:', result); // Mensaje de depuración
 
                 if (result.success) {
                     alert(`Acta guardada exitosamente en: ${result.documentPath}`);
@@ -911,17 +911,17 @@ ComiteConvivenciaComponent {
 
         // --- Información General ---
         // Basado en la estructura de la plantilla, ajustamos las coordenadas
-        changes.push({ row: 4, col: 6, value: data.actaNumber });    // Celda C5 para N° de Acta
-        changes.push({ row: 5, col: 6, value: data.topic });         // Celda C6 para Tema Principal
-        changes.push({ row: 7, col: 6, value: data.fecha });         // Celda C8 para Fecha
-        changes.push({ row: 8, col: 6, value: data.lugar });         // Celda C9 para Lugar
-        changes.push({ row: 9, col: 6, value: data.inicia });        // Celda C10 para Hora Inicio
-        changes.push({ row: 10, col: 6, value: data.termina });      // Celda C11 para Hora Fin
+        changes.push({ row: 6, col: 4, value: data.actaNumber });    // Celda C5 para N° de Acta
+        changes.push({ row: 7, col: 4, value: data.topic });         // Celda C6 para Tema Principal
+        changes.push({ row: 9, col: 4, value: data.fecha });         // Celda C8 para Fecha
+        changes.push({ row: 10, col: 4, value: data.lugar });         // Celda C9 para Lugar
+        changes.push({ row: 11, col: 4, value: data.inicia });        // Celda C10 para Hora Inicio
+        changes.push({ row: 12, col: 6, value: data.termina });      // Celda C11 para Hora Fin
 
         // --- Agenda de la Reunión ---
         // La agenda comienza en la fila 20 (índice 19)
-        let currentRow = 25;
-        
+        let currentRow = 26;
+
         // Título de la agenda
         changes.push({ row: currentRow - 1, col: 1, value: 'AGENDA DE LA REUNIÓN' });
 
@@ -940,7 +940,7 @@ ComiteConvivenciaComponent {
 
         // --- Desarrollo y Compromisos ---
         // Inicia unas filas después de que termine la agenda
-        let desarrolloRow = currentRow + data.agendaItems.length + 5;
+        let desarrolloRow = currentRow + data.agendaItems.length + 4;
         changes.push({ row: desarrolloRow - 1, col: 1, value: 'DESARROLLO DE LA REUNIÓN' });
 
         // Encabezados de la tabla de desarrollo
@@ -1057,13 +1057,13 @@ ComiteConvivenciaComponent {
         const table = this.container.querySelector('.editable-acta-table');
         if (!table) {
             alert('Error: No se encontró la tabla de datos del acta.');
-            console.error('[COPASST] No se encontró la tabla editable');
+            console.error('[COMITE CONVIVENCIA] No se encontró la tabla editable');
             return;
         }
 
         const changes = [];
         const cells = table.querySelectorAll('td[contenteditable="true"]');
-        console.log('[COPASST] Total celdas editables encontradas:', cells.length);
+        console.log('[COMITE CONVIVENCIA] Total celdas editables encontradas:', cells.length);
 
         cells.forEach(cell => {
             const row = parseInt(cell.getAttribute('data-row'));
@@ -1073,30 +1073,30 @@ ComiteConvivenciaComponent {
             if (!isNaN(row) && !isNaN(col) && value) {
                 // Ajustar índice para alinearse con Excel (0-based en frontend, +1 para bajar una fila)
                 changes.push({ row: row + 1, col: col, value });
-                console.log(`[COPASST] Cambio detectado: row=${row} (Excel row=${row + 2}), col=${col} (Excel col=${col + 1}), value="${value}"`);
+                console.log(`[COMITE CONVIVENCIA] Cambio detectado: row=${row} (Excel row=${row + 2}), col=${col} (Excel col=${col + 1}), value="${value}"`);
             } else {
-                console.warn(`[COPASST] Celda ignorada: row=${row}, col=${col}, value="${value}"`);
+                console.warn(`[COMITE CONVIVENCIA] Celda ignorada: row=${row}, col=${col}, value="${value}"`);
             }
         });
 
         if (changes.length === 0) {
             alert('No hay datos para guardar.');
-            console.warn('[COPASST] No se encontraron cambios para guardar');
+            console.warn('[COMITE CONVIVENCIA] No se encontraron cambios para guardar');
             return;
         }
 
         try {
-            console.log('[COPASST] Enviando cambios al IPC:', JSON.stringify(changes, null, 2));
-            const result = await window.electronAPI.generateCopasstActa(changes);
+            console.log('[COMITE CONVIVENCIA] Enviando cambios al IPC:', JSON.stringify(changes, null, 2));
+            const result = await window.electronAPI.generateConvivenciaActa(changes);
             if (result.success) {
                 alert(`Acta guardada exitosamente en: ${result.documentPath}`);
-                console.log('[COPASST] Acta guardada:', result.documentPath);
+                console.log('[COMITE CONVIVENCIA] Acta guardada:', result.documentPath);
             } else {
                 alert(`Error al guardar el acta: ${result.error}`);
-                console.error('[COPASST] Error en IPC:', result.error);
+                console.error('[COMITE CONVIVENCIA] Error en IPC:', result.error);
             }
         } catch (error) {
-            console.error('[COPASST] Error al invocar la generación del acta:', error);
+            console.error('[COMITE CONVIVENCIA] Error al invocar la generación del acta:', error);
             alert(`Error fatal al guardar el acta: ${error.message}`);
         }
     }
@@ -1130,4 +1130,4 @@ ComiteConvivenciaComponent {
     }
 }
 
-window.CopasstComponent = CopasstComponent;
+window.ComiteConvivenciaComponent = ComiteConvivenciaComponent;

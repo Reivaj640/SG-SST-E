@@ -117,8 +117,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getActaData: () => ipcRenderer.invoke('get-acta-data'),
   getConvivenciaActaData: () => ipcRenderer.invoke('getConvivenciaActaData'),
   generateCopasstActa: (changes) => ipcRenderer.invoke('generate-copasst-acta', changes),
-  generateConvivenciaActa: (changes) => ipcRenderer.invoke('generateConvivenciaActa', changes),
-  generateConvivenciaActaFromForm: (actaData) => ipcRenderer.invoke('generate-convivencia-acta-from-form', actaData),
+  generateConvivenciaActa: (changes) => ipcRenderer.invoke('generate-convivencia-acta', changes),
 
   // --- Seguimiento de Incapacidades ---
   saveFollowUp: (followUpData, companyName) => ipcRenderer.invoke('save-follow-up', followUpData, companyName),

@@ -721,7 +721,7 @@ class CopasstComponent {
 
         const initialDesarrollo = [
             { tema: 'Revisión del Acta Anterior, se continúan realizando las inspecciones programadas...', compromisos: 'Ninguno', fecha: '', responsable: 'Ninguno' },
-            { tema: 'Accidente laboral de Armando Cervantes Perez', compromisos: 'Realizar seguimiento del plan de acción del AT.', fecha: '2024-12-31', responsable: 'Miembros del Copasst y Asesor SST' }
+            { tema: 'Accidente laboral de Armando Cervantes Perez', compromisos: 'Realizar seguimiento del plan de acción del AT.', fecha: '', responsable: 'Miembros del Copasst y Asesor SST' }
         ];
 
         // --- Funciones para Crear Elementos Dinámicos ---
