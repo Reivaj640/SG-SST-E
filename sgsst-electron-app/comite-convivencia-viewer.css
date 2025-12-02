@@ -1,29 +1,30 @@
-/* Estilos modernos y profesionales para la funcionalidad de visualización de documentos COPASST */
+/* Estilos modernos y profesionales para la funcionalidad de visualización de documentos Comité de Convivencia */
 
-/* Variables de color inspiradas en el dashboard de ausentismo */
+/* Variables de color consistentes con otros visualizadores */
 :root {
-  --primary-color: #d32f2f; /* Rojo oscuro para seguridad y accidentes */
+  --primary-color: #4a6bdf;
   --primary-light: #e8f0fe;
   --primary-dark: #174ea6;
-  --secondary-color: #5f6368;
-  --success-color: #34a853;
-  --danger-color: #ea4335;
-  --warning-color: #fbbc04;
+  --secondary-color: #f5f7ff;
+  --accent-color: #ff6b6b;
+  --text-color: #333;
+  --light-text: #777;
+  --border-color: #e0e6ed;
+  --success-color: #4caf50;
+  --danger-color: #f44336;
+  --warning-color: #ff9800;
   --light-color: #f8f9fa;
   --dark-color: #202124;
   --white-color: #ffffff;
-  --border-color: #dadce0;
   --border-radius-sm: 4px;
   --border-radius-md: 8px;
   --border-radius-lg: 16px;
   --box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
   --box-shadow-hover: 0 8px 16px rgba(0, 0, 0, 0.1);
   --transition-normal: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  --text-color: #3c4043;
-  --text-light-color: #5f6368;
   --heading-color: #202124;
   --widget-bg-color: #ffffff;
-  --header-bg: linear-gradient(135deg, #d32f2f 0%, #ff5252 100%);
+  --header-bg: linear-gradient(135deg, var(--primary-color), #6b8cff);
   --header-height: 60px;
   --sidebar-width: 300px;
   --footer-height: 50px;
@@ -52,7 +53,7 @@
 body {
   font-family: 'Roboto', Arial, sans-serif;
   color: var(--text-color);
-  background-color: #f5f5f5;
+  background-color: #f8f9fa;
   line-height: 1.5;
   height: 100vh;
   display: flex;
@@ -68,26 +69,17 @@ body {
   overflow: hidden;
 }
 
-/* Encabezado minimalista */
+/* Encabezado estandarizado */
 header {
   background: var(--header-bg);
   color: white;
   padding: 15px 20px;
-  box-shadow: var(--box-shadow);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   height: var(--header-height);
   flex-shrink: 0;
-}
-
-.header-content {
-  justify-content: flex-start !important;
-  gap: 20px; /* opcional para separar */
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  flex: 0 0 auto;
 }
 
 .logo {
@@ -102,35 +94,8 @@ header {
 
 .logo h1 {
   font-weight: 500;
-  font-size: 16px;
-  letter-spacing: 0.3px;
+  font-size: 20px;
   margin: 0;
-}
-
-.app-title {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  flex: 0;
-  text-align: left;
-  margin: 0 20px;
-}
-
-.app-title h1 {
-  font-weight: 400;
-  font-size: 14px;
-  letter-spacing: 0.2px;
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex: 0 0 auto;
 }
 
 .header-actions {
@@ -144,11 +109,10 @@ header {
   border-radius: 4px;
   cursor: pointer;
   font-weight: 500;
-  transition: var(--transition-normal);
+  transition: all 0.3s ease;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 36px;
 }
 
 .btn i {
@@ -163,16 +127,15 @@ header {
 .btn-primary:hover {
   background-color: rgba(255, 255, 255, 0.9);
   transform: translateY(-2px);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 }
 
 .btn-secondary {
-  background-color: rgba(255, 255, 255, 0.2);
-  color: white;
+  background-color: var(--secondary-color);
+  color: var(--primary-color);
 }
 
 .btn-secondary:hover {
-  background-color: rgba(255, 255, 255, 0.3);
+  background-color: rgba(74, 107, 223, 0.1);
 }
 
 .btn:disabled {
@@ -225,7 +188,6 @@ header {
 
 .folder-item:hover {
   background-color: var(--secondary-color);
-  color: white;
 }
 
 .folder-item i {
@@ -299,10 +261,6 @@ header {
   color: var(--text-color);
 }
 
-.header-title-left {
-  text-align: left;
-  flex-grow: 1;
-}
 .document-actions {
   display: flex;
   gap: 10px;
@@ -349,7 +307,7 @@ header {
 .spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid rgba(211, 47, 47, 0.1);
+  border: 4px solid rgba(74, 107, 223, 0.1);
   border-radius: 50%;
   border-top-color: var(--primary-color);
   animation: spin 1s ease-in-out infinite;

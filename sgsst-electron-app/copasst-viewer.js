@@ -109,9 +109,13 @@ async function loadFolders() {
     try {
         const result = await callParentAPI('get-document-folders', { companyName, moduleName, submoduleName });
         console.log('VIEWER: La carga de carpetas y archivos raíz fue exitosa. Renderizando...');
-        currentFolderPath = result.basePath; // Guardar la ruta base
+        console.log('DEBUG loadFolders: Resultado completo de la API:', result);
+        currentFolderPath = result.path || result.basePath; // Intentar con 'path' primero, si no con 'basePath'
+        console.log('DEBUG loadFolders: Ruta base establecida:', currentFolderPath);
         pathHistory = []; // Inicializar historial vacío en la raíz
+        console.log('DEBUG loadFolders: Historial inicializado:', pathHistory);
         updateUpLevelButton(); // Actualizar estado del botón de subir nivel
+        console.log('DEBUG loadFolders: Estado inicial del botón subir nivel (debería estar deshabilitado):', pathHistory.length === 0);
         renderFolders(result.folders);
         renderDocuments(result.files); // <-- AÑADIDO: Renderizar también los archivos en la raíz
     } catch (error) {
@@ -164,9 +168,19 @@ async function selectFolder(path) {
             return;
         }
 
-        // Guardar la ruta actual en el historial antes de cambiar
-        if (currentFolderPath !== path) {
+        console.log('DEBUG selectFolder: currentFolderPath:', currentFolderPath, 'path:', path);
+
+        // Guardar la ruta actual en el historial antes de cambiar, solo si es una ruta válida
+        if (currentFolderPath !== undefined && currentFolderPath !== null && currentFolderPath !== '' && currentFolderPath !== path) {
             pathHistory.push(currentFolderPath);
+            console.log('DEBUG: Ruta guardada en historial. Nuevo historial:', pathHistory);
+        } else {
+            console.log('DEBUG: No se guardó ruta en historial. Condiciones:', {
+                isUndefined: currentFolderPath === undefined,
+                isNull: currentFolderPath === null,
+                isEmpty: currentFolderPath === '',
+                isSame: currentFolderPath === path
+            });
         }
 
         currentFolderPath = path;
@@ -185,6 +199,7 @@ async function selectFolder(path) {
         }
 
         await loadDocuments(path);
+        console.log('DEBUG: Estado del historial antes de updateUpLevelButton:', pathHistory);
         updateUpLevelButton(); // Actualizar estado del botón de subir nivel
 
     } catch (error) {

@@ -109,7 +109,8 @@ async function loadFolders() {
     try {
         const result = await callParentAPI('get-document-folders', { companyName, moduleName, submoduleName });
         console.log('VIEWER: La carga de carpetas y archivos raíz fue exitosa. Renderizando...');
-        currentFolderPath = result.basePath; // Guardar la ruta base
+        currentFolderPath = result.path || result.basePath; // Intentar con 'path' primero, si no con 'basePath'
+        console.log('DEBUG loadFolders: Ruta base establecida:', currentFolderPath);
         pathHistory = []; // Inicializar historial vacío en la raíz
         updateUpLevelButton(); // Actualizar estado del botón de subir nivel
         renderFolders(result.folders);
@@ -164,8 +165,8 @@ async function selectFolder(path) {
             return;
         }
 
-        // Guardar la ruta actual en el historial antes de cambiar
-        if (currentFolderPath !== path) {
+        // Guardar la ruta actual en el historial antes de cambiar, solo si es una ruta válida
+        if (currentFolderPath !== undefined && currentFolderPath !== null && currentFolderPath !== '' && currentFolderPath !== path) {
             pathHistory.push(currentFolderPath);
         }
 
