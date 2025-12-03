@@ -124,13 +124,10 @@ class GestionAmenazasHome {
         submoduleInfo.appendChild(submoduleMeta);
 
         const button = document.createElement('button');
-        button.className = 'btn btn-primary';
+        button.className = 'btn btn-primary btn-ingresar';
         button.textContent = 'Ingresar';
-        // Escape comillas para evitar problemas con el atributo onclick
-        const escapedName = name.replace(/'/g, "\\'");
-        const escapedModule = this.moduleName.replace(/'/g, "\\'");
         button.addEventListener('click', () => {
-            showSubmoduleContent(document.querySelector('.main-canvas'), escapedModule, escapedName);
+            showSubmoduleContent(document.querySelector('.main-canvas'), this.moduleName, name);
         });
 
         submoduleItem.appendChild(submoduleInfo);

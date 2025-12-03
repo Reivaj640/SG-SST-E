@@ -114,6 +114,7 @@
   line-height: 1.6;
   overflow: hidden;
   display: -webkit-box;
+  line-clamp: 3; /* Limitar a 3 líneas (estándar) */
   -webkit-line-clamp: 3; /* Limitar a 3 líneas */
   -webkit-box-orient: vertical;
 }
@@ -480,122 +481,6 @@
   border-radius: 4px;
 }
 
-/* Estilos responsivos */
-@media (max-width: 768px) {
-  .module-cards,
-  .settings-cards {
-    grid-template-columns: 1fr;
-  }
-
-  #company-selection {
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .company-row {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .company-row input[type="text"] {
-    width: 100%;
-    margin-top: 10px;
-  }
-
-  .chat-input-area {
-    flex-direction: column;
-  }
-}
-
-/* Añadir estilos para los elementos de submódulo */
-.submodule-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--spacer);
-  background-color: var(--widget-bg-color);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-md);
-  box-shadow: var(--box-shadow);
-  transition: all var(--transition-fast);
-  margin-bottom: var(--spacer-sm);
-}
-
-.submodule-item:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--box-shadow-lg);
-}
-
-.submodules-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: var(--spacer);
-  margin-top: var(--spacer);
-}
-
-/* Estilos responsivos para dispositivos móviles */
-@media (max-width: 768px) {
-  .submodules-list {
-    grid-template-columns: 1fr; /* Una columna en móviles */
-  }
-}
-
-.submodule-info {
-  flex-grow: 1;
-  margin-right: var(--spacer);
-}
-
-.submodule-name {
-  font-weight: var(--font-weight-bold);
-  color: var(--heading-color);
-  margin-bottom: var(--spacer-xs);
-}
-
-.submodule-meta {
-  font-size: var(--font-size-sm);
-  color: var(--text-light-color);
-}
-
-/* Añadir estilos para los widgets */
-.widgets-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: var(--spacer);
-  margin-bottom: var(--spacer-lg);
-}
-
-.widget {
-  padding: var(--spacer);
-  background-color: var(--widget-bg-color);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-md);
-  box-shadow: var(--box-shadow);
-  transition: transform var(--transition-fast);
-}
-
-.widget:hover {
-  transform: translateY(-2px);
-}
-
-.widget h4 {
-  margin-top: 0;
-  margin-bottom: var(--spacer-xs);
-  color: var(--heading-color);
-  font-size: var(--font-size-base);
-}
-
-.widget-value {
-  font-size: 1.5rem;
-  font-weight: var(--font-weight-bold);
-  color: var(--primary-color);
-  margin-bottom: var(--spacer-xs);
-}
-
-.widget-description {
-  font-size: var(--font-size-sm);
-  color: var(--text-light-color);
-}
-
 /* Estilos para la previsualización de archivos Excel */
 
 .excel-preview {
@@ -715,28 +600,6 @@
     border-top: 2px solid #dee2e6;
 }
 
-/* Responsive design para tablas Excel */
- @media (max-width: 768px) {
-    .excel-table {
-        font-size: 11px;
-    }
-
-    .excel-table th,
-    .excel-table td {
-        padding: 4px 8px;
-        max-width: 120px;
-    }
-
-    .excel-tabs {
-        overflow-x: auto;
-        white-space: nowrap;
-    }
-
-    .excel-tab {
-        flex-shrink: 0;
-    }
-}
-
 /* Scroll personalizado para la tabla Excel */
 .excel-table-container::-webkit-scrollbar {
     width: 8px;
@@ -757,11 +620,11 @@
     background: #a8a8a8;
 }
 
-
 /* Estilos responsivos */
 @media (max-width: 768px) {
   .module-cards,
-  .settings-cards {
+  .settings-cards,
+  .submodules-list {
     grid-template-columns: 1fr;
   }
 
@@ -783,6 +646,25 @@
   .chat-input-area {
     flex-direction: column;
   }
+
+  .excel-table {
+        font-size: 11px;
+    }
+
+    .excel-table th,
+    .excel-table td {
+        padding: 4px 8px;
+        max-width: 120px;
+    }
+
+    .excel-tabs {
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+
+    .excel-tab {
+        flex-shrink: 0;
+    }
 }
 
 /* Añadir estilos para los elementos de submódulo */
@@ -809,13 +691,6 @@
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: var(--spacer);
   margin-top: var(--spacer);
-}
-
-/* Estilos responsivos para dispositivos móviles */
-@media (max-width: 768px) {
-  .submodules-list {
-    grid-template-columns: 1fr; /* Una columna en móviles */
-  }
 }
 
 .submodule-info {
@@ -906,4 +781,15 @@
   padding: 5px;
   width: 0;
   transition: width 0.2s ease-in-out;
+}
+/* Estilo centralizado para el botón de 'Ingresar' */
+.btn-ingresar {
+  background-color: #007bff !important; /* Azul primario de Bootstrap */
+  border-color: #007bff !important;
+  color: white !important;
+}
+
+.btn-ingresar:hover {
+  background-color: #0069d9 !important; /* Un azul un poco más oscuro para el hover */
+  border-color: #0062cc !important;
 }

@@ -473,11 +473,10 @@ class GestionSaludHome {
         submoduleInfo.appendChild(submoduleMeta);
 
         const button = document.createElement('button');
-        button.className = 'btn btn-primary';
+        button.className = 'btn btn-primary btn-ingresar';
         button.textContent = 'Ingresar';
-        // No es necesario escapar comillas aquí porque estamos usando addEventListener
         button.addEventListener('click', () => {
-            showSubmoduleContent(document.querySelector('.main-canvas'), this.moduleName, name);
+            showSubmoduleContent(this.container, this.moduleName, name);
         });
 
         submoduleItem.appendChild(submoduleInfo);

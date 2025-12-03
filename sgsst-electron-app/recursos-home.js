@@ -125,7 +125,7 @@ class RecursosHome {
         submoduleInfo.appendChild(submoduleMeta);
 
         const button = document.createElement('button');
-        button.className = 'btn btn-primary';
+        button.className = 'btn btn-primary btn-ingresar';
         button.textContent = 'Ingresar';
         button.addEventListener('click', () => {
             // 'this.container' es la referencia correcta al .main-canvas que queremos reemplazar.
