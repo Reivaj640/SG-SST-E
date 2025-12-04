@@ -1485,6 +1485,21 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 
+    } else if (submoduleName === "1.2.1 Programa de capacitación Anual") {
+      if (window.CapacitacionesViewer) {
+        const capacitacionesViewer = new window.CapacitacionesViewer(
+          submoduleContentDiv,
+          currentCompany,
+          moduleName,
+          submoduleName,
+          safeBackToModuleCallback // <-- USAR EL CALLBACK SEGURO
+        );
+        capacitacionesViewer.render();
+      } else {
+        console.error('❌ CapacitacionesViewer no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
     } else if (submoduleName === "1.2.3 Curso Virtual 50 Horas") {
       if (window.CursoVirtualComponent) {
         const cursoComponent = new window.CursoVirtualComponent(

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-src 'self'; child-src 'self';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src 'self' data:; font-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; frame-src 'self'; child-src 'self';">
   <title>SG-SST Electron App</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="development-styles.css">
@@ -13,6 +13,10 @@
   <!-- Scripts para animación de fondo (Vanta.js) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/vanta@0.5.24/dist/vanta.waves.min.js"></script>
+
+  <!-- Cargar estilos externos necesarios -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
 </head>
 <body>
   <div id="app">
@@ -70,7 +74,9 @@
     </div>
   </div>
 
-  <!-- Cargar la biblioteca para leer Excel -->
+  <!-- Cargar bibliotecas externas -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="node_modules/xlsx/dist/xlsx.full.min.js"></script>
 
   <!-- Cargar los componentes -->
@@ -101,6 +107,8 @@
   <script src="medicion-ausentismo.js"></script>
   <script src="registrar-ausentismo.js"></script>
   <script src="presupuesto-gestion.js"></script>
+  <script src="components/capacitaciones/capacitaciones.js"></script>
+  <script src="components/capacitaciones/capacitaciones-viewer.js"></script>
   <script src="node_modules/vanilla-calendar-pro/index.js"></script>
   <script src="renderer.js"></script>
 </body>

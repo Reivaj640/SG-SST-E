@@ -1,0 +1,72 @@
+/* capacitaciones-viewer.css - Estilos específicos para el submódulo de capacitaciones */
+
+/* Contenedor principal del viewer de capacitaciones */
+.submodule-content.capacitaciones-viewer {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    background-color: #f8f9fa;
+}
+
+/* Asegurar que el contenido no cause desbordamiento */
+.capacitaciones-container {
+    height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Estilos específicos para evitar conflictos con estilos globales */
+.capacitaciones-container .app-layout {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.capacitaciones-container .app-body {
+    flex: 1;
+    overflow: hidden;
+}
+
+.capacitaciones-container .main-content {
+    overflow: auto;
+    flex: 1;
+}
+
+/* Ajustes para modales dentro del contenedor de capacitaciones */
+.capacitaciones-container .modal {
+    z-index: 1051; /* Asegurar que los modales se muestren correctamente */
+}
+
+/* Evitar conflictos con estilos de tablas globales */
+.capacitaciones-container .table {
+    margin-bottom: 0;
+}
+
+/* Ajustes para elementos específicos de la interfaz de capacitaciones */
+.capacitaciones-container .top-nav {
+    z-index: 100; /* Asegurar que la navegación superior esté por encima de otros elementos */
+}
+
+.capacitaciones-container .nav-link {
+    cursor: pointer;
+}
+
+/* Ajustes para dispositivos móviles */
+@media (max-width: 768px) {
+    .capacitaciones-container .main-content {
+        padding: 1rem;
+    }
+    
+    .capacitaciones-container .top-nav {
+        padding: 0 1rem;
+    }
+    
+    .capacitaciones-container .app-header {
+        padding: 1rem;
+    }
+}
