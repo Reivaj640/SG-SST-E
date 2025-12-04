@@ -510,7 +510,7 @@ class RestriccionesMedicasComponent {
     createModuleCard(title, description, onClick) {
         const card = document.createElement('div');
         card.className = 'card module-card';
-        card.innerHTML = `<div class="card-body"><h5 class="card-title">${title}</h5><p class="card-text">${description}</p><button class="btn btn-primary">Acceder</button></div>`;
+        card.innerHTML = `<div class="card-body"><h5 class="card-title">${title}</h5><p class="card-text">${description}</p><button class="btn btn-primary btn-ingresar">Acceder</button></div>`;
         card.querySelector('button').addEventListener('click', onClick);
         return card;
     }
