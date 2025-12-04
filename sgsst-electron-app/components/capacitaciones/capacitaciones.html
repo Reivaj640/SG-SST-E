@@ -485,17 +485,21 @@
                     </div>
 
                     <!-- Charts and Actions -->
-                    <div class="row">
-                        <div class="col-md-8">
+                    <div class="row mb-4">
+                        <div class="col-12">
                             <div class="chart-container">
                                 <h3>Progreso de Capacitaciones por Mes</h3>
-                                <canvas id="trainingChart" height="100"></canvas>
+                                <canvas id="trainingChart" height="350"></canvas>
                             </div>
                         </div>
-                        <div class="col-md-4">
+                    </div>
+
+                    <!-- ✅ FILA: Acciones Rápidas sola -->
+                    <div class="row mb-4">
+                        <div class="col-12">
                             <div class="action-card">
                                 <h3>Acciones Rápidas</h3>
-                                <div class="d-grid gap-2">
+                                <div class="d-flex flex-wrap gap-2 justify-content-start">
                                     <button class="btn btn-primary-custom" data-bs-toggle="modal" data-bs-target="#addTrainingModal">
                                         <i class="bi bi-plus-circle me-2"></i>Programar Nueva Capacitación
                                     </button>
@@ -667,11 +671,11 @@
                                     <tr>
                                         <th>#</th>
                                         <th>Nombre de la Capacitación</th>
-                                        <th>Tipo</th>
+                                        <th class="col-tipo">Tipo</th>
                                         <th>Fecha Programada</th>
                                         <th>Instructor</th>
                                         <th>Duración</th>
-                                        <th>Estado</th>
+                                        <th class="col-estado">Estado</th>
                                         <th>Acciones</th>
                                     </tr>
                                 </thead>
@@ -679,11 +683,11 @@
                                     <tr>
                                         <td>1</td>
                                         <td>Capacitación Riesgos Asociados a la tarea</td>
-                                        <td><span class="badge bg-primary">SST</span></td>
+                                        <td class="col-tipo"><span class="badge bg-primary">SST</span></td>
                                         <td>15 de enero de 2025</td>
                                         <td>Técnico</td>
                                         <td>2 Horas</td>
-                                        <td><span class="badge bg-warning">Pendiente</span></td>
+                                        <td class="col-estado"><span class="badge bg-warning">Pendiente</span></td>
                                         <td>
                                             <div class="btn-group" role="group">
                                                 <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editTrainingModal">
@@ -783,19 +787,6 @@
                                 </tbody>
                             </table>
                         </div>
-                        <nav aria-label="Page navigation">
-                            <ul class="pagination justify-content-center">
-                                <li class="page-item disabled">
-                                    <a class="page-link" href="#" tabindex="-1" aria-disabled="true">Anterior</a>
-                                </li>
-                                <li class="page-item active"><a class="page-link" href="#">1</a></li>
-                                <li class="page-item"><a class="page-link" href="#">2</a></li>
-                                <li class="page-item"><a class="page-link" href="#">3</a></li>
-                                <li class="page-item">
-                                    <a class="page-link" href="#">Siguiente</a>
-                                </li>
-                            </ul>
-                        </nav>
                     </div>
                 </div>
 

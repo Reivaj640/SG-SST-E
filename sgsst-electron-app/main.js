@@ -597,47 +597,122 @@ ipcMain.handle('init-excel', async (event, filePath) => {
     // Verificar que el archivo existe
     await fsp.access(filePath);
 
-    // Leer el archivo Excel usando exceljs
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile(filePath);
+    // Leer el archivo Excel usando xlsx (SheetJS), que es el enfoque usado en otras partes del sistema
+    const workbook = xlsx.readFile(filePath);
+    console.log('[DEBUG] Nombres de hojas en el archivo:', workbook.SheetNames);
 
-    // Obtener la primera hoja
-    const worksheet = workbook.getWorksheet(1);
+    // Obtener hoja: intentar primero con la hoja correspondiente al año actual
+    const currentYear = new Date().getFullYear().toString();
+    let sheetName = null;
 
+    // Buscar hoja con el patrón específico "Matriz Cap. [año]" para el año actual
+    const matrixPatternCurrent = new RegExp(`Matriz Cap\\.\\s*${currentYear}`, 'i');
+    sheetName = workbook.SheetNames.find(name => matrixPatternCurrent.test(name));
+
+    // Si no encontramos la del año actual, intentar con años anteriores en orden descendente
+    if (!sheetName) {
+      for (let year = parseInt(currentYear); year >= 2017; year--) {
+        const pattern = new RegExp(`Matriz Cap\\.\\s*${year}`, 'i');
+        sheetName = workbook.SheetNames.find(name => pattern.test(name));
+        if (sheetName) break;
+      }
+    }
+
+    // Si aún no encontramos la hoja de matriz, intentar con nombres comunes
+    if (!sheetName) {
+      const commonSheetNames = [
+        currentYear,
+        `${currentYear} Capacitaciones`,
+        `Capacitaciones ${currentYear}`,
+        `${currentYear.toString().slice(-2)}`,
+        `${currentYear.toString().slice(-2)} Capacitaciones`,
+        'Hoja1',
+        'Sheet1',
+        'Capacitaciones',
+        'Cronograma',
+        'Datos',
+        'Planilla1',
+        '1',
+        'Matriz Cap.'
+      ];
+
+      for (const commonName of commonSheetNames) {
+        sheetName = workbook.SheetNames.find(name =>
+          name.toLowerCase().includes(commonName.toLowerCase())
+        );
+        if (sheetName) break;
+      }
+    }
+
+    // Si no encontramos ninguna hoja específica, usar la primera disponible
+    if (!sheetName) {
+      sheetName = workbook.SheetNames[0];
+    }
+
+    if (!sheetName) {
+      throw new Error('No se encontró ninguna hoja en el archivo Excel');
+    }
+
+    console.log('[DEBUG] Hoja seleccionada:', sheetName);
+    const worksheet = workbook.Sheets[sheetName];
+    console.log('[DEBUG] !ref de la hoja:', worksheet['!ref']);
+
+    // Validar que la hoja no esté vacía
+    if (!worksheet['!ref']) {
+      sendLog(`[WARN] La hoja '${sheetName}' de cálculo parece estar vacía (sin !ref).`);
+      return {
+        success: true,
+        data: {
+          processedData: [],
+          headers: [],
+          formulaCells: []
+        }
+      };
+    }
+
+    // Leer todos los datos de la hoja usando sheet_to_json
+    const allData = xlsx.utils.sheet_to_json(worksheet, {
+      header: 1,  // Esto devuelve los datos como array de arrays
+      raw: false, // Esto convierte los datos a strings o números según sea apropiado
+      defval: null // Valor por defecto si la celda está vacía
+    });
+
+    console.log('[DEBUG] Total de filas leídas:', allData.length);
+    console.log('[DEBUG] Primeras 3 filas:', allData.slice(0, 3));
+
+    // Procesar los datos para el formato esperado
     let processedData = [];
     let headers = [];
     let formulaCells = [];
 
-    // Leer todas las filas y extraer datos
-    worksheet.eachRow((row, rowNumber) => {
-      const rowData = [];
-      row.eachCell((cell, colNumber) => {
-        rowData.push({
-          value: cell.value,
-          formula: cell.formula ? cell.formula : undefined,
-          type: cell.type,
-          address: cell.address
-        });
+    if (allData && allData.length > 0) {
+      // Asumimos que la primera fila contiene los encabezados
+      headers = allData[0] || [];
 
-        // Si es una fórmula, almacenarla para seguimiento
-        if (cell.formula) {
-          formulaCells.push({
-            address: cell.address,
-            formula: cell.formula,
-            result: cell.value
-          });
+      // Procesar las filas de datos (desde la segunda fila en adelante)
+      for (let rowIndex = 1; rowIndex < allData.length; rowIndex++) {
+        const row = allData[rowIndex];
+        const rowData = [];
+
+        if (Array.isArray(row)) {
+          for (let colIndex = 0; colIndex < row.length; colIndex++) {
+            // Crear la dirección de celda manualmente si xlsx.utils.encode_cell falla
+            const address = `${String.fromCharCode(65 + colIndex)}${rowIndex + 1}`; // Ej: A1, B1, etc.
+
+            rowData.push({
+              value: row[colIndex],
+              formula: undefined, // Con sheet_to_json no obtenemos fórmulas directamente
+              type: typeof row[colIndex],
+              address: address
+            });
+          }
         }
-      });
 
-      if (rowNumber === 1) {
-        // Suponemos que la primera fila son los encabezados
-        headers = rowData.map(cell => cell.value);
+        processedData.push(rowData);
       }
+    }
 
-      processedData.push(rowData);
-    });
-
-    sendLog(`[MAIN] Archivo Excel procesado exitosamente. Filas: ${processedData.length}`, 'INFO');
+    sendLog(`[MAIN] Archivo Excel procesado exitosamente. Hojas: ${workbook.SheetNames.length}, Fila seleccionada: ${sheetName}, Filas de datos: ${processedData.length}`, 'INFO');
 
     return {
       success: true,

@@ -133,17 +133,113 @@ class CapacitacionesComponent {
 
     async loadCapacitacionesData() {
         try {
-            // Datos de ejemplo - en una implementación real, esto vendría de una API
-            this.capacitaciones = [
-                { id: 1, nombre: 'Capacitación Riesgos Asociados a la tarea', tipo: 'sst', fechaProgramada: '2025-01-15', instructor: 'Técnico', duracion: '2 Horas', estado: 'pending', participantes: 20 },
-                { id: 2, nombre: 'Prevención de lesiones por movimientos repetitivos', tipo: 'sst', fechaProgramada: '2025-01-20', instructor: 'Técnico', duracion: '2 Horas', estado: 'pending', participantes: 15 },
-                { id: 3, nombre: 'Uso adecuado y mantenimiento de EPP', tipo: 'sst', fechaProgramada: '2025-05-28', instructor: 'ARL', duracion: '2 Horas', estado: 'pending', participantes: 25 },
-                { id: 4, nombre: 'Uso y abuso de alcohol, drogas y tabaquismo', tipo: 'pyp', fechaProgramada: '2025-01-10', instructor: 'Técnico', duracion: '2 Horas', estado: 'completed', participantes: 30 },
-                { id: 5, nombre: 'Promoción y prevención del riesgo psicosocial', tipo: 'pyp', fechaProgramada: '2025-02-15', instructor: 'Técnico', duracion: '2 Horas', estado: 'completed', participantes: 18 },
-                { id: 6, nombre: 'Prevención de caídas desde altura', tipo: 'sst', fechaProgramada: '2025-03-10', instructor: 'ARL - Olga Pinto', duracion: '2 Horas', estado: 'pending', participantes: 12 },
-                { id: 7, nombre: 'Manejo defensivo', tipo: 'pyp', fechaProgramada: '2025-01-25', instructor: 'Técnico', duracion: '2 Horas', estado: 'completed', participantes: 22 },
-                { id: 8, nombre: 'Primeros auxilios', tipo: 'pyp', fechaProgramada: '2025-02-28', instructor: 'Técnico', duracion: '4 Horas', estado: 'completed', participantes: 18 }
-            ];
+            // Obtener la ruta del submódulo 1.2.1 Programa de Capacitaciones
+            const submodulePathResult = await window.electronAPI.findSubmodulePath(
+                this.currentCompany,
+                this.moduleName,
+                this.submoduleName
+            );
+
+            if (!submodulePathResult.success) {
+                console.error('Error al obtener la ruta del submódulo:', submodulePathResult.error);
+                this.showNotification('Error al obtener la ruta del submódulo. Usando datos de ejemplo.', 'warning');
+
+                // No se encontraron datos reales, dejar la lista vacía
+                this.capacitaciones = [];
+                this.filteredCapacitaciones = [...this.capacitaciones];
+                this.updateDashboardStats();
+
+                if (this.currentView === 'trainings') {
+                    this.renderTrainingsTable();
+                }
+                return;
+            }
+
+            const submodulePath = submodulePathResult.path;
+
+            // Leer archivos Excel en la carpeta de submódulo
+            const filesResult = await window.electronAPI.readDirectory(submodulePath);
+
+            // Verificar si la respuesta es exitosa y tiene datos
+            if (!filesResult || !filesResult.success) {
+                console.error('Error al leer directorio:', filesResult ? filesResult.error : 'No se obtuvo respuesta');
+                throw new Error(filesResult ? filesResult.error : 'No se pudo leer el directorio');
+            }
+
+            // Asegurarse de que files sea un array
+            const files = Array.isArray(filesResult.files) ? filesResult.files : [];
+
+            // Buscar archivos Excel relevantes
+            // Asumiendo que files es un array de objetos con propiedades como {name, path, type}
+            const excelFiles = files.filter(item => {
+                // Obtener el nombre del archivo del objeto
+                const fileName = typeof item === 'string' ? item : (item.name || item.path || '');
+                const fileNameLower = fileName.toLowerCase();
+
+                return (fileNameLower.includes('capacitacion') ||
+                        fileNameLower.includes('cronograma')) &&
+                       (fileNameLower.endsWith('.xlsx') || fileNameLower.endsWith('.xls'));
+            }).map(item => typeof item === 'string' ? item : item.name || item.path);
+
+            if (excelFiles.length === 0) {
+                console.warn('No se encontraron archivos Excel relevantes en la carpeta del submódulo:', submodulePath);
+                this.showNotification('No se encontraron archivos Excel con datos de capacitaciones. La lista estará vacía hasta que se incluyan archivos válidos.', 'info');
+
+                // No se encontraron datos reales, dejar la lista vacía
+                this.capacitaciones = [];
+                this.filteredCapacitaciones = [...this.capacitaciones];
+                this.updateDashboardStats();
+
+                if (this.currentView === 'trainings') {
+                    this.renderTrainingsTable();
+                }
+                return;
+            }
+
+            // Leer el primer archivo Excel encontrado
+            const excelFilePath = `${submodulePath}/${excelFiles[0]}`;
+
+            // Inicializar el archivo Excel
+            console.log('Intentando leer archivo Excel:', excelFilePath);
+            const excelResult = await window.electronAPI.initExcel(excelFilePath);
+            console.log('Resultado de initExcel:', excelResult);
+
+            if (!excelResult || !excelResult.success) {
+                console.error('Error al leer el archivo Excel:', excelResult ? excelResult.error : 'No se obtuvo respuesta válida');
+                this.showNotification('Error al leer el archivo Excel. La lista estará vacía hasta que se resuelva el problema.', 'danger');
+
+                // Dejar la lista vacía en caso de error
+                this.capacitaciones = [];
+                this.filteredCapacitaciones = [...this.capacitaciones];
+                this.updateDashboardStats();
+
+                if (this.currentView === 'trainings') {
+                    this.renderTrainingsTable();
+                }
+                return;
+            }
+
+            // Procesar los datos del Excel
+            const { processedData, headers } = excelResult.data;
+            console.log('Datos procesados del Excel:', { processedData, headers });
+
+            if (!processedData || !headers) {
+                console.error('Datos insuficientes del archivo Excel:', { processedData, headers });
+                this.showNotification('El archivo Excel no contiene datos válidos. La lista estará vacía.', 'warning');
+
+                // Dejar la lista vacía si no hay datos procesables
+                this.capacitaciones = [];
+                this.filteredCapacitaciones = [...this.capacitaciones];
+                this.updateDashboardStats();
+
+                if (this.currentView === 'trainings') {
+                    this.renderTrainingsTable();
+                }
+                return;
+            }
+
+            // Mapear los datos del Excel al formato esperado por la interfaz
+            this.capacitaciones = this.parseExcelDataToCapacitaciones(processedData, headers);
 
             this.filteredCapacitaciones = [...this.capacitaciones];
             this.updateDashboardStats();
@@ -151,10 +247,97 @@ class CapacitacionesComponent {
             if (this.currentView === 'trainings') {
                 this.renderTrainingsTable();
             }
+
+            this.showNotification(`Datos cargados exitosamente desde: ${excelFiles[0]}`, 'success');
         } catch (error) {
             console.error('Error al cargar datos de capacitaciones:', error);
-            this.showNotification('Error al cargar datos de capacitaciones', 'danger');
+            this.showNotification('Error al cargar datos de capacitaciones. La lista estará vacía hasta que se resuelva el problema.', 'danger');
+
+            // En caso de error, dejar la lista vacía
+            this.capacitaciones = [];
+            this.filteredCapacitaciones = [...this.capacitaciones];
+            this.updateDashboardStats();
+
+            if (this.currentView === 'trainings') {
+                this.renderTrainingsTable();
+            }
         }
+    }
+
+    // Función para mapear los datos del Excel al formato esperado por la interfaz
+    parseExcelDataToCapacitaciones(processedData, headers) {
+        const capacitaciones = [];
+        // Empezamos desde la fila 7 (índice 6) según la indicación del usuario
+        const dataRows = processedData.slice(5);
+
+        for (const row of dataRows) {
+            if (!row || row.length < 9) continue; // Asegurarse de que haya suficientes columnas hasta la 'I'
+
+            // Nombre (Columna B, índice 1)
+            const nombre = row[1] && row[1].value ? row[1].value : '';
+
+            // Condicional para detener la lectura si se encuentra "Total capacitaciones programadas"
+            if (nombre.includes('Total capacitaciones programadas')) {
+                break; // Terminar el bucle
+            }
+            
+            if (!nombre) continue; // Si no hay nombre de capacitación (y no es la fila de total), saltar fila
+
+            // Tipo (Columna C, índice 2)
+            const tipoRaw = row[2] && row[2].value ? row[2].value.toString().toLowerCase() : 'sst';
+            let tipo = 'sst';
+            if (tipoRaw.includes('pyp')) {
+                tipo = 'pyp';
+            }
+
+            // Fecha Programada (Columna D, índice 3) - con manejo de errores robusto
+            let fechaProgramada = 'No especificada';
+            if (row[3] && row[3].value) {
+                const fechaValue = row[3].value;
+                let parsedDate;
+
+                if (typeof fechaValue === 'number') {
+                    // Manejar formato numérico de fecha de Excel
+                    parsedDate = new Date((fechaValue - 25569) * 86400 * 1000);
+                } else {
+                    // Manejar strings u otros formatos
+                    parsedDate = new Date(fechaValue.toString());
+                }
+
+                // Validar que la fecha sea un objeto Date válido antes de formatear
+                if (parsedDate && !isNaN(parsedDate.getTime())) {
+                    fechaProgramada = parsedDate.toISOString().split('T')[0];
+                }
+            }
+
+            // Instructor (Columna G, índice 6)
+            const instructor = row[6] && row[6].value ? row[6].value : 'No especificado';
+
+            // Duración (Columna H, índice 7)
+            const duracion = row[7] && row[7].value ? `${row[7].value} Horas` : 'No especificada';
+            
+            // Estado (Columna I, índice 8)
+            const estadoRaw = row[8] && row[8].value ? row[8].value.toString().toLowerCase() : '';
+            let estado = 'pending';
+            if (estadoRaw.includes('ejecutado') || estadoRaw.includes('completado') || estadoRaw.includes('finalizado') || estadoRaw.includes('realizado')) {
+                estado = 'completed';
+            } else if (estadoRaw.includes('pendiente') || estadoRaw.includes('programado') || estadoRaw.includes('planificado')) {
+                estado = 'pending';
+            }
+
+            capacitaciones.push({
+                id: capacitaciones.length + 1,
+                nombre: nombre,
+                tipo: tipo,
+                fechaProgramada: fechaProgramada,
+                instructor: instructor,
+                duracion: duracion,
+                estado: estado,
+                participantes: 0 // La columna de participantes no se ha especificado, se mantiene como 0
+            });
+        }
+        
+        return capacitaciones;
     }
 
     updateDashboardStats() {
@@ -232,10 +415,8 @@ class CapacitacionesComponent {
             return;
         }
 
-        // Limitar número de filas para evitar desbordamiento
-        const itemsToShow = this.filteredCapacitaciones.slice(0, 50); // Mostrar máximo 50 registros
-
-        itemsToShow.forEach(cap => {
+        // Mostrar todos los registros sin límite
+        this.filteredCapacitaciones.forEach(cap => {
             const row = document.createElement('tr');
 
             // Determinar badge de tipo

@@ -1707,3 +1707,65 @@ select.form-control {
     margin-bottom: 20px;
     border-radius: 4px;
 }
+/* === ESPACIADO GENERAL DEL DASHBOARD === */
+
+/* Separación entre las tarjetas grandes superiores */
+.card {
+    margin-bottom: 1.5rem !important;     /* espacio debajo de cada tarjeta */
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+    border-radius: 12px !important;
+}
+
+/* Contenedor principal del dashboard */
+.main-content,
+.container-fluid,
+.row {
+    row-gap: 2rem !important;            /* separa verticalmente todas las filas */
+}
+
+/* Espacio extra entre secciones grandes */
+.widget,
+.panel,
+.card-block,
+.white-box,
+.info-box {
+    margin-bottom: 2.5rem !important;
+    padding: 1.5rem !important;
+}
+
+/* Secciones específicas que aparecen en tu captura */
+#dashboard .row > div[class*="col-"] {
+    padding-left: 2rem !important;
+    padding-right: 2rem !important;
+}
+
+/* Separación entre gráfico y las listas de capacitaciones recientes/próximas */
+.chart-container,
+.fc-view-container,
+.table-responsive {
+    margin-top: 2.5rem !important;
+    margin-bottom: 3rem !important;
+}
+
+/* Separación entre las dos columnas de "Capacitaciones Recientes" y "Próximas Capacitaciones" */
+.col-md-6 + .col-md-6 {
+    padding-left: 2rem !important;
+}
+
+/* Si usas tarjetas con clase "bg-*" o "stat-item" */
+.bg-success, .bg-info, .bg-warning, .bg-danger,
+.stat-item, .info-box {
+    height: auto !important;
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
+
+/* Responsivo: en pantallas pequeñas reduce un poco el exceso de espacio */
+@media (max-width: 768px) {
+    .card { margin-bottom: 1rem !important; }
+    .row { row-gap: 1.5rem !important; }
+    .col-md-6 + .col-md-6 { padding-left: 0 !important; }
+}
