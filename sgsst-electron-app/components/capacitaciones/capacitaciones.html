@@ -8,9 +8,9 @@
     <style>
         /* Estilos base y variables - Adaptados para evitar conflictos con estilos globales */
         .capacitaciones-container :root {
-            --primary-color: #206A5D;
-            --primary-hover-color: #1A564B;
-            --secondary-color: #6c757d;
+            --primary-color: #4a6bdf;
+            --primary-hover-color: #4a6bdf;
+            --secondary-color: #f5f7ff;
             --success-color: #28a745;
             --danger-color: #dc3545;
             --warning-color: #ffc107;
@@ -579,8 +579,8 @@
                     <!-- Filter Section -->
                     <div class="filter-section">
                         <h3>Filtros</h3>
-                        <div class="row">
-                            <div class="col-md-3">
+                        <div class="d-flex flex-wrap gap-3 mb-3">
+                            <div class="flex-fill" style="min-width: 100px; max-width: 250px;">
                                 <div class="form-group">
                                     <label for="yearFilter">Año</label>
                                     <select class="form-select" id="yearFilter">
@@ -588,7 +588,7 @@
                                     </select>
                                 </div>
                             </div>
-                            <div class="col-md-3">
+                            <div class="flex-fill" style="min-width: 100px; max-width: 250px;">
                                 <div class="form-group">
                                     <label for="typeFilter">Tipo de Capacitación</label>
                                     <select class="form-select" id="typeFilter">
@@ -598,7 +598,7 @@
                                     </select>
                                 </div>
                             </div>
-                            <div class="col-md-3">
+                            <div class="flex-fill" style="min-width: 100px; max-width: 250px;">
                                 <div class="form-group">
                                     <label for="statusFilter">Estado</label>
                                     <select class="form-select" id="statusFilter">
@@ -609,7 +609,7 @@
                                     </select>
                                 </div>
                             </div>
-                            <div class="col-md-3">
+                            <div class="flex-fill" style="min-width: 100px; max-width: 250px;">
                                 <div class="form-group">
                                     <label for="monthFilter">Mes</label>
                                     <select class="form-select" id="monthFilter">
@@ -630,15 +630,13 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="row">
-                            <div class="col-md-12">
-                                <button class="btn btn-primary-custom me-2">
-                                    <i class="bi bi-funnel me-2"></i>Aplicar Filtros
-                                </button>
-                                <button class="btn btn-outline-secondary">
-                                    <i class="bi bi-arrow-clockwise me-2"></i>Limpiar Filtros
-                                </button>
-                            </div>
+                        <div>
+                            <button class="btn btn-primary-custom me-2">
+                                <i class="bi bi-funnel me-2"></i>Aplicar Filtros
+                            </button>
+                            <button class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-clockwise me-2"></i>Limpiar Filtros
+                            </button>
                         </div>
                     </div>
 
@@ -1360,14 +1358,14 @@
             navLinks.forEach(link => {
                 link.addEventListener('click', function(e) {
                     e.preventDefault();
-                    
+
                     // Remove active class from all links and sections
                     navLinks.forEach(l => l.classList.remove('active'));
                     viewSections.forEach(s => s.classList.remove('active'));
-                    
+
                     // Add active class to clicked link
                     this.classList.add('active');
-                    
+
                     // Show corresponding section
                     const targetId = this.getAttribute('href').substring(1);
                     const targetSection = document.getElementById(targetId + '-view');

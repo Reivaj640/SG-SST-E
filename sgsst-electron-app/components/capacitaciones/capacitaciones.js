@@ -23,7 +23,7 @@ class CapacitacionesComponent {
 
         // Agregar clase contenedora específica para evitar conflictos de estilos
         this.container.classList.add('capacitaciones-container');
-        
+
         // Cargar el HTML de la interfaz
         fetch('components/capacitaciones/capacitaciones.html')
             .then(response => response.text())
@@ -164,7 +164,7 @@ class CapacitacionesComponent {
             })
             .filter(y => y !== null && !isNaN(y))
         )].sort((a, b) => b - a);
-        
+
         yearFilter.innerHTML = '';
         if (years.length === 0) {
             yearFilter.innerHTML = '<option value="">No hay años disponibles</option>';
@@ -191,7 +191,7 @@ class CapacitacionesComponent {
         } else {
             this.currentYear = null; // No hay años disponibles
         }
-        
+
         // Cargar datos para el año seleccionado por defecto
         if (this.currentYear) {
             await this.loadDataForYear(this.currentYear);
@@ -200,10 +200,32 @@ class CapacitacionesComponent {
             this.applyFilters();
         }
     }
-    
+
     async loadDataForYear(year) {
         this.currentYear = year;
-        const sheetName = this.availableSheets.find(s => s.includes(year));
+
+        // Buscar hoja específica para el año, buscando patrones específicos como "Matriz Cap. 2025"
+        let sheetName = null;
+
+        // Primero intentar buscar exactamente "Matriz Cap. [año]"
+        sheetName = this.availableSheets.find(s =>
+            s.trim().toLowerCase().includes(`matriz cap.`) &&
+            s.includes(year.toString())
+        );
+
+        // Si no se encuentra con el patrón específico, buscar cualquier hoja que contenga el año
+        if (!sheetName) {
+            sheetName = this.availableSheets.find(s => s.includes(year.toString()));
+        }
+
+        // Si aún no se encuentra, buscar con guiones o guiones bajos
+        if (!sheetName) {
+            sheetName = this.availableSheets.find(s =>
+                s.toLowerCase().includes(year.toString()) &&
+                (s.includes('-') || s.includes('_'))
+            );
+        }
+
         if (!sheetName) {
             this.showNotification(`No se encontró una hoja para el año ${year}.`, 'warning');
             this.capacitaciones = [];
@@ -214,7 +236,7 @@ class CapacitacionesComponent {
         try {
             const excelResult = await window.electronAPI.initExcel({ filePath: this.excelFilePath, sheetName });
             if (!excelResult.success) throw new Error(excelResult.error);
-            
+
             const { processedData, headers, sheetName: loadedSheetName } = excelResult.data; // Recibir el sheetName real
             if (!processedData) throw new Error('La hoja de Excel seleccionada no contiene datos válidos.');
 
@@ -233,7 +255,7 @@ class CapacitacionesComponent {
         const typeFilterValue = document.getElementById('typeFilter')?.value || '';
         const statusFilterValue = document.getElementById('statusFilter')?.value || '';
         const monthFilterValue = document.getElementById('monthFilter')?.value || '';
-        
+
         let filteredData = this.capacitaciones; // Inicia con los datos del año ya cargado
 
         if (typeFilterValue) {
@@ -266,80 +288,117 @@ class CapacitacionesComponent {
     // Función para mapear los datos del Excel al formato esperado por la interfaz
     parseExcelDataToCapacitaciones(processedData, headers) {
         const capacitaciones = [];
-        // `processedData` es `allData` del main.js. Los encabezados están en la fila 6 (índice 5).
-        // La data real empieza en la fila 7 (índice 6).
+        // Los datos empiezan desde la fila 7 del Excel (índice 6 del array), ya que las primeras filas contienen encabezados
         const dataRows = processedData.slice(6); // Ajustado para reflejar que los datos comienzan en la fila 7 del Excel
-        
-        for (const row of dataRows) {
+
+        console.log(`[DEBUG] Procesando ${dataRows.length} filas de datos desde índice 6`);
+        console.log(`[DEBUG] Ejemplo de primera fila de datos:`, dataRows[0]);
+
+        for (let i = 0; i < dataRows.length; i++) {
+            const row = dataRows[i];
+
             // Asegurarse de que row sea un array y tenga suficientes columnas para evitar errores
             // Las columnas usadas son B(1), C(2), D(3), G(6), H(7), I(8). Necesitamos al menos 9 elementos para acceder al índice 8.
-            if (!Array.isArray(row) || row.length < 9) continue; 
+            if (!Array.isArray(row) || row.length < 9) {
+                console.log(`[DEBUG] Fila ${i+7} no válida o sin suficientes columnas (longitud: ${row ? row.length : 'undefined'}):`, row);
+                continue;
+            }
+
+            // Obtener el contenido de cada celda y manejarlo de forma robusta
+            const getCellValue = (cell) => {
+                if (cell === null || cell === undefined) return '';
+                if (typeof cell === 'object' && cell.value !== undefined) return cell.value;
+                if (typeof cell === 'object') return String(cell);
+                return cell;
+            };
 
             // Nombre (Columna B, índice 1)
-            const nombre = row[1] ? row[1].value : '';
+            const nombreRaw = getCellValue(row[1]);
+            const nombre = String(nombreRaw || '').trim();
+
+            console.log(`[DEBUG] Fila ${i+7} - Nombre: "${nombre}" (celda original: ${JSON.stringify(row[1])})`);
 
             // Condicional para detener la lectura si se encuentra "Total capacitaciones programadas"
-            if (typeof nombre === 'string' && nombre.includes('Total capacitaciones programadas')) {
+            if (typeof nombre === 'string' && nombre.toLowerCase().includes('total capacitaciones programadas')) {
+                console.log('[DEBUG] Encontrado "Total capacitaciones programadas", deteniendo lectura');
                 break; // Terminar el bucle
             }
-            
-            if (!nombre) continue; // Si no hay nombre de capacitación (y no es la fila de total), saltar fila
+
+            if (!nombre) {
+                console.log(`[DEBUG] Fila ${i+7} sin nombre de capacitación, saltando`);
+                continue; // Si no hay nombre de capacitación (y no es la fila de total), saltar fila
+            }
 
             // Tipo (Columna C, índice 2)
-            const tipoRaw = row[2] ? String(row[2].value).toLowerCase() : 'sst';
+            const tipoRaw = getCellValue(row[2]);
+            const tipoRawStr = String(tipoRaw || 'sst');
             let tipo = 'sst';
-            if (tipoRaw.includes('pyp')) {
+            if (tipoRawStr.toLowerCase().includes('pyp')) {
                 tipo = 'pyp';
             }
 
             // Fecha Programada (Columna D, índice 3) - con manejo de errores robusto
             let fechaProgramada = 'No especificada';
-            if (row[3] && row[3].value) {
-                const fechaValue = row[3].value;
+            const fechaValue = getCellValue(row[3]);
+            if (fechaValue !== undefined && fechaValue !== null && fechaValue !== '') {
                 let parsedDate;
 
                 if (typeof fechaValue === 'number') {
                     // Manejar formato numérico de fecha de Excel
                     parsedDate = new Date((fechaValue - 25569) * 86400 * 1000);
                 } else {
-                    // Manejar strings u otros formatos. Convertir a string para evitar errores con Date()
-                    parsedDate = new Date(String(fechaValue));
+                    // Convertir a string y manejar strings u otros formatos
+                    const fechaStr = String(fechaValue);
+                    parsedDate = new Date(fechaStr);
                 }
 
                 // Validar que la fecha sea un objeto Date válido antes de formatear
                 if (parsedDate && !isNaN(parsedDate.getTime())) {
                     fechaProgramada = parsedDate.toISOString().split('T')[0];
+                } else {
+                    console.log(`[DEBUG] Fecha no válida en fila ${i+7}: ${fechaValue}`);
                 }
             }
 
             // Instructor (Columna G, índice 6)
-            const instructor = row[6] ? row[6].value : 'No especificado';
+            const instructorRaw = getCellValue(row[6]);
+            const instructor = String(instructorRaw || 'No especificado');
 
             // Duración (Columna H, índice 7)
-            const duracionValue = row[7] ? row[7].value : 0;
-            const duracion = `${parseInt(duracionValue) || 0} Horas`;
-            
+            const duracionValue = getCellValue(row[7]);
+            const duracionNum = parseFloat(String(duracionValue));
+            const duracion = `${!isNaN(duracionNum) ? Math.floor(duracionNum) : 0} Horas`;
+
             // Estado (Columna I, índice 8)
-            const estadoRaw = row[8] ? String(row[8].value).toLowerCase() : '';
+            const estadoRaw = getCellValue(row[8]);
+            const estadoStr = String(estadoRaw || '');
             let estado = 'pending';
-            if (estadoRaw.includes('ejecutado') || estadoRaw.includes('completado') || estadoRaw.includes('finalizado') || estadoRaw.includes('realizado')) {
+            if (estadoStr.toLowerCase().includes('ejecutado') ||
+                estadoStr.toLowerCase().includes('completado') ||
+                estadoStr.toLowerCase().includes('finalizado') ||
+                estadoStr.toLowerCase().includes('realizado')) {
                 estado = 'completed';
-            } else if (estadoRaw.includes('pendiente') || estadoRaw.includes('programado') || estadoRaw.includes('planificado')) {
+            } else if (estadoStr.toLowerCase().includes('pendiente') ||
+                      estadoStr.toLowerCase().includes('programado') ||
+                      estadoStr.toLowerCase().includes('planificado')) {
                 estado = 'pending';
             }
 
+            console.log(`[DEBUG] Capacitación creada: ${nombre}, tipo: ${tipo}, fecha: ${fechaProgramada}, instructor: ${instructor}, duración: ${duracion}, estado: ${estado}`);
+
             capacitaciones.push({
                 id: capacitaciones.length + 1,
-                nombre: String(nombre), // Asegurar que sea string
+                nombre: nombre, // Confirmar que sea string
                 tipo: tipo,
                 fechaProgramada: fechaProgramada,
-                instructor: String(instructor), // Asegurar que sea string
+                instructor: instructor, // Confirmar que sea string
                 duracion: duracion,
                 estado: estado,
                 participantes: 0 // La columna de participantes no se ha especificado, se mantiene como 0
             });
         }
-        
+
+        console.log(`[DEBUG] Total capacitaciones procesadas: ${capacitaciones.length}`);
         return capacitaciones;
     }
 
@@ -382,7 +441,7 @@ class CapacitacionesComponent {
                 if (valueElement4) valueElement4.textContent = pendientes;
             }
         }
-        
+
         this.updateCharts();
         this.updateTrainingLists();
     }
@@ -396,7 +455,7 @@ class CapacitacionesComponent {
         // Limpiar solo los items dinámicos, manteniendo el H3
         recentListContainer.querySelectorAll('.training-item').forEach(item => item.remove());
         upcomingListContainer.querySelectorAll('.training-item').forEach(item => item.remove());
-        
+
         const now = new Date();
         const validTrainings = this.filteredCapacitaciones.filter(c => !isNaN(new Date(c.fechaProgramada).getTime()));
 
@@ -563,7 +622,7 @@ class CapacitacionesComponent {
                 }
             }
         });
-        
+
         ctx.chartInstance.data.labels = labels;
         ctx.chartInstance.data.datasets[0].data = completadasData;
         ctx.chartInstance.data.datasets[1].data = programadasData;
@@ -737,7 +796,7 @@ class CapacitacionesComponent {
         }
 
         this.capacitaciones.push(newTraining);
-        
+
         const modalElement = document.getElementById('addTrainingModal');
         if(modalElement) {
             bootstrap.Modal.getInstance(modalElement)?.hide();
@@ -780,7 +839,7 @@ class CapacitacionesComponent {
         if (capIndex === -1) return;
 
         this.capacitaciones[capIndex].estado = 'completed';
-        
+
         this.applyFilters();
         this.showNotification('Capacitación marcada como completada.', 'success');
         await this._saveDataToExcel();
@@ -790,7 +849,7 @@ class CapacitacionesComponent {
         if (!confirm('¿Está seguro de que desea eliminar esta capacitación?')) return;
 
         this.capacitaciones = this.capacitaciones.filter(c => c.id !== id);
-        
+
         this.applyFilters();
         this.showNotification('Capacitación eliminada.', 'info');
         await this._saveDataToExcel();
@@ -805,7 +864,7 @@ class CapacitacionesComponent {
         const typeFilterValue = document.getElementById('typeFilter')?.value || '';
         const statusFilterValue = document.getElementById('statusFilter')?.value || '';
         const monthFilterValue = document.getElementById('monthFilter')?.value || '';
-        
+
         // this.capacitaciones ya está filtrado por año (por loadDataForYear)
         let filteredData = this.capacitaciones;
 
