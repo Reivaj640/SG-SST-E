@@ -126,16 +126,35 @@ class CapacitacionesComponent {
             const filesResult = await window.electronAPI.readDirectory(submodulePath);
             if (!filesResult.success) throw new Error(filesResult.error);
 
-            const excelFiles = (filesResult.files || []).filter(item => {
+            // Filtrar archivos Excel de capacitaciones, priorizando los que contienen el nombre de la empresa
+            const allExcelFiles = (filesResult.files || []).filter(item => {
                 const fileName = (item.name || item.path || '').toLowerCase();
                 return (fileName.includes('capacitacion') || fileName.includes('cronograma')) && (fileName.endsWith('.xlsx') || fileName.endsWith('.xls'));
             }).map(item => item.name || item.path);
+
+            // Buscar archivos específicos para la empresa actual
+            const companySpecificFiles = allExcelFiles.filter(fileName =>
+                fileName.toLowerCase().includes(this.currentCompany.toLowerCase())
+            );
+
+            let excelFiles = [];
+            if (companySpecificFiles.length > 0) {
+                // Si hay archivos específicos para esta empresa, usarlos
+                excelFiles = companySpecificFiles;
+            } else {
+                // Si no hay archivos específicos, usar todos los archivos encontrados
+                excelFiles = allExcelFiles;
+            }
 
             if (excelFiles.length === 0) {
                 this.showNotification('No se encontraron archivos Excel de capacitaciones.', 'info');
                 return;
             }
+
+            // Tomar el primer archivo encontrado (ya sea el específico de la empresa o el genérico)
             this.excelFilePath = `${submodulePath}/${excelFiles[0]}`;
+            console.log(`[DEBUG] Cargando archivo de capacitaciones para empresa ${this.currentCompany}: ${this.excelFilePath}`);
+
             window.electronAPI.send('start-watching-capacitaciones', this.excelFilePath);
 
             await this._populateYearFilterFromSheets();
