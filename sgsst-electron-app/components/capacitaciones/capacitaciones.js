@@ -12,6 +12,9 @@ class CapacitacionesComponent {
         this.capacitaciones = [];
         this.instructores = [];
         this.filteredCapacitaciones = [];
+        this.excelFilePath = null;
+        this.handleFileChange = null;
+        this.availableSheets = []; // Para almacenar las hojas disponibles del Excel
     }
 
     render() {
@@ -30,8 +33,15 @@ class CapacitacionesComponent {
                 // Asegurar que todos los elementos estén totalmente cargados antes de inicializar listeners
                 setTimeout(() => {
                     this.initializeEventListeners();
-                    this.loadCapacitacionesData();
+                    this.initializeComponent(); // Inicia el proceso de carga
                     this.initializeCharts();
+
+                    // Definir y registrar el listener para cambios en el archivo
+                    this.handleFileChange = () => {
+                        this.showNotification('El archivo de capacitaciones ha cambiado. Recargando datos...', 'info');
+                        this.loadDataForYear(this.currentYear);
+                    };
+                    window.electronAPI.onIpcMessage('capacitaciones-file-changed', this.handleFileChange);
 
                     // Mostrar la vista de dashboard por defecto
                     this.switchView('dashboard');
@@ -43,60 +53,36 @@ class CapacitacionesComponent {
             });
     }
 
+    destroy() {
+        // Detener la vigilancia del archivo
+        if (this.excelFilePath) {
+            window.electronAPI.send('stop-watching-capacitaciones');
+        }
+        // Limpiar el listener de IPC para evitar fugas de memoria
+        if (this.handleFileChange) {
+            window.electronAPI.removeIpcMessageListener('capacitaciones-file-changed', this.handleFileChange);
+        }
+        console.log('CapacitacionesComponent destruido y listeners limpiados.');
+    }
+
     initializeEventListeners() {
-        // Navegación entre vistas (el selector ahora es .top-nav .nav-link)
-        const navLinks = document.querySelectorAll('.top-nav .nav-link');
-        navLinks.forEach(link => {
+        document.querySelectorAll('.top-nav .nav-link').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
-                const viewId = link.getAttribute('href').substring(1);
-                this.switchView(viewId);
+                this.switchView(link.getAttribute('href').substring(1));
             });
         });
 
-        // Selector de año
-        const yearButtons = document.querySelectorAll('.year-selector .btn');
-        yearButtons.forEach(btn => {
-            btn.addEventListener('click', () => {
-                yearButtons.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                this.currentYear = parseInt(btn.textContent);
-                this.loadCapacitacionesData();
-            });
+        document.getElementById('yearFilter')?.addEventListener('change', (e) => {
+            this.loadDataForYear(parseInt(e.target.value));
         });
 
-        // Botón flotante de agregar
-        const floatingBtn = document.querySelector('.floating-action-btn');
-        if (floatingBtn) {
-            floatingBtn.addEventListener('click', () => this.showAddTrainingModal());
-        }
-
-        // Filtros
-        const applyFiltersBtn = document.querySelector('#trainings-view .btn-primary-custom');
-        if (applyFiltersBtn) {
-            applyFiltersBtn.addEventListener('click', () => this.applyFilters());
-        }
-
-        const clearFiltersBtn = document.querySelector('#trainings-view .btn-outline-secondary');
-        if (clearFiltersBtn) {
-            clearFiltersBtn.addEventListener('click', () => this.clearFilters());
-        }
-
-        // Guardar en modales
-        const saveTrainingBtn = document.querySelector('#addTrainingModal .btn-primary-custom');
-        if (saveTrainingBtn) {
-            saveTrainingBtn.addEventListener('click', () => this.saveTraining());
-        }
-
-        const updateTrainingBtn = document.querySelector('#editTrainingModal .btn-primary-custom');
-        if (updateTrainingBtn) {
-            updateTrainingBtn.addEventListener('click', () => this.updateTraining());
-        }
-        
-        const saveInstructorBtn = document.querySelector('#addInstructorModal .btn-primary-custom');
-        if (saveInstructorBtn) {
-            saveInstructorBtn.addEventListener('click', () => this.saveInstructor());
-        }
+        document.querySelector('.floating-action-btn')?.addEventListener('click', () => this.showAddTrainingModal());
+        document.querySelector('#trainings-view .btn-primary-custom')?.addEventListener('click', () => this.applyFilters());
+        document.querySelector('#trainings-view .btn-outline-secondary')?.addEventListener('click', () => this.clearFilters());
+        document.querySelector('#addTrainingModal .btn-primary-custom')?.addEventListener('click', () => this.saveTraining());
+        document.querySelector('#editTrainingModal .btn-primary-custom')?.addEventListener('click', () => this.updateTraining());
+        document.querySelector('#addInstructorModal .btn-primary-custom')?.addEventListener('click', () => this.saveInstructor());
     }
 
     switchView(viewId) {
@@ -131,160 +117,176 @@ class CapacitacionesComponent {
         }
     }
 
-    async loadCapacitacionesData() {
+    async initializeComponent() {
         try {
-            // Obtener la ruta del submódulo 1.2.1 Programa de Capacitaciones
-            const submodulePathResult = await window.electronAPI.findSubmodulePath(
-                this.currentCompany,
-                this.moduleName,
-                this.submoduleName
-            );
-
-            if (!submodulePathResult.success) {
-                console.error('Error al obtener la ruta del submódulo:', submodulePathResult.error);
-                this.showNotification('Error al obtener la ruta del submódulo. Usando datos de ejemplo.', 'warning');
-
-                // No se encontraron datos reales, dejar la lista vacía
-                this.capacitaciones = [];
-                this.filteredCapacitaciones = [...this.capacitaciones];
-                this.updateDashboardStats();
-
-                if (this.currentView === 'trainings') {
-                    this.renderTrainingsTable();
-                }
-                return;
-            }
-
+            const submodulePathResult = await window.electronAPI.findSubmodulePath(this.currentCompany, this.moduleName, this.submoduleName);
+            if (!submodulePathResult.success) throw new Error(submodulePathResult.error);
             const submodulePath = submodulePathResult.path;
 
-            // Leer archivos Excel en la carpeta de submódulo
             const filesResult = await window.electronAPI.readDirectory(submodulePath);
+            if (!filesResult.success) throw new Error(filesResult.error);
 
-            // Verificar si la respuesta es exitosa y tiene datos
-            if (!filesResult || !filesResult.success) {
-                console.error('Error al leer directorio:', filesResult ? filesResult.error : 'No se obtuvo respuesta');
-                throw new Error(filesResult ? filesResult.error : 'No se pudo leer el directorio');
-            }
-
-            // Asegurarse de que files sea un array
-            const files = Array.isArray(filesResult.files) ? filesResult.files : [];
-
-            // Buscar archivos Excel relevantes
-            // Asumiendo que files es un array de objetos con propiedades como {name, path, type}
-            const excelFiles = files.filter(item => {
-                // Obtener el nombre del archivo del objeto
-                const fileName = typeof item === 'string' ? item : (item.name || item.path || '');
-                const fileNameLower = fileName.toLowerCase();
-
-                return (fileNameLower.includes('capacitacion') ||
-                        fileNameLower.includes('cronograma')) &&
-                       (fileNameLower.endsWith('.xlsx') || fileNameLower.endsWith('.xls'));
-            }).map(item => typeof item === 'string' ? item : item.name || item.path);
+            const excelFiles = (filesResult.files || []).filter(item => {
+                const fileName = (item.name || item.path || '').toLowerCase();
+                return (fileName.includes('capacitacion') || fileName.includes('cronograma')) && (fileName.endsWith('.xlsx') || fileName.endsWith('.xls'));
+            }).map(item => item.name || item.path);
 
             if (excelFiles.length === 0) {
-                console.warn('No se encontraron archivos Excel relevantes en la carpeta del submódulo:', submodulePath);
-                this.showNotification('No se encontraron archivos Excel con datos de capacitaciones. La lista estará vacía hasta que se incluyan archivos válidos.', 'info');
-
-                // No se encontraron datos reales, dejar la lista vacía
-                this.capacitaciones = [];
-                this.filteredCapacitaciones = [...this.capacitaciones];
-                this.updateDashboardStats();
-
-                if (this.currentView === 'trainings') {
-                    this.renderTrainingsTable();
-                }
+                this.showNotification('No se encontraron archivos Excel de capacitaciones.', 'info');
                 return;
             }
+            this.excelFilePath = `${submodulePath}/${excelFiles[0]}`;
+            window.electronAPI.send('start-watching-capacitaciones', this.excelFilePath);
 
-            // Leer el primer archivo Excel encontrado
-            const excelFilePath = `${submodulePath}/${excelFiles[0]}`;
+            await this._populateYearFilterFromSheets();
 
-            // Inicializar el archivo Excel
-            console.log('Intentando leer archivo Excel:', excelFilePath);
-            const excelResult = await window.electronAPI.initExcel(excelFilePath);
-            console.log('Resultado de initExcel:', excelResult);
-
-            if (!excelResult || !excelResult.success) {
-                console.error('Error al leer el archivo Excel:', excelResult ? excelResult.error : 'No se obtuvo respuesta válida');
-                this.showNotification('Error al leer el archivo Excel. La lista estará vacía hasta que se resuelva el problema.', 'danger');
-
-                // Dejar la lista vacía en caso de error
-                this.capacitaciones = [];
-                this.filteredCapacitaciones = [...this.capacitaciones];
-                this.updateDashboardStats();
-
-                if (this.currentView === 'trainings') {
-                    this.renderTrainingsTable();
-                }
-                return;
-            }
-
-            // Procesar los datos del Excel
-            const { processedData, headers } = excelResult.data;
-            console.log('Datos procesados del Excel:', { processedData, headers });
-
-            if (!processedData || !headers) {
-                console.error('Datos insuficientes del archivo Excel:', { processedData, headers });
-                this.showNotification('El archivo Excel no contiene datos válidos. La lista estará vacía.', 'warning');
-
-                // Dejar la lista vacía si no hay datos procesables
-                this.capacitaciones = [];
-                this.filteredCapacitaciones = [...this.capacitaciones];
-                this.updateDashboardStats();
-
-                if (this.currentView === 'trainings') {
-                    this.renderTrainingsTable();
-                }
-                return;
-            }
-
-            // Mapear los datos del Excel al formato esperado por la interfaz
-            this.capacitaciones = this.parseExcelDataToCapacitaciones(processedData, headers);
-
-            this.filteredCapacitaciones = [...this.capacitaciones];
-            this.updateDashboardStats();
-
-            if (this.currentView === 'trainings') {
-                this.renderTrainingsTable();
-            }
-
-            this.showNotification(`Datos cargados exitosamente desde: ${excelFiles[0]}`, 'success');
         } catch (error) {
-            console.error('Error al cargar datos de capacitaciones:', error);
-            this.showNotification('Error al cargar datos de capacitaciones. La lista estará vacía hasta que se resuelva el problema.', 'danger');
-
-            // En caso de error, dejar la lista vacía
-            this.capacitaciones = [];
-            this.filteredCapacitaciones = [...this.capacitaciones];
-            this.updateDashboardStats();
-
-            if (this.currentView === 'trainings') {
-                this.renderTrainingsTable();
-            }
+            console.error('Error al inicializar el componente:', error);
+            this.showNotification(`Error de inicialización: ${error.message}`, 'danger');
         }
+    }
+
+    async _populateYearFilterFromSheets() {
+        const yearFilter = document.getElementById('yearFilter');
+        if (!yearFilter) return;
+
+        const sheetsResult = await window.electronAPI.getCapacitacionesSheets(this.excelFilePath);
+        if (!sheetsResult.success) {
+            this.showNotification('No se pudieron leer las hojas del archivo Excel.', 'warning');
+            return;
+        }
+
+        this.availableSheets = sheetsResult.sheets;
+        const years = [...new Set(this.availableSheets
+            .map(sheetName => {
+                const match = sheetName.match(/\d{4}/);
+                return match ? parseInt(match[0]) : null;
+            })
+            .filter(y => y !== null && !isNaN(y))
+        )].sort((a, b) => b - a);
+        
+        yearFilter.innerHTML = '';
+        if (years.length === 0) {
+            yearFilter.innerHTML = '<option value="">No hay años disponibles</option>';
+            this.capacitaciones = [];
+            this.applyFilters();
+            return;
+        }
+
+        years.forEach(year => {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = year;
+            yearFilter.appendChild(option);
+        });
+
+        // Seleccionar el año actual o el más reciente por defecto
+        const currentYear = new Date().getFullYear();
+        if (years.includes(currentYear)) {
+            yearFilter.value = currentYear;
+            this.currentYear = currentYear;
+        } else if (years.length > 0) {
+            this.currentYear = years[0]; // Seleccionar el más reciente si no está el actual
+            yearFilter.value = years[0];
+        } else {
+            this.currentYear = null; // No hay años disponibles
+        }
+        
+        // Cargar datos para el año seleccionado por defecto
+        if (this.currentYear) {
+            await this.loadDataForYear(this.currentYear);
+        } else {
+            this.capacitaciones = [];
+            this.applyFilters();
+        }
+    }
+    
+    async loadDataForYear(year) {
+        this.currentYear = year;
+        const sheetName = this.availableSheets.find(s => s.includes(year));
+        if (!sheetName) {
+            this.showNotification(`No se encontró una hoja para el año ${year}.`, 'warning');
+            this.capacitaciones = [];
+            this.applyFilters();
+            return;
+        }
+
+        try {
+            const excelResult = await window.electronAPI.initExcel({ filePath: this.excelFilePath, sheetName });
+            if (!excelResult.success) throw new Error(excelResult.error);
+            
+            const { processedData, headers, sheetName: loadedSheetName } = excelResult.data; // Recibir el sheetName real
+            if (!processedData) throw new Error('La hoja de Excel seleccionada no contiene datos válidos.');
+
+            this.capacitaciones = this.parseExcelDataToCapacitaciones(processedData, headers);
+            this.applyFilters();
+            this.showNotification(`Datos cargados para el año ${year} desde la hoja '${loadedSheetName}'.`, 'success');
+        } catch (error) {
+             console.error(`Error al cargar datos para el año ${year}:`, error);
+            this.showNotification(`Error al cargar datos para ${year}: ${error.message}`, 'danger');
+            this.capacitaciones = [];
+            this.applyFilters();
+        }
+    }
+
+    applyFilters() {
+        const typeFilterValue = document.getElementById('typeFilter')?.value || '';
+        const statusFilterValue = document.getElementById('statusFilter')?.value || '';
+        const monthFilterValue = document.getElementById('monthFilter')?.value || '';
+        
+        let filteredData = this.capacitaciones; // Inicia con los datos del año ya cargado
+
+        if (typeFilterValue) {
+            filteredData = filteredData.filter(cap => cap.tipo === typeFilterValue);
+        }
+        if (statusFilterValue) {
+            filteredData = filteredData.filter(cap => cap.estado === statusFilterValue);
+        }
+        if (monthFilterValue) {
+            filteredData = filteredData.filter(cap => {
+                const fecha = new Date(cap.fechaProgramada);
+                return !isNaN(fecha.getTime()) && (fecha.getMonth() + 1) == monthFilterValue;
+            });
+        }
+
+        this.filteredCapacitaciones = filteredData;
+        this.renderTrainingsTable();
+        this.updateDashboardStats(); // Actualiza stats y gráficos basados en la nueva data filtrada
+    }
+
+    clearFilters() {
+        document.getElementById('typeFilter').value = '';
+        document.getElementById('statusFilter').value = '';
+        document.getElementById('monthFilter').value = '';
+        // El filtro de año no se limpia, se mantiene el seleccionado. Para limpiarlo, el usuario debe seleccionar otro año.
+        this.applyFilters();
+        this.showNotification('Filtros secundarios limpiados.', 'info');
     }
 
     // Función para mapear los datos del Excel al formato esperado por la interfaz
     parseExcelDataToCapacitaciones(processedData, headers) {
         const capacitaciones = [];
-        // Empezamos desde la fila 7 (índice 6) según la indicación del usuario
-        const dataRows = processedData.slice(5);
-
+        // `processedData` es `allData` del main.js. Los encabezados están en la fila 6 (índice 5).
+        // La data real empieza en la fila 7 (índice 6).
+        const dataRows = processedData.slice(6); // Ajustado para reflejar que los datos comienzan en la fila 7 del Excel
+        
         for (const row of dataRows) {
-            if (!row || row.length < 9) continue; // Asegurarse de que haya suficientes columnas hasta la 'I'
+            // Asegurarse de que row sea un array y tenga suficientes columnas para evitar errores
+            // Las columnas usadas son B(1), C(2), D(3), G(6), H(7), I(8). Necesitamos al menos 9 elementos para acceder al índice 8.
+            if (!Array.isArray(row) || row.length < 9) continue; 
 
             // Nombre (Columna B, índice 1)
-            const nombre = row[1] && row[1].value ? row[1].value : '';
+            const nombre = row[1] ? row[1].value : '';
 
             // Condicional para detener la lectura si se encuentra "Total capacitaciones programadas"
-            if (nombre.includes('Total capacitaciones programadas')) {
+            if (typeof nombre === 'string' && nombre.includes('Total capacitaciones programadas')) {
                 break; // Terminar el bucle
             }
             
             if (!nombre) continue; // Si no hay nombre de capacitación (y no es la fila de total), saltar fila
 
             // Tipo (Columna C, índice 2)
-            const tipoRaw = row[2] && row[2].value ? row[2].value.toString().toLowerCase() : 'sst';
+            const tipoRaw = row[2] ? String(row[2].value).toLowerCase() : 'sst';
             let tipo = 'sst';
             if (tipoRaw.includes('pyp')) {
                 tipo = 'pyp';
@@ -300,8 +302,8 @@ class CapacitacionesComponent {
                     // Manejar formato numérico de fecha de Excel
                     parsedDate = new Date((fechaValue - 25569) * 86400 * 1000);
                 } else {
-                    // Manejar strings u otros formatos
-                    parsedDate = new Date(fechaValue.toString());
+                    // Manejar strings u otros formatos. Convertir a string para evitar errores con Date()
+                    parsedDate = new Date(String(fechaValue));
                 }
 
                 // Validar que la fecha sea un objeto Date válido antes de formatear
@@ -311,13 +313,14 @@ class CapacitacionesComponent {
             }
 
             // Instructor (Columna G, índice 6)
-            const instructor = row[6] && row[6].value ? row[6].value : 'No especificado';
+            const instructor = row[6] ? row[6].value : 'No especificado';
 
             // Duración (Columna H, índice 7)
-            const duracion = row[7] && row[7].value ? `${row[7].value} Horas` : 'No especificada';
+            const duracionValue = row[7] ? row[7].value : 0;
+            const duracion = `${parseInt(duracionValue) || 0} Horas`;
             
             // Estado (Columna I, índice 8)
-            const estadoRaw = row[8] && row[8].value ? row[8].value.toString().toLowerCase() : '';
+            const estadoRaw = row[8] ? String(row[8].value).toLowerCase() : '';
             let estado = 'pending';
             if (estadoRaw.includes('ejecutado') || estadoRaw.includes('completado') || estadoRaw.includes('finalizado') || estadoRaw.includes('realizado')) {
                 estado = 'completed';
@@ -327,10 +330,10 @@ class CapacitacionesComponent {
 
             capacitaciones.push({
                 id: capacitaciones.length + 1,
-                nombre: nombre,
+                nombre: String(nombre), // Asegurar que sea string
                 tipo: tipo,
                 fechaProgramada: fechaProgramada,
-                instructor: instructor,
+                instructor: String(instructor), // Asegurar que sea string
                 duracion: duracion,
                 estado: estado,
                 participantes: 0 // La columna de participantes no se ha especificado, se mantiene como 0
@@ -341,62 +344,110 @@ class CapacitacionesComponent {
     }
 
     updateDashboardStats() {
+        // this.filteredCapacitaciones ya contiene los datos filtrados por el año actual y otros filtros
         const total = this.filteredCapacitaciones.length;
         const completadas = this.filteredCapacitaciones.filter(c => c.estado === 'completed').length;
         const pendientes = this.filteredCapacitaciones.filter(c => c.estado === 'pending').length;
-        const participantes = this.filteredCapacitaciones.reduce((sum, c) => sum + c.participantes, 0);
+        const participantes = this.filteredCapacitaciones.reduce((sum, c) => sum + (parseInt(c.participantes) || 0), 0);
         const porcentaje = total > 0 ? Math.round((completadas / total) * 100) : 0;
 
         // Actualizar valores en las tarjetas de estadísticas
         const statCards = document.querySelectorAll('.stat-card');
         if (statCards.length >= 4) {
-            // Actualizar estadística 1: Capacitaciones Programadas
-            const statCard1 = statCards[0];  // card primaria
+            const statCard1 = statCards[0];
             const valueElement1 = statCard1.querySelector('.stat-value');
             if (valueElement1) valueElement1.textContent = total;
-
-            // Actualizar progreso
             const progressBar1 = statCard1.querySelector('.progress-bar');
             if (progressBar1) progressBar1.style.width = `${porcentaje}%`;
-
-            // Actualizar etiqueta de porcentaje
             const labelElements1 = statCard1.querySelectorAll('.stat-label');
             if (labelElements1.length > 0) {
                 labelElements1[labelElements1.length - 1].textContent = `${porcentaje}% Completadas`;
             }
 
-            // Actualizar estadística 2: Capacitaciones Realizadas
-            const statCard2 = statCards[1];  // card de éxito
+            const statCard2 = statCards[1];
             if (statCard2) {
                 const valueElement2 = statCard2.querySelector('.stat-value');
                 if (valueElement2) valueElement2.textContent = completadas;
-                const labelElements2 = statCard2.querySelectorAll('.stat-label');
-                if (labelElements2.length > 0) {
-                    labelElements2[labelElements2.length - 1].textContent = 'En el último año';
-                }
             }
 
-            // Actualizar estadística 3: Participantes
-            const statCard3 = statCards[2];  // card de advertencia
-            if (statCard3) {
+            const statCard3 = statCards[2];
+             if (statCard3) {
                 const valueElement3 = statCard3.querySelector('.stat-value');
                 if (valueElement3) valueElement3.textContent = participantes;
-                const labelElements3 = statCard3.querySelectorAll('.stat-label');
-                if (labelElements3.length > 0) {
-                    labelElements3[labelElements3.length - 1].textContent = 'Este mes';
-                }
             }
 
-            // Actualizar estadística 4: Pendientes
-            const statCard4 = statCards[3];  // card de peligro
+            const statCard4 = statCards[3];
             if (statCard4) {
                 const valueElement4 = statCard4.querySelector('.stat-value');
                 if (valueElement4) valueElement4.textContent = pendientes;
-                const labelElements4 = statCard4.querySelectorAll('.stat-label');
-                if (labelElements4.length > 0) {
-                    labelElements4[labelElements4.length - 1].textContent = 'Por realizar este mes';
-                }
             }
+        }
+        
+        this.updateCharts();
+        this.updateTrainingLists();
+    }
+
+    updateTrainingLists() {
+        const recentListContainer = document.getElementById('recent-trainings-list');
+        const upcomingListContainer = document.getElementById('upcoming-trainings-list');
+
+        if (!recentListContainer || !upcomingListContainer) return;
+
+        // Limpiar solo los items dinámicos, manteniendo el H3
+        recentListContainer.querySelectorAll('.training-item').forEach(item => item.remove());
+        upcomingListContainer.querySelectorAll('.training-item').forEach(item => item.remove());
+        
+        const now = new Date();
+        const validTrainings = this.filteredCapacitaciones.filter(c => !isNaN(new Date(c.fechaProgramada).getTime()));
+
+        // Capacitaciones Recientes (últimas 3 completadas)
+        const recentTrainings = validTrainings
+            .filter(c => c.estado === 'completed' && new Date(c.fechaProgramada) <= now)
+            .sort((a, b) => new Date(b.fechaProgramada) - new Date(a.fechaProgramada))
+            .slice(0, 3);
+
+        if (recentTrainings.length > 0) {
+            recentTrainings.forEach(cap => {
+                const item = document.createElement('div');
+                item.className = 'training-item';
+                item.innerHTML = `
+                    <div class="training-info">
+                        <div class="training-title">${cap.nombre}</div>
+                        <div class="training-meta">${this.formatDate(cap.fechaProgramada)}</div>
+                    </div>
+                    <div class="training-status status-completed">Completada</div>`;
+                recentListContainer.appendChild(item);
+            });
+        } else {
+            const emptyItem = document.createElement('div');
+            emptyItem.className = 'training-item';
+            emptyItem.innerHTML = '<div class="training-info"><p class="text-muted">No hay capacitaciones completadas recientemente.</p></div>';
+            recentListContainer.appendChild(emptyItem);
+        }
+
+        // Próximas Capacitaciones (próximas 3 pendientes)
+        const upcomingTrainings = validTrainings
+            .filter(c => c.estado === 'pending' && new Date(c.fechaProgramada) >= now)
+            .sort((a, b) => new Date(a.fechaProgramada) - new Date(b.fechaProgramada))
+            .slice(0, 3);
+
+        if (upcomingTrainings.length > 0) {
+            upcomingTrainings.forEach(cap => {
+                const item = document.createElement('div');
+                item.className = 'training-item';
+                item.innerHTML = `
+                    <div class="training-info">
+                        <div class="training-title">${cap.nombre}</div>
+                        <div class="training-meta">${this.formatDate(cap.fechaProgramada)}</div>
+                    </div>
+                    <div class="training-status status-pending">Programada</div>`;
+                upcomingListContainer.appendChild(item);
+            });
+        } else {
+            const emptyItem = document.createElement('div');
+            emptyItem.className = 'training-item';
+            emptyItem.innerHTML = '<div class="training-info"><p class="text-muted">No hay capacitaciones próximas.</p></div>';
+            upcomingListContainer.appendChild(emptyItem);
         }
     }
 
@@ -480,31 +531,43 @@ class CapacitacionesComponent {
     }
 
     attachTableActionListeners() {
-        // Eliminar listeners anteriores para evitar duplicados
-        document.querySelectorAll('.edit-training').forEach(btn => {
-            btn.removeEventListener('click', this.handleEditTraining);
-            btn.addEventListener('click', (e) => this.editTraining(parseInt(e.currentTarget.dataset.id)));
-        });
+        document.querySelectorAll('.edit-training').forEach(btn => btn.addEventListener('click', (e) => this.editTraining(parseInt(e.currentTarget.dataset.id))));
+        document.querySelectorAll('.complete-training').forEach(btn => btn.addEventListener('click', (e) => this.completeTraining(parseInt(e.currentTarget.dataset.id))));
+        document.querySelectorAll('.delete-training').forEach(btn => btn.addEventListener('click', (e) => this.deleteTraining(parseInt(e.currentTarget.dataset.id))));
+        document.querySelectorAll('.view-training').forEach(btn => btn.addEventListener('click', (e) => this.viewTraining(parseInt(e.currentTarget.dataset.id))));
+    }
 
-        document.querySelectorAll('.complete-training').forEach(btn => {
-            btn.removeEventListener('click', this.handleCompleteTraining);
-            btn.addEventListener('click', (e) => this.completeTraining(parseInt(e.currentTarget.dataset.id)));
-        });
+    updateCharts() {
+        const ctx = document.getElementById('trainingChart');
+        if (!ctx || !ctx.chartInstance) return;
 
-        document.querySelectorAll('.delete-training').forEach(btn => {
-            btn.removeEventListener('click', this.handleDeleteTraining);
-            btn.addEventListener('click', (e) => this.deleteTraining(parseInt(e.currentTarget.dataset.id)));
-        });
+        const labels = [];
+        const today = new Date();
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+            labels.push(d.toLocaleString('es-ES', { month: 'long' }));
+        }
 
-        document.querySelectorAll('.view-training').forEach(btn => {
-            btn.removeEventListener('click', this.handleViewTraining);
-            btn.addEventListener('click', (e) => this.viewTraining(parseInt(e.currentTarget.dataset.id)));
-        });
+        const completadasData = Array(6).fill(0);
+        const programadasData = Array(6).fill(0);
 
-        document.querySelectorAll('.download-certificate').forEach(btn => {
-            btn.removeEventListener('click', this.handleDownloadCertificate);
-            btn.addEventListener('click', (e) => this.downloadCertificate(parseInt(e.currentTarget.dataset.id)));
+        this.capacitaciones.forEach(cap => {
+            const fecha = new Date(cap.fechaProgramada);
+            const monthDiff = (today.getFullYear() - fecha.getFullYear()) * 12 + (today.getMonth() - fecha.getMonth());
+
+            if (monthDiff >= 0 && monthDiff < 6) {
+                const index = 5 - monthDiff;
+                programadasData[index]++;
+                if (cap.estado === 'completed') {
+                    completadasData[index]++;
+                }
+            }
         });
+        
+        ctx.chartInstance.data.labels = labels;
+        ctx.chartInstance.data.datasets[0].data = completadasData;
+        ctx.chartInstance.data.datasets[1].data = programadasData;
+        ctx.chartInstance.update();
     }
 
     initializeCharts() {
@@ -528,18 +591,18 @@ class CapacitacionesComponent {
         ctx.chartInstance = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio'],
+                labels: [], // Se llenará dinámicamente
                 datasets: [
                     {
                         label: 'Completadas',
-                        data: [5, 7, 4, 8, 6, 9],
+                        data: [], // Se llenará dinámicamente
                         backgroundColor: 'rgba(32, 106, 93, 0.7)',
                         borderColor: 'rgba(32, 106, 93, 1)',
                         borderWidth: 1
                     },
                     {
                         label: 'Programadas',
-                        data: [6, 8, 5, 9, 7, 10],
+                        data: [], // Se llenará dinámicamente
                         backgroundColor: 'rgba(255, 193, 7, 0.7)',
                         borderColor: 'rgba(255, 193, 7, 1)',
                         borderWidth: 1
@@ -658,50 +721,40 @@ class CapacitacionesComponent {
 
     async saveTraining() {
         const newTraining = {
-            id: Math.max(...this.capacitaciones.map(c => c.id), 0) + 1,
+            id: this.capacitaciones.length > 0 ? Math.max(...this.capacitaciones.map(c => c.id)) + 1 : 1,
             nombre: document.getElementById('trainingName').value,
             tipo: document.getElementById('trainingType').value,
             fechaProgramada: document.getElementById('trainingDate').value,
             instructor: document.getElementById('trainingInstructor').value,
             duracion: `${document.getElementById('trainingDuration').value} Horas`,
-            participantes: parseInt(document.getElementById('trainingParticipants').value),
+            participantes: parseInt(document.getElementById('trainingParticipants').value) || 0,
             estado: 'pending'
         };
 
-        // Validar datos
         if (!newTraining.nombre || !newTraining.tipo || !newTraining.fechaProgramada) {
-            this.showNotification('Por favor completa todos los campos obligatorios', 'warning');
+            this.showNotification('Por favor completa los campos obligatorios.', 'warning');
             return;
         }
 
         this.capacitaciones.push(newTraining);
-        this.filteredCapacitaciones = [...this.capacitaciones];
-
-        // Cerrar modal
+        
         const modalElement = document.getElementById('addTrainingModal');
-        if (modalElement) {
+        if(modalElement) {
             bootstrap.Modal.getInstance(modalElement)?.hide();
         }
 
-        this.updateDashboardStats();
-        this.renderTrainingsTable();
-        this.showNotification('Capacitación guardada exitosamente', 'success');
+        this.applyFilters();
+        this.showNotification('Capacitación guardada.', 'success');
+        await this._saveDataToExcel();
     }
 
     async updateTraining() {
         const id = parseInt(document.getElementById('editTrainingName')?.getAttribute('data-id') || 0);
-        if (!id) {
-            console.error('No se pudo obtener el ID para la actualización');
-            return;
-        }
+        if (!id) return;
 
         const capIndex = this.capacitaciones.findIndex(c => c.id === id);
-        if (capIndex === -1) {
-            console.error(`No se encontró la capacitación con ID ${id}`);
-            return;
-        }
+        if (capIndex === -1) return;
 
-        // Actualizar datos
         this.capacitaciones[capIndex] = {
             ...this.capacitaciones[capIndex],
             nombre: document.getElementById('editTrainingName').value,
@@ -709,46 +762,38 @@ class CapacitacionesComponent {
             fechaProgramada: document.getElementById('editTrainingDate').value,
             instructor: document.getElementById('editTrainingInstructor').value,
             duracion: `${document.getElementById('editTrainingDuration').value} Horas`,
-            participantes: parseInt(document.getElementById('editTrainingParticipants').value),
+            participantes: parseInt(document.getElementById('editTrainingParticipants').value) || 0,
         };
 
-        this.filteredCapacitaciones = [...this.capacitaciones];
-
-        // Cerrar modal
         const modalElement = document.getElementById('editTrainingModal');
-        if (modalElement) {
+        if(modalElement) {
             bootstrap.Modal.getInstance(modalElement)?.hide();
         }
 
-        this.updateDashboardStats();
-        this.renderTrainingsTable();
-        this.showNotification('Capacitación actualizada exitosamente', 'success');
+        this.applyFilters();
+        this.showNotification('Capacitación actualizada.', 'success');
+        await this._saveDataToExcel();
     }
 
     async completeTraining(id) {
         const capIndex = this.capacitaciones.findIndex(c => c.id === id);
-        if (capIndex === -1) {
-            console.error(`No se encontró la capacitación con ID ${id}`);
-            return;
-        }
+        if (capIndex === -1) return;
 
         this.capacitaciones[capIndex].estado = 'completed';
-        this.filteredCapacitaciones = [...this.capacitaciones];
-
-        this.updateDashboardStats();
-        this.renderTrainingsTable();
-        this.showNotification('Capacitación marcada como completada', 'success');
+        
+        this.applyFilters();
+        this.showNotification('Capacitación marcada como completada.', 'success');
+        await this._saveDataToExcel();
     }
 
     async deleteTraining(id) {
         if (!confirm('¿Está seguro de que desea eliminar esta capacitación?')) return;
 
         this.capacitaciones = this.capacitaciones.filter(c => c.id !== id);
-        this.filteredCapacitaciones = [...this.capacitaciones];
-
-        this.updateDashboardStats();
-        this.renderTrainingsTable();
-        this.showNotification('Capacitación eliminada', 'info');
+        
+        this.applyFilters();
+        this.showNotification('Capacitación eliminada.', 'info');
+        await this._saveDataToExcel();
     }
 
     downloadCertificate(id) {
@@ -757,29 +802,37 @@ class CapacitacionesComponent {
     }
 
     applyFilters() {
-        const typeFilter = document.getElementById('typeFilter')?.value || '';
-        const statusFilter = document.getElementById('statusFilter')?.value || '';
-        const monthFilter = document.getElementById('monthFilter')?.value || '';
+        const typeFilterValue = document.getElementById('typeFilter')?.value || '';
+        const statusFilterValue = document.getElementById('statusFilter')?.value || '';
+        const monthFilterValue = document.getElementById('monthFilter')?.value || '';
+        
+        // this.capacitaciones ya está filtrado por año (por loadDataForYear)
+        let filteredData = this.capacitaciones;
 
-        this.filteredCapacitaciones = this.capacitaciones.filter(cap => {
-            const matchType = !typeFilter || cap.tipo === typeFilter;
-            const matchStatus = !statusFilter || cap.estado === statusFilter;
-            const matchMonth = !monthFilter || new Date(cap.fechaProgramada).getMonth() + 1 == monthFilter;
-            return matchType && matchStatus && matchMonth;
-        });
+        if (typeFilterValue) {
+            filteredData = filteredData.filter(cap => cap.tipo === typeFilterValue);
+        }
+        if (statusFilterValue) {
+            filteredData = filteredData.filter(cap => cap.estado === statusFilterValue);
+        }
+        if (monthFilterValue) {
+            filteredData = filteredData.filter(cap => {
+                const fecha = new Date(cap.fechaProgramada);
+                return !isNaN(fecha.getTime()) && (fecha.getMonth() + 1 == monthFilterValue);
+            });
+        }
 
+        this.filteredCapacitaciones = filteredData;
         this.renderTrainingsTable();
-        this.showNotification('Filtros aplicados', 'success');
+        this.updateDashboardStats(); // Actualiza stats y gráficos basados en la nueva data filtrada
     }
 
     clearFilters() {
-        if (document.getElementById('typeFilter')) document.getElementById('typeFilter').value = '';
-        if (document.getElementById('statusFilter')) document.getElementById('statusFilter').value = '';
-        if (document.getElementById('monthFilter')) document.getElementById('monthFilter').value = '';
-
-        this.filteredCapacitaciones = [...this.capacitaciones];
-        this.renderTrainingsTable();
-        this.showNotification('Filtros limpiados', 'info');
+        document.getElementById('typeFilter').value = '';
+        document.getElementById('statusFilter').value = '';
+        document.getElementById('monthFilter').value = '';
+        this.applyFilters(); // Vuelve a aplicar filtros sin el año para actualizar
+        this.showNotification('Filtros secundarios limpiados.', 'info');
     }
 
     exportToExcel() {
@@ -802,6 +855,32 @@ class CapacitacionesComponent {
     renderCalendar() {
         console.log("Renderizando calendario (placeholder)");
         // Lógica para renderizar calendario
+    }
+
+    async _saveDataToExcel() {
+        if (!this.excelFilePath) {
+            this.showNotification('Ruta de archivo no encontrada.', 'danger');
+            return;
+        }
+        const sheetName = this.availableSheets.find(s => s.includes(this.currentYear.toString()));
+        if (!sheetName) {
+            this.showNotification(`No se encontró la hoja para el año ${this.currentYear} para guardar.`, 'danger');
+            return;
+        }
+
+        try {
+            this.showNotification('Guardando cambios en Excel...', 'info');
+            const result = await window.electronAPI.updateCapacitacionesExcel({
+                filePath: this.excelFilePath,
+                capacitacionesData: this.capacitaciones,
+                sheetName: sheetName
+            });
+            if (!result.success) throw new Error(result.error);
+            this.showNotification('Cambios guardados en Excel.', 'success');
+        } catch (error) {
+            console.error('Error al guardar en Excel:', error);
+            this.showNotification(`Error al guardar: ${error.message}`, 'danger');
+        }
     }
 
     saveInstructor() {

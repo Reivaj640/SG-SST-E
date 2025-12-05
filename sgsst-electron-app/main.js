@@ -590,136 +590,149 @@ ipcMain.handle('read-excel-file', async (event, filePath) => {
 });
 
 // --- Manejadores para funcionalidad Excel ---
-ipcMain.handle('init-excel', async (event, filePath) => {
+
+// Handler para obtener las hojas de un archivo de capacitaciones
+ipcMain.handle('get-capacitaciones-sheets', async (event, filePath) => {
   try {
-    sendLog(`[MAIN] Inicializando archivo Excel desde: ${filePath}`, 'INFO');
-
-    // Verificar que el archivo existe
     await fsp.access(filePath);
+    const workbook = xlsx.readFile(filePath, { bookSheets: true });
+    const sheetPattern = /Matriz Cap\.\s*\d{4}/i;
+    const relevantSheets = workbook.SheetNames.filter(name => sheetPattern.test(name));
+    sendLog(`[MAIN] Hojas encontradas para capacitaciones en ${filePath}: ${relevantSheets.join(', ')}`, 'INFO');
+    return { success: true, sheets: relevantSheets };
+  } catch (error) {
+    sendLog(`[MAIN] Error al leer las hojas del archivo ${filePath}: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
 
-    // Leer el archivo Excel usando xlsx (SheetJS), que es el enfoque usado en otras partes del sistema
+// Manejador para actualizar el archivo de capacitaciones
+ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacitacionesData, sheetName: requestedSheetName }) => {
+  try {
+    sendLog(`[MAIN] Actualizando archivo de capacitaciones: ${filePath}`, 'INFO');
+    if (requestedSheetName) {
+      sendLog(`[MAIN] Hoja de destino explícita: ${requestedSheetName}`, 'INFO');
+    }
+    
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+
+    let sheetName = requestedSheetName;
+    if (!sheetName || !workbook.getWorksheet(sheetName)) {
+      if(sheetName) sendLog(`[WARN] La hoja solicitada '${sheetName}' no se encontró para escribir. Buscando una alternativa.`, 'WARN');
+      const currentYear = new Date().getFullYear().toString();
+      const matrixPatternCurrent = new RegExp(`Matriz Cap\\.\\s*${currentYear}`, 'i');
+      sheetName = workbook.worksheets.map(ws => ws.name).find(name => matrixPatternCurrent.test(name));
+    }
+    if (!sheetName) {
+      sheetName = workbook.worksheets[0].name;
+    }
+
+    const worksheet = workbook.getWorksheet(sheetName);
+    if (!worksheet) {
+      throw new Error(`No se pudo encontrar la hoja de trabajo '${sheetName}' para escribir`);
+    }
+
+    const startRow = 7;
+    const totalRowCount = worksheet.lastRow ? worksheet.lastRow.number : startRow;
+
+    let endCleanRow = -1;
+    for (let i = startRow; i <= totalRowCount; i++) {
+        const row = worksheet.getRow(i);
+        const cellB = row.getCell(2).value;
+        if (cellB && typeof cellB === 'string' && cellB.includes('Total capacitaciones programadas')) {
+            endCleanRow = i - 1;
+            break;
+        }
+    }
+    if (endCleanRow === -1) {
+        endCleanRow = totalRowCount > startRow ? totalRowCount : startRow;
+    }
+    
+    for (let i = startRow; i <= endCleanRow + 1; i++) { // +1 para limpiar la fila siguiente
+        const row = worksheet.getRow(i);
+        row.values = [];
+    }
+
+    // Escribir nuevos datos
+    capacitacionesData.forEach((capacitacion, index) => {
+      const rowIndex = startRow + index;
+      const row = worksheet.getRow(rowIndex);
+
+      row.getCell(2).value = capacitacion.nombre; // B
+      row.getCell(3).value = capacitacion.tipo.toUpperCase(); // C
+      row.getCell(4).value = new Date(capacitacion.fechaProgramada); // D
+      row.getCell(7).value = capacitacion.instructor; // G
+      row.getCell(8).value = parseInt(capacitacion.duracion.replace(' Horas', '')) || 0; // H
+      row.getCell(9).value = capacitacion.estado === 'completed' ? 'Ejecutado' : 'Pendiente'; // I
+      
+      row.getCell(4).numFmt = 'dd/mm/yyyy';
+    });
+
+    await workbook.xlsx.writeFile(filePath);
+    sendLog(`[MAIN] Archivo de capacitaciones actualizado en hoja '${sheetName}' exitosamente.`, 'INFO');
+    return { success: true };
+
+  } catch (error) {
+    sendLog(`[MAIN] Error al actualizar el archivo de capacitaciones: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('init-excel', async (event, { filePath, sheetName: requestedSheetName }) => {
+  try {
+    sendLog(`[MAIN] Inicializando archivo Excel: ${filePath}`, 'INFO');
+    if (requestedSheetName) {
+      sendLog(`[MAIN] Hoja solicitada explícitamente: ${requestedSheetName}`, 'INFO');
+    }
+
+    await fsp.access(filePath);
     const workbook = xlsx.readFile(filePath);
-    console.log('[DEBUG] Nombres de hojas en el archivo:', workbook.SheetNames);
+    let sheetName = requestedSheetName;
 
-    // Obtener hoja: intentar primero con la hoja correspondiente al año actual
-    const currentYear = new Date().getFullYear().toString();
-    let sheetName = null;
+    if (!sheetName || !workbook.SheetNames.includes(sheetName)) {
+      if(sheetName) sendLog(`[WARN] La hoja solicitada '${sheetName}' no se encontró. Buscando una alternativa.`, 'WARN');
+      
+      const currentYear = new Date().getFullYear().toString();
+      const matrixPatternCurrent = new RegExp(`Matriz Cap\\.\\s*${currentYear}`, 'i');
+      sheetName = workbook.SheetNames.find(name => matrixPatternCurrent.test(name));
 
-    // Buscar hoja con el patrón específico "Matriz Cap. [año]" para el año actual
-    const matrixPatternCurrent = new RegExp(`Matriz Cap\\.\\s*${currentYear}`, 'i');
-    sheetName = workbook.SheetNames.find(name => matrixPatternCurrent.test(name));
-
-    // Si no encontramos la del año actual, intentar con años anteriores en orden descendente
-    if (!sheetName) {
-      for (let year = parseInt(currentYear); year >= 2017; year--) {
-        const pattern = new RegExp(`Matriz Cap\\.\\s*${year}`, 'i');
-        sheetName = workbook.SheetNames.find(name => pattern.test(name));
-        if (sheetName) break;
+      if (!sheetName) {
+        for (let year = parseInt(currentYear); year >= 2017; year--) {
+          const pattern = new RegExp(`Matriz Cap\\.\\s*${year}`, 'i');
+          sheetName = workbook.SheetNames.find(name => pattern.test(name));
+          if (sheetName) break;
+        }
       }
-    }
-
-    // Si aún no encontramos la hoja de matriz, intentar con nombres comunes
-    if (!sheetName) {
-      const commonSheetNames = [
-        currentYear,
-        `${currentYear} Capacitaciones`,
-        `Capacitaciones ${currentYear}`,
-        `${currentYear.toString().slice(-2)}`,
-        `${currentYear.toString().slice(-2)} Capacitaciones`,
-        'Hoja1',
-        'Sheet1',
-        'Capacitaciones',
-        'Cronograma',
-        'Datos',
-        'Planilla1',
-        '1',
-        'Matriz Cap.'
-      ];
-
-      for (const commonName of commonSheetNames) {
-        sheetName = workbook.SheetNames.find(name =>
-          name.toLowerCase().includes(commonName.toLowerCase())
-        );
-        if (sheetName) break;
+      if (!sheetName) {
+        sheetName = workbook.SheetNames[0];
       }
-    }
-
-    // Si no encontramos ninguna hoja específica, usar la primera disponible
-    if (!sheetName) {
-      sheetName = workbook.SheetNames[0];
     }
 
     if (!sheetName) {
       throw new Error('No se encontró ninguna hoja en el archivo Excel');
     }
-
-    console.log('[DEBUG] Hoja seleccionada:', sheetName);
+    
+    sendLog(`[DEBUG] Hoja seleccionada para la lectura: ${sheetName}`);
     const worksheet = workbook.Sheets[sheetName];
-    console.log('[DEBUG] !ref de la hoja:', worksheet['!ref']);
-
-    // Validar que la hoja no esté vacía
-    if (!worksheet['!ref']) {
-      sendLog(`[WARN] La hoja '${sheetName}' de cálculo parece estar vacía (sin !ref).`);
-      return {
-        success: true,
-        data: {
-          processedData: [],
-          headers: [],
-          formulaCells: []
-        }
-      };
+    
+    if (!worksheet || !worksheet['!ref']) {
+      sendLog(`[WARN] La hoja '${sheetName}' parece estar vacía.`);
+      return { success: true, data: { processedData: [], headers: [] } };
     }
 
-    // Leer todos los datos de la hoja usando sheet_to_json
-    const allData = xlsx.utils.sheet_to_json(worksheet, {
-      header: 1,  // Esto devuelve los datos como array de arrays
-      raw: false, // Esto convierte los datos a strings o números según sea apropiado
-      defval: null // Valor por defecto si la celda está vacía
-    });
+    const allData = xlsx.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: null });
+    const headers = allData[5] || []; // Asumiendo que los encabezados están en la fila 6 (índice 5)
+    const processedData = allData;
 
-    console.log('[DEBUG] Total de filas leídas:', allData.length);
-    console.log('[DEBUG] Primeras 3 filas:', allData.slice(0, 3));
-
-    // Procesar los datos para el formato esperado
-    let processedData = [];
-    let headers = [];
-    let formulaCells = [];
-
-    if (allData && allData.length > 0) {
-      // Asumimos que la primera fila contiene los encabezados
-      headers = allData[0] || [];
-
-      // Procesar las filas de datos (desde la segunda fila en adelante)
-      for (let rowIndex = 1; rowIndex < allData.length; rowIndex++) {
-        const row = allData[rowIndex];
-        const rowData = [];
-
-        if (Array.isArray(row)) {
-          for (let colIndex = 0; colIndex < row.length; colIndex++) {
-            // Crear la dirección de celda manualmente si xlsx.utils.encode_cell falla
-            const address = `${String.fromCharCode(65 + colIndex)}${rowIndex + 1}`; // Ej: A1, B1, etc.
-
-            rowData.push({
-              value: row[colIndex],
-              formula: undefined, // Con sheet_to_json no obtenemos fórmulas directamente
-              type: typeof row[colIndex],
-              address: address
-            });
-          }
-        }
-
-        processedData.push(rowData);
-      }
-    }
-
-    sendLog(`[MAIN] Archivo Excel procesado exitosamente. Hojas: ${workbook.SheetNames.length}, Fila seleccionada: ${sheetName}, Filas de datos: ${processedData.length}`, 'INFO');
+    sendLog(`[MAIN] Archivo Excel procesado. Hoja: ${sheetName}, Filas leídas: ${allData.length}`, 'INFO');
 
     return {
       success: true,
       data: {
         processedData,
         headers,
-        formulaCells
+        sheetName: sheetName // Devolver el nombre de la hoja utilizada
       }
     };
   } catch (error) {
@@ -1154,7 +1167,47 @@ ipcMain.handle('find-submodule-path', async (event, companyName, module, submodu
   }
 });
 
-// Manejar la creación de la ventana principal
+// --- Vigilancia de archivos ---
+let capacitacionesFileWatcher = null;
+let debounceTimer = null;
+
+ipcMain.on('start-watching-capacitaciones', (event, filePath) => {
+  // Detener cualquier watcher anterior
+  if (capacitacionesFileWatcher) {
+    capacitacionesFileWatcher.close();
+  }
+  
+  try {
+    sendLog(`[MAIN] Iniciando vigilancia sobre el archivo: ${filePath}`, 'INFO');
+    capacitacionesFileWatcher = fs.watch(filePath, (eventType, filename) => {
+      if (eventType === 'change') {
+        // Usar debounce para evitar múltiples eventos rápidos
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          sendLog(`[MAIN] Archivo de capacitaciones modificado: ${filename}. Notificando al renderer.`, 'INFO');
+          mainWindow.webContents.send('capacitaciones-file-changed');
+        }, 1000); // Esperar 1 segundo antes de notificar
+      }
+    });
+
+    capacitacionesFileWatcher.on('error', (err) => {
+        sendLog(`[MAIN] Error en el watcher de capacitaciones: ${err.message}`, 'ERROR');
+    });
+
+  } catch (error) {
+      sendLog(`[MAIN] No se pudo iniciar la vigilancia sobre el archivo ${filePath}: ${error.message}`, 'ERROR');
+  }
+});
+
+ipcMain.on('stop-watching-capacitaciones', () => {
+  if (capacitacionesFileWatcher) {
+    sendLog('[MAIN] Deteniendo la vigilancia sobre el archivo de capacitaciones.', 'INFO');
+    capacitacionesFileWatcher.close();
+    capacitacionesFileWatcher = null;
+  }
+});
+
+// Manejador para la creación de la ventana principal
 app.whenReady().then(() => {
   createWindow();
 

@@ -84,7 +84,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('send-remision-by-whatsapp', docPath, extractedData, empresa),
 
   // --- Excel ---
-  initExcel: (filePath) => ipcRenderer.invoke('init-excel', filePath),
+  getCapacitacionesSheets: (filePath) => ipcRenderer.invoke('get-capacitaciones-sheets', filePath),
+  initExcel: (data) => ipcRenderer.invoke('init-excel', data),
+  updateCapacitacionesExcel: (data) => ipcRenderer.invoke('update-capacitaciones-excel', data),
   updateExcelCell: (data) => ipcRenderer.invoke('update-excel-cell', data),
   convertExcelToPdf: (filePath) => ipcRenderer.invoke('convertExcelToPdf', filePath),
 
@@ -130,6 +132,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveDebugHtml: (htmlContent) => ipcRenderer.invoke('save-debug-html', htmlContent),
 
   // --- Eventos IPC ---
+  send: (channel, data) => ipcRenderer.send(channel, data),
   onIpcMessage: (channel, listener) => {
     ipcRenderer.on(channel, (event, ...args) => listener(...args));
   },

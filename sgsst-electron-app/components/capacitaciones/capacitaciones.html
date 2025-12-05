@@ -520,7 +520,7 @@
                     <!-- Recent Trainings -->
                     <div class="row">
                         <div class="col-md-6">
-                            <div class="training-list">
+                            <div class="training-list" id="recent-trainings-list">
                                 <h3>Capacitaciones Recientes</h3>
                                 <div class="training-item">
                                     <div class="training-info">
@@ -546,7 +546,7 @@
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="training-list">
+                            <div class="training-list" id="upcoming-trainings-list">
                                 <h3>Próximas Capacitaciones</h3>
                                 <div class="training-item">
                                     <div class="training-info">
@@ -576,19 +576,18 @@
 
                 <!-- Trainings View -->
                 <div id="trainings-view" class="view-section">
-                    <!-- Year Selector -->
-                    <div class="year-selector">
-                        <button class="btn btn-outline-secondary">2021</button>
-                        <button class="btn btn-outline-secondary">2022</button>
-                        <button class="btn btn-outline-secondary">2023</button>
-                        <button class="btn btn-outline-secondary">2024</button>
-                        <button class="btn active">2025</button>
-                    </div>
-
                     <!-- Filter Section -->
                     <div class="filter-section">
                         <h3>Filtros</h3>
                         <div class="row">
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="yearFilter">Año</label>
+                                    <select class="form-select" id="yearFilter">
+                                        <!-- Opciones de año se llenarán dinámicamente -->
+                                    </select>
+                                </div>
+                            </div>
                             <div class="col-md-3">
                                 <div class="form-group">
                                     <label for="typeFilter">Tipo de Capacitación</label>
@@ -627,17 +626,6 @@
                                         <option value="10">Octubre</option>
                                         <option value="11">Noviembre</option>
                                         <option value="12">Diciembre</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="form-group">
-                                    <label for="instructorFilter">Instructor</label>
-                                    <select class="form-select" id="instructorFilter">
-                                        <option value="">Todos los instructores</option>
-                                        <option value="arl">ARL</option>
-                                        <option value="tecnico">Técnico</option>
-                                        <option value="olga">ARL - Olga Pinto</option>
                                     </select>
                                 </div>
                             </div>
