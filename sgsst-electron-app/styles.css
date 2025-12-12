@@ -389,7 +389,7 @@ select.form-control {
 }
 
 .header-title {
-  font-size: 1.5rem;
+  font-size: 1.1rem;
   font-weight: var(--font-weight-bold);
   margin: 0;
   text-align: left;
@@ -837,19 +837,23 @@ select.form-control {
 }
 
 .main-container {
+  position: relative;
   display: flex;
   flex: 1;
   overflow: hidden;
 }
 
 #sidebar {
-  width: var(--sidebar-width);
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: var(--sidebar-width); /* Mantener el ancho completo para el efecto de superposición */
   background-color: var(--dark-color);
   color: var(--white-color);
   padding: var(--spacer);
-  transition: transform var(--transition-normal);
+  transition: left var(--transition-normal); /* Transición solo para la propiedad left */
   z-index: 900;
-  flex-shrink: 0;
   overflow-y: auto;
 }
 
@@ -921,6 +925,7 @@ select.form-control {
 
 #main-content {
   flex: 1;
+  margin-left: 30px;
   padding: var(--spacer);
   background-color: var(--bg-color);
   overflow-y: auto;
@@ -1529,17 +1534,17 @@ select.form-control {
 }
 
 /* --- Collapsible Sidebar Styles --- */
-#sidebar {
-  transition: width var(--transition-normal);
-}
-
 #sidebar.sidebar-collapsed {
-  width: 80px; /* Ancho colapsado */
+  left: calc(-1 * (var(--sidebar-width) - 30px)); /* Oculta la mayor parte del sidebar, dejando 30px visibles */
 }
 
 #sidebar.sidebar-collapsed .sidebar-menu-button {
   font-size: 0; /* Oculta el texto */
   padding: 10px;
+}
+
+#sidebar.sidebar-collapsed .sidebar-menu-button.active {
+  background-color: transparent; /* Oculta el resaltado del botón activo cuando está colapsado */
 }
 
 #sidebar.sidebar-collapsed .sidebar-icon {
