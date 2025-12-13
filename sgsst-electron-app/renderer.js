@@ -1455,6 +1455,20 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         console.error('❌ AfiliacionComponent no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
+    } else if (submoduleName === "1.1.5 Trabajo de alto riesgo") {
+      if (window.TrabajoAltoRiesgoComponent) {
+        const trabajoAltoRiesgoComponent = new window.TrabajoAltoRiesgoComponent(
+          submoduleContentDiv,
+          currentCompany,
+          moduleName,
+          submoduleName,
+          safeBackToModuleCallback
+        );
+        trabajoAltoRiesgoComponent.render();
+      } else {
+        console.error('❌ TrabajoAltoRiesgoComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
     } else if (submoduleName === "1.1.6 Conformación de Copasst") {
       if (window.CopasstComponent) {
         const copasstComponent = new window.CopasstComponent(
@@ -1467,6 +1481,21 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         copasstComponent.render();
       } else {
         console.error('❌ CopasstComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
+    } else if (submoduleName === "1.1.7 Capacitación al Copasst") {
+      if (window.CapacitacionCopasstComponent) {
+        const capacitacionCopasstComponent = new window.CapacitacionCopasstComponent(
+          submoduleContentDiv,
+          currentCompany,
+          moduleName,
+          submoduleName,
+          safeBackToModuleCallback
+        );
+        capacitacionCopasstComponent.render();
+      } else {
+        console.error('❌ CapacitacionCopasstComponent no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 
