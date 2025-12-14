@@ -273,6 +273,62 @@
             padding: 12px; /* Asegurarse que el padding sea consistente */
         }
 
+        .editable-cell {
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+
+        .editable-cell:hover {
+            background-color: #f0f0f0;
+        }
+
+        .editable-cell-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--primary-color);
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: inherit;
+        }
+
+        .btn-warning {
+            background-color: var(--warning-color);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background-color: #e68900;
+        }
+
+        /* Estilos adicionales para celdas editables */
+        .editable-cell {
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+
+        .editable-cell:hover {
+            background-color: #f0f0f0;
+        }
+
+        .editable-cell-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--primary-color);
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: inherit;
+        }
+
+        .formula-cell {
+            color: #777;
+            background-color: #f4f4f4;
+            cursor: not-allowed;
+        }
+
         @media (max-width: 768px) {
             .summary-grid {
                 grid-template-columns: 1fr;
@@ -315,8 +371,8 @@
                         <div class="summary-label">Aporte Empresa</div>
                     </div>
                     <div class="summary-card">
-                        <div class="summary-value" id="totalArl">$0</div>
-                        <div class="summary-label">Aporte ARL</div>
+                        <div class="summary-value" id="totalArl">0%</div>
+                        <div class="summary-label">% de Cumplimiento</div>
                     </div>
                     <div class="summary-card">
                         <div class="summary-value" id="saldoDisponible">$0</div>
@@ -387,6 +443,8 @@
         let calculationData = [];
         let currentFile = null;
         let formulaCells = [];
+        // Agregar esta variable al principio del script
+        let hasPendingChanges = false;
 
         document.addEventListener('DOMContentLoaded', function() {
             setupEventListeners();
@@ -416,13 +474,23 @@
                     }
                     renderBudgetTable();
                     updateSummary();
+                    markNoPendingChanges(); // Marcar que no hay cambios pendientes al cargar nuevos datos
                 }
 
                 // Lógica de confirmación de guardado
-                if (event.data.success) {
+                if (event.data.action === 'saveComplete') {
                     showNotification('Cambios guardados exitosamente', 'success');
-                } else if (event.data.error) {
+                    markNoPendingChanges(); // Marcar que no hay cambios pendientes
+                } else if (event.data.action === 'saveError') {
                     showNotification(`Error al guardar: ${event.data.error}`, 'error');
+                } else if (event.data.action === 'saveBudgetChanges') {
+                    // Recibir confirmación de guardado del proceso principal
+                    if (event.data.success) {
+                        showNotification('Cambios guardados exitosamente', 'success');
+                        markNoPendingChanges(); // Marcar que no hay cambios pendientes
+                    } else {
+                        showNotification(`Error al guardar: ${event.data.error || 'Error desconocido'}`, 'error');
+                    }
                 }
             });
             // --- FIN: MANEJADOR MEJORADO DE MENSAJES ---
@@ -444,7 +512,7 @@
                 }
 
                 // Verificar propiedades esenciales (excepto filas especiales)
-                if (item.id !== 'TOTAL AÑO' && item.id !== 'ANALISIS PRESUPUESTAL') {
+                if (item.id && item.id !== 'TOTAL AÑO' && item.id !== 'ANALISIS PRESUPUESTAL') {
                     if (typeof item.detalle === 'undefined' ||
                         typeof item.asignacion === 'undefined' ||
                         typeof item.ejecutado_acumulado === 'undefined') {
@@ -457,8 +525,17 @@
             return true;
         }
 
+
         function setupEventListeners() {
-            document.getElementById('backBtn').addEventListener('click', () => window.parent.postMessage({ action: 'backToSelector' }, '*'));
+            document.getElementById('backBtn').addEventListener('click', () => {
+                if (hasPendingChanges) {
+                    if (confirm('Tiene cambios sin guardar. ¿Está seguro de que desea salir sin guardar?')) {
+                        window.parent.postMessage({ action: 'backToSelector' }, '*');
+                    }
+                } else {
+                    window.parent.postMessage({ action: 'backToSelector' }, '*');
+                }
+            });
             document.getElementById('addRowBtn').addEventListener('click', addNewRow);
             document.getElementById('saveBtn').addEventListener('click', saveChanges);
         }
@@ -496,32 +573,126 @@
             return col ? `${col}${row}` : null;
         }
 
+        // Función para marcar cambios pendientes
+        function markPendingChanges() {
+            hasPendingChanges = true;
+            const saveBtn = document.getElementById('saveBtn');
+            saveBtn.classList.add('btn-warning');
+            saveBtn.classList.remove('btn-success');
+            saveBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Guardar cambios pendientes';
+        }
+
+        // Función para marcar que no hay cambios pendientes
+        function markNoPendingChanges() {
+            hasPendingChanges = false;
+            const saveBtn = document.getElementById('saveBtn');
+            saveBtn.classList.remove('btn-warning');
+            saveBtn.classList.add('btn-success');
+            saveBtn.innerHTML = '<i class="fas fa-save"></i> Guardar';
+        }
+
+        // Función para confirmar antes de salir si hay cambios pendientes
+        function confirmExitIfHasPendingChanges() {
+            if (hasPendingChanges) {
+                return confirm('Tiene cambios sin guardar. ¿Está seguro de que desea salir sin guardar?');
+            }
+            return true;
+        }
+
+        // Modificar el evento de cierre de ventana si es necesario
+        window.addEventListener('beforeunload', (e) => {
+            if (hasPendingChanges) {
+                e.preventDefault();
+                e.returnValue = ''; // Necesario para que el navegador muestre el diálogo de confirmación
+                return '';
+            }
+        });
+
+        // Función mejorada para convertir valores formateados a números
+        function parseFormattedNumber(value) {
+            if (value === null || value === undefined || value === '') {
+                return 0;
+            }
+
+            if (typeof value === 'number') {
+                return value;
+            }
+
+            if (typeof value === 'string') {
+                // Remover signos de dólar, espacios y caracteres no numéricos excepto puntos y comas decimales
+                let cleanValue = value.toString()
+                    .replace(/\$/g, '')  // Eliminar signos de dólar
+                    .replace(/\s/g, '')  // Eliminar espacios
+                    .replace(/,/g, '');  // Eliminar comas (separadores de miles en este formato)
+
+                // Si hay un guion, probablemente sea representativo de un valor cero
+                if (cleanValue === '-' || cleanValue.toLowerCase() === '-  ') {
+                    return 0;
+                }
+
+                const parsed = parseFloat(cleanValue);
+                return isNaN(parsed) ? 0 : parsed;
+            }
+
+            return 0;
+        }
+
+        // Función para formatear números con separadores de miles
+        function formatNumberWithThousands(value) {
+            if (typeof value === 'number') {
+                return value.toLocaleString('es-CO', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                }).replace(/\,/g, '.'); // Reemplazar coma por punto según sistema latinoamericano
+            }
+            return value;
+        }
+
         function renderBudgetTable() {
             const tableBody = document.getElementById('budgetTableBody');
             tableBody.innerHTML = '';
             const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
             budgetData.forEach((item, index) => {
                 const row = document.createElement('tr');
+
+                // Verificar si es una fila especial que no debe ser editable
+                const isSpecialRow = item.id === 'TOTAL AÑO' || item.id === 'ANALISIS PRESUPUESTAL';
+
+                // Generar celdas de meses
                 let monthCellsHTML = '';
                 months.forEach(month => {
                     const cellAddress = getCellAddress(index, month);
                     const isFormula = formulaCells.includes(cellAddress);
-                    if (isFormula) {
+
+                    if (isFormula || isSpecialRow) {
                         monthCellsHTML += `<td><span class="formula-cell">${formatNumber(item[month] || 0)}</span></td>`;
                     } else {
-                        monthCellsHTML += `<td><span onclick="makeCellEditable(event, ${index}, '${month}')">${formatNumber(item[month] || 0)}</span></td>`;
+                        monthCellsHTML += `<td><span onclick="makeCellEditable(event, ${index}, '${month}')" class="editable-cell">${formatNumber(item[month] || 0)}</span></td>`;
                     }
                 });
+
+                // Generar celdas de asignación y ejecutado
+                const asignacionCell = isSpecialRow ?
+                    `<td><span class="formula-cell">${formatNumber(item.asignacion || 0)}</span></td>` :
+                    `<td><span onclick="makeCellEditable(event, ${index}, 'asignacion')" class="editable-cell">${formatNumber(item.asignacion || 0)}</span></td>`;
+
+                const ejecutadoCell = isSpecialRow ?
+                    `<td><span class="formula-cell">${formatNumber(item.ejecutado_acumulado || 0)}</span></td>` :
+                    `<td><span onclick="makeCellEditable(event, ${index}, 'ejecutado_acumulado')" class="editable-cell">${formatNumber(item.ejecutado_acumulado || 0)}</span></td>`;
+
                 row.innerHTML = `
                     <td>${item.id === 'TOTAL AÑO' ? 'TOTAL AÑO' : item.id === 'ANALISIS PRESUPUESTAL' ? 'IPC' : index + 1}</td>
-                    <td>${item.detalle || 'Sin detalle'}</td>
-                    <td>${item.asignacion || 0}</td>
-                    <td>$${formatNumber(item.ejecutado_acumulado || 0)}</td>
+                    <td>${item.id === 'TOTAL AÑO' ? 'TOTAL AÑO' : item.detalle || 'Sin detalle'}</td>
+                    ${asignacionCell}
+                    ${ejecutadoCell}
                     <td>${item.porcentaje_ejecutado || 0}%</td>
                     ${monthCellsHTML}
                     <td class="actions-column">
-                        <button class="action-btn edit-btn" onclick="editRow(${index})"><i class="fas fa-edit"></i></button>
-                        <button class="action-btn delete-btn" onclick="deleteRow(${index})"><i class="fas fa-trash"></i></button>
+                        ${!isSpecialRow ? `
+                            <button class="action-btn edit-btn" onclick="editRow(${index})"><i class="fas fa-edit"></i></button>
+                            <button class="action-btn delete-btn" onclick="deleteRow(${index})"><i class="fas fa-trash"></i></button>
+                        ` : ''}
                     </td>
                 `;
                 tableBody.appendChild(row);
@@ -529,22 +700,146 @@
         }
 
         function updateSummary() {
-            const totalPresupuesto = budgetData.reduce((sum, item) => sum + (item.asignacion || 0), 0);
-            const totalEmpresa = 0, totalArl = 0;
-            document.getElementById('totalPresupuesto').textContent = '$' + formatNumber(totalPresupuesto);
-            document.getElementById('totalEmpresa').textContent = '$' + formatNumber(totalEmpresa);
-            document.getElementById('totalArl').textContent = '$' + formatNumber(totalArl);
-            document.getElementById('saldoDisponible').textContent = '$' + formatNumber(totalPresupuesto - totalEmpresa - totalArl);
+            console.log('updateSummary() llamado');
+
+            // Verificar que budgetData exista y sea un array
+            if (!budgetData || !Array.isArray(budgetData)) {
+                console.warn('budgetData no está definido o no es un array');
+                // Actualizar valores predeterminados
+                document.getElementById('totalPresupuesto').textContent = '$0';
+                document.getElementById('totalEmpresa').textContent = '$0';
+                document.getElementById('totalArl').textContent = '0%';
+                document.getElementById('saldoDisponible').textContent = '$0';
+                return;
+            }
+
+            console.log('Datos recibidos:', JSON.stringify(budgetData, null, 2)); // Agregar log de datos completos
+            console.log('Iniciando cálculo de resumen con', budgetData.length, 'elementos');
+
+            // Calcular el total asignado (presupuesto total)
+            let totalPresupuesto = 0;
+            let totalEjecutado = 0;
+
+            for (let i = 0; i < budgetData.length; i++) {
+                const item = budgetData[i];
+                console.log('Procesando item', i, ': id=', item.id, 'asignacion=', item.asignacion, 'ejecutado_acumulado=', item.ejecutado_acumulado);
+
+                // Excluir solo filas especiales que son totales del informe, no todas las filas con ciertos IDs
+                // Queremos incluir todas las filas que tengan valores reales de presupuesto
+                if (item.id === 'TOTAL AÑO') {
+                    console.log('Excluyendo fila TOTAL AÑO del cálculo');
+                    continue;
+                }
+
+                // Procesar asignación
+                let asignacionValue = 0;
+                if (typeof item.asignacion !== 'undefined' && item.asignacion !== null) {
+                    if (typeof item.asignacion === 'string') {
+                        console.log('Parseando asignacion como string:', item.asignacion);
+                        asignacionValue = parseFormattedNumber(item.asignacion);
+                    } else if (typeof item.asignacion === 'number') {
+                        console.log('Usando asignacion como number:', item.asignacion);
+                        asignacionValue = item.asignacion;
+                    } else {
+                        console.log('Tipo desconocido para asignacion:', typeof item.asignacion, item.asignacion);
+                        asignacionValue = 0;
+                    }
+                } else {
+                    console.log('Asignacion indefinida para item', i);
+                }
+
+                // Procesar ejecutado acumulado
+                let ejecutadoValue = 0;
+                if (typeof item.ejecutado_acumulado !== 'undefined' && item.ejecutado_acumulado !== null) {
+                    if (typeof item.ejecutado_acumulado === 'string') {
+                        console.log('Parseando ejecutado_acumulado como string:', item.ejecutado_acumulado);
+                        ejecutadoValue = parseFormattedNumber(item.ejecutado_acumulado);
+                    } else if (typeof item.ejecutado_acumulado === 'number') {
+                        console.log('Usando ejecutado_acumulado como number:', item.ejecutado_acumulado);
+                        ejecutadoValue = item.ejecutado_acumulado;
+                    } else {
+                        console.log('Tipo desconocido para ejecutado_acumulado:', typeof item.ejecutado_acumulado, item.ejecutado_acumulado);
+                        ejecutadoValue = 0;
+                    }
+                } else {
+                    console.log('Ejecutado_acumulado indefinido para item', i);
+                }
+
+                // Solo sumar a los totales si los valores son números válidos y mayores a 0
+                if (typeof asignacionValue === 'number' && !isNaN(asignacionValue)) {
+                    totalPresupuesto += asignacionValue;
+                }
+                if (typeof ejecutadoValue === 'number' && !isNaN(ejecutadoValue)) {
+                    totalEjecutado += ejecutadoValue;
+                }
+
+                console.log(`Item ${i}: asignacion=${asignacionValue}, ejecutado=${ejecutadoValue}, sumas parciales: totalPresupuesto=${totalPresupuesto}, totalEjecutado=${totalEjecutado}`);
+            }
+
+            console.log('Sumas finales antes de formato - Total presupuesto:', totalPresupuesto, 'Total ejecutado:', totalEjecutado);
+
+            // Calcular el % de cumplimiento del presupuesto
+            const porcentajeCumplimiento = totalPresupuesto > 0 ? ((totalEjecutado / totalPresupuesto) * 100) : 0;
+            console.log('Cálculos finales - Total presupuesto:', totalPresupuesto, 'Total ejecutado:', totalEjecutado, 'Porcentaje cumplimiento:', porcentajeCumplimiento);
+
+            // Calcular el saldo disponible
+            const saldoDisponible = totalPresupuesto - totalEjecutado;
+
+            // Asegurar que los elementos existan antes de actualizarlos
+            const totalPresupuestoEl = document.getElementById('totalPresupuesto');
+            const totalEmpresaEl = document.getElementById('totalEmpresa');
+            const cumplimientoEl = document.getElementById('totalArl'); // Mantener el mismo ID pero cambiar el propósito
+            const saldoDisponibleEl = document.getElementById('saldoDisponible');
+
+            console.log('Actualizando elementos del DOM...');
+            if (totalPresupuestoEl) {
+                console.log('Actualizando totalPresupuesto con valor:', totalPresupuesto);
+                totalPresupuestoEl.textContent = '$' + formatNumber(totalPresupuesto);
+            } else {
+                console.error('Elemento totalPresupuesto no encontrado');
+            }
+
+            if (totalEmpresaEl) {
+                console.log('Actualizando totalEmpresa con valor:', totalEjecutado);
+                totalEmpresaEl.textContent = '$' + formatNumber(totalEjecutado); // Mostrar lo ejecutado como "Aporte Empresa"
+            } else {
+                console.error('Elemento totalEmpresa no encontrado');
+            }
+
+            if (cumplimientoEl) {
+                console.log('Actualizando cumplimiento con valor:', porcentajeCumplimiento);
+                cumplimientoEl.textContent = porcentajeCumplimiento.toFixed(2) + '%'; // Mostrar % de cumplimiento
+            } else {
+                console.error('Elemento totalArl no encontrado');
+            }
+
+            if (saldoDisponibleEl) {
+                console.log('Actualizando saldoDisponible con valor:', saldoDisponible);
+                saldoDisponibleEl.textContent = '$' + formatNumber(saldoDisponible);
+            } else {
+                console.error('Elemento saldoDisponible no encontrado');
+            }
         }
 
         function formatNumber(num) {
-            // Convertimos a número si es un string, o usamos 0 si no es un número válido
+            // Manejar casos especiales
+            if (num === null || num === undefined || num === '') {
+                return '0.00';
+            }
+
+            // Si ya es un string formateado, devolverlo tal cual
+            if (typeof num === 'string' && isNaN(parseFloat(num))) {
+                return num;
+            }
+
+            // Convertimos a número si es un string numérico, o usamos 0 si no es un número válido
             const numberValue = isNaN(parseFloat(num)) ? 0 : parseFloat(num);
-            // Aplicamos formato con separador de miles y 2 decimales
+            // Aplicamos formato con separador de miles y 2 decimales para Colombia
+            // En Colombia: 1.000.000,50 (punto como separador de miles, coma como decimal)
             return numberValue.toLocaleString('es-CO', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
-            }).replace(/\,/g, '.'); // Reemplazamos coma decimal por punto según el sistema latinoamericano
+            }); // No reemplazamos nada, ya que toLocaleString('es-CO') da el formato correcto
         }
 
         function addNewRow() {
@@ -586,13 +881,89 @@
             }
         }
 
+        // Función para validar que los datos a guardar tienen el formato correcto
+        function validateDataForSave(data) {
+            if (!Array.isArray(data)) {
+                console.error('La función validateDataForSave recibió un valor no-array:', typeof data);
+                return false;
+            }
+
+            for (let i = 0; i < data.length; i++) {
+                const item = data[i];
+
+                // Solo validar filas que no sean especiales y tengan un id definido
+                if (item.id && item.id !== 'TOTAL AÑO' && item.id !== 'ANALISIS PRESUPUESTAL') {
+                    // Validar que los campos requeridos existan
+                    if (typeof item.detalle === 'undefined') {
+                        console.error(`El ítem en la posición ${i} no tiene la propiedad 'detalle'`);
+                        return false;
+                    }
+
+                    if (typeof item.asignacion === 'undefined') {
+                        console.error(`El ítem en la posición ${i} no tiene la propiedad 'asignacion'`);
+                        return false;
+                    }
+
+                    if (typeof item.ejecutado_acumulado === 'undefined') {
+                        console.error(`El ítem en la posición ${i} no tiene la propiedad 'ejecutado_acumulado'`);
+                        return false;
+                    }
+
+                    // Validar que los valores numéricos sean realmente números válidos
+                    if (typeof item.asignacion !== 'number' || isNaN(item.asignacion)) {
+                        console.error(`El ítem en la posición ${i} tiene un valor inválido para 'asignacion': ${item.asignacion}`);
+                        return false;
+                    }
+
+                    if (typeof item.ejecutado_acumulado !== 'number' || isNaN(item.ejecutado_acumulado)) {
+                        console.error(`El ítem en la posición ${i} tiene un valor inválido para 'ejecutado_acumulado': ${item.ejecutado_acumulado}`);
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
         function saveChanges() {
+            if (!hasPendingChanges) {
+                showNotification('No hay cambios para guardar', 'info');
+                return;
+            }
+
+            // Preparar datos para guardar (convertir a formato numérico)
+            const dataToSave = budgetData.map(item => {
+                const newItem = { ...item };
+
+                // Convertir valores formateados a números
+                for (const key in newItem) {
+                    // Solo procesar campos numéricos, no el id o detalle
+                    if (key !== 'id' && key !== 'detalle' && key !== 'fuente_financiacion' && typeof newItem[key] === 'string') {
+                        const parsedValue = parseFormattedNumber(newItem[key]);
+
+                        // Solo actualizar si el valor era originalmente un string formateado
+                        if (typeof newItem[key] === 'string') {
+                            newItem[key] = parsedValue;
+                        }
+                    }
+                }
+
+                return newItem;
+            });
+
+            // Validar los datos antes de enviarlos
+            if (!validateDataForSave(dataToSave)) {
+                showNotification('Error de validación: Datos no válidos para guardar', 'error');
+                return;
+            }
+
             window.parent.postMessage({
                 action: 'saveBudgetChanges',
                 file: currentFile,
                 changes: 'Actualización de presupuesto',
-                data: budgetData
+                data: dataToSave
             }, '*');
+
             showNotification('Guardando cambios...', 'info');
         }
 
@@ -617,29 +988,109 @@
 
         function hideLoading() {}
 
+        // Función para convertir valores formateados a números
+        function parseFormattedNumber(value) {
+            if (value === null || value === undefined || value === '') {
+                return 0;
+            }
+
+            if (typeof value === 'number') {
+                return value;
+            }
+
+            if (typeof value === 'string') {
+                // Remover signos de dólar, espacios y caracteres no numéricos excepto puntos decimales
+                let cleanValue = value.toString()
+                    .replace(/\$/g, '')  // Eliminar signos de dólar
+                    .replace(/\s/g, '')  // Eliminar espacios
+                    .replace(/,/g, '');  // Eliminar comas (separadores de miles en este formato)
+
+                // Manejar casos especiales como "$ -" o "-  " que representan ceros
+                if (cleanValue.trim() === '-' || cleanValue.trim() === '-  ' || cleanValue.trim() === '') {
+                    return 0;
+                }
+
+                const parsed = parseFloat(cleanValue);
+                return isNaN(parsed) ? 0 : parsed;
+            }
+
+            return 0;
+        }
+
+        // Función para formatear números con separadores de miles
+        function formatNumberWithThousands(value) {
+            if (typeof value === 'number') {
+                return value.toLocaleString('es-CO', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                }).replace(/\,/g, '.');  // En Colombia se usa punto como separador de miles
+            }
+            return value;
+        }
+
         function makeCellEditable(event, index, propertyName) {
             const span = event.target;
             const currentValue = budgetData[index][propertyName];
+
+            // Convertir el valor formateado a número
+            const numericValue = parseFormattedNumber(currentValue);
+
             const input = document.createElement('input');
             input.type = 'number';
-            input.value = currentValue;
+            input.value = numericValue;
             input.className = 'editable-cell-input';
-            span.parentNode.replaceChild(input, span);
+            input.step = '0.01'; // Permitir decimales
+            input.min = '0'; // Asegurar que no se ingresen valores negativos para campos numéricos
+
+            // Reemplazar el span con el input
+            const cell = span.parentNode;
+            cell.replaceChild(input, span);
             input.focus();
+            input.select();
+
             input.onblur = (e) => saveCellEdit(e, index, propertyName);
-            input.onkeydown = (e) => { if (e.key === 'Enter') input.blur(); };
+            input.onkeydown = (e) => {
+                if (e.key === 'Enter') {
+                    input.blur();
+                } else if (e.key === 'Escape') {
+                    // Cancelar edición y restaurar valor original
+                    const newSpan = document.createElement('span');
+                    newSpan.textContent = formatNumber(currentValue);
+                    newSpan.onclick = (e) => makeCellEditable(e, index, propertyName);
+                    newSpan.className = 'editable-cell';
+                    cell.replaceChild(newSpan, input);
+                }
+            };
         }
 
         function saveCellEdit(event, index, propertyName) {
             const input = event.target;
             const newValue = parseFloat(input.value) || 0;
+
+            // Actualizar el valor en los datos
             budgetData[index][propertyName] = newValue;
+
+            // Si cambiamos la asignación o el ejecutado, recalcular el porcentaje
+            if (propertyName === 'asignacion' || propertyName === 'ejecutado_acumulado') {
+                const asignacion = budgetData[index].asignacion || 0;
+                const ejecutado = budgetData[index].ejecutado_acumulado || 0;
+                budgetData[index].porcentaje_ejecutado = asignacion > 0 ?
+                    ((ejecutado / asignacion) * 100).toFixed(2) : 0;
+            }
+
+            // Reemplazar el input con el span actualizado
             const span = document.createElement('span');
             span.textContent = formatNumber(newValue);
             span.onclick = (e) => makeCellEditable(e, index, propertyName);
+            span.className = 'editable-cell';
             input.parentNode.replaceChild(span, input);
+
+            // Actualizar resumen y mostrar notificación
             updateSummary();
             showNotification('Celda actualizada', 'info');
+
+            // Marcar que hay cambios pendientes de guardar
+            markPendingChanges();
         }
     </script>
 </body>

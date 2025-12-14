@@ -772,22 +772,22 @@ ipcMain.handle('readPresupuestoData', async (event, filePath) => {
     // Mapeo de encabezados a propiedades esperadas por el frontend
     const headerMapping = {
       'id': [0, 'A'],
-      'detalle': [2, 'C'],
-      'asignacion': [3, 'D'],
-      'ejecutado_acumulado': [4, 'E'],
-      'porcentaje_ejecutado': [5, 'F'],
-      'enero': [6, 'G'],
-      'febrero': [7, 'H'],
-      'marzo': [8, 'I'],
-      'abril': [9, 'J'],
-      'mayo': [10, 'K'],
-      'junio': [11, 'L'],
-      'julio': [12, 'M'],
-      'agosto': [13, 'N'],
-      'septiembre': [14, 'O'],
-      'octubre': [15, 'P'],
-      'noviembre': [16, 'Q'],
-      'diciembre': [17, 'R']
+      'detalle': [2, 'C'],        // Columna C (índice 2)
+      'asignacion': [3, 'D'],     // Columna D (índice 3)
+      'ejecutado_acumulado': [4, 'E'],  // Columna E (índice 4)
+      'porcentaje_ejecutado': [5, 'F'], // Columna F (índice 5)
+      'enero': [6, 'G'],          // Columna G (índice 6)
+      'febrero': [7, 'H'],        // Columna H (índice 7)
+      'marzo': [8, 'I'],          // Columna I (índice 8)
+      'abril': [9, 'J'],          // Columna J (índice 9)
+      'mayo': [10, 'K'],         // Columna K (índice 10)
+      'junio': [11, 'L'],        // Columna L (índice 11)
+      'julio': [12, 'M'],        // Columna M (índice 12)
+      'agosto': [13, 'N'],       // Columna N (índice 13)
+      'septiembre': [14, 'O'],   // Columna O (índice 14)
+      'octubre': [15, 'P'],      // Columna P (índice 15)
+      'noviembre': [16, 'Q'],    // Columna Q (índice 16)
+      'diciembre': [17, 'R']     // Columna R (índice 17)
     };
 
     // Procesar los datos mapeando cada encabezado a su propiedad correspondiente
@@ -796,6 +796,27 @@ ipcMain.handle('readPresupuestoData', async (event, filePath) => {
       const row = rawData[i];
       // Verificar si la fila contiene texto especial como "TOTAL AÑO" o "ANALISIS PRESUPUESTAL"
       const firstCell = row[0]; // Primera columna (ID)
+
+      // Verificar también en la columna B en caso de celdas unificadas
+      const secondCell = row[1]; // Segunda columna (B) - podría contener "TOTAL AÑO" si la celda A-B está unificada
+
+      // Si encontramos "TOTAL AÑO" en cualquier celda de la fila (A o B), detenemos la lectura de más filas
+      if ((typeof firstCell === 'string' && firstCell.includes('TOTAL AÑO')) ||
+          (typeof secondCell === 'string' && secondCell.includes('TOTAL AÑO'))) {
+        // Crear un objeto especial para TOTAL AÑO con solo el id
+        const obj = {
+          id: typeof firstCell === 'string' && firstCell.includes('TOTAL AÑO') ? firstCell :
+              typeof secondCell === 'string' && secondCell.includes('TOTAL AÑO') ? secondCell : 'TOTAL AÑO',
+          detalle: 'TOTAL AÑO',  // Mostrar TOTAL AÑO en la columna de detalle
+          asignacion: 0,
+          ejecutado_acumulado: 0,
+          porcentaje_ejecutado: 0,
+          enero: 0, febrero: 0, marzo: 0, abril: 0, mayo: 0, junio: 0,
+          julio: 0, agosto: 0, septiembre: 0, octubre: 0, noviembre: 0, diciembre: 0
+        };
+        processedData.push(obj);
+        break; // Detener el bucle para no incluir filas posteriores
+      }
 
       const obj = {};
 
@@ -817,15 +838,11 @@ ipcMain.handle('readPresupuestoData', async (event, filePath) => {
         }
       }
 
-      // Si la primera celda contiene texto especial, preservarlo
-      if (typeof firstCell === 'string' && (firstCell.includes('TOTAL') || firstCell.includes('ANALISIS'))) {
+      // Si la primera o segunda celda contiene texto especial (pero no TOTAL AÑO), preservarlo
+      if (typeof firstCell === 'string' && (firstCell.includes('ANALISIS'))) {
         obj.id = firstCell;
-      }
-
-      // Si encontramos "TOTAL AÑO", detenemos la lectura de más filas
-      if (typeof firstCell === 'string' && firstCell.includes('TOTAL AÑO')) {
-        processedData.push(obj);
-        break; // Detener el bucle para no incluir filas posteriores
+      } else if (typeof secondCell === 'string' && (secondCell.includes('ANALISIS'))) {
+        obj.id = secondCell;
       }
 
       processedData.push(obj);
@@ -1204,6 +1221,179 @@ ipcMain.handle('getPresupuestoFiles', async (event, companyName) => {
       return { success: false, error: error.message };
   }
 });
+
+
+// Manejador para guardar archivos de presupuesto
+ipcMain.handle('saveBudgetFile', async (event, filePath, dataToSave) => {
+  return await handleSaveBudgetFile(event, filePath, dataToSave);
+});
+
+// Manejador para guardar archivos de presupuesto (nombre alternativo para compatibilidad)
+ipcMain.handle('saveBudgetChanges', async (event, filePath, dataToSave) => {
+  sendLog(`[MAIN] Guardando cambios de presupuesto en: ${filePath}`, 'INFO');
+  // Reutiliza la misma lógica que saveBudgetFile para compatibilidad
+  return await handleSaveBudgetFile(event, filePath, dataToSave);
+});
+
+// Función auxiliar para manejar la lógica de guardado de presupuesto, reutilizable
+async function handleSaveBudgetFile(event, filePath, dataToSave) {
+  sendLog(`[MAIN] Guardando archivo de presupuesto: ${filePath}`, 'INFO');
+
+  try {
+    // Validar que se hayan recibido los datos necesarios
+    if (!dataToSave || !Array.isArray(dataToSave)) {
+      throw new Error('Datos de presupuesto no válidos o no proporcionados para guardar');
+    }
+
+    // Verificar que la ruta del archivo exista
+    await fsp.access(filePath);
+
+    // Verificar el tamaño del archivo para asegurar que no esté vacío
+    const stats = await fsp.stat(filePath);
+    if (stats.size === 0) {
+      throw new Error('El archivo Excel está vacío y no se puede procesar.');
+    }
+
+    // Leer el archivo existente
+    const workbook = new ExcelJS.Workbook();
+
+    try {
+      await workbook.xlsx.readFile(filePath);
+    } catch (error) {
+      sendLog(`[MAIN] Error al leer el archivo Excel con ExcelJS: ${error.message}`, 'ERROR');
+      throw new Error(`No se pudo leer el archivo Excel. Puede estar dañado o en un formato no compatible: ${error.message}`);
+    }
+
+    // Verificar si el libro tiene hojas válidas
+    if (!workbook.worksheets || workbook.worksheets.length === 0) {
+      sendLog(`[DEBUG] No se encontraron hojas en el libro. Intentando crear una nueva hoja.`, 'DEBUG');
+      // Si no hay hojas, crear una nueva hoja con un nombre predeterminado
+      const newWorksheet = workbook.addWorksheet('Hoja1');
+
+      // Configurar las cabeceras basadas en la estructura esperada del presupuesto
+      // Aseguramos que la estructura coincida con lo que el frontend espera
+      const headerRow = newWorksheet.getRow(9); // Fila 9 es donde normalmente están los encabezados
+      headerRow.values = [
+        '', // Columna A vacía
+        '', // Columna B vacía
+        'Detalle', // Columna C
+        'Asignación', // Columna D
+        'Ejecutado Acumulado', // Columna E
+        '% Ejecutado', // Columna F
+        'Enero', // Columna G
+        'Febrero', // Columna H
+        'Marzo', // Columna I
+        'Abril', // Columna J
+        'Mayo', // Columna K
+        'Junio', // Columna L
+        'Julio', // Columna M
+        'Agosto', // Columna N
+        'Septiembre', // Columna O
+        'Octubre', // Columna P
+        'Noviembre', // Columna Q
+        'Diciembre' // Columna R
+      ]; // Columnas A-R
+
+      // Ajustar ancho de columnas
+      newWorksheet.columns = [
+        { key: 'id', width: 10 },
+        { key: 'empty_b', width: 5 },
+        { key: 'detalle', width: 30 },
+        { key: 'asignacion', width: 15 },
+        { key: 'ejecutado_acumulado', width: 15 },
+        { key: 'porcentaje_ejecutado', width: 12 },
+        { key: 'enero', width: 12 },
+        { key: 'febrero', width: 12 },
+        { key: 'marzo', width: 12 },
+        { key: 'abril', width: 12 },
+        { key: 'mayo', width: 12 },
+        { key: 'junio', width: 12 },
+        { key: 'julio', width: 12 },
+        { key: 'agosto', width: 12 },
+        { key: 'septiembre', width: 12 },
+        { key: 'octubre', width: 12 },
+        { key: 'noviembre', width: 12 },
+        { key: 'diciembre', width: 12 }
+      ];
+    }
+
+    // Obtener la primera hoja disponible
+    let worksheet = workbook.worksheets[0];
+    if (!worksheet) {
+      throw new Error('No se pudo acceder a ninguna hoja del archivo Excel.');
+    }
+
+    sendLog(`[DEBUG] Hoja seleccionada: ${worksheet.name || 'Hoja sin nombre'}`, 'DEBUG');
+
+    // Mapeo de propiedades a columnas basado en el archivo Excel real de presupuesto
+    // Basado en el mapeo de la función de lectura: [índice, columna]
+    const columnMapping = {
+      'id': [0, 'A'],           // Índice 0, Columna A - ID
+      'detalle': [1, 'B'],      // Índice 1, Columna B - Detalle
+      'asignacion': [2, 'C'],   // Índice 2, Columna C - Asignación
+      'ejecutado_acumulado': [3, 'D'],  // Índice 3, Columna D - Ejecutado Acumulado
+      'porcentaje_ejecutado': [4, 'E'], // Índice 4, Columna E - % Ejecutado
+      'enero': [5, 'F'],        // Índice 5, Columna F - Enero
+      'febrero': [6, 'G'],      // Índice 6, Columna G - Febrero
+      'marzo': [7, 'H'],        // Índice 7, Columna H - Marzo
+      'abril': [8, 'I'],        // Índice 8, Columna I - Abril
+      'mayo': [9, 'J'],        // Índice 9, Columna J - Mayo
+      'junio': [10, 'K'],       // Índice 10, Columna K - Junio
+      'julio': [11, 'L'],       // Índice 11, Columna L - Julio
+      'agosto': [12, 'M'],      // Índice 12, Columna M - Agosto
+      'septiembre': [13, 'N'],  // Índice 13, Columna N - Septiembre
+      'octubre': [14, 'O'],     // Índice 14, Columna O - Octubre
+      'noviembre': [15, 'P'],   // Índice 15, Columna P - Noviembre
+      'diciembre': [16, 'Q']    // Índice 16, Columna Q - Diciembre
+    };
+
+    // Actualizar los datos en el archivo Excel desde la fila 10 en adelante
+    // (basado en la estructura real del archivo presupuesto)
+    for (let i = 0; i < dataToSave.length; i++) {
+      const rowData = dataToSave[i];
+      const rowIndex = i + 10; // Fila 10 en adelante (índice 9)
+
+      // Verificar si es una fila especial que no debe modificarse
+      const isSpecialRow = rowData.id === 'TOTAL AÑO' || rowData.id === 'ANALISIS PRESUPUESTAL';
+
+      // Actualizar cada celda según el mapeo de columnas
+      for (const [property, [index, column]] of Object.entries(columnMapping)) {
+        // Saltar la columna ID para filas especiales para preservar su valor
+        if (property === 'id' && isSpecialRow) continue;
+
+        if (property !== 'id' || !isSpecialRow) {
+          const cellAddress = `${column}${rowIndex}`;
+          const cell = worksheet.getCell(cellAddress);
+
+          let valueToSet = rowData[property];
+
+          // Convertir a número si es un string numérico
+          if (typeof valueToSet === 'string' && !isNaN(parseFloat(valueToSet)) && property !== 'detalle') {
+            valueToSet = parseFloat(valueToSet);
+          }
+
+          // Asegurar que los valores se guarden correctamente
+          if (typeof valueToSet === 'number') {
+            cell.value = valueToSet;
+          } else if (valueToSet === null || valueToSet === undefined || valueToSet === '') {
+            cell.value = 0; // Valor por defecto para campos numéricos vacíos
+          } else {
+            cell.value = valueToSet;
+          }
+        }
+      }
+    }
+
+    // Guardar el archivo actualizado
+    await workbook.xlsx.writeFile(filePath);
+
+    sendLog(`[MAIN] Archivo de presupuesto guardado exitosamente: ${filePath}`, 'INFO');
+    return { success: true, message: 'Archivo guardado exitosamente' };
+  } catch (error) {
+    sendLog(`[MAIN] Error al guardar archivo de presupuesto: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+}
 
 
 // Manejar búsqueda de ruta de submódulo

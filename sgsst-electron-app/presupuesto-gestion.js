@@ -153,12 +153,17 @@ class PresupuestoGestionComponent {
                 }
                 break;
 
-            // El guardado es una funcionalidad más compleja, por ahora solo lo registramos
+            // El guardado es una funcionalidad más compleja
             case 'saveBudgetChanges':
                 this.log('INFO', 'Solicitud de guardado recibida. Llamando a ElectronAPI para guardar el archivo.', event.data);
                 try {
                     const filePath = event.data.file.path;
                     const budgetDataToSave = event.data.data;
+
+                    // Validar que los datos sean correctos antes de guardar
+                    if (!budgetDataToSave || !Array.isArray(budgetDataToSave)) {
+                        throw new Error('Datos de presupuesto no válidos');
+                    }
 
                     // Call Electron API to save the file
                     const saveResult = await window.electronAPI.saveBudgetFile(filePath, budgetDataToSave);
@@ -167,17 +172,29 @@ class PresupuestoGestionComponent {
                     if (gestionIframe) {
                         if (saveResult.success) {
                             this.log('INFO', 'Archivo guardado exitosamente:', saveResult.message);
-                            gestionIframe.contentWindow.postMessage({ success: true, message: saveResult.message }, '*');
+                            gestionIframe.contentWindow.postMessage({
+                                action: 'saveBudgetChanges',
+                                success: true,
+                                message: saveResult.message
+                            }, '*');
                         } else {
-                            this.log('ERROR', 'Error al guardar el archivo:', saveResult.error);
-                            gestionIframe.contentWindow.postMessage({ error: saveResult.error }, '*');
+                            this.log('ERROR', 'Error al guardar archivo:', saveResult.error);
+                            gestionIframe.contentWindow.postMessage({
+                                action: 'saveBudgetChanges',
+                                success: false,
+                                error: saveResult.error
+                            }, '*');
                         }
                     }
                 } catch (error) {
                     this.log('CRITICAL', `Error al procesar solicitud de guardado: ${error.message}`, error.stack);
                     const gestionIframe = this.container.querySelector('iframe');
                     if (gestionIframe) {
-                        gestionIframe.contentWindow.postMessage({ error: error.message }, '*');
+                        gestionIframe.contentWindow.postMessage({
+                            action: 'saveBudgetChanges',
+                            success: false,
+                            error: error.message
+                        }, '*');
                     }
                 }
                 break;
@@ -188,7 +205,7 @@ class PresupuestoGestionComponent {
     formatBudgetDataForDisplay(data) {
         return data.map(row => {
             const newRow = { ...row };
-            // Formatear valores numéricos
+            // Formatear valores numéricos, manteniendo los originales para cálculos
             for (const key in newRow) {
                 if (typeof newRow[key] === 'number') {
                     // Aplicar formato de número con separadores de miles y 2 decimales
