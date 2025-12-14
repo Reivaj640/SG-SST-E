@@ -613,7 +613,7 @@ ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacita
     if (requestedSheetName) {
       sendLog(`[MAIN] Hoja de destino explícita: ${requestedSheetName}`, 'INFO');
     }
-    
+
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(filePath);
 
@@ -648,7 +648,7 @@ ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacita
     if (endCleanRow === -1) {
         endCleanRow = totalRowCount > startRow ? totalRowCount : startRow;
     }
-    
+
     for (let i = startRow; i <= endCleanRow + 1; i++) { // +1 para limpiar la fila siguiente
         const row = worksheet.getRow(i);
         row.values = [];
@@ -665,7 +665,7 @@ ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacita
       row.getCell(7).value = capacitacion.instructor; // G
       row.getCell(8).value = parseInt(capacitacion.duracion.replace(' Horas', '')) || 0; // H
       row.getCell(9).value = capacitacion.estado === 'completed' ? 'Ejecutado' : 'Pendiente'; // I
-      
+
       row.getCell(4).numFmt = 'dd/mm/yyyy';
     });
 
@@ -692,7 +692,7 @@ ipcMain.handle('init-excel', async (event, { filePath, sheetName: requestedSheet
 
     if (!sheetName || !workbook.SheetNames.includes(sheetName)) {
       if(sheetName) sendLog(`[WARN] La hoja solicitada '${sheetName}' no se encontró. Buscando una alternativa.`, 'WARN');
-      
+
       const currentYear = new Date().getFullYear().toString();
       const matrixPatternCurrent = new RegExp(`Matriz Cap\\.\\s*${currentYear}`, 'i');
       sheetName = workbook.SheetNames.find(name => matrixPatternCurrent.test(name));
@@ -712,10 +712,10 @@ ipcMain.handle('init-excel', async (event, { filePath, sheetName: requestedSheet
     if (!sheetName) {
       throw new Error('No se encontró ninguna hoja en el archivo Excel');
     }
-    
+
     sendLog(`[DEBUG] Hoja seleccionada para la lectura: ${sheetName}`);
     const worksheet = workbook.Sheets[sheetName];
-    
+
     if (!worksheet || !worksheet['!ref']) {
       sendLog(`[WARN] La hoja '${sheetName}' parece estar vacía.`);
       return { success: true, data: { processedData: [], headers: [] } };
@@ -737,6 +737,126 @@ ipcMain.handle('init-excel', async (event, { filePath, sheetName: requestedSheet
     };
   } catch (error) {
     sendLog(`[MAIN] Error al inicializar el archivo Excel: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// Manejador específico para leer datos del presupuesto - encabezados en fila 9, datos desde fila 10
+ipcMain.handle('readPresupuestoData', async (event, filePath) => {
+  try {
+    sendLog(`[MAIN] Leyendo datos de presupuesto desde: ${filePath}`, 'INFO');
+
+    // Verificar que el archivo existe
+    await fsp.access(filePath);
+
+    // Leer el archivo Excel
+    const workbook = xlsx.readFile(filePath);
+
+    // Obtener la primera hoja (podríamos mejorar esta lógica si es necesario)
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+
+    if (!worksheet || !worksheet['!ref']) {
+      sendLog(`[WARN] La hoja '${sheetName}' parece estar vacía.`, 'WARN');
+      return { success: true, data: { processedData: [], headers: [], formulaCells: [] } };
+    }
+
+    // Obtener todos los datos de la hoja
+    const allData = xlsx.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: null });
+
+    // Extraer encabezados de la fila 9 (índice 8) y datos desde la fila 10 (índice 9 en adelante)
+    const headers = allData[8] || []; // Fila 9 para encabezados (índice 8)
+    const dataStartIndex = 9; // Datos empiezan desde fila 10 (índice 9)
+    const rawData = allData.slice(dataStartIndex); // Datos desde fila 10 hasta el final
+
+    // Mapeo de encabezados a propiedades esperadas por el frontend
+    const headerMapping = {
+      'id': [0, 'A'],
+      'detalle': [2, 'C'],
+      'asignacion': [3, 'D'],
+      'ejecutado_acumulado': [4, 'E'],
+      'porcentaje_ejecutado': [5, 'F'],
+      'enero': [6, 'G'],
+      'febrero': [7, 'H'],
+      'marzo': [8, 'I'],
+      'abril': [9, 'J'],
+      'mayo': [10, 'K'],
+      'junio': [11, 'L'],
+      'julio': [12, 'M'],
+      'agosto': [13, 'N'],
+      'septiembre': [14, 'O'],
+      'octubre': [15, 'P'],
+      'noviembre': [16, 'Q'],
+      'diciembre': [17, 'R']
+    };
+
+    // Procesar los datos mapeando cada encabezado a su propiedad correspondiente
+    let processedData = [];
+    for (let i = 0; i < rawData.length; i++) {
+      const row = rawData[i];
+      // Verificar si la fila contiene texto especial como "TOTAL AÑO" o "ANALISIS PRESUPUESTAL"
+      const firstCell = row[0]; // Primera columna (ID)
+
+      const obj = {};
+
+      // Mapear cada columna al nombre de propiedad que espera el frontend
+      for (const [propName, [indexCol, columnLetter]] of Object.entries(headerMapping)) {
+        if (row[indexCol] !== undefined && row[indexCol] !== null) {
+          // Intentar convertir a número si es posible, de lo contrario dejar como string
+          const value = row[indexCol];
+          obj[propName] = isNaN(value) || value === '' ? value : parseFloat(value);
+        } else {
+          // Si no hay valor, asignar un valor por defecto basado en el tipo
+          obj[propName] = propName.includes('asignacion') || propName.includes('acumulado') ||
+                          propName.includes('enero') || propName.includes('febrero') ||
+                          propName.includes('marzo') || propName.includes('abril') ||
+                          propName.includes('mayo') || propName.includes('junio') ||
+                          propName.includes('julio') || propName.includes('agosto') ||
+                          propName.includes('septiembre') || propName.includes('octubre') ||
+                          propName.includes('noviembre') || propName.includes('diciembre') ? 0 : '';
+        }
+      }
+
+      // Si la primera celda contiene texto especial, preservarlo
+      if (typeof firstCell === 'string' && (firstCell.includes('TOTAL') || firstCell.includes('ANALISIS'))) {
+        obj.id = firstCell;
+      }
+
+      // Si encontramos "TOTAL AÑO", detenemos la lectura de más filas
+      if (typeof firstCell === 'string' && firstCell.includes('TOTAL AÑO')) {
+        processedData.push(obj);
+        break; // Detener el bucle para no incluir filas posteriores
+      }
+
+      processedData.push(obj);
+    }
+
+    // Filtrar filas especiales o vacías si es necesario para cálculos
+    const filteredData = processedData.filter(item => {
+      // Excluir filas que contengan texto especial como "TOTAL AÑO" o "ANALISIS PRESUPUESTAL" de los cálculos
+      return !(typeof item.detalle === 'string' &&
+               (item.detalle.includes('TOTAL') || item.detalle.includes('ANALISIS')));
+    });
+
+    sendLog(`[MAIN] Datos de presupuesto procesados. Encabezados: ${headers.length}, Filas de datos: ${processedData.length}, Filas para cálculo: ${filteredData.length}`, 'INFO');
+
+    // Devolver también las celdas de fórmulas (vacío por ahora, pero estructura compatible)
+    // En el futuro se podría implementar la detección de fórmulas si es necesario
+    const formulaCells = [];
+
+    return {
+      success: true,
+      data: {
+        processedData, // Devolver todos los datos, incluyendo filas especiales para mostrar en tabla
+        filteredData,  // Devolver datos filtrados para cálculos
+        headers,
+        formulaCells,
+        rawData,
+        sheetName: sheetName
+      }
+    };
+  } catch (error) {
+    sendLog(`[MAIN] Error leyendo datos de presupuesto: ${error.message}`, 'ERROR');
     return { success: false, error: error.message };
   }
 });
@@ -1176,7 +1296,7 @@ ipcMain.on('start-watching-capacitaciones', (event, filePath) => {
   if (capacitacionesFileWatcher) {
     capacitacionesFileWatcher.close();
   }
-  
+
   try {
     sendLog(`[MAIN] Iniciando vigilancia sobre el archivo: ${filePath}`, 'INFO');
     capacitacionesFileWatcher = fs.watch(filePath, (eventType, filename) => {

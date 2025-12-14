@@ -293,7 +293,15 @@ document.addEventListener('DOMContentLoaded', async () => {
           return;
       }
 
-      const { type, payload, requestId } = event.data; // <-- CORRECTLY DESTRUCTURE `requestId`
+      const { type, payload, requestId } = event.data;
+
+      // --- FIX: Guard Clause ---
+      // If the message doesn't have a 'type', it's for a different listener (e.g., PresupuestoGestionComponent).
+      // This prevents the renderer from trying to handle messages with an 'action' property.
+      if (!type) {
+        return;
+      }
+
       console.log('RENDERER: Message received from iframe:', { type, payload, requestId });
 
       // Find the iframe that sent the message

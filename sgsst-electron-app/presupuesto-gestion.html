@@ -384,21 +384,33 @@
 
     <script>
         let budgetData = [];
+        let calculationData = [];
         let currentFile = null;
         let formulaCells = [];
 
         document.addEventListener('DOMContentLoaded', function() {
             setupEventListeners();
 
-            // --- INICIO: MANEJADOR DE MENSAJES UNIFICADO ---
+            // --- INICIO: MANEJADOR MEJORADO DE MENSAJES ---
             window.addEventListener('message', async (event) => {
+                // Verificar el origen del mensaje por seguridad
+                if (event.source !== parent) return;
+
                 // Lógica de carga de datos
                 if (event.data.file) {
                     currentFile = event.data.file;
                     updateFileInfo();
                     await loadData();
                 } else if (event.data.budgetData) {
+                    // Validar los datos recibidos antes de procesarlos
+                    if (!validateBudgetData(event.data.budgetData)) {
+                        showNotification('Datos recibidos no válidos', 'error');
+                        return;
+                    }
+
                     budgetData = event.data.budgetData;
+                    // Usar calculationData para cálculos si está disponible, de lo contrario usar budgetData
+                    calculationData = event.data.calculationData || budgetData;
                     if (event.data.formulaCells) {
                         formulaCells = event.data.formulaCells;
                     }
@@ -413,8 +425,37 @@
                     showNotification(`Error al guardar: ${event.data.error}`, 'error');
                 }
             });
-            // --- FIN: MANEJADOR DE MENSAJES UNIFICADO ---
+            // --- FIN: MANEJADOR MEJORADO DE MENSAJES ---
         });
+
+        // Función para validar los datos recibidos
+        function validateBudgetData(data) {
+            if (!Array.isArray(data)) {
+                console.error('Los datos recibidos no son un array');
+                return false;
+            }
+
+            // Validar estructura básica de cada elemento
+            for (let i = 0; i < data.length; i++) {
+                const item = data[i];
+                if (typeof item !== 'object' || item === null) {
+                    console.error(`El elemento en la posición ${i} no es un objeto válido`);
+                    return false;
+                }
+
+                // Verificar propiedades esenciales (excepto filas especiales)
+                if (item.id !== 'TOTAL AÑO' && item.id !== 'ANALISIS PRESUPUESTAL') {
+                    if (typeof item.detalle === 'undefined' ||
+                        typeof item.asignacion === 'undefined' ||
+                        typeof item.ejecutado_acumulado === 'undefined') {
+                        console.error(`El elemento en la posición ${i} no tiene las propiedades esenciales`);
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
 
         function setupEventListeners() {
             document.getElementById('backBtn').addEventListener('click', () => window.parent.postMessage({ action: 'backToSelector' }, '*'));
@@ -447,9 +488,9 @@
         function getCellAddress(rowIndex, propertyName) {
             const row = rowIndex + 10;
             const columnMap = {
-                'detalle': 'B', 'asignacion': 'C', 'ejecutado_acumulado': 'D', 'porcentaje_ejecutado': 'E',
-                'enero': 'F', 'febrero': 'G', 'marzo': 'H', 'abril': 'I', 'mayo': 'J', 'junio': 'K',
-                'julio': 'L', 'agosto': 'M', 'septiembre': 'N', 'octubre': 'O', 'noviembre': 'P', 'diciembre': 'Q'
+                'detalle': 'C', 'asignacion': 'D', 'ejecutado_acumulado': 'E', 'porcentaje_ejecutado': 'F',
+                'enero': 'G', 'febrero': 'H', 'marzo': 'I', 'abril': 'J', 'mayo': 'K', 'junio': 'L',
+                'julio': 'M', 'agosto': 'N', 'septiembre': 'O', 'octubre': 'P', 'noviembre': 'Q', 'diciembre': 'R'
             };
             const col = columnMap[propertyName];
             return col ? `${col}${row}` : null;
@@ -496,7 +537,15 @@
             document.getElementById('saldoDisponible').textContent = '$' + formatNumber(totalPresupuesto - totalEmpresa - totalArl);
         }
 
-        function formatNumber(num) { return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."); }
+        function formatNumber(num) {
+            // Convertimos a número si es un string, o usamos 0 si no es un número válido
+            const numberValue = isNaN(parseFloat(num)) ? 0 : parseFloat(num);
+            // Aplicamos formato con separador de miles y 2 decimales
+            return numberValue.toLocaleString('es-CO', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).replace(/\,/g, '.'); // Reemplazamos coma decimal por punto según el sistema latinoamericano
+        }
 
         function addNewRow() {
             const newItem = {

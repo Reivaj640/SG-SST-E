@@ -7,7 +7,7 @@ class PresupuestoGestionComponent {
         this.currentView = 'selector'; // 'selector' o 'gestion'
         this.currentFile = null; // Almacena el objeto del archivo seleccionado
         this.messageHandlers = new Map();
-        
+
         this.log('INFO', 'PresupuestoGestionComponent inicializado');
     }
 
@@ -52,7 +52,7 @@ class PresupuestoGestionComponent {
             container.appendChild(loadingDiv);
 
             this.setupIframeEvents(iframe, loadingDiv, viewType);
-            
+
             container.appendChild(iframe);
         } catch (error) {
             this.log('CRITICAL', `Error en renderIframeView(): ${error.message}`, error.stack);
@@ -64,14 +64,14 @@ class PresupuestoGestionComponent {
         iframe.onload = () => {
             this.log('INFO', `✅ Iframe cargado (${viewType})`);
             if (loadingDiv.parentNode) loadingDiv.style.display = 'none';
-            
+
             // Si es la vista de gestión, enviamos el archivo seleccionado para que lo tenga de inmediato.
             if (viewType === 'gestion' && this.currentFile) {
                 iframe.contentWindow.postMessage({ file: this.currentFile }, '*');
             }
         };
         iframe.onerror = (error) => this.log('CRITICAL', `❌ Error al cargar iframe: ${error.message}`);
-        
+
         const messageHandler = (event) => this.handleIframeMessage(event);
         this.registerMessageHandler(viewType, messageHandler);
     }
@@ -99,20 +99,26 @@ class PresupuestoGestionComponent {
                 break;
 
             case 'requestBudgetData':
-                if (this.currentFile) {
+                // FIX: Use the file object directly from the event data for robustness
+                if (file && file.path) {
                     try {
-                        this.log('DEBUG', `Solicitando datos procesados para: ${this.currentFile.path}`);
-                        const result = await window.electronAPI.initExcel(this.currentFile.path);
-                        this.log('DEBUG', 'Resultado de initExcel:', result);
+                        this.log('DEBUG', `Solicitando datos procesados para: ${file.path}`);
+                        // FIX: Use the dedicated function for budget data (headers in row 9, data from row 10)
+                        const result = await window.electronAPI.readPresupuestoData(file.path);
+                        this.log('DEBUG', 'Resultado de readPresupuestoData:', result);
 
                         if (result.success) {
                             const gestionIframe = this.container.querySelector('iframe');
                             if (gestionIframe) {
                                 this.log('DEBUG', `Enviando datos, fórmulas y encabezados al iframe.`);
-                                gestionIframe.contentWindow.postMessage({ 
-                                    budgetData: result.data.processedData, // Pass processed data directly
+                                // Usar la función para formatear los datos antes de enviar
+                                const formattedData = this.formatBudgetDataForDisplay(result.data.processedData);
+
+                                gestionIframe.contentWindow.postMessage({
+                                    budgetData: formattedData, // Datos formateados para mostrar en la tabla (incluye filas especiales)
+                                    calculationData: result.data.filteredData, // Datos para cálculos (excluye filas especiales)
                                     formulaCells: result.data.formulaCells,
-                                    debugHeaders: result.data.headers
+                                    headers: result.data.headers
                                 }, '*');
                             }
                         } else {
@@ -122,9 +128,12 @@ class PresupuestoGestionComponent {
                         this.log('CRITICAL', `Error en requestBudgetData: ${error.message}`, error.stack);
                         this.showErrorUI(error);
                     }
+                } else {
+                    this.log('ERROR', 'La solicitud requestBudgetData se recibió sin un archivo o ruta de archivo válidos.', event.data);
+                    this.showErrorUI(new Error('No se proporcionó un archivo válido para procesar.'));
                 }
                 break;
-            
+
             case 'requestCurrentFile':
                  const gestionIframe = this.container.querySelector('iframe');
                  if (gestionIframe && this.currentFile) {
@@ -137,7 +146,7 @@ class PresupuestoGestionComponent {
                 this.currentView = 'selector';
                 this.render();
                 break;
-            
+
             case 'openOriginalFile':
                 if (file && window.electronAPI.openPath) {
                     window.electronAPI.openPath(file.path);
@@ -150,7 +159,7 @@ class PresupuestoGestionComponent {
                 try {
                     const filePath = event.data.file.path;
                     const budgetDataToSave = event.data.data;
-                    
+
                     // Call Electron API to save the file
                     const saveResult = await window.electronAPI.saveBudgetFile(filePath, budgetDataToSave);
 
@@ -173,6 +182,24 @@ class PresupuestoGestionComponent {
                 }
                 break;
         }
+    }
+
+    // Método para formatear los datos del presupuesto para mostrar en la interfaz
+    formatBudgetDataForDisplay(data) {
+        return data.map(row => {
+            const newRow = { ...row };
+            // Formatear valores numéricos
+            for (const key in newRow) {
+                if (typeof newRow[key] === 'number') {
+                    // Aplicar formato de número con separadores de miles y 2 decimales
+                    newRow[key] = newRow[key].toLocaleString('es-CO', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    });
+                }
+            }
+            return newRow;
+        });
     }
 
     createLoadingElement(message) {
@@ -209,7 +236,7 @@ class PresupuestoGestionComponent {
             }
             this.log('DEBUG', `Llamando a getPresupuestoFiles para la empresa: ${this.currentCompany}`);
             const result = await window.electronAPI.getPresupuestoFiles(this.currentCompany);
-            
+
             if (result.success) {
                 this.log('DEBUG', `Archivos de presupuesto recibidos: ${result.files.length}`, result.files);
                 iframe.contentWindow.postMessage({ files: result.files }, '*');
