@@ -775,9 +775,9 @@ ipcMain.handle('readPresupuestoData', async (event, filePath) => {
     // --- FIN DE LA CORRECCIÓN ---
 
     // Obtener todos los datos de la hoja usando el rango corregido
-    const allData = xlsx.utils.sheet_to_json(worksheet, { 
-        header: 1, 
-        raw: false, 
+    const allData = xlsx.utils.sheet_to_json(worksheet, {
+        header: 1,
+        raw: false,
         defval: null,
         range: correctedRangeStr // Usar el rango corregido aquí
     });
@@ -816,6 +816,16 @@ ipcMain.handle('readPresupuestoData', async (event, filePath) => {
 
     // Procesar los datos mapeando cada encabezado a su propiedad correspondiente
     let processedData = [];
+    const numericFields = ['asignacion', 'ejecutado_acumulado', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                           'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    // Mantener acumuladores para cálculos de TOTAL AÑO
+    const totalAccumulators = {
+      asignacion: 0,
+      ejecutado_acumulado: 0,
+      enero: 0, febrero: 0, marzo: 0, abril: 0, mayo: 0, junio: 0,
+      julio: 0, agosto: 0, septiembre: 0, octubre: 0, noviembre: 0, diciembre: 0
+    };
+
     for (let i = 0; i < rawData.length; i++) {
       const row = rawData[i];
       sendLog(`[DEBUG] readPresupuestoData - Procesando fila ${i + dataStartIndex + 1}: ${JSON.stringify(row)}`, 'DEBUG');
@@ -826,19 +836,55 @@ ipcMain.handle('readPresupuestoData', async (event, filePath) => {
       // Verificar también en la columna B en caso de celdas unificadas
       const secondCell = row[1]; // Segunda columna (B) - podría contener "TOTAL AÑO" si la celda A-B está unificada
 
-      // Si encontramos "TOTAL AÑO" en cualquier celda de la fila (A o B), detenemos la lectura de más filas
+      // Si encontramos "TOTAL AÑO" en cualquier celda de la fila (A o B), creamos la fila TOTAL AÑO con los totales acumulados
       if ((typeof firstCell === 'string' && firstCell.includes('TOTAL AÑO')) ||
           (typeof secondCell === 'string' && secondCell.includes('TOTAL AÑO'))) {
-        // Crear un objeto especial para TOTAL AÑO con solo el id
+        // FUNCIÓN DE FORMATEO - Agregar ANTES de crear el objeto TOTAL AÑO
+        function formatColombianDisplay(value) {
+          // Si el valor es 0 o vacío, retornar "$ -"
+          if (!value || value === 0) {
+            return ' $ -   ';
+          }
+
+          // Asegurarse de que es un número
+          const num = typeof value === 'number' ? value : parseFloat(value);
+
+          if (isNaN(num)) {
+            return ' $ -   ';
+          }
+
+          // Formatear con comas como separador de miles (formato internacional) y sin decimales
+          // Este es el formato que se usa en tus archivos Excel: 13,407,464
+          const formatted = num.toLocaleString('en-US', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+          });
+
+          return ` $ ${formatted} `;
+        }
+
+        // Actualizar la fila TOTAL AÑO con los totales acumulados, formateados adecuadamente
         const obj = {
           id: typeof firstCell === 'string' && firstCell.includes('TOTAL AÑO') ? firstCell :
               typeof secondCell === 'string' && secondCell.includes('TOTAL AÑO') ? secondCell : 'TOTAL AÑO',
           detalle: 'TOTAL AÑO',  // Mostrar TOTAL AÑO en la columna de detalle
-          asignacion: 0,
-          ejecutado_acumulado: 0,
-          porcentaje_ejecutado: 0,
-          enero: 0, febrero: 0, marzo: 0, abril: 0, mayo: 0, junio: 0,
-          julio: 0, agosto: 0, septiembre: 0, octubre: 0, noviembre: 0, diciembre: 0
+          asignacion: formatColombianDisplay(totalAccumulators.asignacion),
+          ejecutado_acumulado: formatColombianDisplay(totalAccumulators.ejecutado_acumulado),
+          porcentaje_ejecutado: totalAccumulators.asignacion > 0
+            ? ((totalAccumulators.ejecutado_acumulado / totalAccumulators.asignacion) * 100).toFixed(2) + '%'
+            : '0,00%',
+          enero: formatColombianDisplay(totalAccumulators.enero),
+          febrero: formatColombianDisplay(totalAccumulators.febrero),
+          marzo: formatColombianDisplay(totalAccumulators.marzo),
+          abril: formatColombianDisplay(totalAccumulators.abril),
+          mayo: formatColombianDisplay(totalAccumulators.mayo),
+          junio: formatColombianDisplay(totalAccumulators.junio),
+          julio: formatColombianDisplay(totalAccumulators.julio),
+          agosto: formatColombianDisplay(totalAccumulators.agosto),
+          septiembre: formatColombianDisplay(totalAccumulators.septiembre),
+          octubre: formatColombianDisplay(totalAccumulators.octubre),
+          noviembre: formatColombianDisplay(totalAccumulators.noviembre),
+          diciembre: formatColombianDisplay(totalAccumulators.diciembre)
         };
         processedData.push(obj);
         sendLog(`[DEBUG] readPresupuestoData - Detectado TOTAL AÑO en fila ${i + dataStartIndex + 1}, deteniendo lectura`, 'DEBUG');
@@ -853,6 +899,64 @@ ipcMain.handle('readPresupuestoData', async (event, filePath) => {
           const value = row[indexCol];
           obj[propName] = value; // Asignar el valor original sin conversiones
           sendLog(`[DEBUG] readPresupuestoData - Fila ${i + dataStartIndex + 1}, Columna ${columnLetter}[${indexCol}]: ${propName} = ${value}`, 'DEBUG');
+
+          // Acumular valores numéricos para el TOTAL AÑO si es un campo numérico
+          if (numericFields.includes(propName)) {
+            let numericValue = value;
+
+            if (typeof value === 'string') {
+              // ====================================================================
+              // PARSEO CORREGIDO PARA FORMATO INTERNACIONAL CON COMAS
+              // ====================================================================
+              // Tus datos vienen así: " $ 9,427,464 " (COMA = separador de miles)
+              // NO es formato colombiano (punto = miles, coma = decimal)
+
+              // Paso 1: Limpiar el string
+              let cleanValue = value
+                .replace(/\$/g, '')      // Quitar símbolo $
+                .replace(/\s/g, '')      // Quitar TODOS los espacios
+                .trim();
+
+              // Log para debug
+              console.log(`[PARSEO DEBUG] Original: "${value}" -> Limpio: "${cleanValue}"`);
+
+              // Paso 2: Verificar si es valor vacío
+              if (cleanValue === '' || cleanValue === '-') {
+                numericValue = 0;
+                console.log(`[PARSEO DEBUG] Valor vacío detectado, asignando 0`);
+              } else {
+                // Paso 3: Remover TODAS las comas (son separadores de miles)
+                cleanValue = cleanValue.replace(/,/g, '');
+
+                // Paso 4: Si hay punto, verificar si es separador de miles o decimal
+                if (cleanValue.includes('.')) {
+                  const parts = cleanValue.split('.');
+
+                  // Si hay más de un punto O si la parte decimal tiene 3+ dígitos,
+                  // entonces los puntos son separadores de miles
+                  if (parts.length > 2 || (parts.length === 2 && parts[1].length >= 3)) {
+                    // Remover todos los puntos (separadores de miles)
+                    cleanValue = cleanValue.replace(/\./g, '');
+                    console.log(`[PARSEO DEBUG] Puntos removidos como separadores de miles: "${cleanValue}"`);
+                  }
+                  // Si tiene un solo punto con 1-2 dígitos después, es decimal (mantenerlo)
+                }
+
+                // Paso 5: Parsear el valor final
+                numericValue = parseFloat(cleanValue) || 0;
+
+                console.log(`[PARSEO DEBUG] Resultado final: ${numericValue}`);
+              }
+            } else if (typeof value !== 'number') {
+              numericValue = 0;
+              console.log(`[PARSEO DEBUG] Tipo no válido, asignando 0`);
+            }
+
+            // Acumular en totalAccumulators
+            totalAccumulators[propName] += numericValue;
+
+            console.log(`[PARSEO DEBUG] ${propName}: "${value}" -> ${numericValue}, Total acumulado: ${totalAccumulators[propName]}`);
+          }
         } else {
           // Si no hay valor, asignar un valor por defecto basado en el tipo
           obj[propName] = propName.includes('asignacion') || propName.includes('acumulado') ||
@@ -1408,11 +1512,11 @@ async function handleSaveBudgetFile(event, filePath, dataToSave) {
       values[0] = rowData.id;
       values[1] = ''; // Columna B explícitamente vacía
       values[2] = rowData.detalle;
-      
+
       values[3] = parseValue(rowData.asignacion);
       values[4] = parseValue(rowData.ejecutado_acumulado);
       values[5] = parsePercentage(rowData.porcentaje_ejecutado);
-      
+
       values[6] = parseValue(rowData.enero);
       values[7] = parseValue(rowData.febrero);
       values[8] = parseValue(rowData.marzo);
@@ -1427,17 +1531,17 @@ async function handleSaveBudgetFile(event, filePath, dataToSave) {
       values[17] = parseValue(rowData.diciembre);
 
       row.values = values;
-      
+
       // Aplicar formato de número a las celdas para correcta visualización en Excel
       row.getCell('D').numFmt = '#,##0.00'; // Asignación
       row.getCell('E').numFmt = '#,##0.00'; // Ejecutado
       row.getCell('F').numFmt = '0.00%';    // Porcentaje
-      
+
       // Formato para meses (columnas G a R)
       for (let col = 7; col <= 18; col++) { // 7 es 'G', 18 es 'R'
         row.getCell(col).numFmt = '#,##0.00';
       }
-      
+
       sendLog(`[DEBUG] handleSaveBudgetFile - Escribiendo valores en fila ${rowIndex}`, 'DEBUG');
     }
 
