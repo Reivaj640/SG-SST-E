@@ -552,6 +552,9 @@
         }
 
         async function loadData() {
+            console.log('[DEBUG] Iniciando carga de datos...');
+            console.time('[PERFORMANCE] Carga de datos');
+
             try {
                 showLoading();
                 window.parent.postMessage({ action: 'requestBudgetData', file: currentFile }, '*');
@@ -565,12 +568,27 @@
         function getCellAddress(rowIndex, propertyName) {
             const row = rowIndex + 10;
             const columnMap = {
-                'detalle': 'C', 'asignacion': 'D', 'ejecutado_acumulado': 'E', 'porcentaje_ejecutado': 'F',
-                'enero': 'G', 'febrero': 'H', 'marzo': 'I', 'abril': 'J', 'mayo': 'K', 'junio': 'L',
-                'julio': 'M', 'agosto': 'N', 'septiembre': 'O', 'octubre': 'P', 'noviembre': 'Q', 'diciembre': 'R'
-            };
+                'id': [0, 'A'],                    // Columna A (índice 0)
+                'empty_b': [1, 'B'],               // Columna B (índice 1) - Vacía (o intermedia)
+                'detalle': [2, 'C'],               // Columna C (índice 2)
+                'asignacion': [3, 'D'],            // Columna D (índice 3)
+                'ejecutado_acumulado': [4, 'E'],   // Columna E (índice 4)
+                'porcentaje_ejecutado': [5, 'F'],  // Columna F (índice 5)
+                'enero': [6, 'G'],                 // Columna G (índice 6)
+                'febrero': [7, 'H'],               // Columna H (índice 7)
+                'marzo': [8, 'I'],                 // Columna I (índice 8)
+                'abril': [9, 'J'],                 // Columna J (índice 9)
+                'mayo': [10, 'K'],                // Columna K (índice 10)
+                'junio': [11, 'L'],               // Columna L (índice 11)
+                'julio': [12, 'M'],               // Columna M (índice 12)
+                'agosto': [13, 'N'],              // Columna N (índice 13)
+                'septiembre': [14, 'O'],          // Columna O (índice 14)
+                'octubre': [15, 'P'],             // Columna P (índice 15)
+                'noviembre': [16, 'Q'],           // Columna Q (índice 16)
+                'diciembre': [17, 'R']            // Columna R (índice 17)
+    };
             const col = columnMap[propertyName];
-            return col ? `${col}${row}` : null;
+            return col ? `${col[1]}${row}` : null;
         }
 
         // Función para marcar cambios pendientes
@@ -619,15 +637,30 @@
             }
 
             if (typeof value === 'string') {
-                // Remover signos de dólar, espacios y caracteres no numéricos excepto puntos y comas decimales
+                // Remover signos de dólar y espacios
                 let cleanValue = value.toString()
                     .replace(/\$/g, '')  // Eliminar signos de dólar
-                    .replace(/\s/g, '')  // Eliminar espacios
-                    .replace(/,/g, '');  // Eliminar comas (separadores de miles en este formato)
+                    .replace(/\s/g, ''); // Eliminar espacios
 
-                // Si hay un guion, probablemente sea representativo de un valor cero
-                if (cleanValue === '-' || cleanValue.toLowerCase() === '-  ') {
+                // Si hay un guion, representativo de un valor cero
+                if (cleanValue === '-' || cleanValue === '-  ' || cleanValue.trim() === '') {
                     return 0;
+                }
+
+                // Detectar formato: si tiene punto antes de la coma, es formato colombiano (1.000.000,50)
+                // Si tiene coma antes del punto o solo comas, es formato internacional (1,000,000.50)
+                
+                const hasCommaAfterDot = /\.\d+,\d+/.test(cleanValue); // Ej: 1.000,50
+                const hasDotAfterComma = /,\d+\.\d+/.test(cleanValue); // Ej: 1,000.50
+                
+                if (hasCommaAfterDot) {
+                    // Formato colombiano: 1.000.000,50
+                    cleanValue = cleanValue
+                        .replace(/\./g, '')  // Eliminar puntos (separadores de miles)
+                        .replace(/,/g, '.'); // Convertir coma decimal a punto
+                } else if (hasDotAfterComma || cleanValue.includes(',')) {
+                    // Formato internacional: 1,000,000.50 o solo tiene comas
+                    cleanValue = cleanValue.replace(/,/g, ''); // Eliminar comas (separadores de miles)
                 }
 
                 const parsed = parseFloat(cleanValue);

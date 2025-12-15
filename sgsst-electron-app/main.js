@@ -761,8 +761,26 @@ ipcMain.handle('readPresupuestoData', async (event, filePath) => {
       return { success: true, data: { processedData: [], headers: [], formulaCells: [] } };
     }
 
-    // Obtener todos los datos de la hoja
-    const allData = xlsx.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: null });
+        // --- INICIO DE LA CORRECCIÓN ---
+    // La detección automática del rango ('!ref') no es fiable después de guardar con exceljs.
+    // Forzamos el rango para que siempre empiece en A1 y termine en la columna R,
+    // pero respetando la última fila detectada por la librería.
+    const originalRange = xlsx.utils.decode_range(worksheet['!ref']);
+    const correctedRange = {
+      s: { c: 0, r: 0 }, // Empezar en la columna A (0) y fila 1 (0)
+      e: { c: 17, r: originalRange.e.r } // Terminar en la columna R (17) y la última fila detectada
+    };
+    const correctedRangeStr = xlsx.utils.encode_range(correctedRange);
+    sendLog(`[DEBUG] readPresupuestoData - Rango original: ${worksheet['!ref']}, Rango corregido: ${correctedRangeStr}`, 'DEBUG');
+    // --- FIN DE LA CORRECCIÓN ---
+
+    // Obtener todos los datos de la hoja usando el rango corregido
+    const allData = xlsx.utils.sheet_to_json(worksheet, { 
+        header: 1, 
+        raw: false, 
+        defval: null,
+        range: correctedRangeStr // Usar el rango corregido aquí
+    });
 
     // Extraer encabezados de la fila 9 (índice 8) y datos desde la fila 10 (índice 9 en adelante)
     const headers = allData[8] || []; // Fila 9 para encabezados (índice 8)
@@ -771,29 +789,37 @@ ipcMain.handle('readPresupuestoData', async (event, filePath) => {
 
     // Mapeo de encabezados a propiedades esperadas por el frontend
     const headerMapping = {
-      'id': [0, 'A'],
-      'detalle': [2, 'C'],        // Columna C (índice 2)
-      'asignacion': [3, 'D'],     // Columna D (índice 3)
-      'ejecutado_acumulado': [4, 'E'],  // Columna E (índice 4)
-      'porcentaje_ejecutado': [5, 'F'], // Columna F (índice 5)
-      'enero': [6, 'G'],          // Columna G (índice 6)
-      'febrero': [7, 'H'],        // Columna H (índice 7)
-      'marzo': [8, 'I'],          // Columna I (índice 8)
-      'abril': [9, 'J'],          // Columna J (índice 9)
-      'mayo': [10, 'K'],         // Columna K (índice 10)
-      'junio': [11, 'L'],        // Columna L (índice 11)
-      'julio': [12, 'M'],        // Columna M (índice 12)
-      'agosto': [13, 'N'],       // Columna N (índice 13)
-      'septiembre': [14, 'O'],   // Columna O (índice 14)
-      'octubre': [15, 'P'],      // Columna P (índice 15)
-      'noviembre': [16, 'Q'],    // Columna Q (índice 16)
-      'diciembre': [17, 'R']     // Columna R (índice 17)
+      'id': [0, 'A'],                    // Índice 0, Columna A - ID
+      'detalle': [2, 'C'],               // Índice 2, Columna C - Detalle
+      'asignacion': [3, 'D'],            // Índice 3, Columna D - Asignación
+      'ejecutado_acumulado': [4, 'E'],   // Índice 4, Columna E - Ejecutado Acumulado
+      'porcentaje_ejecutado': [5, 'F'],  // Índice 5, Columna F - % Ejecutado
+      'enero': [6, 'G'],                 // Índice 6, Columna G - Enero
+      'febrero': [7, 'H'],               // Índice 7, Columna H - Febrero
+      'marzo': [8, 'I'],                 // Índice 8, Columna I - Marzo
+      'abril': [9, 'J'],                 // Índice 9, Columna J - Abril
+      'mayo': [10, 'K'],                // Índice 10, Columna K - Mayo
+      'junio': [11, 'L'],               // Índice 11, Columna L - Junio
+      'julio': [12, 'M'],               // Índice 12, Columna M - Julio
+      'agosto': [13, 'N'],              // Índice 13, Columna N - Agosto
+      'septiembre': [14, 'O'],          // Índice 14, Columna O - Septiembre
+      'octubre': [15, 'P'],             // Índice 15, Columna P - Octubre
+      'noviembre': [16, 'Q'],           // Índice 16, Columna Q - Noviembre
+      'diciembre': [17, 'R']            // Índice 17, Columna R - Diciembre
     };
+
+    // Log de información del archivo y mapeo
+    sendLog(`[DEBUG] readPresupuestoData - Hoja: ${sheetName}, Rango de datos: ${worksheet['!ref']}`, 'DEBUG');
+    sendLog(`[DEBUG] readPresupuestoData - Encabezados encontrados: ${JSON.stringify(headers)}`, 'DEBUG');
+    sendLog(`[DEBUG] readPresupuestoData - Total de filas de datos: ${rawData.length}`, 'DEBUG');
+    sendLog(`[DEBUG] readPresupuestoData - Mapeo de columnas: ${JSON.stringify(headerMapping)}`, 'DEBUG');
 
     // Procesar los datos mapeando cada encabezado a su propiedad correspondiente
     let processedData = [];
     for (let i = 0; i < rawData.length; i++) {
       const row = rawData[i];
+      sendLog(`[DEBUG] readPresupuestoData - Procesando fila ${i + dataStartIndex + 1}: ${JSON.stringify(row)}`, 'DEBUG');
+
       // Verificar si la fila contiene texto especial como "TOTAL AÑO" o "ANALISIS PRESUPUESTAL"
       const firstCell = row[0]; // Primera columna (ID)
 
@@ -815,6 +841,7 @@ ipcMain.handle('readPresupuestoData', async (event, filePath) => {
           julio: 0, agosto: 0, septiembre: 0, octubre: 0, noviembre: 0, diciembre: 0
         };
         processedData.push(obj);
+        sendLog(`[DEBUG] readPresupuestoData - Detectado TOTAL AÑO en fila ${i + dataStartIndex + 1}, deteniendo lectura`, 'DEBUG');
         break; // Detener el bucle para no incluir filas posteriores
       }
 
@@ -823,9 +850,9 @@ ipcMain.handle('readPresupuestoData', async (event, filePath) => {
       // Mapear cada columna al nombre de propiedad que espera el frontend
       for (const [propName, [indexCol, columnLetter]] of Object.entries(headerMapping)) {
         if (row[indexCol] !== undefined && row[indexCol] !== null) {
-          // Intentar convertir a número si es posible, de lo contrario dejar como string
           const value = row[indexCol];
-          obj[propName] = isNaN(value) || value === '' ? value : parseFloat(value);
+          obj[propName] = value; // Asignar el valor original sin conversiones
+          sendLog(`[DEBUG] readPresupuestoData - Fila ${i + dataStartIndex + 1}, Columna ${columnLetter}[${indexCol}]: ${propName} = ${value}`, 'DEBUG');
         } else {
           // Si no hay valor, asignar un valor por defecto basado en el tipo
           obj[propName] = propName.includes('asignacion') || propName.includes('acumulado') ||
@@ -835,6 +862,7 @@ ipcMain.handle('readPresupuestoData', async (event, filePath) => {
                           propName.includes('julio') || propName.includes('agosto') ||
                           propName.includes('septiembre') || propName.includes('octubre') ||
                           propName.includes('noviembre') || propName.includes('diciembre') ? 0 : '';
+          sendLog(`[DEBUG] readPresupuestoData - Fila ${i + dataStartIndex + 1}, Columna ${columnLetter}[${indexCol}]: ${propName} = valor por defecto`, 'DEBUG');
         }
       }
 
@@ -856,6 +884,7 @@ ipcMain.handle('readPresupuestoData', async (event, filePath) => {
     });
 
     sendLog(`[MAIN] Datos de presupuesto procesados. Encabezados: ${headers.length}, Filas de datos: ${processedData.length}, Filas para cálculo: ${filteredData.length}`, 'INFO');
+    sendLog(`[DEBUG] readPresupuestoData - Muestra de los primeros 3 datos procesados: ${JSON.stringify(processedData.slice(0, 3))}`, 'DEBUG');
 
     // Devolver también las celdas de fórmulas (vacío por ahora, pero estructura compatible)
     // En el futuro se podría implementar la detección de fórmulas si es necesario
@@ -1328,60 +1357,88 @@ async function handleSaveBudgetFile(event, filePath, dataToSave) {
     // Mapeo de propiedades a columnas basado en el archivo Excel real de presupuesto
     // Basado en el mapeo de la función de lectura: [índice, columna]
     const columnMapping = {
-      'id': [0, 'A'],           // Índice 0, Columna A - ID
-      'detalle': [1, 'B'],      // Índice 1, Columna B - Detalle
-      'asignacion': [2, 'C'],   // Índice 2, Columna C - Asignación
-      'ejecutado_acumulado': [3, 'D'],  // Índice 3, Columna D - Ejecutado Acumulado
-      'porcentaje_ejecutado': [4, 'E'], // Índice 4, Columna E - % Ejecutado
-      'enero': [5, 'F'],        // Índice 5, Columna F - Enero
-      'febrero': [6, 'G'],      // Índice 6, Columna G - Febrero
-      'marzo': [7, 'H'],        // Índice 7, Columna H - Marzo
-      'abril': [8, 'I'],        // Índice 8, Columna I - Abril
-      'mayo': [9, 'J'],        // Índice 9, Columna J - Mayo
-      'junio': [10, 'K'],       // Índice 10, Columna K - Junio
-      'julio': [11, 'L'],       // Índice 11, Columna L - Julio
-      'agosto': [12, 'M'],      // Índice 12, Columna M - Agosto
-      'septiembre': [13, 'N'],  // Índice 13, Columna N - Septiembre
-      'octubre': [14, 'O'],     // Índice 14, Columna O - Octubre
-      'noviembre': [15, 'P'],   // Índice 15, Columna P - Noviembre
-      'diciembre': [16, 'Q']    // Índice 16, Columna Q - Diciembre
+      'id': [0, 'A'],                    // Índice 0, Columna A - ID
+      'detalle': [2, 'C'],               // Índice 2, Columna C - Detalle
+      'asignacion': [3, 'D'],            // Índice 3, Columna D - Asignación
+      'ejecutado_acumulado': [4, 'E'],   // Índice 4, Columna E - Ejecutado Acumulado
+      'porcentaje_ejecutado': [5, 'F'],  // Índice 5, Columna F - % Ejecutado
+      'enero': [6, 'G'],                 // Índice 6, Columna G - Enero
+      'febrero': [7, 'H'],               // Índice 7, Columna H - Febrero
+      'marzo': [8, 'I'],                 // Índice 8, Columna I - Marzo
+      'abril': [9, 'J'],                 // Índice 9, Columna J - Abril
+      'mayo': [10, 'K'],                // Índice 10, Columna K - Mayo
+      'junio': [11, 'L'],               // Índice 11, Columna L - Junio
+      'julio': [12, 'M'],               // Índice 12, Columna M - Julio
+      'agosto': [13, 'N'],              // Índice 13, Columna N - Agosto
+      'septiembre': [14, 'O'],          // Índice 14, Columna O - Septiembre
+      'octubre': [15, 'P'],             // Índice 15, Columna P - Octubre
+      'noviembre': [16, 'Q'],           // Índice 16, Columna Q - Noviembre
+      'diciembre': [17, 'R']            // Índice 17, Columna R - Diciembre
     };
 
     // Actualizar los datos en el archivo Excel desde la fila 10 en adelante
-    // (basado en la estructura real del archivo presupuesto)
     for (let i = 0; i < dataToSave.length; i++) {
       const rowData = dataToSave[i];
-      const rowIndex = i + 10; // Fila 10 en adelante (índice 9)
+      const rowIndex = i + 10;
+      const row = worksheet.getRow(rowIndex);
 
-      // Verificar si es una fila especial que no debe modificarse
-      const isSpecialRow = rowData.id === 'TOTAL AÑO' || rowData.id === 'ANALISIS PRESUPUESTAL';
+      const values = new Array(18);
 
-      // Actualizar cada celda según el mapeo de columnas
-      for (const [property, [index, column]] of Object.entries(columnMapping)) {
-        // Saltar la columna ID para filas especiales para preservar su valor
-        if (property === 'id' && isSpecialRow) continue;
-
-        if (property !== 'id' || !isSpecialRow) {
-          const cellAddress = `${column}${rowIndex}`;
-          const cell = worksheet.getCell(cellAddress);
-
-          let valueToSet = rowData[property];
-
-          // Convertir a número si es un string numérico
-          if (typeof valueToSet === 'string' && !isNaN(parseFloat(valueToSet)) && property !== 'detalle') {
-            valueToSet = parseFloat(valueToSet);
-          }
-
-          // Asegurar que los valores se guarden correctamente
-          if (typeof valueToSet === 'number') {
-            cell.value = valueToSet;
-          } else if (valueToSet === null || valueToSet === undefined || valueToSet === '') {
-            cell.value = 0; // Valor por defecto para campos numéricos vacíos
-          } else {
-            cell.value = valueToSet;
-          }
+      // Función interna para parsear de forma segura, similar a la del frontend
+      const parseValue = (val) => {
+        if (typeof val === 'number') return val;
+        if (typeof val !== 'string') return 0;
+        let cleanValue = val.replace(/\$/g, '').replace(/\s/g, '');
+        if (cleanValue.indexOf(',') > cleanValue.indexOf('.')) {
+            return parseFloat(cleanValue.replace(/\./g, '').replace(',', '.')) || 0;
         }
+        return parseFloat(cleanValue.replace(/,/g, '')) || 0;
+      };
+
+      const parsePercentage = (val) => {
+          if (typeof val === 'number') return val / 100; // Si ya es un número (ej: 50), convertir a 0.5
+          if (typeof val === 'string') {
+              const num = parseValue(val.replace('%', ''));
+              return (num / 100) || 0;
+          }
+          return 0;
+      };
+
+      // Asignar valores a los índices correctos del array
+      values[0] = rowData.id;
+      values[1] = ''; // Columna B explícitamente vacía
+      values[2] = rowData.detalle;
+      
+      values[3] = parseValue(rowData.asignacion);
+      values[4] = parseValue(rowData.ejecutado_acumulado);
+      values[5] = parsePercentage(rowData.porcentaje_ejecutado);
+      
+      values[6] = parseValue(rowData.enero);
+      values[7] = parseValue(rowData.febrero);
+      values[8] = parseValue(rowData.marzo);
+      values[9] = parseValue(rowData.abril);
+      values[10] = parseValue(rowData.mayo);
+      values[11] = parseValue(rowData.junio);
+      values[12] = parseValue(rowData.julio);
+      values[13] = parseValue(rowData.agosto);
+      values[14] = parseValue(rowData.septiembre);
+      values[15] = parseValue(rowData.octubre);
+      values[16] = parseValue(rowData.noviembre);
+      values[17] = parseValue(rowData.diciembre);
+
+      row.values = values;
+      
+      // Aplicar formato de número a las celdas para correcta visualización en Excel
+      row.getCell('D').numFmt = '#,##0.00'; // Asignación
+      row.getCell('E').numFmt = '#,##0.00'; // Ejecutado
+      row.getCell('F').numFmt = '0.00%';    // Porcentaje
+      
+      // Formato para meses (columnas G a R)
+      for (let col = 7; col <= 18; col++) { // 7 es 'G', 18 es 'R'
+        row.getCell(col).numFmt = '#,##0.00';
       }
+      
+      sendLog(`[DEBUG] handleSaveBudgetFile - Escribiendo valores en fila ${rowIndex}`, 'DEBUG');
     }
 
     // Guardar el archivo actualizado
