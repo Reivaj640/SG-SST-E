@@ -649,10 +649,10 @@
 
                 // Detectar formato: si tiene punto antes de la coma, es formato colombiano (1.000.000,50)
                 // Si tiene coma antes del punto o solo comas, es formato internacional (1,000,000.50)
-                
+
                 const hasCommaAfterDot = /\.\d+,\d+/.test(cleanValue); // Ej: 1.000,50
                 const hasDotAfterComma = /,\d+\.\d+/.test(cleanValue); // Ej: 1,000.50
-                
+
                 if (hasCommaAfterDot) {
                     // Formato colombiano: 1.000.000,50
                     cleanValue = cleanValue
@@ -714,12 +714,17 @@
                     `<td><span class="formula-cell">${formatNumber(item.ejecutado_acumulado || 0)}</span></td>` :
                     `<td><span onclick="makeCellEditable(event, ${index}, 'ejecutado_acumulado')" class="editable-cell">${formatNumber(item.ejecutado_acumulado || 0)}</span></td>`;
 
+                // Calcular el porcentaje de ejecución dinámicamente para cada fila
+                const asignacion = parseFormattedNumber(item.asignacion || 0);
+                const ejecutado = parseFormattedNumber(item.ejecutado_acumulado || 0);
+                const porcentajeEjecutado = asignacion > 0 ? ((ejecutado / asignacion) * 100).toFixed(2) : 0;
+
                 row.innerHTML = `
                     <td>${item.id === 'TOTAL AÑO' ? 'TOTAL AÑO' : item.id === 'ANALISIS PRESUPUESTAL' ? 'IPC' : index + 1}</td>
                     <td>${item.id === 'TOTAL AÑO' ? 'TOTAL AÑO' : item.detalle || 'Sin detalle'}</td>
                     ${asignacionCell}
                     ${ejecutadoCell}
-                    <td>${item.porcentaje_ejecutado || 0}%</td>
+                    <td id="porcentaje_ejecutado_${index}">${porcentajeEjecutado}%</td>
                     ${monthCellsHTML}
                     <td class="actions-column">
                         ${!isSpecialRow ? `
@@ -1103,12 +1108,49 @@
             // Actualizar el valor en los datos
             budgetData[index][propertyName] = newValue;
 
+            // Definir los meses para calcular el acumulado
+            const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+            // Verificar si el campo editado es un mes
+            const isMonthField = months.includes(propertyName);
+
+            if (isMonthField) {
+                // Si se editó un mes, recalcular el ejecutado acumulado como la suma de todos los meses
+                let totalEjecutado = 0;
+                months.forEach(month => {
+                    const monthValue = parseFormattedNumber(budgetData[index][month] || 0);
+                    totalEjecutado += monthValue;
+                });
+
+                // Actualizar el ejecutado acumulado en los datos
+                budgetData[index].ejecutado_acumulado = totalEjecutado;
+
+                // Actualizar dinámicamente el ejecutado acumulado en la interfaz
+                // Para hacerlo, necesitamos encontrar la celda de ejecutado acumulado en esta fila
+                const row = document.querySelector(`#budgetTableBody tr:nth-child(${index + 1})`);
+                if (row) {
+                    const cells = row.querySelectorAll('td');
+                    // La celda de ejecutado acumulado es la cuarta (índice 3) después de ID, Detalle, Asignación
+                    if (cells.length > 3) {
+                        cells[3].querySelector('span').textContent = formatNumber(totalEjecutado);
+                    }
+                }
+            }
+
             // Si cambiamos la asignación o el ejecutado, recalcular el porcentaje
-            if (propertyName === 'asignacion' || propertyName === 'ejecutado_acumulado') {
-                const asignacion = budgetData[index].asignacion || 0;
-                const ejecutado = budgetData[index].ejecutado_acumulado || 0;
-                budgetData[index].porcentaje_ejecutado = asignacion > 0 ?
-                    ((ejecutado / asignacion) * 100).toFixed(2) : 0;
+            if (propertyName === 'asignacion' || propertyName === 'ejecutado_acumulado' || isMonthField) {
+                const asignacion = parseFormattedNumber(budgetData[index].asignacion || 0);
+                const ejecutado = parseFormattedNumber(budgetData[index].ejecutado_acumulado || 0);
+                const porcentajeEjecutado = asignacion > 0 ? ((ejecutado / asignacion) * 100).toFixed(2) : 0;
+
+                // Actualizar el porcentaje en los datos
+                budgetData[index].porcentaje_ejecutado = porcentajeEjecutado;
+
+                // Actualizar dinámicamente el porcentaje en la interfaz
+                const porcentajeCell = document.getElementById(`porcentaje_ejecutado_${index}`);
+                if (porcentajeCell) {
+                    porcentajeCell.textContent = `${porcentajeEjecutado}%`;
+                }
             }
 
             // Reemplazar el input con el span actualizado
