@@ -618,19 +618,37 @@ ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacita
     await workbook.xlsx.readFile(filePath);
 
     let sheetName = requestedSheetName;
-    if (!sheetName || !workbook.getWorksheet(sheetName)) {
-      if(sheetName) sendLog(`[WARN] La hoja solicitada '${sheetName}' no se encontró para escribir. Buscando una alternativa.`, 'WARN');
-      const currentYear = new Date().getFullYear().toString();
-      const matrixPatternCurrent = new RegExp(`Matriz Cap\\.\\s*${currentYear}`, 'i');
-      sheetName = workbook.worksheets.map(ws => ws.name).find(name => matrixPatternCurrent.test(name));
-    }
-    if (!sheetName) {
-      sheetName = workbook.worksheets[0].name;
+    let worksheet = sheetName ? workbook.getWorksheet(sheetName) : null;
+
+    // Añadir búsqueda tolerante por si hay discrepancias entre librerías (xlsx vs exceljs)
+    if (!worksheet && sheetName) {
+        const tolerantSheet = workbook.worksheets.find(ws => ws.name.trim() === sheetName.trim());
+        if (tolerantSheet) {
+            worksheet = tolerantSheet;
+            sendLog(`[WARN] Se encontró la hoja '${sheetName}' con una búsqueda tolerante (sin espacios extra).`, 'WARN');
+        }
     }
 
-    const worksheet = workbook.getWorksheet(sheetName);
     if (!worksheet) {
-      throw new Error(`No se pudo encontrar la hoja de trabajo '${sheetName}' para escribir`);
+        if(sheetName) sendLog(`[WARN] La hoja solicitada '${sheetName}' sigue sin encontrarse. Buscando una alternativa por año.`, 'WARN');
+        const currentYear = new Date().getFullYear().toString();
+        const matrixPatternCurrent = new RegExp(`Matriz Cap\\.\\s*${currentYear}`, 'i');
+        
+        const foundSheet = workbook.worksheets.find(ws => matrixPatternCurrent.test(ws.name));
+
+        if (foundSheet) {
+            worksheet = foundSheet;
+            sheetName = worksheet.name;
+            sendLog(`[INFO] Alternativa encontrada por año actual: '${sheetName}'`, 'INFO');
+        } else if (workbook.worksheets.length > 0) {
+            worksheet = workbook.worksheets[0];
+            sheetName = worksheet.name;
+            sendLog(`[WARN] No se encontró hoja por año. Usando la primera hoja disponible como fallback: '${sheetName}'`, 'WARN');
+        }
+    }
+
+    if (!worksheet) {
+      throw new Error(`No se pudo encontrar ninguna hoja de trabajo válida para escribir en el archivo.`);
     }
 
     const startRow = 7;
@@ -654,8 +672,18 @@ ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacita
         row.values = [];
     }
 
+    // Filtrar datos inválidos antes de procesarlos
+    const validCapacitaciones = capacitacionesData.filter(cap => {
+      return cap &&
+             typeof cap === 'object' &&
+             cap.nombre !== undefined &&
+             cap.nombre !== null &&
+             cap.nombre !== '' &&
+             typeof cap.nombre === 'string';
+    });
+
     // Escribir nuevos datos
-    capacitacionesData.forEach((capacitacion, index) => {
+    validCapacitaciones.forEach((capacitacion, index) => {
       const rowIndex = startRow + index;
       const row = worksheet.getRow(rowIndex);
 

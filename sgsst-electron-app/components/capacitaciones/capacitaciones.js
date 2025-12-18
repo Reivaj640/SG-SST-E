@@ -126,33 +126,29 @@ class CapacitacionesComponent {
             const filesResult = await window.electronAPI.readDirectory(submodulePath);
             if (!filesResult.success) throw new Error(filesResult.error);
 
-            // Filtrar archivos Excel de capacitaciones, priorizando los que contienen el nombre de la empresa
+            // Filtrar archivos Excel de capacitaciones que coincidan con el patrón específico
             const allExcelFiles = (filesResult.files || []).filter(item => {
                 const fileName = (item.name || item.path || '').toLowerCase();
-                return (fileName.includes('capacitacion') || fileName.includes('cronograma')) && (fileName.endsWith('.xlsx') || fileName.endsWith('.xls'));
+                return fileName.includes('act-fo-005') && (fileName.endsWith('.xlsx') || fileName.endsWith('.xls'));
             }).map(item => item.name || item.path);
 
-            // Buscar archivos específicos para la empresa actual
-            const companySpecificFiles = allExcelFiles.filter(fileName =>
-                fileName.toLowerCase().includes(this.currentCompany.toLowerCase())
-            );
+            // Ordenar para priorizar archivos .xlsx
+            allExcelFiles.sort((a, b) => {
+                const aIsXlsx = a.toLowerCase().endsWith('.xlsx');
+                const bIsXlsx = b.toLowerCase().endsWith('.xlsx');
+                
+                if (aIsXlsx && !bIsXlsx) return -1; // a (.xlsx) va antes que b (.xls)
+                if (!aIsXlsx && bIsXlsx) return 1;  // b (.xlsx) va antes que a (.xls)
+                return a.localeCompare(b);          // Mantener orden alfabético para el mismo tipo
+            });
 
-            let excelFiles = [];
-            if (companySpecificFiles.length > 0) {
-                // Si hay archivos específicos para esta empresa, usarlos
-                excelFiles = companySpecificFiles;
-            } else {
-                // Si no hay archivos específicos, usar todos los archivos encontrados
-                excelFiles = allExcelFiles;
-            }
-
-            if (excelFiles.length === 0) {
-                this.showNotification('No se encontraron archivos Excel de capacitaciones.', 'info');
+            if (allExcelFiles.length === 0) {
+                this.showNotification('No se encontraron archivos Excel de capacitaciones que coincidan con "ACT-FO-005".', 'info');
                 return;
             }
 
-            // Tomar el primer archivo encontrado (ya sea el específico de la empresa o el genérico)
-            this.excelFilePath = `${submodulePath}/${excelFiles[0]}`;
+            // Tomar el primer archivo de la lista priorizada y filtrada
+            this.excelFilePath = `${submodulePath}/${allExcelFiles[0]}`;
             console.log(`[DEBUG] Cargando archivo de capacitaciones para empresa ${this.currentCompany}: ${this.excelFilePath}`);
 
             window.electronAPI.send('start-watching-capacitaciones', this.excelFilePath);
@@ -307,23 +303,22 @@ class CapacitacionesComponent {
     // Función para mapear los datos del Excel al formato esperado por la interfaz
     parseExcelDataToCapacitaciones(processedData, headers) {
         const capacitaciones = [];
-        // Los datos empiezan desde la fila 7 del Excel (índice 6 del array), ya que las primeras filas contienen encabezados
-        const dataRows = processedData.slice(6); // Ajustado para reflejar que los datos comienzan en la fila 7 del Excel
+        // Los datos empiezan desde la fila 7 del Excel (índice 6 del array), pero la primera fila de datos real puede variar.
+        const dataRows = processedData.slice(6);
 
         console.log(`[DEBUG] Procesando ${dataRows.length} filas de datos desde índice 6`);
         console.log(`[DEBUG] Ejemplo de primera fila de datos:`, dataRows[0]);
 
+        // El bucle ahora empieza en 0 porque dataRows[0] es la primera fila de datos real.
         for (let i = 0; i < dataRows.length; i++) {
             const row = dataRows[i];
 
-            // Asegurarse de que row sea un array y tenga suficientes columnas para evitar errores
-            // Las columnas usadas son B(1), C(2), D(3), G(6), H(7), I(8). Necesitamos al menos 9 elementos para acceder al índice 8.
+            // Ajustar la comprobación de longitud a las columnas que se usarán (máximo índice es 8)
             if (!Array.isArray(row) || row.length < 9) {
                 console.log(`[DEBUG] Fila ${i+7} no válida o sin suficientes columnas (longitud: ${row ? row.length : 'undefined'}):`, row);
                 continue;
             }
 
-            // Obtener el contenido de cada celda y manejarlo de forma robusta
             const getCellValue = (cell) => {
                 if (cell === null || cell === undefined) return '';
                 if (typeof cell === 'object' && cell.value !== undefined) return cell.value;
@@ -331,24 +326,25 @@ class CapacitacionesComponent {
                 return cell;
             };
 
-            // Nombre (Columna B, índice 1)
+            // Nombre (Columna B, índice 1) - CORREGIDO
             const nombreRaw = getCellValue(row[1]);
             const nombre = String(nombreRaw || '').trim();
 
             console.log(`[DEBUG] Fila ${i+7} - Nombre: "${nombre}" (celda original: ${JSON.stringify(row[1])})`);
 
-            // Condicional para detener la lectura si se encuentra "Total capacitaciones programadas"
+            // Detener si es la fila de totalizadores
             if (typeof nombre === 'string' && nombre.toLowerCase().includes('total capacitaciones programadas')) {
                 console.log('[DEBUG] Encontrado "Total capacitaciones programadas", deteniendo lectura');
-                break; // Terminar el bucle
+                break;
             }
 
-            if (!nombre) {
-                console.log(`[DEBUG] Fila ${i+7} sin nombre de capacitación, saltando`);
-                continue; // Si no hay nombre de capacitación (y no es la fila de total), saltar fila
+            // Omitir filas vacías o de encabezado residual
+            if (!nombre || nombre === 'Nombre de la capacitación') {
+                console.log(`[DEBUG] Fila ${i+7} sin nombre de capacitación válido, saltando`);
+                continue;
             }
 
-            // Tipo (Columna C, índice 2)
+            // Tipo (Columna C, índice 2) - CORREGIDO
             const tipoRaw = getCellValue(row[2]);
             const tipoRawStr = String(tipoRaw || 'sst');
             let tipo = 'sst';
@@ -356,22 +352,17 @@ class CapacitacionesComponent {
                 tipo = 'pyp';
             }
 
-            // Fecha Programada (Columna D, índice 3) - con manejo de errores robusto
+            // Fecha Programada (Columna D, índice 3) - CORREGIDO
             let fechaProgramada = 'No especificada';
             const fechaValue = getCellValue(row[3]);
             if (fechaValue !== undefined && fechaValue !== null && fechaValue !== '') {
                 let parsedDate;
-
                 if (typeof fechaValue === 'number') {
-                    // Manejar formato numérico de fecha de Excel
                     parsedDate = new Date((fechaValue - 25569) * 86400 * 1000);
                 } else {
-                    // Convertir a string y manejar strings u otros formatos
                     const fechaStr = String(fechaValue);
                     parsedDate = new Date(fechaStr);
                 }
-
-                // Validar que la fecha sea un objeto Date válido antes de formatear
                 if (parsedDate && !isNaN(parsedDate.getTime())) {
                     fechaProgramada = parsedDate.toISOString().split('T')[0];
                 } else {
@@ -379,16 +370,16 @@ class CapacitacionesComponent {
                 }
             }
 
-            // Instructor (Columna G, índice 6)
+            // Instructor (Columna G, índice 6) - CORREGIDO
             const instructorRaw = getCellValue(row[6]);
             const instructor = String(instructorRaw || 'No especificado');
 
-            // Duración (Columna H, índice 7)
+            // Duración (Columna H, índice 7) - CORREGIDO
             const duracionValue = getCellValue(row[7]);
             const duracionNum = parseFloat(String(duracionValue));
             const duracion = `${!isNaN(duracionNum) ? Math.floor(duracionNum) : 0} Horas`;
 
-            // Estado (Columna I, índice 8)
+            // Estado (Columna I, índice 8) - CORREGIDO
             const estadoRaw = getCellValue(row[8]);
             const estadoStr = String(estadoRaw || '');
             let estado = 'pending';
@@ -407,13 +398,13 @@ class CapacitacionesComponent {
 
             capacitaciones.push({
                 id: capacitaciones.length + 1,
-                nombre: nombre, // Confirmar que sea string
+                nombre: nombre,
                 tipo: tipo,
                 fechaProgramada: fechaProgramada,
-                instructor: instructor, // Confirmar que sea string
+                instructor: instructor,
                 duracion: duracion,
                 estado: estado,
-                participantes: 0 // La columna de participantes no se ha especificado, se mantiene como 0
+                participantes: 0 
             });
         }
 
@@ -734,6 +725,10 @@ class CapacitacionesComponent {
             document.getElementById('editTrainingDuration').value = cap.duracion.replace(' Horas', '');
             document.getElementById('editTrainingParticipants').value = cap.participantes;
 
+            // Eliminar aria-hidden antes de mostrar el modal para evitar problemas de accesibilidad
+            modalElement.removeAttribute('aria-hidden');
+            modalElement.setAttribute('aria-modal', 'true');
+
             const modalInstance = new bootstrap.Modal(modalElement);
             modalInstance.show();
         }
@@ -947,10 +942,44 @@ class CapacitacionesComponent {
         }
 
         try {
+            // Filtrar las capacitaciones para asegurarse de que no haya entradas inválidas
+            // Verificar que el objeto exista, sea del tipo correcto y tenga la propiedad name
+            const validCapacitaciones = this.capacitaciones.filter(cap => {
+                return cap &&
+                       typeof cap === 'object' &&
+                       cap.nombre !== undefined &&
+                       cap.nombre !== null &&
+                       cap.nombre !== '' &&
+                       typeof cap.nombre === 'string';
+            });
+
+            // Validación adicional más estricta y depuración
+            const fullyValidCapacitaciones = validCapacitaciones.filter((cap, index) => {
+                const isValid = cap &&
+                               typeof cap === 'object' &&
+                               cap.nombre &&
+                               typeof cap.nombre === 'string' &&
+                               cap.nombre.trim() !== '';
+
+                if (!isValid) {
+                    console.warn(`[DEBUG] Capacitación inválida encontrada en índice ${index}:`, cap);
+                }
+
+                return isValid;
+            });
+
+            // Comprobar si hay elementos inválidos antes de guardar
+            const invalidCount = this.capacitaciones.length - fullyValidCapacitaciones.length;
+            if (invalidCount > 0) {
+                console.warn(`[DEBUG] Filtrados ${invalidCount} elementos inválidos antes de guardar`);
+                console.log(`[DEBUG] Total capacitaciones antes de filtrar: ${this.capacitaciones.length}`);
+                console.log(`[DEBUG] Total capacitaciones después de filtrar: ${fullyValidCapacitaciones.length}`);
+            }
+
             this.showNotification('Guardando cambios en Excel...', 'info');
             const result = await window.electronAPI.updateCapacitacionesExcel({
                 filePath: this.excelFilePath,
-                capacitacionesData: this.capacitaciones,
+                capacitacionesData: fullyValidCapacitaciones,
                 sheetName: sheetName
             });
             if (!result.success) throw new Error(result.error);

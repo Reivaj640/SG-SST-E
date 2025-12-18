@@ -735,6 +735,15 @@
                 `;
                 tableBody.appendChild(row);
             });
+
+            // Asegurar que todos los valores estén correctamente formateados en la interfaz
+            // Recorrer cada celda editable y aplicar formato numérico
+            document.querySelectorAll('.editable-cell').forEach(cell => {
+                if (cell.textContent && !isNaN(parseFormattedNumber(cell.textContent))) {
+                    const numericValue = parseFormattedNumber(cell.textContent);
+                    cell.textContent = formatNumber(numericValue);
+                }
+            });
         }
 
         function updateSummary() {
