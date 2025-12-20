@@ -303,8 +303,8 @@ class CapacitacionesComponent {
     // Función para mapear los datos del Excel al formato esperado por la interfaz
     parseExcelDataToCapacitaciones(processedData, headers) {
         const capacitaciones = [];
-        // Los datos empiezan desde la fila 7 del Excel (índice 6 del array), pero la primera fila de datos real puede variar.
-        const dataRows = processedData.slice(6);
+        // Los datos empiezan desde la fila 6 del Excel (índice 6 del array), pero la primera fila de datos real puede variar.
+        const dataRows = processedData.slice(5);
 
         console.log(`[DEBUG] Procesando ${dataRows.length} filas de datos desde índice 6`);
         console.log(`[DEBUG] Ejemplo de primera fila de datos:`, dataRows[0]);
