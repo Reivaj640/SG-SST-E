@@ -607,7 +607,7 @@ ipcMain.handle('get-capacitaciones-sheets', async (event, filePath) => {
 });
 
 // Manejador para actualizar el archivo de capacitaciones
-ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacitacionesData, sheetName: requestedSheetName }) => {
+ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacitacionesData, sheetName: requestedSheetName, clearBeforeSave = true, startRow = 7 }) => {
   try {
     sendLog(`[MAIN] Actualizando archivo de capacitaciones: ${filePath}`, 'INFO');
     if (requestedSheetName) {
@@ -633,7 +633,7 @@ ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacita
         if(sheetName) sendLog(`[WARN] La hoja solicitada '${sheetName}' sigue sin encontrarse. Buscando una alternativa por año.`, 'WARN');
         const currentYear = new Date().getFullYear().toString();
         const matrixPatternCurrent = new RegExp(`Matriz Cap\\.\\s*${currentYear}`, 'i');
-        
+
         const foundSheet = workbook.worksheets.find(ws => matrixPatternCurrent.test(ws.name));
 
         if (foundSheet) {
@@ -651,25 +651,41 @@ ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacita
       throw new Error(`No se pudo encontrar ninguna hoja de trabajo válida para escribir en el archivo.`);
     }
 
-    const startRow = 7;
-    const totalRowCount = worksheet.lastRow ? worksheet.lastRow.number : startRow;
-
-    let endCleanRow = -1;
-    for (let i = startRow; i <= totalRowCount; i++) {
-        const row = worksheet.getRow(i);
-        const cellB = row.getCell(2).value;
-        if (cellB && typeof cellB === 'string' && cellB.includes('Total capacitaciones programadas')) {
-            endCleanRow = i - 1;
-            break;
+    // --- LÓGICA CLAVE PARA EVITAR DUPLICADOS ---
+    // Si se solicita limpiar, borramos todas las filas desde startRow hasta el final
+    if (clearBeforeSave) {
+        const lastRowNumber = worksheet.rowCount;
+        // Borra las filas en orden inverso para no afectar los índices
+        for (let i = lastRowNumber; i >= startRow; i--) {
+            const row = worksheet.getRow(i);
+            const cellB = row.getCell(2).value;
+            // No borrar la fila de "Total capacitaciones programadas" ni las filas después de ella
+            if (cellB && typeof cellB === 'string' && cellB.includes('Total capacitaciones programadas')) {
+                // Encontramos la fila de total, dejar de borrar desde aquí hacia abajo
+                break;
+            }
+            // Eliminar la fila si está dentro del rango de datos
+            worksheet.spliceRows(i, 1);
         }
-    }
-    if (endCleanRow === -1) {
-        endCleanRow = totalRowCount > startRow ? totalRowCount : startRow;
-    }
-
-    for (let i = startRow; i <= endCleanRow + 1; i++) { // +1 para limpiar la fila siguiente
-        const row = worksheet.getRow(i);
-        row.values = [];
+        sendLog(`[MAIN] Limpiadas filas desde la fila ${startRow} hasta antes de 'Total capacitaciones programadas'.`, 'INFO');
+    } else {
+        // Si no se limpia, encontrar la fila de "Total capacitaciones programadas" y limpiar solo hasta allí
+        const totalRowCount = worksheet.lastRow ? worksheet.lastRow.number : startRow;
+        let endCleanRow = -1;
+        for (let i = startRow; i <= totalRowCount; i++) {
+            const row = worksheet.getRow(i);
+            const cellB = row.getCell(2).value;
+            if (cellB && typeof cellB === 'string' && cellB.includes('Total capacitaciones programadas')) {
+                endCleanRow = i - 1;
+                break;
+            }
+        }
+        if (endCleanRow !== -1) {
+            for (let i = startRow; i <= endCleanRow; i++) {
+                const row = worksheet.getRow(i);
+                row.values = [];
+            }
+        }
     }
 
     // Filtrar datos inválidos antes de procesarlos
@@ -689,12 +705,22 @@ ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacita
 
       row.getCell(2).value = capacitacion.nombre; // B
       row.getCell(3).value = capacitacion.tipo.toUpperCase(); // C
-      row.getCell(4).value = new Date(capacitacion.fechaProgramada); // D
+
+      // Manejar la fecha para que Excel la reconozca
+      if (capacitacion.fechaProgramada && capacitacion.fechaProgramada !== 'No especificada') {
+        row.getCell(4).value = new Date(capacitacion.fechaProgramada); // D
+      } else {
+        row.getCell(4).value = null;
+      }
+
       row.getCell(7).value = capacitacion.instructor; // G
       row.getCell(8).value = parseInt(capacitacion.duracion.replace(' Horas', '')) || 0; // H
       row.getCell(9).value = capacitacion.estado === 'completed' ? 'Ejecutado' : 'Pendiente'; // I
 
-      row.getCell(4).numFmt = 'dd/mm/yyyy';
+      // Formatear la celda de fecha
+      if (row.getCell(4).value) {
+        row.getCell(4).numFmt = 'dd/mm/yyyy';
+      }
     });
 
     await workbook.xlsx.writeFile(filePath);

@@ -136,7 +136,7 @@ class CapacitacionesComponent {
             allExcelFiles.sort((a, b) => {
                 const aIsXlsx = a.toLowerCase().endsWith('.xlsx');
                 const bIsXlsx = b.toLowerCase().endsWith('.xlsx');
-                
+
                 if (aIsXlsx && !bIsXlsx) return -1; // a (.xlsx) va antes que b (.xls)
                 if (!aIsXlsx && bIsXlsx) return 1;  // b (.xlsx) va antes que a (.xls)
                 return a.localeCompare(b);          // Mantener orden alfabético para el mismo tipo
@@ -255,6 +255,10 @@ class CapacitacionesComponent {
             const { processedData, headers, sheetName: loadedSheetName } = excelResult.data; // Recibir el sheetName real
             if (!processedData) throw new Error('La hoja de Excel seleccionada no contiene datos válidos.');
 
+            // Limpiar datos existentes antes de cargar nuevos
+            this.capacitaciones = [];
+
+            // Cargar nuevos datos
             this.capacitaciones = this.parseExcelDataToCapacitaciones(processedData, headers);
             this.applyFilters();
             this.showNotification(`Datos cargados para el año ${year} desde la hoja '${loadedSheetName}'.`, 'success');
@@ -303,11 +307,10 @@ class CapacitacionesComponent {
     // Función para mapear los datos del Excel al formato esperado por la interfaz
     parseExcelDataToCapacitaciones(processedData, headers) {
         const capacitaciones = [];
-        // Los datos empiezan desde la fila 6 del Excel (índice 6 del array), pero la primera fila de datos real puede variar.
+        // Los datos empiezan desde la fila 6 del Excel (índice 6 del array)
         const dataRows = processedData.slice(5);
 
         console.log(`[DEBUG] Procesando ${dataRows.length} filas de datos desde índice 6`);
-        console.log(`[DEBUG] Ejemplo de primera fila de datos:`, dataRows[0]);
 
         // El bucle ahora empieza en 0 porque dataRows[0] es la primera fila de datos real.
         for (let i = 0; i < dataRows.length; i++) {
@@ -326,11 +329,15 @@ class CapacitacionesComponent {
                 return cell;
             };
 
-            // Nombre (Columna B, índice 1) - CORREGIDO
+            // Nombre (Columna B, índice 1)
             const nombreRaw = getCellValue(row[1]);
             const nombre = String(nombreRaw || '').trim();
 
-            console.log(`[DEBUG] Fila ${i+7} - Nombre: "${nombre}" (celda original: ${JSON.stringify(row[1])})`);
+            // Omitir filas vacías o de encabezado residual
+            if (!nombre || nombre === 'Nombre de la capacitación' || nombre === '') {
+                console.log(`[DEBUG] Fila ${i+7} sin nombre de capacitación válido, saltando`);
+                continue;
+            }
 
             // Detener si es la fila de totalizadores
             if (typeof nombre === 'string' && nombre.toLowerCase().includes('total capacitaciones programadas')) {
@@ -338,13 +345,7 @@ class CapacitacionesComponent {
                 break;
             }
 
-            // Omitir filas vacías o de encabezado residual
-            if (!nombre || nombre === 'Nombre de la capacitación') {
-                console.log(`[DEBUG] Fila ${i+7} sin nombre de capacitación válido, saltando`);
-                continue;
-            }
-
-            // Tipo (Columna C, índice 2) - CORREGIDO
+            // Tipo (Columna C, índice 2)
             const tipoRaw = getCellValue(row[2]);
             const tipoRawStr = String(tipoRaw || 'sst');
             let tipo = 'sst';
@@ -352,34 +353,52 @@ class CapacitacionesComponent {
                 tipo = 'pyp';
             }
 
-            // Fecha Programada (Columna D, índice 3) - CORREGIDO
+            // Fecha Programada (Columna D, índice 3)
             let fechaProgramada = 'No especificada';
             const fechaValue = getCellValue(row[3]);
+
+            // Mejorar el manejo de fechas
             if (fechaValue !== undefined && fechaValue !== null && fechaValue !== '') {
                 let parsedDate;
                 if (typeof fechaValue === 'number') {
-                    parsedDate = new Date((fechaValue - 25569) * 86400 * 1000);
+                    // Manejar fechas de Excel (números)
+                    // Ignorar fechas que son menores a 1 (que resultarían en años anteriores a 1900)
+                    if (fechaValue >= 1) {
+                        parsedDate = new Date((fechaValue - 25569) * 86400 * 1000);
+                    }
                 } else {
                     const fechaStr = String(fechaValue);
+                    // Intentar diferentes formatos de fecha
                     parsedDate = new Date(fechaStr);
+                    if (isNaN(parsedDate.getTime())) {
+                        // Intentar formato DD/MM/YYYY
+                        const parts = fechaStr.split('/');
+                        if (parts.length === 3) {
+                            parsedDate = new Date(parts[2], parts[1] - 1, parts[0]);
+                        }
+                    }
                 }
-                if (parsedDate && !isNaN(parsedDate.getTime())) {
+
+                // Verificar si la fecha es válida y no es una fecha por defecto de Excel
+                if (parsedDate && !isNaN(parsedDate.getTime()) &&
+                    parsedDate.getFullYear() >= 1900 &&
+                    !(parsedDate.getFullYear() === 1900 && parsedDate.getMonth() === 0 && parsedDate.getDate() === 1)) {
                     fechaProgramada = parsedDate.toISOString().split('T')[0];
                 } else {
                     console.log(`[DEBUG] Fecha no válida en fila ${i+7}: ${fechaValue}`);
                 }
             }
 
-            // Instructor (Columna G, índice 6) - CORREGIDO
+            // Instructor (Columna G, índice 6)
             const instructorRaw = getCellValue(row[6]);
             const instructor = String(instructorRaw || 'No especificado');
 
-            // Duración (Columna H, índice 7) - CORREGIDO
+            // Duración (Columna H, índice 7)
             const duracionValue = getCellValue(row[7]);
             const duracionNum = parseFloat(String(duracionValue));
             const duracion = `${!isNaN(duracionNum) ? Math.floor(duracionNum) : 0} Horas`;
 
-            // Estado (Columna I, índice 8) - CORREGIDO
+            // Estado (Columna I, índice 8)
             const estadoRaw = getCellValue(row[8]);
             const estadoStr = String(estadoRaw || '');
             let estado = 'pending';
@@ -398,13 +417,14 @@ class CapacitacionesComponent {
 
             capacitaciones.push({
                 id: capacitaciones.length + 1,
+                rowIndex: i + 6, // Mantener el índice original de la fila en Excel (0-indexed + 6 offset)
                 nombre: nombre,
                 tipo: tipo,
                 fechaProgramada: fechaProgramada,
                 instructor: instructor,
                 duracion: duracion,
                 estado: estado,
-                participantes: 0 
+                participantes: 0
             });
         }
 
@@ -793,18 +813,33 @@ class CapacitacionesComponent {
     }
 
     async saveTraining() {
+        // Validar la fecha antes de guardar
+        const newDate = document.getElementById('trainingDate').value;
+        let fechaProgramada = 'No especificada';
+
+        if (newDate && newDate !== '') {
+            const parsedDate = new Date(newDate);
+            if (!isNaN(parsedDate.getTime()) && parsedDate.getFullYear() >= 1900) {
+                fechaProgramada = parsedDate.toISOString().split('T')[0];
+            } else {
+                this.showNotification('La fecha ingresada no es válida.', 'warning');
+                return;
+            }
+        }
+
         const newTraining = {
             id: this.capacitaciones.length > 0 ? Math.max(...this.capacitaciones.map(c => c.id)) + 1 : 1,
+            rowIndex: this.capacitaciones.length > 0 ? Math.max(...this.capacitaciones.map(c => c.rowIndex)) + 1 : 6,
             nombre: document.getElementById('trainingName').value,
             tipo: document.getElementById('trainingType').value,
-            fechaProgramada: document.getElementById('trainingDate').value,
+            fechaProgramada: fechaProgramada,
             instructor: document.getElementById('trainingInstructor').value,
             duracion: `${document.getElementById('trainingDuration').value} Horas`,
             participantes: parseInt(document.getElementById('trainingParticipants').value) || 0,
             estado: 'pending'
         };
 
-        if (!newTraining.nombre || !newTraining.tipo || !newTraining.fechaProgramada) {
+        if (!newTraining.nombre || !newTraining.tipo) {
             this.showNotification('Por favor completa los campos obligatorios.', 'warning');
             return;
         }
@@ -816,9 +851,12 @@ class CapacitacionesComponent {
             bootstrap.Modal.getInstance(modalElement)?.hide();
         }
 
+        // Guardar cambios en Excel
+        await this._saveDataToExcel();
+
+        // Actualizar vista
         this.applyFilters();
         this.showNotification('Capacitación guardada.', 'success');
-        await this._saveDataToExcel();
     }
 
     async updateTraining() {
@@ -826,13 +864,31 @@ class CapacitacionesComponent {
         if (!id) return;
 
         const capIndex = this.capacitaciones.findIndex(c => c.id === id);
-        if (capIndex === -1) return;
+        if (capIndex === -1) {
+            this.showNotification('No se encontró la capacitación para actualizar.', 'danger');
+            return;
+        }
 
+        // Validar la fecha antes de actualizar
+        const newDate = document.getElementById('editTrainingDate').value;
+        let fechaProgramada = 'No especificada';
+
+        if (newDate && newDate !== '') {
+            const parsedDate = new Date(newDate);
+            if (!isNaN(parsedDate.getTime()) && parsedDate.getFullYear() >= 1900) {
+                fechaProgramada = parsedDate.toISOString().split('T')[0];
+            } else {
+                this.showNotification('La fecha ingresada no es válida.', 'warning');
+                return;
+            }
+        }
+
+        // Actualizar solo los campos editables manteniendo el ID original y rowIndex
         this.capacitaciones[capIndex] = {
             ...this.capacitaciones[capIndex],
             nombre: document.getElementById('editTrainingName').value,
             tipo: document.getElementById('editTrainingType').value,
-            fechaProgramada: document.getElementById('editTrainingDate').value,
+            fechaProgramada: fechaProgramada,
             instructor: document.getElementById('editTrainingInstructor').value,
             duracion: `${document.getElementById('editTrainingDuration').value} Horas`,
             participantes: parseInt(document.getElementById('editTrainingParticipants').value) || 0,
@@ -843,9 +899,12 @@ class CapacitacionesComponent {
             bootstrap.Modal.getInstance(modalElement)?.hide();
         }
 
+        // Guardar cambios en Excel
+        await this._saveDataToExcel();
+
+        // Actualizar vista
         this.applyFilters();
         this.showNotification('Capacitación actualizada.', 'success');
-        await this._saveDataToExcel();
     }
 
     async completeTraining(id) {
@@ -854,9 +913,12 @@ class CapacitacionesComponent {
 
         this.capacitaciones[capIndex].estado = 'completed';
 
+        // Guardar cambios en Excel
+        await this._saveDataToExcel();
+
+        // Actualizar vista
         this.applyFilters();
         this.showNotification('Capacitación marcada como completada.', 'success');
-        await this._saveDataToExcel();
     }
 
     async deleteTraining(id) {
@@ -864,9 +926,12 @@ class CapacitacionesComponent {
 
         this.capacitaciones = this.capacitaciones.filter(c => c.id !== id);
 
+        // Guardar cambios en Excel
+        await this._saveDataToExcel();
+
+        // Actualizar vista
         this.applyFilters();
         this.showNotification('Capacitación eliminada.', 'info');
-        await this._saveDataToExcel();
     }
 
     downloadCertificate(id) {
@@ -891,7 +956,7 @@ class CapacitacionesComponent {
         if (monthFilterValue) {
             filteredData = filteredData.filter(cap => {
                 const fecha = new Date(cap.fechaProgramada);
-                return !isNaN(fecha.getTime()) && (fecha.getMonth() + 1 == monthFilterValue);
+                return !isNaN(fecha.getTime()) && (fecha.getMonth() + 1) == monthFilterValue;
             });
         }
 
@@ -935,6 +1000,7 @@ class CapacitacionesComponent {
             this.showNotification('Ruta de archivo no encontrada.', 'danger');
             return;
         }
+
         const sheetName = this.availableSheets.find(s => s.includes(this.currentYear.toString()));
         if (!sheetName) {
             this.showNotification(`No se encontró la hoja para el año ${this.currentYear} para guardar.`, 'danger');
@@ -942,9 +1008,11 @@ class CapacitacionesComponent {
         }
 
         try {
+            // Ordenar las capacitaciones por rowIndex para mantener el orden original en Excel
+            const sortedCapacitaciones = [...this.capacitaciones].sort((a, b) => a.rowIndex - b.rowIndex);
+
             // Filtrar las capacitaciones para asegurarse de que no haya entradas inválidas
-            // Verificar que el objeto exista, sea del tipo correcto y tenga la propiedad name
-            const validCapacitaciones = this.capacitaciones.filter(cap => {
+            const validCapacitaciones = sortedCapacitaciones.filter(cap => {
                 return cap &&
                        typeof cap === 'object' &&
                        cap.nombre !== undefined &&
@@ -953,36 +1021,31 @@ class CapacitacionesComponent {
                        typeof cap.nombre === 'string';
             });
 
-            // Validación adicional más estricta y depuración
-            const fullyValidCapacitaciones = validCapacitaciones.filter((cap, index) => {
-                const isValid = cap &&
-                               typeof cap === 'object' &&
-                               cap.nombre &&
-                               typeof cap.nombre === 'string' &&
-                               cap.nombre.trim() !== '';
-
-                if (!isValid) {
-                    console.warn(`[DEBUG] Capacitación inválida encontrada en índice ${index}:`, cap);
-                }
-
-                return isValid;
-            });
-
             // Comprobar si hay elementos inválidos antes de guardar
-            const invalidCount = this.capacitaciones.length - fullyValidCapacitaciones.length;
+            const invalidCount = sortedCapacitaciones.length - validCapacitaciones.length;
             if (invalidCount > 0) {
                 console.warn(`[DEBUG] Filtrados ${invalidCount} elementos inválidos antes de guardar`);
-                console.log(`[DEBUG] Total capacitaciones antes de filtrar: ${this.capacitaciones.length}`);
-                console.log(`[DEBUG] Total capacitaciones después de filtrar: ${fullyValidCapacitaciones.length}`);
+                console.log(`[DEBUG] Total capacitaciones antes de filtrar: ${sortedCapacitaciones.length}`);
+                console.log(`[DEBUG] Total capacitaciones después de filtrar: ${validCapacitaciones.length}`);
             }
 
+            // Asegurar que todas las filas anteriores se borren antes de escribir los nuevos datos
             this.showNotification('Guardando cambios en Excel...', 'info');
+
+            // Enviar los datos al proceso principal para guardar en Excel
             const result = await window.electronAPI.updateCapacitacionesExcel({
                 filePath: this.excelFilePath,
-                capacitacionesData: fullyValidCapacitaciones,
-                sheetName: sheetName
+                capacitacionesData: validCapacitaciones,
+                sheetName: sheetName,
+                clearBeforeSave: true,  // Asegurar que se limpie antes de guardar
+                startRow: 6  // Especificar que los datos empiezan en la fila 6
             });
+
             if (!result.success) throw new Error(result.error);
+
+            // Recargar los datos para asegurar sincronización
+            await this.loadDataForYear(this.currentYear);
+
             this.showNotification('Cambios guardados en Excel.', 'success');
         } catch (error) {
             console.error('Error al guardar en Excel:', error);
