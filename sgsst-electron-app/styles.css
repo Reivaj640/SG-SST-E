@@ -1758,7 +1758,6 @@ select.form-control {
 }
 
 /* Si usas tarjetas con clase "bg-*" o "stat-item" */
-.bg-success, .bg-info, .bg-warning, .bg-danger,
 .stat-item, .info-box {
     height: auto !important;
     min-height: 120px;

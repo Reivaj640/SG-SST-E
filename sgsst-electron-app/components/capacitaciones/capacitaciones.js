@@ -573,13 +573,13 @@ class CapacitacionesComponent {
 
             // Determinar badge de tipo
             const tipoBadge = cap.tipo === 'sst'
-                ? '<span class="badge bg-primary">SST</span>'
-                : '<span class="badge bg-info">PYP</span>';
+                ? '<span class="badge bg-primary" style="height: fit-content;">SST</span>'
+                : '<span class="badge bg-info" style="height: fit-content;">PYP</span>';
 
             // Determinar badge de estado
             const estadoBadge = cap.estado === 'completed'
-                ? '<span class="badge bg-success">Completada</span>'
-                : '<span class="badge bg-warning">Pendiente</span>';
+                ? '<span class="badge bg-success" style="height: fit-content;">Completada</span>'
+                : '<span class="badge bg-warning" style="height: fit-content;">Pendiente</span>';
 
             // Determinar acciones según estado
             const acciones = cap.estado === 'pending'
@@ -590,11 +590,11 @@ class CapacitacionesComponent {
             row.innerHTML = `
                 <td>${cap.id}</td>
                 <td>${cap.nombre}</td>
-                <td>${tipoBadge}</td>
+                <td class="col-tipo">${tipoBadge}</td>
                 <td>${this.formatDate(cap.fechaProgramada)}</td>
                 <td>${cap.instructor}</td>
                 <td>${cap.duracion}</td>
-                <td>${estadoBadge}</td>
+                <td class="col-estado">${estadoBadge}</td>
                 <td>${acciones}</td>
             `;
 
