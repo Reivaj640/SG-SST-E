@@ -706,11 +706,20 @@ ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacita
       row.getCell(2).value = capacitacion.nombre; // B
       row.getCell(3).value = capacitacion.tipo.toUpperCase(); // C
 
-      // Manejar la fecha para que Excel la reconozca
+      // --- CORRECCIÓN CLAVE PARA LA FECHA ---
       if (capacitacion.fechaProgramada && capacitacion.fechaProgramada !== 'No especificada') {
-        row.getCell(4).value = new Date(capacitacion.fechaProgramada); // D
+          // Descomponer la fecha para crearla sin ajuste de zona horaria
+          const dateParts = capacitacion.fechaProgramada.split('-'); // [YYYY, MM, DD]
+          const year = parseInt(dateParts[0]);
+          const month = parseInt(dateParts[1]) - 1; // Los meses en JS son 0-11
+          const day = parseInt(dateParts[2]);
+
+          // Crear la fecha en UTC para evitar problemas de zona horaria
+          const date = new Date(Date.UTC(year, month, day));
+
+          row.getCell(4).value = date;
       } else {
-        row.getCell(4).value = null;
+          row.getCell(4).value = null;
       }
 
       row.getCell(7).value = capacitacion.instructor; // G

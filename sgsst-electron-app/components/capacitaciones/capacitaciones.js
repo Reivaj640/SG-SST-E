@@ -357,14 +357,22 @@ class CapacitacionesComponent {
             let fechaProgramada = 'No especificada';
             const fechaValue = getCellValue(row[3]);
 
-            // Mejorar el manejo de fechas
+            // Mejorar el manejo de fechas para evitar desfase de zona horaria
             if (fechaValue !== undefined && fechaValue !== null && fechaValue !== '') {
                 let parsedDate;
                 if (typeof fechaValue === 'number') {
                     // Manejar fechas de Excel (números)
                     // Ignorar fechas que son menores a 1 (que resultarían en años anteriores a 1900)
                     if (fechaValue >= 1) {
-                        parsedDate = new Date((fechaValue - 25569) * 86400 * 1000);
+                        // Convertir el número serial de Excel a fecha JavaScript
+                        // Usamos UTC para evitar problemas de zona horaria
+                        const utcDate = new Date((fechaValue - 25569) * 86400 * 1000);
+                        // Crear una fecha local a partir de los componentes UTC para asegurar la representación del día correcto en la zona horaria local
+                        const year = utcDate.getUTCFullYear();
+                        const month = utcDate.getUTCMonth(); // getUTCMonth es 0-indexado
+                        const day = utcDate.getUTCDate();
+                        const localDate = new Date(year, month, day); // Esto crea una fecha local con esos componentes
+                        fechaProgramada = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`;
                     }
                 } else {
                     const fechaStr = String(fechaValue);
@@ -377,15 +385,19 @@ class CapacitacionesComponent {
                             parsedDate = new Date(parts[2], parts[1] - 1, parts[0]);
                         }
                     }
-                }
 
-                // Verificar si la fecha es válida y no es una fecha por defecto de Excel
-                if (parsedDate && !isNaN(parsedDate.getTime()) &&
-                    parsedDate.getFullYear() >= 1900 &&
-                    !(parsedDate.getFullYear() === 1900 && parsedDate.getMonth() === 0 && parsedDate.getDate() === 1)) {
-                    fechaProgramada = parsedDate.toISOString().split('T')[0];
-                } else {
-                    console.log(`[DEBUG] Fecha no válida en fila ${i+7}: ${fechaValue}`);
+                    // Verificar si la fecha es válida y no es una fecha por defecto de Excel
+                    if (parsedDate && !isNaN(parsedDate.getTime()) &&
+                        parsedDate.getFullYear() >= 1900 &&
+                        !(parsedDate.getFullYear() === 1900 && parsedDate.getMonth() === 0 && parsedDate.getDate() === 1)) {
+                        // Formatear la fecha en formato YYYY-MM-DD sin conversión de zona horaria
+                        const year = parsedDate.getFullYear();
+                        const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
+                        const day = String(parsedDate.getDate()).padStart(2, '0');
+                        fechaProgramada = `${year}-${month}-${day}`;
+                    } else {
+                        console.log(`[DEBUG] Fecha no válida en fila ${i+7}: ${fechaValue}`);
+                    }
                 }
             }
 
@@ -712,7 +724,14 @@ class CapacitacionesComponent {
     }
 
     formatDate(dateString) {
-        return new Date(dateString).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+        if (!dateString || dateString === 'No especificada') {
+            return 'No especificada';
+        }
+        // Reemplazar guiones con slashes para asegurar que se interprete como fecha local y no UTC.
+        // new Date('2025-12-21') -> UTC
+        // new Date('2025/12/21') -> Local
+        const localDate = new Date(dateString.replace(/-/g, '/'));
+        return localDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
     }
 
     showAddTrainingModal() {
@@ -818,9 +837,12 @@ class CapacitacionesComponent {
         let fechaProgramada = 'No especificada';
 
         if (newDate && newDate !== '') {
-            const parsedDate = new Date(newDate);
+            const parsedDate = new Date(newDate.replace(/-/g, '/'));
             if (!isNaN(parsedDate.getTime()) && parsedDate.getFullYear() >= 1900) {
-                fechaProgramada = parsedDate.toISOString().split('T')[0];
+                const year = parsedDate.getFullYear();
+                const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
+                const day = String(parsedDate.getDate()).padStart(2, '0');
+                fechaProgramada = `${year}-${month}-${day}`;
             } else {
                 this.showNotification('La fecha ingresada no es válida.', 'warning');
                 return;
@@ -874,9 +896,12 @@ class CapacitacionesComponent {
         let fechaProgramada = 'No especificada';
 
         if (newDate && newDate !== '') {
-            const parsedDate = new Date(newDate);
+            const parsedDate = new Date(newDate.replace(/-/g, '/'));
             if (!isNaN(parsedDate.getTime()) && parsedDate.getFullYear() >= 1900) {
-                fechaProgramada = parsedDate.toISOString().split('T')[0];
+                const year = parsedDate.getFullYear();
+                const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
+                const day = String(parsedDate.getDate()).padStart(2, '0');
+                fechaProgramada = `${year}-${month}-${day}`;
             } else {
                 this.showNotification('La fecha ingresada no es válida.', 'warning');
                 return;
