@@ -642,33 +642,55 @@ class CapacitacionesComponent {
         const ctx = document.getElementById('trainingChart');
         if (!ctx || !ctx.chartInstance) return;
 
-        const labels = [];
-        const today = new Date();
-        for (let i = 5; i >= 0; i--) {
-            const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-            labels.push(d.toLocaleString('es-ES', { month: 'long' }));
-        }
+        console.log('[DEBUG] Iniciando updateCharts');
+        console.log('[DEBUG] filteredCapacitaciones length:', this.filteredCapacitaciones.length);
 
-        const completadasData = Array(6).fill(0);
-        const programadasData = Array(6).fill(0);
+        // Etiquetas para los 12 meses del año + una categoría "Sin Fecha"
+        const labels = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre', 'Sin Fecha'];
 
-        this.capacitaciones.forEach(cap => {
+        // Arrays para almacenar datos de completadas y programadas por mes (0-11) + sin fecha (12)
+        const completadasData = Array(13).fill(0);
+        const programadasData = Array(13).fill(0);
+
+        console.log('[DEBUG] Procesando capacitaciones para gráfica:');
+
+        // Use filteredCapacitaciones instead of capacitaciones to match the table data
+        this.filteredCapacitaciones.forEach((cap, index) => {
             const fecha = new Date(cap.fechaProgramada);
-            const monthDiff = (today.getFullYear() - fecha.getFullYear()) * 12 + (today.getMonth() - fecha.getMonth());
+            console.log(`[DEBUG] Capacitación ${index + 1}:`, cap.nombre, 'Fecha:', cap.fechaProgramada, 'Estado:', cap.estado);
 
-            if (monthDiff >= 0 && monthDiff < 6) {
-                const index = 5 - monthDiff;
-                programadasData[index]++;
-                if (cap.estado === 'completed') {
-                    completadasData[index]++;
-                }
+            let dataIndex;
+
+            if (isNaN(fecha.getTime()) || cap.fechaProgramada === 'No especificada') {
+                console.log(`[DEBUG] Fecha inválida para: ${cap.nombre}, asignando a 'Sin Fecha'`);
+                dataIndex = 12; // Índice para "Sin Fecha"
+            } else {
+                // Obtener el mes de la capacitación (0-indexed: 0=Enero, 11=Diciembre)
+                dataIndex = fecha.getMonth();
+                console.log(`[DEBUG] Mes de capacitación ${cap.nombre}: ${dataIndex} (${labels[dataIndex]})`);
+            }
+
+            // Contar según estado y mes/fecha
+            if (cap.estado === 'completed') {
+                completadasData[dataIndex]++;
+                console.log(`[DEBUG] Incrementando completadasData[${dataIndex}] = ${completadasData[dataIndex]}`);
+            } else if (cap.estado === 'pending') {
+                programadasData[dataIndex]++;
+                console.log(`[DEBUG] Incrementando programadasData[${dataIndex}] = ${programadasData[dataIndex]}`);
             }
         });
+
+        console.log('[DEBUG] Datos finales para gráfica - Completadas:', completadasData, 'Programadas:', programadasData);
 
         ctx.chartInstance.data.labels = labels;
         ctx.chartInstance.data.datasets[0].data = completadasData;
         ctx.chartInstance.data.datasets[1].data = programadasData;
-        ctx.chartInstance.update();
+
+        // Forzar actualización del gráfico
+        ctx.chartInstance.update('active');
+
+        console.log('[DEBUG] Gráfica actualizada');
     }
 
     initializeCharts() {
