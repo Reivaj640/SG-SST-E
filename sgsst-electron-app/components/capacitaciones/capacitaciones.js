@@ -82,7 +82,7 @@ class CapacitacionesComponent {
         document.querySelector('#trainings-view .btn-outline-secondary')?.addEventListener('click', () => this.clearFilters());
         document.querySelector('#addTrainingModal .btn-primary-custom')?.addEventListener('click', () => this.saveTraining());
         document.querySelector('#editTrainingModal .btn-primary-custom')?.addEventListener('click', () => this.updateTraining());
-        document.querySelector('#addInstructorModal .btn-primary-custom')?.addEventListener('click', () => this.saveInstructor());
+        // document.querySelector('#addInstructorModal .btn-primary-custom')?.addEventListener('click', () => this.saveInstructor());
     }
 
     switchView(viewId) {
@@ -110,10 +110,6 @@ class CapacitacionesComponent {
         // Actualizar contenido específico según la vista
         if (viewId === 'trainings') {
             this.renderTrainingsTable();
-        } else if (viewId === 'instructors') {
-            this.renderInstructorsTable();
-        } else if (viewId === 'calendar') {
-            this.renderCalendar();
         }
     }
 

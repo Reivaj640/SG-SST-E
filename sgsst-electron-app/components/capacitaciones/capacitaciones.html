@@ -412,23 +412,8 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#calendar">
-                            <i class="bi bi-calendar3 me-2"></i>Calendario
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#instructors">
-                            <i class="bi bi-person-badge me-2"></i>Instructores
-                        </a>
-                    </li>
-                    <li class="nav-item">
                         <a class="nav-link" href="#reports">
                             <i class="bi bi-graph-up me-2"></i>Reportes
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#settings">
-                            <i class="bi bi-gear me-2"></i>Configuración
                         </a>
                     </li>
                 </ul>
@@ -777,15 +762,6 @@
                     </div>
                 </div>
 
-                <!-- Calendar View -->
-                <div id="calendar-view" class="view-section">
-                    <div class="card">
-                        <div class="card-body">
-                            <h3 class="card-title">Calendario de Capacitaciones</h3>
-                            <div id="training-calendar"></div>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- Instructors View -->
                 <div id="instructors-view" class="view-section">
@@ -959,98 +935,6 @@
                     </div>
                 </div>
 
-                <!-- Settings View -->
-                <div id="settings-view" class="view-section">
-                    <div class="card">
-                        <div class="card-body">
-                            <h3 class="card-title">Configuración</h3>
-                            <ul class="nav nav-tabs" id="settingsTab" role="tablist">
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link active" id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button" role="tab" aria-controls="general" aria-selected="true">General</button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="notifications-tab" data-bs-toggle="tab" data-bs-target="#notifications" type="button" role="tab" aria-controls="notifications" aria-selected="false">Notificaciones</button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="backup-tab" data-bs-toggle="tab" data-bs-target="#backup" type="button" role="tab" aria-controls="backup" aria-selected="false">Respaldo</button>
-                                </li>
-                            </ul>
-                            <div class="tab-content" id="settingsTabContent">
-                                <div class="tab-pane fade show active" id="general" role="tabpanel" aria-labelledby="general-tab">
-                                    <div class="row mt-3">
-                                        <div class="col-md-6">
-                                            <div class="form-group">
-                                                <label for="companyName">Nombre de la Empresa</label>
-                                                <input type="text" class="form-control" id="companyName" value="Empresa SG-SST">
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="form-group">
-                                                <label for="defaultDuration">Duración Predeterminada de Capacitaciones</label>
-                                                <select class="form-select" id="defaultDuration">
-                                                    <option value="1">1 Hora</option>
-                                                    <option value="2" selected>2 Horas</option>
-                                                    <option value="3">3 Horas</option>
-                                                    <option value="4">4 Horas</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="row mt-3">
-                                        <div class="col-md-12">
-                                            <button class="btn btn-primary-custom">Guardar Configuración</button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="tab-pane fade" id="notifications" role="tabpanel" aria-labelledby="notifications-tab">
-                                    <div class="row mt-3">
-                                        <div class="col-md-12">
-                                            <div class="form-check form-switch mb-2">
-                                                <input class="form-check-input" type="checkbox" id="emailNotifications" checked>
-                                                <label class="form-check-label" for="emailNotifications">
-                                                    Notificaciones por Correo Electrónico
-                                                </label>
-                                            </div>
-                                            <div class="form-check form-switch mb-2">
-                                                <input class="form-check-input" type="checkbox" id="reminderNotifications" checked>
-                                                <label class="form-check-label" for="reminderNotifications">
-                                                    Recordatorios de Capacitaciones
-                                                </label>
-                                            </div>
-                                            <div class="form-check form-switch mb-2">
-                                                <input class="form-check-input" type="checkbox" id="reportNotifications">
-                                                <label class="form-check-label" for="reportNotifications">
-                                                    Notificaciones de Reportes
-                                                </label>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="row mt-3">
-                                        <div class="col-md-12">
-                                            <button class="btn btn-primary-custom">Guardar Configuración</button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="tab-pane fade" id="backup" role="tabpanel" aria-labelledby="backup-tab">
-                                    <div class="row mt-3">
-                                        <div class="col-md-12">
-                                            <div class="alert alert-info">
-                                                <i class="bi bi-info-circle me-2"></i>
-                                                Se recomienda realizar respaldos periódicos de sus datos para evitar pérdida de información.
-                                            </div>
-                                            <button class="btn btn-primary-custom me-2">
-                                                <i class="bi bi-cloud-download me-2"></i>Realizar Respaldo Ahora
-                                            </button>
-                                            <button class="btn btn-outline-secondary">
-                                                <i class="bi bi-clock-history me-2"></i>Ver Historial de Respaldos
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </main>
         </div>
     </div>
