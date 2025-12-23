@@ -26,59 +26,6 @@ class CapacitacionesViewer {
             overflow: hidden;
         `;
 
-        // Crear el encabezado del submódulo
-        const headerDiv = document.createElement('div');
-        headerDiv.className = 'submodule-header';
-        headerDiv.style.cssText = `
-            display: flex;
-            align-items: center;
-            margin-bottom: 20px;
-            background-color: white;
-            padding: 15px 20px;
-            border: 1px solid #dee2e6;
-            border-radius: 0.375rem;
-            box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
-            min-height: 80px;
-        `;
-
-        const titleDiv = document.createElement('div');
-        titleDiv.style.cssText = `
-            flex-grow: 1;
-            text-align: center;
-        `;
-
-        const title = document.createElement('h2');
-        title.textContent = this.submoduleName;
-        title.style.cssText = `
-            margin: 0;
-            color: #212529;
-            font-size: 1.5rem;
-        `;
-
-        titleDiv.appendChild(title);
-        headerDiv.appendChild(titleDiv);
-
-        // Botón de volver
-        if (this.onBack && typeof this.onBack === 'function') {
-            const backButton = document.createElement('button');
-            backButton.className = 'btn btn-back';
-            backButton.textContent = '← Volver';
-            backButton.style.cssText = `
-                background-color: #f8f9fa;
-                border: 1px solid #dee2e6;
-                color: #212529;
-                font-size: 1rem;
-                padding: 0.5rem 1rem;
-                cursor: pointer;
-                transition: all 0.15s ease-in-out;
-                border-radius: 0.375rem;
-            `;
-            backButton.addEventListener('click', this.onBack);
-            headerDiv.appendChild(backButton);
-        }
-
-        contentDiv.appendChild(headerDiv);
-
         // Crear el contenedor para el componente
         const componentContainer = document.createElement('div');
         componentContainer.style.cssText = `
@@ -100,7 +47,7 @@ class CapacitacionesViewer {
             this.submoduleName,
             this.onBack
         );
-        
+
         // Renderizar el componente
         this.component.render();
     }

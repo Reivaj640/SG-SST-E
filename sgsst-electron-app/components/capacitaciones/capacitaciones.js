@@ -32,6 +32,45 @@ class CapacitacionesComponent {
 
                 // Asegurar que todos los elementos estén totalmente cargados antes de inicializar listeners
                 setTimeout(() => {
+                    // Agregar el botón de volver al header de "Administración de Capacitaciones"
+                    const appHeader = document.querySelector('.app-header');
+                    if (appHeader && this.backToModuleCallback) {
+                        const exportDropdownContainer = appHeader.querySelector('.dropdown');
+                        if (exportDropdownContainer) {
+                            // Crear un contenedor para ambos botones
+                            const buttonsContainer = document.createElement('div');
+                            buttonsContainer.className = 'd-flex gap-2 justify-content-end';
+
+                            // Botón de volver
+                            const backButton = document.createElement('button');
+                            backButton.className = 'btn btn-outline-light';
+                            backButton.innerHTML = '<i class="bi bi-arrow-left me-1"></i>Volver';
+                            backButton.type = 'button';
+                            backButton.onclick = this.backToModuleCallback;
+
+                            // Agregar ambos botones al contenedor
+                            buttonsContainer.appendChild(backButton);
+                            buttonsContainer.appendChild(exportDropdownContainer);
+
+                            // Crear un div para contener los botones y reemplazar al contenedor original
+                            const buttonCol = document.createElement('div');
+                            buttonCol.className = 'col-md-6 text-end';
+                            buttonCol.appendChild(buttonsContainer);
+
+                            // Encontrar el contenedor padre y reemplazar el contenido
+                            const containerFluid = appHeader.querySelector('.container-fluid');
+                            const rowElement = appHeader.querySelector('.row');
+                            if (rowElement) {
+                                const existingCol = rowElement.querySelector('.col-md-6:last-child');
+                                if (existingCol) {
+                                    rowElement.replaceChild(buttonCol, existingCol);
+                                } else {
+                                    rowElement.appendChild(buttonCol);
+                                }
+                            }
+                        }
+                    }
+
                     this.initializeEventListeners();
                     this.initializeComponent(); // Inicia el proceso de carga
                     this.initializeCharts();
