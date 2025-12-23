@@ -71,6 +71,9 @@ class CapacitacionesComponent {
                         }
                     }
 
+                    // Escuchar eventos del sidebar para manejar la superposición
+                    this.setupSidebarEventListener();
+
                     this.initializeEventListeners();
                     this.initializeComponent(); // Inicia el proceso de carga
                     this.initializeCharts();
@@ -1168,6 +1171,63 @@ class CapacitacionesComponent {
                 alertDiv.remove();
             }
         }, 5000);
+    }
+
+    setupSidebarEventListener() {
+        // Asegurar que el header del módulo de capacitaciones se comporte correctamente cuando se abre/cierra el sidebar
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                    const bodyClasses = document.body.classList;
+
+                    // Buscar el header de capacitaciones
+                    const capacitacionesHeader = document.querySelector('.capacitaciones-container .app-header');
+                    if (capacitacionesHeader) {
+                        if (bodyClasses.contains('sidebar-open') || document.querySelector('.sidebar')?.classList.contains('active')) {
+                            // Cuando el sidebar se abre, asegurar que el header esté detrás
+                            capacitacionesHeader.style.zIndex = '1000';
+                        } else {
+                            // Cuando el sidebar se cierra, restaurar el z-index normal
+                            capacitacionesHeader.style.zIndex = '1001'; // Un valor mayor que otros elementos pero menor que el sidebar
+                        }
+                    }
+                }
+            });
+        });
+
+        // Observar cambios en las clases del body
+        observer.observe(document.body, {
+            attributes: true,
+            attributeFilter: ['class']
+        });
+
+        // También observar si hay un sidebar activo
+        const sidebar = document.querySelector('.sidebar');
+        if (sidebar) {
+            const sidebarObserver = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                        const sidebarClasses = sidebar.classList;
+
+                        const capacitacionesHeader = document.querySelector('.capacitaciones-container .app-header');
+                        if (capacitacionesHeader) {
+                            if (sidebarClasses.contains('active') || sidebarClasses.contains('show')) {
+                                // Cuando el sidebar se abre, asegurar que el header esté detrás
+                                capacitacionesHeader.style.zIndex = '1000';
+                            } else {
+                                // Cuando el sidebar se cierra, restaurar el z-index normal
+                                capacitacionesHeader.style.zIndex = '1001';
+                            }
+                        }
+                    }
+                });
+            });
+
+            sidebarObserver.observe(sidebar, {
+                attributes: true,
+                attributeFilter: ['class']
+            });
+        }
     }
 }
 

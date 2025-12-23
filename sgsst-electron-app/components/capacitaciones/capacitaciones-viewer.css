@@ -25,6 +25,12 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    position: relative; /* Añadido para que el z-index funcione correctamente */
+}
+
+.capacitaciones-container .app-header {
+    position: relative;
+    z-index: 1000; /* Asegurar que el header esté por debajo del sidebar cuando se abre */
 }
 
 .capacitaciones-container .app-body {
@@ -49,7 +55,8 @@
 
 /* Ajustes para elementos específicos de la interfaz de capacitaciones */
 .capacitaciones-container .top-nav {
-    z-index: 100; /* Asegurar que la navegación superior esté por encima de otros elementos */
+    position: relative;
+    z-index: 100; /* Este valor debe ser menor que el z-index del sidebar cuando se abre */
 }
 
 .capacitaciones-container .nav-link {
@@ -61,15 +68,28 @@
     .capacitaciones-container .main-content {
         padding: 1rem;
     }
-    
+
     .capacitaciones-container .top-nav {
         padding: 0 1rem;
     }
-    
+
     .capacitaciones-container .app-header {
         padding: 1rem;
     }
 }
+
+/* Solución para el problema de superposición del sidebar */
+/* Asegurar que el header no se quede por encima del sidebar al abrirse */
+.sidebar-open .capacitaciones-container .app-header,
+body.sidebar-open .capacitaciones-container .app-header {
+    z-index: 1000 !important; /* Asegurar que el header esté por debajo del sidebar */
+}
+
+/* Ajuste adicional para el layout principal */
+.capacitaciones-container .app-layout {
+    z-index: 1001; /* Asegurar que el layout esté por encima del header */
+}
+
 /* ============================================================= */
 /* ESPACIADO VERTICAL EXCLUSIVO PARA EL DASHBOARD DE CAPACITACIONES */
 /* No afecta a ningún otro módulo del sistema                     */
