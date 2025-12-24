@@ -325,6 +325,12 @@ class InduccionesComponent {
         const participantes = this.filteredInducciones.reduce((sum, i) => sum + (parseInt(i.participantes) || 0), 0);
         const porcentaje = total > 0 ? Math.round((aprobadas / total) * 100) : 0;
 
+        console.log('[DEBUG] updateDashboardStats called:');
+        console.log(`[DEBUG] Total inducciones: ${total}`);
+        console.log(`[DEBUG] Inducciones aprobadas: ${aprobadas}`);
+        console.log(`[DEBUG] Inducciones reprobadas: ${reprobadas}`);
+        console.log(`[DEBUG] Porcentaje de aprobación: ${porcentaje}%`);
+
         // Actualizar valores en las tarjetas de estadísticas
         const statCards = document.querySelectorAll('.dashboard-card');
         if (statCards.length >= 4) {
@@ -870,8 +876,8 @@ class InduccionesComponent {
                 return cell;
             };
 
-            // Empleado (Columna B, índice 1)
-            const empleadoRaw = getCellValue(row[1]);
+            // Empleado (Columna A, índice 0) - Asumido
+            const empleadoRaw = getCellValue(row[0]);
             const empleado = String(empleadoRaw || '').trim();
 
             // Omitir filas vacías o de encabezado residual
@@ -886,52 +892,41 @@ class InduccionesComponent {
                 break;
             }
 
-            // Cédula (Columna C, índice 2)
-            const cedulaRaw = getCellValue(row[2]);
+            // Cédula (Columna E, índice 4) - Suposición
+            const cedulaRaw = getCellValue(row[4]);
             const cedula = String(cedulaRaw || 'No especificada');
 
-            // Cargo (Columna D, índice 3)
-            const cargoRaw = getCellValue(row[3]);
+            // Cargo (Columna F, índice 5) - Suposición
+            const cargoRaw = getCellValue(row[5]);
             const cargo = String(cargoRaw || 'No especificado');
 
-            // Fecha (Columna E, índice 4)
+            // Fecha (Columna D, índice 3) - Deducido de los logs
             let fecha = 'No especificada';
-            const fechaValue = getCellValue(row[4]);
+            const fechaValue = getCellValue(row[3]);
 
-            // Mejorar el manejo de fechas para evitar desfase de zona horaria
             if (fechaValue !== undefined && fechaValue !== null && fechaValue !== '') {
                 let parsedDate;
                 if (typeof fechaValue === 'number') {
-                    // Manejar fechas de Excel (números)
-                    // Ignorar fechas que son menores a 1 (que resultarían en años anteriores a 1900)
                     if (fechaValue >= 1) {
-                        // Convertir el número serial de Excel a fecha JavaScript
-                        // Usamos UTC para evitar problemas de zona horaria
                         const utcDate = new Date((fechaValue - 25569) * 86400 * 1000);
-                        // Crear una fecha local a partir de los componentes UTC para asegurar la representación del día correcto en la zona horaria local
                         const year = utcDate.getUTCFullYear();
-                        const month = utcDate.getUTCMonth(); // getUTCMonth es 0-indexado
+                        const month = utcDate.getUTCMonth();
                         const day = utcDate.getUTCDate();
-                        const localDate = new Date(year, month, day); // Esto crea una fecha local con esos componentes
+                        const localDate = new Date(year, month, day);
                         fecha = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`;
                     }
                 } else {
                     const fechaStr = String(fechaValue);
-                    // Intentar diferentes formatos de fecha
                     parsedDate = new Date(fechaStr);
                     if (isNaN(parsedDate.getTime())) {
-                        // Intentar formato DD/MM/YYYY
                         const parts = fechaStr.split('/');
                         if (parts.length === 3) {
-                            parsedDate = new Date(parts[2], parts[1] - 1, parts[0]);
+                            const year = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
+                            parsedDate = new Date(year, parts[1] - 1, parts[0]);
                         }
                     }
 
-                    // Verificar si la fecha es válida y no es una fecha por defecto de Excel
-                    if (parsedDate && !isNaN(parsedDate.getTime()) &&
-                        parsedDate.getFullYear() >= 1900 &&
-                        !(parsedDate.getFullYear() === 1900 && parsedDate.getMonth() === 0 && parsedDate.getDate() === 1)) {
-                        // Formatear la fecha en formato YYYY-MM-DD sin conversión de zona horaria
+                    if (parsedDate && !isNaN(parsedDate.getTime()) && parsedDate.getFullYear() >= 1900) {
                         const year = parsedDate.getFullYear();
                         const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
                         const day = String(parsedDate.getDate()).padStart(2, '0');
@@ -942,32 +937,26 @@ class InduccionesComponent {
                 }
             }
 
-            // Puntuación (Columna F, índice 5)
-            const puntuacionValue = getCellValue(row[5]);
-            const puntuacionNum = parseFloat(String(puntuacionValue));
+            // Puntuación (Columna B, índice 1) - Deducido de los logs
+            const puntuacionValue = getCellValue(row[1]);
+            const puntuacionNum = parseFloat(String(puntuacionValue).split('/')[0].trim());
             const puntuacion = `${!isNaN(puntuacionNum) ? Math.floor(puntuacionNum) : 0} / 22`;
 
-            // Estado (Columna G, índice 6)
-            const estadoRaw = getCellValue(row[6]);
+            // Estado (Columna C, índice 2) - Deducido de los logs
+            const estadoRaw = getCellValue(row[2]);
             const estadoStr = String(estadoRaw || '');
             let estado = 'pending';
-            if (estadoStr.toLowerCase().includes('aprob') ||
-                estadoStr.toLowerCase().includes('complet') ||
-                estadoStr.toLowerCase().includes('finaliz') ||
-                estadoStr.toLowerCase().includes('realiz')) {
+            if (estadoStr.toLowerCase().includes('aprob')) {
                 estado = 'approved';
-            } else if (estadoStr.toLowerCase().includes('reprob') ||
-                      estadoStr.toLowerCase().includes('pendient') ||
-                      estadoStr.toLowerCase().includes('program') ||
-                      estadoStr.toLowerCase().includes('planif')) {
-                estado = 'failed'; // En el contexto de inducciones, 'failed' puede significar reprobado o pendiente
+            } else if (estadoStr.toLowerCase().includes('reprob')) {
+                estado = 'failed';
             }
 
-            console.log(`[DEBUG] Inducción creada: ${empleado}, cédula: ${cedula}, cargo: ${cargo}, fecha: ${fecha}, puntuación: ${puntuacion}, estado: ${estado}`);
+            console.log(`[DEBUG] Inducción corregida: ${empleado}, cédula: ${cedula}, cargo: ${cargo}, fecha: ${fecha}, puntuación: ${puntuacion}, estado: ${estado}`);
 
             inducciones.push({
                 id: inducciones.length + 1,
-                rowIndex: i + 6, // Mantener el índice original de la fila en Excel (0-indexed + 6 offset)
+                rowIndex: i + 6,
                 empleado: empleado,
                 cedula: cedula,
                 cargo: cargo,
