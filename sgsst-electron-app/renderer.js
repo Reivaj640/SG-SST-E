@@ -1537,6 +1537,21 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 
+    } else if (submoduleName === "1.2.2 Inducción y Reinducción") {
+      if (window.InduccionesViewer) {
+        const induccionesViewer = new window.InduccionesViewer(
+          submoduleContentDiv,
+          currentCompany,
+          moduleName,
+          submoduleName,
+          safeBackToModuleCallback // <-- USAR EL CALLBACK SEGURO
+        );
+        induccionesViewer.render();
+      } else {
+        console.error('❌ InduccionesViewer no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
     } else if (submoduleName === "1.2.3 Curso Virtual 50 Horas") {
       if (window.CursoVirtualComponent) {
         const cursoComponent = new window.CursoVirtualComponent(

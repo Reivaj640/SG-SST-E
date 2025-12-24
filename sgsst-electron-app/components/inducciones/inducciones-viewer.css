@@ -1,0 +1,538 @@
+/* inducciones-viewer.css - Estilos específicos para el submódulo de inducciones */
+
+/* Contenedor principal del viewer de inducciones */
+.submodule-content.inducciones-viewer {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    background-color: #f8f9fa;
+}
+
+/* Asegurar que el contenido no cause desbordamiento */
+.inducciones-container {
+    height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Estilos específicos para evitar conflictos con estilos globales */
+.inducciones-container .app-layout {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative; /* Añadido para que el z-index funcione correctamente */
+}
+
+.inducciones-container .app-header {
+    position: relative;
+    z-index: 1000; /* Asegurar que el header esté por debajo del sidebar cuando se abre */
+}
+
+.inducciones-container .app-body {
+    flex: 1;
+    overflow: hidden;
+}
+
+.inducciones-container .main-content {
+    overflow: auto;
+    flex: 1;
+}
+
+/* Ajustes para modales dentro del contenedor de inducciones */
+.inducciones-container .modal {
+    z-index: 1051; /* Asegurar que los modales se muestren correctamente */
+}
+
+/* Evitar conflictos con estilos de tablas globales */
+.inducciones-container .table {
+    margin-bottom: 0;
+}
+
+/* Ajustes para elementos específicos de la interfaz de inducciones */
+.inducciones-container .top-nav {
+    position: relative;
+    z-index: 100; /* Este valor debe ser menor que el z-index del sidebar cuando se abre */
+}
+
+.inducciones-container .nav-link {
+    cursor: pointer;
+}
+
+/* Ajustes para dispositivos móviles */
+@media (max-width: 768px) {
+    .inducciones-container .main-content {
+        padding: 1rem;
+    }
+
+    .inducciones-container .top-nav {
+        padding: 0 1rem;
+    }
+
+    .inducciones-container .app-header {
+        padding: 1rem;
+    }
+}
+
+/* Solución para el problema de superposición del sidebar */
+/* Asegurar que el header no se quede por encima del sidebar al abrirse */
+.sidebar-open .inducciones-container .app-header,
+body.sidebar-open .inducciones-container .app-header {
+    z-index: 1000 !important; /* Asegurar que el header esté por debajo del sidebar */
+}
+
+/* Ajuste adicional para el layout principal */
+.inducciones-container .app-layout {
+    z-index: 1001; /* Asegurar que el layout esté por encima del header */
+}
+
+/* Estilos para las secciones de vista */
+.view-section {
+    display: none;
+}
+
+.view-section.active {
+    display: block;
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Estilos para las tarjetas de dashboard */
+.dashboard-card {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    padding: 20px;
+    margin-bottom: 20px;
+    transition: transform 0.3s;
+    height: 100%;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.card-header-custom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.card-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #202124;
+}
+
+.card-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+}
+
+.card-icon.primary {
+    background-color: #1a73e8;
+}
+
+.card-icon.success {
+    background-color: #0f9d58;
+}
+
+.card-icon.warning {
+    background-color: #f4b400;
+}
+
+.card-icon.danger {
+    background-color: #ea4335;
+}
+
+.card-value {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 5px;
+    color: #202124;
+}
+
+.card-description {
+    color: #5f6368;
+    font-size: 0.9rem;
+}
+
+/* Estilos para tablas */
+.custom-table {
+    background-color: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    margin-bottom: 20px;
+}
+
+.table-header {
+    padding: 15px 20px;
+    background-color: white;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.table-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.table-actions {
+    display: flex;
+    gap: 10px;
+}
+
+/* Estilos para botones */
+.btn-custom {
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: none;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.btn-primary-custom {
+    background-color: #1a73e8;
+    color: white;
+}
+
+.btn-primary-custom:hover {
+    background-color: #4285f4;
+}
+
+.btn-secondary-custom {
+    background-color: white;
+    color: #202124;
+    border: 1px solid #e0e0e0;
+}
+
+.btn-secondary-custom:hover {
+    background-color: #f1f3f4;
+}
+
+/* Estilos para formularios */
+.form-section {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.form-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-label {
+    font-weight: 500;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.form-control-custom {
+    width: 100%;
+    padding: 10px 15px;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    transition: all 0.2s;
+    box-sizing: border-box;
+}
+
+.form-control-custom:focus {
+    outline: none;
+    border-color: #1a73e8;
+    box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.1);
+}
+
+/* Estilos para badges de estado */
+.status-badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    display: inline-block;
+}
+
+.status-approved {
+    background-color: rgba(15, 157, 88, 0.1);
+    color: #0f9d58;
+}
+
+.status-failed {
+    background-color: rgba(234, 67, 53, 0.1);
+    color: #ea4335;
+}
+
+/* Estilos para el contenedor de gráficos */
+.chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+
+/* Estilos para el botón flotante de acción */
+.floating-action-btn {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background-color: #1a73e8;
+    color: white;
+    border: none;
+    font-size: 24px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    transition: all 0.3s;
+}
+
+.floating-action-btn:hover {
+    transform: scale(1.1);
+    background-color: #4285f4;
+}
+
+/* Estilos para modales */
+.modal-custom {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-custom.active {
+    display: flex;
+}
+
+.modal-content-custom {
+    background-color: white;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 90vh;
+    overflow-y: auto;
+    animation: modalFadeIn 0.3s;
+}
+
+@keyframes modalFadeIn {
+    from { opacity: 0; transform: translateY(-30px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.modal-header-custom {
+    padding: 20px;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-title-custom {
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #5f6368;
+}
+
+.modal-body-custom {
+    padding: 20px;
+}
+
+.modal-footer-custom {
+    padding: 15px 20px;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* Estilos para pestañas */
+.tabs-container {
+    margin-bottom: 20px;
+}
+
+.tabs-nav {
+    display: flex;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.tab-button {
+    padding: 12px 20px;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    font-weight: 500;
+    color: #5f6368;
+    transition: all 0.2s;
+}
+
+.tab-button:hover {
+    color: #202124;
+}
+
+.tab-button.active {
+    color: #1a73e8;
+    border-bottom-color: #1a73e8;
+}
+
+.tab-content {
+    display: none;
+    padding: 20px 0;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Ajustes de responsive */
+@media (max-width: 768px) {
+    .inducciones-container .top-nav .nav-link {
+        padding: 10px 15px;
+        font-size: 0.9rem;
+    }
+
+    .table-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .table-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    .dashboard-card {
+        margin-bottom: 15px;
+    }
+
+    .card-value {
+        font-size: 1.5rem;
+    }
+
+    .modal-content-custom {
+        width: 95%;
+        margin: 20px;
+    }
+}
+
+/* ============================================================= */
+/* ESPACIADO VERTICAL EXCLUSIVO PARA EL DASHBOARD DE INDUCCIONES */
+/* No afecta a ningún otro módulo del sistema                     */
+/* ============================================================= */
+
+/* ✅ SOBREESCRITURA DEFINITIVA — Solo para el dashboard de inducciones */
+.inducciones-container #dashboard-view {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem; /* espacio uniforme ENTRE LAS FILAS */
+    overflow: hidden;
+    padding: 0 !important; /* anular cualquier padding heredado */
+    margin: 0 !important;
+}
+
+/* Cada fila del dashboard */
+.inducciones-container #dashboard-view > .row {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 1.5rem !important; /* espacio ENTRE TARJETAS dentro de la fila */
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    align-items: stretch !important;
+}
+
+/* Cada columna/tarjeta dentro de las filas */
+.inducciones-container #dashboard-view .row > [class*="col-"] {
+    display: flex !important;
+    flex-direction: column !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Componentes visuales reales: tarjetas */
+.inducciones-container #dashboard-view .stat-card,
+.inducciones-container #dashboard-view .chart-container,
+.inducciones-container #dashboard-view .action-card,
+.inducciones-container #dashboard-view .training-list {
+    background-color: white !important;
+    border-radius: 8px !important;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05) !important;
+    padding: 1.5rem !important;
+    margin: 0 !important; /* ← clave: anular margin heredado */
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+}
+
+/* Asegurar que no haya margin collapse ni paddings fantasma */
+.inducciones-container #dashboard-view .stat-card > *,
+.inducciones-container #dashboard-view .chart-container > *,
+.inducciones-container #dashboard-view .action-card > *,
+.inducciones-container #dashboard-view .training-list > * {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+}
+
+/* Títulos dentro de tarjetas */
+.inducciones-container #dashboard-view .stat-card h3,
+.inducciones-container #dashboard-view .chart-container h3,
+.inducciones-container #dashboard-view .action-card h3,
+.inducciones-container #dashboard-view .training-list h3 {
+    margin-top: 0 !important;
+    margin-bottom: 1rem !important;
+}
+
+/* Última fila: sin gap extra abajo */
+.inducciones-container #dashboard-view > .row:last-child {
+    margin-bottom: 0 !important;
+}
