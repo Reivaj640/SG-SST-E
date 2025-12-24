@@ -41,6 +41,8 @@
 .inducciones-container .main-content {
     overflow: auto;
     flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Ajustes para modales dentro del contenedor de inducciones */
@@ -391,6 +393,15 @@ body.sidebar-open .inducciones-container .app-header {
     gap: 10px;
 }
 
+/* Estilos para el título "Programa de Inducciones" en el header */
+.submodule-content.inducciones-viewer .top-header .logo-section h3 {
+    color: white !important;
+    margin: 0 !important;
+    opacity: 0.9 !important;
+    font-size: 1.5rem !important;
+    font-weight: 600 !important;
+}
+
 /* Estilos para pestañas */
 .tabs-container {
     margin-bottom: 20px;
@@ -468,17 +479,24 @@ body.sidebar-open .inducciones-container .app-header {
 /* ============================================================= */
 
 /* ✅ SOBREESCRITURA DEFINITIVA — Solo para el dashboard de inducciones */
-.inducciones-container #dashboard-view {
+.inducciones-container #dashboard-page {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+}
+
+#dashboard-view {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
     display: flex;
     flex-direction: column;
     gap: 2rem; /* espacio uniforme ENTRE LAS FILAS */
-    overflow: hidden;
-    padding: 0 !important; /* anular cualquier padding heredado */
-    margin: 0 !important;
 }
 
 /* Cada fila del dashboard */
-.inducciones-container #dashboard-view > .row {
+#dashboard-view > .row {
     display: flex !important;
     flex-wrap: wrap !important;
     gap: 1.5rem !important; /* espacio ENTRE TARJETAS dentro de la fila */
@@ -490,7 +508,7 @@ body.sidebar-open .inducciones-container .app-header {
 }
 
 /* Cada columna/tarjeta dentro de las filas */
-.inducciones-container #dashboard-view .row > [class*="col-"] {
+#dashboard-view .row > [class*="col-"] {
     display: flex !important;
     flex-direction: column !important;
     margin: 0 !important;
@@ -498,10 +516,10 @@ body.sidebar-open .inducciones-container .app-header {
 }
 
 /* Componentes visuales reales: tarjetas */
-.inducciones-container #dashboard-view .stat-card,
-.inducciones-container #dashboard-view .chart-container,
-.inducciones-container #dashboard-view .action-card,
-.inducciones-container #dashboard-view .training-list {
+#dashboard-view .stat-card,
+#dashboard-view .chart-container,
+#dashboard-view .action-card,
+#dashboard-view .training-list {
     background-color: white !important;
     border-radius: 8px !important;
     box-shadow: 0 2px 10px rgba(0,0,0,0.05) !important;
@@ -515,24 +533,24 @@ body.sidebar-open .inducciones-container .app-header {
 }
 
 /* Asegurar que no haya margin collapse ni paddings fantasma */
-.inducciones-container #dashboard-view .stat-card > *,
-.inducciones-container #dashboard-view .chart-container > *,
-.inducciones-container #dashboard-view .action-card > *,
-.inducciones-container #dashboard-view .training-list > * {
+#dashboard-view .stat-card > *,
+#dashboard-view .chart-container > *,
+#dashboard-view .action-card > *,
+#dashboard-view .training-list > * {
     margin-top: 0 !important;
     margin-bottom: 0 !important;
 }
 
 /* Títulos dentro de tarjetas */
-.inducciones-container #dashboard-view .stat-card h3,
-.inducciones-container #dashboard-view .chart-container h3,
-.inducciones-container #dashboard-view .action-card h3,
-.inducciones-container #dashboard-view .training-list h3 {
+#dashboard-view .stat-card h3,
+#dashboard-view .chart-container h3,
+#dashboard-view .action-card h3,
+#dashboard-view .training-list h3 {
     margin-top: 0 !important;
     margin-bottom: 1rem !important;
 }
 
 /* Última fila: sin gap extra abajo */
-.inducciones-container #dashboard-view > .row:last-child {
+#dashboard-view > .row:last-child {
     margin-bottom: 0 !important;
 }

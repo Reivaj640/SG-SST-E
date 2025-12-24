@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Gestión de Inducciones - Tempoactiva</title>
+    <title>Sistema de Gestión de Inducciones</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -155,7 +155,8 @@
         /* Main Content */
         .main-content {
             padding: 20px 30px;
-            min-height: calc(100vh - var(--header-height) - var(--nav-height));
+            height: calc(100vh - var(--header-height) - var(--nav-height));
+            overflow-y: auto;
         }
         
         .page-title {
@@ -540,8 +541,7 @@
                 <button class="mobile-menu-toggle" id="mobileMenuToggle">
                     <i class="bi bi-list"></i>
                 </button>
-                <h3>Tempoactiva</h3>
-                <p>Sistema de Inducciones</p>
+                <h3>Programa de Inducciones</h3>
             </div>
             <div class="header-actions">
                 <button class="header-btn">
@@ -550,9 +550,6 @@
                 <button class="header-btn">
                     <i class="bi bi-download"></i> Exportar
                 </button>
-                <div class="user-info">
-                    <span>Administrador</span>
-                    <div class="user-avatar">A</div>
                 </div>
             </div>
         </header>
@@ -579,21 +576,9 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a href="#" class="nav-link" data-page="questionnaire">
-                        <i class="bi bi-question-circle"></i>
-                        <span>Cuestionario</span>
-                    </a>
-                </li>
-                <li class="nav-item">
                     <a href="#" class="nav-link" data-page="reports">
                         <i class="bi bi-graph-up"></i>
                         <span>Reportes y Análisis</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="#" class="nav-link" data-page="settings">
-                        <i class="bi bi-gear"></i>
-                        <span>Configuración</span>
                     </a>
                 </li>
             </ul>
@@ -955,169 +940,6 @@
             </div>
         </div>
 
-        <!-- Questionnaire Page -->
-        <div id="questionnaire-page" class="page-content" style="display: none;">
-            <h1 class="page-title">Configuración del Cuestionario</h1>
-            
-            <div class="form-section">
-                <div class="form-title">Preguntas del Cuestionario de Inducción</div>
-                
-                <div class="tabs-container">
-                    <div class="tabs-nav">
-                        <button class="tab-button active" data-tab="questions">Preguntas</button>
-                        <button class="tab-button" data-tab="options">Opciones de Respuesta</button>
-                        <button class="tab-button" data-tab="evaluation">Criterios de Evaluación</button>
-                    </div>
-                    
-                    <div class="tab-content active" id="questions-tab">
-                        <div class="table-actions mb-3">
-                            <button class="btn-custom btn-primary-custom" id="add-question-btn">
-                                <i class="bi bi-plus-circle"></i> Nueva Pregunta
-                            </button>
-                        </div>
-                        
-                        <div class="accordion" id="questionsAccordion">
-                            <div class="accordion-item">
-                                <h2 class="accordion-header" id="heading1">
-                                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse1" aria-expanded="true" aria-controls="collapse1">
-                                        1. Seleccione la Política de Salud y Seguridad en el Trabajo de Tempoactiva S.A.S.
-                                    </button>
-                                </h2>
-                                <div id="collapse1" class="accordion-collapse collapse show" aria-labelledby="heading1" data-bs-parent="#questionsAccordion">
-                                    <div class="accordion-body">
-                                        <div class="mb-3">
-                                            <label class="form-label">Tipo de pregunta:</label>
-                                            <select class="form-control-custom">
-                                                <option>Selección múltiple</option>
-                                                <option>Verdadero/Falso</option>
-                                                <option>Respuesta abierta</option>
-                                            </select>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="form-label">Opciones de respuesta:</label>
-                                            <div class="mb-2">
-                                                <input type="text" class="form-control-custom" value="a) Prevenir lesiones, enfermedades laborales, contaminación, daño a la propiedad de la empresa y del cliente e impactos socio-ambientales; a partir de la identificación de peligros, controles de aspectos y condiciones inseguras.">
-                                            </div>
-                                            <div class="mb-2">
-                                                <input type="text" class="form-control-custom" value="b) Promover la satisfacción de las necesidades y los requisitos del cliente, así como los legales y reglamentarios en materia de calidad, seguridad, salud en el trabajo, medio ambiente y otros aplicables para la organización.">
-                                            </div>
-                                            <div class="mb-2">
-                                                <input type="text" class="form-control-custom" value="c) Proyectar la calidad total de sus servicios, mantener y fortalecer una relación mutuamente beneficiosa con el cliente a fin de satisfacer sus necesidades exceder sus expectativas, teniendo en cuenta los grupos de interés de su área de influencia.">
-                                            </div>
-                                            <div class="mb-2">
-                                                <input type="text" class="form-control-custom" value="d) Proporcionar y facilitar los recursos financieros, así como el personal competente, confiable, calificado motivado y comprometido con el fortalecimiento de la empresa que nos permitan lograr las metas y objetivos propuestos para alcanzar el mejoramiento continuo y el liderazgo a nivel nacional e internacional en el sector.">
-                                            </div>
-                                            <div class="mb-2">
-                                                <input type="text" class="form-control-custom" value="e) Todas las anteriores son válidas.">
-                                            </div>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="form-label">Respuesta correcta:</label>
-                                            <select class="form-control-custom">
-                                                <option>Opción a</option>
-                                                <option>Opción b</option>
-                                                <option>Opción c</option>
-                                                <option>Opción d</option>
-                                                <option selected>Opción e</option>
-                                            </select>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="form-label">Puntuación:</label>
-                                            <input type="number" class="form-control-custom" value="1">
-                                        </div>
-                                        <div class="text-end">
-                                            <button class="btn-custom btn-primary-custom">Guardar Cambios</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="tab-content" id="options-tab">
-                        <div class="alert alert-info">
-                            <i class="bi bi-info-circle"></i> Aquí puedes configurar las opciones de respuesta para cada tipo de pregunta.
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-section">
-                                    <div class="form-title">Opciones para Preguntas de Selección Múltiple</div>
-                                    <div class="mb-3">
-                                        <label class="form-label">Número de opciones por pregunta:</label>
-                                        <input type="number" class="form-control-custom" value="5">
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">Permitir múltiples respuestas:</label>
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="radio" name="multipleAnswers" id="noMultiple" checked>
-                                            <label class="form-check-label" for="noMultiple">No</label>
-                                        </div>
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="radio" name="multipleAnswers" id="yesMultiple">
-                                            <label class="form-check-label" for="yesMultiple">Sí</label>
-                                        </div>
-                                    </div>
-                                    <button class="btn-custom btn-primary-custom">Guardar Configuración</button>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-6">
-                                <div class="form-section">
-                                    <div class="form-title">Opciones para Preguntas de Verdadero/Falso</div>
-                                    <div class="mb-3">
-                                        <label class="form-label">Texto para opción verdadera:</label>
-                                        <input type="text" class="form-control-custom" value="Verdadero">
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">Texto para opción falsa:</label>
-                                        <input type="text" class="form-control-custom" value="Falso">
-                                    </div>
-                                    <button class="btn-custom btn-primary-custom">Guardar Configuración</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="tab-content" id="evaluation-tab">
-                        <div class="form-section">
-                            <div class="form-title">Criterios de Evaluación</div>
-                            
-                            <div class="mb-3">
-                                <label class="form-label">Puntuación mínima para aprobar:</label>
-                                <input type="number" class="form-control-custom" value="18">
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label class="form-label">Puntuación máxima:</label>
-                                <input type="number" class="form-control-custom" value="22">
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label class="form-label">Porcentaje mínimo para aprobar:</label>
-                                <div class="input-group">
-                                    <input type="number" class="form-control-custom" value="80">
-                                    <span class="input-group-text">%</span>
-                                </div>
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label class="form-label">Intentos permitidos:</label>
-                                <input type="number" class="form-control-custom" value="3">
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label class="form-label">Tiempo límite (minutos):</label>
-                                <input type="number" class="form-control-custom" value="30">
-                            </div>
-                            
-                            <button class="btn-custom btn-primary-custom">Guardar Configuración</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Reports Page -->
         <div id="reports-page" class="page-content" style="display: none;">
             <h1 class="page-title">Reportes y Análisis</h1>
@@ -1183,145 +1005,6 @@
                             <div class="chart-container">
                                 <canvas id="errorRateChart"></canvas>
                             </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Settings Page -->
-        <div id="settings-page" class="page-content" style="display: none;">
-            <h1 class="page-title">Configuración del Sistema</h1>
-            
-            <div class="form-section">
-                <div class="form-title">Configuración General</div>
-                
-                <div class="tabs-container">
-                    <div class="tabs-nav">
-                        <button class="tab-button active" data-tab="general">General</button>
-                        <button class="tab-button" data-tab="notifications">Notificaciones</button>
-                        <button class="tab-button" data-tab="users">Usuarios</button>
-                        <button class="tab-button" data-tab="backup">Respaldo</button>
-                    </div>
-                    
-                    <div class="tab-content active" id="general-tab">
-                        <div class="form-group">
-                            <label class="form-label">Nombre de la Empresa:</label>
-                            <input type="text" class="form-control-custom" value="TEMPOACTIVA EST S.A.S.">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">Código del Formulario:</label>
-                            <input type="text" class="form-control-custom" value="ACT-FO-046">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">Versión del Formulario:</label>
-                            <input type="text" class="form-control-custom" value="Rev. 02">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">Fecha de Vigencia:</label>
-                            <input type="date" class="form-control-custom" value="2025-01-02">
-                        </div>
-                        
-                        <button class="btn-custom btn-primary-custom">Guardar Cambios</button>
-                    </div>
-                    
-                    <div class="tab-content" id="notifications-tab">
-                        <div class="form-group">
-                            <label class="form-label">Notificaciones por Correo Electrónico:</label>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="emailNewInduction" checked>
-                                <label class="form-check-label" for="emailNewInduction">
-                                    Notificar cuando se registra una nueva inducción
-                                </label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="emailFailedInduction" checked>
-                                <label class="form-check-label" for="emailFailedInduction">
-                                    Notificar cuando una inducción es reprobada
-                                </label>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">Destinatarios de Notificaciones:</label>
-                            <textarea class="form-control-custom" rows="3" placeholder="admin@tempoactiva.com, sst@tempoactiva.com">admin@tempoactiva.com, sst@tempoactiva.com</textarea>
-                        </div>
-                        
-                        <button class="btn-custom btn-primary-custom">Guardar Configuración</button>
-                    </div>
-                    
-                    <div class="tab-content" id="users-tab">
-                        <div class="table-actions mb-3">
-                            <button class="btn-custom btn-primary-custom" id="add-user-btn">
-                                <i class="bi bi-plus-circle"></i> Nuevo Usuario
-                            </button>
-                        </div>
-                        
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Usuario</th>
-                                        <th>Nombre</th>
-                                        <th>Correo Electrónico</th>
-                                        <th>Rol</th>
-                                        <th>Estado</th>
-                                        <th>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td>admin</td>
-                                        <td>Administrador Sistema</td>
-                                        <td>admin@tempoactiva.com</td>
-                                        <td>Administrador</td>
-                                        <td><span class="status-badge status-approved">Activo</span></td>
-                                        <td>
-                                            <button class="btn btn-sm btn-outline-primary">Editar</button>
-                                            <button class="btn btn-sm btn-outline-danger">Desactivar</button>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>jrobles</td>
-                                        <td>Javier Robles Fontalvo</td>
-                                        <td>jrobles@tempoactiva.com</td>
-                                        <td>Representante SG-SST</td>
-                                        <td><span class="status-badge status-approved">Activo</span></td>
-                                        <td>
-                                            <button class="btn btn-sm btn-outline-primary">Editar</button>
-                                            <button class="btn btn-sm btn-outline-danger">Desactivar</button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    
-                    <div class="tab-content" id="backup-tab">
-                        <div class="alert alert-info">
-                            <i class="bi bi-info-circle"></i> Realiza copias de seguridad periódicas de tus datos para evitar pérdida de información.
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">Frecuencia de Respaldo Automático:</label>
-                            <select class="form-control-custom">
-                                <option>Diario</option>
-                                <option>Semanal</option>
-                                <option>Mensual</option>
-                                <option>Desactivado</option>
-                            </select>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <button class="btn-custom btn-primary-custom">
-                                <i class="bi bi-download"></i> Realizar Respaldo Ahora
-                            </button>
-                            <button class="btn-custom btn-secondary-custom">
-                                <i class="bi bi-upload"></i> Restaurar desde Respaldo
-                            </button>
                         </div>
                     </div>
                 </div>

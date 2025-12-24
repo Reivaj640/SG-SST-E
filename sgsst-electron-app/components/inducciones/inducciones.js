@@ -200,7 +200,8 @@ class InduccionesComponent {
             // Iniciar la vigilancia del archivo
             window.electronAPI.send('start-watching-inducciones', this.excelFilePath);
 
-            await this._populateYearFilterFromSheets();
+            // Leer y procesar el archivo Excel de inducciones
+            await this.loadInduccionesFromExcel();
 
         } catch (error) {
             console.error('Error al inicializar el componente:', error);
@@ -755,6 +756,93 @@ class InduccionesComponent {
                 }
             });
         }
+    }
+
+    // Función para cargar datos de inducciones desde el archivo Excel
+    async loadInduccionesFromExcel() {
+        try {
+            // Verificar que el archivo exista
+            if (!this.excelFilePath) {
+                this.showNotification('No se encontró el archivo de inducciones.', 'warning');
+                return;
+            }
+
+            console.log(`[DEBUG] Intentando leer archivo de inducciones: ${this.excelFilePath}`);
+
+            // Intentar leer el archivo Excel
+            // Usar una función genérica de Excel si no hay una específica para inducciones
+            const result = await window.electronAPI.readExcelFile(this.excelFilePath);
+
+            if (!result.success) {
+                throw new Error(result.error || 'Error al leer el archivo Excel');
+            }
+
+            // Procesar los datos del Excel
+            // Necesitamos usar una función que pueda leer los datos del Excel
+            // Por ahora, intentaremos usar la función de inicialización de Excel genérica
+            const initData = await window.electronAPI.initExcel({ filePath: this.excelFilePath });
+
+            if (initData.success) {
+                const { processedData, headers } = initData.data;
+
+                // Parsear los datos del Excel a la estructura de inducciones
+                this.inducciones = this.parseExcelDataToInducciones(processedData, headers);
+
+                // Actualizar empleados basados en las inducciones
+                this.empleados = this.extractEmployeesFromInducciones(this.inducciones);
+
+                // Actualizar la interfaz con los datos reales
+                this.filteredInducciones = [...this.inducciones];
+                this.updateDashboardStats();
+                this.renderInduccionesTable();
+                this.renderEmployeesTable();
+
+                this.showNotification(`Datos cargados exitosamente. ${this.inducciones.length} inducciones encontradas.`, 'success');
+            } else {
+                console.error('Error al inicializar datos del Excel:', initData.error);
+                // Si falla, usar datos de ejemplo
+                this.inducciones = this.generateSampleInducciones();
+                this.empleados = this.generateSampleEmployees();
+                this.filteredInducciones = [...this.inducciones];
+                this.updateDashboardStats();
+                this.renderInduccionesTable();
+                this.renderEmployeesTable();
+                this.showNotification('Error al leer el archivo Excel. Se están mostrando datos de ejemplo.', 'warning');
+            }
+        } catch (error) {
+            console.error('Error al cargar datos desde Excel:', error);
+            // Si falla completamente, usar datos de ejemplo
+            this.inducciones = this.generateSampleInducciones();
+            this.empleados = this.generateSampleEmployees();
+            this.filteredInducciones = [...this.inducciones];
+            this.updateDashboardStats();
+            this.renderInduccionesTable();
+            this.renderEmployeesTable();
+            this.showNotification('Error al cargar datos desde el archivo Excel. Se están mostrando datos de ejemplo.', 'warning');
+        }
+    }
+
+    // Función para extraer empleados únicos de las inducciones
+    extractEmployeesFromInducciones(inducciones) {
+        const uniqueEmployees = new Map();
+
+        inducciones.forEach(induccion => {
+            const key = induccion.cedula; // Usar cédula como clave única
+            if (!uniqueEmployees.has(key)) {
+                uniqueEmployees.set(key, {
+                    id: uniqueEmployees.size + 1,
+                    nombre: induccion.empleado,
+                    cedula: induccion.cedula,
+                    cargo: induccion.cargo,
+                    fechaNacimiento: '', // No disponible en el archivo de inducciones
+                    edad: '-', // No disponible en el archivo de inducciones
+                    genero: '', // No disponible en el archivo de inducciones
+                    estadoInduccion: induccion.estado
+                });
+            }
+        });
+
+        return Array.from(uniqueEmployees.values());
     }
 
     // Función para parsear datos de Excel de inducciones
