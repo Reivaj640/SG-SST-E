@@ -564,12 +564,6 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a href="#" class="nav-link" data-page="employees">
-                        <i class="bi bi-people"></i>
-                        <span>Empleados</span>
-                    </a>
-                </li>
-                <li class="nav-item">
                     <a href="#" class="nav-link" data-page="inductions">
                         <i class="bi bi-clipboard-check"></i>
                         <span>Registro de Inducciones</span>
@@ -589,7 +583,12 @@
     <main class="main-content">
         <!-- Dashboard Page -->
         <div id="dashboard-page" class="page-content">
-            <h1 class="page-title">Dashboard</h1>
+            <div class="filter-section" style="margin-bottom: 20px; display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                <select id="yearFilter" class="form-control-custom" style="width: 120px;"></select>
+                <select id="monthFilter" class="form-control-custom" style="width: 150px;"></select>
+                <button id="applyFiltersBtn" class="btn-custom btn-primary-custom">Aplicar</button>
+                <button id="clearFiltersBtn" class="btn-custom btn-secondary-custom">Limpiar</button>
+            </div>
             
             <!-- Stats Cards -->
             <div class="row">
@@ -688,154 +687,7 @@
                                 <th>Acciones</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <tr>
-                                <td>30/07/2024</td>
-                                <td>Jesus alberto polania de la hoz</td>
-                                <td>Portero</td>
-                                <td>14 / 22</td>
-                                <td><span class="status-badge status-failed">Reprobado</span></td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-primary">Ver Detalles</button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>25/07/2024</td>
-                                <td>Michel David Martínez Contreras</td>
-                                <td>Panadero</td>
-                                <td>18 / 22</td>
-                                <td><span class="status-badge status-failed">Reprobado</span></td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-primary">Ver Detalles</button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>23/07/2024</td>
-                                <td>Edilberto carlos olivares charris</td>
-                                <td>Cocinero</td>
-                                <td>20 / 22</td>
-                                <td><span class="status-badge status-approved">Aprobado</span></td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-primary">Ver Detalles</button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>19/07/2024</td>
-                                <td>Honatan Enrique Molina Reyes</td>
-                                <td>Sub chef</td>
-                                <td>22 / 22</td>
-                                <td><span class="status-badge status-approved">Aprobado</span></td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-primary">Ver Detalles</button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>19/07/2024</td>
-                                <td>Carolain</td>
-                                <td>Operaria integral</td>
-                                <td>20 / 22</td>
-                                <td><span class="status-badge status-approved">Aprobado</span></td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-primary">Ver Detalles</button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- Employees Page -->
-        <div id="employees-page" class="page-content" style="display: none;">
-            <h1 class="page-title">Empleados</h1>
-            
-            <div class="form-section">
-                <div class="form-title">Gestión de Empleados</div>
-                
-                <div class="table-actions mb-3">
-                    <button class="btn-custom btn-primary-custom" id="add-employee-btn">
-                        <i class="bi bi-plus-circle"></i> Nuevo Empleado
-                    </button>
-                    <button class="btn-custom btn-secondary-custom">
-                        <i class="bi bi-upload"></i> Importar desde Excel
-                    </button>
-                    <div class="float-end">
-                        <input type="text" class="form-control-custom d-inline-block" style="width: 250px;" placeholder="Buscar empleado...">
-                    </div>
-                </div>
-                
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Nombre Completo</th>
-                                <th>Cédula</th>
-                                <th>Cargo</th>
-                                <th>Fecha de Nacimiento</th>
-                                <th>Edad</th>
-                                <th>Género</th>
-                                <th>Estado Inducción</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>1</td>
-                                <td>Javier Robles Fontalvo</td>
-                                <td>1044391066</td>
-                                <td>Representante del SG-SST</td>
-                                <td>06/11/1987</td>
-                                <td>37</td>
-                                <td>Hombre</td>
-                                <td><span class="status-badge status-approved">Aprobado</span></td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-primary">Ver</button>
-                                    <button class="btn btn-sm btn-outline-secondary">Editar</button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>2</td>
-                                <td>Lilia Vásquez Muñoz</td>
-                                <td>1129566447</td>
-                                <td>Coordinación Nómina</td>
-                                <td>-</td>
-                                <td>-</td>
-                                <td>Mujer</td>
-                                <td><span class="status-badge status-approved">Aprobado</span></td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-primary">Ver</button>
-                                    <button class="btn btn-sm btn-outline-secondary">Editar</button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>3</td>
-                                <td>Jesus David Manjarres Díaz Granados</td>
-                                <td>1045748792</td>
-                                <td>Técnico audiodivisual</td>
-                                <td>-</td>
-                                <td>-</td>
-                                <td>Hombre</td>
-                                <td><span class="status-badge status-approved">Aprobado</span></td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-primary">Ver</button>
-                                    <button class="btn btn-sm btn-outline-secondary">Editar</button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>4</td>
-                                <td>Genisis María cantillo torres</td>
-                                <td>1002228922</td>
-                                <td>Mesera</td>
-                                <td>-</td>
-                                <td>-</td>
-                                <td>Mujer</td>
-                                <td><span class="status-badge status-failed">Reprobado</span></td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-primary">Ver</button>
-                                    <button class="btn btn-sm btn-outline-secondary">Editar</button>
-                                </td>
-                            </tr>
+                        <tbody id="recent-inductions-tbody">
                         </tbody>
                     </table>
                 </div>
@@ -844,7 +696,6 @@
 
         <!-- Inductions Page -->
         <div id="inductions-page" class="page-content" style="display: none;">
-            <h1 class="page-title">Registro de Inducciones</h1>
             
             <div class="form-section">
                 <div class="form-title">Listado de Inducciones</div>
@@ -942,7 +793,6 @@
 
         <!-- Reports Page -->
         <div id="reports-page" class="page-content" style="display: none;">
-            <h1 class="page-title">Reportes y Análisis</h1>
             
             <div class="form-section">
                 <div class="form-title">Generador de Reportes</div>

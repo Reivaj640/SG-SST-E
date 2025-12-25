@@ -104,6 +104,12 @@ class InduccionesComponent {
         // Eventos de guardado
         document.getElementById('saveEmployee')?.addEventListener('click', () => this.saveEmployee());
         document.getElementById('saveInduction')?.addEventListener('click', () => this.saveInduction());
+
+        // Eventos de filtros
+        document.getElementById('yearFilter')?.addEventListener('change', () => this.applyFilters());
+        document.getElementById('monthFilter')?.addEventListener('change', () => this.applyFilters());
+        document.getElementById('applyFiltersBtn')?.addEventListener('click', () => this.applyFilters());
+        document.getElementById('clearFiltersBtn')?.addEventListener('click', () => this.clearFilters());
     }
 
     switchView(viewId) {
@@ -168,7 +174,9 @@ class InduccionesComponent {
             // Filtrar archivos Excel de inducciones que coincidan con el patrón específico
             const allExcelFiles = (filesResult.files || []).filter(item => {
                 const fileName = (item.name || item.path || '').toLowerCase();
-                return fileName.includes('act-fo-046') && (fileName.endsWith('.xlsx') || fileName.endsWith('.xls'));
+                // Excluir archivos temporales de Excel que comienzan con ~$
+                const isTempFile = fileName.startsWith('~$');
+                return !isTempFile && fileName.includes('act-fo-046') && (fileName.endsWith('.xlsx') || fileName.endsWith('.xls'));
             }).map(item => item.name || item.path);
 
             // Ordenar para priorizar archivos .xlsx
@@ -217,57 +225,34 @@ class InduccionesComponent {
         }
     }
 
-    async _populateYearFilterFromSheets() {
+    populateYearFilter() {
         const yearFilter = document.getElementById('yearFilter');
         if (!yearFilter) return;
 
-        // En un entorno real, esta función leería las hojas del archivo Excel
-        // Por ahora, generamos datos de ejemplo
-        this.availableSheets = ['Inducciones 2024', 'Inducciones 2023', 'Inducciones 2022'];
-        const years = [...new Set(this.availableSheets
-            .map(sheetName => {
-                const match = sheetName.match(/\d{4}/);
-                return match ? parseInt(match[0]) : null;
-            })
-            .filter(y => y !== null && !isNaN(y))
-        )].sort((a, b) => b - a);
+        // Extraer años únicos de los datos de inducciones y ordenarlos
+        const years = [...new Set(this.inducciones.map(i => i.year).filter(y => y))]
+            .sort((a, b) => b - a);
+        console.log('[DEBUG-Filtro] Años únicos encontrados para el filtro:', years);
 
-        // Limpiar filtro de año si existe
-        if (yearFilter) {
-            yearFilter.innerHTML = '';
-            if (years.length === 0) {
-                yearFilter.innerHTML = '<option value="">No hay años disponibles</option>';
-                this.inducciones = [];
-                this.applyFilters();
-                return;
-            }
 
-            years.forEach(year => {
-                const option = document.createElement('option');
-                option.value = year;
-                option.textContent = year;
-                yearFilter.appendChild(option);
-            });
+        yearFilter.innerHTML = '<option value="">Todos los años</option>'; // Opción para mostrar todos
 
-            // Seleccionar el año actual o el más reciente por defecto
-            const currentYear = new Date().getFullYear();
-            if (years.includes(currentYear)) {
-                yearFilter.value = currentYear;
-                this.currentYear = currentYear;
-            } else if (years.length > 0) {
-                this.currentYear = years[0]; // Seleccionar el más reciente si no está el actual
-                yearFilter.value = years[0];
-            } else {
-                this.currentYear = null; // No hay años disponibles
-            }
+        if (years.length === 0) {
+            this.applyFilters();
+            return;
         }
 
-        // Cargar datos para el año seleccionado por defecto
-        if (this.currentYear) {
-            await this.loadDataForYear(this.currentYear);
-        } else {
-            this.inducciones = [];
-            this.applyFilters();
+        years.forEach(year => {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = year;
+            yearFilter.appendChild(option);
+        });
+
+        // Seleccionar el año más reciente por defecto si existen años
+        if (years.length > 0) {
+             this.currentYear = years[0];
+             yearFilter.value = years[0];
         }
     }
 
@@ -305,14 +290,27 @@ class InduccionesComponent {
     }
 
     applyFilters() {
-        // Aplicar filtros a las inducciones
-        this.filteredInducciones = [...this.inducciones];
+        const selectedYear = document.getElementById('yearFilter').value;
+        console.log(`[DEBUG-Filtro] applyFilters llamado. Año seleccionado: '${selectedYear}'`);
+
+        let filteredData = [...this.inducciones];
+        console.log(`[DEBUG-Filtro] Cantidad de registros antes de filtrar: ${filteredData.length}`);
+
+        // Filtrar por año
+        if (selectedYear) {
+            filteredData = filteredData.filter(i => i.year == selectedYear);
+        }
+
+        console.log(`[DEBUG-Filtro] Cantidad de registros después de filtrar: ${filteredData.length}`);
+
+        this.filteredInducciones = filteredData;
         this.renderInduccionesTable();
         this.updateDashboardStats();
     }
 
     clearFilters() {
-        // Limpiar filtros
+        document.getElementById('yearFilter').value = '';
+        // document.getElementById('monthFilter').value = ''; // Para futura implementación
         this.applyFilters();
         this.showNotification('Filtros limpiados.', 'info');
     }
@@ -393,6 +391,36 @@ class InduccionesComponent {
                     <button class="btn btn-sm btn-outline-primary" onclick="window.currentInduccionesComponent.showInductionDetails(${induccion.id})">Ver Detalles</button>
                     <button class="btn btn-sm btn-outline-secondary" onclick="window.currentInduccionesComponent.editInduction(${induccion.id})">Editar</button>
                     <button class="btn btn-sm btn-outline-danger" onclick="window.currentInduccionesComponent.deleteInduction(${induccion.id})">Eliminar</button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    renderRecentInduccionesTable() {
+        const tbody = document.getElementById('recent-inductions-tbody');
+        if (!tbody) return;
+
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth() + 1;
+
+        const recentInducciones = this.inducciones.filter(i => {
+            const inductionDate = new Date(i.fecha);
+            return inductionDate.getFullYear() === currentYear && (inductionDate.getUTCMonth() + 1) === currentMonth;
+        });
+
+        tbody.innerHTML = '';
+        recentInducciones.forEach(induccion => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${this.formatDate(induccion.fecha)}</td>
+                <td>${induccion.empleado}</td>
+                <td>${induccion.cargo}</td>
+                <td>${induccion.puntuacion}</td>
+                <td><span class="status-badge ${induccion.estado === 'approved' ? 'status-approved' : 'status-failed'}">${induccion.estado === 'approved' ? 'Aprobado' : 'Reprobado'}</span></td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" onclick="window.currentInduccionesComponent.showInductionDetails(${induccion.id})">Ver Detalles</button>
                 </td>
             `;
             tbody.appendChild(row);
@@ -797,10 +825,11 @@ class InduccionesComponent {
                 // Actualizar empleados basados en las inducciones
                 this.empleados = this.extractEmployeesFromInducciones(this.inducciones);
 
-                // Actualizar la interfaz con los datos reales
-                this.filteredInducciones = [...this.inducciones];
-                this.updateDashboardStats();
-                this.renderInduccionesTable();
+                // Popular el filtro de año y aplicar el filtro inicial
+                this.populateYearFilter();
+                this.applyFilters();
+
+                // Renderizar las tablas restantes
                 this.renderEmployeesTable();
 
                 this.showNotification(`Datos cargados exitosamente. ${this.inducciones.length} inducciones encontradas.`, 'success');
@@ -809,9 +838,8 @@ class InduccionesComponent {
                 // Si falla, usar datos de ejemplo
                 this.inducciones = this.generateSampleInducciones();
                 this.empleados = this.generateSampleEmployees();
-                this.filteredInducciones = [...this.inducciones];
-                this.updateDashboardStats();
-                this.renderInduccionesTable();
+                this.populateYearFilter();
+                this.applyFilters();
                 this.renderEmployeesTable();
                 this.showNotification('Error al leer el archivo Excel. Se están mostrando datos de ejemplo.', 'warning');
             }
@@ -820,9 +848,8 @@ class InduccionesComponent {
             // Si falla completamente, usar datos de ejemplo
             this.inducciones = this.generateSampleInducciones();
             this.empleados = this.generateSampleEmployees();
-            this.filteredInducciones = [...this.inducciones];
-            this.updateDashboardStats();
-            this.renderInduccionesTable();
+            this.populateYearFilter();
+            this.applyFilters();
             this.renderEmployeesTable();
             this.showNotification('Error al cargar datos desde el archivo Excel. Se están mostrando datos de ejemplo.', 'warning');
         }
@@ -854,18 +881,48 @@ class InduccionesComponent {
     // Función para parsear datos de Excel de inducciones
     parseExcelDataToInducciones(processedData, headers) {
         const inducciones = [];
-        // Los datos empiezan desde la fila 6 del Excel (índice 6 del array)
-        const dataRows = processedData.slice(5);
 
-        console.log(`[DEBUG] Procesando ${dataRows.length} filas de datos desde índice 6`);
+        console.log(`[DEBUG] Total de filas en processedData: ${processedData.length}`);
+        console.log(`[DEBUG] Headers:`, headers);
+
+        // Validar que hay datos para procesar
+        if (!Array.isArray(processedData) || processedData.length === 0) {
+            console.log('[DEBUG] processedData está vacío o no es un array');
+            return inducciones;
+        }
+
+        // Encontrar la fila donde comienzan los datos reales (después de encabezados)
+        let startIndex = 0;
+        for (let i = 0; i < processedData.length; i++) {
+            const row = processedData[i];
+            if (Array.isArray(row) && row.length > 0) {
+                const firstCell = row[0];
+                if (firstCell !== undefined && firstCell !== null && String(firstCell).trim() !== '') {
+                    // Buscar filas que puedan contener encabezados o títulos
+                    const firstCellValue = String(firstCell).toLowerCase();
+                    if (firstCellValue.includes('empleado') || firstCellValue.includes('nombre') ||
+                        firstCellValue.includes('fecha') || firstCellValue.includes('inducción')) {
+                        startIndex = i + 1; // Comenzar después de la fila de encabezado
+                        break;
+                    }
+                }
+            }
+        }
+
+        console.log(`[DEBUG] Comenzando a procesar desde el índice: ${startIndex}`);
+
+        // Los datos empiezan desde el índice encontrado o por defecto desde 5
+        const dataRows = startIndex > 0 ? processedData.slice(startIndex) : processedData.slice(5);
+
+        console.log(`[DEBUG] Procesando ${dataRows.length} filas de datos desde índice ${startIndex > 0 ? startIndex : 5}`);
 
         // El bucle ahora empieza en 0 porque dataRows[0] es la primera fila de datos real.
         for (let i = 0; i < dataRows.length; i++) {
             const row = dataRows[i];
 
-            // Ajustar la comprobación de longitud a las columnas que se usarán
-            if (!Array.isArray(row) || row.length < 6) {
-                console.log(`[DEBUG] Fila ${i+7} no válida o sin suficientes columnas (longitud: ${row ? row.length : 'undefined'}):`, row);
+            // Ajustar la comprobación de longitud a las columnas que se usarán (hasta la H, índice 7)
+            if (!Array.isArray(row) || row.length < 1) {
+                console.log(`[DEBUG] Fila ${i + startIndex + 1} no válida o sin suficientes columnas (longitud: ${row ? row.length : 'undefined'}):`, row);
                 continue;
             }
 
@@ -882,7 +939,7 @@ class InduccionesComponent {
 
             // Omitir filas vacías o de encabezado residual
             if (!empleado || empleado === 'Nombre del empleado' || empleado === '') {
-                console.log(`[DEBUG] Fila ${i+7} sin nombre de empleado válido, saltando`);
+                console.log(`[DEBUG] Fila ${i + startIndex + 1} sin nombre de empleado válido, saltando: '${empleado}'`);
                 continue;
             }
 
@@ -892,13 +949,37 @@ class InduccionesComponent {
                 break;
             }
 
-            // Cédula (Columna E, índice 4) - Suposición
-            const cedulaRaw = getCellValue(row[4]);
-            const cedula = String(cedulaRaw || 'No especificada');
+            // Año (Columna E, índice 4) - Confirmado por usuario
+            const yearRaw = getCellValue(row[4]);
+            const year = String(yearRaw || '').trim();
+            console.log(`[DEBUG-Filtro] Fila ${i + startIndex + 1}: Leyendo año de columna E. Valor: '${year}'`);
+
+            // Si el año está vacío, intentar extraerlo de la fecha
+            let finalYear = year;
+            if (!finalYear || finalYear === '') {
+                // Extraer año de la fecha si está disponible
+                const fechaValue = getCellValue(row[3]);
+                if (fechaValue) {
+                    const fechaStr = String(fechaValue);
+                    const dateRegex = /(\d{1,2})\/(\d{1,2})\/(\d{2,4})/;
+                    const match = fechaStr.match(dateRegex);
+                    if (match) {
+                        let yearFromFecha = match[3];
+                        if (yearFromFecha.length === 2) {
+                            yearFromFecha = `20${yearFromFecha}`; // Asumir siglo 21 para años de 2 colores
+                        }
+                        finalYear = yearFromFecha;
+                    }
+                }
+            }
 
             // Cargo (Columna F, índice 5) - Suposición
             const cargoRaw = getCellValue(row[5]);
             const cargo = String(cargoRaw || 'No especificado');
+
+            // Cédula (Columna H, índice 7) - Confirmado por usuario
+            const cedulaRaw = getCellValue(row[7]);
+            const cedula = String(cedulaRaw || 'No especificada');
 
             // Fecha (Columna D, índice 3) - Deducido de los logs
             let fecha = 'No especificada';
@@ -932,7 +1013,7 @@ class InduccionesComponent {
                         const day = String(parsedDate.getDate()).padStart(2, '0');
                         fecha = `${year}-${month}-${day}`;
                     } else {
-                        console.log(`[DEBUG] Fecha no válida en fila ${i+7}: ${fechaValue}`);
+                        console.log(`[DEBUG] Fecha no válida en fila ${i + startIndex + 1}: ${fechaValue}`);
                     }
                 }
             }
@@ -952,15 +1033,14 @@ class InduccionesComponent {
                 estado = 'failed';
             }
 
-            console.log(`[DEBUG] Inducción corregida: ${empleado}, cédula: ${cedula}, cargo: ${cargo}, fecha: ${fecha}, puntuación: ${puntuacion}, estado: ${estado}`);
-
             inducciones.push({
                 id: inducciones.length + 1,
-                rowIndex: i + 6,
+                rowIndex: i + startIndex + 1,
                 empleado: empleado,
                 cedula: cedula,
                 cargo: cargo,
                 fecha: fecha,
+                year: finalYear,
                 puntuacion: puntuacion,
                 estado: estado,
                 participantes: 1
