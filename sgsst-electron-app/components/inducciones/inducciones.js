@@ -107,7 +107,6 @@ class InduccionesComponent {
 
         // Eventos de filtros
         document.getElementById('yearFilter')?.addEventListener('change', () => this.applyFilters());
-        document.getElementById('monthFilter')?.addEventListener('change', () => this.applyFilters());
         document.getElementById('applyFiltersBtn')?.addEventListener('click', () => this.applyFilters());
         document.getElementById('clearFiltersBtn')?.addEventListener('click', () => this.clearFilters());
     }
@@ -310,7 +309,6 @@ class InduccionesComponent {
 
     clearFilters() {
         document.getElementById('yearFilter').value = '';
-        // document.getElementById('monthFilter').value = ''; // Para futura implementación
         this.applyFilters();
         this.showNotification('Filtros limpiados.', 'info');
     }
@@ -357,6 +355,9 @@ class InduccionesComponent {
         if (descriptions.length > 0) {
             descriptions[descriptions.length - 1].textContent = `${porcentaje}% de aprobación`;
         }
+
+        // Actualizar tabla de inducciones recientes (siempre del mes en curso)
+        this.renderRecentInduccionesTable();
     }
 
     calculateAverageScore() {
@@ -405,26 +406,50 @@ class InduccionesComponent {
         const currentYear = now.getFullYear();
         const currentMonth = now.getMonth() + 1;
 
-        const recentInducciones = this.inducciones.filter(i => {
+        // Usamos this.filteredInducciones en lugar de this.inducciones para respetar los filtros aplicados
+        // Primero intentamos filtrar por mes actual
+        let recentInducciones = this.filteredInducciones.filter(i => {
             const inductionDate = new Date(i.fecha);
-            return inductionDate.getFullYear() === currentYear && (inductionDate.getUTCMonth() + 1) === currentMonth;
+            return inductionDate.getFullYear() === currentYear && (inductionDate.getMonth() + 1) === currentMonth;
         });
 
+        // Si no hay inducciones en el mes actual, mostramos las más recientes del conjunto filtrado
+        if (recentInducciones.length === 0) {
+            // Tomar las más recientes del conjunto filtrado
+            recentInducciones = [...this.filteredInducciones]; // Copiar array para no modificar el original
+
+            // Ordenar por fecha descendente y tomar las más recientes
+            recentInducciones.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+            recentInducciones = recentInducciones.slice(0, 10); // Tomar las 10 más recientes
+        } else {
+            // Si hay inducciones en el mes actual, ordenarlas por fecha
+            recentInducciones.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+        }
+
         tbody.innerHTML = '';
-        recentInducciones.forEach(induccion => {
+        if (recentInducciones.length > 0) {
+            recentInducciones.forEach(induccion => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${this.formatDate(induccion.fecha)}</td>
+                    <td>${induccion.empleado}</td>
+                    <td>${induccion.cargo}</td>
+                    <td>${induccion.puntuacion}</td>
+                    <td><span class="status-badge ${induccion.estado === 'approved' ? 'status-approved' : 'status-failed'}">${induccion.estado === 'approved' ? 'Aprobado' : 'Reprobado'}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="window.currentInduccionesComponent.showInductionDetails(${induccion.id})">Ver Detalles</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        } else {
+            // Si no hay ninguna inducción, mostrar un mensaje
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td>${this.formatDate(induccion.fecha)}</td>
-                <td>${induccion.empleado}</td>
-                <td>${induccion.cargo}</td>
-                <td>${induccion.puntuacion}</td>
-                <td><span class="status-badge ${induccion.estado === 'approved' ? 'status-approved' : 'status-failed'}">${induccion.estado === 'approved' ? 'Aprobado' : 'Reprobado'}</span></td>
-                <td>
-                    <button class="btn btn-sm btn-outline-primary" onclick="window.currentInduccionesComponent.showInductionDetails(${induccion.id})">Ver Detalles</button>
-                </td>
+                <td colspan="6" style="text-align: center; padding: 20px;">No hay inducciones registradas</td>
             `;
             tbody.appendChild(row);
-        });
+        }
     }
 
     renderEmployeesTable() {
@@ -933,8 +958,8 @@ class InduccionesComponent {
                 return cell;
             };
 
-            // Empleado (Columna A, índice 0) - Asumido
-            const empleadoRaw = getCellValue(row[0]);
+            // Empleado (Columna G, índice 6) - Asumido
+            const empleadoRaw = getCellValue(row[6]);
             const empleado = String(empleadoRaw || '').trim();
 
             // Omitir filas vacías o de encabezado residual
@@ -973,8 +998,8 @@ class InduccionesComponent {
                 }
             }
 
-            // Cargo (Columna F, índice 5) - Suposición
-            const cargoRaw = getCellValue(row[5]);
+            // Cargo (Columna I, índice 8) - Suposición
+            const cargoRaw = getCellValue(row[8]);
             const cargo = String(cargoRaw || 'No especificado');
 
             // Cédula (Columna H, índice 7) - Confirmado por usuario

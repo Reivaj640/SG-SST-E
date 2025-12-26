@@ -20,19 +20,19 @@
             --header-height: 70px;
             --nav-height: 60px;
         }
-        
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: var(--light-bg);
             color: var(--dark-text);
         }
-        
+
         /* Top Header */
         .top-header {
             height: var(--header-height);
@@ -44,30 +44,30 @@
             padding: 0 30px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-        
+
         .logo-section {
             display: flex;
             align-items: center;
         }
-        
+
         .logo-section h3 {
             font-size: 1.5rem;
             font-weight: 600;
             margin: 0;
         }
-        
+
         .logo-section p {
             margin: 0 0 0 15px;
             opacity: 0.9;
             font-size: 0.9rem;
         }
-        
+
         .header-actions {
             display: flex;
             align-items: center;
             gap: 15px;
         }
-        
+
         .header-btn {
             background-color: rgba(255,255,255,0.2);
             color: white;
@@ -78,16 +78,16 @@
             transition: all 0.2s;
             font-weight: 500;
         }
-        
+
         .header-btn:hover {
             background-color: rgba(255,255,255,0.3);
         }
-        
+
         .user-info {
             display: flex;
             align-items: center;
         }
-        
+
         .user-avatar {
             width: 40px;
             height: 40px;
@@ -100,7 +100,7 @@
             margin-left: 10px;
             font-weight: 600;
         }
-        
+
         /* Navigation Bar */
         .nav-bar {
             height: var(--nav-height);
@@ -110,7 +110,7 @@
             align-items: center;
             padding: 0 30px;
         }
-        
+
         .nav-menu {
             display: flex;
             list-style: none;
@@ -118,13 +118,13 @@
             padding: 0;
             height: 100%;
         }
-        
+
         .nav-item {
             height: 100%;
             display: flex;
             align-items: center;
         }
-        
+
         .nav-link {
             display: flex;
             align-items: center;
@@ -136,36 +136,36 @@
             border-bottom: 3px solid transparent;
             font-weight: 500;
         }
-        
+
         .nav-link:hover {
             background-color: rgba(26, 115, 232, 0.05);
             color: var(--primary-color);
         }
-        
+
         .nav-link.active {
             color: var(--primary-color);
             border-bottom-color: var(--primary-color);
         }
-        
+
         .nav-link i {
             margin-right: 8px;
             font-size: 1.1rem;
         }
-        
+
         /* Main Content */
         .main-content {
             padding: 20px 30px;
             height: calc(100vh - var(--header-height) - var(--nav-height));
             overflow-y: auto;
         }
-        
+
         .page-title {
             font-size: 1.8rem;
             font-weight: 600;
             margin-bottom: 25px;
             color: var(--dark-text);
         }
-        
+
         /* Dashboard Cards */
         .dashboard-card {
             background-color: white;
@@ -175,25 +175,25 @@
             margin-bottom: 20px;
             transition: transform 0.3s;
         }
-        
+
         .dashboard-card:hover {
             transform: translateY(-5px);
             box-shadow: 0 5px 15px rgba(0,0,0,0.1);
         }
-        
+
         .card-header-custom {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 15px;
         }
-        
+
         .card-title {
             font-size: 1.1rem;
             font-weight: 600;
             color: var(--dark-text);
         }
-        
+
         .card-icon {
             width: 40px;
             height: 40px;
@@ -203,34 +203,34 @@
             justify-content: center;
             color: white;
         }
-        
+
         .card-icon.primary {
             background-color: var(--primary-color);
         }
-        
+
         .card-icon.success {
             background-color: var(--success-color);
         }
-        
+
         .card-icon.warning {
             background-color: var(--warning-color);
         }
-        
+
         .card-icon.danger {
             background-color: var(--danger-color);
         }
-        
+
         .card-value {
             font-size: 2rem;
             font-weight: 700;
             margin-bottom: 5px;
         }
-        
+
         .card-description {
             color: #5f6368;
             font-size: 0.9rem;
         }
-        
+
         /* Tables */
         .custom-table {
             background-color: white;
@@ -238,7 +238,7 @@
             overflow: hidden;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
         }
-        
+
         .table-header {
             padding: 15px 20px;
             background-color: white;
@@ -247,17 +247,17 @@
             justify-content: space-between;
             align-items: center;
         }
-        
+
         .table-title {
             font-size: 1.2rem;
             font-weight: 600;
         }
-        
+
         .table-actions {
             display: flex;
             gap: 10px;
         }
-        
+
         .btn-custom {
             padding: 8px 16px;
             border-radius: 6px;
@@ -266,43 +266,43 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-        
+
         .btn-primary-custom {
             background-color: var(--primary-color);
             color: white;
         }
-        
+
         .btn-primary-custom:hover {
             background-color: var(--secondary-color);
         }
-        
+
         .btn-secondary-custom {
             background-color: white;
             color: var(--dark-text);
             border: 1px solid #e0e0e0;
         }
-        
+
         .btn-secondary-custom:hover {
             background-color: #f1f3f4;
         }
-        
+
         .status-badge {
             padding: 4px 10px;
             border-radius: 20px;
             font-size: 0.85rem;
             font-weight: 500;
         }
-        
+
         .status-approved {
             background-color: rgba(15, 157, 88, 0.1);
             color: var(--success-color);
         }
-        
+
         .status-failed {
             background-color: rgba(234, 67, 53, 0.1);
             color: var(--danger-color);
         }
-        
+
         /* Forms */
         .form-section {
             background-color: white;
@@ -311,7 +311,7 @@
             padding: 20px;
             margin-bottom: 20px;
         }
-        
+
         .form-title {
             font-size: 1.2rem;
             font-weight: 600;
@@ -319,17 +319,17 @@
             padding-bottom: 10px;
             border-bottom: 1px solid #e0e0e0;
         }
-        
+
         .form-group {
             margin-bottom: 20px;
         }
-        
+
         .form-label {
             font-weight: 500;
             margin-bottom: 8px;
             display: block;
         }
-        
+
         .form-control-custom {
             width: 100%;
             padding: 10px 15px;
@@ -337,20 +337,20 @@
             border-radius: 6px;
             transition: all 0.2s;
         }
-        
+
         .form-control-custom:focus {
             outline: none;
             border-color: var(--primary-color);
             box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.1);
         }
-        
+
         /* Charts */
         .chart-container {
             position: relative;
             height: 300px;
             width: 100%;
         }
-        
+
         /* Mobile Menu Toggle */
         .mobile-menu-toggle {
             display: none;
@@ -360,58 +360,58 @@
             color: white;
             cursor: pointer;
         }
-        
+
         /* Responsive */
         @media (max-width: 768px) {
             .top-header {
                 padding: 0 15px;
             }
-            
+
             .nav-bar {
                 padding: 0 15px;
             }
-            
+
             .main-content {
                 padding: 15px;
             }
-            
+
             .mobile-menu-toggle {
                 display: block;
             }
-            
+
             .logo-section p {
                 display: none;
             }
-            
+
             .nav-bar {
                 transform: translateY(-100%);
                 transition: transform 0.3s;
             }
-            
+
             .nav-bar.active {
                 transform: translateY(0);
             }
-            
+
             .nav-menu {
                 flex-direction: column;
                 width: 100%;
             }
-            
+
             .nav-item {
                 width: 100%;
             }
-            
+
             .nav-link {
                 width: 100%;
                 padding: 15px;
                 border-bottom: 1px solid #e0e0e0;
             }
-            
+
             .dashboard-card {
                 margin-bottom: 15px;
             }
         }
-        
+
         /* Loading Spinner */
         .spinner {
             border: 4px solid rgba(0, 0, 0, 0.1);
@@ -421,12 +421,12 @@
             border-left-color: var(--primary-color);
             animation: spin 1s ease infinite;
         }
-        
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        
+
         /* Modal */
         .modal-custom {
             display: none;
@@ -440,11 +440,11 @@
             align-items: center;
             justify-content: center;
         }
-        
+
         .modal-custom.active {
             display: flex;
         }
-        
+
         .modal-content-custom {
             background-color: white;
             border-radius: 8px;
@@ -454,12 +454,12 @@
             overflow-y: auto;
             animation: modalFadeIn 0.3s;
         }
-        
+
         @keyframes modalFadeIn {
             from { opacity: 0; transform: translateY(-30px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        
+
         .modal-header-custom {
             padding: 20px;
             border-bottom: 1px solid #e0e0e0;
@@ -467,12 +467,12 @@
             justify-content: space-between;
             align-items: center;
         }
-        
+
         .modal-title-custom {
             font-size: 1.3rem;
             font-weight: 600;
         }
-        
+
         .modal-close {
             background: none;
             border: none;
@@ -480,11 +480,11 @@
             cursor: pointer;
             color: #5f6368;
         }
-        
+
         .modal-body-custom {
             padding: 20px;
         }
-        
+
         .modal-footer-custom {
             padding: 15px 20px;
             border-top: 1px solid #e0e0e0;
@@ -492,17 +492,17 @@
             justify-content: flex-end;
             gap: 10px;
         }
-        
+
         /* Tabs */
         .tabs-container {
             margin-bottom: 20px;
         }
-        
+
         .tabs-nav {
             display: flex;
             border-bottom: 1px solid #e0e0e0;
         }
-        
+
         .tab-button {
             padding: 12px 20px;
             background: none;
@@ -513,21 +513,21 @@
             color: #5f6368;
             transition: all 0.2s;
         }
-        
+
         .tab-button:hover {
             color: var(--dark-text);
         }
-        
+
         .tab-button.active {
             color: var(--primary-color);
             border-bottom-color: var(--primary-color);
         }
-        
+
         .tab-content {
             display: none;
             padding: 20px 0;
         }
-        
+
         .tab-content.active {
             display: block;
         }
@@ -585,11 +585,10 @@
         <div id="dashboard-page" class="page-content">
             <div class="filter-section" style="margin-bottom: 20px; display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
                 <select id="yearFilter" class="form-control-custom" style="width: 120px;"></select>
-                <select id="monthFilter" class="form-control-custom" style="width: 150px;"></select>
                 <button id="applyFiltersBtn" class="btn-custom btn-primary-custom">Aplicar</button>
                 <button id="clearFiltersBtn" class="btn-custom btn-secondary-custom">Limpiar</button>
             </div>
-            
+
             <!-- Stats Cards -->
             <div class="row">
                 <div class="col-lg-3 col-md-6">
@@ -696,10 +695,10 @@
 
         <!-- Inductions Page -->
         <div id="inductions-page" class="page-content" style="display: none;">
-            
+
             <div class="form-section">
                 <div class="form-title">Listado de Inducciones</div>
-                
+
                 <div class="table-actions mb-3">
                     <button class="btn-custom btn-primary-custom" id="add-induction-btn">
                         <i class="bi bi-plus-circle"></i> Nueva Inducción
@@ -713,7 +712,7 @@
                         <input type="date" class="form-control-custom d-inline-block ms-2" style="width: 200px;">
                     </div>
                 </div>
-                
+
                 <div class="table-responsive">
                     <table class="table table-hover">
                         <thead>
@@ -793,10 +792,10 @@
 
         <!-- Reports Page -->
         <div id="reports-page" class="page-content" style="display: none;">
-            
+
             <div class="form-section">
                 <div class="form-title">Generador de Reportes</div>
-                
+
                 <div class="row mb-4">
                     <div class="col-md-4">
                         <div class="form-group">
@@ -823,7 +822,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="mb-3">
                     <button class="btn-custom btn-primary-custom" id="generateReport">
                         <i class="bi bi-bar-chart"></i> Generar Reporte
@@ -835,7 +834,7 @@
                         <i class="bi bi-file-pdf"></i> Exportar a PDF
                     </button>
                 </div>
-                
+
                 <div class="row">
                     <div class="col-md-6">
                         <div class="dashboard-card">
@@ -976,52 +975,52 @@
             const navLinks = document.querySelectorAll('.nav-link');
             const pages = document.querySelectorAll('.page-content');
             const pageTitles = document.querySelectorAll('.page-title');
-            
+
             navLinks.forEach(link => {
                 link.addEventListener('click', function(e) {
                     e.preventDefault();
-                    
+
                     // Remove active class from all links and pages
                     navLinks.forEach(l => l.classList.remove('active'));
                     pages.forEach(p => p.style.display = 'none');
-                    
+
                     // Add active class to clicked link
                     this.classList.add('active');
-                    
+
                     // Show corresponding page
                     const pageId = this.getAttribute('data-page') + '-page';
                     const page = document.getElementById(pageId);
                     if (page) {
                         page.style.display = 'block';
                     }
-                    
+
                     // Close mobile menu
                     if (window.innerWidth <= 768) {
                         document.getElementById('navBar').classList.remove('active');
                     }
                 });
             });
-            
+
             // Mobile menu toggle
             const mobileMenuToggle = document.getElementById('mobileMenuToggle');
             const navBar = document.getElementById('navBar');
-            
+
             mobileMenuToggle.addEventListener('click', function() {
                 navBar.classList.toggle('active');
             });
-            
+
             // Tabs
             const tabButtons = document.querySelectorAll('.tab-button');
             const tabContents = document.querySelectorAll('.tab-content');
-            
+
             tabButtons.forEach(button => {
                 button.addEventListener('click', function() {
                     const tabId = this.getAttribute('data-tab');
-                    
+
                     // Remove active class from all buttons and contents
                     tabButtons.forEach(b => b.classList.remove('active'));
                     tabContents.forEach(c => c.classList.remove('active'));
-                    
+
                     // Add active class to clicked button and corresponding content
                     this.classList.add('active');
                     const tabContent = document.getElementById(tabId + '-tab');
@@ -1030,58 +1029,58 @@
                     }
                 });
             });
-            
+
             // Modals
             const addEmployeeBtn = document.getElementById('add-employee-btn');
             const addEmployeeModal = document.getElementById('addEmployeeModal');
             const closeEmployeeModal = document.getElementById('closeEmployeeModal');
             const cancelAddEmployee = document.getElementById('cancelAddEmployee');
             const saveEmployee = document.getElementById('saveEmployee');
-            
+
             addEmployeeBtn.addEventListener('click', function() {
                 addEmployeeModal.classList.add('active');
             });
-            
+
             closeEmployeeModal.addEventListener('click', function() {
                 addEmployeeModal.classList.remove('active');
             });
-            
+
             cancelAddEmployee.addEventListener('click', function() {
                 addEmployeeModal.classList.remove('active');
             });
-            
+
             saveEmployee.addEventListener('click', function() {
                 // Save employee logic here
                 addEmployeeModal.classList.remove('active');
                 // Show success message
                 alert('Empleado guardado correctamente');
             });
-            
+
             const addInductionBtn = document.getElementById('add-induction-btn');
             const addInductionModal = document.getElementById('addInductionModal');
             const closeInductionModal = document.getElementById('closeInductionModal');
             const cancelAddInduction = document.getElementById('cancelAddInduction');
             const saveInduction = document.getElementById('saveInduction');
-            
+
             addInductionBtn.addEventListener('click', function() {
                 addInductionModal.classList.add('active');
             });
-            
+
             closeInductionModal.addEventListener('click', function() {
                 addInductionModal.classList.remove('active');
             });
-            
+
             cancelAddInduction.addEventListener('click', function() {
                 addInductionModal.classList.remove('active');
             });
-            
+
             saveInduction.addEventListener('click', function() {
                 // Save induction logic here
                 addInductionModal.classList.remove('active');
                 // Show success message
                 alert('Inducción guardada correctamente');
             });
-            
+
             // Charts
             const weeklyChartCtx = document.getElementById('weeklyChart').getContext('2d');
             const weeklyChart = new Chart(weeklyChartCtx, {
@@ -1119,7 +1118,7 @@
                     }
                 }
             });
-            
+
             const positionChartCtx = document.getElementById('positionChart').getContext('2d');
             const positionChart = new Chart(positionChartCtx, {
                 type: 'doughnut',
@@ -1145,7 +1144,7 @@
                     }
                 }
             });
-            
+
             const approvalRateChartCtx = document.getElementById('approvalRateChart').getContext('2d');
             const approvalRateChart = new Chart(approvalRateChartCtx, {
                 type: 'bar',
@@ -1169,7 +1168,7 @@
                     }
                 }
             });
-            
+
             const errorRateChartCtx = document.getElementById('errorRateChart').getContext('2d');
             const errorRateChart = new Chart(errorRateChartCtx, {
                 type: 'horizontalBar',
@@ -1193,7 +1192,7 @@
                     }
                 }
             });
-            
+
             // Set current date for induction date input
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('inductionDate').value = today;
