@@ -358,6 +358,9 @@ class InduccionesComponent {
 
         // Actualizar tabla de inducciones recientes (siempre del mes en curso)
         this.renderRecentInduccionesTable();
+
+        // Actualizar gráfica de inducciones mensuales para reflejar los filtros aplicados
+        this.renderWeeklyChart();
     }
 
     calculateAverageScore() {
@@ -658,7 +661,7 @@ class InduccionesComponent {
     }
 
     renderWeeklyChart() {
-        // Renderizar gráfico semanal
+        // Renderizar gráfico mensual (renombrado de weekly a monthly pero manteniendo el ID del canvas)
         const canvas = document.getElementById('weeklyChart');
         if (canvas && typeof Chart !== 'undefined') {
             const ctx = canvas.getContext('2d');
@@ -668,20 +671,55 @@ class InduccionesComponent {
                 canvas.chartInstance.destroy();
             }
 
+            // Preparar datos mensuales para el año seleccionado
+            const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                           'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+            // Contar inducciones por mes
+            const induccionesRealizadas = Array(12).fill(0);
+            const induccionesAprobadas = Array(12).fill(0);
+
+            console.log(`[DEBUG-Gráfica] Total de registros en filteredInducciones: ${this.filteredInducciones.length}`);
+
+            // Usar this.filteredInducciones para respetar los filtros aplicados
+            this.filteredInducciones.forEach((induccion, index) => {
+                console.log(`[DEBUG-Gráfica] Procesando inducción ${index + 1}: Fecha=${induccion.fecha}, Estado=${induccion.estado}`);
+
+                const fecha = new Date(induccion.fecha);
+                if (fecha && !isNaN(fecha.getTime())) {
+                    const monthIndex = fecha.getMonth(); // 0 = Enero, 11 = Diciembre
+                    console.log(`[DEBUG-Gráfica] Fecha válida: ${fecha}, Mes: ${months[monthIndex]} (${monthIndex})`);
+
+                    // Incrementar contador de inducciones realizadas
+                    induccionesRealizadas[monthIndex]++;
+                    console.log(`[DEBUG-Gráfica] Inducciones realizadas en ${months[monthIndex]}: ${induccionesRealizadas[monthIndex]}`);
+
+                    // Incrementar contador de inducciones aprobadas si aplica
+                    if (induccion.estado === 'approved') {
+                        induccionesAprobadas[monthIndex]++;
+                        console.log(`[DEBUG-Gráfica] Inducciones aprobadas en ${months[monthIndex]}: ${induccionesAprobadas[monthIndex]}`);
+                    }
+                } else {
+                    console.log(`[DEBUG-Gráfica] Fecha inválida para inducción: ${induccion.fecha}`);
+                }
+            });
+
+            console.log(`[DEBUG-Gráfica] Datos finales - Realizadas: [${induccionesRealizadas.join(', ')}], Aprobadas: [${induccionesAprobadas.join(', ')}]`);
+
             canvas.chartInstance = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: ['Semana 1', 'Semana 2', 'Semana 3', 'Semana 4'],
+                    labels: months,
                     datasets: [{
                         label: 'Inducciones Realizadas',
-                        data: [12, 19, 8, 15],
+                        data: induccionesRealizadas,
                         backgroundColor: 'rgba(26, 115, 232, 0.2)',
                         borderColor: 'rgba(26, 115, 232, 1)',
                         borderWidth: 2,
                         tension: 0.4
                     }, {
                         label: 'Inducciones Aprobadas',
-                        data: [9, 14, 6, 12],
+                        data: induccionesAprobadas,
                         backgroundColor: 'rgba(15, 157, 88, 0.2)',
                         borderColor: 'rgba(15, 157, 88, 1)',
                         borderWidth: 2,
@@ -698,7 +736,10 @@ class InduccionesComponent {
                     },
                     scales: {
                         y: {
-                            beginAtZero: true
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0 // Mostrar solo números enteros
+                            }
                         }
                     }
                 }
