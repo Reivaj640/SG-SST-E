@@ -109,6 +109,9 @@ class InduccionesComponent {
         document.getElementById('yearFilter')?.addEventListener('change', () => this.applyFilters());
         document.getElementById('applyFiltersBtn')?.addEventListener('click', () => this.applyFilters());
         document.getElementById('clearFiltersBtn')?.addEventListener('click', () => this.clearFilters());
+
+        // Inicializar eventos de búsqueda
+        this.initializeSearchEvents();
     }
 
     switchView(viewId) {
@@ -209,6 +212,15 @@ class InduccionesComponent {
 
             // Leer y procesar el archivo Excel de inducciones
             await this.loadInduccionesFromExcel();
+
+            // Inicializar las inducciones filtradas con todas las inducciones (sin filtrar por defecto para la vista de registros)
+            this.filteredInducciones = [...this.inducciones];
+
+            // Actualizar el filtro de año con todos los años disponibles
+            this.populateYearFilter();
+
+            // Actualizar dashboard stats con todas las inducciones
+            this.updateDashboardStats();
 
         } catch (error) {
             console.error('Error al inicializar el componente:', error);
@@ -381,10 +393,13 @@ class InduccionesComponent {
         if (!tbody) return;
 
         tbody.innerHTML = '';
-        this.filteredInducciones.forEach(induccion => {
+        this.filteredInducciones.forEach((induccion, index) => {
+            // Calcular ID secuencial para mostrar en la tabla (comenzando desde 01)
+            const displayId = String(index + 1).padStart(2, '0');
+
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td>${induccion.id}</td>
+                <td>${displayId}</td>
                 <td>${this.formatDate(induccion.fecha)}</td>
                 <td>${induccion.empleado}</td>
                 <td>${induccion.cedula}</td>
@@ -399,6 +414,60 @@ class InduccionesComponent {
             `;
             tbody.appendChild(row);
         });
+    }
+
+    // Función para buscar inducciones por cédula o nombre
+    searchInducciones(searchTerm) {
+        if (!searchTerm || searchTerm.trim() === '') {
+            // Si no hay término de búsqueda, mostrar todas las inducciones
+            this.filteredInducciones = [...this.inducciones];
+        } else {
+            const term = searchTerm.toLowerCase().trim();
+            this.filteredInducciones = this.inducciones.filter(induccion => {
+                // Buscar en el nombre del empleado o en la cédula
+                return (
+                    induccion.empleado.toLowerCase().includes(term) ||
+                    induccion.cedula.includes(term)
+                );
+            });
+        }
+
+        // Actualizar la tabla con los resultados filtrados
+        this.renderInduccionesTable();
+    }
+
+    // Función para inicializar los eventos del buscador
+    initializeSearchEvents() {
+        const searchInput = document.getElementById('searchInput');
+        const searchBtn = document.getElementById('searchBtn');
+        const clearSearchBtn = document.getElementById('clearSearchBtn');
+
+        if (searchInput) {
+            searchInput.addEventListener('keyup', (e) => {
+                if (e.key === 'Enter') {
+                    this.searchInducciones(searchInput.value);
+                }
+            });
+        }
+
+        if (searchBtn) {
+            searchBtn.addEventListener('click', () => {
+                const searchInput = document.getElementById('searchInput');
+                if (searchInput) {
+                    this.searchInducciones(searchInput.value);
+                }
+            });
+        }
+
+        if (clearSearchBtn) {
+            clearSearchBtn.addEventListener('click', () => {
+                const searchInput = document.getElementById('searchInput');
+                if (searchInput) {
+                    searchInput.value = '';
+                    this.searchInducciones('');
+                }
+            });
+        }
     }
 
     renderRecentInduccionesTable() {
@@ -957,37 +1026,22 @@ class InduccionesComponent {
             return inducciones;
         }
 
-        // Encontrar la fila donde comienzan los datos reales (después de encabezados)
-        let startIndex = 0;
-        for (let i = 0; i < processedData.length; i++) {
-            const row = processedData[i];
-            if (Array.isArray(row) && row.length > 0) {
-                const firstCell = row[0];
-                if (firstCell !== undefined && firstCell !== null && String(firstCell).trim() !== '') {
-                    // Buscar filas que puedan contener encabezados o títulos
-                    const firstCellValue = String(firstCell).toLowerCase();
-                    if (firstCellValue.includes('empleado') || firstCellValue.includes('nombre') ||
-                        firstCellValue.includes('fecha') || firstCellValue.includes('inducción')) {
-                        startIndex = i + 1; // Comenzar después de la fila de encabezado
-                        break;
-                    }
-                }
-            }
-        }
+        // Comenzar a procesar desde la fila 2 (índice 1) asumiendo que los encabezados están en la fila 1 (índice 2)
+        const startIndex = 1;
 
         console.log(`[DEBUG] Comenzando a procesar desde el índice: ${startIndex}`);
 
-        // Los datos empiezan desde el índice encontrado o por defecto desde 5
-        const dataRows = startIndex > 0 ? processedData.slice(startIndex) : processedData.slice(5);
+        // Los datos empiezan desde el índice 1 (fila 2 del Excel)
+        const dataRows = processedData.slice(startIndex);
 
-        console.log(`[DEBUG] Procesando ${dataRows.length} filas de datos desde índice ${startIndex > 0 ? startIndex : 5}`);
+        console.log(`[DEBUG] Procesando ${dataRows.length} filas de datos desde índice ${startIndex}`);
 
         // El bucle ahora empieza en 0 porque dataRows[0] es la primera fila de datos real.
         for (let i = 0; i < dataRows.length; i++) {
             const row = dataRows[i];
 
-            // Ajustar la comprobación de longitud a las columnas que se usarán (hasta la H, índice 7)
-            if (!Array.isArray(row) || row.length < 1) {
+            // Ajustar la comprobación de longitud a las columnas que se usarán (mínimo hasta la I, índice 8)
+            if (!Array.isArray(row) || row.length < 9) {
                 console.log(`[DEBUG] Fila ${i + startIndex + 1} no válida o sin suficientes columnas (longitud: ${row ? row.length : 'undefined'}):`, row);
                 continue;
             }
@@ -999,7 +1053,7 @@ class InduccionesComponent {
                 return cell;
             };
 
-            // Empleado (Columna G, índice 6) - Asumido
+            // Empleado (Columna G, índice 6)
             const empleadoRaw = getCellValue(row[6]);
             const empleado = String(empleadoRaw || '').trim();
 
@@ -1039,20 +1093,19 @@ class InduccionesComponent {
                 }
             }
 
-            // Cargo (Columna I, índice 8) - Suposición
+            // Cargo (Columna I, índice 8)
             const cargoRaw = getCellValue(row[8]);
             const cargo = String(cargoRaw || 'No especificado');
 
-            // Cédula (Columna H, índice 7) - Confirmado por usuario
+            // Cédula (Columna H, índice 7)
             const cedulaRaw = getCellValue(row[7]);
             const cedula = String(cedulaRaw || 'No especificada');
 
-            // Fecha (Columna D, índice 3) - Deducido de los logs
+            // Fecha (Columna D, índice 3)
             let fecha = 'No especificada';
             const fechaValue = getCellValue(row[3]);
 
             if (fechaValue !== undefined && fechaValue !== null && fechaValue !== '') {
-                let parsedDate;
                 if (typeof fechaValue === 'number') {
                     if (fechaValue >= 1) {
                         const utcDate = new Date((fechaValue - 25569) * 86400 * 1000);
@@ -1063,6 +1116,7 @@ class InduccionesComponent {
                         fecha = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`;
                     }
                 } else {
+                    let parsedDate;
                     const fechaStr = String(fechaValue);
                     parsedDate = new Date(fechaStr);
                     if (isNaN(parsedDate.getTime())) {
@@ -1084,12 +1138,12 @@ class InduccionesComponent {
                 }
             }
 
-            // Puntuación (Columna B, índice 1) - Deducido de los logs
+            // Puntuación (Columna B, índice 1)
             const puntuacionValue = getCellValue(row[1]);
             const puntuacionNum = parseFloat(String(puntuacionValue).split('/')[0].trim());
             const puntuacion = `${!isNaN(puntuacionNum) ? Math.floor(puntuacionNum) : 0} / 22`;
 
-            // Estado (Columna C, índice 2) - Deducido de los logs
+            // Estado (Columna C, índice 2)
             const estadoRaw = getCellValue(row[2]);
             const estadoStr = String(estadoRaw || '');
             let estado = 'pending';
