@@ -544,11 +544,8 @@
                 <h3>Programa de Inducciones</h3>
             </div>
             <div class="header-actions">
-                <button class="header-btn">
+                <button class="header-btn" id="backButton">
                     <i class="bi bi-arrow-left"></i> Volver
-                </button>
-                <button class="header-btn">
-                    <i class="bi bi-download"></i> Exportar
                 </button>
                 </div>
             </div>
@@ -866,6 +863,85 @@
                             </div>
                             <div class="chart-container">
                                 <canvas id="errorRateChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Estadísticas por Género -->
+                <div class="mt-4">
+                    <h5 class="form-title">Estadísticas por Género</h5>
+
+                    <div class="row mb-4">
+                        <div class="col-lg-3 col-md-6">
+                            <div class="dashboard-card gender-stat-card">
+                                <div class="card-header-custom">
+                                    <div class="card-title">Total Hombres</div>
+                                    <div class="card-icon primary">
+                                        <i class="bi bi-person"></i>
+                                    </div>
+                                </div>
+                                <div class="card-value">0</div>
+                                <div class="card-description">Inducciones realizadas</div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-md-6">
+                            <div class="dashboard-card gender-stat-card">
+                                <div class="card-header-custom">
+                                    <div class="card-title">Total Mujeres</div>
+                                    <div class="card-icon success">
+                                        <i class="bi bi-person"></i>
+                                    </div>
+                                </div>
+                                <div class="card-value">0</div>
+                                <div class="card-description">Inducciones realizadas</div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-md-6">
+                            <div class="dashboard-card gender-stat-card">
+                                <div class="card-header-custom">
+                                    <div class="card-title">Hombres Aprobados</div>
+                                    <div class="card-icon success">
+                                        <i class="bi bi-check-circle"></i>
+                                    </div>
+                                </div>
+                                <div class="card-value">0</div>
+                                <div class="card-description">Tasa de aprobación</div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-md-6">
+                            <div class="dashboard-card gender-stat-card">
+                                <div class="card-header-custom">
+                                    <div class="card-title">Mujeres Aprobadas</div>
+                                    <div class="card-icon success">
+                                        <i class="bi bi-check-circle"></i>
+                                    </div>
+                                </div>
+                                <div class="card-value">0</div>
+                                <div class="card-description">Tasa de aprobación</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="dashboard-card">
+                                <div class="card-header-custom">
+                                    <div class="card-title">Distribución por Género</div>
+                                </div>
+                                <div class="chart-container">
+                                    <canvas id="genderDistributionChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="dashboard-card">
+                                <div class="card-header-custom">
+                                    <div class="card-title">Aprobación por Género</div>
+                                </div>
+                                <div class="chart-container">
+                                    <canvas id="approvalByGenderChart"></canvas>
+                                </div>
                             </div>
                         </div>
                     </div>
