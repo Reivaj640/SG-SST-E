@@ -1185,10 +1185,10 @@ class CapacitacionesComponent {
                     if (capacitacionesHeader) {
                         if (bodyClasses.contains('sidebar-open') || document.querySelector('.sidebar')?.classList.contains('active')) {
                             // Cuando el sidebar se abre, asegurar que el header esté detrás
-                            capacitacionesHeader.style.zIndex = '1000';
+                            capacitacionesHeader.style.zIndex = '899'; // Menor que el z-index del sidebar (900)
                         } else {
                             // Cuando el sidebar se cierra, restaurar el z-index normal
-                            capacitacionesHeader.style.zIndex = '1001'; // Un valor mayor que otros elementos pero menor que el sidebar
+                            capacitacionesHeader.style.zIndex = '1000'; // Un valor mayor que otros elementos pero menor que el sidebar cuando está abierto
                         }
                     }
                 }

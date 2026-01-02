@@ -82,7 +82,7 @@
 /* Asegurar que el header no se quede por encima del sidebar al abrirse */
 .sidebar-open .capacitaciones-container .app-header,
 body.sidebar-open .capacitaciones-container .app-header {
-    z-index: 1000 !important; /* Asegurar que el header esté por debajo del sidebar */
+    z-index: 899 !important; /* Asegurar que el header esté por debajo del sidebar */
 }
 
 /* Ajuste adicional para el layout principal */
