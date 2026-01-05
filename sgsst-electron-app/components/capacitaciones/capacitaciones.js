@@ -119,6 +119,7 @@ class CapacitacionesComponent {
             this.loadDataForYear(parseInt(e.target.value));
         });
 
+        document.getElementById('create-period-button')?.addEventListener('click', () => this.createNewPeriod());
         document.querySelector('.floating-action-btn')?.addEventListener('click', () => this.showAddTrainingModal());
         document.querySelector('#trainings-view .btn-primary-custom')?.addEventListener('click', () => this.applyFilters());
         document.querySelector('#trainings-view .btn-outline-secondary')?.addEventListener('click', () => this.clearFilters());
@@ -152,6 +153,52 @@ class CapacitacionesComponent {
         // Actualizar contenido específico según la vista
         if (viewId === 'trainings') {
             this.renderTrainingsTable();
+        }
+    }
+
+    async createNewPeriod() {
+        if (!this.excelFilePath) {
+            this.showNotification('No se ha cargado ningún archivo de Excel.', 'warning');
+            return;
+        }
+        try {
+            const result = await window.electronAPI.duplicateCapacitacionesSheet(this.excelFilePath);
+            if (result.success) {
+                this.showNotification(`Se ha creado la hoja '${result.newSheetName}' exitosamente.`, 'success');
+
+                // Actualizar la lista de hojas disponibles para asegurar que contenga la nueva hoja
+                await this._populateYearFilterFromSheets();
+
+                // Verificar que la nueva hoja esté en la lista de hojas disponibles
+                const newSheetYear = parseInt(result.newSheetName.match(/\d{4}/)[0]);
+                const sheetExists = this.availableSheets.some(sheet =>
+                    sheet.includes(newSheetYear.toString()) &&
+                    (sheet.trim().toLowerCase().includes(`matriz cap.`) ||
+                     sheet.includes('-') ||
+                     sheet.includes('_'))
+                );
+
+                if (!sheetExists) {
+                    // Si la hoja no se encuentra en la lista actualizada, intentar recargar directamente
+                    const sheetsResult = await window.electronAPI.getCapacitacionesSheets(this.excelFilePath);
+                    if (sheetsResult.success) {
+                        this.availableSheets = sheetsResult.sheets;
+                    }
+                }
+
+                // Verificar que newSheetYear sea un número válido antes de continuar
+                if (isNaN(newSheetYear) || newSheetYear === null || newSheetYear === undefined) {
+                    throw new Error(`No se pudo extraer un año válido del nombre de la nueva hoja: ${result.newSheetName}`);
+                }
+
+                // Cargar datos para el nuevo año
+                this.loadDataForYear(newSheetYear);
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error) {
+            console.error('Error al crear nuevo periodo:', error);
+            this.showNotification(`Error al crear nuevo periodo: ${error.message}`, 'danger');
         }
     }
 
@@ -209,7 +256,17 @@ class CapacitacionesComponent {
             return;
         }
 
-        this.availableSheets = sheetsResult.sheets;
+        // Asegurar que sheetsResult.sheets sea un array y contenga solo cadenas válidas
+        if (!sheetsResult.sheets || !Array.isArray(sheetsResult.sheets)) {
+            this.showNotification('Las hojas del archivo Excel no están en el formato esperado.', 'warning');
+            return;
+        }
+
+        // Filtrar solo las cadenas válidas
+        this.availableSheets = sheetsResult.sheets.filter(sheet =>
+            sheet && typeof sheet === 'string'
+        );
+
         const years = [...new Set(this.availableSheets
             .map(sheetName => {
                 const match = sheetName.match(/\d{4}/);
@@ -257,23 +314,36 @@ class CapacitacionesComponent {
     async loadDataForYear(year) {
         this.currentYear = year;
 
+        // Verificar que availableSheets esté definido
+        if (!this.availableSheets || !Array.isArray(this.availableSheets)) {
+            this.showNotification('No se han cargado las hojas disponibles del archivo Excel.', 'warning');
+            this.capacitaciones = [];
+            this.applyFilters();
+            return;
+        }
+
         // Buscar hoja específica para el año, buscando patrones específicos como "Matriz Cap. 2025"
         let sheetName = null;
 
         // Primero intentar buscar exactamente "Matriz Cap. [año]"
         sheetName = this.availableSheets.find(s =>
+            s && typeof s === 'string' && // Verificar que s no sea null/undefined
             s.trim().toLowerCase().includes(`matriz cap.`) &&
             s.includes(year.toString())
         );
 
         // Si no se encuentra con el patrón específico, buscar cualquier hoja que contenga el año
         if (!sheetName) {
-            sheetName = this.availableSheets.find(s => s.includes(year.toString()));
+            sheetName = this.availableSheets.find(s =>
+                s && typeof s === 'string' && // Verificar que s no sea null/undefined
+                s.includes(year.toString())
+            );
         }
 
         // Si aún no se encuentra, buscar con guiones o guiones bajos
         if (!sheetName) {
             sheetName = this.availableSheets.find(s =>
+                s && typeof s === 'string' && // Verificar que s no sea null/undefined
                 s.toLowerCase().includes(year.toString()) &&
                 (s.includes('-') || s.includes('_'))
             );
@@ -293,7 +363,7 @@ class CapacitacionesComponent {
             const { processedData, headers, sheetName: loadedSheetName } = excelResult.data; // Recibir el sheetName real
             if (!processedData) throw new Error('La hoja de Excel seleccionada no contiene datos válidos.');
 
-            // Limpiar datos existentes antes de cargar nuevos
+            // Limpiar datos existenes antes de cargar nuevos
             this.capacitaciones = [];
 
             // Cargar nuevos datos
