@@ -21,6 +21,12 @@
             --hover-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
         }
 
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -33,7 +39,7 @@
             color: var(--text-color);
             line-height: 1.6;
             height: 100vh;
-            overflow: auto; /* Cambiado de hidden a auto para permitir scroll en el body */
+            overflow: hidden; /* Cambiado de hidden a auto para permitir scroll en el body */
         }
 
         .dashboard-wrapper {
@@ -41,7 +47,9 @@
             flex-direction: column;
             height: 100%;
             width: 100%;
-            overflow: auto; /* Cambiado de hidden a auto para permitir scroll */
+            overflow: hidden; /* Cambiado de hidden a auto para permitir scroll */
+            margin: 0;  /* Asegurar que no haya margen */
+            padding: 0; /* Asegurar que no haya padding */
         }
 
         header {
@@ -53,6 +61,7 @@
             justify-content: space-between;
             align-items: center;
             flex-shrink: 0;
+            margin: 0; /* Margen explícito en 0 */
         }
 
         .logo {
@@ -68,6 +77,8 @@
         .logo h1 {
             font-weight: 500;
             font-size: 20px;
+            margin: 0; /* Eliminar cualquier margen predeterminado */
+            line-height: 1; /* Ajustar line-height para control preciso */
         }
 
         .header-actions {
@@ -108,20 +119,23 @@
 
         .content {
             flex: 1;
-            display: flex;
+            display: flex; /* Rompe definitivamente el colapso de márgenes */
             flex-direction: column;
             overflow: auto; /* Cambiado de hidden a auto para permitir scroll */
-            padding: 20px;
+            padding: 10px;
+        }
+
+        .content > *:first-child {
+            margin-top: 0 !important;
         }
 
         .budget-summary {
             background-color: white;
             border-radius: 8px;
-            padding: 20px;
+            padding: 10px;
+            margin: 0 0 20px 0; /* Añadido margen inferior para crear espacio con la tabla */
             box-shadow: var(--card-shadow);
-            margin-bottom: 20px;
-            flex-shrink: 0;
-        }
+            }
 
         .summary-grid {
             display: grid;
@@ -131,7 +145,7 @@
 
         .summary-card {
             text-align: center;
-            padding: 15px;
+            padding: 0px 15px;
             border-radius: 8px;
             background-color: var(--secondary-color);
         }
@@ -152,6 +166,7 @@
             background-color: white;
             border-radius: 8px;
             padding: 20px;
+            margin-top: 10;
             box-shadow: var(--card-shadow);
             flex: 1;
             overflow: auto;
