@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuraciones SG-SST</title>
+    <style>
+        /* --- VARIABLES CSS --- */
+        :root {
+            /* Tema Claro (Por defecto) */
+            --primary-color: #007bff;
+            --primary-dark: #0056b3;
+            --secondary-color: #6c757d;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+
+            --bg-body: #f4f6f9;
+            --bg-card: #ffffff;
+            --bg-input: #ffffff;
+
+            --text-main: #1a202c;
+            --text-secondary: #718096;
+            --text-on-primary: #ffffff;
+
+            --border-color: #e2e8f0;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+
+            --sidebar-width: 260px;
+        }
+
+        /* Variables para Tema Oscuro (Noche) */
+        [data-theme="dark"] {
+            --bg-body: #1a202c;
+            --bg-card: #2d3748;
+            --bg-input: #4a5568;
+
+            --text-main: #f7fafc;
+            --text-secondary: #cbd5e0;
+
+            --border-color: #4a5568;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
+        }
+
+        /* --- ESTILOS BASE --- */
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* Header */
+        header {
+            background-color: var(--bg-card);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            box-shadow: var(--shadow);
+            z-index: 10;
+        }
+
+        header h1 {
+            font-size: 1.2rem;
+            margin: 0;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Main Layout */
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        aside {
+            width: var(--sidebar-width);
+            background-color: var(--bg-card);
+            border-right: 1px solid var(--border-color);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+
+        .sidebar-title {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            font-weight: 700;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-btn {
+            padding: 14px 16px;
+            margin-bottom: 8px;
+            background: none;
+            border: none;
+            text-align: left;
+            cursor: pointer;
+            border-radius: 8px;
+            color: var(--text-secondary);
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .sidebar-btn:hover {
+            background-color: rgba(0, 123, 255, 0.05);
+            color: var(--primary-color);
+        }
+
+        .sidebar-btn.active {
+            background-color: var(--primary-color);
+            color: white;
+            box-shadow: 0 4px 6px rgba(0, 123, 255, 0.3);
+        }
+
+        /* Content Area */
+        #content-area {
+            flex: 1;
+            padding: 0;
+            overflow-y: auto;
+            position: relative;
+            background-color: var(--bg-body);
+        }
+
+        /* --- ESTILOS DE COMPONENTES --- */
+
+        /* Botones */
+        .action-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .action-btn:hover {
+            background-color: var(--primary-dark);
+            transform: translateY(-1px);
+        }
+
+        .action-btn.secondary {
+            background-color: var(--bg-input);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .action-btn.secondary:hover {
+            background-color: var(--border-color);
+        }
+
+        /* Tarjetas */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: var(--shadow);
+            margin-bottom: 20px;
+        }
+
+        .settings-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .settings-header h2 {
+            margin: 0;
+            color: var(--text-main);
+        }
+
+        /* --- ESTILOS ACERCA DE APP (NUEVOS) --- */
+        .about-container {
+            max-width: 600px;
+            margin: 0 auto;
+            text-align: center;
+            padding-top: 40px;
+        }
+
+        .app-logo-large {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            color: var(--primary-color);
+            background: rgba(0, 123, 255, 0.1);
+            width: 120px;
+            height: 120px;
+            line-height: 120px;
+            border-radius: 24px;
+            margin-left: auto;
+            margin-right: auto;
+            display: block;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-main);
+        }
+        .info-label { font-weight: 600; color: var(--text-secondary); }
+        .info-value { font-weight: 500; text-align: right; }
+
+        .update-card {
+            background: rgba(40, 167, 69, 0.1); /* Verde claro */
+            border: 1px solid rgba(40, 167, 69, 0.2);
+        }
+        .update-card h3 { color: var(--success-color); margin-top: 0; }
+
+        /* --- TOAST NOTIFICATIONS --- */
+        .toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .toast {
+            background: var(--bg-card);
+            color: var(--text-main);
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+            border-left: 4px solid var(--primary-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 300px;
+            animation: slideIn 0.3s ease-out;
+        }
+        .toast.success { border-left-color: var(--success-color); }
+        .toast.error { border-left-color: var(--danger-color); }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Grillas y Contenedores */
+        .companies-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; margin-top: 20px; }
+
+        /* Estilos Específicos por Sección (Resto mantenido igual) */
+        .company-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+            transition: transform 0.2s;
+        }
+        .company-card:hover { transform: translateY(-3px); border-color: var(--primary-color); }
+        .company-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0; }
+        .stat-box { background: var(--bg-input); padding: 10px; border-radius: 8px; text-align: center; }
+        .stat-val { font-weight: bold; font-size: 1.1rem; color: var(--text-main); }
+        .stat-lbl { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; }
+        .theme-selector { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 30px; }
+        .theme-option {
+            border: 2px solid var(--border-color);
+            border-radius: 12px; padding: 20px; cursor: pointer;
+            text-align: center; transition: all 0.2s; background: var(--bg-input);
+        }
+        .theme-option:hover { border-color: var(--primary-color); }
+        .theme-option.selected {
+            border-color: var(--primary-color);
+            background-color: rgba(0, 123, 255, 0.1);
+            position: relative;
+        }
+        .theme-icon { font-size: 2rem; margin-bottom: 10px; display: block; }
+        .form-group { margin-bottom: 20px; }
+        .form-label { display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-main); font-size: 0.9rem; }
+        .form-control {
+            width: 100%; padding: 12px; border: 1px solid var(--border-color);
+            border-radius: 8px; background-color: var(--bg-input); color: var(--text-main);
+            font-size: 1rem; box-sizing: border-box; transition: border-color 0.2s;
+        }
+        .form-control:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1); }
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center;
+            z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.3s; backdrop-filter: blur(2px);
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal-content {
+            background: var(--bg-card); width: 90%; max-width: 600px; border-radius: 16px; padding: 30px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); transform: scale(0.95); transition: transform 0.3s; color: var(--text-main);
+        }
+        .modal-overlay.active .modal-content { transform: scale(1); }
+        .log-box {
+            background: #000; color: #0f0; font-family: monospace; padding: 15px;
+            border-radius: 8px; height: 180px; overflow-y: auto; margin-top: 15px; font-size: 0.85rem;
+        }
+        .toggle-switch { position: relative; display: inline-block; width: 50px; height: 26px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: var(--border-color); transition: .4s; border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 18px; width: 18px; left: 4px; bottom: 4px;
+            background-color: white; transition: .4s; border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--primary-color); }
+        input:checked + .slider:before { transform: translateX(24px); }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🛡️ SG-SST App <small style="font-size: 0.6em; color: var(--text-secondary); font-weight: normal;">(Configuración)</small></h1>
+        <button class="action-btn secondary" id="back-to-app">🏠 Volver a la App</button>
+    </header>
+
+    <div class="main-container">
+        <aside>
+            <div class="sidebar-title">Menú Configuración</div>
+
+            <button class="sidebar-btn active" id="nav-empresas" onclick="navigate('empresas')">🏢 Gestión de Empresas</button>
+            <button class="sidebar-btn" id="nav-usuario" onclick="navigate('usuario')">👤 Ajustes de Usuario</button>
+            <button class="sidebar-btn" id="nav-ia" onclick="navigate('ia')">🤖 Configuración de IA</button>
+            <button class="sidebar-btn" id="nav-ui" onclick="navigate('ui')">🎨 Interfaz de Usuario</button>
+
+            <!-- NUEVA SECCIÓN ACERCA DE APP -->
+            <button class="sidebar-btn" id="nav-about" onclick="navigate('about')">ℹ️ Acerca de App</button>
+
+            <div style="margin-top: auto; padding-top: 20px; border-top: 1px solid var(--border-color);">
+                <small style="color: var(--text-secondary);">Versión <span id="app-version">2.0.1</span></small>
+            </div>
+        </aside>
+
+        <main id="content-area"></main>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Modal Overlay -->
+    <div id="modal-overlay" class="modal-overlay">
+        <div class="modal-content" id="modal-content"></div>
+    </div>
+
+    <script>
+        // --- ESTADO Y NAVEGACIÓN ---
+        const contentArea = document.getElementById('content-area');
+        const modalOverlay = document.getElementById('modal-overlay');
+        const modalContent = document.getElementById('modal-content');
+
+        // Cargar versión de la aplicación
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                // Verificar que la API de Electron esté disponible
+                if (window.electronAPI && typeof window.electronAPI.getAppVersion === 'function') {
+                    const version = await window.electronAPI.getAppVersion();
+                    document.getElementById('app-version').textContent = version;
+                } else {
+                    // Si no está disponible directamente, intentar acceder a través del padre
+                    if (window.parent && window.parent !== window && window.parent.electronAPI) {
+                        const version = await window.parent.electronAPI.getAppVersion();
+                        document.getElementById('app-version').textContent = version;
+                    } else {
+                        // Si no está disponible, usar una versión por defecto
+                        document.getElementById('app-version').textContent = '2.0.1';
+                    }
+                }
+            } catch (error) {
+                console.error('Error al obtener la versión:', error);
+                document.getElementById('app-version').textContent = '2.0.1'; // Valor por defecto
+            }
+            applyThemePreference();
+            navigate('empresas');
+        });
+
+        // Botón para volver a la app principal
+        document.getElementById('back-to-app').addEventListener('click', () => {
+            if (window.parent && window.parent !== window) {
+                // Si estamos en un iframe, enviar mensaje al padre
+                window.parent.postMessage({ type: 'back-to-main-app' }, '*');
+            } else {
+                // Si no estamos en un iframe, usar la función global si está disponible
+                if (typeof showHomePage === 'function') {
+                    showHomePage();
+                } else {
+                    // Si no está disponible, intentar usar history o recargar
+                    window.history.back();
+                }
+            }
+        });
+
+        function navigate(section) {
+            document.querySelectorAll('.sidebar-btn').forEach(btn => btn.classList.remove('active'));
+            const activeBtn = document.getElementById(`nav-${section}`);
+            if(activeBtn) activeBtn.classList.add('active');
+            contentArea.innerHTML = '';
+
+            switch(section) {
+                case 'empresas': renderCompanyManagement(); break;
+                case 'usuario': renderUserSettings(); break;
+                case 'ia': renderIASettings(); break;
+                case 'ui': renderUISettings(); break;
+                case 'about': renderAboutPage(); break; // NUEVO CASO
+            }
+        }
+
+        // --- 1. GESTIÓN DE EMPRESAS ---
+        async function renderCompanyManagement() {
+            try {
+                const config = await window.electronAPI.loadConfig();
+                const companies = config.companyPaths || {};
+
+                const container = document.createElement('div');
+                container.innerHTML = `
+                    <div class="settings-header">
+                        <h2>🏢 Gestión de Empresas</h2>
+                        <button class="action-btn" onclick="openAddCompanyModal()">+ Agregar Empresa</button>
+                    </div>
+                    <div class="companies-grid" id="companies-grid"></div>
+                `;
+                contentArea.appendChild(container);
+                renderCompanyCards(Object.keys(companies).map(name => ({
+                    name: name,
+                    path: companies[name].root || '',
+                    stats: companies[name].stats || { employees: 0, risk: '-' }
+                })));
+            } catch (error) {
+                console.error('Error al cargar la configuración:', error);
+                contentArea.innerHTML = '<div class="card"><p>Error al cargar la configuración de empresas.</p></div>';
+            }
+        }
+
+        function renderCompanyCards(companies) {
+            const grid = document.getElementById('companies-grid');
+            if (!grid) return;
+
+            grid.innerHTML = '';
+            companies.forEach(comp => {
+                const hasPath = comp.path ? true : false;
+                const div = document.createElement('div');
+                div.className = 'company-card';
+                div.innerHTML = `
+                    <div style="display:flex; justify-content:space-between;">
+                        <h3>${comp.name}</h3>
+                        <span class="badge" style="background:${hasPath ? 'var(--success-color)' : '#ed8936'}; color:white; padding:4px 8px; border-radius:4px; font-size:0.8rem;">${hasPath ? 'Vinculada' : 'Sin Ruta'}</span>
+                    </div>
+                    <div class="company-stats">
+                        <div class="stat-box"><div class="stat-val">${comp.stats?.employees || 0}</div><div class="stat-lbl">Empleados</div></div>
+                        <div class="stat-box"><div class="stat-val">Clase ${comp.stats?.risk || '-'}</div><div class="stat-lbl">Riesgo</div></div>
+                    </div>
+                    <div style="background:var(--bg-input); padding:8px; border-radius:6px; font-family:monospace; font-size:0.85rem; color:var(--text-secondary); margin-bottom:15px; word-break: break-all;">${comp.path || 'Ruta no seleccionada'}</div>
+                    <div style="display:flex; gap:10px;">
+                        <button class="action-btn secondary" style="flex:1; justify-content:center;" onclick="linkPath('${comp.name}')">${hasPath ? 'Cambiar Ruta' : 'Vincular'}</button>
+                        ${hasPath ? `<button class="action-btn" style="flex:1; justify-content:center;" onclick="openPath('${comp.path}')">Abrir</button>` : ''}
+                    </div>
+                `;
+                grid.appendChild(div);
+            });
+        }
+
+        async function linkPath(name) {
+            try {
+                const path = await window.electronAPI.selectDirectory();
+                if(path) {
+                    const config = await window.electronAPI.loadConfig();
+                    if (!config.companyPaths) config.companyPaths = {};
+
+                    // Actualizar la ruta de la empresa
+                    config.companyPaths[name] = {
+                        ...config.companyPaths[name],
+                        root: path
+                    };
+
+                    await window.electronAPI.saveConfig(config);
+                    renderCompanyManagement();
+                    showToast('Ruta actualizada correctamente', 'success');
+                }
+            } catch (error) {
+                console.error('Error al vincular ruta:', error);
+                showToast('Error al vincular la ruta', 'error');
+            }
+        }
+
+        async function openPath(path) {
+            try {
+                await window.electronAPI.openPath(path);
+            } catch (error) {
+                console.error('Error al abrir la ruta:', error);
+                showToast('Error al abrir la ruta', 'error');
+            }
+        }
+
+        async function openAddCompanyModal() {
+            try {
+                const path = await window.electronAPI.selectDirectory();
+                if(!path) return;
+
+                showModal(`
+                    <h3>Nueva Empresa</h3>
+                    <form id="new-co-form">
+                        <div class="form-group"><label class="form-label">Nombre</label><input class="form-control" id="nc-name" required></div>
+                        <div style="display:flex; gap:10px;">
+                            <div class="form-group" style="flex:1"><label class="form-label">Empleados</label><input type="number" class="form-control" id="nc-emp" required></div>
+                            <div class="form-group" style="flex:1"><label class="form-label">Riesgo</label><select class="form-control" id="nc-risk"><option>I</option><option>II</option><option>III</option><option>IV</option><option>V</option></select></div>
+                        </div>
+                        <div class="form-group"><label class="form-label">Ruta</label><input class="form-control" value="${path}" disabled></div>
+                        <button type="submit" class="action-btn">Guardar</button>
+                        <button type="button" class="action-btn secondary" onclick="closeModal()">Cancelar</button>
+                    </form>
+                `);
+
+                document.getElementById('new-co-form').onsubmit = async (e) => {
+                    e.preventDefault();
+                    try {
+                        const config = await window.electronAPI.loadConfig();
+                        if (!config.companyPaths) config.companyPaths = {};
+
+                        const name = document.getElementById('nc-name').value;
+                        const employees = document.getElementById('nc-emp').value;
+                        const risk = document.getElementById('nc-risk').value;
+
+                        config.companyPaths[name] = {
+                            root: path,
+                            stats: { employees: parseInt(employees), risk: risk }
+                        };
+
+                        await window.electronAPI.saveConfig(config);
+                        closeModal();
+                        renderCompanyManagement();
+                        showToast('Empresa agregada correctamente', 'success');
+                    } catch (error) {
+                        console.error('Error al guardar la empresa:', error);
+                        showToast('Error al guardar la empresa', 'error');
+                    }
+                };
+            } catch (error) {
+                console.error('Error al seleccionar directorio:', error);
+                showToast('Error al seleccionar directorio', 'error');
+            }
+        }
+
+        // --- 2. AJUSTES DE USUARIO ---
+        function renderUserSettings() {
+            contentArea.innerHTML = `
+                <div class="settings-header"><h2>👤 Ajustes de Usuario</h2></div>
+                <div class="card">
+                    <h3>🔑 Credenciales</h3>
+                    <div class="form-group"><label class="form-label">Usuario</label><input type="text" class="form-control" value="Admin"></div>
+                    <div class="form-group"><label class="form-label">Nueva Contraseña</label><input type="password" class="form-control" placeholder="••••••••"></div>
+                    <button class="action-btn" onclick="showToast('Contraseña actualizada', 'success')">Actualizar</button>
+                </div>
+                <div class="card">
+                    <h3>🛡️ Seguridad</h3>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div><strong>Bloqueo Automático</strong><br><small style="color:var(--text-secondary)">Pedir clave al inactividad</small></div>
+                        <label class="toggle-switch"><input type="checkbox"><span class="slider"></span></label>
+                    </div>
+                    <hr style="border:0; border-top:1px solid var(--border-color); margin:20px 0;">
+                    <button class="action-btn" style="background-color:var(--danger-color);" onclick="showToast('Cifrado iniciado...', 'error')">Cifrar Datos</button>
+                </div>
+            `;
+        }
+
+        // --- 3. CONFIGURACIÓN DE IA ---
+        async function renderIASettings() {
+            try {
+                const config = await window.electronAPI.loadConfig();
+                const llm = config.llmSettings || {};
+
+                contentArea.innerHTML = `
+                    <div class="settings-header"><h2>🤖 Configuración de IA</h2></div>
+                    <div class="card">
+                        <h3>🧠 Modelo Local</h3>
+                        <div class="form-group">
+                            <label class="form-label">Ruta del Modelo</label>
+                            <div style="display:flex; gap:10px;">
+                                <input class="form-control" id="llm-path" value="${llm.modelPath || ''}" disabled>
+                                <button class="action-btn secondary" onclick="selectLLMPath()">Examinar</button>
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:20px;">
+                            <div class="form-group" style="flex:1"><label class="form-label">Contexto</label><input type="number" class="form-control" id="llm-ctx" value="${llm.context || 4096}"></div>
+                            <div class="form-group" style="flex:1"><label class="form-label">Temperatura</label><input type="number" class="form-control" id="llm-temp" value="${llm.temperature || 0.7}"></div>
+                        </div>
+                        <button class="action-btn" onclick="saveLLM()">Guardar</button>
+                    </div>
+                    <div class="card">
+                        <h3>📜 Logs</h3>
+                        <div class="log-box" id="llm-logs">> [INIT] Motor cargado<br>> [INFO] Esperando configuración...</div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error al cargar la configuración de IA:', error);
+                contentArea.innerHTML = '<div class="card"><p>Error al cargar la configuración de IA.</p></div>';
+            }
+        }
+
+        async function selectLLMPath() {
+            try {
+                const path = await window.electronAPI.selectDirectory();
+                if(path) document.getElementById('llm-path').value = path;
+            } catch (error) {
+                console.error('Error al seleccionar ruta del modelo:', error);
+                showToast('Error al seleccionar ruta del modelo', 'error');
+            }
+        }
+
+        async function saveLLM() {
+            try {
+                const config = await window.electronAPI.loadConfig();
+                if (!config.llmSettings) config.llmSettings = {};
+
+                config.llmSettings = {
+                    ...config.llmSettings,
+                    modelPath: document.getElementById('llm-path').value,
+                    context: parseInt(document.getElementById('llm-ctx').value),
+                    temperature: parseFloat(document.getElementById('llm-temp').value)
+                };
+
+                await window.electronAPI.saveConfig(config);
+                document.getElementById('llm-logs').innerHTML += `<br>> [SUCCESS] Configuración guardada.`;
+                showToast('Configuración IA guardada', 'success');
+            } catch (error) {
+                console.error('Error al guardar la configuración de IA:', error);
+                showToast('Error al guardar la configuración de IA', 'error');
+            }
+        }
+
+        // --- 4. INTERFAZ DE USUARIO ---
+        async function renderUISettings() {
+            const storedTheme = localStorage.getItem('theme') || 'light';
+            const storedMotion = localStorage.getItem('reduceMotion') === 'true';
+
+            contentArea.innerHTML = `
+                <div class="settings-header"><h2>🎨 Interfaz de Usuario</h2></div>
+                <div class="card">
+                    <h3>🌓 Apariencia</h3>
+                    <div class="theme-selector">
+                        <div class="theme-option ${storedTheme === 'light' ? 'selected' : ''}" onclick="setTheme('light')"><span class="theme-icon">☀️</span><strong>Claro</strong></div>
+                        <div class="theme-option ${storedTheme === 'dark' ? 'selected' : ''}" onclick="setTheme('dark')"><span class="theme-icon">🌙</span><strong>Oscuro</strong></div>
+                        <div class="theme-option ${storedTheme === 'system' ? 'selected' : ''}" onclick="setTheme('system')"><span class="theme-icon">💻</span><strong>Sistema</strong></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>♿ Accesibilidad</h3>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div><strong>Reducir Movimiento</strong><br><small style="color:var(--text-secondary)">Desactiva animaciones</small></div>
+                        <label class="toggle-switch"><input type="checkbox" id="motion-toggle" ${storedMotion ? 'checked' : ''} onchange="toggleMotion(this)"><span class="slider"></span></label>
+                    </div>
+                </div>
+            `;
+        }
+
+        function setTheme(theme) {
+            localStorage.setItem('theme', theme);
+            applyThemePreference();
+            renderUISettings();
+        }
+
+        function applyThemePreference() {
+            const theme = localStorage.getItem('theme') || 'light';
+            if (theme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else if (theme === 'light') {
+                document.documentElement.removeAttribute('data-theme');
+            } else if (theme === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+            }
+        }
+
+        function toggleMotion(checkbox) {
+            localStorage.setItem('reduceMotion', checkbox.checked);
+            showToast('Preferencias de movimiento actualizadas', 'success');
+        }
+
+        // --- 5. NUEVA SECCIÓN: ACERCA DE APP ---
+        async function renderAboutPage() {
+            try {
+                const config = await window.electronAPI.loadConfig();
+                const appVersion = await window.electronAPI.getAppVersion();
+
+                contentArea.innerHTML = `
+                    <div class="about-container">
+                        <div class="app-logo-large">🛡️</div>
+                        <h1>SG-SST Electron App</h1>
+                        <p style="color:var(--text-secondary);">Sistema de Gestión de Seguridad y Salud en el Trabajo</p>
+
+                        <br>
+
+                        <div class="card" style="text-align:left;">
+                            <h3 style="margin-top:0;">Desarrollador</h3>
+                            <div style="display:flex; align-items:center; gap:15px; margin-bottom:20px;">
+                                <div style="width:50px; height:50px; background:#ddd; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.5rem;">👤</div>
+                                <div>
+                                    <strong>Javier Robles F.</strong><br>
+                                    <small>Prof. SG-SST - Esp. Gerencia de Proyectos</small>
+                                </div>
+                            </div>
+
+                            <h3 style="margin-top:0;">Detalles Técnicos</h3>
+                            <div class="info-row"><span class="info-label">Versión de App</span><span class="info-value">v${appVersion}</span></div>
+                            <div class="info-row"><span class="info-label">Framework</span><span class="info-value">Electron</span></div>
+                            <div class="info-row"><span class="info-label">Modelo IA</span><span class="info-value">${config.llmSettings?.modelVersion || 'No configurado'}</span></div>
+                        </div>
+
+                        <div class="card update-card">
+                            <h3>Actualizaciones</h3>
+                            <p style="color:var(--text-main); margin-bottom:15px;">Mantén tu aplicación segura y con las últimas funciones.</p>
+                            <button class="action-btn" id="btn-check-updates" onclick="checkUpdates()">
+                                🔍 Verificar Actualizaciones
+                            </button>
+                        </div>
+
+                        <div style="margin-top:30px;">
+                            <a href="https://github.com/javierrobles/sg-sst-app" target="_blank" style="text-decoration:none; color:inherit;">
+                                <button class="action-btn secondary">
+                                    🔗 Repositorio del Proyecto
+                                </button>
+                            </a>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error al cargar la página de acerca de:', error);
+                contentArea.innerHTML = '<div class="card"><p>Error al cargar la información de la aplicación.</p></div>';
+            }
+        }
+
+        // Simular verificación de actualizaciones
+        async function checkUpdates() {
+            const btn = document.getElementById('btn-check-updates');
+            if (!btn) return;
+
+            const originalHTML = btn.innerHTML;
+
+            // Estado de carga
+            btn.disabled = true;
+            btn.innerHTML = `⏳ Verificando...`;
+
+            // Simular delay de red
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.innerHTML = originalHTML;
+
+                // Simular respuesta (Por defecto, 'sin actualizaciones')
+                showToast('¡Estás al día! No hay actualizaciones pendientes.', 'success');
+            }, 2000);
+        }
+
+        // --- UTILIDADES ---
+        function showModal(html) {
+            modalContent.innerHTML = html;
+            modalOverlay.classList.add('active');
+        }
+
+        function closeModal() {
+            modalOverlay.classList.remove('active');
+        }
+
+        modalOverlay.addEventListener('click', (e) => {
+            if(e.target === modalOverlay) closeModal();
+        });
+
+        // Sistema de Toasts (Notificaciones)
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+
+            let icon = type === 'success' ? '✔' : '⚠';
+
+            toast.innerHTML = `<span style="font-size:1.2rem;">${icon}</span> <span>${message}</span>`;
+
+            container.appendChild(toast);
+
+            // Remover después de 3 segundos
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

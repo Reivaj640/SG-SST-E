@@ -1961,7 +1961,7 @@ function createModuleCard(title, description, onClick) {
   function showSettingsPage() {
     // ✅ Pasar contentArea a hideCalendar
     hideCalendar(contentArea);
-    console.log('Showing settings page...');
+    console.log('Showing enhanced settings page...');
     // Verificar que contentArea exista
     if (!contentArea) {
       console.error('contentArea is not defined or accessible in showSettingsPage.');
@@ -1979,55 +1979,27 @@ function createModuleCard(title, description, onClick) {
 
     contentArea.innerHTML = ''; // Limpiar contenido anterior
 
-    // Crear el contenedor principal del canvas
-    const mainCanvas = document.createElement('div');
-    mainCanvas.className = 'main-canvas';
+    // Crear un iframe para cargar la nueva interfaz de configuraciones
+    const iframe = document.createElement('iframe');
+    iframe.src = 'config-viewer.html';
+    iframe.style.width = '100%';
+    iframe.style.height = '100%';
+    iframe.style.border = 'none';
+    iframe.id = 'config-iframe';
 
-    const settingsDiv = document.createElement('div');
-    settingsDiv.className = 'settings-content';
+    // En lugar de usar sandbox (que bloquea el acceso a la API de Electron),
+    // vamos a pasar la API de Electron al iframe a través de window.postMessage
+    // Eliminar completamente el sandbox para permitir el acceso a la API
 
-    const title = document.createElement('h2');
-    title.textContent = 'Panel de Configuraciones';
-    settingsDiv.appendChild(title);
+    contentArea.appendChild(iframe);
 
-    // Botón para volver al inicio
-    const backButton = document.createElement('button');
-    backButton.className = 'btn';
-    backButton.textContent = '< Volver al Inicio';
-    backButton.addEventListener('click', showHomePage);
-    settingsDiv.appendChild(backButton);
-
-    // Crear tarjetas de configuración
-    const cardsContainer = document.createElement('div');
-    cardsContainer.className = 'settings-cards';
-
-    // Tarjeta para vincular empresas
-    const pathCard = createSettingsCard(
-      'Vincular Empresas',
-      'Conecta las carpetas de cada empresa para el análisis.',
-      showPathLinkingPage
-    );
-    cardsContainer.appendChild(pathCard);
-
-    // Tarjeta para ajustes de chat
-    const chatCard = createSettingsCard(
-      'Ajustes de Chat',
-      'Configura el comportamiento y la apariencia del asistente LLM.',
-      showChatSettingsPage
-    );
-    cardsContainer.appendChild(chatCard);
-
-    // Tarjeta para ajustes de usuario
-    const userCard = createSettingsCard(
-      'Ajustes de Usuario',
-      'Gestiona la información y preferencias del usuario.',
-      showUserSettingsPage
-    );
-    cardsContainer.appendChild(userCard);
-
-    settingsDiv.appendChild(cardsContainer);
-    mainCanvas.appendChild(settingsDiv);
-    contentArea.appendChild(mainCanvas);
+    // Una vez que el iframe se carga, pasarle la API de Electron
+    iframe.onload = function() {
+      if (iframe.contentWindow) {
+        // Pasar la API de Electron al iframe
+        iframe.contentWindow.electronAPI = window.electronAPI;
+      }
+    };
   }
 function createSettingsCard(title, description, onClick) {
   const card = document.createElement('div');
