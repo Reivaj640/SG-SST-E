@@ -22,7 +22,7 @@ const SIDEBAR_BUTTONS = [
 
 // Submódulos para cada sección principal
 // Este objeto estructura el contenido que aparece en InternalPage
-const RESOURCES_SUBMODULES = {
+const ALL_SUBMODULES = {
   "Recursos": [
     "1.1.1 Responsable del SG",
     "1.1.2 Roles y Responsabilidades",
@@ -112,12 +112,170 @@ const COMPANY_LOGOS = {
   "Asel": "assets/Asel.png"
 };
 
+// --- Sistema Normativo ---
+let normativaData = null;
+
+// Cargar la normativa desde el archivo JSON
+async function cargarNormativa() {
+  try {
+    // Usar fetch para cargar el archivo JSON
+    const response = await fetch('normativa-0312.json');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    normativaData = await response.json();
+    console.log('Normativa cargada correctamente:', normativaData);
+  } catch (error) {
+    console.error('Error al cargar la normativa:', error);
+    // En caso de error, usar una estructura vacía o valores por defecto
+    normativaData = {
+      escenarios: {}
+    };
+  }
+}
+
+// Función para determinar el escenario normativo basado en los datos de la empresa
+function determinarEscenarioNormativo(empresa) {
+  const { employees: numeroTrabajadores, risk: nivelRiesgo, isAgropecuaria = false } = empresa.stats || {};
+
+  // Validar entradas
+  if (typeof numeroTrabajadores !== 'number' || !nivelRiesgo) {
+    console.warn('Datos insuficientes para determinar escenario normativo:', empresa);
+    return null;
+  }
+
+  // Verificar que normativaData esté disponible
+  if (!normativaData || !normativaData.escenarios) {
+    console.warn('Normativa no disponible o con formato incorrecto:', normativaData);
+    return 'COMPLETO_CAP_III'; // Escenario por defecto
+  }
+
+  // Buscar escenario en la normativa
+  for (const [nombreEscenario, escenario] of Object.entries(normativaData.escenarios)) {
+    const { condiciones } = escenario;
+
+    // Verificar condiciones de trabajadores
+    const cumpleTrabajadores =
+      (!condiciones.trabajadores_min || numeroTrabajadores >= condiciones.trabajadores_min) &&
+      (!condiciones.trabajadores_max || numeroTrabajadores <= condiciones.trabajadores_max);
+
+    // Verificar condiciones de riesgo
+    const cumpleRiesgo = !condiciones.riesgo || condiciones.riesgo.includes(nivelRiesgo);
+
+    // Verificar si aplica a empresas agropecuarias
+    const aplicaAgropecuaria = !condiciones.es_agropecuaria || condiciones.es_agropecuaria === isAgropecuaria;
+
+    // Verificar condiciones adicionales
+    let cumpleAdicional = true;
+    if (condiciones.aplica_si) {
+      // Lógica para condiciones complejas
+      cumpleAdicional = evaluarCondicionAdicional(condiciones.aplica_si, numeroTrabajadores, nivelRiesgo, isAgropecuaria);
+    }
+
+    if (cumpleTrabajadores && cumpleRiesgo && aplicaAgropecuaria && cumpleAdicional) {
+      return nombreEscenario;
+    }
+  }
+
+  // Si no se encuentra un escenario específico, usar uno por defecto
+  console.warn(`No se encontró un escenario específico para la empresa: ${empresa.nombre}. Trabajadores: ${numeroTrabajadores}, Riesgo: ${nivelRiesgo}, Agropecuaria: ${isAgropecuaria}`);
+  return 'COMPLETO_CAP_III'; // Escenario por defecto más completo
+}
+
+// Función auxiliar para evaluar condiciones adicionales complejas
+function evaluarCondicionAdicional(condiciones, numeroTrabajadores, nivelRiesgo, isAgropecuaria) {
+  // Evaluar cada condición en el array
+  for (const cond of condiciones) {
+    if (cond.includes('trabajadores > 50')) {
+      if (numeroTrabajadores > 50) return true;
+    } else if (cond.includes('trabajadores <= 50 y riesgo in [IV,V]')) {
+      if (numeroTrabajadores <= 50 && ['IV', 'V'].includes(nivelRiesgo)) {
+        return true;
+      }
+    } else if (cond.includes('es_agropecuaria')) {
+      if (isAgropecuaria) return true;
+    }
+  }
+  return false;
+}
+
+// Función para filtrar módulos y submódulos según el escenario normativo
+function filtrarModulosPorNormativa(escenario) {
+  if (!normativaData || !escenario || !normativaData.escenarios[escenario]) {
+    console.warn('No se encontró escenario normativo válido:', escenario);
+    // Devolver todos los módulos si no hay normativa
+    return ALL_SUBMODULES;
+  }
+
+  const reglas = normativaData.escenarios[escenario];
+  const { modulos, submodulos } = reglas;
+
+  // Filtrar módulos activos
+  const modulosActivos = modulos.activar || [];
+  const modulosDesactivados = modulos.desactivar || [];
+
+  // Filtrar submódulos activos
+  const submodulosActivos = submodulos.activar || [];
+  const submodulosDesactivados = submodulos.desactivar || [];
+
+  // Crear objeto con módulos filtrados
+  const modulosFiltrados = {};
+
+  for (const [moduloNombre, submodulos] of Object.entries(ALL_SUBMODULES)) {
+    // Determinar si este módulo está en la lista de activos
+    const moduloNumero = parseInt(moduloNombre.split(' ')[0]); // Extraer número del módulo
+    const moduloActivo = modulosActivos.includes(moduloNumero) && !modulosDesactivados.includes(moduloNumero);
+
+    if (moduloActivo) {
+      // Filtrar submódulos para este módulo
+      const submodulosFiltrados = submodulos.filter(submodulo => {
+        // Extraer código del submódulo (ej. "1.1.1" de "1.1.1 Responsable del SG")
+        const codigoSubmodulo = submodulo.split(' ')[0];
+
+        // Verificar si está en la lista de activos o desactivados
+        const activo = submodulosActivos.some(pattern => {
+          if (pattern === '*') return true; // Activar todos
+          if (pattern.endsWith('*')) {
+            // Patrón de wildcard (ej. "3.3.*")
+            const prefix = pattern.slice(0, -1);
+            return codigoSubmodulo.startsWith(prefix);
+          }
+          return pattern === codigoSubmodulo;
+        });
+
+        const desactivado = submodulosDesactivados.some(pattern => {
+          if (pattern === '*') return true; // Desactivar todos
+          if (pattern.endsWith('*')) {
+            // Patrón de wildcard (ej. "3.3.*")
+            const prefix = pattern.slice(0, -1);
+            return codigoSubmodulo.startsWith(prefix);
+          }
+          return pattern === codigoSubmodulo;
+        });
+
+        // El submódulo está activo si está en activos y no en desactivados
+        return activo && !desactivado;
+      });
+
+      // Solo agregar el módulo si tiene submódulos activos
+      if (submodulosFiltrados.length > 0) {
+        modulosFiltrados[moduloNombre] = submodulosFiltrados;
+      }
+    }
+  }
+
+  return modulosFiltrados;
+}
+
 // --- Estado de la Aplicación ---
 let currentCompany = null;
 let currentModule = null;
 let currentSubmodule = null; // ✅ NUEVA VARIABLE
 let logBuffer = []; // Búfer para almacenar los logs
 let currentCalendarInstance = null; // Para mantener una referencia a la instancia del calendario
+
+// Variable para almacenar los submódulos filtrados por normativa
+let RESOURCES_SUBMODULES = ALL_SUBMODULES;
 
 // --- Funciones para controlar el Calendario ---
 
@@ -389,6 +547,35 @@ document.addEventListener('DOMContentLoaded', async () => {
                   apiCallArgs = [payload.companyName];
                   responseType = 'FOLLOW_UP_LOAD_RESPONSE';
                   break;
+              case 'back-to-main-app':
+                  // This is a UI navigation request to return to the main app
+                  // We handle it directly here and don't send a response back to iframe
+                  console.log('RENDERER: Received back-to-main-app request from iframe.');
+                  // Determine where to go based on current state
+                  try {
+                      // Check if there's a selected company in the configuration
+                      if (window.electronAPI && typeof window.electronAPI.loadConfig === 'function') {
+                          const config = await window.electronAPI.loadConfig();
+                          const selectedCompany = config.selectedCompany || currentCompany || null;
+
+                          // If there's a selected company, go to the company home page
+                          if (selectedCompany) {
+                              currentCompany = selectedCompany; // Ensure currentCompany is set
+                              showCompanyHomePage();
+                          } else {
+                              // If no company is selected, go to the main home page
+                              showHomePage();
+                          }
+                      } else {
+                          // Fallback to home if electronAPI is not available
+                          showHomePage();
+                      }
+                  } catch (error) {
+                      console.error('Error determining where to navigate:', error);
+                      // Fallback to home page if there's an error
+                      showHomePage();
+                  }
+                  return; // Exit after handling navigation
               default:
                   console.warn(`RENDERER: Unknown message type received from iframe: ${type}`);
                   sourceIframe.contentWindow.postMessage({
@@ -759,12 +946,26 @@ function setActiveSidebarButton(buttonElement) {
   window.activeSidebarButton = buttonElement;
 }
 
-function showHomePage() {
+async function showHomePage() {
   // ✅ LIMPIAR ESTADO
   currentSubmodule = null;
   // ✅ Pasar contentArea a hideCalendar
   hideCalendar(contentArea);
   console.log('Showing home page...');
+
+  // Cargar dinámicamente las empresas desde la configuración
+  let dynamicCompanies = [];
+  try {
+    const config = await window.electronAPI.loadConfig();
+    if (config.companyPaths) {
+      dynamicCompanies = Object.keys(config.companyPaths);
+    }
+  } catch (error) {
+    console.error('Error al cargar la configuración de empresas:', error);
+    // Si hay un error, usar la constante existente como fallback
+    dynamicCompanies = ["Tempoactiva", "Temposum", "Aseplus", "Asel"];
+  }
+
   // Limpiar el área de contenido
   contentArea.innerHTML = '';
 
@@ -847,14 +1048,26 @@ function showHomePage() {
   companySelectionDiv.id = 'company-selection';
   companySelectionDiv.style.textAlign = 'center';
 
-  COMPANY_BUTTONS.forEach(companyName => {
-    const button = document.createElement('button');
-    button.className = 'company-select-button';
-    button.textContent = companyName;
-    button.style.margin = '5px';
-    button.addEventListener('click', () => selectCompany(companyName, button));
-    companySelectionDiv.appendChild(button);
-  });
+  // Mostrar mensaje si no hay empresas registradas
+  if (dynamicCompanies.length === 0) {
+    const noCompaniesMessage = document.createElement('p');
+    noCompaniesMessage.textContent = 'No hay empresas registradas. Por favor, crea una empresa en la sección de configuración.';
+    noCompaniesMessage.style.color = 'white';
+    noCompaniesMessage.style.fontSize = '18px';
+    noCompaniesMessage.style.textAlign = 'center';
+    noCompaniesMessage.style.marginBottom = '20px';
+    noCompaniesMessage.style.textShadow = '2px 2px 4px rgba(0,0,0,0.8)';
+    uiContainer.appendChild(noCompaniesMessage);
+  } else {
+    dynamicCompanies.forEach(companyName => {
+      const button = document.createElement('button');
+      button.className = 'company-select-button';
+      button.textContent = companyName;
+      button.style.margin = '5px';
+      button.addEventListener('click', () => selectCompany(companyName, button));
+      companySelectionDiv.appendChild(button);
+    });
+  }
 
   uiContainer.appendChild(companySelectionDiv);
   homePageDiv.appendChild(uiContainer);
@@ -863,9 +1076,34 @@ function showHomePage() {
   console.log('Added home page to contentArea');
 }
 
-function selectCompany(companyName, buttonElement) {
+async function selectCompany(companyName, buttonElement) {
   console.log(`Selecting company: ${companyName}`);
   currentCompany = companyName;
+
+  // Cargar la normativa si aún no se ha hecho
+  if (!normativaData) {
+    await cargarNormativa();
+  }
+
+  // Obtener la configuración de la empresa para determinar el escenario normativo
+  try {
+    const config = await window.electronAPI.loadConfig();
+    const empresa = config.companyPaths && config.companyPaths[companyName] ?
+      { nombre: companyName, stats: config.companyPaths[companyName].stats } :
+      { nombre: companyName, stats: { employees: 0, risk: 'I' } }; // Valores por defecto
+
+    // Determinar el escenario normativo basado en los datos de la empresa
+    const escenario = determinarEscenarioNormativo(empresa);
+
+    // Filtrar los módulos y submódulos según el escenario normativo
+    RESOURCES_SUBMODULES = filtrarModulosPorNormativa(escenario);
+
+    console.log(`Módulos filtrados para la empresa ${companyName} (escenario: ${escenario}):`, RESOURCES_SUBMODULES);
+  } catch (error) {
+    console.error('Error al cargar la configuración de la empresa o aplicar normativa:', error);
+    // Si hay un error, usar los módulos completos como fallback
+    RESOURCES_SUBMODULES = ALL_SUBMODULES;
+  }
 
   // Actualizar UI: nombre de la empresa y logo en la barra lateral
   companyNameElement.textContent = ''; // Clear the text
@@ -877,6 +1115,7 @@ function selectCompany(companyName, buttonElement) {
     companyLogoElement.style.display = 'block';
     companyLogoPlaceholder.style.display = 'none';
   } else {
+    // Si no hay logo específico para la empresa, usar un placeholder genérico o dejarlo como está
     companyLogoElement.style.display = 'none';
     companyLogoPlaceholder.style.display = 'flex';
   }
@@ -910,6 +1149,7 @@ function handleLogout() {
   console.log('Handling logout...');
   currentCompany = null;
   currentModule = null;
+  currentSubmodule = null; // Asegurar que también se resetea el submódulo
 
   // Resetear UI
   if (companyNameElement) {

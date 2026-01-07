@@ -1,0 +1,103 @@
+{
+  "meta": {
+    "norma": "Resolución 0312 de 2019",
+    "fuente": "ABECÉ",
+    "descripcion": "Motor normativo para activación de módulos y submódulos SG-SST",
+    "version": "1.0.0"
+  },
+
+  "variables_entrada": {
+    "numero_trabajadores": "number",
+    "nivel_riesgo": ["I", "II", "III", "IV", "V"],
+    "es_agropecuaria": "boolean"
+  },
+
+  "escenarios": {
+    "SIMPLIFICADO_≤10_R1-3": {
+      "condiciones": {
+        "trabajadores_max": 10,
+        "riesgo": ["I", "II", "III"]
+      },
+      "modulos": {
+        "activar": [1, 2, 3, 4],
+        "desactivar": [5, 6, 7]
+      },
+      "submodulos": {
+        "activar": [
+          "1.1.1","1.1.2","1.1.3","1.1.4",
+          "1.2.1","1.2.2",
+
+          "2.1.1","2.3.1","2.4.1","2.5.1","2.13.1",
+
+          "3.1.4","3.2.1",
+
+          "4.1.1","4.1.2","4.2.1","4.2.2"
+        ],
+        "desactivar": [
+          "1.1.5","1.1.6","1.1.7","1.1.8",
+          "1.2.3","1.2.4",
+          "2.2.1","2.6.1","2.7.1","2.8.1","2.9.1","2.10.1","2.11.1","2.12.1",
+          "3.1.1","3.1.2","3.1.3","3.1.5","3.1.6","3.1.7","3.1.8","3.1.9",
+          "3.2.2","3.3.*",
+          "4.1.3","4.1.4","4.2.3","4.2.4","4.2.5","4.2.6",
+          "5.*","6.*","7.*"
+        ]
+      },
+      "agropecuaria": {
+        "aplica": true,
+        "observacion": "Refuerza identificación de peligros, control de riesgos y capacitación en procesos productivos"
+      }
+    },
+
+    "INTERMEDIO_11-50_R1-3": {
+      "condiciones": {
+        "trabajadores_min": 11,
+        "trabajadores_max": 50,
+        "riesgo": ["I", "II", "III"]
+      },
+      "modulos": {
+        "activar": [1, 2, 3, 4, 5, 6],
+        "desactivar": [7]
+      },
+      "submodulos": {
+        "activar": [
+          "1.*",
+
+          "2.1.1","2.2.1","2.3.1","2.4.1","2.5.1","2.7.1","2.8.1","2.13.1",
+
+          "3.1.1","3.1.2","3.1.4","3.2.1",
+
+          "4.1.1","4.1.2","4.2.1","4.2.2","4.2.4","4.2.5","4.2.6",
+
+          "5.1.1",
+
+          "6.1.1","6.1.3"
+        ],
+        "desactivar": [
+          "2.11.1",
+          "3.2.2","3.3.*",
+          "6.1.2","6.1.4",
+          "7.*"
+        ]
+      }
+    },
+
+    "COMPLETO_CAP_III": {
+      "condiciones": {
+        "riesgo": ["I", "II", "III", "IV", "V"],
+        "aplica_si": [
+          "trabajadores > 50",
+          "trabajadores <= 50 y riesgo in [IV,V]"
+        ]
+      },
+      "modulos": {
+        "activar": [1, 2, 3, 4, 5, 6, 7],
+        "desactivar": []
+      },
+      "submodulos": {
+        "activar": ["*"],
+        "desactivar": []
+      }
+    }
+  }
+}

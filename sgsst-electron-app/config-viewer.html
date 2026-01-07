@@ -400,17 +400,51 @@
         });
 
         // Botón para volver a la app principal
-        document.getElementById('back-to-app').addEventListener('click', () => {
+        document.getElementById('back-to-app').addEventListener('click', async () => {
             if (window.parent && window.parent !== window) {
                 // Si estamos en un iframe, enviar mensaje al padre
                 window.parent.postMessage({ type: 'back-to-main-app' }, '*');
             } else {
-                // Si no estamos en un iframe, usar la función global si está disponible
-                if (typeof showHomePage === 'function') {
-                    showHomePage();
-                } else {
-                    // Si no está disponible, intentar usar history o recargar
-                    window.history.back();
+                // Si no estamos en un iframe, determinar a dónde regresar según el estado actual
+                try {
+                    // Intentar cargar la configuración para ver si hay una empresa seleccionada
+                    if (window.electronAPI && typeof window.electronAPI.loadConfig === 'function') {
+                        const config = await window.electronAPI.loadConfig();
+                        const selectedCompany = config.selectedCompany || null;
+
+                        // Si hay una empresa seleccionada, ir al home de la empresa
+                        if (selectedCompany) {
+                            if (typeof showCompanyHomePage === 'function') {
+                                showCompanyHomePage();
+                            } else if (typeof showHomePage === 'function') {
+                                showHomePage();
+                            } else {
+                                window.history.back();
+                            }
+                        } else {
+                            // Si no hay empresa seleccionada, ir al home general
+                            if (typeof showHomePage === 'function') {
+                                showHomePage();
+                            } else {
+                                window.history.back();
+                            }
+                        }
+                    } else {
+                        // Si no podemos acceder a la API, usar la función global si está disponible
+                        if (typeof showHomePage === 'function') {
+                            showHomePage();
+                        } else {
+                            window.history.back();
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error al determinar el estado de la empresa:', error);
+                    // Si hay un error, ir al home general por defecto
+                    if (typeof showHomePage === 'function') {
+                        showHomePage();
+                    } else {
+                        window.history.back();
+                    }
                 }
             }
         });
@@ -468,7 +502,10 @@
                 div.innerHTML = `
                     <div style="display:flex; justify-content:space-between;">
                         <h3>${comp.name}</h3>
-                        <span class="badge" style="background:${hasPath ? 'var(--success-color)' : '#ed8936'}; color:white; padding:4px 8px; border-radius:4px; font-size:0.8rem;">${hasPath ? 'Vinculada' : 'Sin Ruta'}</span>
+                        <div style="display:flex; gap:5px;">
+                            <span class="badge" style="background:${hasPath ? 'var(--success-color)' : '#ed8936'}; color:white; padding:4px 8px; border-radius:4px; font-size:0.8rem;">${hasPath ? 'Vinculada' : 'Sin Ruta'}</span>
+                            <button class="action-btn" style="background-color: var(--danger-color); padding: 4px 8px; font-size: 0.8rem;" onclick="eliminarEmpresa('${comp.name}')">Eliminar</button>
+                        </div>
                     </div>
                     <div class="company-stats">
                         <div class="stat-box"><div class="stat-val">${comp.stats?.employees || 0}</div><div class="stat-lbl">Empleados</div></div>
@@ -517,51 +554,168 @@
         }
 
         async function openAddCompanyModal() {
-            try {
-                const path = await window.electronAPI.selectDirectory();
-                if(!path) return;
-
-                showModal(`
-                    <h3>Nueva Empresa</h3>
-                    <form id="new-co-form">
-                        <div class="form-group"><label class="form-label">Nombre</label><input class="form-control" id="nc-name" required></div>
-                        <div style="display:flex; gap:10px;">
-                            <div class="form-group" style="flex:1"><label class="form-label">Empleados</label><input type="number" class="form-control" id="nc-emp" required></div>
-                            <div class="form-group" style="flex:1"><label class="form-label">Riesgo</label><select class="form-control" id="nc-risk"><option>I</option><option>II</option><option>III</option><option>IV</option><option>V</option></select></div>
+            // Primero mostramos un formulario para ingresar los datos básicos de la empresa
+            showModal(`
+                <h3>Nueva Empresa</h3>
+                <form id="new-co-form-initial">
+                    <div class="form-group">
+                        <label class="form-label">Nombre de la Empresa *</label>
+                        <input class="form-control" id="nc-name" required>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <div class="form-group" style="flex:1">
+                            <label class="form-label">Número de Empleados *</label>
+                            <input type="number" class="form-control" id="nc-emp" required min="1">
                         </div>
-                        <div class="form-group"><label class="form-label">Ruta</label><input class="form-control" value="${path}" disabled></div>
-                        <button type="submit" class="action-btn">Guardar</button>
-                        <button type="button" class="action-btn secondary" onclick="closeModal()">Cancelar</button>
-                    </form>
-                `);
+                        <div class="form-group" style="flex:1">
+                            <label class="form-label">Nivel de Riesgo *</label>
+                            <select class="form-control" id="nc-risk" required>
+                                <option value="">Seleccione...</option>
+                                <option value="I">Clase I - Bajo</option>
+                                <option value="II">Clase II - Medio</option>
+                                <option value="III">Clase III - Alto</option>
+                                <option value="IV">Clase IV - Muy Alto</option>
+                                <option value="V">Clase V - Extremadamente Alto</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">¿Es una Unidad Agropecuaria? *</label>
+                        <select class="form-control" id="nc-agro" required>
+                            <option value="false">No</option>
+                            <option value="true">Sí</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Descripción (Opcional)</label>
+                        <textarea class="form-control" id="nc-desc" placeholder="Breve descripción de la empresa"></textarea>
+                    </div>
+                    <div style="display:flex; gap:10px; margin-top:20px;">
+                        <button type="submit" class="action-btn" style="flex:1;">Siguiente</button>
+                        <button type="button" class="action-btn secondary" onclick="closeModal()" style="flex:1;">Cancelar</button>
+                    </div>
+                </form>
+            `);
 
-                document.getElementById('new-co-form').onsubmit = async (e) => {
-                    e.preventDefault();
-                    try {
-                        const config = await window.electronAPI.loadConfig();
-                        if (!config.companyPaths) config.companyPaths = {};
+            // Manejar el evento de submit del formulario inicial
+            document.getElementById('new-co-form-initial').onsubmit = async (e) => {
+                e.preventDefault();
 
-                        const name = document.getElementById('nc-name').value;
-                        const employees = document.getElementById('nc-emp').value;
-                        const risk = document.getElementById('nc-risk').value;
+                const name = document.getElementById('nc-name').value.trim();
+                const employees = document.getElementById('nc-emp').value;
+                const risk = document.getElementById('nc-risk').value;
+                const isAgro = document.getElementById('nc-agro').value === 'true';
+                const description = document.getElementById('nc-desc').value.trim();
 
-                        config.companyPaths[name] = {
-                            root: path,
-                            stats: { employees: parseInt(employees), risk: risk }
-                        };
+                if (!name || !employees || !risk) {
+                    showToast('Por favor complete todos los campos obligatorios', 'error');
+                    return;
+                }
 
-                        await window.electronAPI.saveConfig(config);
-                        closeModal();
-                        renderCompanyManagement();
-                        showToast('Empresa agregada correctamente', 'success');
-                    } catch (error) {
-                        console.error('Error al guardar la empresa:', error);
-                        showToast('Error al guardar la empresa', 'error');
+                if (parseInt(employees) <= 0) {
+                    showToast('El número de empleados debe ser mayor a 0', 'error');
+                    return;
+                }
+
+                // Ahora pedimos seleccionar la carpeta para la empresa
+                try {
+                    const path = await window.electronAPI.selectDirectory();
+                    if(!path) {
+                        showToast('Debe seleccionar una carpeta para la empresa', 'error');
+                        return;
                     }
-                };
+
+                    // Guardar la información en la configuración
+                    const config = await window.electronAPI.loadConfig();
+                    if (!config.companyPaths) config.companyPaths = {};
+
+                    // Verificar que no exista una empresa con el mismo nombre
+                    if (config.companyPaths[name]) {
+                        showToast('Ya existe una empresa con este nombre', 'error');
+                        return;
+                    }
+
+                    // Calcular el escenario normativo basado en los datos de la empresa
+                    const escenarioNormativo = calcularEscenarioNormativo(parseInt(employees), risk, isAgro);
+
+                    // Guardar la información de la empresa
+                    config.companyPaths[name] = {
+                        root: path,
+                        stats: {
+                            employees: parseInt(employees),
+                            risk: risk,
+                            isAgropecuaria: isAgro,
+                            description: description
+                        },
+                        escenario_normativo: escenarioNormativo,
+                        createdAt: new Date().toISOString()
+                    };
+
+                    await window.electronAPI.saveConfig(config);
+                    closeModal();
+                    renderCompanyManagement();
+                    showToast('Empresa agregada correctamente', 'success');
+                } catch (error) {
+                    console.error('Error al guardar la empresa:', error);
+                    showToast('Error al guardar la empresa', 'error');
+                }
+            };
+        }
+
+        // Función para eliminar una empresa
+        async function eliminarEmpresa(nombreEmpresa) {
+            const confirmacion = confirm(`¿Está seguro de que desea eliminar la empresa "${nombreEmpresa}" y toda su configuración? Esta acción no se puede deshacer.`);
+
+            if (!confirmacion) {
+                return; // Si el usuario cancela, no hacemos nada
+            }
+
+            try {
+                // Cargar la configuración actual
+                const config = await window.electronAPI.loadConfig();
+
+                // Verificar que la empresa exista en la configuración
+                if (!config.companyPaths || !config.companyPaths[nombreEmpresa]) {
+                    showToast(`La empresa "${nombreEmpresa}" no existe en la configuración.`, 'error');
+                    return;
+                }
+
+                // Eliminar la empresa de la configuración
+                delete config.companyPaths[nombreEmpresa];
+
+                // Guardar la configuración actualizada
+                await window.electronAPI.saveConfig(config);
+
+                // Actualizar la vista de gestión de empresas
+                renderCompanyManagement();
+
+                showToast(`Empresa "${nombreEmpresa}" eliminada correctamente`, 'success');
             } catch (error) {
-                console.error('Error al seleccionar directorio:', error);
-                showToast('Error al seleccionar directorio', 'error');
+                console.error('Error al eliminar la empresa:', error);
+                showToast('Error al eliminar la empresa', 'error');
+            }
+        }
+
+        // Función para calcular el escenario normativo basado en los datos de la empresa
+        function calcularEscenarioNormativo(numeroTrabajadores, nivelRiesgo, isAgropecuaria = false) {
+            // Si es una unidad agropecuaria, aplicar reglas específicas
+            if (isAgropecuaria) {
+                if (numeroTrabajadores <= 10) {
+                    return 'AGROPECUARIO_SIMPLIFICADO_≤10';
+                } else if (numeroTrabajadores >= 11 && numeroTrabajadores <= 50) {
+                    return 'AGROPECUARIO_INTERMEDIO_11-50';
+                } else {
+                    return 'AGROPECUARIO_COMPLETO_50+';
+                }
+            } else {
+                // Reglas estándar para empresas no agropecuarias
+                if (numeroTrabajadores <= 10 && ['I', 'II', 'III'].includes(nivelRiesgo)) {
+                    return 'SIMPLIFICADO_≤10_R1-3';
+                } else if (numeroTrabajadores >= 11 && numeroTrabajadores <= 50 && ['I', 'II', 'III'].includes(nivelRiesgo)) {
+                    return 'INTERMEDIO_11-50_R1-3';
+                } else {
+                    return 'COMPLETO_CAP_III';
+                }
             }
         }
 
