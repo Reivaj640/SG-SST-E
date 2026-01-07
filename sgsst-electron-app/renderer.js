@@ -141,7 +141,7 @@ function determinarEscenarioNormativo(empresa) {
   // Validar entradas
   if (typeof numeroTrabajadores !== 'number' || !nivelRiesgo) {
     console.warn('Datos insuficientes para determinar escenario normativo:', empresa);
-    return null;
+    return 'COMPLETO_CAP_III'; // Escenario por defecto
   }
 
   // Verificar que normativaData esté disponible
@@ -173,6 +173,7 @@ function determinarEscenarioNormativo(empresa) {
     }
 
     if (cumpleTrabajadores && cumpleRiesgo && aplicaAgropecuaria && cumpleAdicional) {
+      console.log(`Escenario determinado para ${empresa.nombre}: ${nombreEscenario}`);
       return nombreEscenario;
     }
   }
@@ -221,14 +222,44 @@ function filtrarModulosPorNormativa(escenario) {
   // Crear objeto con módulos filtrados
   const modulosFiltrados = {};
 
-  for (const [moduloNombre, submodulos] of Object.entries(ALL_SUBMODULES)) {
-    // Determinar si este módulo está en la lista de activos
-    const moduloNumero = parseInt(moduloNombre.split(' ')[0]); // Extraer número del módulo
+  for (const [moduloNombre, submodulosArray] of Object.entries(ALL_SUBMODULES)) {
+    // Extraer número del módulo del nombre (por ejemplo, "Recursos" -> 1, "Gestión Integral" -> 2, etc.)
+    let moduloNumero = null;
+
+    // Mapeo de nombres de módulos a números
+    const moduloNombresANumeros = {
+      "Recursos": 1,
+      "Gestión Integral": 2,
+      "Gestión de la Salud": 3,
+      "Gestión de Peligros y Riesgos": 4,
+      "Gestión de Amenazas": 5,
+      "Verificación": 6,
+      "Mejoramiento": 7
+    };
+
+    // Buscar el número correspondiente al nombre del módulo
+    if (moduloNombresANumeros[moduloNombre]) {
+      moduloNumero = moduloNombresANumeros[moduloNombre];
+    } else {
+      // Si no se encuentra un mapeo directo, intentar con una búsqueda parcial
+      for (const [nombre, num] of Object.entries(moduloNombresANumeros)) {
+        if (moduloNombre.includes(nombre) || moduloNombre.startsWith(nombre.split(' ')[0])) {
+          moduloNumero = num;
+          break;
+        }
+      }
+    }
+
+    // Si no se encontró un número de módulo, asumir que no está activo
+    if (moduloNumero === null) {
+      continue;
+    }
+
     const moduloActivo = modulosActivos.includes(moduloNumero) && !modulosDesactivados.includes(moduloNumero);
 
     if (moduloActivo) {
       // Filtrar submódulos para este módulo
-      const submodulosFiltrados = submodulos.filter(submodulo => {
+      const submodulosFiltrados = submodulosArray.filter(submodulo => {
         // Extraer código del submódulo (ej. "1.1.1" de "1.1.1 Responsable del SG")
         const codigoSubmodulo = submodulo.split(' ')[0];
 
@@ -890,13 +921,21 @@ function initializeApp() {
 
 // --- Funciones de Navegación y UI ---
 
-function createSidebarButtons() {
-  console.log('Creating sidebar buttons...');
+function createSidebarButtons(activeModules = null) {
+  console.log('Creating sidebar buttons...', activeModules ? `Filtrando por: ${activeModules.length} módulos activos` : 'Mostrando todos');
   // Limpiar el menú existente
   sidebarMenu.innerHTML = '';
-  console.log('Cleared sidebar menu');
+  // console.log('Cleared sidebar menu'); // Reducir ruido en logs
 
   SIDEBAR_BUTTONS.forEach((item, index) => {
+    // FILTRADO DINÁMICO:
+    // Si activeModules está definido (no es null), filtramos.
+    // El botón "Salir" SIEMPRE se muestra.
+    // Para los demás, verificamos si su nombre está en la lista de activos.
+    if (activeModules && item.name !== "Salir" && !activeModules.includes(item.name)) {
+      return; // No crear este botón
+    }
+
     const li = document.createElement('li');
     li.className = 'sidebar-menu-item';
 
@@ -952,6 +991,12 @@ async function showHomePage() {
   // ✅ Pasar contentArea a hideCalendar
   hideCalendar(contentArea);
   console.log('Showing home page...');
+
+  // --- OCULTAR SIDEBAR EN HOME PRINCIPAL ---
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar) {
+    sidebar.classList.add('sidebar-hidden');
+  }
 
   // Cargar dinámicamente las empresas desde la configuración
   let dynamicCompanies = [];
@@ -1080,6 +1125,12 @@ async function selectCompany(companyName, buttonElement) {
   console.log(`Selecting company: ${companyName}`);
   currentCompany = companyName;
 
+  // --- MOSTRAR SIDEBAR AL SELECCIONAR EMPRESA ---
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar) {
+    sidebar.classList.remove('sidebar-hidden');
+  }
+
   // Cargar la normativa si aún no se ha hecho
   if (!normativaData) {
     await cargarNormativa();
@@ -1099,10 +1150,19 @@ async function selectCompany(companyName, buttonElement) {
     RESOURCES_SUBMODULES = filtrarModulosPorNormativa(escenario);
 
     console.log(`Módulos filtrados para la empresa ${companyName} (escenario: ${escenario}):`, RESOURCES_SUBMODULES);
+
+    // --- ACTUALIZACIÓN DINÁMICA DEL SIDEBAR ---
+    // Extraer los nombres de los módulos que tienen contenido (submódulos activos)
+    const activeModuleNames = Object.keys(RESOURCES_SUBMODULES);
+    // Reconstruir el sidebar mostrando solo los módulos activos
+    createSidebarButtons(activeModuleNames);
+
   } catch (error) {
     console.error('Error al cargar la configuración de la empresa o aplicar normativa:', error);
     // Si hay un error, usar los módulos completos como fallback
     RESOURCES_SUBMODULES = ALL_SUBMODULES;
+    // Restaurar sidebar completo en caso de error
+    createSidebarButtons(null);
   }
 
   // Actualizar UI: nombre de la empresa y logo en la barra lateral
@@ -1179,6 +1239,9 @@ function handleLogout() {
 
   // Limpiar el contenido y volver a la página de inicio
   showHomePage();
+
+  // Restaurar el sidebar completo (mostrar todos los botones)
+  createSidebarButtons(null);
 
   // Desactivar botón de sidebar
   if (window.activeSidebarButton) {

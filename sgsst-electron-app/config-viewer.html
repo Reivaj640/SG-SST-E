@@ -525,18 +525,36 @@
             try {
                 const path = await window.electronAPI.selectDirectory();
                 if(path) {
+                    showToast('Mapeando directorio, esto puede tomar unos segundos...', 'info');
+
+                    // Mapear el directorio seleccionado
+                    let structure = null;
+                    try {
+                        const mapResult = await window.electronAPI.mapDirectory(path);
+                        if (mapResult && mapResult.success) {
+                            structure = mapResult.structure;
+                        } else {
+                            console.warn('El mapeo de directorio no devolvió éxito:', mapResult);
+                            showToast('Advertencia: No se pudo mapear la estructura completa.', 'error');
+                        }
+                    } catch (mapError) {
+                        console.error('Error al mapear directorio:', mapError);
+                        showToast('Error al mapear la estructura de carpetas.', 'error');
+                    }
+
                     const config = await window.electronAPI.loadConfig();
                     if (!config.companyPaths) config.companyPaths = {};
 
                     // Actualizar la ruta de la empresa
                     config.companyPaths[name] = {
                         ...config.companyPaths[name],
-                        root: path
+                        root: path,
+                        structure: structure // Guardar la estructura mapeada
                     };
 
                     await window.electronAPI.saveConfig(config);
                     renderCompanyManagement();
-                    showToast('Ruta actualizada correctamente', 'success');
+                    showToast('Ruta actualizada y estructura mapeada correctamente', 'success');
                 }
             } catch (error) {
                 console.error('Error al vincular ruta:', error);
@@ -635,6 +653,23 @@
                         return;
                     }
 
+                    showToast('Mapeando directorio, esto puede tomar unos segundos...', 'info');
+
+                    // Mapear el directorio seleccionado
+                    let structure = null;
+                    try {
+                        const mapResult = await window.electronAPI.mapDirectory(path);
+                        if (mapResult && mapResult.success) {
+                            structure = mapResult.structure;
+                        } else {
+                            console.warn('El mapeo de directorio no devolvió éxito:', mapResult);
+                            showToast('Advertencia: No se pudo mapear la estructura completa.', 'error');
+                        }
+                    } catch (mapError) {
+                        console.error('Error al mapear directorio:', mapError);
+                        showToast('Error al mapear la estructura de carpetas.', 'error');
+                    }
+
                     // Calcular el escenario normativo basado en los datos de la empresa
                     const escenarioNormativo = calcularEscenarioNormativo(parseInt(employees), risk, isAgro);
 
@@ -648,6 +683,7 @@
                             description: description
                         },
                         escenario_normativo: escenarioNormativo,
+                        structure: structure, // Guardar la estructura mapeada
                         createdAt: new Date().toISOString()
                     };
 

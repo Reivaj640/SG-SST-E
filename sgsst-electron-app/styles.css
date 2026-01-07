@@ -1773,3 +1773,7 @@ select.form-control {
     .row { row-gap: 1.5rem !important; }
     .col-md-6 + .col-md-6 { padding-left: 0 !important; }
 }
+/* Ocultar sidebar en el home principal */
+.sidebar-hidden {
+    display: none !important;
+}
