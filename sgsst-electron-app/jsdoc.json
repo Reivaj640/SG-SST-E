@@ -1,0 +1,71 @@
+{
+  "tags": {
+    "allowUnknownTags": true,
+    "dictionaries": ["jsdoc", "closure"]
+  },
+  "source": {
+    "include": [
+      "./main.js",
+      "./preload.js",
+      "./renderer.js",
+      "./afiliacion-component.js",
+      "./afiliacion-viewer.js",
+      "./capacitacion-copasst.js",
+      "./capacitacion-copasst-viewer.js",
+      "./comite-convivencia.js",
+      "./comite-convivencia-viewer.js",
+      "./copasst.js",
+      "./copasst-viewer.js",
+      "./curso-50-horas.js",
+      "./curso-virtual-component.js",
+      "./curso-virtual-viewer.js",
+      "./evaluaciones-component.js",
+      "./evaluaciones-medicas.js",
+      "./evaluaciones-viewer.js",
+      "./gestion-amenazas-home.js",
+      "./gestion-integral-home.js",
+      "./gestion-peligros-home.js",
+      "./gestion-salud-home.js",
+      "./investigacion-accidente.js",
+      "./investigacion-accidentes.js",
+      "./investigaciones-viewer.js",
+      "./medicion-ausentismo.js",
+      "./mejoramiento-home.js",
+      "./normativa-utils.js",
+      "./politica-component.js",
+      "./politica-viewer.js",
+      "./presupuesto-gestion.js",
+      "./reportes-accidentes.js",
+      "./reportes-accidentes-viewer.js",
+      "./responsable-sg.js",
+      "./responsable-sg-viewer.js",
+      "./restricciones-component.js",
+      "./restricciones-medicas.js",
+      "./restricciones-viewer.js",
+      "./roles-responsabilidades-component.js",
+      "./roles-responsabilidades-viewer.js",
+      "./sociodemografica-component.js",
+      "./sociodemografica-viewer.js",
+      "./test-module-cards.js",
+      "./trabajo-alto-riesgo.js",
+      "./trabajo-alto-riesgo-viewer.js",
+      "./ver-ausentismo.js",
+      "./verificacion-home.js"
+    ],
+    "includePattern": ".+\\.js(doc|x)?$",
+    "excludePattern": "(^|\\/|\\\\)_"
+  },
+  "plugins": [
+    "plugins/markdown"
+  ],
+  "templates": {
+    "cleverLinks": false,
+    "monospaceLinks": false
+  },
+  "opts": {
+    "destination": "./docs/api/",
+    "encoding": "utf8",
+    "private": false,
+    "recurse": true
+  }
+}

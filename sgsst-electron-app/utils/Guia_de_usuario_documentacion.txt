@@ -1,0 +1,110 @@
+📚 Sistema de Automatización de Documentación para tu App SG-SST
+
+  🎯 ¿Qué hicimos?
+
+  Hemos implementado un sistema completo de documentación automática para tu aplicación SG-SST      
+  que combina documentación técnica generada automáticamente desde el código con documentación      
+  funcional descriptiva del sistema.
+
+  🏗️ Componentes del Sistema
+
+  1. Documentación Técnica Automática (API)
+   - Herramienta: JSDoc
+   - Función: Genera documentación desde los comentarios en tu código JavaScript
+   - Ubicación: docs/api/ (generado automáticamente)
+
+  2. Documentación Funcional
+   - Contenido: Descripciones detalladas del sistema, módulos y flujos
+   - Ubicación: Directorio docs/
+   - Archivos clave:
+     - PROJECT_OVERVIEW.md - Documento maestro con la estructura real de tu app
+     - arquitectura.md - Detalles técnicos de la estructura
+     - archivos-clave.md - Detalles de los archivos fundamentales (main.js, preload.js, renderer.js, index.html)
+     - motor-normativo.md - Funcionamiento del sistema normativo
+     - escenarios-normativos.md - Tipos y categorías de escenarios
+     - flujo-creacion-empresa.md - Proceso de registro
+     - renderer.md - Mecanismo de renderizado dinámico
+     - mantenimiento-documentacion.md - Guía para mantener la documentación actualizada
+
+  ⚙️ Cómo usar el sistema
+
+  1. Generar documentación automática
+
+   1 # Generar documentación una vez
+   2 npm run docs:generate
+   3
+   4 # Generar documentación y vigilar cambios (modo desarrollo)
+   5 npm run docs:watch
+
+  2. Documentar tu código con JSDoc
+  Cuando escribas nuevas funciones o modifiques existentes, agrega comentarios JSDoc:
+
+    1 /**
+    2  * Renderiza los módulos y submódulos activos de una empresa
+    3  * según el escenario normativo asignado.
+    4  *
+    5  * @param {Object} empresa - Objeto que representa la empresa
+    6  * @param {string} empresa.escenario_normativo - El escenario normativo
+      asignado
+    7  * @param {Object} reglasNormativas - Las reglas normativas aplicables
+    8  * @returns {void}
+    9  */
+   10 function renderizarModulosEmpresa(empresa, reglasNormativas) {
+   11   // lógica de la función
+   12 }
+
+  3. Actualizar documentación funcional
+  Cuando realices cambios significativos:
+   - Actualiza los archivos en docs/ si cambian funcionalidades importantes
+   - Asegúrate de que PROJECT_OVERVIEW.md refleje la estructura actual
+   - Actualiza CHANGELOG.md con los cambios realizados
+
+  🔄 Flujo de desarrollo con documentación
+
+  Antes de comenzar un cambio:
+   1. Lee docs/PROJECT_OVERVIEW.md para entender la estructura
+   2. Revisa los archivos relevantes en docs/
+
+  Durante el desarrollo:
+   1. Documenta tus funciones con comentarios JSDoc
+   2. Sigue las decisiones arquitectónicas establecidas
+
+  Después de completar el desarrollo:
+   1. Ejecuta npm run docs:generate para actualizar la documentación de API
+   2. Actualiza archivos en docs/ si es necesario
+   3. Agrega entrada en CHANGELOG.md
+
+  🤖 Uso con IA
+
+  Antes de pedirle a una IA (como yo) que proponga cambios:
+   1. Revisa `PROJECT_OVERVIEW.md` y los archivos en /docs
+   2. Respetar la arquitectura, el motor normativo y los escenarios existentes
+   3. No toques las decisiones arquitectónicas fundamentales
+   4. Sí puedes mejorar nuevas funcionalidades dentro del marco existente
+   5. Presta especial atención a los archivos clave del sistema:
+      - main.js: Proceso principal de Electron con responsabilidades críticas
+      - preload.js: Punto de entrada seguro para la comunicación entre procesos
+      - renderer.js: Proceso de renderizado que gestiona la interfaz de usuario y la navegación
+      - index.html: Estructura principal de la interfaz de usuario
+
+  🔧 Scripts disponibles
+
+   - npm run docs:generate - Genera documentación de API desde JSDoc
+   - npm run docs:watch - Vigila cambios y regenera documentación automáticamente
+   - npm start - Inicia la aplicación
+   - npm run dev - Inicia en modo desarrollo
+   - npm run build - Construye para distribución
+
+  ✅ Beneficios del sistema
+
+   1. Documentación siempre actualizada - Se genera automáticamente desde el código
+   2. Contexto completo para IA - Cualquier IA puede entender tu sistema completo
+   3. Facilita auditorías - Toda la estructura está documentada
+   4. Mantenimiento disciplinado - Proceso claro para mantener todo actualizado
+   5. Facilita onboarding - Nuevos desarrolladores pueden entender rápidamente el sistema
+
+  📝 Nota importante
+
+  La documentación técnica se genera desde los comentarios JSDoc y la documentación funcional se    
+   mantiene bajo disciplina de cambios. ¡Tu sistema ahora está completamente documentado y
+  automatizado!

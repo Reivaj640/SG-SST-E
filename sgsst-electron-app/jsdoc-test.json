@@ -1,0 +1,18 @@
+{
+  "source": {
+    "include": ["./main.js", "./renderer.js"],
+    "includePattern": ".+\\.js(doc|x)?$"
+  },
+  "opts": {
+    "destination": "./docs/api/",
+    "template": "node_modules/ink-docstrap/template"
+  },
+  "templates": {
+    "applicationName": "SG-SST Electron App",
+    "theme": "cerulean",
+    "navType": "vertical",
+    "linenums": true,
+    "collapseSymbols": false,
+    "inverseNav": true
+  }
+}
