@@ -2,7 +2,7 @@
 
 ## 📊 Resumen General
 
-Hemos completado exitosamente **18 fases** de reorganización del sistema SG-SST, implementando una arquitectura modular que mantiene la compatibilidad con el sistema existente.
+Hemos completado exitosamente **18 fases** de reorganización del sistema SG-SST, implementando una arquitectura modular que mantiene la compatibilidad con el sistema existente. Además, hemos realizado una limpieza completa de la raíz del proyecto reorganizando todos los archivos restantes.
 
 ## 🎯 Fases Completadas
 
@@ -176,6 +176,50 @@ Hemos completado exitosamente **18 fases** de reorganización del sistema SG-SST
 3. **Seguir el proceso probado** - Aplicar los mismos pasos que han sido exitosos
 4. **Probar después de cada cambio** - Validar que todo funcione correctamente
 5. **Actualizar documentación** - El archivo `ESTADO_ACTUAL_REORGANIZACION.md` contiene toda la información de las fases completadas
+
+## 🧹 Limpieza de la Raíz del Proyecto
+
+Además de los módulos anteriores, se ha realizado una limpieza completa de la raíz del proyecto:
+
+### 1. Archivos de ejemplo y demostración
+- `crear_presupuesto_ejemplo.js` → `examples/scripts/crear_presupuesto_ejemplo.js`
+- `test-grid.html` → `examples/views/test-grid.html`
+- `prueba_modular.html` → `examples/views/prueba_modular.html`
+
+### 2. Archivos de depuración
+- `debug-app.js` → `utils/debug/debug-app.js`
+- `debug-full.js` → `utils/debug/debug-full.js`
+- `debug-main.js` → `utils/debug/debug-main.js`
+- Actualizado `package.json` para reflejar nuevas rutas
+
+### 3. Archivos de utilidades
+- `normativa-utils.js` → `utils/normativa-utils.js`
+- `generate-docs.js` → `scripts/generate-docs.js`
+- `test-jsdoc.js` → `test/test-jsdoc.js`
+- `test-module-cards.js` → `test/test-module-cards.js`
+- Actualizado `jsdoc.json` y `generate-docs.js` para reflejar nuevas rutas
+
+### 4. Scripts auxiliares
+- `verificar-tamanos.bat` → `scripts/verificar-tamanos.bat`
+- `npx` (archivo vacío) → eliminado
+- Actualizado `README-LIMPIEZA.md` para reflejar nueva ubicación del script
+
+### 5. Archivos de vistas específicas
+- `config-viewer.html` → `components/config/config-viewer.html`
+- `exportar-informe-seguimiento.html` → `components/seguimiento/exportar-informe-seguimiento.html`
+- `seguimiento-incapacidades.html` → `components/seguimiento/seguimiento-incapacidades.html`
+- Actualizado `renderer.js` y `medicion-ausentismo.js` para reflejar nuevas rutas
+
+### 6. Archivos especiales
+- `compat-responsable-sg.js` → `utils/compat/compat-responsable-sg.js`
+- `curso-50-horas.js` → `examples/curso-50-horas.js` (archivo duplicado)
+- `dev_log.txt` → `logs/dev_log.txt`
+- `test_remision_utils.py` → `test/test_remision_utils.py`
+- Actualizado `index.html` para remover referencia al archivo duplicado
+
+## 📚 Documentación Automatizada
+
+La documentación automatizada se genera mediante el script `generate-docs.js` que utiliza JSDoc para crear documentación API en el directorio `docs/api/`. La configuración de JSDoc se encuentra en `jsdoc.json`.
 
 ## 🚀 Continuidad del Proyecto
 

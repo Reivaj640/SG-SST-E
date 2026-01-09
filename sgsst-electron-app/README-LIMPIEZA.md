@@ -18,7 +18,7 @@ El archivo `.gitignore` incluye patrones para ignorar:
    - Entornos virtuales de Python
    - Archivos temporales y cachés
 
-2. **verificar-tamanos.bat**: Muestra el tamaño de las carpetas principales
+2. **scripts/verificar-tamanos.bat**: Muestra el tamaño de las carpetas principales
 
 ### Recomendaciones
 

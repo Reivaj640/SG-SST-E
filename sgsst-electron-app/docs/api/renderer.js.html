@@ -1,4 +1,32 @@
-// renderer.js - Lógica del proceso de renderizado de Electron
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: renderer.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: renderer.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>// renderer.js - Lógica del proceso de renderizado de Electron
 
 // --- Constantes y Configuración ---
 // Módulos principales donde se debe mostrar el calendario
@@ -156,8 +184,8 @@ function determinarEscenarioNormativo(empresa) {
 
     // Verificar condiciones de trabajadores
     const cumpleTrabajadores =
-      (!condiciones.trabajadores_min || numeroTrabajadores >= condiciones.trabajadores_min) &&
-      (!condiciones.trabajadores_max || numeroTrabajadores <= condiciones.trabajadores_max);
+      (!condiciones.trabajadores_min || numeroTrabajadores >= condiciones.trabajadores_min) &amp;&amp;
+      (!condiciones.trabajadores_max || numeroTrabajadores &lt;= condiciones.trabajadores_max);
 
     // Verificar condiciones de riesgo
     const cumpleRiesgo = !condiciones.riesgo || condiciones.riesgo.includes(nivelRiesgo);
@@ -172,7 +200,7 @@ function determinarEscenarioNormativo(empresa) {
       cumpleAdicional = evaluarCondicionAdicional(condiciones.aplica_si, numeroTrabajadores, nivelRiesgo, isAgropecuaria);
     }
 
-    if (cumpleTrabajadores && cumpleRiesgo && aplicaAgropecuaria && cumpleAdicional) {
+    if (cumpleTrabajadores &amp;&amp; cumpleRiesgo &amp;&amp; aplicaAgropecuaria &amp;&amp; cumpleAdicional) {
       console.log(`Escenario determinado para ${empresa.nombre}: ${nombreEscenario}`);
       return nombreEscenario;
     }
@@ -189,8 +217,8 @@ function evaluarCondicionAdicional(condiciones, numeroTrabajadores, nivelRiesgo,
   for (const cond of condiciones) {
     if (cond.includes('trabajadores > 50')) {
       if (numeroTrabajadores > 50) return true;
-    } else if (cond.includes('trabajadores <= 50 y riesgo in [IV,V]')) {
-      if (numeroTrabajadores <= 50 && ['IV', 'V'].includes(nivelRiesgo)) {
+    } else if (cond.includes('trabajadores &lt;= 50 y riesgo in [IV,V]')) {
+      if (numeroTrabajadores &lt;= 50 &amp;&amp; ['IV', 'V'].includes(nivelRiesgo)) {
         return true;
       }
     } else if (cond.includes('es_agropecuaria')) {
@@ -255,7 +283,7 @@ function filtrarModulosPorNormativa(escenario) {
       continue;
     }
 
-    const moduloActivo = modulosActivos.includes(moduloNumero) && !modulosDesactivados.includes(moduloNumero);
+    const moduloActivo = modulosActivos.includes(moduloNumero) &amp;&amp; !modulosDesactivados.includes(moduloNumero);
 
     if (moduloActivo) {
       // Filtrar submódulos para este módulo
@@ -285,7 +313,7 @@ function filtrarModulosPorNormativa(escenario) {
         });
 
         // El submódulo está activo si está en activos y no en desactivados
-        return activo && !desactivado;
+        return activo &amp;&amp; !desactivado;
       });
 
       // Solo agregar el módulo si tiene submódulos activos
@@ -373,12 +401,12 @@ function showCalendarInModule(parentContainer) {
                 console.log(`🔹 [showCalendarInModule] Referencia a instancia guardada.`);
             } else {
                 console.error(`❌ [showCalendarInModule] Error: Vanilla Calendar Pro script NO CARGADO.`);
-                calendarContainer.innerHTML = '<p style="color:red;">Error: Calendario no disponible.</p>';
+                calendarContainer.innerHTML = '&lt;p style="color:red;">Error: Calendario no disponible.&lt;/p>';
             }
         } catch (e) {
             console.error(`❌ [showCalendarInModule] Error al inicializar Vanilla Calendar:`, e);
             if (calendarContainer) {
-                calendarContainer.innerHTML = `<p style="color:red;">Error cargando el calendario: ${e.message}</p>`;
+                calendarContainer.innerHTML = `&lt;p style="color:red;">Error cargando el calendario: ${e.message}&lt;/p>`;
             }
         }
     } else {
@@ -397,7 +425,7 @@ function hideCalendar() {
 
     let hidden = false;
     // 1. Intentar eliminar usando la referencia directa (método más fiable)
-    if (lastCalendarContainer && lastCalendarContainer.parentElement) {
+    if (lastCalendarContainer &amp;&amp; lastCalendarContainer.parentElement) {
         lastCalendarContainer.remove();
         lastCalendarContainer = null;
         hidden = true;
@@ -585,7 +613,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                   // Determine where to go based on current state
                   try {
                       // Check if there's a selected company in the configuration
-                      if (window.electronAPI && typeof window.electronAPI.loadConfig === 'function') {
+                      if (window.electronAPI &amp;&amp; typeof window.electronAPI.loadConfig === 'function') {
                           const config = await window.electronAPI.loadConfig();
                           const selectedCompany = config.selectedCompany || currentCompany || null;
 
@@ -612,7 +640,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                   sourceIframe.contentWindow.postMessage({
                       type: responseType,
                       payload: { success: false, error: `Unknown request type: ${type}` },
-                      requestId: requestId // <-- Pass back the original ID
+                      requestId: requestId // &lt;-- Pass back the original ID
                   }, 'file://');
                   return;
           }
@@ -624,7 +652,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           sourceIframe.contentWindow.postMessage({
               type: responseType,
               payload: result,
-              requestId: requestId // <-- FIX: Use 'requestId' to match what the iframe is waiting for
+              requestId: requestId // &lt;-- FIX: Use 'requestId' to match what the iframe is waiting for
           }, 'file://');
 
       } catch (error) {
@@ -632,7 +660,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           sourceIframe.contentWindow.postMessage({
               type: responseType,
               payload: { success: false, error: error.message },
-              requestId: requestId // <-- Pass back the original ID on error too
+              requestId: requestId // &lt;-- Pass back the original ID on error too
           }, 'file://');
       }
   });
@@ -664,7 +692,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // --- END: Collapsible Sidebar Logic ---
 
   // Escuchar eventos de log desde el proceso principal
-  if (window.electronAPI && window.electronAPI.onIpcMessage) {
+  if (window.electronAPI &amp;&amp; window.electronAPI.onIpcMessage) {
     window.electronAPI.onIpcMessage('log-message', (message, level) => {
       logMessage(message, level);
     });
@@ -754,7 +782,7 @@ function toggleCalendarModal() {
 // Función para mostrar el modal del calendario
 function showCalendarModal() {
   // Eliminar el modal anterior si existe
-  if (calendarModalElement && document.body.contains(calendarModalElement)) {
+  if (calendarModalElement &amp;&amp; document.body.contains(calendarModalElement)) {
     document.body.removeChild(calendarModalElement);
   }
 
@@ -815,7 +843,7 @@ function showCalendarModal() {
 
   // Botón de cierre
   const closeButton = document.createElement('button');
-  closeButton.innerHTML = '&times;';
+  closeButton.innerHTML = '&amp;times;';
   closeButton.style.cssText = `
     position: absolute;
     top: 5px;
@@ -868,11 +896,11 @@ function showCalendarModal() {
       });
       calendar.init();
     } else {
-      calendarContent.innerHTML = '<p style="color: #666; font-size: 14px; text-align: center; margin-top: 20px;">Error: Calendario no disponible.</p>';
+      calendarContent.innerHTML = '&lt;p style="color: #666; font-size: 14px; text-align: center; margin-top: 20px;">Error: Calendario no disponible.&lt;/p>';
     }
   } catch (error) {
     console.error('Error al inicializar el calendario:', error);
-    calendarContent.innerHTML = '<p style="color: #666; font-size: 14px; text-align: center; margin-top: 20px;">Error al cargar el calendario.</p>';
+    calendarContent.innerHTML = '&lt;p style="color: #666; font-size: 14px; text-align: center; margin-top: 20px;">Error al cargar el calendario.&lt;/p>';
   }
 
   // Activar la visibilidad con animación
@@ -886,7 +914,7 @@ function showCalendarModal() {
 
 // Función para ocultar el modal del calendario
 function hideCalendarModal() {
-  if (calendarModalElement && document.body.contains(calendarModalElement)) {
+  if (calendarModalElement &amp;&amp; document.body.contains(calendarModalElement)) {
     const calendarContainer = calendarModalElement.querySelector('#calendar-container');
 
     // Aplicar animación de salida
@@ -932,7 +960,7 @@ function createSidebarButtons(activeModules = null) {
     // Si activeModules está definido (no es null), filtramos.
     // El botón "Salir" SIEMPRE se muestra.
     // Para los demás, verificamos si su nombre está en la lista de activos.
-    if (activeModules && item.name !== "Salir" && !activeModules.includes(item.name)) {
+    if (activeModules &amp;&amp; item.name !== "Salir" &amp;&amp; !activeModules.includes(item.name)) {
       return; // No crear este botón
     }
 
@@ -948,7 +976,7 @@ function createSidebarButtons(activeModules = null) {
         handleLogout();
       } else if (currentCompany) {
         // ✅ NUEVA VALIDACIÓN: No cambiar módulo si estamos en un submódulo
-        if (currentSubmodule && currentModule !== item.name) {
+        if (currentSubmodule &amp;&amp; currentModule !== item.name) {
           console.log(`ℹ️ Ignorando click en "${item.name}" porque estamos en submódulo: "${currentSubmodule}"`);
           return;
         }
@@ -1026,9 +1054,9 @@ async function showHomePage() {
   // Aplicar la animación de Vanta al contenedor principal
   // Usar setTimeout para asegurar que el elemento esté en el DOM antes de aplicar la animación
   setTimeout(() => {
-    if (typeof VANTA !== 'undefined' && typeof VANTA.WAVES !== 'undefined') {
+    if (typeof VANTA !== 'undefined' &amp;&amp; typeof VANTA.WAVES !== 'undefined') {
       // Asegurar que no haya animaciones previas
-      if (window.vantaEffect && typeof window.vantaEffect.destroy === 'function') {
+      if (window.vantaEffect &amp;&amp; typeof window.vantaEffect.destroy === 'function') {
         window.vantaEffect.destroy();
       }
       window.vantaEffect = VANTA.WAVES({
@@ -1049,7 +1077,7 @@ async function showHomePage() {
 
       // Función para actualizar la animación cuando cambia el tamaño
       window.updateVantaEffect = function() {
-        if (window.vantaEffect && typeof window.vantaEffect.resize === 'function') {
+        if (window.vantaEffect &amp;&amp; typeof window.vantaEffect.resize === 'function') {
           window.vantaEffect.resize();
         }
       };
@@ -1139,7 +1167,7 @@ async function selectCompany(companyName, buttonElement) {
   // Obtener la configuración de la empresa para determinar el escenario normativo
   try {
     const config = await window.electronAPI.loadConfig();
-    const empresa = config.companyPaths && config.companyPaths[companyName] ?
+    const empresa = config.companyPaths &amp;&amp; config.companyPaths[companyName] ?
       { nombre: companyName, stats: config.companyPaths[companyName].stats } :
       { nombre: companyName, stats: { employees: 0, risk: 'I' } }; // Valores por defecto
 
@@ -1191,7 +1219,7 @@ async function selectCompany(companyName, buttonElement) {
   console.log(`Empresa seleccionada: ${companyName}`);
 
   // Destruir la animación de Vanta antes de cambiar de página
-  if (window.vantaEffect && typeof window.vantaEffect.destroy === 'function') {
+  if (window.vantaEffect &amp;&amp; typeof window.vantaEffect.destroy === 'function') {
     window.vantaEffect.destroy();
     window.vantaEffect = null;
   }
@@ -1227,7 +1255,7 @@ function handleLogout() {
   });
 
   // Destruir la animación de Vanta si existe antes de volver al home
-  if (window.vantaEffect && typeof window.vantaEffect.destroy === 'function') {
+  if (window.vantaEffect &amp;&amp; typeof window.vantaEffect.destroy === 'function') {
     window.vantaEffect.destroy();
     window.vantaEffect = null;
   }
@@ -1256,7 +1284,7 @@ function showCompanyHomePage() {
   // ✅ LIMPIAR ESTADO
   currentSubmodule = null;
   // Destruir la animación de Vanta si existe
-  if (window.vantaEffect && typeof window.vantaEffect.destroy === 'function') {
+  if (window.vantaEffect &amp;&amp; typeof window.vantaEffect.destroy === 'function') {
     window.vantaEffect.destroy();
     window.vantaEffect = null;
   }
@@ -1288,36 +1316,36 @@ function showCompanyHomePage() {
   const metricsSection = document.createElement('div');
   metricsSection.className = 'metrics-section';
   metricsSection.innerHTML = `
-    <div class="metrics-grid">
-      <div class="metric-card">
-        <div class="metric-icon-placeholder"></div>
-        <div class="metric-info">
-          <div class="metric-value">8</div>
-          <div class="metric-label">Módulos</div>
-        </div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-icon-placeholder"></div>
-        <div class="metric-info">
-          <div class="metric-value">24</div>
-          <div class="metric-label">Submódulos</div>
-        </div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-icon-placeholder"></div>
-        <div class="metric-info">
-          <div class="metric-value">15</div>
-          <div class="metric-label">Documentos</div>
-        </div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-icon-placeholder"></div>
-        <div class="metric-info">
-          <div class="metric-value">98%</div>
-          <div class="metric-label">Completado</div>
-        </div>
-      </div>
-    </div>
+    &lt;div class="metrics-grid">
+      &lt;div class="metric-card">
+        &lt;div class="metric-icon-placeholder">&lt;/div>
+        &lt;div class="metric-info">
+          &lt;div class="metric-value">8&lt;/div>
+          &lt;div class="metric-label">Módulos&lt;/div>
+        &lt;/div>
+      &lt;/div>
+      &lt;div class="metric-card">
+        &lt;div class="metric-icon-placeholder">&lt;/div>
+        &lt;div class="metric-info">
+          &lt;div class="metric-value">24&lt;/div>
+          &lt;div class="metric-label">Submódulos&lt;/div>
+        &lt;/div>
+      &lt;/div>
+      &lt;div class="metric-card">
+        &lt;div class="metric-icon-placeholder">&lt;/div>
+        &lt;div class="metric-info">
+          &lt;div class="metric-value">15&lt;/div>
+          &lt;div class="metric-label">Documentos&lt;/div>
+        &lt;/div>
+      &lt;/div>
+      &lt;div class="metric-card">
+        &lt;div class="metric-icon-placeholder">&lt;/div>
+        &lt;div class="metric-info">
+          &lt;div class="metric-value">98%&lt;/div>
+          &lt;div class="metric-label">Completado&lt;/div>
+        &lt;/div>
+      &lt;/div>
+    &lt;/div>
   `;
   companyHomeDiv.appendChild(metricsSection);
 
@@ -1331,17 +1359,17 @@ function showCompanyHomePage() {
   const modulesInfo = document.createElement('div');
   modulesInfo.className = 'modules-info';
   modulesInfo.innerHTML = `
-    <h3>Módulos Disponibles</h3>
-    <p>Puedes acceder a los siguientes módulos principales:</p>
-    <ul>
-      <li><strong>Recursos</strong>: Gestión de recursos humanos y materiales.</li>
-      <li><strong>Gestión Integral</strong>: Políticas, objetivos y planificación general.</li>
-      <li><strong>Gestión de la Salud</strong>: Programas de medicina, seguridad y salud ocupacional.</li>
-      <li><strong>Gestión de Peligros y Riesgos</strong>: Identificación y control de peligros.</li>
-      <li><strong>Gestión de Amenazas</strong>: Planes de emergencia y respuesta a desastres.</li>
-      <li><strong>Verificación</strong>: Auditorías y revisiones del sistema.</li>
-      <li><strong>Mejoramiento</strong>: Acciones correctivas y planes de mejora.</li>
-    </ul>
+    &lt;h3>Módulos Disponibles&lt;/h3>
+    &lt;p>Puedes acceder a los siguientes módulos principales:&lt;/p>
+    &lt;ul>
+      &lt;li>&lt;strong>Recursos&lt;/strong>: Gestión de recursos humanos y materiales.&lt;/li>
+      &lt;li>&lt;strong>Gestión Integral&lt;/strong>: Políticas, objetivos y planificación general.&lt;/li>
+      &lt;li>&lt;strong>Gestión de la Salud&lt;/strong>: Programas de medicina, seguridad y salud ocupacional.&lt;/li>
+      &lt;li>&lt;strong>Gestión de Peligros y Riesgos&lt;/strong>: Identificación y control de peligros.&lt;/li>
+      &lt;li>&lt;strong>Gestión de Amenazas&lt;/strong>: Planes de emergencia y respuesta a desastres.&lt;/li>
+      &lt;li>&lt;strong>Verificación&lt;/strong>: Auditorías y revisiones del sistema.&lt;/li>
+      &lt;li>&lt;strong>Mejoramiento&lt;/strong>: Acciones correctivas y planes de mejora.&lt;/li>
+    &lt;/ul>
   `;
   companyHomeDiv.appendChild(modulesInfo);
 
@@ -1380,7 +1408,7 @@ function showModuleContent(moduleName) {
   // 2. Llenar el contenedor (que ya está en el DOM).
   const submodules = RESOURCES_SUBMODULES[moduleName];
 
-  if (submodules && submodules.length > 0) {
+  if (submodules &amp;&amp; submodules.length > 0) {
     // Mostrar directamente el home del módulo, que asignará la clase a mainCanvas
     showModuleHome(mainCanvas, moduleName);
   } else {
@@ -1401,8 +1429,8 @@ function showModuleContent(moduleName) {
     const placeholderCard = document.createElement('div');
     placeholderCard.className = 'card';
     placeholderCard.innerHTML = `
-      <h3>Funcionalidad en Desarrollo</h3>
-      <p>Esta sección está en construcción.</p>
+      &lt;h3>Funcionalidad en Desarrollo&lt;/h3>
+      &lt;p>Esta sección está en construcción.&lt;/p>
     `;
     moduleDiv.appendChild(placeholderCard);
 
@@ -1484,7 +1512,7 @@ function showSubmoduleSelectorAndContent(container, moduleName, submoduleName) {
 
 let lastCalendarContainer = null;
 
-function showModuleHome(container, moduleName) { // 'container' ya es el <div class="main-canvas"> creado en showModuleContent
+function showModuleHome(container, moduleName) { // 'container' ya es el &lt;div class="main-canvas"> creado en showModuleContent
     console.log(`🔹 [showModuleHome] Iniciando para módulo: ${moduleName}`);
     if (!container) {
         console.error('❌ [showModuleHome] Container es null');
@@ -1679,7 +1707,7 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
           currentCompany,
           moduleName,
           submoduleName,
-          safeBackToModuleCallback // <-- USAR EL CALLBACK SEGURO
+          safeBackToModuleCallback // &lt;-- USAR EL CALLBACK SEGURO
         );
         responsableSgComponent.render();
       } else {
@@ -1693,7 +1721,7 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
           currentCompany,
           moduleName,
           submoduleName,
-          safeBackToModuleCallback // <-- USAR EL CALLBACK SEGURO
+          safeBackToModuleCallback // &lt;-- USAR EL CALLBACK SEGURO
         );
         rolesResponsabilidadesComponent.render();
       } else {
@@ -1707,7 +1735,7 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
           currentCompany,
           moduleName,
           submoduleName,
-          safeBackToModuleCallback // <-- USAR EL CALLBACK SEGURO
+          safeBackToModuleCallback // &lt;-- USAR EL CALLBACK SEGURO
         );
         afiliacionComponent.render();
       } else {
@@ -1780,7 +1808,7 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
           currentCompany,
           moduleName,
           submoduleName,
-          safeBackToModuleCallback // <-- USAR EL CALLBACK SEGURO
+          safeBackToModuleCallback // &lt;-- USAR EL CALLBACK SEGURO
         );
         capacitacionesViewer.render();
       } else {
@@ -1795,7 +1823,7 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
           currentCompany,
           moduleName,
           submoduleName,
-          safeBackToModuleCallback // <-- USAR EL CALLBACK SEGURO
+          safeBackToModuleCallback // &lt;-- USAR EL CALLBACK SEGURO
         );
         induccionesViewer.render();
       } else {
@@ -1810,7 +1838,7 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
           currentCompany,
           moduleName,
           submoduleName,
-          safeBackToModuleCallback // <-- USAR EL CALLBACK SEGURO
+          safeBackToModuleCallback // &lt;-- USAR EL CALLBACK SEGURO
         );
         cursoComponent.render();
       } else {
@@ -1824,7 +1852,7 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
           currentCompany,
           moduleName,
           submoduleName,
-          safeBackToModuleCallback // <-- USAR EL CALLBACK SEGURO
+          safeBackToModuleCallback // &lt;-- USAR EL CALLBACK SEGURO
         );
         politicaComponent.render();
       } else {
@@ -1839,7 +1867,7 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
           currentCompany,
           moduleName,
           submoduleName,
-          safeBackToModuleCallback // <-- USAR EL CALLBACK SEGURO
+          safeBackToModuleCallback // &lt;-- USAR EL CALLBACK SEGURO
         );
         sociodemograficaComponent.render();
       } else {
@@ -1931,7 +1959,7 @@ function showVerAusentismoContent(container, currentCompany, moduleName, submodu
         () => {
           // Callback para volver al home del módulo
           const mainCanvas = document.querySelector('.main-canvas');
-          if (mainCanvas && mainCanvas.parentElement) {
+          if (mainCanvas &amp;&amp; mainCanvas.parentElement) {
             showModuleHome(mainCanvas.parentElement, moduleName);
           } else {
             showModuleHome(container, moduleName);
@@ -1961,7 +1989,7 @@ function showRegistrarAusentismoContent(container, currentCompany, moduleName, s
         () => {
           // Callback para volver al home del módulo
           const mainCanvas = document.querySelector('.main-canvas');
-          if (mainCanvas && mainCanvas.parentElement) {
+          if (mainCanvas &amp;&amp; mainCanvas.parentElement) {
             showModuleHome(mainCanvas.parentElement, moduleName);
           } else {
             showModuleHome(container, moduleName);
@@ -1981,20 +2009,20 @@ function showRegistrarAusentismoContent(container, currentCompany, moduleName, s
 
 function showDevelopmentMessage(container, submoduleName) {
   container.innerHTML = `
-    <div class="development-message">
-      <h3>Funcionalidad en Desarrollo</h3>
-      <p>La funcionalidad para el submódulo "${submoduleName}" se implementará en el futuro.</p>
-    </div>
+    &lt;div class="development-message">
+      &lt;h3>Funcionalidad en Desarrollo&lt;/h3>
+      &lt;p>La funcionalidad para el submódulo "${submoduleName}" se implementará en el futuro.&lt;/p>
+    &lt;/div>
   `;
 }
 
 function showErrorMessage(container, submoduleName, errorMessage) {
   container.innerHTML = `
-    <div class="development-message">
-      <h3>Error al cargar el submódulo</h3>
-      <p>No se pudo cargar el contenido del submódulo "${submoduleName}".</p>
-      <p>Error: ${errorMessage}</p>
-    </div>
+    &lt;div class="development-message">
+      &lt;h3>Error al cargar el submódulo&lt;/h3>
+      &lt;p>No se pudo cargar el contenido del submódulo "${submoduleName}".&lt;/p>
+      &lt;p>Error: ${errorMessage}&lt;/p>
+    &lt;/div>
   `;
 }
 
@@ -2011,18 +2039,18 @@ async function showGenericSubmoduleContent(container, moduleName, submoduleName)
     }
 
     // Mostrar mensaje de carga
-    container.innerHTML = '<p>Buscando contenido del submódulo...</p>';
+    container.innerHTML = '&lt;p>Buscando contenido del submódulo...&lt;/p>';
 
     // Resto de tu código para buscar el submódulo...
     const submodulePathResult = await window.electronAPI.findSubmodulePath(currentCompany, moduleName, submoduleName);
 
     if (!submodulePathResult.success) {
       container.innerHTML = `
-        <div class="development-message">
-          <h3>Funcionalidad en Desarrollo</h3>
-          <p>La funcionalidad para el submódulo "${submoduleName}" se implementará en el futuro.</p>
-          <p>Error: ${submodulePathResult.error}</p>
-        </div>
+        &lt;div class="development-message">
+          &lt;h3>Funcionalidad en Desarrollo&lt;/h3>
+          &lt;p>La funcionalidad para el submódulo "${submoduleName}" se implementará en el futuro.&lt;/p>
+          &lt;p>Error: ${submodulePathResult.error}&lt;/p>
+        &lt;/div>
       `;
       return;
     }
@@ -2031,24 +2059,24 @@ async function showGenericSubmoduleContent(container, moduleName, submoduleName)
     console.log('Submodule path:', submodulePath);
 
     container.innerHTML = `
-      <div class="submodule-info">
-        <h3>Submódulo: ${submoduleName}</h3>
-        <p>Ruta encontrada: ${submodulePath}</p>
-        <div class="development-message">
-          <h4>Contenido del submódulo</h4>
-          <p>Esta sección está en construcción. Aquí se mostrará el contenido específico del submódulo.</p>
-          <button class="btn" onclick="window.open('${submodulePath}')">Abrir Carpeta</button>
-        </div>
-      </div>
+      &lt;div class="submodule-info">
+        &lt;h3>Submódulo: ${submoduleName}&lt;/h3>
+        &lt;p>Ruta encontrada: ${submodulePath}&lt;/p>
+        &lt;div class="development-message">
+          &lt;h4>Contenido del submódulo&lt;/h4>
+          &lt;p>Esta sección está en construcción. Aquí se mostrará el contenido específico del submódulo.&lt;/p>
+          &lt;button class="btn" onclick="window.open('${submodulePath}')">Abrir Carpeta&lt;/button>
+        &lt;/div>
+      &lt;/div>
     `;
   } catch (error) {
     console.error('Error al cargar el contenido del submódulo:', error);
     container.innerHTML = `
-      <div class="development-message">
-        <h3>Error al cargar el submódulo</h3>
-        <p>No se pudo cargar el contenido del submódulo "${submoduleName}".</p>
-        <p>Error: ${error.message}</p>
-      </div>
+      &lt;div class="development-message">
+        &lt;h3>Error al cargar el submódulo&lt;/h3>
+        &lt;p>No se pudo cargar el contenido del submódulo "${submoduleName}".&lt;/p>
+        &lt;p>Error: ${error.message}&lt;/p>
+      &lt;/div>
     `;
   }
 }
@@ -2077,9 +2105,9 @@ function showControlRemisionesContent(container) {
   const tablePlaceholder = document.createElement('div');
   tablePlaceholder.className = 'control-remisiones-table';
   tablePlaceholder.innerHTML = `
-    <p>Tabla de control de remisiones se cargará aquí.</p>
-    <p>Esta funcionalidad se conectará al backend Python para obtener los datos.</p>
-    <button class="btn">Refrescar</button>
+    &lt;p>Tabla de control de remisiones se cargará aquí.&lt;/p>
+    &lt;p>Esta funcionalidad se conectará al backend Python para obtener los datos.&lt;/p>
+    &lt;button class="btn">Refrescar&lt;/button>
   `;
   container.appendChild(tablePlaceholder);
 }
@@ -2131,7 +2159,7 @@ function showInvestigacionAccidentesContent(container, currentCompany, moduleNam
         () => {
           // Callback para volver al home del módulo
           const mainCanvas = document.querySelector('.main-canvas');
-          if (mainCanvas && mainCanvas.parentElement) {
+          if (mainCanvas &amp;&amp; mainCanvas.parentElement) {
             showModuleHome(mainCanvas.parentElement, moduleName);
           } else {
             showModuleHome(container, moduleName);
@@ -2157,7 +2185,7 @@ function showMedicionAusentismoContent(container, currentCompany, moduleName, su
 
       const medicionComponent = new window.MedicionAusentismoComponent(
         container,
-        currentCompany, // <-- CORREGIDO: Usar la variable dinámica
+        currentCompany, // &lt;-- CORREGIDO: Usar la variable dinámica
         moduleName,
         submoduleName,
         () => {
@@ -2222,7 +2250,7 @@ function createModuleCard(title, description, onClick) {
         console.error('Critical: content-area element still not found.');
         // Mostrar mensaje de error en la UI
         if (document.body) {
-          document.body.innerHTML = '<h1>Error: No se puede cargar la página de configuración</h1>';
+          document.body.innerHTML = '&lt;h1>Error: No se puede cargar la página de configuración&lt;/h1>';
         }
         return;
       }
@@ -2293,7 +2321,7 @@ function showPathLinkingPage() {
   // Botón para volver
   const backButton = document.createElement('button');
   backButton.className = 'btn';
-  backButton.textContent = '< Volver';
+  backButton.textContent = '&lt; Volver';
   backButton.addEventListener('click', showSettingsPage);
   pathLinkingDiv.appendChild(backButton);
 
@@ -2376,7 +2404,7 @@ ${result.log}
 
 `;
 
-          if (result.structure && result.structure.structure) {
+          if (result.structure &amp;&amp; result.structure.structure) {
             logTextarea.value += '--- Estructura Mapeada ---';
             logTextarea.value += formatStructureForLog(result.structure.structure);
           } else {
@@ -2440,7 +2468,7 @@ Error al mapear el directorio: ${error.message}`;
   // Área de registro
   const logArea = document.createElement('div');
   logArea.className = 'log-area';
-  logArea.innerHTML = '<h3>Registro de Actividad</h3><textarea disabled></textarea>';
+  logArea.innerHTML = '&lt;h3>Registro de Actividad&lt;/h3>&lt;textarea disabled>&lt;/textarea>';
   pathLinkingDiv.appendChild(logArea);
 
   // Poblar el área de log con el búfer existente
@@ -2509,7 +2537,7 @@ async function loadExistingPaths() {
       for (const companyName in config.companyPaths) {
         const pathInput = document.getElementById(`path-input-${companyName}`);
         const checkmark = document.getElementById(`checkmark-${companyName}`);
-        if (pathInput && checkmark) {
+        if (pathInput &amp;&amp; checkmark) {
           pathInput.value = config.companyPaths[companyName].root;
           checkmark.style.display = 'inline';
         }
@@ -2532,7 +2560,7 @@ function showChatSettingsPage() {
   // Botón para volver
   const backButton = document.createElement('button');
   backButton.className = 'btn';
-  backButton.textContent = '< Volver';
+  backButton.textContent = '&lt; Volver';
   backButton.addEventListener('click', showSettingsPage);
   chatSettingsDiv.appendChild(backButton);
 
@@ -2560,7 +2588,7 @@ function showUserSettingsPage() {
   // Botón para volver
   const backButton = document.createElement('button');
   backButton.className = 'btn';
-  backButton.textContent = '< Volver';
+  backButton.textContent = '&lt; Volver';
   backButton.addEventListener('click', showSettingsPage);
   userSettingsDiv.appendChild(backButton);
 
@@ -2590,7 +2618,7 @@ function showLLMChatPage() {
       console.error('Critical: content-area element still not found.');
       // Mostrar mensaje de error en la UI
       if (document.body) {
-        document.body.innerHTML = '<h1>Error: No se puede cargar la página de chat</h1>';
+        document.body.innerHTML = '&lt;h1>Error: No se puede cargar la página de chat&lt;/h1>';
       }
       return;
     }
@@ -2612,7 +2640,7 @@ function showLLMChatPage() {
   // Área de historial del chat
   const chatHistory = document.createElement('div');
   chatHistory.className = 'chat-history';
-  chatHistory.innerHTML = '<p>Bienvenido al asistente LLM. ¿En qué puedo ayudarte?</p>';
+  chatHistory.innerHTML = '&lt;p>Bienvenido al asistente LLM. ¿En qué puedo ayudarte?&lt;/p>';
   chatDiv.appendChild(chatHistory);
 
   // Área de entrada de usuario
@@ -2700,7 +2728,7 @@ function showCustomAlert(message) {
 // --- Función para formatear la estructura del directorio para el log ---
 function formatStructureForLog(node, indent = '') {
     let logString = '';
-    if (node && node.name) {
+    if (node &amp;&amp; node.name) {
         logString += `${indent}[DIR] ${node.name}\n`;
 
         if (node.subdirectories) {
@@ -2716,4 +2744,26 @@ function formatStructureForLog(node, indent = '') {
         }
     }
     return logString;
-}
+}</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#callParentAPI">callParentAPI</a></li><li><a href="global.html#hideCalendar">hideCalendar</a></li><li><a href="global.html#showCalendarInModule">showCalendarInModule</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Fri Jan 09 2026 16:49:00 GMT-0500 (hora estándar de Colombia)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

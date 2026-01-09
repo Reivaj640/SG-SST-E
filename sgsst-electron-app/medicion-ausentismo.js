@@ -213,7 +213,7 @@ class MedicionAusentismoComponent {
 
         // Crear iframe para cargar la interfaz de seguimiento de incapacidades
         const iframe = document.createElement('iframe');
-        iframe.src = 'seguimiento-incapacidades.html';
+        iframe.src = 'components/seguimiento/seguimiento-incapacidades.html';
         iframe.style.cssText = `
             width: 100%;
             height: 100%;
