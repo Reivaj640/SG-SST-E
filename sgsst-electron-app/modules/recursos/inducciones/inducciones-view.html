@@ -1,0 +1,1291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Gestión de Inducciones</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-color: #1a73e8;
+            --secondary-color: #4285f4;
+            --success-color: #0f9d58;
+            --warning-color: #f4b400;
+            --danger-color: #ea4335;
+            --light-bg: #f8f9fa;
+            --dark-text: #202124;
+            --header-height: 70px;
+            --nav-height: 60px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--light-bg);
+            color: var(--dark-text);
+        }
+
+        /* Top Header */
+        .top-header {
+            height: var(--header-height);
+            background-color: var(--primary-color);
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+        }
+
+        .logo-section h3 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .logo-section p {
+            margin: 0 0 0 15px;
+            opacity: 0.9;
+            font-size: 0.9rem;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .header-btn {
+            background-color: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .header-btn:hover {
+            background-color: rgba(255,255,255,0.3);
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: rgba(255,255,255,0.3);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 10px;
+            font-weight: 600;
+        }
+
+        /* Navigation Bar */
+        .nav-bar {
+            height: var(--nav-height);
+            background-color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            display: flex;
+            align-items: center;
+            padding: 0 30px;
+        }
+
+        .nav-menu {
+            display: flex;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            height: 100%;
+        }
+
+        .nav-item {
+            height: 100%;
+            display: flex;
+            align-items: center;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            height: 100%;
+            color: var(--dark-text);
+            text-decoration: none;
+            transition: all 0.2s;
+            border-bottom: 3px solid transparent;
+            font-weight: 500;
+        }
+
+        .nav-link:hover {
+            background-color: rgba(26, 115, 232, 0.05);
+            color: var(--primary-color);
+        }
+
+        .nav-link.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+        }
+
+        .nav-link i {
+            margin-right: 8px;
+            font-size: 1.1rem;
+        }
+
+        /* Main Content */
+        .main-content {
+            padding: 20px 30px;
+            height: calc(100vh - var(--header-height) - var(--nav-height));
+            overflow-y: auto;
+        }
+
+        .page-title {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 25px;
+            color: var(--dark-text);
+        }
+
+        /* Dashboard Cards */
+        .dashboard-card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            padding: 20px;
+            margin-bottom: 20px;
+            transition: transform 0.3s;
+        }
+
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .card-header-custom {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--dark-text);
+        }
+
+        .card-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+
+        .card-icon.primary {
+            background-color: var(--primary-color);
+        }
+
+        .card-icon.success {
+            background-color: var(--success-color);
+        }
+
+        .card-icon.warning {
+            background-color: var(--warning-color);
+        }
+
+        .card-icon.danger {
+            background-color: var(--danger-color);
+        }
+
+        .card-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .card-description {
+            color: #5f6368;
+            font-size: 0.9rem;
+        }
+
+        /* Tables */
+        .custom-table {
+            background-color: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .table-header {
+            padding: 15px 20px;
+            background-color: white;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .table-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .table-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-custom {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary-custom {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary-custom:hover {
+            background-color: var(--secondary-color);
+        }
+
+        .btn-secondary-custom {
+            background-color: white;
+            color: var(--dark-text);
+            border: 1px solid #e0e0e0;
+        }
+
+        .btn-secondary-custom:hover {
+            background-color: #f1f3f4;
+        }
+
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .status-approved {
+            background-color: rgba(15, 157, 88, 0.1);
+            color: var(--success-color);
+        }
+
+        .status-failed {
+            background-color: rgba(234, 67, 53, 0.1);
+            color: var(--danger-color);
+        }
+
+        /* Forms */
+        .form-section {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            font-weight: 500;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .form-control-custom {
+            width: 100%;
+            padding: 10px 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .form-control-custom:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.1);
+        }
+
+        /* Charts */
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+
+        /* Mobile Menu Toggle */
+        .mobile-menu-toggle {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: white;
+            cursor: pointer;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .top-header {
+                padding: 0 15px;
+            }
+
+            .nav-bar {
+                padding: 0 15px;
+            }
+
+            .main-content {
+                padding: 15px;
+            }
+
+            .mobile-menu-toggle {
+                display: block;
+            }
+
+            .logo-section p {
+                display: none;
+            }
+
+            .nav-bar {
+                transform: translateY(-100%);
+                transition: transform 0.3s;
+            }
+
+            .nav-bar.active {
+                transform: translateY(0);
+            }
+
+            .nav-menu {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            .nav-item {
+                width: 100%;
+            }
+
+            .nav-link {
+                width: 100%;
+                padding: 15px;
+                border-bottom: 1px solid #e0e0e0;
+            }
+
+            .dashboard-card {
+                margin-bottom: 15px;
+            }
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: var(--primary-color);
+            animation: spin 1s ease infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Modal */
+        .modal-custom {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-custom.active {
+            display: flex;
+        }
+
+        .modal-content-custom {
+            background-color: white;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: modalFadeIn 0.3s;
+        }
+
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: translateY(-30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .modal-header-custom {
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title-custom {
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #5f6368;
+        }
+
+        .modal-body-custom {
+            padding: 20px;
+        }
+
+        .modal-footer-custom {
+            padding: 15px 20px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        /* Tabs */
+        .tabs-container {
+            margin-bottom: 20px;
+        }
+
+        .tabs-nav {
+            display: flex;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .tab-button {
+            padding: 12px 20px;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-weight: 500;
+            color: #5f6368;
+            transition: all 0.2s;
+        }
+
+        .tab-button:hover {
+            color: var(--dark-text);
+        }
+
+        .tab-button.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+        }
+
+        .tab-content {
+            display: none;
+            padding: 20px 0;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="induccion-sub-header">
+        <!-- Top Header -->
+        <header class="top-header">
+            <div class="logo-section">
+                <button class="mobile-menu-toggle" id="mobileMenuToggle">
+                    <i class="bi bi-list"></i>
+                </button>
+                <h3>Programa de Inducciones</h3>
+            </div>
+            <div class="header-actions">
+                <button class="header-btn" id="backButton">
+                    <i class="bi bi-arrow-left"></i> Volver
+                </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation Bar -->
+        <nav class="nav-bar" id="navBar">
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="#" class="nav-link active" data-page="dashboard">
+                        <i class="bi bi-speedometer2"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-page="inductions">
+                        <i class="bi bi-clipboard-check"></i>
+                        <span>Registro de Inducciones</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-page="reports">
+                        <i class="bi bi-graph-up"></i>
+                        <span>Reportes y Análisis</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Dashboard Page -->
+        <div id="dashboard-page" class="page-content">
+            <div class="filter-section" style="margin-bottom: 20px; display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                <select id="yearFilter" class="form-control-custom" style="width: 120px;"></select>
+                <button id="applyFiltersBtn" class="btn-custom btn-primary-custom">Aplicar</button>
+                <button id="clearFiltersBtn" class="btn-custom btn-secondary-custom">Limpiar</button>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="row">
+                <div class="col-lg-3 col-md-6">
+                    <div class="dashboard-card">
+                        <div class="card-header-custom">
+                            <div class="card-title">Total Inducciones</div>
+                            <div class="card-icon primary">
+                                <i class="bi bi-clipboard-check"></i>
+                            </div>
+                        </div>
+                        <div class="card-value">43</div>
+                        <div class="card-description">Registradas este mes</div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="dashboard-card">
+                        <div class="card-header-custom">
+                            <div class="card-title">Aprobadas</div>
+                            <div class="card-icon success">
+                                <i class="bi bi-check-circle"></i>
+                            </div>
+                        </div>
+                        <div class="card-value">32</div>
+                        <div class="card-description">74.4% de aprobación</div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="dashboard-card">
+                        <div class="card-header-custom">
+                            <div class="card-title">Reprobadas</div>
+                            <div class="card-icon danger">
+                                <i class="bi bi-x-circle"></i>
+                            </div>
+                        </div>
+                        <div class="card-value">11</div>
+                        <div class="card-description">25.6% de reprobación</div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="dashboard-card">
+                        <div class="card-header-custom">
+                            <div class="card-title">Puntuación Promedio</div>
+                            <div class="card-icon warning">
+                                <i class="bi bi-graph-up"></i>
+                            </div>
+                        </div>
+                        <div class="card-value">19.8</div>
+                        <div class="card-description">De 22 puntos posibles</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="dashboard-card">
+                        <div class="card-header-custom">
+                            <div class="card-title">Inducciones por Semana</div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="weeklyChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="dashboard-card">
+                        <div class="card-header-custom">
+                            <div class="card-title">Distribución por Cargo</div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="positionChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Inductions Table -->
+            <div class="custom-table">
+                <div class="table-header">
+                    <div class="table-title">Inducciones Recientes</div>
+                    <div class="table-actions">
+                        <button class="btn-custom btn-secondary-custom">Exportar</button>
+                        <button class="btn-custom btn-primary-custom">Ver Todas</button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Nombre</th>
+                                <th>Cargo</th>
+                                <th>Puntuación</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-inductions-tbody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Inductions Page -->
+        <div id="inductions-page" class="page-content" style="display: none;">
+
+            <div class="form-section">
+                <div class="form-title">Listado de Inducciones</div>
+
+                <div class="table-actions mb-3">
+                    <button class="btn-custom btn-primary-custom" id="add-induction-btn">
+                        <i class="bi bi-plus-circle"></i> Nueva Inducción
+                    </button>
+                    <div class="float-end">
+                        <select class="form-control-custom d-inline-block" style="width: 200px;">
+                            <option>Todos los estados</option>
+                            <option>Aprobado</option>
+                            <option>Reprobado</option>
+                        </select>
+                        <input type="date" class="form-control-custom d-inline-block ms-2" style="width: 200px;">
+                    </div>
+                </div>
+
+                <!-- Buscador para cédula o nombre -->
+                <div class="mb-3">
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="searchInput" placeholder="Buscar por cédula o nombre...">
+                        <button class="btn btn-outline-secondary" type="button" id="searchBtn">
+                            <i class="bi bi-search"></i> Buscar
+                        </button>
+                        <button class="btn btn-outline-secondary" type="button" id="clearSearchBtn">
+                            <i class="bi bi-x"></i> Limpiar
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Fecha</th>
+                                <th>Empleado</th>
+                                <th>Cédula</th>
+                                <th>Cargo</th>
+                                <th>Puntuación</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td>08/05/2024</td>
+                                <td>Javier Robles Fontalvo</td>
+                                <td>1044391066</td>
+                                <td>Representante del SG-SST</td>
+                                <td>22 / 22</td>
+                                <td><span class="status-badge status-approved">Aprobado</span></td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary">Ver Detalles</button>
+                                    <button class="btn btn-sm btn-outline-secondary">Editar</button>
+                                    <button class="btn btn-sm btn-outline-danger">Eliminar</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td>09/05/2024</td>
+                                <td>Lilia Vásquez Muñoz</td>
+                                <td>1129566447</td>
+                                <td>Coordinación Nómina</td>
+                                <td>22 / 22</td>
+                                <td><span class="status-badge status-approved">Aprobado</span></td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary">Ver Detalles</button>
+                                    <button class="btn btn-sm btn-outline-secondary">Editar</button>
+                                    <button class="btn btn-sm btn-outline-danger">Eliminar</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>3</td>
+                                <td>14/05/2024</td>
+                                <td>Jesus David Manjarres Díaz Granados</td>
+                                <td>1045748792</td>
+                                <td>Técnico audiodivisual</td>
+                                <td>20 / 22</td>
+                                <td><span class="status-badge status-approved">Aprobado</span></td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary">Ver Detalles</button>
+                                    <button class="btn btn-sm btn-outline-secondary">Editar</button>
+                                    <button class="btn btn-sm btn-outline-danger">Eliminar</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>4</td>
+                                <td>14/05/2024</td>
+                                <td>Genisis María cantillo torres</td>
+                                <td>1002228922</td>
+                                <td>Mesera</td>
+                                <td>18 / 22</td>
+                                <td><span class="status-badge status-failed">Reprobado</span></td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary">Ver Detalles</button>
+                                    <button class="btn btn-sm btn-outline-secondary">Editar</button>
+                                    <button class="btn btn-sm btn-outline-danger">Eliminar</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports Page -->
+        <div id="reports-page" class="page-content" style="display: none;">
+
+            <div class="form-section">
+                <div class="form-title">Generador de Reportes</div>
+
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label class="form-label">Tipo de Reporte:</label>
+                            <select class="form-control-custom" id="reportType">
+                                <option value="general">Reporte General</option>
+                                <option value="employee">Reporte por Empleado</option>
+                                <option value="position">Reporte por Cargo</option>
+                                <option value="date">Reporte por Fecha</option>
+                                <option value="question">Análisis por Pregunta</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label class="form-label">Fecha Inicio:</label>
+                            <input type="date" class="form-control-custom" id="startDate">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label class="form-label">Fecha Fin:</label>
+                            <input type="date" class="form-control-custom" id="endDate">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <button class="btn-custom btn-primary-custom" id="generateReport">
+                        <i class="bi bi-bar-chart"></i> Generar Reporte
+                    </button>
+                    <button class="btn-custom btn-secondary-custom">
+                        <i class="bi bi-download"></i> Exportar a Excel
+                    </button>
+                    <button class="btn-custom btn-secondary-custom">
+                        <i class="bi bi-file-pdf"></i> Exportar a PDF
+                    </button>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="dashboard-card">
+                            <div class="card-header-custom">
+                                <div class="card-title">Tasa de Aprobación por Mes</div>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="approvalRateChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="dashboard-card">
+                            <div class="card-header-custom">
+                                <div class="card-title">Preguntas con Mayor Tasa de Error</div>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="errorRateChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Estadísticas por Género -->
+                <div class="mt-4">
+                    <h5 class="form-title">Estadísticas por Género</h5>
+
+                    <div class="row mb-4">
+                        <div class="col-lg-3 col-md-6">
+                            <div class="dashboard-card gender-stat-card">
+                                <div class="card-header-custom">
+                                    <div class="card-title">Total Hombres</div>
+                                    <div class="card-icon primary">
+                                        <i class="bi bi-person"></i>
+                                    </div>
+                                </div>
+                                <div class="card-value">0</div>
+                                <div class="card-description">Inducciones realizadas</div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-md-6">
+                            <div class="dashboard-card gender-stat-card">
+                                <div class="card-header-custom">
+                                    <div class="card-title">Total Mujeres</div>
+                                    <div class="card-icon success">
+                                        <i class="bi bi-person"></i>
+                                    </div>
+                                </div>
+                                <div class="card-value">0</div>
+                                <div class="card-description">Inducciones realizadas</div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-md-6">
+                            <div class="dashboard-card gender-stat-card">
+                                <div class="card-header-custom">
+                                    <div class="card-title">Hombres Aprobados</div>
+                                    <div class="card-icon success">
+                                        <i class="bi bi-check-circle"></i>
+                                    </div>
+                                </div>
+                                <div class="card-value">0</div>
+                                <div class="card-description">Tasa de aprobación</div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-md-6">
+                            <div class="dashboard-card gender-stat-card">
+                                <div class="card-header-custom">
+                                    <div class="card-title">Mujeres Aprobadas</div>
+                                    <div class="card-icon success">
+                                        <i class="bi bi-check-circle"></i>
+                                    </div>
+                                </div>
+                                <div class="card-value">0</div>
+                                <div class="card-description">Tasa de aprobación</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="dashboard-card">
+                                <div class="card-header-custom">
+                                    <div class="card-title">Distribución por Género</div>
+                                </div>
+                                <div class="chart-container">
+                                    <canvas id="genderDistributionChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="dashboard-card">
+                                <div class="card-header-custom">
+                                    <div class="card-title">Aprobación por Género</div>
+                                </div>
+                                <div class="chart-container">
+                                    <canvas id="approvalByGenderChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Add Employee Modal -->
+    <div class="modal-custom" id="addEmployeeModal">
+        <div class="modal-content-custom">
+            <div class="modal-header-custom">
+                <h5 class="modal-title-custom">Agregar Nuevo Empleado</h5>
+                <button class="modal-close" id="closeEmployeeModal">&times;</button>
+            </div>
+            <div class="modal-body-custom">
+                <div class="form-group">
+                    <label class="form-label">Nombre Completo:</label>
+                    <input type="text" class="form-control-custom" id="employeeName">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Cédula:</label>
+                    <input type="text" class="form-control-custom" id="employeeId">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Cargo:</label>
+                    <select class="form-control-custom" id="employeePosition">
+                        <option value="">Seleccionar cargo</option>
+                        <option value="Representante del SG-SST">Representante del SG-SST</option>
+                        <option value="Coordinación Nómina">Coordinación Nómina</option>
+                        <option value="Técnico audiodivisual">Técnico audiodivisual</option>
+                        <option value="Mesera">Mesera</option>
+                        <option value="Supernumerario">Supernumerario</option>
+                        <option value="Ayudante">Ayudante</option>
+                        <option value="salvavidas">salvavidas</option>
+                        <option value="Recepcionista">Recepcionista</option>
+                        <option value="Auxiliar de cocina">Auxiliar de cocina</option>
+                        <option value="Cajera">Cajera</option>
+                        <option value="Auxiliar de cafetería">Auxiliar de cafetería</option>
+                        <option value="Sub chef">Sub chef</option>
+                        <option value="Operaria integral">Operaria integral</option>
+                        <option value="Cocinero">Cocinero</option>
+                        <option value="Panadero">Panadero</option>
+                        <option value="Portero">Portero</option>
+                        <option value="Oficios varios">Oficios varios</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Fecha de Nacimiento:</label>
+                    <input type="date" class="form-control-custom" id="employeeBirthdate">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Género:</label>
+                    <select class="form-control-custom" id="employeeGender">
+                        <option value="">Seleccionar género</option>
+                        <option value="Hombre">Hombre</option>
+                        <option value="Mujer">Mujer</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer-custom">
+                <button class="btn-custom btn-secondary-custom" id="cancelAddEmployee">Cancelar</button>
+                <button class="btn-custom btn-primary-custom" id="saveEmployee">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Induction Modal -->
+    <div class="modal-custom" id="addInductionModal">
+        <div class="modal-content-custom">
+            <div class="modal-header-custom">
+                <h5 class="modal-title-custom">Registrar Nueva Inducción</h5>
+                <button class="modal-close" id="closeInductionModal">&times;</button>
+            </div>
+            <div class="modal-body-custom">
+                <div class="form-group">
+                    <label class="form-label">Empleado:</label>
+                    <select class="form-control-custom" id="inductionEmployee">
+                        <option value="">Seleccionar empleado</option>
+                        <option value="1">Javier Robles Fontalvo</option>
+                        <option value="2">Lilia Vásquez Muñoz</option>
+                        <option value="3">Jesus David Manjarres Díaz Granados</option>
+                        <option value="4">Genisis María cantillo torres</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Fecha:</label>
+                    <input type="date" class="form-control-custom" id="inductionDate">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Lugar:</label>
+                    <input type="text" class="form-control-custom" id="inductionLocation" value="Barranquilla">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Puntuación:</label>
+                    <div class="input-group">
+                        <input type="number" class="form-control-custom" id="inductionScore" min="0" max="22">
+                        <span class="input-group-text">/ 22</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Estado:</label>
+                    <select class="form-control-custom" id="inductionStatus">
+                        <option value="Aprobo">Aprobado</option>
+                        <option value="Reprobo">Reprobado</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer-custom">
+                <button class="btn-custom btn-secondary-custom" id="cancelAddInduction">Cancelar</button>
+                <button class="btn-custom btn-primary-custom" id="saveInduction">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Navigation
+        document.addEventListener('DOMContentLoaded', function() {
+            const navLinks = document.querySelectorAll('.nav-link');
+            const pages = document.querySelectorAll('.page-content');
+            const pageTitles = document.querySelectorAll('.page-title');
+
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+
+                    // Remove active class from all links and pages
+                    navLinks.forEach(l => l.classList.remove('active'));
+                    pages.forEach(p => p.style.display = 'none');
+
+                    // Add active class to clicked link
+                    this.classList.add('active');
+
+                    // Show corresponding page
+                    const pageId = this.getAttribute('data-page') + '-page';
+                    const page = document.getElementById(pageId);
+                    if (page) {
+                        page.style.display = 'block';
+                    }
+
+                    // Close mobile menu
+                    if (window.innerWidth <= 768) {
+                        document.getElementById('navBar').classList.remove('active');
+                    }
+                });
+            });
+
+            // Mobile menu toggle
+            const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+            const navBar = document.getElementById('navBar');
+
+            mobileMenuToggle.addEventListener('click', function() {
+                navBar.classList.toggle('active');
+            });
+
+            // Tabs
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            tabButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const tabId = this.getAttribute('data-tab');
+
+                    // Remove active class from all buttons and contents
+                    tabButtons.forEach(b => b.classList.remove('active'));
+                    tabContents.forEach(c => c.classList.remove('active'));
+
+                    // Add active class to clicked button and corresponding content
+                    this.classList.add('active');
+                    const tabContent = document.getElementById(tabId + '-tab');
+                    if (tabContent) {
+                        tabContent.classList.add('active');
+                    }
+                });
+            });
+
+            // Modals
+            const addEmployeeBtn = document.getElementById('add-employee-btn');
+            const addEmployeeModal = document.getElementById('addEmployeeModal');
+            const closeEmployeeModal = document.getElementById('closeEmployeeModal');
+            const cancelAddEmployee = document.getElementById('cancelAddEmployee');
+            const saveEmployee = document.getElementById('saveEmployee');
+
+            addEmployeeBtn.addEventListener('click', function() {
+                addEmployeeModal.classList.add('active');
+            });
+
+            closeEmployeeModal.addEventListener('click', function() {
+                addEmployeeModal.classList.remove('active');
+            });
+
+            cancelAddEmployee.addEventListener('click', function() {
+                addEmployeeModal.classList.remove('active');
+            });
+
+            saveEmployee.addEventListener('click', function() {
+                // Save employee logic here
+                addEmployeeModal.classList.remove('active');
+                // Show success message
+                alert('Empleado guardado correctamente');
+            });
+
+            const addInductionBtn = document.getElementById('add-induction-btn');
+            const addInductionModal = document.getElementById('addInductionModal');
+            const closeInductionModal = document.getElementById('closeInductionModal');
+            const cancelAddInduction = document.getElementById('cancelAddInduction');
+            const saveInduction = document.getElementById('saveInduction');
+
+            addInductionBtn.addEventListener('click', function() {
+                addInductionModal.classList.add('active');
+            });
+
+            closeInductionModal.addEventListener('click', function() {
+                addInductionModal.classList.remove('active');
+            });
+
+            cancelAddInduction.addEventListener('click', function() {
+                addInductionModal.classList.remove('active');
+            });
+
+            saveInduction.addEventListener('click', function() {
+                // Save induction logic here
+                addInductionModal.classList.remove('active');
+                // Show success message
+                alert('Inducción guardada correctamente');
+            });
+
+            // Charts
+            const weeklyChartCtx = document.getElementById('weeklyChart').getContext('2d');
+            const weeklyChart = new Chart(weeklyChartCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Semana 1', 'Semana 2', 'Semana 3', 'Semana 4'],
+                    datasets: [{
+                        label: 'Inducciones Realizadas',
+                        data: [12, 19, 8, 15],
+                        backgroundColor: 'rgba(26, 115, 232, 0.2)',
+                        borderColor: 'rgba(26, 115, 232, 1)',
+                        borderWidth: 2,
+                        tension: 0.4
+                    }, {
+                        label: 'Inducciones Aprobadas',
+                        data: [9, 14, 6, 12],
+                        backgroundColor: 'rgba(15, 157, 88, 0.2)',
+                        borderColor: 'rgba(15, 157, 88, 1)',
+                        borderWidth: 2,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            const positionChartCtx = document.getElementById('positionChart').getContext('2d');
+            const positionChart = new Chart(positionChartCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Supernumerario', 'Cocina', 'Otros'],
+                    datasets: [{
+                        data: [15, 8, 20],
+                        backgroundColor: [
+                            'rgba(26, 115, 232, 0.8)',
+                            'rgba(15, 157, 88, 0.8)',
+                            'rgba(244, 180, 0, 0.8)'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        }
+                    }
+                }
+            });
+
+            const approvalRateChartCtx = document.getElementById('approvalRateChart').getContext('2d');
+            const approvalRateChart = new Chart(approvalRateChartCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Mayo', 'Junio', 'Julio', 'Agosto'],
+                    datasets: [{
+                        label: 'Tasa de Aprobación (%)',
+                        data: [75, 82, 78, 85],
+                        backgroundColor: 'rgba(26, 115, 232, 0.8)',
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    }
+                }
+            });
+
+            const errorRateChartCtx = document.getElementById('errorRateChart').getContext('2d');
+            const errorRateChart = new Chart(errorRateChartCtx, {
+                type: 'horizontalBar',
+                data: {
+                    labels: ['Pregunta 7', 'Pregunta 8', 'Pregunta 9', 'Pregunta 10', 'Pregunta 11'],
+                    datasets: [{
+                        label: 'Tasa de Error (%)',
+                        data: [35, 28, 22, 18, 15],
+                        backgroundColor: 'rgba(234, 67, 53, 0.8)',
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    }
+                }
+            });
+
+            // Set current date for induction date input
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('inductionDate').value = today;
+        });
+    </script>
+</body>
+</html>

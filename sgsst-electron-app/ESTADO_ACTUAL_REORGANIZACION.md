@@ -2,7 +2,7 @@
 
 ## 📊 Resumen General
 
-Hemos completado exitosamente **11 fases** de reorganización del sistema SG-SST, implementando una arquitectura modular que mantiene la compatibilidad con el sistema existente.
+Hemos completado exitosamente **18 fases** de reorganización del sistema SG-SST, implementando una arquitectura modular que mantiene la compatibilidad con el sistema existente.
 
 ## 🎯 Fases Completadas
 
@@ -50,6 +50,34 @@ Hemos completado exitosamente **11 fases** de reorganización del sistema SG-SST
 - Módulo completamente reorganizado
 - Archivos migrados: `ver-ausentismo.js`, `ver-ausentismo-dashboard.html`
 
+### 12. Evaluaciones Médicas
+- Módulo completamente reorganizado
+- Archivos migrados: `evaluaciones-medicas.js` → `evaluaciones-medicas-logic.js`, `evaluaciones-component.js`, `evaluaciones-viewer.js`, `evaluaciones-viewer.html` → `evaluaciones-view.html`, `evaluaciones-viewer.css` → `evaluaciones-view.css`, `exportar-informe-seguimiento.html`
+
+### 13. Reportes de Accidentes
+- Módulo completamente reorganizado
+- Archivos migrados: `reportes-accidentes.js` → `reportes-accidentes-logic.js`, `reportes-accidentes-viewer.js`, `reportes-accidentes-viewer.html` → `reportes-accidentes-view.html`, `reportes-accidentes-viewer.css` → `reportes-accidentes-view.css`
+
+### 14. Investigación de Accidentes
+- Módulo completamente reorganizado
+- Archivos migrados: `investigacion-accidentes.js` → `investigacion-accidentes-logic.js`, `investigacion-accidente.js` → `investigacion-accidente-logic.js`, `investigaciones-viewer.js`, `investigaciones-viewer.html` → `investigaciones-view.html`, `investigaciones-viewer.css` → `investigaciones-view.css`, `investigacion-accidente.css` → `investigacion-accidente-view.css`, `investigacion_handlers.js`
+
+### 15. Restricciones Médicas
+- Módulo completamente reorganizado
+- Archivos migrados: `restricciones-medicas.js` → `restricciones-medicas-logic.js`, `restricciones-component.js`, `restricciones-viewer.js`, `restricciones-viewer.html` → `restricciones-view.html`, `restricciones-viewer.css` → `restricciones-view.css`
+
+### 16. Información Sociodemográfica
+- Módulo completamente reorganizado
+- Archivos migrados: `sociodemografica-component.js`, `sociodemografica-viewer.js`, `sociodemografica-viewer.html` → `sociodemografica-view.html`, `sociodemografica-viewer.css` → `sociodemografica-view.css`
+
+### 17. Capacitaciones
+- Módulo completamente reorganizado
+- Archivos migrados: `capacitaciones.js` → `capacitaciones-logic.js`, `capacitaciones-viewer.js`, `capacitaciones-viewer.html` → `capacitaciones-view.html`, `capacitaciones-viewer.css` → `capacitaciones-view.css`
+
+### 18. Inducciones
+- Módulo completamente reorganizado
+- Archivos migrados: `inducciones.js` → `inducciones-logic.js`, `inducciones-viewer.js`, `inducciones.html` → `inducciones-view.html`, `inducciones-viewer.css` → `inducciones-view.css`
+
 ## 📁 Estructura de Directorios Actual
 
 ### Módulos Reorganizados:
@@ -64,6 +92,13 @@ Hemos completado exitosamente **11 fases** de reorganización del sistema SG-SST
 - `modules/gestion-integral/politica/`
 - `modules/recursos/trabajo-alto-riesgo/`
 - `modules/gestion-salud/ausentismo/`
+- `modules/gestion-salud/evaluaciones-medicas/`
+- `modules/gestion-salud/reportes-accidentes/`
+- `modules/gestion-salud/investigacion-accidentes/`
+- `modules/gestion-salud/restricciones-medicas/`
+- `modules/gestion-salud/sociodemografica/`
+- `modules/recursos/capacitaciones/`
+- `modules/recursos/inducciones/`
 
 ## 🔄 Proceso de Reorganización Seguido
 
@@ -112,7 +147,7 @@ Hemos completado exitosamente **11 fases** de reorganización del sistema SG-SST
 - `PROJECT_OVERVIEW.md` - Documento maestro con la estructura completa
 - `arquitectura.md` - Detalles técnicos de la estructura
 - `archivos-clave.md` - Descripción de los archivos fundamentales
-- `FASE_1_COMPLETADA.md` a `FASE_11_COMPLETADA.md` - Resúmenes de cada fase
+- `ESTADO_ACTUAL_REORGANIZACION.md` - Documento consolidado con la información de todas las fases
 
 ## 🧪 Validación Actual
 
@@ -127,13 +162,12 @@ Hemos completado exitosamente **11 fases** de reorganización del sistema SG-SST
 ### Siguientes Módulos por Reorganizar:
 1. **Registrar Ausentismo** - Archivos relacionados con registro de ausentismo
 2. **Medición de Ausentismo** - Archivos relacionados con medición
-3. **Evaluaciones Médicas** - Archivos relacionados con evaluaciones médicas
-4. **Restricciones Médicas** - Archivos relacionados con restricciones médicas
-5. **Sociodemográfica** - Archivos relacionados con información sociodemográfica
-6. **Gestión de Riesgos** - Archivos relacionados con gestión de peligros y riesgos
-7. **Gestión de Amenazas** - Archivos relacionados con gestión de amenazas
-8. **Verificación** - Archivos relacionados con verificación
-9. **Mejoramiento** - Archivos relacionados con mejoramiento
+3. **Restricciones Médicas** - Archivos relacionados con restricciones médicas
+4. **Sociodemográfica** - Archivos relacionados con información sociodemográfica
+5. **Gestión de Riesgos** - Archivos relacionados con gestión de peligros y riesgos
+6. **Gestión de Amenazas** - Archivos relacionados con gestión de amenazas
+7. **Verificación** - Archivos relacionados con verificación
+8. **Mejoramiento** - Archivos relacionados con mejoramiento
 
 ## 💡 Recomendaciones para Continuar
 
@@ -141,7 +175,7 @@ Hemos completado exitosamente **11 fases** de reorganización del sistema SG-SST
 2. **Identificar el siguiente módulo** - Buscar archivos relacionados con el próximo módulo objetivo
 3. **Seguir el proceso probado** - Aplicar los mismos pasos que han sido exitosos
 4. **Probar después de cada cambio** - Validar que todo funcione correctamente
-5. **Actualizar documentación** - Mantener los archivos de documentación actualizados
+5. **Actualizar documentación** - El archivo `ESTADO_ACTUAL_REORGANIZACION.md` contiene toda la información de las fases completadas
 
 ## 🚀 Continuidad del Proyecto
 

@@ -14,7 +14,7 @@ const log = require('electron-log');
 const ExcelJS = require('exceljs');
 
 // Importar handlers de investigación de accidentes
-require('./investigacion_handlers.js');
+require('./modules/gestion-salud/investigacion-accidentes/investigacion_handlers.js');
 
 // Capturar promesas no manejadas globalmente
 process.on('unhandledRejection', (reason, promise) => {

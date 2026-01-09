@@ -11,6 +11,8 @@ const afiliacion = require('./afiliacion');
 const copasst = require('./copasst');
 const capacitacionCopasst = require('./capacitacion-copasst');
 const comiteConvivencia = require('./comite-convivencia');
+const capacitaciones = require('./capacitaciones');
+const inducciones = require('./inducciones');
 
 module.exports = {
   responsableSg,
@@ -18,5 +20,7 @@ module.exports = {
   afiliacion,
   copasst,
   capacitacionCopasst,
-  comiteConvivencia
+  comiteConvivencia,
+  capacitaciones,
+  inducciones
 };

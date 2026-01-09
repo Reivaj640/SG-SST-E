@@ -156,3 +156,11 @@ El sistema SG-SST (Sistema de Gestión de Seguridad y Salud en el Trabajo) es un
 - Componentes reutilizables
 - Configuración basada en normativas
 - Renderizado dinámico según escenarios
+
+## Estructura Modular
+
+- El sistema ha sido reorganizado en módulos independientes en el directorio `modules/`
+- Cada módulo tiene su propia estructura de archivos lógica-vista (logic.js, viewer.js, view.html, view.css)
+- La información de todas las fases de reorganización está consolidada en el archivo `ESTADO_ACTUAL_REORGANIZACION.md`
+- Los módulos se integran con el sistema existente manteniendo compatibilidad
+- Cada módulo tiene su propio archivo `index.js` para exportar sus componentes

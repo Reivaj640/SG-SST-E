@@ -170,3 +170,4 @@ El archivo `index.html` es la página principal de la aplicación que define la 
 - Las nuevas APIs disponibles para el renderer deben exponerse a través de preload.js
 - El archivo index.html debe mantenerse actualizado con las dependencias necesarias
 - El archivo renderer.js debe mantenerse actualizado con la lógica de interfaz y navegación
+- La información sobre las fases de reorganización está consolidada en el archivo ESTADO_ACTUAL_REORGANIZACION.md

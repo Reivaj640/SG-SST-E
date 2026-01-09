@@ -165,6 +165,7 @@ El Sistema de Gestión de Seguridad y Salud en el Trabajo (SG-SST) es una aplica
 
 - [Arquitectura del Sistema](arquitectura.md) - Detalles técnicos de la estructura
 - [Archivos Clave del Sistema](archivos-clave.md) - Descripción detallada de main.js, preload.js, renderer.js e index.html
+- [Estado Actual de la Reorganización](../ESTADO_ACTUAL_REORGANIZACION.md) - Documento consolidado con la información de todas las fases de reorganización completadas
 - [Motor Normativo](motor-normativo.md) - Funcionamiento del sistema normativo
 - [Escenarios Normativos](escenarios-normativos.md) - Tipos y categorías de escenarios
 - [Flujo de Creación de Empresa](flujo-creacion-empresa.md) - Proceso de registro

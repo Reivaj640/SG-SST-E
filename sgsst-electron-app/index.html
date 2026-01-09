@@ -7,7 +7,7 @@
   <title>SG-SST Electron App</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="development-styles.css">
-  <link rel="stylesheet" href="investigacion-accidente.css">
+  <link rel="stylesheet" href="modules/gestion-salud/investigacion-accidentes/investigacion-accidente-view.css">
   <link rel="stylesheet" href="node_modules/vanilla-calendar-pro/styles/index.css">
 
   <!-- Scripts para animación de fondo (Vanta.js) -->
@@ -82,9 +82,9 @@
   <!-- Inicializar sistema modular -->
   <script src="init-modular-system.js"></script>
   <!-- Cargar los componentes -->
-  <script src="reportes-accidentes.js"></script>
-  <script src="restricciones-medicas.js"></script>
-  <script src="evaluaciones-medicas.js"></script>
+  <script src="modules/gestion-salud/reportes-accidentes/reportes-accidentes-logic.js"></script>
+  <script src="modules/gestion-salud/restricciones-medicas/restricciones-medicas-logic.js"></script>
+  <script src="modules/gestion-salud/evaluaciones-medicas/evaluaciones-medicas-logic.js"></script>
   <script src="modules/recursos/responsable-sg/responsable-sg-logic.js"></script>
   <script src="modules/recursos/capacitacion-copasst/capacitacion-copasst-logic.js"></script>
   <script src="modules/recursos/trabajo-alto-riesgo/trabajo-alto-riesgo-logic.js"></script>
@@ -92,7 +92,7 @@
   <script src="modules/recursos/afiliacion/afiliacion-logic.js"></script>
   <script src="modules/recursos/curso-virtual/curso-virtual-logic.js"></script>
   <script src="modules/gestion-integral/politica/politica-logic.js"></script>
-  <script src="sociodemografica-component.js"></script>
+  <script src="modules/gestion-salud/sociodemografica/sociodemografica-component.js"></script>
   <script src="gestion-integral-home.js"></script>
   <script src="recursos-home.js"></script>
   <script src="gestion-salud-home.js"></script>
@@ -100,18 +100,18 @@
   <script src="gestion-amenazas-home.js"></script>
   <script src="verificacion-home.js"></script>
   <script src="mejoramiento-home.js"></script>
-  <script src="investigacion-accidentes.js"></script>
-  <script src="investigacion-accidente.js"></script>
+  <script src="modules/gestion-salud/investigacion-accidentes/investigacion-accidentes-logic.js"></script>
+  <script src="modules/gestion-salud/investigacion-accidentes/investigacion-accidente-logic.js"></script>
   <script src="modules/recursos/copasst/copasst-logic.js"></script>
   <script src="modules/recursos/comite-convivencia/comite-convivencia-logic.js"></script>
   <script src="curso-50-horas.js"></script>
   <script src="medicion-ausentismo.js"></script>
   <script src="registrar-ausentismo.js"></script>
   <script src="modules/recursos/presupuesto/presupuesto-logic.js"></script>
-  <script src="components/capacitaciones/capacitaciones.js"></script>
-  <script src="components/capacitaciones/capacitaciones-viewer.js"></script>
-  <script src="components/inducciones/inducciones.js"></script>
-  <script src="components/inducciones/inducciones-viewer.js"></script>
+  <script src="modules/recursos/capacitaciones/capacitaciones-logic.js"></script>
+  <script src="modules/recursos/capacitaciones/capacitaciones-viewer.js"></script>
+  <script src="modules/recursos/inducciones/inducciones-logic.js"></script>
+  <script src="modules/recursos/inducciones/inducciones-viewer.js"></script>
   <script src="node_modules/vanilla-calendar-pro/index.js"></script>
   <script src="renderer.js"></script>
 </body>

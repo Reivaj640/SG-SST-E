@@ -1,0 +1,214 @@
+/* capacitaciones-viewer.css - Estilos específicos para el submódulo de capacitaciones */
+
+/* Contenedor principal del viewer de capacitaciones */
+.submodule-content.capacitaciones-viewer {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    background-color: #f8f9fa;
+}
+
+/* Asegurar que el contenido no cause desbordamiento */
+.capacitaciones-container {
+    height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Estilos específicos para evitar conflictos con estilos globales */
+.capacitaciones-container .app-layout {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative; /* Añadido para que el z-index funcione correctamente */
+}
+
+.capacitaciones-container .app-header {
+    position: relative;
+    z-index: 1000; /* Asegurar que el header esté por debajo del sidebar cuando se abre */
+}
+
+.capacitaciones-container .app-body {
+    flex: 1;
+    overflow: hidden;
+}
+
+.capacitaciones-container .main-content {
+    overflow: auto;
+    flex: 1;
+}
+
+/* Ajustes para modales dentro del contenedor de capacitaciones */
+.capacitaciones-container .modal {
+    z-index: 1051; /* Asegurar que los modales se muestren correctamente */
+}
+
+/* Evitar conflictos con estilos de tablas globales */
+.capacitaciones-container .table {
+    margin-bottom: 0;
+}
+
+/* Ajustes para elementos específicos de la interfaz de capacitaciones */
+.capacitaciones-container .top-nav {
+    position: relative;
+    z-index: 100; /* Este valor debe ser menor que el z-index del sidebar cuando se abre */
+}
+
+.capacitaciones-container .nav-link {
+    cursor: pointer;
+}
+
+/* Ajustes para dispositivos móviles */
+@media (max-width: 768px) {
+    .capacitaciones-container .main-content {
+        padding: 1rem;
+    }
+
+    .capacitaciones-container .top-nav {
+        padding: 0 1rem;
+    }
+
+    .capacitaciones-container .app-header {
+        padding: 1rem;
+    }
+}
+
+/* Solución para el problema de superposición del sidebar */
+/* Asegurar que el header no se quede por encima del sidebar al abrirse */
+.sidebar-open .capacitaciones-container .app-header,
+body.sidebar-open .capacitaciones-container .app-header {
+    z-index: 899 !important; /* Asegurar que el header esté por debajo del sidebar */
+}
+
+/* Ajuste adicional para el layout principal */
+.capacitaciones-container .app-layout {
+    z-index: 1001; /* Asegurar que el layout esté por encima del header */
+}
+
+/* ============================================================= */
+/* ESPACIADO VERTICAL EXCLUSIVO PARA EL DASHBOARD DE CAPACITACIONES */
+/* No afecta a ningún otro módulo del sistema                     */
+/* ============================================================= */
+
+/* ✅ SOBREESCRITURA DEFINITIVA — Solo para el dashboard de capacitaciones */
+.capacitaciones-container #dashboard-view {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem; /* espacio uniforme ENTRE LAS FILAS */
+    overflow: hidden;
+    padding: 0 !important; /* anular cualquier padding heredado */
+    margin: 0 !important;
+}
+
+/* Cada fila del dashboard */
+.capacitaciones-container #dashboard-view > .row {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 1.5rem !important; /* espacio ENTRE TARJETAS dentro de la fila */
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    align-items: stretch !important;
+}
+
+/* Cada columna/tarjeta dentro de las filas */
+.capacitaciones-container #dashboard-view .row > [class*="col-"] {
+    display: flex !important;
+    flex-direction: column !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Componentes visuales reales: tarjetas */
+.capacitaciones-container #dashboard-view .stat-card,
+.capacitaciones-container #dashboard-view .chart-container,
+.capacitaciones-container #dashboard-view .action-card,
+.capacitaciones-container #dashboard-view .training-list {
+    background-color: var(--white-color) !important;
+    border-radius: var(--border-radius-lg) !important;
+    box-shadow: var(--box-shadow) !important;
+    padding: 1.5rem !important;
+    margin: 0 !important; /* ← clave: anular margin heredado */
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+}
+
+/* Asegurar que no haya margin collapse ni paddings fantasma */
+.capacitaciones-container #dashboard-view .stat-card > *,
+.capacitaciones-container #dashboard-view .chart-container > *,
+.capacitaciones-container #dashboard-view .action-card > *,
+.capacitaciones-container #dashboard-view .training-list > * {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+}
+
+/* Títulos dentro de tarjetas */
+.capacitaciones-container #dashboard-view .stat-card h3,
+.capacitaciones-container #dashboard-view .chart-container h3,
+.capacitaciones-container #dashboard-view .action-card h3,
+.capacitaciones-container #dashboard-view .training-list h3 {
+    margin-top: 0 !important;
+    margin-bottom: 1rem !important;
+}
+
+/* Última fila: sin gap extra abajo */
+.capacitaciones-container #dashboard-view > .row:last-child {
+    margin-bottom: 0 !important;
+}
+/* === ESTILOS PARA ALINEAR VERTICALMENTE LAS CELDAS DE TIPO Y ESTADO === */
+
+/* Asegurar que las celdas de tipo y estado tengan altura mínima y se centren verticalmente */
+.capacitaciones-container .table td.col-tipo,
+.capacitaciones-container .table td.col-estado {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 60px; /* Ajusta este valor si necesitas más o menos altura */
+    padding: 0.5rem 0.75rem !important; /* Restaurar padding para que el badge no ocupe todo el espacio */
+}
+
+/* Asegurar que los badges tengan un tamaño consistente y se centren horizontalmente */
+.capacitaciones-container .table .badge {
+    width: auto; /* Cambiado de 100% a auto para que el badge se ajuste al contenido */
+    height: auto; /* Cambiado de 100% a auto para que el badge se ajuste al contenido */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem; /* Ajusta el tamaño de fuente si es necesario */
+    text-align: center;
+    padding: 0.375rem 0.75rem; /* Ajusta el padding para que el badge tenga espaciado apropiado */
+    border-radius: var(--border-radius-md);
+    white-space: nowrap; /* Cambiado de normal a nowrap para evitar que el texto se rompa en varias líneas */
+    line-height: 1.2; /* Ajustar el espaciado entre líneas */
+}
+
+/* Estilos específicos para los badges de tipo y estado */
+.capacitaciones-container .table .badge.bg-primary,
+.capacitaciones-container .table .badge.bg-info {
+    background-color: #0d6efd !important;
+    color: white !important;
+}
+
+.capacitaciones-container .table .badge.bg-success {
+    background-color: #198754 !important;
+    color: white !important;
+}
+
+.capacitaciones-container .table .badge.bg-warning {
+    background-color: #ffc107 !important;
+    color: #212529 !important;
+}
+
+.capacitaciones-container .table .badge.bg-danger {
+    background-color: #dc3545 !important;
+    color: white !important;
+}
