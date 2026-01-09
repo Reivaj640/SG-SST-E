@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizador de Documentos</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="responsable-sg-view.css">
+</head>
+<body>
+    <div class="document-viewer-wrapper">
+        <header>
+            <div class="logo">
+                <i class="fas fa-file-alt"></i>
+                <h1>Visualizador de Documentos</h1>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-secondary" id="backBtn">
+                    <i class="fas fa-arrow-left"></i>
+                    Volver
+                </button>
+                <button class="btn btn-primary" id="downloadBtn">
+                    <i class="fas fa-download"></i>
+                    Descargar
+                </button>
+                <button class="btn btn-secondary" id="printBtn">
+                    <i class="fas fa-print"></i>
+                    Imprimir
+                </button>
+            </div>
+        </header>
+        <div class="content">
+            <div class="sidebar">
+                <div class="navigation-controls">
+                    <button class="btn btn-secondary" id="upLevelBtn" title="Subir un nivel">
+                        <i class="fas fa-level-up-alt"></i>
+                        Subir Nivel
+                    </button>
+                </div>
+                <h3>Carpetas de Documentos</h3>
+                <div id="folderList">
+                    <!-- Las carpetas se cargarán dinámicamente -->
+                </div>
+                <h3 style="margin-top: 20px;">Documentos en Carpeta</h3>
+                <div id="documentList">
+                    <!-- Los documentos se cargarán dinámicamente aquí -->
+                </div>
+            </div>
+            <div class="main-content">
+                <div class="document-info">
+                    <div class="document-title" id="documentTitle">Selecciona un documento</div>
+                    <div class="document-actions">
+                        <div class="toolbar-group">
+                            <label for="zoomLevel">Zoom:</label>
+                            <select id="zoomLevel">
+                                <option value="auto">Auto</option>
+                                <option value="page-width">Ancho de página</option>
+                                <option value="page-height">Alto de página</option>
+                                <option value="50%">50%</option>
+                                <option value="75%">75%</option>
+                                <option value="100%">100%</option>
+                                <option value="125%">125%</option>
+                                <option value="150%">150%</option>
+                                <option value="200%">200%</option>
+                            </select>
+                        </div>
+                        <div class="toolbar-group">
+                            <label for="pageOrientation">Orientación:</label>
+                            <select id="pageOrientation">
+                                <option value="vertical">Vertical</option>
+                                <option value="horizontal">Horizontal</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="document-viewer-container">
+                    <div class="loading" id="loadingDiv">
+                        <div class="spinner"></div>
+                        <p>Cargando documento...</p>
+                    </div>
+                    <div id="viewerContainer" style="display: none;">
+                        <!-- El visor de documento se cargará aquí -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="notification" id="notification">
+            <i class="notification-icon fas fa-check-circle"></i>
+            <div class="notification-message">Operación completada con éxito</div>
+        </div>
+    </div>
+    <script src="responsable-sg-viewer.js"></script>
+</body>
+</html>

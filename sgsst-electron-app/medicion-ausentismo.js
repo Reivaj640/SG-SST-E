@@ -725,7 +725,7 @@ class MedicionAusentismoComponent {
         });
 
         const iframe = document.createElement('iframe');
-        iframe.src = 'ver-ausentismo-dashboard.html';
+        iframe.src = 'modules/gestion-salud/ausentismo/ver-ausentismo-dashboard.html';
         iframe.classList.add('dashboard-fullscreen'); // Añadir clase para asegurar ancho completo
         Object.assign(iframe.style, {
             width: '100%',

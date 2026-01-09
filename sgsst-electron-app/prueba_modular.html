@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Prueba de Estructura Modular</title>
+</head>
+<body>
+    <h1>Prueba de Estructura Modular</h1>
+    <p>Abre la consola del navegador para ver los resultados de la prueba</p>
+    
+    <!-- Cargar el sistema modular -->
+    <script src="init-modular-system.js"></script>
+    
+    <!-- Cargar el componente responsable-sg desde la nueva ubicación -->
+    <script src="modules/recursos/responsable-sg/responsable-sg-logic.js"></script>
+    
+    <script>
+        console.log('=== Prueba de Estructura Modular ===');
+        
+        // Verificar si el componente está disponible globalmente
+        if (window.ResponsableSgComponent) {
+            console.log('✅ ResponsableSgComponent está disponible globalmente');
+            
+            // Verificar si el módulo está disponible en la estructura modular
+            if (window.modules && window.modules.recursos && window.modules.recursos.responsableSg) {
+                console.log('✅ ResponsableSg también está disponible en la estructura modular');
+            } else {
+                console.log('⚠️ ResponsableSg NO está disponible en la estructura modular');
+                console.log('window.modules:', window.modules);
+            }
+        } else {
+            console.log('❌ ResponsableSgComponent NO está disponible globalmente');
+            console.log('window object:', window);
+        }
+        
+        console.log('window.modules:', window.modules);
+        console.log('Fin de la prueba');
+    </script>
+</body>
+</html>
