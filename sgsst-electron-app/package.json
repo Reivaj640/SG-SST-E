@@ -21,7 +21,7 @@
   },
   "build": {
     "appId": "com.jrfsoluciones.sgsst",
-    "productName": "SG-SST Electron App",
+    "productName": "K+AIR",
     "copyright": "Copyright Â© 2025 Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos.",
     "asar": false,
     "directories": {
@@ -55,23 +55,23 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "assets/Blanco.ico"
+      "icon": "assets/KIAR256.ico"
     },
     "mac": {
       "target": "dmg",
-      "icon": "assets/Blanco.icns",
+      "icon": "assets/KIAR256.ico",
       "category": "public.app-category.business"
     },
     "linux": {
       "target": "AppImage",
-      "icon": "assets/Blanco.png",
+      "icon": "assets/KIAR256.ico",
       "category": "Business"
     },
     "publish": [
       {
         "provider": "github",
         "owner": "Reivaj640",
-        "repo": "SG-SST-E",
+        "repo": "K-IAR",
         "private": false,
         "releaseType": "draft"
       }

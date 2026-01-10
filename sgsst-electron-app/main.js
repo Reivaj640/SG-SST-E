@@ -150,7 +150,7 @@ const createWindow = () => {
     height: 900, // Alto inicial 900 para mejor visualización
     minWidth: 900,
     minHeight: 800,
-    icon: path.join(__dirname, 'assets', 'icons8-adelante-100.ico'),
+    icon: path.join(__dirname, 'assets', 'KIAR256.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,

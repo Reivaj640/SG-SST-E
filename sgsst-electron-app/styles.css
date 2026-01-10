@@ -73,7 +73,7 @@
 
   /* Otros */
   --sidebar-width: 180px; /* Reducido de 200px */
-  --header-height: 60px;
+  --header-height: 45px;
 }
 
 /* Estilos generales */
@@ -376,7 +376,7 @@ select.form-control {
 .app-header {
   background-color: var(--white-color);
   border-bottom: 1px solid var(--border-color);
-  padding: var(--spacer-sm) var(--spacer) var(--spacer-sm) var(--spacer-xs); /* Reduced left padding to 4px */
+  padding: calc(var(--spacer-sm) * 0.5) var(--spacer) calc(var(--spacer-sm) * 0.5) var(--spacer-xs); /* Reduced left padding to 4px */
   box-shadow: var(--box-shadow);
   z-index: 1000;
   flex-shrink: 0;
@@ -768,7 +768,7 @@ select.form-control {
 #app-header {
   background-color: var(--white-color);
   border-bottom: 1px solid var(--border-color);
-  padding: var(--spacer-sm) var(--spacer);
+  padding: calc(var(--spacer-sm) * 0.5) var(--spacer);
   box-shadow: var(--box-shadow);
   z-index: 1000;
   flex-shrink: 0;
@@ -1776,4 +1776,21 @@ select.form-control {
 /* Ocultar sidebar en el home principal */
 .sidebar-hidden {
     display: none !important;
+}
+
+/* Estilos específicos para el título de la aplicación */
+#app-title {
+    font-family: 'Lexend', sans-serif;
+}
+
+/* Aplicar estilos específicos al texto del título */
+#app-title strong {
+    font-family: 'Lexend', sans-serif;
+    font-weight: 600;
+}
+
+#app-title small {
+    font-family: 'Teko', sans-serif;
+    font-weight: 400;
+    font-size: 0.6em;
 }

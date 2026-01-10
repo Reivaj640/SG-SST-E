@@ -1,0 +1,7 @@
+{
+  "icon": {
+    "windows": "assets/KIAR256.ico",
+    "mac": "assets/KIAR256.ico",
+    "linux": "assets/KIAR256.ico"
+  }
+}
