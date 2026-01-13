@@ -578,6 +578,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                   apiCallArgs = [payload.companyName];
                   responseType = 'FOLLOW_UP_LOAD_RESPONSE';
                   break;
+              case 'duplicate-budget-file':
+                  // Handle request to duplicate budget file
+                  apiCallFunction = window.electronAPI.duplicateBudgetFile;
+                  apiCallArgs = [payload];
+                  responseType = 'DUPLICATE_BUDGET_FILE_RESPONSE';
+                  break;
               case 'back-to-main-app':
                   // This is a UI navigation request to return to the main app
                   // We handle it directly here and don't send a response back to iframe

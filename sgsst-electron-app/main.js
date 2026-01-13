@@ -2930,6 +2930,71 @@ ipcMain.handle('duplicate-capacitaciones-sheet', async (event, filePath) => {
         return { success: false, error: error.message };
     }
 });
+
+// Manejador para duplicar archivo de presupuesto con nuevo año
+ipcMain.handle('duplicate-budget-file', async (event, { currentFilePath, newYear }) => {
+    try {
+        sendLog(`[MAIN] Iniciando duplicación de archivo: ${currentFilePath} con nuevo año: ${newYear}`, 'INFO');
+
+        // Verificar que el archivo original exista
+        await fsp.access(currentFilePath);
+        sendLog(`[MAIN] Archivo original verificado: ${currentFilePath}`, 'DEBUG');
+
+        // Extraer directorio y nombre base del archivo
+        const dirPath = path.dirname(currentFilePath);
+        const fileExtension = path.extname(currentFilePath);
+        const fileNameWithoutExt = path.basename(currentFilePath, fileExtension);
+
+        sendLog(`[MAIN] Directorio: ${dirPath}, Nombre base: ${fileNameWithoutExt}, Extensión: ${fileExtension}`, 'DEBUG');
+
+        // Extraer el año actual del nombre del archivo si existe
+        const yearMatch = fileNameWithoutExt.match(/(20\d{2})/);
+        let newFileName;
+
+        if (yearMatch) {
+            // Si el nombre del archivo contiene un año, reemplazarlo con el nuevo año
+            const currentYear = yearMatch[1];
+            newFileName = fileNameWithoutExt.replace(currentYear, newYear) + fileExtension;
+            sendLog(`[MAIN] Año encontrado en el nombre: ${currentYear}, nuevo nombre: ${newFileName}`, 'DEBUG');
+        } else {
+            // Si no hay año en el nombre, agregar el año al final
+            newFileName = `${fileNameWithoutExt}_${newYear}${fileExtension}`;
+            sendLog(`[MAIN] No se encontró año en el nombre, nuevo nombre: ${newFileName}`, 'DEBUG');
+        }
+
+        // Ruta del nuevo archivo
+        const newFilePath = path.join(dirPath, newFileName);
+        sendLog(`[MAIN] Ruta del nuevo archivo: ${newFilePath}`, 'DEBUG');
+
+        // Verificar si el nuevo archivo ya existe
+        if (fs.existsSync(newFilePath)) {
+            const errorMsg = `Ya existe un archivo con el nombre "${newFileName}" en la carpeta.`;
+            sendLog(`[MAIN] Error: ${errorMsg}`, 'ERROR');
+            throw new Error(errorMsg);
+        }
+
+        // Copiar el archivo original al nuevo archivo
+        fs.copyFileSync(currentFilePath, newFilePath);
+        sendLog(`[MAIN] Archivo copiado exitosamente`, 'DEBUG');
+
+        // Verificar que el archivo se haya creado
+        await fsp.access(newFilePath);
+        sendLog(`[MAIN] Archivo nuevo verificado: ${newFilePath}`, 'DEBUG');
+
+        sendLog(`[MAIN] Archivo de presupuesto duplicado exitosamente: ${currentFilePath} -> ${newFilePath}`, 'INFO');
+
+        return {
+            success: true,
+            newFilePath: newFilePath,
+            newFileName: newFileName,
+            message: `Archivo duplicado exitosamente como "${newFileName}"`
+        };
+    } catch (error) {
+        sendLog(`[MAIN] Error duplicando archivo de presupuesto: ${error.message}`, 'ERROR');
+        return { success: false, error: error.message };
+    }
+});
+
 ipcMain.on('restart_app', () => {
   log.info('El usuario ha aceptado la actualización. Reiniciando para instalar...');
 

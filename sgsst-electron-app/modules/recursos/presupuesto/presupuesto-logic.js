@@ -153,6 +153,40 @@ class PresupuestoGestionComponent {
                 }
                 break;
 
+            case 'duplicate-budget-file':
+                try {
+                    this.log('INFO', `Solicitud de duplicación de archivo recibida: ${event.data.currentFilePath} con nuevo año: ${event.data.newYear}`);
+
+                    // Llamar a la API de Electron para duplicar el archivo
+                    const duplicateResult = await window.electronAPI.duplicateBudgetFile(event.data);
+
+                    // Enviar respuesta de vuelta al iframe
+                    const selectorIframe = this.container.querySelector('iframe');
+                    if (selectorIframe) {
+                        selectorIframe.contentWindow.postMessage({
+                            action: 'duplicateBudgetFile',
+                            ...duplicateResult
+                        }, '*');
+                    }
+
+                    // Si la duplicación fue exitosa, recargar la lista de archivos
+                    if (duplicateResult.success) {
+                        this.sendFilesToSelectorIframe(selectorIframe);
+                    }
+                } catch (error) {
+                    this.log('CRITICAL', `Error al duplicar archivo de presupuesto: ${error.message}`, error.stack);
+
+                    const selectorIframe = this.container.querySelector('iframe');
+                    if (selectorIframe) {
+                        selectorIframe.contentWindow.postMessage({
+                            action: 'duplicateBudgetFile',
+                            success: false,
+                            error: error.message
+                        }, '*');
+                    }
+                }
+                break;
+
             // El guardado es una funcionalidad más compleja
             case 'saveBudgetChanges':
                 this.log('INFO', 'Solicitud de guardado recibida. Llamando a ElectronAPI para guardar el archivo.', event.data);

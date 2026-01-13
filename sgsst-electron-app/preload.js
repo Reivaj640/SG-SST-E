@@ -96,6 +96,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readPresupuestoData: (filePath) => ipcRenderer.invoke('readPresupuestoData', filePath),
   saveBudgetFile: (filePath, data) => ipcRenderer.invoke('saveBudgetFile', filePath, data),
   openBudgetWindow: (file) => ipcRenderer.invoke('open-budget-window', file),
+  duplicateBudgetFile: (params) => ipcRenderer.invoke('duplicate-budget-file', params),
 
   // --- Accidentes ---
   selectAccidentPdf: () => ipcRenderer.invoke('select-accident-pdf'),

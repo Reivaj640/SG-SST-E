@@ -286,7 +286,7 @@
             .year-options {
                 grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
             }
-            
+
             .file-info {
                 grid-template-columns: 1fr;
             }
@@ -304,6 +304,10 @@
                 <button class="btn btn-primary" id="refreshBtn">
                     <i class="fas fa-sync-alt"></i>
                     Actualizar
+                </button>
+                <button class="btn btn-success" id="createNewFileBtn">
+                    <i class="fas fa-file-medical"></i>
+                    Crear Nuevo Archivo
                 </button>
             </div>
         </header>
@@ -380,13 +384,54 @@
         function setupEventListeners() {
             document.getElementById('refreshBtn').addEventListener('click', loadAvailableFiles);
             document.getElementById('openFileBtn').addEventListener('click', openSelectedFile);
+            document.getElementById('createNewFileBtn').addEventListener('click', createNewBudgetFile);
+        }
+
+        // Crear nuevo archivo de presupuesto
+        async function createNewBudgetFile() {
+            if (!selectedFile) {
+                showNotification('Por favor, seleccione un archivo existente para clonar', 'warning');
+                return;
+            }
+
+            try {
+                // Extraer el año actual del archivo seleccionado
+                const currentYear = extractYearFromFileName(selectedFile.name);
+
+                // Verificar que se haya extraído correctamente el año
+                if (currentYear === 'Desconocido' || isNaN(parseInt(currentYear))) {
+                    showNotification('No se pudo determinar el año del archivo seleccionado. Por favor, elija un archivo con un nombre que contenga el año (ej. 2024).', 'error');
+                    return;
+                }
+
+                const nextYear = parseInt(currentYear) + 1;
+
+                // Confirmar con el usuario antes de crear el nuevo archivo
+                const confirmMessage = `¿Está seguro de que desea crear un nuevo archivo de presupuesto para el año ${nextYear} basado en "${selectedFile.name}"?`;
+                if (!confirm(confirmMessage)) {
+                    return;
+                }
+
+                showNotification(`Creando nuevo archivo para el año ${nextYear}...`, 'success');
+
+                // Enviar solicitud al proceso principal para duplicar el archivo
+                window.parent.postMessage({
+                    action: 'duplicate-budget-file',
+                    currentFilePath: selectedFile.path,
+                    newYear: nextYear
+                }, '*');
+
+            } catch (error) {
+                console.error('Error al crear nuevo archivo de presupuesto:', error);
+                showNotification(`Error al crear nuevo archivo: ${error.message}`, 'error');
+            }
         }
 
         // Cargar archivos disponibles
         async function loadAvailableFiles() {
             try {
                 showLoading();
-                
+
                 // Solicitar archivos al padre
                 console.log('📤 [presupuesto-selector] Enviando solicitud de archivos al padre...');
                 window.parent.postMessage({ action: 'requestBudgetFiles' }, '*');
@@ -401,7 +446,7 @@
         function renderYearOptions() {
             const yearOptions = document.getElementById('yearOptions');
             yearOptions.innerHTML = '';
-            
+
             // Agrupar archivos por año
             const filesByYear = {};
             availableFiles.forEach(file => {
@@ -411,13 +456,13 @@
                 }
                 filesByYear[year].push(file);
             });
-            
+
             // Crear tarjetas para cada año
             Object.keys(filesByYear).sort().forEach(year => {
                 const yearCard = document.createElement('div');
                 yearCard.className = 'year-card';
                 yearCard.dataset.year = year;
-                
+
                 yearCard.innerHTML = `
                     <div class="year-icon">
                         <i class="fas fa-calendar-alt"></i>
@@ -425,9 +470,9 @@
                     <div class="year-title">${year}</div>
                     <div class="year-description">${filesByYear[year].length} archivo(s) disponible(s)</div>
                 `;
-                
+
                 yearCard.addEventListener('click', () => selectYear(year, filesByYear[year]));
-                
+
                 yearOptions.appendChild(yearCard);
             });
         }
@@ -445,11 +490,11 @@
                 card.classList.remove('selected');
             });
             document.querySelector(`.year-card[data-year="${year}"]`).classList.add('selected');
-            
+
             // Seleccionar el archivo más reciente de ese año
             const sortedFiles = files.sort((a, b) => new Date(b.modified) - new Date(a.modified));
             selectedFile = sortedFiles[0];
-            
+
             // Mostrar detalles del archivo
             showFileDetails();
         }
@@ -457,10 +502,10 @@
         // Mostrar detalles del archivo seleccionado
         function showFileDetails() {
             if (!selectedFile) return;
-            
+
             const fileDetails = document.getElementById('fileDetails');
             fileDetails.classList.add('active');
-            
+
             document.getElementById('fileName').textContent = selectedFile.name;
             document.getElementById('fileYear').textContent = extractYearFromFileName(selectedFile.name);
             document.getElementById('filePath').textContent = selectedFile.path;
@@ -473,11 +518,11 @@
                 showNotification('Por favor, seleccione un archivo primero', 'warning');
                 return;
             }
-            
+
             // Enviar mensaje al padre con el archivo seleccionado
-            window.parent.postMessage({ 
-                action: 'openBudgetFile', 
-                file: selectedFile 
+            window.parent.postMessage({
+                action: 'openBudgetFile',
+                file: selectedFile
             }, '*');
         }
 
@@ -486,13 +531,13 @@
             const notification = document.getElementById('notification');
             const messageElement = notification.querySelector('.notification-message');
             const iconElement = notification.querySelector('.notification-icon');
-            
+
             // Actualizar mensaje
             messageElement.textContent = message;
-            
+
             // Actualizar clase y icono según el tipo
             notification.className = 'notification ' + type;
-            
+
             if (type === 'success') {
                 iconElement.className = 'notification-icon fas fa-check-circle';
             } else if (type === 'error') {
@@ -500,10 +545,10 @@
             } else if (type === 'warning') {
                 iconElement.className = 'notification-icon fas fa-exclamation-circle';
             }
-            
+
             // Mostrar notificación
             notification.classList.add('show');
-            
+
             // Ocultar después de 3 segundos
             setTimeout(() => {
                 notification.classList.remove('show');
@@ -524,7 +569,7 @@
         // Escuchar mensajes del padre
         window.addEventListener('message', async (event) => {
             console.log('📥 [presupuesto-selector] Mensaje recibido del padre:', event.data);
-            
+
             if (event.data.files !== undefined) {
                 console.log('📊 [presupuesto-selector] Archivos recibidos:', event.data.files.length);
                 availableFiles = event.data.files;
@@ -541,6 +586,15 @@
                 console.error('❌ [presupuesto-selector] Error recibido:', event.data.error);
                 showNotification(`Error al cargar archivos: ${event.data.error}`, 'error');
                 hideLoading();
+            } else if (event.data.action === 'duplicateBudgetFile') {
+                // Manejar respuesta de duplicación de archivo
+                if (event.data.success) {
+                    showNotification(event.data.message || `Archivo duplicado exitosamente como ${event.data.newFileName}`, 'success');
+                    // Recargar la lista de archivos para mostrar el nuevo archivo
+                    loadAvailableFiles();
+                } else {
+                    showNotification(`Error al duplicar archivo: ${event.data.error || 'Error desconocido'}`, 'error');
+                }
             }
         });
 
