@@ -5,6 +5,7 @@ class RecursosHome {
         this.container = container;
         this.moduleName = moduleName;
         this.submodules = submodules;
+        this.currentCompany = window.currentCompany || 'default_company'; // Asumiendo que hay una variable global con la empresa actual
     }
 
     async render() {
@@ -15,49 +16,51 @@ class RecursosHome {
         }
 
         // this.container.innerHTML = ''; // ESTA LÍNEA CAUSABA EL ERROR
-        
+
         // Crear el contenedor principal
         const mainContainer = document.createElement('div');
         mainContainer.className = 'gestion-integral-home';
-        
+
         // Crear el área principal (izquierda)
         const mainArea = document.createElement('div');
         mainArea.className = 'main-area';
-        
+
         // Crear el panel lateral (derecha)
         const sidebarPanel = document.createElement('div');
         sidebarPanel.className = 'sidebar-panel';
-        
+
         // Renderizar el área principal
-        this.renderMainArea(mainArea);
-        
+        await this.renderMainArea(mainArea);
+
         // Renderizar el panel lateral
         await this.renderSidebarPanel(sidebarPanel);
-        
+
         // Añadir las áreas al contenedor principal
         mainContainer.appendChild(mainArea);
         mainContainer.appendChild(sidebarPanel);
-        
+
         this.container.appendChild(mainContainer);
     }
-    
-    renderMainArea(container) {
+
+    async renderMainArea(container) {
         // Widgets con contadores específicos para Recursos
         const widgetsContainer = document.createElement('div');
         widgetsContainer.className = 'widgets-container';
-        
+
         const widget1 = this.createWidget('Personal Asignado', '42', '↗ 2 nuevos este mes');
         const widget2 = this.createWidget('Capacitaciones', '18', '📅 3 programadas');
         const widget3 = this.createWidget('EPPs Entregados', '120', '📦 15 por entregar');
-        const widget4 = this.createWidget('Presupuesto', '$12,500', '📉 5% bajo lo presupuestado');
-        
+
+        // Obtener datos de presupuesto y crear el widget correspondiente
+        const budgetWidget = await this.createBudgetWidget();
+
         widgetsContainer.appendChild(widget1);
         widgetsContainer.appendChild(widget2);
         widgetsContainer.appendChild(widget3);
-        widgetsContainer.appendChild(widget4);
-        
+        widgetsContainer.appendChild(budgetWidget);
+
         container.appendChild(widgetsContainer);
-        
+
         // Gráfica (simulada)
         const chartContainer = document.createElement('div');
         chartContainer.className = 'chart-container';
@@ -75,18 +78,18 @@ class RecursosHome {
             </div>
         `;
         container.appendChild(chartContainer);
-        
+
         // Listado de submódulos
         const submodulesContainer = document.createElement('div');
         submodulesContainer.className = 'submodules-container';
-        
+
         const submodulesHeader = document.createElement('h3');
         submodulesHeader.textContent = 'Submódulos';
         submodulesContainer.appendChild(submodulesHeader);
 
         const submodulesList = document.createElement('div');
         submodulesList.className = 'submodules-list';
-        
+
         this.submodules.forEach(submodule => {
             const submoduleItem = this.renderSubmoduleItem(submodule);
             submodulesList.appendChild(submoduleItem);
@@ -95,7 +98,155 @@ class RecursosHome {
         submodulesContainer.appendChild(submodulesList);
         container.appendChild(submodulesContainer);
     }
-    
+
+    // Función para crear el widget de presupuesto con datos reales
+    async createBudgetWidget() {
+        try {
+            // Obtener los archivos de presupuesto
+            const result = await window.electronAPI.getPresupuestoFiles(this.currentCompany);
+
+            if (result.success && result.files && result.files.length > 0) {
+                // Tomar el primer archivo para calcular los datos (podría ser configurable)
+                const firstFile = result.files[0];
+
+                // Leer los datos del presupuesto
+                const budgetResult = await window.electronAPI.readPresupuestoData(firstFile.path);
+
+                if (budgetResult.success) {
+                    // Calcular los valores de presupuesto
+                    const { totalPresupuesto, totalEjecutado, porcentajeCumplimiento, saldoDisponible } =
+                        this.calculateBudgetSummary(budgetResult.data.processedData);
+
+                    // Formatear los valores para mostrar
+                    const formattedTotal = this.formatCurrency(totalPresupuesto);
+                    const formattedEjecutado = this.formatCurrency(totalEjecutado);
+                    const formattedSaldo = this.formatCurrency(saldoDisponible);
+
+                    // Crear el widget con los datos reales
+                    const widget = document.createElement('div');
+                    widget.className = 'widget';
+                    widget.innerHTML = `
+                        <h4>Presupuesto</h4>
+                        <div class="widget-value">${formattedTotal}</div>
+                        <div class="widget-description">
+                            <div>% Cumplimiento: ${porcentajeCumplimiento.toFixed(2)}%</div>
+                            <div>Monto Ejecutado: ${formattedEjecutado}</div>
+                            <div>Restante: ${formattedSaldo}
+                        </div>
+                    `;
+                    return widget;
+                }
+            }
+        } catch (error) {
+            console.error('Error obteniendo datos de presupuesto:', error);
+        }
+
+        // Widget por defecto si no se pueden obtener los datos
+        const widget = document.createElement('div');
+        widget.className = 'widget';
+        widget.innerHTML = `
+            <h4>Presupuesto</h4>
+            <div class="widget-value">$12,500</div>
+            <div class="widget-description">📉 5% bajo lo presupuestado</div>
+        `;
+        return widget;
+    }
+
+    // Función para calcular el resumen de presupuesto
+    calculateBudgetSummary(processedData) {
+        let totalPresupuesto = 0;
+        let totalEjecutado = 0;
+
+        for (let i = 0; i < processedData.length; i++) {
+            const item = processedData[i];
+
+            // Excluir filas especiales como 'TOTAL AÑO'
+            if (item.id === 'TOTAL AÑO') {
+                continue;
+            }
+
+            // Procesar asignación
+            let asignacionValue = 0;
+            if (typeof item.asignacion !== 'undefined' && item.asignacion !== null) {
+                if (typeof item.asignacion === 'string') {
+                    asignacionValue = this.parseFormattedNumber(item.asignacion);
+                } else if (typeof item.asignacion === 'number') {
+                    asignacionValue = item.asignacion;
+                }
+            }
+
+            // Procesar ejecutado acumulado
+            let ejecutadoValue = 0;
+            if (typeof item.ejecutado_acumulado !== 'undefined' && item.ejecutado_acumulado !== null) {
+                if (typeof item.ejecutado_acumulado === 'string') {
+                    ejecutadoValue = this.parseFormattedNumber(item.ejecutado_acumulado);
+                } else if (typeof item.ejecutado_acumulado === 'number') {
+                    ejecutadoValue = item.ejecutado_acumulado;
+                }
+            }
+
+            // Sumar a los totales
+            if (typeof asignacionValue === 'number' && !isNaN(asignacionValue)) {
+                totalPresupuesto += asignacionValue;
+            }
+            if (typeof ejecutadoValue === 'number' && !isNaN(ejecutadoValue)) {
+                totalEjecutado += ejecutadoValue;
+            }
+        }
+
+        // Calcular el % de cumplimiento
+        const porcentajeCumplimiento = totalPresupuesto > 0 ? ((totalEjecutado / totalPresupuesto) * 100) : 0;
+
+        // Calcular el saldo disponible
+        const saldoDisponible = totalPresupuesto - totalEjecutado;
+
+        return {
+            totalPresupuesto,
+            totalEjecutado,
+            porcentajeCumplimiento,
+            saldoDisponible
+        };
+    }
+
+    // Función para parsear números formateados
+    parseFormattedNumber(value) {
+        if (value === null || value === undefined || value === '') {
+            return 0;
+        }
+
+        if (typeof value === 'number') {
+            return value;
+        }
+
+        if (typeof value === 'string') {
+            // Remover signos de dólar, espacios y comas
+            let cleanValue = value.toString()
+                .replace(/\$/g, '')  // Eliminar signos de dólar
+                .replace(/\s/g, '')  // Eliminar espacios
+                .replace(/,/g, '');  // Eliminar comas
+
+            // Manejar casos especiales como "$ -" o "-  " que representan ceros
+            if (cleanValue.trim() === '-' || cleanValue.trim() === '-  ' || cleanValue.trim() === '') {
+                return 0;
+            }
+
+            const parsed = parseFloat(cleanValue);
+            return isNaN(parsed) ? 0 : parsed;
+        }
+
+        return 0;
+    }
+
+    // Función para formatear moneda
+    formatCurrency(amount) {
+        return new Intl.NumberFormat('es-CO', {
+            style: 'currency',
+            currency: 'COP',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }).format(amount);
+    }
+
     createWidget(title, value, description) {
         const widget = document.createElement('div');
         widget.className = 'widget';
@@ -106,7 +257,7 @@ class RecursosHome {
         `;
         return widget;
     }
-    
+
     renderSubmoduleItem(name) {
         const submoduleItem = document.createElement('div');
         submoduleItem.className = 'submodule-item';
@@ -134,20 +285,20 @@ class RecursosHome {
 
         submoduleItem.appendChild(submoduleInfo);
         submoduleItem.appendChild(button);
-        
+
         return submoduleItem;
     }
-        
+
     getRandomLastAccess() {
         const days = ['Hace 1 día', 'Hace 2 días', 'Hace 3 días', 'Hace 1 semana', 'Hace 2 semanas'];
         return days[Math.floor(Math.random() * days.length)];
     }
-    
+
     getRandomTimeSpent() {
         const times = ['5 min', '15 min', '30 min', '1 hora', '2 horas'];
         return times[Math.floor(Math.random() * times.length)];
     }
-    
+
     async renderSidebarPanel(container) {
     }
 }

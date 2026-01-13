@@ -147,6 +147,13 @@ class PresupuestoGestionComponent {
                 this.render();
                 break;
 
+            case 'backToSubmodules':
+                // Llamar a la función de retorno al módulo principal
+                if (this.onBack) {
+                    this.onBack();
+                }
+                break;
+
             case 'openOriginalFile':
                 if (file && window.electronAPI.openPath) {
                     window.electronAPI.openPath(file.path);

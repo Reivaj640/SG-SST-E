@@ -359,6 +359,10 @@
                 <h1>Gestión de Presupuesto</h1>
             </div>
             <div class="header-actions">
+                <button class="btn btn-primary" id="backToSubmodulesBtn">
+                    <i class="fas fa-arrow-left"></i>
+                    Volver a Submódulos
+                </button>
                 <button class="btn btn-primary" id="backBtn">
                     <i class="fas fa-arrow-left"></i>
                     Volver al Selector
@@ -549,6 +553,15 @@
                     }
                 } else {
                     window.parent.postMessage({ action: 'backToSelector' }, '*');
+                }
+            });
+            document.getElementById('backToSubmodulesBtn').addEventListener('click', () => {
+                if (hasPendingChanges) {
+                    if (confirm('Tiene cambios sin guardar. ¿Está seguro de que desea salir sin guardar?')) {
+                        window.parent.postMessage({ action: 'backToSubmodules' }, '*');
+                    }
+                } else {
+                    window.parent.postMessage({ action: 'backToSubmodules' }, '*');
                 }
             });
             document.getElementById('addRowBtn').addEventListener('click', addNewRow);

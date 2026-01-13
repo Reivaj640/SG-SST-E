@@ -301,6 +301,10 @@
                 <h1>Selector de Archivos de Presupuesto</h1>
             </div>
             <div class="header-actions">
+                <button class="btn btn-primary" id="backToSubmodulesBtn">
+                    <i class="fas fa-arrow-left"></i>
+                    Volver a Submódulos
+                </button>
                 <button class="btn btn-primary" id="refreshBtn">
                     <i class="fas fa-sync-alt"></i>
                     Actualizar
@@ -385,6 +389,12 @@
             document.getElementById('refreshBtn').addEventListener('click', loadAvailableFiles);
             document.getElementById('openFileBtn').addEventListener('click', openSelectedFile);
             document.getElementById('createNewFileBtn').addEventListener('click', createNewBudgetFile);
+            document.getElementById('backToSubmodulesBtn').addEventListener('click', backToSubmodules);
+        }
+
+        // Función para volver a la vista de submódulos
+        function backToSubmodules() {
+            window.parent.postMessage({ action: 'backToSubmodules' }, '*');
         }
 
         // Crear nuevo archivo de presupuesto
