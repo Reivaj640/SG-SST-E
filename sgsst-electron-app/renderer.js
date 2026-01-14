@@ -1215,6 +1215,9 @@ async function selectCompany(companyName, buttonElement) {
   // el backend Python asociado a esta empresa.
   console.log(`Empresa seleccionada: ${companyName}`);
 
+  // Establecer la empresa también en el contexto global
+  window.currentCompany = companyName;
+
   // Destruir la animación de Vanta antes de cambiar de página
   if (window.vantaEffect && typeof window.vantaEffect.destroy === 'function') {
     window.vantaEffect.destroy();

@@ -969,45 +969,26 @@ ipcMain.handle('readPresupuestoData', async (event, filePath) => {
 
             if (typeof value === 'string') {
               // ====================================================================
-              // PARSEO CORREGIDO PARA FORMATO INTERNACIONAL CON COMAS
+              // PARSEO PARA FORMATO NUMÉRICO INTERNACIONAL (en-US)
+              // Coma (,) como separador de miles, Punto (.) como separador decimal.
               // ====================================================================
-              // Tus datos vienen así: " $ 9,427,464 " (COMA = separador de miles)
-              // NO es formato colombiano (punto = miles, coma = decimal)
 
               // Paso 1: Limpiar el string
               let cleanValue = value
                 .replace(/\$/g, '')      // Quitar símbolo $
                 .replace(/\s/g, '')      // Quitar TODOS los espacios
-                .trim();
+                .replace(/,/g, '');      // Quitar comas (separador de miles)
 
               // Log para debug
-              console.log(`[PARSEO DEBUG] Original: "${value}" -> Limpio: "${cleanValue}"`);
+              console.log(`[PARSEO DEBUG] Original: "${value}" -> Limpio (sin $, espacios, comas): "${cleanValue}"`);
 
               // Paso 2: Verificar si es valor vacío
               if (cleanValue === '' || cleanValue === '-') {
                 numericValue = 0;
-                console.log(`[PARSEO DEBUG] Valor vacío detectado, asignando 0`);
+                console.log(`[PARSEO DEBUG] Valor vacío detectado o '-', asignando 0`);
               } else {
-                // Paso 3: Remover TODAS las comas (son separadores de miles)
-                cleanValue = cleanValue.replace(/,/g, '');
-
-                // Paso 4: Si hay punto, verificar si es separador de miles o decimal
-                if (cleanValue.includes('.')) {
-                  const parts = cleanValue.split('.');
-
-                  // Si hay más de un punto O si la parte decimal tiene 3+ dígitos,
-                  // entonces los puntos son separadores de miles
-                  if (parts.length > 2 || (parts.length === 2 && parts[1].length >= 3)) {
-                    // Remover todos los puntos (separadores de miles)
-                    cleanValue = cleanValue.replace(/\./g, '');
-                    console.log(`[PARSEO DEBUG] Puntos removidos como separadores de miles: "${cleanValue}"`);
-                  }
-                  // Si tiene un solo punto con 1-2 dígitos después, es decimal (mantenerlo)
-                }
-
-                // Paso 5: Parsear el valor final
+                // Paso 3: Parsear el valor final. El punto (.) ahora es el separador decimal estándar.
                 numericValue = parseFloat(cleanValue) || 0;
-
                 console.log(`[PARSEO DEBUG] Resultado final: ${numericValue}`);
               }
             } else if (typeof value !== 'number') {
@@ -1018,7 +999,8 @@ ipcMain.handle('readPresupuestoData', async (event, filePath) => {
             // Acumular en totalAccumulators
             totalAccumulators[propName] += numericValue;
 
-            console.log(`[PARSEO DEBUG] ${propName}: "${value}" -> ${numericValue}, Total acumulado: ${totalAccumulators[propName]}`);
+            // Eliminamos el log redundante que ya está en la parte de arriba
+            // console.log(`[PARSEO DEBUG] ${propName}: "${value}" -> ${numericValue}, Total acumulado: ${totalAccumulators[propName]}`);
           }
         } else {
           // Si no hay valor, asignar un valor por defecto basado en el tipo
