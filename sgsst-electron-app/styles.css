@@ -76,6 +76,47 @@
   --header-height: 45px;
 }
 
+/* Variables de tema oscuro */
+[data-theme="dark"] {
+  /* Colores principales */
+  --primary-color: #4da6ff;
+  --primary-hover-color: #66b3ff;
+  --secondary-color: #6c757d;
+  --success-color: #5cb85c;
+  --danger-color: #d9534f;
+  --warning-color: #f0ad4e;
+  --info-color: #5bc0de;
+  --light-color: #343a40;
+  --dark-color: #212529;
+  --white-color: #2d3748;
+  --black-color: #f8f9fa;
+
+  /* Colores de texto */
+  --text-color: #e9ecef;
+  --text-light-color: #adb5bd;
+  --text-lighter-color: #868e96;
+  --heading-color: #f8f9fa;
+
+  /* Colores de fondo */
+  --bg-color: #1a202c;
+  --widget-bg-color: #2d3748;
+  --border-color: #4a5568;
+
+  /* Colores de botones */
+  --button-bg-color: var(--primary-color);
+  --button-text-color: var(--white-color);
+  --button-hover-bg-color: var(--primary-hover-color);
+  --button-border-color: var(--primary-color);
+
+  /* Colores de enlaces */
+  --link-color: var(--primary-color);
+  --link-hover-color: var(--primary-hover-color);
+
+  /* Sombras */
+  --box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.5);
+  --box-shadow-lg: 0 1rem 3rem rgba(0, 0, 0, 0.7);
+}
+
 /* Estilos generales */
 * {
   box-sizing: border-box;

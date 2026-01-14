@@ -449,6 +449,22 @@ let companyNameElement;
 let companyLogoElement;
 let companyLogoPlaceholder;
 
+// Función para aplicar el tema globalmente
+function applyGlobalTheme() {
+  const storedTheme = localStorage.getItem('theme') || 'light';
+
+  // Aplicar el tema al documento raíz
+  if (storedTheme === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  } else if (storedTheme === 'light') {
+    document.documentElement.removeAttribute('data-theme');
+  } else if (storedTheme === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+}
+
 // --- Inicialización ---
 // Esperar a que el DOM esté completamente cargado
 document.addEventListener('DOMContentLoaded', async () => {
@@ -464,6 +480,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch (error) {
     console.error('Error al obtener la versión de la app:', error);
   }
+
+  // Aplicar el tema global al cargar la aplicación
+  applyGlobalTheme();
 
   // Obtener referencias a los elementos del DOM
   contentArea = document.getElementById('content-area');

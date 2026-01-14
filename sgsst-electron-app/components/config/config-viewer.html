@@ -871,6 +871,18 @@
             localStorage.setItem('theme', theme);
             applyThemePreference();
             renderUISettings();
+
+            // Notificar a otros componentes que el tema ha cambiado
+            if (window.parent && window.parent !== window) {
+                // Si estamos en un iframe, enviar mensaje al padre
+                window.parent.postMessage({ type: 'THEME_CHANGED', theme: theme }, '*');
+            }
+
+            // Si estamos en la ventana principal, notificar a iframes
+            const iframes = document.querySelectorAll('iframe');
+            iframes.forEach(iframe => {
+                iframe.contentWindow.postMessage({ type: 'THEME_CHANGED', theme: theme }, '*');
+            });
         }
 
         function applyThemePreference() {
@@ -885,6 +897,13 @@
                 document.documentElement.removeAttribute('data-theme');
             }
         }
+
+        // Añadir un listener para recibir mensajes de cambio de tema
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'THEME_CHANGED') {
+                applyThemePreference();
+            }
+        });
 
         function toggleMotion(checkbox) {
             localStorage.setItem('reduceMotion', checkbox.checked);
