@@ -316,8 +316,8 @@ class RecursosHome {
             <div class="widget-value">Cargando...</div>
             <div class="widget-description">
                 <div class="budget-indicator">
-                    <div class="progress-container">
-                        <div class="progress-bar" style="width: 0%; background-color: #e0e0e0;"></div>
+                    <div class="progress-container" id="budget-progress-container-loading">
+                        <div id="budget-progress-bar-loading" style="height: 20px;"></div>
                     </div>
                     <div class="progress-text" style="color: #9e9e9e;">
                         Cargando datos...
@@ -329,6 +329,20 @@ class RecursosHome {
                 </div>
             </div>
         `;
+
+        // Inicializar la barra de progreso de jQuery UI si jQuery está disponible
+        if (typeof $ !== 'undefined' && typeof $.fn.progressbar !== 'undefined') {
+            // Usar setTimeout para asegurar que el elemento esté en el DOM
+            setTimeout(() => {
+                const $progressBar = $('#budget-progress-bar-loading');
+                if ($progressBar.length && !$progressBar.hasClass('ui-progressbar')) {
+                    $progressBar.progressbar({
+                        value: 0,
+                        max: 100
+                    });
+                }
+            }, 100);
+        }
 
         this.addBudgetWidgetStyles();
         return widget;
@@ -343,8 +357,8 @@ class RecursosHome {
             <div class="widget-value">Error</div>
             <div class="widget-description">
                 <div class="budget-indicator">
-                    <div class="progress-container">
-                        <div class="progress-bar" style="width: 0%; background-color: #f44336;"></div>
+                    <div class="progress-container" id="budget-progress-container-error">
+                        <div id="budget-progress-bar-error" style="height: 20px;"></div>
                     </div>
                     <div class="progress-text" style="color: #f44336;">
                         Error al cargar
@@ -355,6 +369,24 @@ class RecursosHome {
                 </div>
             </div>
         `;
+
+        // Inicializar la barra de progreso de jQuery UI si jQuery está disponible
+        if (typeof $ !== 'undefined' && typeof $.fn.progressbar !== 'undefined') {
+            // Usar setTimeout para asegurar que el elemento esté en el DOM
+            setTimeout(() => {
+                const $progressBar = $('#budget-progress-bar-error');
+                if ($progressBar.length && !$progressBar.hasClass('ui-progressbar')) {
+                    $progressBar.progressbar({
+                        value: 0,
+                        max: 100,
+                        classes: {
+                            "ui-progressbar": "ui-corner-all",
+                            "ui-progressbar-value": "ui-corner-left error-progress"
+                        }
+                    });
+                }
+            }, 100);
+        }
 
         this.addBudgetWidgetStyles();
         return widget;
@@ -370,18 +402,46 @@ class RecursosHome {
                     margin: 10px 0;
                 }
 
-                .progress-container {
+                .budget-indicator .progress-container {
                     width: 100%;
-                    height: 10px;
-                    background-color: #e0e0e0;
-                    border-radius: 5px;
-                    overflow: hidden;
+                    height: 20px;
                     margin-bottom: 5px;
+                    display: flex;
+                    align-items: center;
                 }
 
-                .progress-bar {
-                    height: 100%;
-                    transition: width 0.3s ease;
+                /* Estilos específicos para la barra de progreso de jQuery UI */
+                .ui-progressbar {
+                    height: 100% !important;
+                    border-radius: 10px !important;
+                    background: #e0e0e0 !important;
+                    overflow: hidden !important;
+                    border: none !important;
+                }
+
+                .ui-progressbar-value {
+                    border: none !important;
+                    border-radius: 10px !important;
+                    margin: 0 !important;
+                    height: 100% !important;
+                    transition: width 0.5s ease-in-out !important;
+                }
+
+                .ui-progressbar .ui-progressbar-value {
+                    background: #4CAF50 !important;
+                }
+
+                .error-progress {
+                    background: #f44336 !important;
+                }
+
+                /* Asegurar que la barra de progreso tenga un tamaño adecuado */
+                #budget-progress-bar,
+                #budget-progress-bar-loading,
+                #budget-progress-bar-error {
+                    width: 95% !important;
+                    height: 20px !important;
+                    margin: 0 auto !important; /* Centrar horizontalmente */
                 }
 
                 .progress-text {
@@ -420,11 +480,14 @@ class RecursosHome {
         // Obtener el año actual
         const currentYear = new Date().getFullYear();
 
+        // Limitar el porcentaje al máximo de 100% para evitar barras que sobresalgan
+        const limitedPorcentaje = Math.min(porcentajeCumplimiento, 100);
+
         // Determinar el color del porcentaje basado en el nivel de cumplimiento
         let cumplimientoColor = '#4CAF50'; // Verde para buen cumplimiento
-        if (porcentajeCumplimiento < 50) {
+        if (limitedPorcentaje < 50) {
             cumplimientoColor = '#f44336'; // Rojo para bajo cumplimiento
-        } else if (porcentajeCumplimiento < 80) {
+        } else if (limitedPorcentaje < 80) {
             cumplimientoColor = '#ff9800'; // Naranja para cumplimiento moderado
         }
 
@@ -437,11 +500,11 @@ class RecursosHome {
             <div class="widget-value">${formattedTotal}</div>
             <div class="widget-description">
                 <div class="budget-indicator">
-                    <div class="progress-container">
-                        <div class="progress-bar" style="width: ${porcentajeCumplimiento}%; background-color: ${cumplimientoColor};"></div>
+                    <div class="progress-container" id="budget-progress-container">
+                        <div id="budget-progress-bar" style="height: 20px;"></div>
                     </div>
-                    <div class="progress-text" style="color: ${cumplimientoColor};">
-                        ${porcentajeCumplimiento.toFixed(2)}% Ejecutado
+                    <div class="progress-text" id="budget-progress-text" style="color: ${cumplimientoColor};">
+                        0.00% Ejecutado
                     </div>
                 </div>
                 <div class="budget-details">
@@ -450,6 +513,107 @@ class RecursosHome {
                 </div>
             </div>
         `;
+
+        // Añadir funcionalidad para actualizar la barra de progreso dinámicamente usando jQuery UI
+        const updateProgressBar = (newPorcentaje, newTotal, newEjecutado, newSaldo) => {
+            // Limitar el porcentaje al máximo de 100%
+            const limitedNewPorcentaje = Math.min(newPorcentaje, 100);
+
+            // Verificar que jQuery esté disponible
+            if (typeof $ !== 'undefined' && typeof $.fn.progressbar !== 'undefined') {
+                // Esperar a que el elemento esté completamente renderizado
+                setTimeout(() => {
+                    const $progressBar = $('#budget-progress-bar');
+
+                    // Si aún no está inicializado, inicialízalo
+                    if (!$progressBar.hasClass('ui-progressbar')) {
+                        $progressBar.progressbar({
+                            value: 0, // Empezar en 0 y luego animar
+                            max: 100
+                        });
+                    }
+
+                    // Actualizar el valor con animación
+                    $progressBar.progressbar('value', limitedNewPorcentaje);
+                }, 100);
+            } else {
+                // Fallback a la implementación anterior si jQuery UI no está disponible
+                const progressBar = widget.querySelector('#budget-progress-bar');
+                const progressText = widget.querySelector('#budget-progress-text');
+
+                if (!progressBar || !progressText) {
+                    console.error('⚠️ [updateProgressBar] No se encontraron los elementos de la barra de progreso');
+                    return;
+                }
+
+                // Actualizar el ancho de la barra de progreso
+                progressBar.style.width = `${limitedNewPorcentaje}%`;
+                progressBar.style.backgroundColor = '#4CAF50'; // Color verde por defecto
+                progressText.style.color = '#4CAF50';
+                progressText.textContent = `${limitedNewPorcentaje.toFixed(2)}% Ejecutado`;
+            }
+
+            // Determinar el color del porcentaje basado en el nuevo nivel de cumplimiento
+            let newColor = '#4CAF50'; // Verde para buen cumplimiento
+            if (limitedNewPorcentaje < 50) {
+                newColor = '#f44336'; // Rojo para bajo cumplimiento
+            } else if (limitedNewPorcentaje < 80) {
+                newColor = '#ff9800'; // Naranja para cumplimiento moderado
+            }
+
+            // Actualizar el color del texto
+            const progressText = widget.querySelector('#budget-progress-text');
+            if (progressText) {
+                progressText.style.color = newColor;
+                progressText.textContent = `${limitedNewPorcentaje.toFixed(2)}% Ejecutado`;
+            }
+
+            // Actualizar también los valores mostrados
+            const valueElement = widget.querySelector('.widget-value');
+            const executedElement = widget.querySelector('.executed-amount');
+            const remainingElement = widget.querySelector('.remaining-amount');
+
+            if (valueElement) valueElement.textContent = this.formatCurrency(newTotal);
+            if (executedElement) executedElement.textContent = `Ejecutado: ${this.formatCurrency(newEjecutado)}`;
+            if (remainingElement) remainingElement.textContent = `Restante: ${this.formatCurrency(newSaldo)}`;
+
+            console.log(`📊 [updateProgressBar] Barra actualizada: ${limitedNewPorcentaje}% (Total: ${newTotal}, Ejecutado: ${newEjecutado}, Saldo: ${newSaldo})`);
+        };
+
+        // Forzar la actualización visual con animación para que se vea el progreso
+        // Asegurar que el elemento esté en el DOM antes de inicializar jQuery UI
+        setTimeout(() => {
+            // Agregar el widget al DOM antes de intentar inicializar jQuery UI
+            if (widget.parentNode) {
+                updateProgressBar(limitedPorcentaje, totalPresupuesto, totalEjecutado, saldoDisponible);
+            } else {
+                // Si aún no está en el DOM, esperar un poco más
+                setTimeout(() => {
+                    updateProgressBar(limitedPorcentaje, totalPresupuesto, totalEjecutado, saldoDisponible);
+                }, 100);
+            }
+        }, 100); // Aumentar el tiempo para asegurar renderizado
+
+        // Añadir MutationObserver para detectar cambios en los datos y actualizar automáticamente
+        // Esto permitirá que la barra se actualice si los datos cambian externamente
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'data-budget-update') {
+                    const newData = JSON.parse(mutation.target.getAttribute('data-budget-update'));
+                    if (newData && newData.totalPresupuesto !== undefined) {
+                        updateProgressBar(
+                            newData.porcentajeCumplimiento,
+                            newData.totalPresupuesto,
+                            newData.totalEjecutado,
+                            newData.saldoDisponible
+                        );
+                    }
+                }
+            });
+        });
+
+        // Configurar el observador para futuras actualizaciones si es necesario
+        // observer.observe(widget, { attributes: true, attributeFilter: ['data-budget-update'] });
 
         this.addBudgetWidgetStyles();
         return widget;
@@ -464,6 +628,9 @@ class RecursosHome {
     // Función para calcular el resumen de presupuesto
     calculateBudgetSummary(processedData) {
         console.log('📊 [calculateBudgetSummary] Calculando resumen con', processedData.length, 'filas');
+
+        // Mostrar información detallada de todas las filas para análisis
+        console.log('📊 [calculateBudgetSummary] Datos procesados completos:', processedData);
 
         // Buscar si ya existe una fila de totales
         const totalRow = processedData.find(item =>
@@ -487,14 +654,48 @@ class RecursosHome {
                 let calculatedTotalPresupuesto = 0;
                 let calculatedTotalEjecutado = 0;
 
+                // Contadores para análisis
+                let rowsProcessed = 0;
+                let rowsExcluded = 0;
+                let identicalRowsCount = 0; // Contador para filas con valores idénticos
+
                 for (const item of processedData) {
-                    // Excluir filas especiales como TOTAL AÑO
+                    // Mostrar cada fila para análisis
+                    console.log(`🔍 [calculateBudgetSummary] Procesando fila: ID=${item.id}, Asignación=${item.asignacion}, Ejecutado=${item.ejecutado_acumulado}`);
+
+                    // Excluir filas especiales como TOTAL AÑO u otras filas de totales
                     if (item.id && typeof item.id === 'string' && item.id.toUpperCase().includes('TOTAL')) {
+                        console.log(`🚫 [calculateBudgetSummary] Excluyendo fila TOTAL: ${item.id}`);
+                        rowsExcluded++;
                         continue;
                     }
 
                     const asignacionValue = this.parseFormattedNumber(item.asignacion);
                     const ejecutadoValue = this.parseFormattedNumber(item.ejecutado_acumulado);
+
+                    console.log(`📈 [calculateBudgetSummary] Valores parseados - Asignación: ${asignacionValue}, Ejecutado: ${ejecutadoValue}`);
+
+                    // Verificar si los valores son idénticos (esto podría indicar filas de totales parciales)
+                    if (asignacionValue === ejecutadoValue && asignacionValue !== 0) {
+                        console.warn(`⚠️ [calculateBudgetSummary] Fila con valores idénticos detectada: ID=${item.id}, Asignación=${asignacionValue}, Ejecutado=${ejecutadoValue}`);
+                        identicalRowsCount++;
+
+                        // Distinguir entre filas que son probablemente totales parciales (como filas vacías o con IDs como "TOTAL ANALITICO")
+                        // y filas que son entradas reales del presupuesto
+                        const isLikelySubtotal = item.id && typeof item.id === 'string' &&
+                            (item.id.toUpperCase().includes('TOTAL') ||
+                             item.id.toUpperCase().includes('SUBTOTAL') ||
+                             item.id.toUpperCase().includes('ANALISIS') ||
+                             item.detalle && typeof item.detalle === 'string' &&
+                             (item.detalle.toUpperCase().includes('TOTAL') ||
+                              item.detalle.toUpperCase().includes('SUBTOTAL') ||
+                              item.detalle.toUpperCase().includes('ANALISIS')));
+
+                        if (isLikelySubtotal) {
+                            console.log(`⏭️ [calculateBudgetSummary] Excluyendo fila de subtotal: ID=${item.id}`);
+                            continue; // Excluir esta fila si es un subtotal
+                        }
+                    }
 
                     if (typeof asignacionValue === 'number' && !isNaN(asignacionValue)) {
                         calculatedTotalPresupuesto += asignacionValue;
@@ -502,8 +703,14 @@ class RecursosHome {
                     if (typeof ejecutadoValue === 'number' && !isNaN(ejecutadoValue)) {
                         calculatedTotalEjecutado += ejecutadoValue;
                     }
+
+                    rowsProcessed++;
                 }
 
+                console.log(`📊 [calculateBudgetSummary] Filas procesadas: ${rowsProcessed}, Filas excluidas: ${rowsExcluded}, Filas con valores idénticos: ${identicalRowsCount}`);
+                console.log(`📊 [calculateBudgetSummary] Sumas calculadas - Presupuesto: ${calculatedTotalPresupuesto}, Ejecutado: ${calculatedTotalEjecutado}`);
+
+                // Calcular el porcentaje basado en los valores reales
                 const porcentajeCumplimiento = calculatedTotalPresupuesto > 0 ? ((calculatedTotalEjecutado / calculatedTotalPresupuesto) * 100) : 0;
                 const saldoDisponible = calculatedTotalPresupuesto - calculatedTotalEjecutado;
 
@@ -545,14 +752,47 @@ class RecursosHome {
         let totalPresupuesto = 0;
         let totalEjecutado = 0;
 
+        // Contadores para análisis
+        let rowsProcessed = 0;
+        let rowsExcluded = 0;
+        let identicalRowsCount = 0; // Contador para filas con valores idénticos
+
         for (const item of processedData) {
+            // Mostrar cada fila para análisis
+            console.log(`🔍 [calculateBudgetSummary] Procesando fila: ID=${item.id}, Asignación=${item.asignacion}, Ejecutado=${item.ejecutado_acumulado}`);
+
             // Excluir filas especiales
             if (item.id && typeof item.id === 'string' && item.id.toUpperCase().includes('TOTAL')) {
+                console.log(`🚫 [calculateBudgetSummary] Excluyendo fila TOTAL: ${item.id}`);
+                rowsExcluded++;
                 continue;
             }
 
             const asignacionValue = this.parseFormattedNumber(item.asignacion);
             const ejecutadoValue = this.parseFormattedNumber(item.ejecutado_acumulado);
+
+            console.log(`📈 [calculateBudgetSummary] Valores parseados - Asignación: ${asignacionValue}, Ejecutado: ${ejecutadoValue}`);
+
+            // Verificar si los valores son idénticos (esto podría indicar filas de totales parciales)
+            if (asignacionValue === ejecutadoValue && asignacionValue !== 0) {
+                console.warn(`⚠️ [calculateBudgetSummary] Fila con valores idénticos detectada: ID=${item.id}, Asignación=${asignacionValue}, Ejecutado=${ejecutadoValue}`);
+                identicalRowsCount++;
+
+                // Distinguir entre filas que son probablemente totales parciales y filas que son entradas reales del presupuesto
+                const isLikelySubtotal = item.id && typeof item.id === 'string' &&
+                    (item.id.toUpperCase().includes('TOTAL') ||
+                     item.id.toUpperCase().includes('SUBTOTAL') ||
+                     item.id.toUpperCase().includes('ANALISIS') ||
+                     item.detalle && typeof item.detalle === 'string' &&
+                     (item.detalle.toUpperCase().includes('TOTAL') ||
+                      item.detalle.toUpperCase().includes('SUBTOTAL') ||
+                      item.detalle.toUpperCase().includes('ANALISIS')));
+
+                if (isLikelySubtotal) {
+                    console.log(`⏭️ [calculateBudgetSummary] Excluyendo fila de subtotal: ID=${item.id}`);
+                    continue; // Excluir esta fila si es un subtotal
+                }
+            }
 
             if (typeof asignacionValue === 'number' && !isNaN(asignacionValue)) {
                 totalPresupuesto += asignacionValue;
@@ -560,7 +800,12 @@ class RecursosHome {
             if (typeof ejecutadoValue === 'number' && !isNaN(ejecutadoValue)) {
                 totalEjecutado += ejecutadoValue;
             }
+
+            rowsProcessed++;
         }
+
+        console.log(`📊 [calculateBudgetSummary] Filas procesadas: ${rowsProcessed}, Filas excluidas: ${rowsExcluded}, Filas con valores idénticos: ${identicalRowsCount}`);
+        console.log(`📊 [calculateBudgetSummary] Sumas calculadas - Presupuesto: ${totalPresupuesto}, Ejecutado: ${totalEjecutado}`);
 
         const porcentajeCumplimiento = totalPresupuesto > 0 ? ((totalEjecutado / totalPresupuesto) * 100) : 0;
         const saldoDisponible = totalPresupuesto - totalEjecutado;

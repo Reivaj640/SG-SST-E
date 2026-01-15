@@ -92,6 +92,8 @@
     "electron-squirrel-startup": "^1.0.1",
     "electron-updater": "^6.6.2",
     "exceljs": "^4.4.0",
+    "jquery": "^3.7.1",
+    "jquery-ui-dist": "^1.13.3",
     "vanilla-calendar-pro": "^3.0.5",
     "xlsx": "^0.18.5"
   }
