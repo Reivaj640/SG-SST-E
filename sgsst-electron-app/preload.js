@@ -87,8 +87,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getCapacitacionesSheets: (filePath) => ipcRenderer.invoke('get-capacitaciones-sheets', filePath),
   initExcel: (data) => ipcRenderer.invoke('init-excel', data),
   updateCapacitacionesExcel: (data) => ipcRenderer.invoke('update-capacitaciones-excel', data),
-  duplicateCapacitacionesSheet: (filePath) => ipcRenderer.invoke('duplicate-capacitaciones-sheet', filePath),
-  updateExcelCell: (data) => ipcRenderer.invoke('update-excel-cell', data),
+      duplicateCapacitacionesSheet: (args) => ipcRenderer.invoke('duplicate-capacitaciones-sheet', args),  updateExcelCell: (data) => ipcRenderer.invoke('update-excel-cell', data),
   convertExcelToPdf: (filePath) => ipcRenderer.invoke('convertExcelToPdf', filePath),
 
   // --- Presupuesto ---

@@ -2868,50 +2868,7 @@ ipcMain.handle('generate-convivencia-acta', async (event, changes, savePath = nu
 // --- Manejador para reiniciar la aplicación ---
 
 
-ipcMain.handle('duplicate-capacitaciones-sheet', async (event, filePath) => {
-    try {
-        await fsp.access(filePath);
-        const workbook = xlsx.readFile(filePath, { bookSheets: true });
-
-        // Verificar que existan hojas en el libro
-        if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
-            throw new Error('No se encontraron hojas en el archivo Excel.');
-        }
-
-        const years = workbook.SheetNames
-            .map(name => {
-                const match = name.match(/\d{4}/);
-                return match ? parseInt(match[0]) : null;
-            })
-            .filter(y => y !== null)
-            .sort((a, b) => b - a);
-
-        if (years.length === 0) {
-            throw new Error('No se encontraron hojas con a�os en el nombre.');
-        }
-
-        const lastYear = years[0];
-        const nextYear = lastYear + 1;
-        const newSheetName = `Matriz Cap. ${nextYear}`;
-
-        if (workbook.SheetNames.includes(newSheetName)) {
-            throw new Error(`La hoja '${newSheetName}' ya existe.`);
-        }
-
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-
-        // Deep copy the worksheet
-        const newWorksheet = JSON.parse(JSON.stringify(worksheet));
-
-        xlsx.utils.book_append_sheet(workbook, newWorksheet, newSheetName);
-        xlsx.writeFile(workbook, filePath);
-
-        return { success: true, newSheetName };
-    } catch (error) {
-        return { success: false, error: error.message };
-    }
-});
+// REPLACEMENT_MARKER
 
 // Manejador para duplicar archivo de presupuesto con nuevo año
 ipcMain.handle('duplicate-budget-file', async (event, { currentFilePath, newYear }) => {

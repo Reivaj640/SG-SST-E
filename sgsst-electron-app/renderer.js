@@ -1860,6 +1860,21 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 
+    } else if (submoduleName === "2.4.1 Plan de Trabajo Anual") {
+      if (window.PlanTrabajoComponent) {
+        const planTrabajoComponent = new window.PlanTrabajoComponent(
+          submoduleContentDiv,
+          currentCompany,
+          moduleName,
+          submoduleName,
+          safeBackToModuleCallback // <-- USAR EL CALLBACK SEGURO
+        );
+        planTrabajoComponent.render();
+      } else {
+        console.error('❌ PlanTrabajoComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
     } else if (submoduleName === "3.1.1 Descripción Sociodemografica y diagnostico de condiciones de salud") {
       if (window.SociodemograficaComponent) {
         const sociodemograficaComponent = new window.SociodemograficaComponent(
