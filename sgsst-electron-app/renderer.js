@@ -632,6 +632,28 @@ document.addEventListener('DOMContentLoaded', async () => {
                       showHomePage();
                   }
                   return; // Exit after handling navigation
+              case 'find-submodule-path-request':
+                  // Handle request to find the path of a submodule
+                  apiCallFunction = window.electronAPI.findSubmodulePath;
+                  apiCallArgs = [payload.company, payload.module, payload.submodule];
+                  break;
+              case 'get-file-path-request':
+                  // Handle request to construct a file path
+                  apiCallFunction = window.electronAPI.getFilePath;
+                  apiCallArgs = [payload]; // payload is { directory, fileName }
+                  break;
+              case 'read-excel-file-request':
+                  // Handle request to read an Excel file
+                  apiCallFunction = window.electronAPI.readExcelFile;
+                  // payload from plan-viewer.js is { filePath: '...' }
+                  // The API expects just the string, so we extract it if it's an object
+                  apiCallArgs = [payload.filePath || payload];
+                  break;
+              case 'process-excel-data-request':
+                  // Handle request to process Excel data
+                  apiCallFunction = window.electronAPI.processExcelData;
+                  apiCallArgs = [payload]; // payload is { buffer, company, period }
+                  break;
               default:
                   console.warn(`RENDERER: Unknown message type received from iframe: ${type}`);
                   sourceIframe.contentWindow.postMessage({

@@ -21,7 +21,7 @@ let currentCompany = null;
 /**
  * Helper function to communicate with the parent window via postMessage.
  * This abstracts the request-response logic for calling Electron APIs from the iframe.
- * @param {string} type - The type of the request (e.g., 'get-documents-in-folder').
+ * @param {string} type - The type of the request (e.g., 'find-submodule-path').
  * @param {*} payload - The data to send with the request.
  * @returns {Promise<any>} - A promise that resolves with the payload from the parent's response.
  */
@@ -183,10 +183,17 @@ async function loadPlanDataFromExcel() {
             // Leer el archivo Excel
             const result = await callParentAPI('read-excel-file', { filePath });
             if (result.success) {
-                // Procesar los datos del archivo Excel
-                const processedData = processExcelData(result.data);
+                // Procesar los datos del archivo Excel (processExcelData es ahora async)
+                const processedData = await processExcelData(result.data);
                 periodsData = processedData;
                 console.log('[loadPlanDataFromExcel] Datos procesados exitosamente. PeriodsData:', periodsData);
+                
+                // --- CAMBIO SOLICITADO: Siempre mostrar el modal para selección manual ---
+                console.log('[loadPlanDataFromExcel] Mostrando modal para selección manual del período.');
+                renderPeriodSelector();
+                document.getElementById('periodSelector').style.display = 'flex';
+                
+                // Renderizar inicialmente el plan (aunque esté detrás del modal)
                 renderTree();
                 renderGantt();
                 updateKPIs();
@@ -209,20 +216,22 @@ async function loadPlanDataFromExcel() {
 async function findExcelFilesInDirectory(dirPath) {
     try {
         // Enviar solicitud al proceso principal para leer el directorio
-        const result = await callParentAPI('read-directory', { directoryPath: dirPath });
+        // CORRECCIÓN: Enviar la ruta directamente como string, no como objeto
+        const result = await callParentAPI('get-documents-in-folder', dirPath);
 
         if (result.success) {
             const excelExtensions = ['.xls', '.xlsx', '.xlsm'];
             const excelFiles = [];
 
-            result.contents.forEach(item => {
-                if (item.type === 'file') {
+            // La respuesta de get-documents-in-folder tiene propiedades 'folders' y 'files'
+            if (result.files && Array.isArray(result.files)) {
+                result.files.forEach(item => {
                     const ext = item.name.substring(item.name.lastIndexOf('.')).toLowerCase();
                     if (excelExtensions.includes(ext)) {
                         excelFiles.push({ name: item.name, path: item.path });
                     }
-                }
-            });
+                });
+            }
 
             return excelFiles;
         } else {
@@ -236,22 +245,54 @@ async function findExcelFilesInDirectory(dirPath) {
 }
 
 // Función para procesar datos desde un archivo Excel
-function processExcelData(excelBuffer) {
+async function processExcelData(excelBuffer) {
     try {
         // En una implementación real, usaríamos una librería como xlsx para procesar el buffer
-        // Por ahora, devolvemos una estructura vacía que será rellenada con datos por defecto
         console.log('[processExcelData] Procesando datos desde buffer Excel...');
 
-        // Simular la lectura y procesamiento del archivo Excel
-        // En la implementación real, esto usaría xlsx o similar para leer el buffer
-        const processedData = {};
+        // Si el buffer no está vacío, intentamos procesarlo
+        if (excelBuffer && excelBuffer.length > 0) {
+            console.log('[processExcelData] Buffer de Excel recibido, longitud:', excelBuffer.length);
 
-        // Por defecto, crear estructura para cada año
-        for (let year = 2024; year <= 2026; year++) {
-            processedData[year] = [];
+            // Enviar solicitud al proceso principal para que procese el archivo Excel
+            // Esto delega la tarea pesada al proceso principal que tiene acceso a las librerías necesarias
+            const result = await callParentAPI('process-excel-data', { buffer: excelBuffer, company: currentCompany, period: currentPeriod });
+
+            if (result.success) {
+                console.log('[processExcelData] Datos procesados exitosamente desde Excel:', result.data);
+
+                // Mapear los datos del Excel a la estructura que espera la interfaz
+                const processedData = {};
+
+                // Suponiendo que result.data contiene los datos estructurados del Excel
+                // Creamos una estructura para cada año
+                for (let year = 2024; year <= 2026; year++) {
+                    if (result.data[year]) {
+                        processedData[year] = result.data[year];
+                    } else {
+                        processedData[year] = [];
+                    }
+                }
+
+                return processedData;
+            } else {
+                console.error('[processExcelData] Error al procesar datos del Excel:', result.error);
+                // Si falla el procesamiento, devolver estructura vacía
+                return {
+                    2024: [],
+                    2025: [],
+                    2026: []
+                };
+            }
+        } else {
+            console.log('[processExcelData] Buffer de Excel vacío o indefinido');
+            // Si no hay buffer, devolvemos estructura vacía
+            return {
+                2024: [],
+                2025: [],
+                2026: []
+            };
         }
-
-        return processedData;
     } catch (error) {
         console.error('Error al procesar datos del Excel:', error);
         // Devolver estructura vacía en caso de error
@@ -607,6 +648,7 @@ function toggleMonthStatus(actId, monthIdx) {
     let newVal = '';
     if(currentVal === '') newVal = 'P';
     else if(currentVal === 'P') newVal = 'C';
+    else newVal = '';
 
     periodsData[currentPeriod][idx].months[monthIdx] = newVal;
     selectActivity(actId);
@@ -765,12 +807,15 @@ function loadInitialData() {
 
 // Funciones de utilidad para comunicación con el módulo principal
 function showLoading() {
-    document.getElementById('loadingDiv')?.style.display = 'flex';
-    document.getElementById('viewerContainer')?.style.display = 'none';
+    const loadingDiv = document.getElementById('loadingDiv');
+    if (loadingDiv) loadingDiv.style.display = 'flex';
+    const viewerContainer = document.getElementById('viewerContainer');
+    if (viewerContainer) viewerContainer.style.display = 'none';
 }
 
 function hideLoading() {
-    document.getElementById('loadingDiv')?.style.display = 'none';
+    const loadingDiv = document.getElementById('loadingDiv');
+    if (loadingDiv) loadingDiv.style.display = 'none';
 }
 
 function showNotification(message, type = 'success') {

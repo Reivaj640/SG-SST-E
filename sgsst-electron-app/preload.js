@@ -56,6 +56,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   readExcelFile: (filePath) => ipcRenderer.invoke('read-excel-file', filePath),
+  processExcelData: (payload) => ipcRenderer.invoke('process-excel-data', payload),
 
   // --- New Document Viewer ---
   getDocumentFolders: (payload) => ipcRenderer.invoke('get-document-folders', payload),
@@ -69,6 +70,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // --- Submódulos / rutas ---
   findSubmodulePath: (companyName, module, submodule) =>
     ipcRenderer.invoke('find-submodule-path', companyName, module, submodule),
+  getFilePath: (payload) => ipcRenderer.invoke('get-file-path', payload),
 
   // --- Remisiones ---
   getControlRemisionesData: (companyName) =>

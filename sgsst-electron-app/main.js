@@ -167,9 +167,26 @@ const createWindow = () => {
 
 // Función para buscar rutas en la estructura mapeada
 function searchInStructure(node, searchTerm) {
-  // Si el nombre del nodo contiene el término de búsqueda, devolver la ruta
-  if (node.name && node.name.includes(searchTerm)) {
-    return node.path;
+  // Si el nombre del nodo contiene el término de búsqueda
+  if (node.name) {
+    // Si el término parece un código (ej. "2.4.1"), buscar coincidencia exacta al inicio
+    // Esto evita que "2.4.1" coincida con "4.2.4.1"
+    const isCode = /^[0-9.]+$/.test(searchTerm);
+    
+    if (isCode) {
+      // Verificar si empieza con el código seguido de un espacio o punto, o es igual
+      // Ej: "2.4.1 " o "2.4.1." o "2.4.1"
+      if (node.name.startsWith(searchTerm + ' ') || 
+          node.name.startsWith(searchTerm + '.') || 
+          node.name === searchTerm) {
+        return node.path;
+      }
+    } else {
+      // Búsqueda laxa para nombres normales
+      if (node.name.includes(searchTerm)) {
+        return node.path;
+      }
+    }
   }
 
   // Si tiene subdirectorios, buscar recursivamente en ellos
@@ -556,6 +573,31 @@ ipcMain.handle('read-directory', async (event, directoryPath) => {
   }
 });
 
+// Manejar construcción de ruta de archivo
+ipcMain.handle('get-file-path', async (event, { directory, fileName }) => {
+  try {
+    // Validar entradas
+    if (!directory || !fileName) {
+      throw new Error('Directorio o nombre de archivo no proporcionados');
+    }
+    
+    // Construir la ruta
+    const filePath = path.join(directory, fileName);
+    console.log('[MAIN] Construyendo ruta de archivo:', filePath);
+    
+    // Verificar si existe (opcional, pero útil)
+    if (fs.existsSync(filePath)) {
+      return { success: true, path: filePath, exists: true };
+    } else {
+      console.warn('[MAIN] El archivo construido no existe:', filePath);
+      return { success: true, path: filePath, exists: false };
+    }
+  } catch (error) {
+    console.error('[MAIN] Error en get-file-path:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // Manejar apertura de archivo o carpeta
 ipcMain.handle('open-path', async (event, pathToOpen) => {
   try {
@@ -590,6 +632,190 @@ ipcMain.handle('read-excel-file', async (event, filePath) => {
 });
 
 // --- Manejadores para funcionalidad Excel ---
+
+// Handler para procesar datos del archivo Excel del plan de trabajo
+ipcMain.handle('process-excel-data', async (event, { buffer, company, period }) => {
+  try {
+    sendLog(`[MAIN] Procesando datos del archivo Excel para la empresa: ${company} y periodo: ${period}`, 'INFO');
+
+    if (!buffer || buffer.length === 0) {
+      throw new Error('No se proporcionó un buffer de archivo Excel válido');
+    }
+
+    const XLSX = require('xlsx');
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    const firstSheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[firstSheetName];
+
+    // Leer como matriz de arrays (más fácil para buscar encabezados)
+    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+
+    sendLog(`[MAIN] Datos crudos extraídos: ${rawData.length} filas`, 'INFO');
+
+    // --- DEBUG: IMPRIMIR LAS PRIMERAS 10 FILAS PARA VER LA ESTRUCTURA ---
+    sendLog(`[MAIN][DEBUG] --- INICIO ESTRUCTURA DEL ARCHIVO (Primeras 10 filas) ---`, 'DEBUG');
+    for (let i = 0; i < Math.min(10, rawData.length); i++) {
+        sendLog(`[MAIN][DEBUG] Fila ${i}: ${JSON.stringify(rawData[i])}`, 'DEBUG');
+    }
+    sendLog(`[MAIN][DEBUG] --- FIN ESTRUCTURA DEL ARCHIVO ---`, 'DEBUG');
+
+    // --- 1. BUSCAR LA FILA DE ENCABEZADOS ---
+    let headerRowIndex = -1;
+    let columnMap = {}; // { 'actividad': index, 'enero': index, ... }
+
+    // Palabras clave para identificar columnas (normalizadas)
+    const keywords = {
+        'actividad': ['actividad', 'actividades', 'descripcion', 'tema', 'nombre actividad', 'item'],
+        'responsable': ['responsable', 'cargo', 'quien', 'asignado'],
+        'meses': ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'set', 'oct', 'nov', 'dic', 'enero']
+    };
+
+    // Función normalizadora
+    const normalize = (str) => {
+        if (!str) return "";
+        return str.toString().toLowerCase().trim()
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    };
+
+    // Buscar en las primeras 20 filas
+    for (let i = 0; i < Math.min(20, rawData.length); i++) {
+        const row = rawData[i];
+        if (!Array.isArray(row)) continue;
+
+        // Contar coincidencias en esta fila
+        let matches = 0;
+        let monthMatches = 0;
+        let actOrRespFound = false;
+        let foundKeywords = [];
+
+        row.forEach(cell => {
+            const val = normalize(cell);
+            // Búsqueda más estricta para actividad/responsable para evitar falsos positivos como "Act. Prog."
+            if (keywords.actividad.some(k => val === k || val.startsWith(k + ' ') || val.includes(' ' + k))) { 
+                matches++; 
+                actOrRespFound = true;
+                foundKeywords.push('actividad'); 
+            }
+            if (keywords.responsable.some(k => val === k || val.startsWith(k + ' ') || val.includes(' ' + k))) { 
+                matches++; 
+                actOrRespFound = true;
+                foundKeywords.push('responsable'); 
+            }
+            
+            // Verificación de meses (muy importante para confirmar que es la cabecera del cronograma)
+            if (keywords.meses.some(k => val === k)) { 
+                monthMatches++; 
+                foundKeywords.push('mes'); 
+            }
+        });
+
+        sendLog(`[MAIN][DEBUG] Escaneando fila ${i}: ${matches} coincidencias clave, ${monthMatches} meses encontrados. (${foundKeywords.join(', ')})`, 'DEBUG');
+
+        // CRITERIO REFORZADO: 
+        // 1. Debe haber encontrado al menos una palabra clave de actividad/responsable Y al menos 2 meses.
+        // 2. O si encontramos muchos meses (>= 6) aunque la palabra 'actividad' sea sutil.
+        if ((actOrRespFound && monthMatches >= 2) || monthMatches >= 6) {
+            headerRowIndex = i;
+            sendLog(`[MAIN] Encabezados encontrados en la fila ${i + 1}`, 'INFO');
+            
+            // Mapear índices de columnas basándose en esta fila
+            row.forEach((cell, colIndex) => {
+                const val = normalize(cell);
+                if (keywords.actividad.some(k => val.includes(k))) columnMap['actividad'] = colIndex;
+                else if (keywords.responsable.some(k => val.includes(k))) columnMap['responsable'] = colIndex;
+                
+                // Mapeo específico de meses (buscando abreviaturas comunes)
+                else if (val === 'ene' || val === 'enero') columnMap['enero'] = colIndex;
+                else if (val === 'feb' || val === 'febrero') columnMap['febrero'] = colIndex;
+                else if (val === 'mar' || val === 'marzo') columnMap['marzo'] = colIndex;
+                else if (val === 'abr' || val === 'abril') columnMap['abril'] = colIndex;
+                else if (val === 'may' || val === 'mayo') columnMap['mayo'] = colIndex;
+                else if (val === 'jun' || val === 'junio') columnMap['junio'] = colIndex;
+                else if (val === 'jul' || val === 'julio') columnMap['julio'] = colIndex;
+                else if (val === 'ago' || val === 'agosto') columnMap['agosto'] = colIndex;
+                else if (val === 'sep' || val === 'set' || val === 'septiembre') columnMap['septiembre'] = colIndex;
+                else if (val === 'oct' || val === 'octubre') columnMap['octubre'] = colIndex;
+                else if (val === 'nov' || val === 'noviembre') columnMap['noviembre'] = colIndex;
+                else if (val === 'dic' || val === 'diciembre') columnMap['diciembre'] = colIndex;
+                
+                else if (['observaciones', 'notas', 'comentarios'].some(k => val.includes(k))) columnMap['observaciones'] = colIndex;
+            });
+            break;
+        }
+    }
+
+    if (headerRowIndex === -1) {
+        sendLog(`[MAIN][WARN] No se encontró fila de encabezados clara. Intentando usar primera fila como fallback.`, 'WARN');
+        headerRowIndex = 0;
+        // Fallback: Mapeo por posición estándar si falla la detección
+        columnMap = {
+            'actividad': 1, // Columna B
+            'responsable': 6, // Columna G
+            'enero': 7, 'febrero': 8, 'marzo': 9, 'abril': 10, 'mayo': 11, 'junio': 12,
+            'julio': 13, 'agosto': 14, 'septiembre': 15, 'octubre': 16, 'noviembre': 17, 'diciembre': 18,
+            'observaciones': 19
+        };
+    }
+
+    sendLog(`[MAIN] Mapeo de columnas final: ${JSON.stringify(columnMap)}`, 'DEBUG');
+
+    const processedData = {};
+    for (let year = 2024; year <= 2026; year++) {
+      processedData[year] = [];
+      if (year == period) {
+        // Iterar filas de datos (después del encabezado)
+        let rowsProcessed = 0;
+        for (let i = headerRowIndex + 1; i < rawData.length; i++) {
+            const row = rawData[i];
+            // Asegurarse de que la fila tenga datos y la columna de actividad no esté vacía
+            const actividad = row[columnMap['actividad']];
+            
+            // --- DEBUG ROW SKIPPING ---
+            if (rowsProcessed < 5) { // Log first 5 processed/skipped rows
+                 sendLog(`[MAIN][DEBUG] Procesando Fila datos ${i}: Actividad="${actividad}" (Tipo: ${typeof actividad})`, 'DEBUG');
+            }
+
+            if (actividad && typeof actividad === 'string' && actividad.trim().length > 0) {
+                // Verificar si es un encabezado de sección (opcional, por ahora tratamos todo como actividad)
+                
+                const activity = {
+                  id: i + 1,
+                  name: actividad,
+                  level: 4, 
+                  type: 'activity',
+                  responsible: row[columnMap['responsable']] || 'Profesional SST',
+                  months: [
+                    row[columnMap['enero']] || '',
+                    row[columnMap['febrero']] || '',
+                    row[columnMap['marzo']] || '',
+                    row[columnMap['abril']] || '',
+                    row[columnMap['mayo']] || '',
+                    row[columnMap['junio']] || '',
+                    row[columnMap['julio']] || '',
+                    row[columnMap['agosto']] || '',
+                    row[columnMap['septiembre']] || '',
+                    row[columnMap['octubre']] || '',
+                    row[columnMap['noviembre']] || '',
+                    row[columnMap['diciembre']] || ''
+                  ],
+                  observations: row[columnMap['observaciones']] || ''
+                };
+                processedData[year].push(activity);
+                rowsProcessed++;
+            } else if (rowsProcessed < 5) {
+                sendLog(`[MAIN][DEBUG] Fila ${i} saltada: Actividad vacía o no válida.`, 'DEBUG');
+            }
+        }
+      }
+    }
+
+    sendLog(`[MAIN] Datos procesados: ${processedData[period].length} actividades encontradas.`, 'INFO');
+    return { success: true, data: processedData };
+  } catch (error) {
+    sendLog(`[MAIN] Error al procesar datos del Excel: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message, data: null };
+  }
+});
 
 // Handler para obtener las hojas de un archivo de capacitaciones
 ipcMain.handle('get-capacitaciones-sheets', async (event, filePath) => {
