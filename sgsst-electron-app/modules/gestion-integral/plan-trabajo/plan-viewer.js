@@ -10,11 +10,13 @@ let currentPage = 1;
 let folderPath = '';
 
 // Variables específicas para el Plan de Trabajo
-let currentPeriod = 2025;
+let currentPeriod = null; // Se establecerá al seleccionar en el modal
 let selectedActivityId = null;
 let deleteTargetId = null;
 let periodsData = {};
+let availableFilesMap = {}; // Mapa de { año: nombreArchivo }
 let currentCompany = null;
+let currentSubmodulePath = null;
 
 // --- START: Refactored Communication Logic ---
 
@@ -104,110 +106,49 @@ function initializePlanWork() {
 function loadURLParameters() {
     const urlParams = new URLSearchParams(window.location.search);
     currentCompany = urlParams.get('company') || 'Empresa Desconocida';
-    const moduleName = urlParams.get('module') || 'Módulo Desconocido';
-    const submoduleName = urlParams.get('submodule') || 'Submódulo Desconocido';
-
-    // Actualizar la información de la empresa en el header
     document.getElementById('companyName').textContent = currentCompany;
 
-    // Cargar datos iniciales del plan de trabajo
-    loadPlanDataFromExcel();
+    // Iniciar detección de archivos disponibles
+    detectAvailablePeriods();
 }
 
-// Cargar datos del plan de trabajo desde Excel
-async function loadPlanDataFromExcel() {
-    console.log('[loadPlanDataFromExcel] Iniciando carga de datos para la empresa:', currentCompany, 'y año:', currentPeriod);
+// NUEVA FUNCIÓN: Detectar períodos basados en los archivos reales
+async function detectAvailablePeriods() {
+    console.log('[detectAvailablePeriods] Escaneando archivos disponibles...');
     try {
-        // Usar el mecanismo estándar para encontrar la ruta del submódulo
-        // El nombre del submódulo debe coincidir con el que se usa en la estructura de carpetas
         const submoduleResult = await callParentAPI('find-submodule-path', {
             company: currentCompany,
-            module: 'Gestión Integral',  // Nombre del módulo tal como aparece en la estructura
-            submodule: '2.4.1 Plan de Trabajo Anual'  // Nombre exacto del submódulo con el código
+            module: 'Gestión Integral',
+            submodule: '2.4.1 Plan de Trabajo Anual'
         });
 
-        console.log('[loadPlanDataFromExcel] Resultado de find-submodule-path:', submoduleResult);
-
         if (submoduleResult.success) {
-            const submodulePath = submoduleResult.path;
-            console.log('[loadPlanDataFromExcel] Ruta del submódulo encontrada:', submodulePath);
-
-            // Buscar archivos Excel en la carpeta del submódulo
-            const excelFiles = await findExcelFilesInDirectory(submodulePath);
-            if (excelFiles.length === 0) {
-                console.log('[loadPlanDataFromExcel] No se encontraron archivos Excel en la ruta:', submodulePath);
-                initializeDefaultData();
-                return;
-            }
-
-            // Buscar el archivo específico del año (por ejemplo, "GI-FO-045 PLAN DE TRABAJO ANUAL 2025 SST.xls")
-            const targetFileName = `PLAN DE TRABAJO ANUAL ${currentPeriod} SST`;
-            let targetFile = excelFiles.find(file =>
-                file.name.toUpperCase().includes(targetFileName.toUpperCase())
-            );
-
-            // Si no encontramos el archivo con el nombre exacto, buscar uno que contenga "plan de trabajo" y el año
-            if (!targetFile) {
-                const fallbackFile = excelFiles.find(file =>
-                    file.name.toUpperCase().includes('PLAN DE TRABAJO') &&
-                    file.name.includes(currentPeriod.toString())
-                );
-
-                if (fallbackFile) {
-                    console.log('[loadPlanDataFromExcel] Usando archivo encontrado como alternativa:', fallbackFile.name);
-                    targetFile = fallbackFile;
+            currentSubmodulePath = submoduleResult.path;
+            const excelFiles = await findExcelFilesInDirectory(currentSubmodulePath);
+            
+            availableFilesMap = {};
+            excelFiles.forEach(file => {
+                // Intentar extraer el año (4 dígitos que empiecen por 20)
+                const yearMatch = file.name.match(/20\d{2}/);
+                if (yearMatch) {
+                    const year = yearMatch[0];
+                    availableFilesMap[year] = file.name;
                 }
-            }
-
-            if (!targetFile) {
-                console.log(`[loadPlanDataFromExcel] No se encontró el archivo específico para el año ${currentPeriod} en: ${submodulePath}`);
-                initializeDefaultData();
-                return;
-            }
-
-            // Obtener la ruta completa del archivo a través del proceso principal
-            const filePathResult = await callParentAPI('get-file-path', {
-                directory: submodulePath,
-                fileName: targetFile.name
             });
 
-            if (!filePathResult.success) {
-                console.error('[loadPlanDataFromExcel] Error al obtener la ruta del archivo:', filePathResult.error);
-                initializeDefaultData();
-                return;
-            }
+            const foundYears = Object.keys(availableFilesMap);
+            console.log('[detectAvailablePeriods] Años detectados en archivos:', foundYears);
 
-            const filePath = filePathResult.path;
-            console.log('[loadPlanDataFromExcel] Leyendo archivo Excel del plan de trabajo:', filePath);
-
-            // Leer el archivo Excel
-            const result = await callParentAPI('read-excel-file', { filePath });
-            if (result.success) {
-                // Procesar los datos del archivo Excel (processExcelData es ahora async)
-                const processedData = await processExcelData(result.data);
-                periodsData = processedData;
-                console.log('[loadPlanDataFromExcel] Datos procesados exitosamente. PeriodsData:', periodsData);
-                
-                // --- CAMBIO SOLICITADO: Siempre mostrar el modal para selección manual ---
-                console.log('[loadPlanDataFromExcel] Mostrando modal para selección manual del período.');
-                renderPeriodSelector();
+            if (foundYears.length > 0) {
+                renderPeriodSelector(foundYears);
                 document.getElementById('periodSelector').style.display = 'flex';
-                
-                // Renderizar inicialmente el plan (aunque esté detrás del modal)
-                renderTree();
-                renderGantt();
-                updateKPIs();
             } else {
-                console.log('[loadPlanDataFromExcel] Falló la lectura del archivo Excel, usando datos por defecto');
-                initializeDefaultData();
+                console.warn('[detectAvailablePeriods] No se detectaron años en los nombres de archivo.');
+                initializeDefaultData(); // Fallback si no hay archivos con años claros
             }
-        } else {
-            console.log('[loadPlanDataFromExcel] Falló la búsqueda de la ruta del submódulo, usando datos por defecto');
-            initializeDefaultData();
         }
     } catch (error) {
-        console.error('Error al cargar datos del plan de trabajo:', error);
-        console.log('[loadPlanDataFromExcel] Error capturado, usando datos por defecto');
+        console.error('Error al detectar períodos:', error);
         initializeDefaultData();
     }
 }
@@ -215,15 +156,10 @@ async function loadPlanDataFromExcel() {
 // Función para encontrar archivos Excel en un directorio
 async function findExcelFilesInDirectory(dirPath) {
     try {
-        // Enviar solicitud al proceso principal para leer el directorio
-        // CORRECCIÓN: Enviar la ruta directamente como string, no como objeto
         const result = await callParentAPI('get-documents-in-folder', dirPath);
-
         if (result.success) {
             const excelExtensions = ['.xls', '.xlsx', '.xlsm'];
             const excelFiles = [];
-
-            // La respuesta de get-documents-in-folder tiene propiedades 'folders' y 'files'
             if (result.files && Array.isArray(result.files)) {
                 result.files.forEach(item => {
                     const ext = item.name.substring(item.name.lastIndexOf('.')).toLowerCase();
@@ -232,127 +168,133 @@ async function findExcelFilesInDirectory(dirPath) {
                     }
                 });
             }
-
             return excelFiles;
-        } else {
-            console.error('Error al leer directorio:', result.error);
-            return [];
         }
+        return [];
     } catch (error) {
-        console.error('Error al buscar archivos Excel en directorio:', error);
         return [];
     }
 }
 
-// Función para procesar datos desde un archivo Excel
-async function processExcelData(excelBuffer) {
-    try {
-        // En una implementación real, usaríamos una librería como xlsx para procesar el buffer
-        console.log('[processExcelData] Procesando datos desde buffer Excel...');
+// Modificar renderPeriodSelector para usar los años detectados
+function renderPeriodSelector(years) {
+    const grid = document.getElementById('periodGrid');
+    if (!grid) return;
 
-        // Si el buffer no está vacío, intentamos procesarlo
-        if (excelBuffer && excelBuffer.length > 0) {
-            console.log('[processExcelData] Buffer de Excel recibido, longitud:', excelBuffer.length);
+    grid.innerHTML = '';
+    // Ordenar años de mayor a menor
+    const sortedYears = (years || Object.keys(availableFilesMap)).sort((a, b) => b - a);
 
-            // Enviar solicitud al proceso principal para que procese el archivo Excel
-            // Esto delega la tarea pesada al proceso principal que tiene acceso a las librerías necesarias
-            const result = await callParentAPI('process-excel-data', { buffer: excelBuffer, company: currentCompany, period: currentPeriod });
+    sortedYears.forEach(year => {
+        const btn = document.createElement('div');
+        btn.className = 'year-btn';
+        btn.innerHTML = `<i class="fas fa-file-excel" style="margin-bottom: 8px; display: block; font-size: 1.2rem; color: #217346;"></i> ${year}`;
+        btn.onclick = () => selectPeriod(year);
+        grid.appendChild(btn);
+    });
+}
 
-            if (result.success) {
-                console.log('[processExcelData] Datos procesados exitosamente desde Excel:', result.data);
+// Al seleccionar el período, cargar EL ARCHIVO correspondiente
+async function selectPeriod(year) {
+    console.log(`[selectPeriod] Año seleccionado: ${year}`);
+    currentPeriod = year;
+    document.getElementById('periodSelector').style.display = 'none';
+    document.getElementById('currentPeriodLabel').innerText = year;
 
-                // Mapear los datos del Excel a la estructura que espera la interfaz
-                const processedData = {};
-
-                // Suponiendo que result.data contiene los datos estructurados del Excel
-                // Creamos una estructura para cada año
-                for (let year = 2024; year <= 2026; year++) {
-                    if (result.data[year]) {
-                        processedData[year] = result.data[year];
-                    } else {
-                        processedData[year] = [];
-                    }
-                }
-
-                return processedData;
-            } else {
-                console.error('[processExcelData] Error al procesar datos del Excel:', result.error);
-                // Si falla el procesamiento, devolver estructura vacía
-                return {
-                    2024: [],
-                    2025: [],
-                    2026: []
-                };
-            }
-        } else {
-            console.log('[processExcelData] Buffer de Excel vacío o indefinido');
-            // Si no hay buffer, devolvemos estructura vacía
-            return {
-                2024: [],
-                2025: [],
-                2026: []
-            };
-        }
-    } catch (error) {
-        console.error('Error al procesar datos del Excel:', error);
-        // Devolver estructura vacía en caso de error
-        return {
-            2024: [],
-            2025: [],
-            2026: []
-        };
+    const fileName = availableFilesMap[year];
+    if (fileName) {
+        await loadSpecificYearFile(fileName);
+    } else {
+        // Fallback si no hay archivo (clonación o nuevo)
+        periodsData[year] = [
+            { id: Date.now(), name: `PLAN ANUAL ${year}`, level: 1, type: 'header', expanded: true, months: [], responsible: 'Profesional SST' }
+        ];
+        renderTree();
+        renderGantt();
+        updateKPIs();
     }
 }
 
-// Inicializar datos por defecto
+// Cargar un archivo específico seleccionado por el usuario
+async function loadSpecificYearFile(fileName) {
+    showLoading();
+    try {
+        const filePathResult = await callParentAPI('get-file-path', {
+            directory: currentSubmodulePath,
+            fileName: fileName
+        });
+
+        if (filePathResult.success) {
+            const result = await callParentAPI('read-excel-file', { filePath: filePathResult.path });
+            if (result.success) {
+                const processedData = await processExcelData(result.data);
+                periodsData = processedData;
+                renderTree();
+                renderGantt();
+                updateKPIs();
+            }
+        }
+    } catch (error) {
+        console.error('Error al cargar el archivo del año:', error);
+    } finally {
+        hideLoading();
+    }
+}
+
+async function processExcelData(excelBuffer) {
+    try {
+        if (excelBuffer && excelBuffer.length > 0) {
+            const result = await callParentAPI('process-excel-data', { 
+                buffer: excelBuffer, 
+                company: currentCompany, 
+                period: currentPeriod 
+            });
+
+            if (result.success) {
+                const processedData = {};
+                // Asegurarnos de que el año seleccionado tenga datos, aunque los otros vengan vacíos
+                processedData[currentPeriod] = result.data[currentPeriod] || [];
+                // Preservar otros años si existieran en el objeto result.data
+                Object.keys(result.data).forEach(y => {
+                    if (!processedData[y]) processedData[y] = result.data[y];
+                });
+                return processedData;
+            }
+        }
+        return { [currentPeriod]: [] };
+    } catch (error) {
+        return { [currentPeriod]: [] };
+    }
+}
+
+// Inicializar datos por defecto (solo si falla el escaneo de archivos)
 function initializeDefaultData() {
-    console.log('[initializeDefaultData] Inicializando datos por defecto...');
+    console.log('[initializeDefaultData] Usando datos por defecto...');
     periodsData = {
-        2024: [
-            { id: 1, name: "MEDICINA PREVENTIVA 2024", level: 1, type: 'header', expanded: true, months: [], responsible: 'Profesional SST' },
-            { id: 2, name: "Revisión procedimiento...", level: 4, type: 'activity', responsible: 'Profesional SST', months: ['C','C',''] },
-            { id: 3, name: "SVE - COVID 2024", level: 1, type: 'header', expanded: true, months: [], responsible: 'Profesional SST' },
-            { id: 4, name: "Capacitaciones...", level: 4, type: 'activity', responsible: 'Profesional SST', months: ['C','C',''] }
-        ],
         2025: [
-            { id: 101, name: "MEDICINA PREVENTIVA Y DEL TRABAJO", level: 1, type: 'header', expanded: true, months: [], responsible: 'Profesional SST' },
-            { id: 102, name: "Revisión y actualización procedimiento...", level: 4, type: 'activity', responsible: 'Profesional SST', months: ['', 'C', '', 'C', '', ''] },
-            { id: 103, name: "Actualización de formatos medicina...", level: 4, type: 'activity', responsible: 'Profesional SST', months: ['', '', 'C', '', '', ''] },
-            { id: 104, name: "SVE - Desorden Musculo Esqueletico", level: 1, type: 'header', expanded: false, months: [], responsible: 'Profesional SST' },
-            { id: 105, name: "Planear", level: 3, type: 'subtitle', months: [], responsible: 'Profesional SST' },
-            { id: 106, name: "Revisión resultados exámenes...", level: 4, type: 'activity', responsible: 'Profesional SST', months: ['C', 'C', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'] },
-            { id: 107, name: "Análisis estadísticas...", level: 4, type: 'activity', responsible: 'Profesional SST', months: ['C', 'C', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'] },
-            { id: 108, name: "SVE - Covid", level: 1, type: 'header', expanded: true, months: [], responsible: 'Profesional SST' },
-            { id: 109, name: "Capacitaciones en Bioseguridad", level: 4, type: 'activity', responsible: 'Profesional SST', months: ['C', 'C', 'P', '', '', '', '', 'P', 'P', '', '', ''] }
-        ],
-        2026: []
+            { id: 101, name: "SIN ARCHIVOS DETECTADOS", level: 1, type: 'header', expanded: true, months: [], responsible: 'Sistema' },
+            { id: 102, name: "Verifique la carpeta del Plan de Trabajo", level: 4, type: 'activity', responsible: 'Admin', months: [] }
+        ]
     };
-
-    console.log('[initializeDefaultData] Datos por defecto establecidos. periodsData:', periodsData);
-
-    // Mostrar el selector de periodos inicialmente para que el usuario pueda elegir
-    setTimeout(() => {
-        console.log('[initializeDefaultData] Mostrando selector de periodos...');
-        renderPeriodSelector();
-        document.getElementById('periodSelector').style.display = 'flex';
-        console.log('[initializeDefaultData] Selector de periodos mostrado');
-    }, 100); // Pequeño retraso para asegurar que el DOM esté listo
-
-    renderTree();
-    renderGantt();
-    updateKPIs();
+    renderPeriodSelector(['2025']);
+    document.getElementById('periodSelector').style.display = 'flex';
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   LÓGICA DE VISIBILIDAD (SYNC TREE/GANTT)
+   LÓGICA DE VISIBILIDAD & SYNC
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 function isItemVisible(item, index, data) {
-    if (item.level <= 1) return true; // Headers raíz siempre visibles
+    if (item.level <= 1) return true; // Nivel 1 siempre visible
 
-    // Buscar el padre inmediatamente superior en nivel
-    for(let i=index-1; i>=0; i--) {
-        if(data[i].level < item.level) {
-            return data[i].expanded; // Si el padre no está expandido, soy invisible
+    let currentLevel = item.level;
+    // Buscar hacia arriba todos los posibles ancestros
+    for (let i = index - 1; i >= 0; i--) {
+        if (data[i].level < currentLevel) {
+            // Si el ancestro no está expandido, el item es invisible
+            if (!data[i].expanded) return false;
+            // Continuar subiendo en la jerarquía (ej: de Nivel 3 a Nivel 2, de Nivel 2 a Nivel 1)
+            currentLevel = data[i].level;
+            if (currentLevel <= 1) break; 
         }
     }
     return true;
@@ -395,65 +337,145 @@ function initResizer() {
     resizer.addEventListener('mousedown', mouseDownHandler);
 }
 
-/* --- PERIOD SELECTOR --- */
-function renderPeriodSelector() {
+// Modificar renderPeriodSelector para usar los años detectados
+function renderPeriodSelector(years) {
     const grid = document.getElementById('periodGrid');
     if (!grid) return;
 
     grid.innerHTML = '';
-    const years = Object.keys(periodsData).sort();
+    // Ordenar años de mayor a menor
+    const sortedYears = (years || Object.keys(availableFilesMap)).sort((a, b) => b - a);
 
-    years.forEach(year => {
+    sortedYears.forEach(year => {
         const btn = document.createElement('div');
         btn.className = 'year-btn';
-        btn.innerText = year;
+        btn.innerHTML = `<i class="fas fa-file-excel" style="margin-bottom: 8px; display: block; font-size: 1.2rem; color: #217346;"></i> ${year}`;
         btn.onclick = () => selectPeriod(year);
         grid.appendChild(btn);
     });
 }
 
-function selectPeriod(year) {
+// Al seleccionar el período, cargar EL ARCHIVO correspondiente
+async function selectPeriod(year) {
+    console.log(`[selectPeriod] Año seleccionado: ${year}`);
     currentPeriod = year;
     document.getElementById('periodSelector').style.display = 'none';
     document.getElementById('currentPeriodLabel').innerText = year;
 
-    if(!periodsData[year] || periodsData[year].length === 0) {
+    const fileName = availableFilesMap[year];
+    if (fileName) {
+        await loadSpecificYearFile(fileName);
+    } else {
+        // Fallback si no hay archivo (clonación o nuevo)
         periodsData[year] = [
             { id: Date.now(), name: `PLAN ANUAL ${year}`, level: 1, type: 'header', expanded: true, months: [], responsible: 'Profesional SST' }
         ];
+        renderTree();
+        renderGantt();
+        updateKPIs();
     }
+}
 
-    renderTree();
-    renderGantt();
-    updateKPIs();
+// Cargar un archivo específico seleccionado por el usuario
+async function loadSpecificYearFile(fileName) {
+    showLoading();
+    try {
+        const filePathResult = await callParentAPI('get-file-path', {
+            directory: currentSubmodulePath,
+            fileName: fileName
+        });
 
-    document.getElementById('inspectorContent').innerHTML = `
-        <div style="text-align: center; color: var(--text-muted); margin-top: 2rem;">
-            <i class="fas fa-mouse-pointer" style="font-size: 2rem; margin-bottom: 10px;"></i>
-            <p>Seleccione una actividad.</p>
-        </div>
-    `;
+        if (filePathResult.success) {
+            const result = await callParentAPI('read-excel-file', { filePath: filePathResult.path });
+            if (result.success) {
+                const processedData = await processExcelData(result.data);
+                periodsData = processedData;
+                renderTree();
+                renderGantt();
+                updateKPIs();
+            }
+        }
+    } catch (error) {
+        console.error('Error al cargar el archivo del año:', error);
+    } finally {
+        hideLoading();
+    }
 }
 
 function showPeriodSelector() {
     document.getElementById('periodSelector').style.display = 'flex';
 }
 
-function clonePeriod() {
-    if(!periodsData[currentPeriod]) return;
+async function clonePeriod() {
+    console.log('[clonePeriod] Iniciando proceso de clonación independiente...');
+    
+    const availableYears = Object.keys(availableFilesMap);
+    
+    if (availableYears.length === 0) {
+        alert("No se encontraron planes existentes para clonar. Por favor, asegúrese de tener al menos un archivo Excel en la carpeta.");
+        return;
+    }
 
-    const nextYear = parseInt(currentPeriod) + 1;
-    const newData = JSON.parse(JSON.stringify(periodsData[currentPeriod]));
+    // 1. Seleccionar el año ORIGEN
+    let sourceYear = currentPeriod;
+    
+    if (availableYears.length > 1) {
+        // Si hay múltiples años, usamos el actual seleccionado o el último disponible
+        sourceYear = currentPeriod || availableYears[availableYears.length - 1];
+    } else {
+        // Si solo hay uno, lo usamos automáticamente
+        sourceYear = availableYears[0];
+        console.log(`[clonePeriod] Solo un año disponible (${sourceYear}), usándolo como origen.`);
+    }
 
-    newData.forEach(item => {
-        item.id = Date.now() + Math.random();
-        item.months = new Array(12).fill('');
-    });
+    // 2. Calcular el año DESTINO automáticamente (Estilo Módulo Presupuesto 1.1.3)
+    // Evitamos usar prompt() porque puede fallar en Electron/Iframes
+    const newYear = parseInt(sourceYear) + 1;
 
-    periodsData[nextYear] = newData;
+    if (availableFilesMap[newYear]) {
+        alert(`Ya existe un archivo para el año ${newYear}. No se puede duplicar sobre uno existente.`);
+        return;
+    }
 
-    renderPeriodSelector();
-    alert(`Plan clonado exitosamente al año ${nextYear}.`);
+    const confirmMessage = `¿Desea crear un nuevo Plan de Trabajo para el año ${newYear} basado en el plan del ${sourceYear}?`;
+    
+    if (!confirm(confirmMessage)) return;
+
+    const sourceFileName = availableFilesMap[sourceYear];
+    console.log(`[clonePeriod] Clonando archivo: ${sourceFileName} (Origen: ${sourceYear}) -> Destino: ${newYear}`);
+    
+    try {
+        const sourcePathResult = await callParentAPI('get-file-path', {
+            directory: currentSubmodulePath,
+            fileName: sourceFileName
+        });
+
+        if (!sourcePathResult.success) throw new Error("No se pudo encontrar la ruta del archivo origen.");
+
+        showLoading();
+        
+        const cloneResult = await callParentAPI('duplicate-budget-file', {
+            currentFilePath: sourcePathResult.path,
+            newYear: newYear
+        });
+
+        if (cloneResult.success) {
+            alert(`¡Éxito! El plan ha sido clonado para el año ${newYear}.\nSe ha creado el archivo: ${cloneResult.newFileName}`);
+            
+            // Refrescar la lista de periodos inmediatamente
+            await detectAvailablePeriods();
+            
+            // Forzar que el modal se mantenga abierto para que el usuario vea el nuevo botón
+            document.getElementById('periodSelector').style.display = 'flex';
+        } else {
+            alert("Error al clonar el archivo: " + cloneResult.error);
+        }
+    } catch (error) {
+        console.error("[clonePeriod] Error crítico:", error);
+        alert("Ocurrió un error inesperado: " + error.message);
+    } finally {
+        hideLoading();
+    }
 }
 
 /* --- 1. RENDER TREE --- */

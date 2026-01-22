@@ -760,29 +760,57 @@ ipcMain.handle('process-excel-data', async (event, { buffer, company, period }) 
     sendLog(`[MAIN] Mapeo de columnas final: ${JSON.stringify(columnMap)}`, 'DEBUG');
 
     const processedData = {};
+    const parentTitles = [
+        'MEDICINA PREVENTIVA Y DEL TRABAJO',
+        'SEGURIDAD INDUSTRIAL',
+        'HIGIENE INDUSTRIAL',
+        'VERIFICACION Y MEJORAMIENTO',
+        'VERIFICACIÓN Y MEJORAMIENTO'
+    ];
+    const phvaTitles = ['PLANEAR', 'HACER', 'VERIFICAR', 'ACTUAR'];
+
     for (let year = 2024; year <= 2026; year++) {
       processedData[year] = [];
       if (year == period) {
-        // Iterar filas de datos (después del encabezado)
         let rowsProcessed = 0;
         for (let i = headerRowIndex + 1; i < rawData.length; i++) {
             const row = rawData[i];
-            // Asegurarse de que la fila tenga datos y la columna de actividad no esté vacía
-            const actividad = row[columnMap['actividad']];
+            const actividad = String(row[columnMap['actividad']] || '').trim();
             
-            // --- DEBUG ROW SKIPPING ---
-            if (rowsProcessed < 5) { // Log first 5 processed/skipped rows
-                 sendLog(`[MAIN][DEBUG] Procesando Fila datos ${i}: Actividad="${actividad}" (Tipo: ${typeof actividad})`, 'DEBUG');
-            }
+            if (actividad.length > 0) {
+                // Determinar nivel jerárquico
+                let level = 4; 
+                let type = 'activity';
+                const colA = String(row[0] || '').trim();
+                const normalizedAct = actividad.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-            if (actividad && typeof actividad === 'string' && actividad.trim().length > 0) {
-                // Verificar si es un encabezado de sección (opcional, por ahora tratamos todo como actividad)
-                
+                // 1. Títulos Padre (Nivel 1)
+                if (parentTitles.some(t => normalizedAct.includes(t.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")))) {
+                    level = 1;
+                    type = 'header';
+                }
+                // 2. PHVA (Nivel 3)
+                else if (phvaTitles.includes(normalizedAct)) {
+                    level = 3;
+                    type = 'subtitle';
+                }
+                // 3. Actividades (Nivel 4 - Tienen número en Col A)
+                else if (colA !== '' && !isNaN(parseFloat(colA.replace(',', '.')))) {
+                    level = 4;
+                    type = 'activity';
+                }
+                // 4. Títulos Hijos (Nivel 2)
+                else {
+                    level = 2;
+                    type = 'header';
+                }
+
                 const activity = {
                   id: i + 1,
                   name: actividad,
-                  level: 4, 
-                  type: 'activity',
+                  level: level, 
+                  type: type,
+                  expanded: true,
                   responsible: row[columnMap['responsable']] || 'Profesional SST',
                   months: [
                     row[columnMap['enero']] || '',
@@ -802,14 +830,12 @@ ipcMain.handle('process-excel-data', async (event, { buffer, company, period }) 
                 };
                 processedData[year].push(activity);
                 rowsProcessed++;
-            } else if (rowsProcessed < 5) {
-                sendLog(`[MAIN][DEBUG] Fila ${i} saltada: Actividad vacía o no válida.`, 'DEBUG');
             }
         }
       }
     }
 
-    sendLog(`[MAIN] Datos procesados: ${processedData[period].length} actividades encontradas.`, 'INFO');
+    sendLog(`[INFO] [MAIN] Datos procesados: ${processedData[period].length} filas con jerarquía detectadas.`, 'INFO');
     return { success: true, data: processedData };
   } catch (error) {
     sendLog(`[MAIN] Error al procesar datos del Excel: ${error.message}`, 'ERROR');
