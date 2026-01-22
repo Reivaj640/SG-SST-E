@@ -1,4 +1,4 @@
-// capacitacion-copasst.js - Componente para el submódulo "1.1.7 Capacitación al Copasst"
+// capacitacion-copasst-logic.js - Componente para el submódulo "1.1.7 Capacitación al Copasst"
 
 class CapacitacionCopasstComponent {
     constructor(container, companyName, moduleName, submoduleName, onBackToModuleHome) {
@@ -27,60 +27,89 @@ class CapacitacionCopasstComponent {
     }
 
     handleIframeMessage(event) {
-        // Por seguridad, podrías verificar event.origin aquí si supieras el origen exacto del iframe
-        if (!event.data || !event.data.action) {
-            return; // Ignorar mensajes sin acción definida
+        if (!event.data || !event.data.type) {
+            return;
         }
 
-        switch (event.data.action) {
-            case 'backToModule':
-                if (this.onBackToModuleHome) {
-                    this.onBackToModuleHome();
-                }
-                break;
-            case 'get-pdf-preview-request':
-                this.handleFilePreviewRequest(event, 'getPDFPreview');
-                break;
-            case 'get-word-preview-request':
-                this.handleFilePreviewRequest(event, 'getWordPreview');
-                break;
-            // Puedes añadir más casos para otros tipos de archivos si es necesario
-            default:
-                console.warn('Mensaje de iframe no reconocido:', event.data.action);
-                break;
+        // Manejar mensajes del nuevo estándar (type: 'action-request')
+        if (event.data.type.endsWith('-request')) {
+            const action = event.data.type.replace('-request', '');
+            
+            switch (action) {
+                case 'back-to-module':
+                    if (this.onBackToModuleHome) this.onBackToModuleHome();
+                    break;
+                case 'get-document-folders':
+                    this.handleStandardRequest(event, 'getDocumentFolders');
+                    break;
+                case 'get-documents-in-folder':
+                    this.handleStandardRequest(event, 'getDocumentsInFolder');
+                    break;
+                case 'get-pdf-preview':
+                    this.handleStandardRequest(event, 'getPDFPreview');
+                    break;
+                case 'get-word-preview':
+                    this.handleStandardRequest(event, 'getWordPreview');
+                    break;
+                case 'get-excel-preview':
+                    this.handleStandardRequest(event, 'getExcelPreview');
+                    break;
+                case 'download-document':
+                    this.handleStandardRequest(event, 'downloadDocument');
+                    break;
+                default:
+                    console.warn(`[CapacitacionCopasstLogic] Acción no manejada: ${action}`);
+            }
         }
     }
 
-    async handleFilePreviewRequest(event, apiFunctionName) {
-        const { requestId, filePath } = event.data;
-        console.log(`[capacitacion-copasst.js][handleFilePreviewRequest] Solicitud de previsualización recibida. requestId: ${requestId}, filePath: ${filePath}, apiFunctionName: ${apiFunctionName}`);
+    async handleStandardRequest(event, apiFunctionName) {
+        const { requestId, payload } = event.data;
+        console.log(`[CapacitacionCopasstLogic] Solicitud: ${apiFunctionName}, ID: ${requestId}`);
+        
         try {
             if (!window.electronAPI || typeof window.electronAPI[apiFunctionName] !== 'function') {
-                console.error(`[capacitacion-copasst.js][handleFilePreviewRequest] Error: electronAPI.${apiFunctionName} no está disponible.`);
-                throw new Error(`electronAPI.${apiFunctionName} no está disponible.`);
+                throw new Error(`API function ${apiFunctionName} not found`);
             }
-            const result = await window.electronAPI[apiFunctionName](filePath);
-            console.log(`[capacitacion-copasst.js][handleFilePreviewRequest] Respuesta de electronAPI.${apiFunctionName} para requestId ${requestId}: success=${result.success}, error=${result.error}`);
+
+            // Preparar argumento: Si el payload es un objeto con filePath (enviado por viewers),
+            // extraemos el string porque las APIs de preview esperan la ruta directa.
+            let apiArgs = payload;
+            if (payload && typeof payload === 'object' && payload.filePath) {
+                apiArgs = payload.filePath;
+            }
+
+            const result = await window.electronAPI[apiFunctionName](apiArgs);
+            
             event.source.postMessage({
-                action: `${apiFunctionName}-response`,
+                type: `${event.data.type.replace('-request', '')}-response`,
                 requestId,
-                success: result.success,
-                data: result.data,
-                error: result.error
-            }, '*'); // Considerar especificar el origin para mayor seguridad
+                payload: {
+                    success: result.success,
+                    data: result.data || result, 
+                    files: result.files, 
+                    folders: result.folders,
+                    basePath: result.basePath,
+                    fileName: result.fileName,
+                    base64Data: result.base64Data,
+                    error: result.error
+                }
+            }, '*');
+
         } catch (error) {
-            console.error(`[capacitacion-copasst.js][handleFilePreviewRequest] Error al manejar la solicitud de previsualización (${apiFunctionName}) para filePath ${filePath}:`, error);
+            console.error(`[CapacitacionCopasstLogic] Error en ${apiFunctionName}:`, error);
             event.source.postMessage({
-                action: `${apiFunctionName}-response`,
+                type: `${event.data.type.replace('-request', '')}-response`,
                 requestId,
-                success: false,
-                error: error.message
-            }, '*'); // Considerar especificar el origin para mayor seguridad
+                payload: {
+                    success: false,
+                    error: error.message
+                }
+            }, '*');
         }
     }
 
     destroy() {
-        // Limpiar el event listener cuando el componente se destruye
         window.removeEventListener('message', this.handleIframeMessage);
         this.container.innerHTML = '';
     }

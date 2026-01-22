@@ -44,3 +44,15 @@ El sistema de renderizado se integra con el motor normativo para:
 - Obtener configuraciones dinámicas
 - Aplicar reglas específicas por escenario
 - Actualizar la interfaz según cambios normativos
+
+## 🎨 Evolución de la Interfaz Visual (Sistema K+AIR)
+
+A partir de Enero 2026, se ha iniciado la implementación del **Sistema de Diseño K+AIR** para modernizar la experiencia de usuario.
+
+### Referencia de Implementación: 1.1.1 Responsable del SG
+Este submódulo sirve como la implementación de referencia ("Gold Standard") para la nueva arquitectura visual:
+- **Layout Moderno:** Header fijo, Sidebar de navegación y Área de contenido limpia.
+- **Estilos:** Variables CSS centralizadas (`:root`), paleta de colores institucional y tipografía Lexend/Roboto.
+- **Componentes:** Botones *ghost*, toolbars contextuales y feedback visual mediante notificaciones.
+
+Para más detalles sobre esta implementación específica, consultar: [Actualización de Interfaz: 1.1.1 Responsable del SG](ui-update-responsable-sg.md).

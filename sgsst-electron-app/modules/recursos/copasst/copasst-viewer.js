@@ -3,46 +3,34 @@
 // Variables globales
 let currentDocument = null;
 let currentViewer = null;
-let currentZoom = 'auto';
-let currentOrientation = 'vertical';
+let currentZoom = 100;
 let totalPages = 0;
 let currentPage = 1;
 let currentFolderPath = '';
 let pathHistory = [];
 
-// --- START: Refactored Communication Logic ---
+// --- START: Communication Logic ---
 
-/**
- * Helper function to communicate with the parent window via postMessage.
- * This abstracts the request-response logic for calling Electron APIs from the iframe.
- * @param {string} type - The type of the request (e.g., 'get-documents-in-folder').
- * @param {*} payload - The data to send with the request.
- * @returns {Promise<any>} - A promise that resolves with the payload from the parent's response.
- */
 function callParentAPI(type, payload) {
     console.log(`[copasst-viewer.js][callParentAPI] Enviando solicitud al padre. Tipo: ${type}, Payload:`, payload);
     return new Promise((resolve, reject) => {
-        // Unique ID for this request to match it with a response
         const requestId = `req-${Date.now()}-${Math.random()}`;
 
         const handleResponse = (event) => {
-            // Security: only accept messages from the parent window on file protocol
             if (event.origin !== 'file://' || event.source !== window.parent) {
                 return;
             }
 
             const response = event.data;
-            // Check if the response corresponds to our request
             if (response.type === `${type}-response` && response.requestId === requestId) {
-                // Clean up the event listener
                 window.removeEventListener('message', handleResponse);
-                console.log(`[copasst-viewer.js][callParentAPI] Respuesta recibida del padre para requestId ${requestId}. Success: ${response.payload && response.payload.success}`);
+                console.log(`[copasst-viewer.js][callParentAPI] Respuesta recibida. Success: ${response.payload && response.payload.success}`);
 
                 if (response.payload && response.payload.success) {
                     resolve(response.payload);
                 } else {
                     const errorMessage = (response.payload && response.payload.error) || 'Unknown error from parent process';
-                    console.error(`[copasst-viewer.js][callParentAPI] Error recibido para la solicitud '${type}':`, errorMessage);
+                    console.error(`[copasst-viewer.js][callParentAPI] Error:`, errorMessage);
                     reject(new Error(errorMessage));
                 }
             }
@@ -50,8 +38,6 @@ function callParentAPI(type, payload) {
 
         window.addEventListener('message', handleResponse);
 
-        // Send the request to the parent window
-        console.log(`VIEWER: 🗣️ Sending message to parent: ${type}-request`, { payload, requestId });
         window.parent.postMessage({
             type: `${type}-request`,
             payload,
@@ -59,7 +45,7 @@ function callParentAPI(type, payload) {
         }, 'file://');
     });
 }
-// --- END: Refactored Communication Logic ---
+// --- END: Communication Logic ---
 
 
 // Inicialización
@@ -70,23 +56,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Configurar event listeners
 function setupEventListeners() {
-    document.getElementById('backBtn').addEventListener('click', () => {
+    // Navegación Global
+    document.getElementById('backToModuleBtn').addEventListener('click', () => {
         if (window.parent && window.parent.postMessage) {
-            // Use a standardized message format for all communications
             window.parent.postMessage({ type: 'back-to-module-request' }, '*');
         }
     });
+
+    // Acciones de Documento
     document.getElementById('downloadBtn').addEventListener('click', downloadDocument);
     document.getElementById('printBtn').addEventListener('click', printDocument);
-    document.getElementById('upLevelBtn').addEventListener('click', () => goUpLevel());
-    document.getElementById('zoomLevel').addEventListener('change', (e) => {
-        currentZoom = e.target.value;
-        applyZoom();
-    });
-    document.getElementById('pageOrientation').addEventListener('change', (e) => {
-        currentOrientation = e.target.value;
-        applyOrientation();
-    });
+    document.getElementById('closeDocBtn').addEventListener('click', closeDocument);
+
+    // Navegación Local (Carpetas)
+    document.getElementById('goBackBtn').addEventListener('click', () => goUpLevel());
+
+    // Zoom Controls
+    document.getElementById('zoomInBtn').addEventListener('click', zoomIn);
+    document.getElementById('zoomOutBtn').addEventListener('click', zoomOut);
+    document.getElementById('fitWidthBtn').addEventListener('click', fitWidth);
 }
 
 // Cargar carpetas
@@ -95,32 +83,27 @@ async function loadFolders() {
     showLoading();
 
     const urlParams = new URLSearchParams(window.location.search);
-    const companyName = decodeURIComponent(urlParams.get('company') || '');
-    const moduleName = decodeURIComponent(urlParams.get('module') || '');
-    const submoduleName = decodeURIComponent(urlParams.get('submodule') || '');
+    const companyName = urlParams.get('company');
+    const moduleName = urlParams.get('module');
+    const submoduleName = urlParams.get('submodule');
 
     if (!companyName || !moduleName || !submoduleName) {
         showNotification('Faltan parámetros en la URL', 'error');
-        console.error('VIEWER: Faltan parámetros en la URL:', { companyName, moduleName, submoduleName });
         hideLoading();
         return;
     }
 
     try {
         const result = await callParentAPI('get-document-folders', { companyName, moduleName, submoduleName });
-        console.log('VIEWER: La carga de carpetas y archivos raíz fue exitosa. Renderizando...');
-        console.log('DEBUG loadFolders: Resultado completo de la API:', result);
-        currentFolderPath = result.path || result.basePath; // Intentar con 'path' primero, si no con 'basePath'
-        console.log('DEBUG loadFolders: Ruta base establecida:', currentFolderPath);
-        pathHistory = []; // Inicializar historial vacío en la raíz
-        console.log('DEBUG loadFolders: Historial inicializado:', pathHistory);
-        updateUpLevelButton(); // Actualizar estado del botón de subir nivel
-        console.log('DEBUG loadFolders: Estado inicial del botón subir nivel (debería estar deshabilitado):', pathHistory.length === 0);
+        currentFolderPath = result.basePath; 
+        pathHistory = []; 
+        
+        updateNavigationState();
+        
         renderFolders(result.folders);
-        renderDocuments(result.files); // <-- AÑADIDO: Renderizar también los archivos en la raíz
+        renderDocuments(result.files); 
     } catch (error) {
-        showNotification(`Error al cargar contenido inicial: ${error.message}`, 'error');
-        console.error('VIEWER: Error catastrófico en loadFolders:', error);
+        showNotification(`Error al cargar contenido: ${error.message}`, 'error');
     } finally {
         hideLoading();
     }
@@ -132,23 +115,29 @@ function renderFolders(folders) {
     folderList.innerHTML = '';
 
     if (!folders || folders.length === 0) {
-        folderList.innerHTML = '<p>No se encontraron carpetas.</p>';
+        folderList.innerHTML = '<div style="padding:1rem; color:#999; font-size:0.85rem;">No hay carpetas.</div>';
         return;
     }
 
     folders.forEach(folder => {
         const folderItem = document.createElement('div');
-        folderItem.className = 'folder-item';
+        folderItem.className = 'list-item';
         folderItem.dataset.path = folder.path;
 
-        const icon = document.createElement('i');
-        icon.className = 'fas fa-folder';
+        const iconDiv = document.createElement('div');
+        iconDiv.className = 'item-icon folder';
+        iconDiv.innerHTML = '<i class="fas fa-folder"></i>';
 
-        const name = document.createElement('div');
-        name.textContent = folder.name;
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'item-info';
+        
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'item-name';
+        nameDiv.textContent = folder.name;
 
-        folderItem.appendChild(icon);
-        folderItem.appendChild(name);
+        infoDiv.appendChild(nameDiv);
+        folderItem.appendChild(iconDiv);
+        folderItem.appendChild(infoDiv);
 
         folderItem.addEventListener('click', () => {
             selectFolder(folder.path);
@@ -161,90 +150,80 @@ function renderFolders(folders) {
 // Seleccionar carpeta
 async function selectFolder(path) {
     try {
-        // Validar que la ruta no sea undefined o vacía
-        if (!path) {
-            showNotification('La ruta de la carpeta no es válida', 'error');
-            console.error('Ruta no válida recibida:', path);
-            return;
-        }
-
-        console.log('DEBUG selectFolder: currentFolderPath:', currentFolderPath, 'path:', path);
-
-        // Guardar la ruta actual en el historial antes de cambiar, solo si es una ruta válida
-        if (currentFolderPath !== undefined && currentFolderPath !== null && currentFolderPath !== '' && currentFolderPath !== path) {
+        if (currentFolderPath !== path) {
             pathHistory.push(currentFolderPath);
-            console.log('DEBUG: Ruta guardada en historial. Nuevo historial:', pathHistory);
-        } else {
-            console.log('DEBUG: No se guardó ruta en historial. Condiciones:', {
-                isUndefined: currentFolderPath === undefined,
-                isNull: currentFolderPath === null,
-                isEmpty: currentFolderPath === '',
-                isSame: currentFolderPath === path
-            });
         }
 
         currentFolderPath = path;
 
-        document.querySelectorAll('.folder-item').forEach(item => {
+        document.querySelectorAll('.list-item').forEach(item => {
             item.classList.remove('active');
         });
 
-        // Usar un selector más robusto que maneje caracteres especiales
-        const selectedItems = document.querySelectorAll('.folder-item');
-        for (const item of selectedItems) {
-            if (item.dataset.path === path) {
-                item.classList.add('active');
-                break;
-            }
+        const selectedItem = document.querySelector(`[data-path="${path}"]`);
+        if (selectedItem) {
+            selectedItem.classList.add('active');
         }
 
         await loadDocuments(path);
-        console.log('DEBUG: Estado del historial antes de updateUpLevelButton:', pathHistory);
-        updateUpLevelButton(); // Actualizar estado del botón de subir nivel
+        updateNavigationState();
 
     } catch (error) {
         showNotification('Error al seleccionar carpeta', 'error');
-        console.error('Error al seleccionar carpeta:', error);
     }
 }
 
-// Cargar documentos de una carpeta
+// Cargar documentos
 async function loadDocuments(folderPath) {
     try {
-        console.log(`VIEWER: Cargando documentos para la ruta: ${folderPath}`);
         const result = await callParentAPI('get-documents-in-folder', folderPath);
-        renderFolders(result.folders); // Renderizar subcarpetas
-        renderDocuments(result.files); // <-- CORREGIDO: usar result.files
+        renderDocuments(result.files); 
     } catch (error) {
         showNotification(`Error al cargar documentos: ${error.message}`, 'error');
-        console.error('VIEWER: Error en loadDocuments:', error);
     }
 }
 
 // Renderizar documentos
 function renderDocuments(documents) {
-    console.log('[DIAGNÓSTICO] renderDocuments: Recibidos para renderizar:', documents);
-    const documentList = document.getElementById('documentList');
+    const documentList = document.getElementById('fileList');
+    const docCount = document.getElementById('docCount');
+    
     documentList.innerHTML = '';
 
     if (!documents || documents.length === 0) {
-        documentList.innerHTML = '<p>No hay documentos en esta carpeta.</p>';
+        documentList.innerHTML = '<div style="padding:1rem; color:#999; font-size:0.85rem;">Carpeta vacía.</div>';
+        if(docCount) docCount.innerText = '0';
         return;
     }
 
+    if(docCount) docCount.innerText = documents.length;
+
     documents.forEach(doc => {
         const docItem = document.createElement('div');
-        docItem.className = 'document-item';
+        docItem.className = 'list-item';
         docItem.dataset.path = doc.path;
 
-        const icon = document.createElement('i');
-        icon.className = getDocumentIcon(doc.extension);
+        const fileTypeInfo = getFileTypeInfo(doc.extension);
+        
+        const iconDiv = document.createElement('div');
+        iconDiv.className = `item-icon ${fileTypeInfo.className}`;
+        iconDiv.innerHTML = `<i class="fas ${fileTypeInfo.icon}"></i>`;
 
-        const name = document.createElement('div');
-        name.textContent = doc.name;
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'item-info';
 
-        docItem.appendChild(icon);
-        docItem.appendChild(name);
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'item-name';
+        nameDiv.textContent = doc.name;
+
+        const metaDiv = document.createElement('div');
+        metaDiv.className = 'item-meta';
+        metaDiv.innerHTML = `<span class="badge-type">${doc.extension.toUpperCase()}</span>`; 
+
+        infoDiv.appendChild(nameDiv);
+        infoDiv.appendChild(metaDiv);
+        docItem.appendChild(iconDiv);
+        docItem.appendChild(infoDiv);
 
         docItem.addEventListener('click', () => {
             selectDocument(doc);
@@ -254,33 +233,39 @@ function renderDocuments(documents) {
     });
 }
 
-// Obtener icono según la extensión
-function getDocumentIcon(extension) {
-    const iconMap = {
-        'pdf': 'fas fa-file-pdf',
-        'xls': 'fas fa-file-excel',
-        'xlsx': 'fas fa-file-excel',
-        'doc': 'fas fa-file-word',
-        'docx': 'fas fa-file-word',
-        'ppt': 'fas fa-file-powerpoint',
-        'pptx': 'fas fa-file-powerpoint',
-        'txt': 'fas fa-file-alt',
-        'default': 'fas fa-file'
+function getFileTypeInfo(extension) {
+    const ext = extension.toLowerCase().replace('.', '');
+    
+    const types = {
+        'pdf': { className: 'pdf', icon: 'fa-file-pdf' },
+        'xls': { className: 'excel', icon: 'fa-file-excel' },
+        'xlsx': { className: 'excel', icon: 'fa-file-excel' },
+        'doc': { className: 'word', icon: 'fa-file-word' },
+        'docx': { className: 'word', icon: 'fa-file-word' },
+        'ppt': { className: 'powerpoint', icon: 'fa-file-powerpoint' },
+        'pptx': { className: 'powerpoint', icon: 'fa-file-powerpoint' },
+        'txt': { className: 'default', icon: 'fa-file-alt' }
     };
 
-    return iconMap[extension.toLowerCase()] || iconMap.default;
+    return types[ext] || { className: 'default', icon: 'fa-file' };
 }
 
 // Seleccionar documento
 async function selectDocument(doc) {
     try {
         currentDocument = doc;
-        document.getElementById('documentTitle').textContent = doc.name;
+        document.getElementById('docName').textContent = doc.name;
+        
+        const extension = doc.extension.toLowerCase().replace('.', '');
 
-        const extension = doc.extension.toLowerCase();
-        console.log(`[copasst-viewer.js][selectDocument] Documento seleccionado: ${doc.name}, Path: ${doc.path}, Extensión: ${extension}`);
+        document.querySelectorAll('.list-item').forEach(i => i.classList.remove('active'));
+        const activeItem = document.querySelector(`[data-path="${doc.path}"]`);
+        if(activeItem) activeItem.classList.add('active');
 
         showLoading();
+        document.getElementById('emptyState').style.display = 'none';
+        
+        enableDocActions(true);
 
         if (extension === 'pdf') {
             loadPDF(doc.path);
@@ -289,16 +274,7 @@ async function selectDocument(doc) {
         } else if (extension === 'doc' || extension === 'docx') {
             loadWord(doc.path);
         } else {
-            showNotification('Tipo de archivo no soportado para previsualización.', 'warning');
-            hideLoading();
-            const viewerContainer = document.getElementById('viewerContainer');
-            viewerContainer.innerHTML = `
-                <div class="error-message">
-                    <h3>Previsualización no disponible</h3>
-                    <p>La previsualización interna no está disponible para archivos .${extension}.</p>
-                    <p>Puede usar el botón de descarga para abrirlo con la aplicación predeterminada.</p>
-                </div>
-            `;
+            showUnsupportedMessage(extension);
         }
 
     } catch (error) {
@@ -309,68 +285,43 @@ async function selectDocument(doc) {
 
 // Cargar PDF
 async function loadPDF(filePath) {
-    console.log(`[copasst-viewer.js][loadPDF] Solicitando previsualización de PDF para: ${filePath}`);
     try {
-        const result = await callParentAPI('get-pdf-preview', { filePath: filePath }); // Pass filePath in an object
+        const result = await callParentAPI('get-pdf-preview', { filePath: filePath });
         if (result.success) {
-            displayPDF(result.data); // result.data now contains the base64 string
+            displayPDF(result.data);
         } else {
-            showNotification(`Error al previsualizar PDF: ${result.error}`, 'error');
-            hideLoading();
+            showErrorInViewer(`Error al previsualizar PDF: ${result.error}`);
         }
     } catch (error) {
-        showNotification(`Error al cargar PDF: ${error.message}`, 'error');
-        hideLoading();
+        showErrorInViewer(`Error al cargar PDF: ${error.message}`);
     }
 }
 
 // Cargar Excel
 async function loadExcel(filePath) {
-    console.log(`[copasst-viewer.js][loadExcel] Solicitando previsualización de Excel para: ${filePath}`);
     try {
-        const result = await callParentAPI('get-excel-preview', { filePath: filePath }); // Pass filePath in an object
+        const result = await callParentAPI('get-excel-preview', { filePath: filePath });
         if (result.success) {
-            displayPDF(result.data); // get-excel-preview should return base64 PDF data
+            displayPDF(result.data);
         } else {
-            showNotification(`Error al previsualizar Excel: ${result.error}`, 'error');
-            hideLoading();
-            const viewerContainer = document.getElementById('viewerContainer');
-            viewerContainer.innerHTML = `
-                <div class="error-message">
-                    <h3>Previsualización de Excel no disponible</h3>
-                    <p>No se pudo convertir el archivo Excel a PDF para previsualizarlo.</p>
-                    <p>Detalle: ${result.error}</p>
-                </div>
-            `;
+            showErrorInViewer(`Error al previsualizar Excel: ${result.error}`);
         }
     } catch (error) {
-        showNotification(`Error al cargar Excel: ${error.message}`, 'error');
-        hideLoading();
+        showErrorInViewer(`Error al cargar Excel: ${error.message}`);
     }
 }
 
 // Cargar Word
 async function loadWord(filePath) {
-    console.log(`[copasst-viewer.js][loadWord] Solicitando previsualización de Word para: ${filePath}`);
     try {
-        const result = await callParentAPI('get-word-preview', { filePath: filePath }); // Pass filePath in an object
+        const result = await callParentAPI('get-word-preview', { filePath: filePath });
         if (result.success) {
-            displayPDF(result.data); // get-word-preview should return base64 PDF data
+            displayPDF(result.data); 
         } else {
-            showNotification(`Error al previsualizar Word: ${result.error}`, 'error');
-            hideLoading();
-            const viewerContainer = document.getElementById('viewerContainer');
-            viewerContainer.innerHTML = `
-                <div class="error-message">
-                    <h3>Previsualización de Word no disponible</h3>
-                    <p>No se pudo convertir el archivo Word a PDF para previsualizarlo.</p>
-                    <p>Detalle: ${result.error}</p>
-                </div>
-            `;
+            showErrorInViewer(`Error al previsualizar Word: ${result.error}`);
         }
     } catch (error) {
-        showNotification(`Error al cargar Word: ${error.message}`, 'error');
-        hideLoading();
+        showErrorInViewer(`Error al cargar Word: ${error.message}`);
     }
 }
 
@@ -379,76 +330,112 @@ function displayPDF(pdfData) {
     hideLoading();
 
     const viewerContainer = document.getElementById('viewerContainer');
-    viewerContainer.style.display = 'block';
-    // Set initial src without hash, applyZoom will add it
-    viewerContainer.innerHTML = `<iframe class="pdf-viewer" src="data:application/pdf;base64,${pdfData}"></iframe>`;
+    viewerContainer.style.display = 'flex';
+    document.getElementById('toolbar').classList.add('visible');
+    
+    viewerContainer.innerHTML = `<iframe id="docFrame" class="pdf-viewer" src="data:application/pdf;base64,${pdfData}"></iframe>`;
 
-    currentViewer = 'pdf';
-    totalPages = 1;
-    currentPage = 1;
-
-    updatePageInfo();
-
-    // Apply initial settings
-    // Use a small timeout to ensure the iframe is in the DOM before we manipulate its src
-    setTimeout(() => {
-        applyOrientation(); // This will also call applyZoom
-    }, 100);
+    currentZoom = 100;
+    updateZoomDisplay();
 }
 
-// Mostrar Excel
-function displayExcel(excelData) { // excelData is expected to be base64 PDF data
+function showUnsupportedMessage(extension) {
     hideLoading();
-
     const viewerContainer = document.getElementById('viewerContainer');
-    viewerContainer.style.display = 'block';
-    viewerContainer.innerHTML = `<iframe class="excel-viewer" src="data:application/pdf;base64,${excelData}"></iframe>`;
+    viewerContainer.style.display = 'flex';
+    document.getElementById('toolbar').classList.remove('visible');
 
-    currentViewer = 'excel';
-    totalPages = 1;
-    currentPage = 1;
-
-    updatePageInfo();
+    viewerContainer.innerHTML = `
+        <div class="error-message">
+            <h3>Previsualización no disponible</h3>
+            <p>La previsualización interna no está disponible para archivos .${extension}.</p>
+            <p>Puede usar el botón de descarga en la barra superior para abrirlo externamente.</p>
+        </div>
+    `;
 }
 
-// Actualizar estado del botón de subir nivel
-function updateUpLevelButton() {
-    const upLevelBtn = document.getElementById('upLevelBtn');
-    if (upLevelBtn) {
-        upLevelBtn.disabled = pathHistory.length === 0;
+function showErrorInViewer(message) {
+    hideLoading();
+    const viewerContainer = document.getElementById('viewerContainer');
+    viewerContainer.style.display = 'flex';
+    document.getElementById('toolbar').classList.remove('visible');
+
+    viewerContainer.innerHTML = `
+        <div class="error-message">
+            <h3 style="color:var(--danger)">Error de Carga</h3>
+            <p>${message}</p>
+        </div>
+    `;
+}
+
+function closeDocument() {
+    currentDocument = null;
+    
+    document.getElementById('emptyState').style.display = 'block';
+    document.getElementById('viewerContainer').style.display = 'none';
+    document.getElementById('toolbar').classList.remove('visible');
+    document.getElementById('viewerContainer').innerHTML = '';
+    
+    enableDocActions(false);
+    
+    document.querySelectorAll('.list-item').forEach(i => i.classList.remove('active'));
+}
+
+function enableDocActions(enable) {
+    const btns = ['closeDocBtn', 'downloadBtn', 'printBtn'];
+    btns.forEach(id => {
+        const btn = document.getElementById(id);
+        if(btn) {
+            btn.disabled = !enable;
+            btn.style.opacity = enable ? '1' : '0.3';
+            btn.style.cursor = enable ? 'pointer' : 'not-allowed';
+        }
+    });
+}
+
+function updateNavigationState() {
+    const backBtn = document.getElementById('goBackBtn');
+    if (backBtn) {
+        backBtn.disabled = pathHistory.length === 0;
+        backBtn.style.opacity = backBtn.disabled ? '0.5' : '1';
+        backBtn.style.cursor = backBtn.disabled ? 'not-allowed' : 'pointer';
+    }
+
+    const breadcrumb = document.getElementById('breadcrumb');
+    let bcHTML = `<div class="crumb-item" onclick="resetToRoot()"><i class="fas fa-hdd"></i> Raíz</div>`;
+    
+    if (pathHistory.length > 0) {
+        const currentFolderName = currentFolderPath.split('\\').pop().split('/').pop(); 
+        bcHTML += `<div class="crumb-separator"><i class="fas fa-chevron-right"></i></div>`;
+        bcHTML += `<div class="crumb-item">${currentFolderName}</div>`;
+    }
+    
+    breadcrumb.innerHTML = bcHTML;
+}
+
+async function resetToRoot() {
+    if (pathHistory.length > 0) {
+        loadFolders(); 
     }
 }
 
-// Subir un nivel en la jerarquía de carpetas
 async function goUpLevel() {
     if (pathHistory.length > 0) {
-        try {
-            const previousPath = pathHistory.pop();
-            if (previousPath) {
-                await selectFolder(previousPath);
-                updateUpLevelButton(); // Actualizar estado del botón
-            }
-        } catch (error) {
-            showNotification('Error al subir de nivel', 'error');
-            console.error('Error en goUpLevel:', error);
-        }
+        const previousPath = pathHistory.pop();
+        await selectFolder(previousPath);
+        updateNavigationState();
     }
 }
 
-// Actualizar información de página
-function updatePageInfo() {
-    // No se implementa en este caso ya que no se usan controles de página
-}
-
-// --- Funciones de utilidad ---
-
+// Utilidades
 function showLoading() {
-    document.getElementById('loadingDiv').style.display = 'flex';
-    document.getElementById('viewerContainer').style.display = 'none';
+    const overlay = document.getElementById('loadingOverlay');
+    if(overlay) overlay.classList.add('active');
 }
 
 function hideLoading() {
-    document.getElementById('loadingDiv').style.display = 'none';
+    const overlay = document.getElementById('loadingOverlay');
+    if(overlay) overlay.classList.remove('active');
 }
 
 function showNotification(message, type = 'success') {
@@ -458,7 +445,13 @@ function showNotification(message, type = 'success') {
 
     messageDiv.textContent = message;
     notification.className = `notification ${type}`;
-    icon.className = `notification-icon fas ${getNotificationIcon(type)}`;
+    
+    let iconClass = 'fa-info-circle';
+    if(type === 'success') iconClass = 'fa-check-circle';
+    if(type === 'error') iconClass = 'fa-times-circle';
+    if(type === 'warning') iconClass = 'fa-exclamation-triangle';
+    
+    icon.className = `notification-icon fas ${iconClass}`;
 
     notification.classList.add('show');
     setTimeout(() => {
@@ -466,23 +459,13 @@ function showNotification(message, type = 'success') {
     }, 3000);
 }
 
-function getNotificationIcon(type) {
-    switch (type) {
-        case 'success': return 'fa-check-circle';
-        case 'error': return 'fa-times-circle';
-        case 'warning': return 'fa-exclamation-triangle';
-        default: return 'fa-info-circle';
-    }
-}
-
 async function downloadDocument() {
     if (currentDocument) {
         try {
-            showNotification('Preparando descarga...');
+            showNotification('Preparando descarga...', 'info');
             const result = await callParentAPI('download-document', currentDocument.path);
 
             if (result.success) {
-                // Crear un blob a partir de los datos base64
                 const binaryData = atob(result.base64Data);
                 const bytes = new Uint8Array(binaryData.length);
                 for (let i = 0; i < binaryData.length; i++) {
@@ -492,140 +475,102 @@ async function downloadDocument() {
                 const blob = new Blob([bytes], { type: 'application/octet-stream' });
                 const url = URL.createObjectURL(blob);
 
-                // Crear un enlace de descarga
                 const link = document.createElement('a');
                 link.href = url;
                 link.download = result.fileName;
                 document.body.appendChild(link);
                 link.click();
 
-                // Limpiar
                 document.body.removeChild(link);
                 URL.revokeObjectURL(url);
 
-                showNotification('Documento descargado exitosamente.', 'success');
+                showNotification('Descarga completada', 'success');
             } else {
-                showNotification(`Error en la descarga: ${result.error}`, 'error');
+                showNotification(`Error: ${result.error}`, 'error');
             }
         } catch (error) {
-            showNotification(`Error en la descarga: ${error.message}`, 'error');
+            showNotification(`Error: ${error.message}`, 'error');
         }
+    }
+}
+
+function printDocument() {
+    if (!currentDocument) return;
+    
+    const iframe = document.getElementById('docFrame');
+    if (iframe && iframe.contentWindow) {
+        iframe.contentWindow.print();
     } else {
-        showNotification('No hay documento seleccionado', 'warning');
+        printConvertedDocument(currentDocument.path, currentDocument.extension);
+    }
+}
+
+async function printConvertedDocument(filePath, extension) {
+    try {
+        showNotification('Preparando impresión...', 'info');
+        let result = await callParentAPI('get-pdf-preview', { filePath: filePath }); 
+        
+        const ext = extension.toLowerCase();
+        if(ext.includes('xls')) result = await callParentAPI('get-excel-preview', { filePath });
+        if(ext.includes('doc')) result = await callParentAPI('get-word-preview', { filePath });
+
+        if (result.success) {
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(
+                `<html>
+                    <body style="margin:0;">
+                        <iframe src="data:application/pdf;base64,${result.data}"
+                                style="width:100%; height:100vh; border:none;"
+                                onload="window.print(); window.onafterprint = function() { window.close(); }">
+                        </iframe>
+                    </body>
+                </html>`
+            );
+            printWindow.document.close();
+        }
+    } catch (error) {
+        showNotification('Error al imprimir', 'error');
+    }
+}
+
+function zoomIn() {
+    currentZoom += 10;
+    applyZoom();
+}
+
+function zoomOut() {
+    if (currentZoom > 20) {
+        currentZoom -= 10;
+        applyZoom();
+    }
+}
+
+function fitWidth() {
+    currentZoom = 'width'; 
+    applyZoom();
+}
+
+function updateZoomDisplay() {
+    const display = document.getElementById('zoomLevelDisplay');
+    if(display) {
+        display.innerText = (currentZoom === 'width') ? 'Ancho' : `${currentZoom}%`;
     }
 }
 
 function applyZoom() {
-    const iframe = document.querySelector('.pdf-viewer');
+    const iframe = document.getElementById('docFrame');
     if (!iframe) return;
 
-    let src = iframe.src.split('#')[0]; // Get base src without any hash
+    updateZoomDisplay();
+
+    let src = iframe.src.split('#')[0]; 
     let zoomParam = '';
 
-    switch (currentZoom) {
-        case 'page-width':
-            zoomParam = '#view=FitH'; // Fit horizontally
-            break;
-        case 'page-height':
-            zoomParam = '#view=FitV'; // Fit vertically
-            break;
-        case 'auto':
-            zoomParam = '#view=Fit'; // Fit whole page
-            break;
-        default: // For percentage values like "50%", "100%"
-            const percent = parseInt(currentZoom, 10);
-            if (!isNaN(percent)) {
-                zoomParam = `#zoom=${percent}`;
-            } else {
-                zoomParam = '#view=Fit';
-            }
-            break;
+    if (currentZoom === 'width') {
+        zoomParam = '#view=FitH';
+    } else {
+        zoomParam = `#zoom=${currentZoom}`;
     }
-
-    console.log(`Applying zoom: ${zoomParam}`);
+    
     iframe.src = src + zoomParam;
-}
-
-function applyOrientation() {
-    // Link orientation to a zoom level for simplicity
-    if (currentOrientation === 'horizontal') {
-        document.getElementById('zoomLevel').value = 'page-width';
-        currentZoom = 'page-width';
-    } else {
-        document.getElementById('zoomLevel').value = 'auto';
-        currentZoom = 'auto';
-    }
-    applyZoom();
-}
-
-function formatFileSize(bytes) {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-// Función para imprimir el documento
-function printDocument() {
-    if (currentDocument) {
-        const extension = currentDocument.extension.toLowerCase();
-
-        if (extension === 'pdf') {
-            // Para PDFs, intentamos imprimir directamente el iframe
-            const iframe = document.querySelector('.pdf-viewer');
-            if (iframe && iframe.contentWindow) {
-                iframe.contentWindow.print();
-            } else {
-                showNotification('No se puede imprimir el PDF en este momento', 'warning');
-            }
-        } else if (extension === 'doc' || extension === 'docx' || extension === 'xls' || extension === 'xlsx') {
-            // Para Word y Excel, primero convertimos a PDF y luego imprimimos
-            printConvertedDocument(currentDocument.path, extension);
-        } else {
-            // Para otros tipos de archivos, abrir con la aplicación predeterminada y dejar que el usuario imprima desde allí
-            callParentAPI('open-path', currentDocument.path)
-                .then(() => showNotification('Documento abierto en aplicación predeterminada', 'info'))
-                .catch(err => showNotification(`Error al abrir documento: ${err.message}`, 'error'));
-        }
-    } else {
-        showNotification('No hay documento seleccionado', 'warning');
-    }
-}
-
-// Función para imprimir documentos que necesitan conversión
-async function printConvertedDocument(filePath, extension) {
-    try {
-        showNotification('Preparando impresión...');
-
-        let result;
-        if (extension === 'doc' || extension === 'docx') {
-            result = await callParentAPI('get-word-preview', { filePath: filePath });
-        } else if (extension === 'xls' || extension === 'xlsx') {
-            result = await callParentAPI('get-excel-preview', { filePath: filePath });
-        }
-
-        if (result.success) {
-            // Crear un iframe temporal con el PDF base64 para imprimirlo
-            const printWindow = window.open('', '_blank');
-            printWindow.document.write(`
-                <html>
-                    <head>
-                        <title>Imprimir Documento</title>
-                    </head>
-                    <body style="margin: 0; padding: 0;">
-                        <iframe src="data:application/pdf;base64,${result.data}"
-                                style="width: 100%; height: 100vh; border: none;"
-                                onload="window.print(); window.onafterprint = function() { window.close(); }">
-                        </iframe>
-                    </body>
-                </html>
-            `);
-            printWindow.document.close();
-        } else {
-            showNotification(`Error al preparar documento para impresión: ${result.error}`, 'error');
-        }
-    } catch (error) {
-        showNotification(`Error al imprimir documento: ${error.message}`, 'error');
-    }
 }

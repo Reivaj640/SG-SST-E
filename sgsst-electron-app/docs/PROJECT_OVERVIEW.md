@@ -170,6 +170,8 @@ El Sistema de Gestión de Seguridad y Salud en el Trabajo (SG-SST) es una aplica
 - [Escenarios Normativos](escenarios-normativos.md) - Tipos y categorías de escenarios
 - [Flujo de Creación de Empresa](flujo-creacion-empresa.md) - Proceso de registro
 - [Sistema de Renderizado](renderer.md) - Mecanismo de renderizado dinámico
+- [Actualización de Interfaz: 1.1.1](ui-update-responsable-sg.md) - Detalles del nuevo Sistema de Diseño K+AIR
+- [Actualización de Interfaz: 1.1.2](ui-update-roles-responsabilidades.md) - Detalles de migración para Roles y Responsabilidades
 - [Mantenimiento de Documentación](mantenimiento-documentacion.md) - Guía para mantener la documentación actualizada
 
 ## ⚠️ Reglas de Cambio
