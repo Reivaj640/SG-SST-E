@@ -994,7 +994,118 @@ ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacita
   }
 });
 
-ipcMain.handle('init-excel', async (event, { filePath, sheetName: requestedSheetName }) => {
+  // --- Handler para duplicar hoja de capacitaciones (Nuevo Periodo) ---
+  ipcMain.handle('duplicate-capacitaciones-sheet', async (event, { filePath, currentSheetName, newYear }) => {
+    console.log(`[MAIN] Duplicando hoja de capacitaciones. Archivo: ${filePath}, Origen: ${currentSheetName}, Nuevo Año: ${newYear}`);
+    try {
+      // Verificar que el archivo exista
+      try {
+        await fsp.access(filePath);
+      } catch (error) {
+        return { success: false, error: 'El archivo no existe' };
+      }
+
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.readFile(filePath);
+
+      const sourceSheet = workbook.getWorksheet(currentSheetName);
+      if (!sourceSheet) {
+        return { success: false, error: `No se encontró la hoja origen: ${currentSheetName}` };
+      }
+
+      // Determinar nombre de la nueva hoja
+      // Intentar mantener el formato "Matriz Cap. YYYY"
+      let newSheetName = `Matriz Cap. ${newYear}`;
+      
+      // Si el nombre origen no sigue el patrón estándar, intentar adaptarlo o usar el estándar
+      if (!currentSheetName.includes('Matriz Cap.')) {
+          // Si tiene el año viejo, reemplazarlo
+          const sourceYearMatch = currentSheetName.match(/\d{4}/);
+          if (sourceYearMatch) {
+              newSheetName = currentSheetName.replace(sourceYearMatch[0], newYear);
+          }
+      }
+
+      if (workbook.getWorksheet(newSheetName)) {
+        return { success: false, error: `La hoja destino ya existe: ${newSheetName}` };
+      }
+
+      // Crear la nueva hoja
+      const newSheet = workbook.addWorksheet(newSheetName);
+
+      console.log(`[MAIN] Copiando contenido de ${currentSheetName} a ${newSheetName}...`);
+
+      // Copiar configuración de página y vistas
+      newSheet.pageSetup = sourceSheet.pageSetup;
+      newSheet.views = sourceSheet.views;
+      
+      // Copiar columnas (ancho, etc)
+      if (sourceSheet.columns) {
+          newSheet.columns = sourceSheet.columns.map(col => ({ ...col }));
+      }
+
+      // Copiar filas y celdas
+      sourceSheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+        const newRow = newSheet.getRow(rowNumber);
+        
+        // Copiar altura de fila
+        if (row.height) newRow.height = row.height;
+        
+        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+          const newCell = newRow.getCell(colNumber);
+          newCell.value = cell.value;
+          newCell.style = JSON.parse(JSON.stringify(cell.style)); // Copia profunda de estilos
+          
+          // Clonar datos pero LIMPIAR información de ejecución para el nuevo año
+          // Suponiendo que las filas de datos empiezan en la fila 7 (según update-capacitaciones-excel startRow=7)
+          if (rowNumber >= 7) {
+              // Columna D (4): Fecha Programada -> Limpiar o poner fecha futura tentativa? Mejor limpiar.
+              // Columna I (9): Estado -> Resetear a pendiente
+              
+              if (colNumber === 4) { // Fecha
+                  // newCell.value = 'No especificada'; // O dejar vacío
+                  // Si queremos mantener la estructura pero sin fechas viejas:
+                  newCell.value = null; 
+              }
+              if (colNumber === 9) { // Estado (columna I)
+                  // Resetear visualmente si hay texto
+                  if (typeof newCell.value === 'string') {
+                      newCell.value = 'Pendiente'; // O valor por defecto
+                  }
+              }
+              // Columna de Ejecutado/Realizado si existe (asumimos lógica genérica de limpieza)
+          }
+        });
+        newRow.commit();
+      });
+
+      // Copiar celdas combinadas (Merges)
+      // ExcelJS no itera merges fácilmente, hay que acceder a `model` o `_merges` (interno) o iterar.
+      // Una forma segura es ver las celdas maestras de los merges.
+      // Nota: model.merges devuelve rangos ['A1:B2', ...]
+      if (sourceSheet.model && sourceSheet.model.merges) {
+          sourceSheet.model.merges.forEach(mergeRange => {
+              try {
+                  newSheet.mergeCells(mergeRange);
+              } catch (e) {
+                  console.warn(`[MAIN] No se pudo fusionar celdas ${mergeRange} en nueva hoja: ${e.message}`);
+              }
+          });
+      }
+
+      // Guardar archivo
+      await workbook.xlsx.writeFile(filePath);
+      console.log(`[MAIN] Hoja duplicada exitosamente: ${newSheetName}`);
+
+      return { success: true, newSheetName };
+
+    } catch (error) {
+      console.error('[MAIN] Error crítico al duplicar hoja:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('init-excel', async (event, { filePath, sheetName: requestedSheetName }) => {
   try {
     sendLog(`[MAIN] Inicializando archivo Excel: ${filePath}`, 'INFO');
     if (requestedSheetName) {

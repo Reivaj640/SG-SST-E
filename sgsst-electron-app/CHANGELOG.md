@@ -5,17 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.39] - 2026-01-21
 
 ### Added
-- Sistema de documentación automática con JSDoc
-- Configuración para generación automática de documentación
-- Documentación funcional en /docs
-- Scripts para generación y monitoreo de documentación
+- Estandarización de patrones de comunicación entre Iframes y Renderer (`-request` / `-response`).
+- Nueva petición `duplicate-budget-file-request` en el sistema de renderizado.
 
-### Changed
-- Estructura del proyecto para incluir documentación
-- Configuración de desarrollo para soportar documentación automática
+### Fixed
+- Corrección del módulo **Plan de Trabajo Anual** (2.4.1):
+  - Solucionado error que bloqueaba la clonación de planes de trabajo.
+  - Eliminado uso de `prompt()` (incompatible con Electron/Iframe) por `confirm()`.
+  - Automatización del cálculo del año siguiente para nuevos periodos.
+  - Sincronización de tipos de mensajes entre `plan-viewer.js` y `renderer.js`.
 
 ## [0.1.38] - 2025-01-08
 

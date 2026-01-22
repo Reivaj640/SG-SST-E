@@ -1,3 +1,19 @@
+--- Log del 21 de enero de 2026 ---
+
+**Resumen del Proyecto SG-SST-E:**
+
+- **Objetivo:** Solucionar fallo crítico en la clonación de planes de trabajo en el módulo "Gestión Integral" (2.4.1).
+- **Diagnóstico:** 
+    1. El uso de `prompt()` en el iframe del visor (`plan-viewer.js`) bloqueaba la ejecución en Electron, impidiendo que el proceso continuara.
+    2. Existía una discrepancia en los tipos de mensajes entre el visor y el renderer principal. El visor enviaba `duplicate-budget-file-request` pero el renderer esperaba `duplicate-budget-file`.
+- **Solución Quirúrgica:**
+    1. **Plan Viewer:** Se reemplazó `prompt()` por `confirm()` para validación de usuario. Se automatizó el cálculo del año destino (Año Origen + 1) siguiendo el patrón exitoso del módulo de Presupuesto (1.1.3).
+    2. **Estandarización de Comunicación:** Se actualizó `renderer.js` para adoptar el patrón de sufijos `-request` y `-response`. Ahora el renderer escucha `duplicate-budget-file-request` y responde con `duplicate-budget-file-response`.
+    3. **Resiliencia:** Se mejoró la lógica de detección de años en nombres de archivo para asegurar que la clonación siempre tenga un origen válido.
+- **Resultado:** Funcionalidad de clonación operativa y comunicación entre procesos estandarizada según las mejores prácticas del proyecto.
+
+---
+
 Fecha: 21 de octubre de 2025
 
 Feature: Implementación de Sidebar Colapsable

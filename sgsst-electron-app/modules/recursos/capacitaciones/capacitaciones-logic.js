@@ -169,27 +169,43 @@ class CapacitacionesComponent {
         console.log('📁 [DEBUG] Ruta del archivo Excel:', this.excelFilePath);
 
         try {
-            // Obtener la hoja actual para determinar el año actual
-            const currentSheet = this.availableSheets.find(s => s.includes(this.currentYear.toString()));
+            // 1. Detectar todos los años disponibles en las hojas
+            const availableYears = this.availableSheets
+                .map(sheetName => {
+                    const match = sheetName.match(/\d{4}/);
+                    return match ? parseInt(match[0]) : null;
+                })
+                .filter(y => y !== null && !isNaN(y))
+                .sort((a, b) => b - a); // Ordenar descendente (el más reciente primero)
 
-            if (!currentSheet) {
-                console.log('⚠️ [DEBUG] No se encontró la hoja actual para el año', this.currentYear);
-                this.showNotification(`No se encontró la hoja actual para el año ${this.currentYear}.`, 'warning');
+            if (availableYears.length === 0) {
+                this.showNotification('No se detectaron años en las hojas existentes para tomar como base.', 'warning');
                 return;
             }
 
-            // Extraer el año actual del nombre de la hoja
-            const currentYearMatch = currentSheet.match(/\d{4}/);
-            if (!currentYearMatch) {
-                console.log('❌ [DEBUG] No se pudo encontrar un año válido en el nombre de la hoja actual:', currentSheet);
-                throw new Error(`No se pudo encontrar un año válido en el nombre de la hoja actual: ${currentSheet}`);
+            // 2. Determinar el año base (el más reciente disponible)
+            const latestYear = availableYears[0];
+            const nextYear = latestYear + 1;
+
+            // 3. Encontrar la hoja correspondiente al año base
+            const baseSheet = this.availableSheets.find(s => s.includes(latestYear.toString()));
+
+            if (!baseSheet) {
+                this.showNotification(`Error interno: No se encontró la hoja base para el año ${latestYear}.`, 'danger');
+                return;
             }
 
-            const currentYear = parseInt(currentYearMatch[0]);
-            const nextYear = currentYear + 1;
+            console.log(`[DEBUG] Año base detectado: ${latestYear} (Hoja: ${baseSheet}) -> Nuevo año objetivo: ${nextYear}`);
 
-            // Confirmar con el usuario antes de crear el nuevo periodo
-            const confirmMessage = `¿Está seguro de que desea crear un nuevo periodo para el año ${nextYear} basado en "${currentSheet}"?`;
+            // 4. Validar si el año destino ya existe
+            if (availableYears.includes(nextYear)) {
+                this.showNotification(`El periodo para el año ${nextYear} ya existe.`, 'warning');
+                return;
+            }
+
+            // 5. Confirmar con el usuario
+            const confirmMessage = `Se detectó que el último periodo disponible es ${latestYear}.\n\n¿Desea crear un nuevo Plan de Capacitación para el año ${nextYear} basado en la hoja "${baseSheet}"?`;
+            
             if (!confirm(confirmMessage)) {
                 console.log('❌ [DEBUG] Usuario canceló la creación del nuevo periodo');
                 return;
@@ -198,102 +214,45 @@ class CapacitacionesComponent {
             this.showNotification(`Creando nuevo periodo para el año ${nextYear}...`, 'info');
             console.log('🔄 [DEBUG] Llamando a la API para duplicar la hoja para el año', nextYear);
 
-            // Llamar a la API para duplicar la hoja - pasar la información necesaria en el formato correcto
+            // Llamar a la API para duplicar la hoja
             const result = await window.electronAPI.duplicateCapacitacionesSheet({
                 filePath: this.excelFilePath,
-                currentSheetName: currentSheet,
+                currentSheetName: baseSheet, // Usamos la hoja del año más reciente como fuente
                 newYear: nextYear
             });
 
             console.log('📥 [DEBUG] Resultado de la API:', result);
 
-            // Verificar que result no sea undefined ni null
-            if (typeof result === 'undefined' || result === null) {
-                console.log('❌ [DEBUG] La respuesta de la API es indefinida o nula');
-                throw new Error('La respuesta de la API es indefinida o nula');
-            }
-
-            // Verificar que result.success exista y sea verdadero
-            if (!Object.prototype.hasOwnProperty.call(result, 'success') || !result.success) {
-                const errorMessage = Object.prototype.hasOwnProperty.call(result, 'error') ? result.error : 'Error desconocido al duplicar la hoja';
-                console.log('❌ [DEBUG] Resultado no exitoso:', errorMessage);
+            if (!result || !result.success) {
+                const errorMessage = result?.error || 'Error desconocido al duplicar la hoja';
                 throw new Error(errorMessage);
-            }
-
-            // Verificar que result.newSheetName exista y no sea undefined
-            if (!Object.prototype.hasOwnProperty.call(result, 'newSheetName') || typeof result.newSheetName === 'undefined' || result.newSheetName === null) {
-                console.log('❌ [DEBUG] La respuesta no contiene el nombre de la nueva hoja');
-                throw new Error('La respuesta no contiene el nombre de la nueva hoja');
             }
 
             console.log('✅ [DEBUG] Hoja creada exitosamente:', result.newSheetName);
             this.showNotification(`Se ha creado la hoja '${result.newSheetName}' exitosamente.`, 'success');
 
-            // Actualizar la lista de hojas disponibles para asegurar que contenga la nueva hoja
-            // Usar un enfoque más directo para evitar posibles conflictos
-            console.log('🔄 [DEBUG] Obteniendo lista actualizada de hojas...');
+            // Actualizar la lista de hojas disponibles
             const sheetsResult = await window.electronAPI.getCapacitacionesSheets(this.excelFilePath);
-            console.log('📥 [DEBUG] Resultado de getCapacitacionesSheets:', sheetsResult);
-
-            if (sheetsResult && Object.prototype.hasOwnProperty.call(sheetsResult, 'success') &&
-                sheetsResult.success && Object.prototype.hasOwnProperty.call(sheetsResult, 'sheets') &&
-                sheetsResult.sheets && Array.isArray(sheetsResult.sheets)) {
-                console.log('📋 [DEBUG] Actualizando availableSheets:', sheetsResult.sheets);
+            if (sheetsResult && sheetsResult.success && sheetsResult.sheets) {
                 this.availableSheets = sheetsResult.sheets.filter(sheet => sheet && typeof sheet === 'string');
-                console.log('📋 [DEBUG] availableSheets filtrado:', this.availableSheets);
+                // Actualizar el filtro de años en la UI
+                await this._populateYearFilterFromSheets();
             }
 
-            // Extraer el año del nombre de la hoja con manejo de errores
-            const yearMatch = result.newSheetName.match(/\d{4}/);
-            console.log('📅 [DEBUG] Coincidencia de año en el nombre de la hoja:', yearMatch);
-
-            if (!yearMatch) {
-                console.log('❌ [DEBUG] No se pudo encontrar un año válido en el nombre de la hoja:', result.newSheetName);
-                throw new Error(`No se pudo encontrar un año válido en el nombre de la hoja: ${result.newSheetName}`);
+            // Seleccionar automáticamente el nuevo año
+            const yearFilter = document.getElementById('yearFilter');
+            if (yearFilter) {
+                yearFilter.value = nextYear;
+                // Disparar el evento de cambio para cargar los datos
+                yearFilter.dispatchEvent(new Event('change'));
+            } else {
+                // Fallback si no hay selector
+                this.loadDataForYear(nextYear);
             }
-
-            const newSheetYear = parseInt(yearMatch[0]);
-            console.log('📅 [DEBUG] Año extraído:', newSheetYear);
-
-            // Verificar que newSheetYear sea un número válido antes de continuar
-            if (isNaN(newSheetYear) || newSheetYear === null || newSheetYear === undefined) {
-                console.log('❌ [DEBUG] No se pudo extraer un año válido del nombre de la nueva hoja:', result.newSheetName);
-                throw new Error(`No se pudo extraer un año válido del nombre de la nueva hoja: ${result.newSheetName}`);
-            }
-
-            // Cargar datos para el nuevo año después de un breve retraso
-            // para asegurar que la nueva hoja esté disponible
-            console.log('⏳ [DEBUG] Programando carga de datos para el año', newSheetYear, 'en 2 segundos...');
-            setTimeout(() => {
-                console.log('🔄 [DEBUG] Ejecutando carga de datos para el año', newSheetYear);
-                // Verificar que el componente aún exista antes de llamar a loadDataForYear
-                if (this && typeof this.loadDataForYear === 'function') {
-                    console.log('✅ [DEBUG] Llamando a loadDataForYear con año:', newSheetYear);
-                    try {
-                        this.loadDataForYear(newSheetYear);
-                    } catch (loadError) {
-                        console.error('❌ [ERROR] Error al cargar datos para el nuevo año:', loadError);
-                        this.showNotification(`Error al cargar datos para el año ${newSheetYear}: ${loadError.message}`, 'danger');
-                    }
-                } else {
-                    console.error('❌ [ERROR] El componente o la función loadDataForYear no existen');
-                }
-            }, 2000); // Aumenté aún más el tiempo para mayor seguridad
-
-            console.log('✅ [DEBUG] Proceso de creación de nuevo periodo completado exitosamente');
 
         } catch (error) {
             console.error('💥 [ERROR] Error completo al crear nuevo periodo:', error);
-            console.error('📝 [ERROR] Mensaje del error:', error.message);
-            console.error('📝 [ERROR] Stack del error:', error.stack);
-
-            // Verificar si el error está relacionado con el acceso a propiedades
-            if (error.message && error.message.includes('Cannot read properties of undefined')) {
-                console.error('🚨 [ERROR] Error específico de propiedad indefinida detectado');
-                this.showNotification('Error interno: Problema con la estructura de datos. Por favor, recargue la aplicación.', 'danger');
-            } else {
-                this.showNotification(`Error al crear nuevo periodo: ${error.message || error}`, 'danger');
-            }
+            this.showNotification(`Error al crear nuevo periodo: ${error.message || error}`, 'danger');
         }
     }
 
