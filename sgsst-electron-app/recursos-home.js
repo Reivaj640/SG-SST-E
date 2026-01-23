@@ -5,7 +5,7 @@ class RecursosHome {
         this.submodules = submodules;
         this.currentCompany = null;
         this.budgetData = null;
-        this.chartInstance = null;
+        this.charts = {}; // Almacenar instancias de Chart.js
     }
 
     getCurrentCompany() {
@@ -66,8 +66,8 @@ class RecursosHome {
         layout.appendChild(contentContainer);
         this.container.appendChild(layout);
 
-        // Inicializar gráfico
-        setTimeout(() => this.initChart(), 100);
+        // Inicializar gráficos
+        setTimeout(() => this.initCharts(), 100);
     }
 
     injectStyles() {
@@ -358,6 +358,38 @@ class RecursosHome {
                 grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
                 gap: 1.5rem;
             }
+
+            /* Layout Grid para los Gráficos */
+            .charts-grid {
+                display: grid;
+                grid-template-columns: 2fr 1fr; /* 2/3 para Presupuesto, 1/3 para los otros apilados */
+                grid-template-rows: auto auto;
+                gap: 1.5rem;
+                margin-bottom: 2rem;
+            }
+
+            .chart-card {
+                background: var(--k-bg-card);
+                border: 1px solid var(--k-border);
+                border-radius: var(--k-radius-lg);
+                padding: 1.5rem;
+                box-shadow: var(--k-shadow-sm);
+            }
+
+            /* El gráfico grande ocupa toda la primera fila si es desktop */
+            .chart-card.budget-chart { grid-column: 1 / -1; }
+
+            .chart-title {
+                font-size: 1.1rem; font-weight: 600; color: var(--k-text-main);
+                margin-bottom: 1rem; display: flex; justify-content: space-between;
+            }
+
+            .canvas-container { position: relative; height: 250px; }
+
+            @media (max-width: 992px) {
+                .charts-grid { grid-template-columns: 1fr; }
+                .chart-card.budget-chart { grid-column: auto; }
+            }
         `;
         document.head.appendChild(style);
     }
@@ -366,10 +398,10 @@ class RecursosHome {
         const widgetsContainer = document.createElement('div');
         widgetsContainer.className = 'widgets-container';
 
-        // Widgets Simples
-        widgetsContainer.appendChild(this.createWidget('Personal Asignado', '42', '↗ 2 nuevos este mes'));
-        widgetsContainer.appendChild(this.createWidget('Capacitaciones', '18', '📅 3 programadas'));
-        widgetsContainer.appendChild(this.createWidget('EPPs Entregados', '120', '📦 15 por entregar'));
+        // Widgets Simples (Actualizados)
+        widgetsContainer.appendChild(this.createWidget('Inducciones', '124 / 150', '⚠️ 26 Pendientes (Crítico)'));
+        widgetsContainer.appendChild(this.createWidget('Capacitaciones', '82%', '✔ Al cumplimiento normativo'));
+        widgetsContainer.appendChild(this.createWidget('EPPs Entregados', '1,020', 'Stock actual óptimo'));
 
         // Widget de Presupuesto (MODERNIZADO)
         const budgetWidget = await this.createBudgetWidget();
@@ -377,19 +409,47 @@ class RecursosHome {
 
         container.appendChild(widgetsContainer);
 
-        const contentGrid = document.createElement('div');
-        contentGrid.className = 'content-grid';
+        // Contenedor para gráficos
+        const chartsGrid = document.createElement('div');
+        chartsGrid.className = 'charts-grid';
 
-        // Gráfico
-        const chartContainer = document.createElement('div');
-        chartContainer.className = 'chart-container';
-        chartContainer.innerHTML = `
-            <h3>Distribución de Personal por Área</h3>
-            <div style="flex:1; position: relative; min-height: 250px;">
-                <canvas id="distributionChart"></canvas>
+        // Gráfico Principal: Ejecución Presupuestal
+        const budgetChartCard = document.createElement('div');
+        budgetChartCard.className = 'chart-card budget-chart';
+        budgetChartCard.innerHTML = `
+            <div class="chart-title">
+                <span>Ejecución Presupuestal (Acumulada)</span>
+                <i class="bi bi-bar-chart-line" style="color: var(--k-primary);"></i>
             </div>
+            <div class="canvas-container"><canvas id="budgetChart"></canvas></div>
         `;
-        contentGrid.appendChild(chartContainer);
+        chartsGrid.appendChild(budgetChartCard);
+
+        // Gráfico 2: Capacitaciones Mensuales
+        const trainingChartCard = document.createElement('div');
+        trainingChartCard.className = 'chart-card';
+        trainingChartCard.innerHTML = `
+            <div class="chart-title">
+                <span>Capacitaciones Mensuales</span>
+                <i class="bi bi-mortarboard" style="color: var(--k-primary);"></i>
+            </div>
+            <div class="canvas-container"><canvas id="trainingChart"></canvas></div>
+        `;
+        chartsGrid.appendChild(trainingChartCard);
+
+        // Gráfico 3: Inducciones Anuales
+        const inductionChartCard = document.createElement('div');
+        inductionChartCard.className = 'chart-card';
+        inductionChartCard.innerHTML = `
+            <div class="chart-title">
+                <span>Inducciones Anuales</span>
+                <i class="bi bi-person-check" style="color: var(--k-primary);"></i>
+            </div>
+            <div class="canvas-container"><canvas id="inductionChart"></canvas></div>
+        `;
+        chartsGrid.appendChild(inductionChartCard);
+
+        container.appendChild(chartsGrid);
 
         // Lista Submódulos
         const submodulesContainer = document.createElement('div');
@@ -403,12 +463,7 @@ class RecursosHome {
             submodulesList.appendChild(item);
         });
         submodulesContainer.appendChild(submodulesList);
-        contentGrid.appendChild(submodulesContainer);
-
-        container.appendChild(contentGrid);
-
-        // Inicializar gráfico
-        setTimeout(() => this.initChart(), 100);
+        container.appendChild(submodulesContainer);
     }
 
     // =========================================
@@ -619,30 +674,104 @@ class RecursosHome {
         return item;
     }
 
-    initChart() {
-        const ctx = document.getElementById('distributionChart');
-        if(!ctx || typeof Chart === 'undefined') return;
-
-        if(this.chartInstance) {
-            try { this.chartInstance.destroy(); } catch(e){}
+    // --- CHART INITIALIZATION ---
+    initCharts() {
+        // Configuración Global
+        if (typeof Chart !== 'undefined') {
+            Chart.defaults.font.family = "'Segoe UI', sans-serif";
+            Chart.defaults.color = '#6c757d';
         }
 
-        this.chartInstance = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Operaciones', 'Administración', 'Mantenimiento', 'Seguridad'],
-                datasets: [{
-                    data: [40, 20, 20, 20],
-                    backgroundColor: ['#174ea6', '#28a745', '#ffc107', '#dc3545'],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { position: 'right' } }
-            }
-        });
+        // 1. Budget Chart (Line: Planned vs Real)
+        const ctxBudget = document.getElementById('budgetChart');
+        if(ctxBudget && typeof Chart !== 'undefined') {
+            this.charts.budget = new Chart(ctxBudget, {
+                type: 'line',
+                data: {
+                    labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago'],
+                    datasets: [
+                        {
+                            label: 'Planeado (S-Curve)',
+                            data: [5, 12, 20, 28, 35, 42, 50, 58],
+                            borderColor: '#dee2e6', // Gris suave para lo planeado
+                            borderDash: [5, 5],
+                            fill: false,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Ejecutado Real',
+                            data: [4.5, 11, 19, 25, 32, 40, 48, 55],
+                            borderColor: '#174ea6', // K+AIR Primary
+                            backgroundColor: 'rgba(23, 78, 166, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        // 2. Training Chart (Bar: Programadas vs Realizadas)
+        const ctxTraining = document.getElementById('trainingChart');
+        if(ctxTraining && typeof Chart !== 'undefined') {
+            this.charts.training = new Chart(ctxTraining, {
+                type: 'bar',
+                data: {
+                    labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago'],
+                    datasets: [
+                        {
+                            label: 'Programadas',
+                            data: [5, 6, 5, 7, 6, 8, 5, 6],
+                            backgroundColor: '#dee2e6',
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Realizadas',
+                            data: [5, 5, 6, 6, 7, 7, 5, 5],
+                            backgroundColor: '#28a745', // Success
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { x: { stacked: false }, y: { beginAtZero: true, ticks: { precision: 0 } } },
+                    plugins: { legend: { display: false } } // Ocultar leyenda para ahorrar espacio
+                }
+            });
+        }
+
+        // 3. Induction Chart (Line: Tendencia)
+        const ctxInduction = document.getElementById('inductionChart');
+        if(ctxInduction && typeof Chart !== 'undefined') {
+            this.charts.induction = new Chart(ctxInduction, {
+                type: 'line',
+                data: {
+                    labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago'],
+                    datasets: [{
+                        label: 'Inducciones Acumuladas',
+                        data: [15, 28, 45, 60, 78, 92, 110, 124],
+                        borderColor: '#ffc107', // Warning color (Induction is usually urgent)
+                        backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
     }
 
     handleSubmoduleClick(submoduleName) {
