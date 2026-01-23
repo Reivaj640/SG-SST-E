@@ -3,11 +3,11 @@
 class CopasstComponent {
     constructor(container, companyName, moduleName, submoduleName, onBackToModuleHome) {
         this.container = container;
-        this.currentCompany = companyName; // Nota: Normalizando nombres de variables
-        this.companyName = companyName;    // Para compatibilidad con métodos nuevos
+        this.currentCompany = companyName; // Normalizando nombres
+        this.companyName = companyName;    // Compatibilidad
         this.moduleName = moduleName;
         this.submoduleName = submoduleName;
-        this.onBackToModuleHome = onBackToModuleHome; // Callback para volver al home del módulo principal
+        this.onBackToModuleHome = onBackToModuleHome; // Callback para volver al home
         
         // Bindings
         this.handleIframeMessage = this.handleIframeMessage.bind(this);
@@ -29,7 +29,7 @@ class CopasstComponent {
         header.appendChild(title);
 
         const backButton = document.createElement('button');
-        backButton.className = 'btn btn-secondary'; // Usando clases bootstrap-like si existen, o fallback
+        backButton.className = 'btn btn-secondary'; 
         backButton.textContent = 'Volver al Módulo';
         backButton.style.padding = '8px 16px';
         backButton.style.cursor = 'pointer';
@@ -65,7 +65,7 @@ class CopasstComponent {
 
         this.container.appendChild(cardsContainer);
         
-        // Limpiar listeners anteriores si existen para evitar duplicados globales
+        // Limpiar listeners anteriores
         window.removeEventListener('message', this.handleIframeMessage);
     }
 
@@ -83,7 +83,7 @@ class CopasstComponent {
         const h5 = document.createElement('h3');
         h5.textContent = title;
         h5.style.marginTop = '0';
-        h5.style.color = '#174ea6'; // K+AIR Primary
+        h5.style.color = '#206A5D'; // Color verde original de la app
 
         const p = document.createElement('p');
         p.textContent = description;
@@ -91,7 +91,7 @@ class CopasstComponent {
 
         const btn = document.createElement('button');
         btn.textContent = 'Acceder';
-        btn.style.backgroundColor = '#174ea6';
+        btn.style.backgroundColor = '#206A5D';
         btn.style.color = 'white';
         btn.style.border = 'none';
         btn.style.padding = '10px';
@@ -99,8 +99,8 @@ class CopasstComponent {
         btn.style.cursor = 'pointer';
         btn.style.marginTop = '10px';
         
-        btn.addEventListener('mouseenter', () => btn.style.backgroundColor = '#13428e');
-        btn.addEventListener('mouseleave', () => btn.style.backgroundColor = '#174ea6');
+        btn.addEventListener('mouseenter', () => btn.style.backgroundColor = '#1A564B');
+        btn.addEventListener('mouseleave', () => btn.style.backgroundColor = '#206A5D');
         btn.addEventListener('click', onClick);
 
         card.appendChild(h5);
@@ -110,20 +110,18 @@ class CopasstComponent {
         return card;
     }
 
-    // --- SECCIÓN: VER ACTAS (INTEGRACIÓN K+AIR) ---
+    // --- SECCIÓN: VER ACTAS (NUEVO VISUALIZADOR) ---
     showVerActasPage() {
         this.container.innerHTML = '';
         
-        // Registrar listener para comunicación con el iframe
         window.addEventListener('message', this.handleIframeMessage);
 
         const iframe = document.createElement('iframe');
         iframe.style.width = '100%';
         iframe.style.height = '100%';
         iframe.style.border = 'none';
-        iframe.style.display = 'block'; // Asegurar que ocupe espacio
+        iframe.style.display = 'block'; 
         
-        // Pasar parámetros a la nueva interfaz a través de la URL
         const viewerUrl = `modules/recursos/copasst/copasst-view.html?company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
         iframe.src = viewerUrl;
 
@@ -131,19 +129,15 @@ class CopasstComponent {
     }
 
     handleIframeMessage(event) {
-        if (!event.data || !event.data.type) {
-            return;
-        }
+        if (!event.data || !event.data.type) return;
 
-        // Manejar mensajes del nuevo estándar (type: 'action-request')
         if (event.data.type.endsWith('-request')) {
             const action = event.data.type.replace('-request', '');
             
             switch (action) {
                 case 'back-to-module':
-                    // Al volver desde el visor, regresamos a las tarjetas
                     window.removeEventListener('message', this.handleIframeMessage);
-                    this.render(); 
+                    this.render();
                     break;
                 case 'get-document-folders':
                     this.handleStandardRequest(event, 'getDocumentFolders');
@@ -171,8 +165,6 @@ class CopasstComponent {
 
     async handleStandardRequest(event, apiFunctionName) {
         const { requestId, payload } = event.data;
-        console.log(`[CopasstLogic] Solicitud: ${apiFunctionName}, ID: ${requestId}`);
-        
         try {
             if (!window.electronAPI || typeof window.electronAPI[apiFunctionName] !== 'function') {
                 throw new Error(`API function ${apiFunctionName} not found`);
@@ -205,164 +197,212 @@ class CopasstComponent {
             event.source.postMessage({
                 type: `${event.data.type.replace('-request', '')}-response`,
                 requestId,
-                payload: {
-                    success: false,
-                    error: error.message
-                }
+                payload: { success: false, error: error.message }
             }, '*');
         }
     }
 
-    // --- SECCIÓN: REALIZAR ACTAS (Lógica original adaptada) ---
+    // --- SECCIÓN: REALIZAR ACTAS (RESTAURADA DEL RESPALDO ORIGINAL) ---
     showRealizarActasInterface() {
         this.container.innerHTML = '';
 
-        // Header simple para la sección
         const header = document.createElement('div');
+        header.className = 'submodule-header';
+        header.style.display = 'flex';
+        header.style.alignItems = 'center';
         header.style.marginBottom = '20px';
         header.style.padding = '10px';
         header.style.backgroundColor = '#f8f9fa';
         header.style.borderBottom = '1px solid #dee2e6';
-        
+
         const backBtn = document.createElement('button');
-        backBtn.textContent = '← Volver';
-        backBtn.className = 'btn btn-secondary'; // Clase visual si existe
-        backBtn.style.padding = '5px 15px';
-        backBtn.style.cursor = 'pointer';
+        backBtn.innerHTML = '&#8592; Volver';
+        backBtn.className = 'btn btn-secondary';
         backBtn.onclick = () => this.render();
         
-        const title = document.createElement('span');
-        title.textContent = ' Realizar Acta de Reunión';
-        title.style.fontWeight = 'bold';
-        title.style.marginLeft = '15px';
-        title.style.fontSize = '1.1rem';
+        const title = document.createElement('h3');
+        title.textContent = 'Realizar Acta de Reunión';
+        title.style.flexGrow = '1';
+        title.style.textAlign = 'center';
+        title.style.margin = '0';
 
         header.appendChild(backBtn);
         header.appendChild(title);
         this.container.appendChild(header);
 
-        // Cargar el formulario (reutilizando la estructura original pero inyectando el HTML directo)
-        // Nota: Mantenemos la lógica de generación del formulario original para no romper funcionalidad.
-        
         const editorContainer = document.createElement('div');
         editorContainer.className = 'acta-editor-container';
-        
-        // Estilos específicos para el editor (incrustados para asegurar aislamiento)
+
+        // Estilos ORIGINALES del formulario (Verdes)
         const style = document.createElement('style');
-        style.textContent = 
-            `.acta-editor-container { padding: 20px; font-family: 'Roboto', sans-serif; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-            .form-section { margin-bottom: 25px; padding: 15px; border: 1px solid #eee; border-radius: 6px; }
-            .form-section h3 { margin-top: 0; color: #174ea6; border-bottom: 2px solid #e8f0fe; padding-bottom: 10px; margin-bottom: 15px; }
-            .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
-            .form-group { margin-bottom: 10px; }
-            .form-group label { display: block; margin-bottom: 5px; font-weight: 500; color: #555; }
-            .form-group input, .form-group textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-            .form-group input:focus, .form-group textarea:focus { border-color: #174ea6; outline: none; }
-            .dynamic-item { background: #f9f9f9; padding: 15px; margin-bottom: 10px; border-radius: 4px; border: 1px solid #eee; position: relative; }
-            .btn-add { background: #28a745; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; margin-top: 10px; font-size: 0.9rem; display: inline-flex; align-items: center; gap: 5px; }
-            .btn-add:hover { background: #218838; }
-            .btn-remove { position: absolute; top: 10px; right: 10px; background: #dc3545; color: white; border: none; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 12px; }
-            .actions-bar { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; display: flex; justify-content: flex-end; gap: 10px; }
-            .btn-action { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: 500; }
-            .btn-save { background: #174ea6; color: white; }
-            .btn-export { background: #206A5D; color: white; } /* Color Excel-like */
-        
-`;
+        style.textContent = `
+            :root {
+                --primary-color: #206A5D;
+                --primary-hover-color: #1A564B;
+                --bg-color: #f8f9fa;
+                --widget-bg-color: #ffffff;
+                --border-color: #dee2e6;
+                --text-color: #212529;
+                --text-light-color: #6c757d;
+                --font-family: 'Poppins', sans-serif;
+            }
+
+            .acta-form-wrapper {
+                font-family: var(--font-family);
+                color: var(--text-color);
+                background: var(--bg-color);
+                padding: 2rem 1.5rem;
+                max-width: 1100px;
+                margin: 0 auto;
+            }
+
+            .acta-card {
+                background: var(--widget-bg-color);
+                border-radius: 8px;
+                border: 1px solid var(--border-color);
+                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                padding: 2rem;
+                margin-bottom: 2rem;
+            }
+
+            .acta-card-title {
+                font-size: 1.5rem;
+                font-weight: 600;
+                margin-top: 0;
+                margin-bottom: 1.5rem;
+                color: #495057;
+                border-bottom: 2px solid var(--primary-color);
+                padding-bottom: 0.5rem;
+            }
+
+            .acta-form-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 1.5rem;
+            }
+
+            .acta-form-group { display: flex; flex-direction: column; }
+            .acta-form-group.full-width { grid-column: 1 / -1; }
+            .acta-form-group label { font-size: 0.9rem; font-weight: 500; color: var(--text-light-color); margin-bottom: 0.5rem; }
+            .acta-form-group input, .acta-form-group textarea {
+                padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: 4px;
+            }
+
+            .acta-dynamic-item {
+                background: #f8f9fa; border: 1px solid var(--border-color); border-radius: 6px;
+                padding: 1.5rem; margin-bottom: 1rem; position: relative;
+            }
+
+            .acta-btn-add {
+                width: 100%; padding: 0.75rem; background: var(--primary-color); color: white;
+                border: none; border-radius: 4px; cursor: pointer; font-weight: 500;
+            }
+
+            .acta-btn-remove {
+                position: absolute; top: 10px; right: 10px; background: #dc3545; color: white;
+                border: none; width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
+            }
+
+            .acta-footer { display: flex; justify-content: center; gap: 1.5rem; margin-top: 2rem; }
+            .acta-btn-action { padding: 0.75rem 1.5rem; border-radius: 4px; cursor: pointer; font-weight: 500; border: 1px solid transparent; }
+            .acta-btn-primary { background: var(--primary-color); color: white; }
+            .acta-btn-secondary { background: white; color: var(--text-color); border-color: var(--border-color); }
+        `;
         this.container.appendChild(style);
 
-        // --- Estructura del Formulario HTML ---
-        editorContainer.innerHTML = 
-            `<div class="form-section">
-                <h3>Información de la Reunión</h3>
-                <div class="form-grid">
-                    <div class="form-group"><label>N° de Acta</label><input type="number" id="acta-number" value="108"></div>
-                    <div class="form-group"><label>Fecha</label><input type="date" id="fecha" value="${new Date().toISOString().split('T')[0]}"></div>
-                    <div class="form-group"><label>Hora Inicio</label><input type="time" id="inicia" value="08:00"></div>
-                    <div class="form-group"><label>Hora Fin</label><input type="time" id="termina" value="09:00"></div>
-                    <div class="form-group" style="grid-column: 1/-1"><label>Tema</label><input type="text" id="topic" value="Reunión mensual ordinaria del COPASST"></div>
-                    <div class="form-group" style="grid-column: 1/-1"><label>Lugar</label><input type="text" id="ciudad-lugar" value="Instalaciones de la empresa - Sala de Juntas"></div>
+        // Estructura HTML ORIGINAL del formulario
+        editorContainer.innerHTML = `
+            <div class="acta-form-wrapper">
+                <section class="acta-card">
+                    <h2 class="acta-card-title">Información de la Reunión</h2>
+                    <div class="acta-form-grid">
+                        <div class="acta-form-group"><label>N° de Acta</label><input type="number" id="acta-number" value="108"></div>
+                        <div class="acta-form-group"><label>Fecha</label><input type="date" id="fecha" value="${new Date().toISOString().split('T')[0]}"></div>
+                        <div class="acta-form-group"><label>Hora Inicio</label><input type="time" id="inicia" value="08:00"></div>
+                        <div class="acta-form-group"><label>Hora Fin</label><input type="time" id="termina" value="09:00"></div>
+                        <div class="acta-form-group full-width"><label>Tema</label><input type="text" id="topic" value="Reunión del COPASST"></div>
+                        <div class="acta-form-group full-width"><label>Lugar</label><input type="text" id="ciudad-lugar" value="Barranquilla, Oficinas Tempoactiva"></div>
+                    </div>
+                </section>
+
+                <section class="acta-card">
+                    <h2 class="acta-card-title">Agenda de la Reunión</h2>
+                    <div id="agenda-list"></div>
+                    <button class="acta-btn-add" id="add-agenda-btn">+ Agregar tema</button>
+                </section>
+
+                <section class="acta-card">
+                    <h2 class="acta-card-title">Desarrollo y Compromisos</h2>
+                    <div id="desarrollo-list"></div>
+                    <button class="acta-btn-add" id="add-desarrollo-btn">+ Agregar punto tratado</button>
+                </section>
+
+                <div class="acta-footer">
+                    <button class="acta-btn-action acta-btn-secondary" id="save-draft-btn">Guardar Borrador</button>
+                    <button class="acta-btn-action acta-btn-primary" id="export-excel-btn">Exportar a Excel</button>
                 </div>
             </div>
-
-            <div class="form-section">
-                <h3>Agenda de la Reunión</h3>
-                <div id="agenda-list"></div>
-                <button class="btn-add" id="add-agenda-btn">+ Agregar tema</button>
-            </div>
-
-            <div class="form-section">
-                <h3>Desarrollo y Compromisos</h3>
-                <div id="desarrollo-list"></div>
-                <button class="btn-add" id="add-desarrollo-btn">+ Agregar punto</button>
-            </div>
-
-            <div class="actions-bar">
-                <button class="btn-action btn-save" id="save-draft-btn">Guardar Borrador</button>
-                <button class="btn-action btn-export" id="export-excel-btn">Exportar a Excel</button>
-            </div>
-        
-`;
+        `;
 
         this.container.appendChild(editorContainer);
 
-        // --- Lógica del Formulario ---
         const agendaList = document.getElementById('agenda-list');
         const desarrolloList = document.getElementById('desarrollo-list');
 
-        // Helpers para crear items
         const createAgendaItem = (data = {}) => {
-            const item = document.createElement('div');
-            item.className = 'dynamic-item agenda-item';
-            item.innerHTML = 
-                `<div class="form-grid">
-                    <div class="form-group" style="grid-column: span 2"><label>Tema</label><input type="text" class="input-tema" placeholder="Descripción" value="${data.tema || ''}"></div>
-                    <div class="form-group"><label>Duración</label><input type="text" class="input-duracion" placeholder="Ej: 10 min" value="${data.duracion || ''}"></div>
-                    <div class="form-group"><label>Líder</label><input type="text" class="input-lider" placeholder="Nombre" value="${data.lider || ''}"></div>
+            const div = document.createElement('div');
+            div.className = 'acta-dynamic-item';
+            div.innerHTML = `
+                <div class="acta-form-grid">
+                    <div class="acta-form-group" style="grid-column: span 2"><label>Tema</label><input type="text" class="in-tema" value="${data.tema || ''}"></div>
+                    <div class="acta-form-group"><label>Duración</label><input type="text" class="in-duracion" value="${data.duracion || ''}"></div>
+                    <div class="acta-form-group"><label>Líder</label><input type="text" class="in-lider" value="${data.lider || ''}"></div>
                 </div>
-                <button class="btn-remove" title="Eliminar">✕</button>
+                <button class="acta-btn-remove">✕</button>
             `;
-            item.querySelector('.btn-remove').onclick = () => item.remove();
-            return item;
+            div.querySelector('.acta-btn-remove').onclick = () => div.remove();
+            return div;
         };
 
         const createDesarrolloItem = (data = {}) => {
-            const item = document.createElement('div');
-            item.className = 'dynamic-item desarrollo-item';
-            item.innerHTML = 
-                `<div class="form-group"><label>Temas Tratados</label><textarea class="input-tema" rows="3">${data.tema || ''}</textarea></div>
-                <div class="form-group"><label>Compromisos Generados</label><textarea class="input-compromisos" rows="2">${data.compromisos || ''}</textarea></div>
-                <div class="form-grid">
-                    <div class="form-group"><label>Fecha Límite</label><input type="date" class="input-fecha" value="${data.fecha || ''}"></div>
-                    <div class="form-group"><label>Responsable</label><input type="text" class="input-responsable" value="${data.responsable || ''}">
-</div>
+            const div = document.createElement('div');
+            div.className = 'acta-dynamic-item';
+            div.innerHTML = `
+                <div class="acta-form-group"><label>Temas Tratados</label><textarea class="in-tema" rows="9">${data.tema || ''}</textarea></div>
+                <div class="acta-form-group"><label>Compromisos</label><textarea class="in-compromisos" rows="5">${data.compromisos || ''}</textarea></div>
+                <div class="acta-form-grid" style="margin-top:10px;">
+                    <div class="acta-form-group"><label>Fecha</label><input type="date" class="in-fecha" value="${data.fecha || ''}"></div>
+                    <div class="acta-form-group"><label>Responsable</label><input type="text" class="in-responsable" value="${data.responsable || ''}"></div>
                 </div>
-                <button class="btn-remove" title="Eliminar">✕</button>
+                <button class="acta-btn-remove">✕</button>
             `;
-            item.querySelector('.btn-remove').onclick = () => item.remove();
-            return item;
+            div.querySelector('.acta-btn-remove').onclick = () => div.remove();
+            return div;
         };
 
-        // Datos iniciales de ejemplo
-        agendaList.appendChild(createAgendaItem({ tema: 'Verificación del quórum', duracion: '5 min', lider: 'Presidente' }));
-        agendaList.appendChild(createAgendaItem({ tema: 'Lectura acta anterior', duracion: '10 min', lider: 'Secretario' }));
-        
-        desarrolloList.appendChild(createDesarrolloItem({ tema: 'Se verificó la asistencia...', compromisos: 'Ninguno', responsable: 'N/A' }));
+        // Datos iniciales (ORIGINALES del COPASST)
+        const initialAgenda = [
+            { tema: 'Revisión del acta anterior N° 107', duracion: '00:10 Minutos', lider: 'Representante del Copasst' },
+            { tema: 'Revisión de Accidentes del Mes de Diciembre', duracion: '00:10 Minutos', lider: 'Representante del Copasst' },
+            { tema: 'Revisión Avance del Plan de Trabajo Anual', duracion: '00:30 Minutos', lider: 'Representante del Copasst' }
+        ];
 
-        // Listeners de botones
+        const initialDesarrollo = [
+            { tema: 'Revisión del Acta Anterior, se continúan realizando las inspecciones programadas...', compromisos: 'Ninguno', responsable: 'Ninguno' },
+            { tema: 'Accidente laboral de Armando Cervantes Perez', compromisos: 'Realizar seguimiento del plan de acción del AT.', responsable: 'Miembros del Copasst y Asesor SST' }
+        ];
+
+        initialAgenda.forEach(d => agendaList.appendChild(createAgendaItem(d)));
+        initialDesarrollo.forEach(d => desarrolloList.appendChild(createDesarrolloItem(d)));
+
         document.getElementById('add-agenda-btn').onclick = () => agendaList.appendChild(createAgendaItem());
         document.getElementById('add-desarrollo-btn').onclick = () => desarrolloList.appendChild(createDesarrolloItem());
 
-        document.getElementById('save-draft-btn').onclick = () => {
-            alert('Funcionalidad de guardado temporal (simulada).');
-        };
-
-        document.getElementById('export-excel-btn').onclick = () => {
-            this.handleExportExcel();
-        };
+        document.getElementById('save-draft-btn').onclick = () => alert('Borrador guardado (simulado)');
+        document.getElementById('export-excel-btn').onclick = () => this.handleExportExcel();
     }
 
     async handleExportExcel() {
-        // 1. Recopilar datos
         const data = {
             actaNumber: document.getElementById('acta-number').value,
             fecha: document.getElementById('fecha').value,
@@ -374,34 +414,25 @@ class CopasstComponent {
             desarrolloItems: []
         };
 
-        // Agenda
-        document.querySelectorAll('#agenda-list .agenda-item').forEach(item => {
+        document.querySelectorAll('#agenda-list .acta-dynamic-item').forEach(item => {
             data.agendaItems.push({
-                tema: item.querySelector('.input-tema').value,
-                duracion: item.querySelector('.input-duracion').value,
-                lider: item.querySelector('.input-lider').value
+                tema: item.querySelector('.in-tema').value,
+                duracion: item.querySelector('.in-duracion').value,
+                lider: item.querySelector('.in-lider').value
             });
         });
 
-        // Desarrollo
-        document.querySelectorAll('#desarrollo-list .desarrollo-item').forEach(item => {
+        document.querySelectorAll('#desarrollo-list .acta-dynamic-item').forEach(item => {
             data.desarrolloItems.push({
-                tema: item.querySelector('.input-tema').value,
-                compromisos: item.querySelector('.input-compromisos').value,
-                fecha: item.querySelector('.input-fecha').value,
-                responsable: item.querySelector('.input-responsable').value
+                tema: item.querySelector('.in-tema').value,
+                compromisos: item.querySelector('.in-compromisos').value,
+                fecha: item.querySelector('.in-fecha').value,
+                responsable: item.querySelector('.in-responsable').value
             });
         });
 
-        // 2. Preparar cambios para el Excel (Mapeo de celdas)
         const changes = this.prepareExcelChanges(data);
 
-        if (changes.length === 0) {
-            alert('No hay datos suficientes para exportar.');
-            return;
-        }
-
-        // 3. Diálogo de guardado
         try {
             const savePath = await window.electronAPI.showSaveDialog({
                 title: 'Guardar Acta de COPASST',
@@ -411,46 +442,36 @@ class CopasstComponent {
 
             if (!savePath) return;
 
-            // 4. Generar
             const result = await window.electronAPI.generateCopasstActa(changes, savePath);
-            
             if (result.success) {
                 alert(`Acta generada correctamente en: ${result.documentPath}`);
             } else {
-                alert(`Error al generar: ${result.error}`);
+                alert(`Error: ${result.error}`);
             }
-
         } catch (error) {
-            console.error('Error exportando:', error);
-            alert(`Error inesperado: ${error.message}`);
+            alert(`Error: ${error.message}`);
         }
     }
 
+    // Mapeo ORIGINAL de celdas para la plantilla de COPASST
     prepareExcelChanges(data) {
         const changes = [];
-        
-        // Mapeo básico a celdas específicas de la plantilla (Ajustar según plantilla real)
-        // Ejemplo basado en el código anterior leído:
-        changes.push({ row: 4, col: 6, value: data.actaNumber }); // C5
-        changes.push({ row: 5, col: 6, value: data.topic });      // C6
-        changes.push({ row: 7, col: 6, value: data.fecha });      // C8
-        changes.push({ row: 8, col: 6, value: data.lugar });      // C9
-        changes.push({ row: 9, col: 6, value: data.inicia });     // C10
-        changes.push({ row: 10, col: 6, value: data.termina });   // C11
+        changes.push({ row: 4, col: 6, value: data.actaNumber });
+        changes.push({ row: 5, col: 6, value: data.topic });
+        changes.push({ row: 7, col: 6, value: data.fecha });
+        changes.push({ row: 8, col: 6, value: data.lugar });
+        changes.push({ row: 9, col: 6, value: data.inicia });
+        changes.push({ row: 10, col: 6, value: data.termina });
 
-        // Lógica para tablas dinámicas (Agenda y Desarrollo)
-        // Se asume que la plantilla tiene espacio o se insertan filas.
-        // Aquí simplificamos insertando valores en filas consecutivas a partir de un offset fijo
-        
-        let row = 25; // Inicio Agenda (aprox)
+        let row = 25; // Inicio Agenda
         data.agendaItems.forEach(item => {
-            changes.push({ row: row, col: 3, value: item.tema });    // Col D
-            changes.push({ row: row, col: 5, value: item.duracion });// Col F
-            changes.push({ row: row, col: 6, value: item.lider });   // Col G
+            changes.push({ row: row, col: 3, value: item.tema });
+            changes.push({ row: row, col: 5, value: item.duracion });
+            changes.push({ row: row, col: 6, value: item.lider });
             row++;
         });
 
-        row += 5; // Espacio entre tablas
+        row += 5; // Espacio para Desarrollo
         data.desarrolloItems.forEach((item, idx) => {
             changes.push({ row: row, col: 1, value: idx + 1 });
             changes.push({ row: row, col: 2, value: item.tema });
