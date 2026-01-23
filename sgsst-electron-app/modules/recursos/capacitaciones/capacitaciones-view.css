@@ -1,214 +1,550 @@
-/* capacitaciones-viewer.css - Estilos específicos para el submódulo de capacitaciones */
+/* =========================================
+   1. CORE VISUAL SYSTEM (K+AIR) - Módulo Capacitaciones
+   ========================================= */
 
-/* Contenedor principal del viewer de capacitaciones */
-.submodule-content.capacitaciones-viewer {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    width: 100%;
-    overflow: hidden;
-    background-color: #f8f9fa;
-}
-
-/* Asegurar que el contenido no cause desbordamiento */
+/* Variables Scopeadas al módulo para evitar colisiones globales si no están en root */
 .capacitaciones-container {
+    --k-primary: #174ea6;
+    --k-primary-hover: #185abd;
+    --k-primary-light: rgba(23, 78, 166, 0.1);
+    
+    --k-success: #28a745;
+    --k-success-light: rgba(40, 167, 69, 0.1);
+    
+    --k-warning: #ffc107;
+    --k-warning-light: rgba(255, 193, 7, 0.1);
+    
+    --k-danger: #dc3545;
+    --k-danger-light: rgba(220, 53, 69, 0.1);
+    
+    --k-info: #17a2b8;
+    --k-info-light: rgba(23, 162, 184, 0.1);
+
+    --k-bg-app: #f8f9fa;
+    --k-bg-card: #ffffff;
+    --k-border: #dee2e6;
+    
+    --k-font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+    --k-text-main: #212529;
+    --k-text-muted: #6c757d;
+
+    --k-radius-md: 0.375rem;
+    --k-radius-lg: 0.5rem;
+    --k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
+    --k-shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.08);
+    --k-header-height: 60px;
+
+    font-family: var(--k-font-family);
+    background-color: var(--k-bg-app);
+    color: var(--k-text-main);
     height: 100%;
     width: 100%;
     display: flex;
     flex-direction: column;
+    overflow: hidden; /* Importante para el layout */
+}
+
+/* =========================================
+   2. LAYOUT & ESTRUCTURA
+   ========================================= */
+
+.k-app-layout {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
     overflow: hidden;
 }
 
-/* Estilos específicos para evitar conflictos con estilos globales */
-.capacitaciones-container .app-layout {
+/* Header del Módulo */
+.k-module-header {
+    background-color: var(--k-bg-card);
+    border-bottom: 1px solid var(--k-border);
+    padding: 0 1.5rem;
+    height: var(--k-header-height);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    z-index: 10;
+}
+
+.k-module-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--k-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+/* Navegación Secundaria (Tabs) */
+.k-tabs-container {
+    background-color: var(--k-bg-card);
+    padding: 0 1.5rem;
+    border-bottom: 1px solid var(--k-border);
+    flex-shrink: 0;
+}
+
+.k-nav-tabs {
+    display: flex;
+    gap: 2rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.k-nav-item {
+    padding: 1rem 0;
+    position: relative;
+    cursor: pointer;
+    color: var(--k-text-muted);
+    font-weight: 500;
+    transition: color 0.2s ease;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.k-nav-item:hover {
+    color: var(--k-primary);
+}
+
+.k-nav-item.active {
+    color: var(--k-primary);
+    font-weight: 600;
+}
+
+.k-nav-item.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background-color: var(--k-primary);
+    border-radius: 3px 3px 0 0;
+}
+
+/* Área Principal */
+.k-main-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+    position: relative;
+}
+
+.k-view-section {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+
+.k-view-section.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* =========================================
+   3. COMPONENTES UI
+   ========================================= */
+
+/* Botones */
+.k-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    border-radius: var(--k-radius-md);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: none; /* Reset */
+    line-height: 1.5;
+}
+
+.k-btn-primary {
+    background-color: var(--k-primary);
+    color: white;
+    box-shadow: 0 2px 4px rgba(23, 78, 166, 0.2);
+}
+.k-btn-primary:hover {
+    background-color: var(--k-primary-hover);
+    transform: translateY(-1px);
+    color: white;
+}
+
+.k-btn-outline {
+    background-color: transparent;
+    border-color: var(--k-border);
+    color: var(--k-text-main);
+}
+.k-btn-outline:hover {
+    border-color: var(--k-primary);
+    color: var(--k-primary);
+    background-color: var(--k-primary-light);
+}
+
+.k-btn-icon {
+    padding: 0.4rem;
+    border-radius: var(--k-radius-md);
+    line-height: 1;
+}
+
+/* Grid Dashboard */
+.k-grid-dashboard {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.k-stat-card {
+    background: var(--k-bg-card);
+    border: 1px solid var(--k-border);
+    border-radius: var(--k-radius-lg);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.k-stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--k-shadow-md);
+}
+
+.k-stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+}
+
+.k-stat-card.primary::before { background-color: var(--k-primary); }
+.k-stat-card.success::before { background-color: var(--k-success); }
+.k-stat-card.warning::before { background-color: var(--k-warning); }
+.k-stat-card.danger::before { background-color: var(--k-danger); }
+
+.k-stat-label {
+    font-size: 0.85rem;
+    color: var(--k-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.5rem;
+}
+
+.k-stat-value {
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: var(--k-text-main);
+    line-height: 1.1;
+}
+
+.k-stat-meta {
+    margin-top: auto;
+    padding-top: 1rem;
+    font-size: 0.85rem;
+    color: var(--k-text-muted);
+}
+
+/* Gráficos y Layout Complejo */
+.dashboard-grid {
+    display: grid; 
+    grid-template-columns: 2fr 1fr; 
+    gap: 1.5rem; 
+    margin-bottom: 2rem;
+}
+
+.k-chart-container {
+    background: white;
+    border: 1px solid var(--k-border);
+    border-radius: var(--k-radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--k-shadow-sm);
     height: 100%;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
-    position: relative; /* Añadido para que el z-index funcione correctamente */
 }
 
-.capacitaciones-container .app-header {
+.k-chart-body {
     position: relative;
-    z-index: 1000; /* Asegurar que el header esté por debajo del sidebar cuando se abre */
-}
-
-.capacitaciones-container .app-body {
-    flex: 1;
+    flex: 1; 
+    width: 100%;
+    min-height: 300px; /* Altura mínima fija para asegurar visibilidad */
+    height: 300px; /* Altura base para evitar colapso inicial */
     overflow: hidden;
 }
 
-.capacitaciones-container .main-content {
-    overflow: auto;
-    flex: 1;
+.k-chart-body canvas {
+    position: absolute; /* CLAVE: Saca el canvas del flujo para evitar que empuje al padre */
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100% !important;
+    height: 100% !important;
 }
 
-/* Ajustes para modales dentro del contenedor de capacitaciones */
-.capacitaciones-container .modal {
-    z-index: 1051; /* Asegurar que los modales se muestren correctamente */
+.k-chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
 }
 
-/* Evitar conflictos con estilos de tablas globales */
-.capacitaciones-container .table {
+.k-chart-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--k-text-main);
+}
+
+/* Acciones Rápidas */
+.k-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
     margin-bottom: 0;
 }
 
-/* Ajustes para elementos específicos de la interfaz de capacitaciones */
-.capacitaciones-container .top-nav {
-    position: relative;
-    z-index: 100; /* Este valor debe ser menor que el z-index del sidebar cuando se abre */
-}
-
-.capacitaciones-container .nav-link {
-    cursor: pointer;
-}
-
-/* Ajustes para dispositivos móviles */
-@media (max-width: 768px) {
-    .capacitaciones-container .main-content {
-        padding: 1rem;
-    }
-
-    .capacitaciones-container .top-nav {
-        padding: 0 1rem;
-    }
-
-    .capacitaciones-container .app-header {
-        padding: 1rem;
-    }
-}
-
-/* Solución para el problema de superposición del sidebar */
-/* Asegurar que el header no se quede por encima del sidebar al abrirse */
-.sidebar-open .capacitaciones-container .app-header,
-body.sidebar-open .capacitaciones-container .app-header {
-    z-index: 899 !important; /* Asegurar que el header esté por debajo del sidebar */
-}
-
-/* Ajuste adicional para el layout principal */
-.capacitaciones-container .app-layout {
-    z-index: 1001; /* Asegurar que el layout esté por encima del header */
-}
-
-/* ============================================================= */
-/* ESPACIADO VERTICAL EXCLUSIVO PARA EL DASHBOARD DE CAPACITACIONES */
-/* No afecta a ningún otro módulo del sistema                     */
-/* ============================================================= */
-
-/* ✅ SOBREESCRITURA DEFINITIVA — Solo para el dashboard de capacitaciones */
-.capacitaciones-container #dashboard-view {
-    display: flex;
-    flex-direction: column;
-    gap: 2rem; /* espacio uniforme ENTRE LAS FILAS */
-    overflow: hidden;
-    padding: 0 !important; /* anular cualquier padding heredado */
-    margin: 0 !important;
-}
-
-/* Cada fila del dashboard */
-.capacitaciones-container #dashboard-view > .row {
-    display: flex !important;
-    flex-wrap: wrap !important;
-    gap: 1.5rem !important; /* espacio ENTRE TARJETAS dentro de la fila */
-    margin: 0 !important;
-    padding: 0 !important;
-    width: 100% !important;
-    min-width: 0 !important;
-    align-items: stretch !important;
-}
-
-/* Cada columna/tarjeta dentro de las filas */
-.capacitaciones-container #dashboard-view .row > [class*="col-"] {
-    display: flex !important;
-    flex-direction: column !important;
-    margin: 0 !important;
-    padding: 0 !important;
-}
-
-/* Componentes visuales reales: tarjetas */
-.capacitaciones-container #dashboard-view .stat-card,
-.capacitaciones-container #dashboard-view .chart-container,
-.capacitaciones-container #dashboard-view .action-card,
-.capacitaciones-container #dashboard-view .training-list {
-    background-color: var(--white-color) !important;
-    border-radius: var(--border-radius-lg) !important;
-    box-shadow: var(--box-shadow) !important;
-    padding: 1.5rem !important;
-    margin: 0 !important; /* ← clave: anular margin heredado */
-    flex: 1 1 auto !important;
-    min-width: 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow: hidden !important;
-}
-
-/* Asegurar que no haya margin collapse ni paddings fantasma */
-.capacitaciones-container #dashboard-view .stat-card > *,
-.capacitaciones-container #dashboard-view .chart-container > *,
-.capacitaciones-container #dashboard-view .action-card > *,
-.capacitaciones-container #dashboard-view .training-list > * {
-    margin-top: 0 !important;
-    margin-bottom: 0 !important;
-}
-
-/* Títulos dentro de tarjetas */
-.capacitaciones-container #dashboard-view .stat-card h3,
-.capacitaciones-container #dashboard-view .chart-container h3,
-.capacitaciones-container #dashboard-view .action-card h3,
-.capacitaciones-container #dashboard-view .training-list h3 {
-    margin-top: 0 !important;
-    margin-bottom: 1rem !important;
-}
-
-/* Última fila: sin gap extra abajo */
-.capacitaciones-container #dashboard-view > .row:last-child {
-    margin-bottom: 0 !important;
-}
-/* === ESTILOS PARA ALINEAR VERTICALMENTE LAS CELDAS DE TIPO Y ESTADO === */
-
-/* Asegurar que las celdas de tipo y estado tengan altura mínima y se centren verticalmente */
-.capacitaciones-container .table td.col-tipo,
-.capacitaciones-container .table td.col-estado {
+.k-action-card {
+    background: white;
+    border: 1px solid var(--k-border);
+    padding: 1.25rem;
+    border-radius: var(--k-radius-lg);
     display: flex;
     align-items: center;
-    justify-content: center;
-    min-height: 60px; /* Ajusta este valor si necesitas más o menos altura */
-    padding: 0.5rem 0.75rem !important; /* Restaurar padding para que el badge no ocupe todo el espacio */
+    gap: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
 }
 
-/* Asegurar que los badges tengan un tamaño consistente y se centren horizontalmente */
-.capacitaciones-container .table .badge {
-    width: auto; /* Cambiado de 100% a auto para que el badge se ajuste al contenido */
-    height: auto; /* Cambiado de 100% a auto para que el badge se ajuste al contenido */
+.k-action-card:hover {
+    border-color: var(--k-primary);
+    background-color: var(--k-primary-light);
+}
+
+.k-action-icon {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background-color: #f0f2f5;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--k-primary);
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+/* Listas Recientes */
+.k-recent-list-container {
+    margin-bottom: 0;
+}
+
+.k-recent-item {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--k-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.k-recent-item:last-child {
+    border-bottom: none;
+}
+
+/* Barra de Herramientas y Filtros */
+.k-toolbar {
+    background: var(--k-bg-card);
+    border: 1px solid var(--k-border);
+    border-radius: var(--k-radius-lg) var(--k-radius-lg) 0 0;
+    padding: 1rem 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: none;
+}
+
+.k-filter-group {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.k-form-select {
+    padding: 0.5rem 2rem 0.5rem 1rem;
+    border: 1px solid var(--k-border);
+    border-radius: var(--k-radius-md);
+    background-color: var(--k-bg-app);
+    font-size: 0.9rem;
+    color: var(--k-text-main);
+    cursor: pointer;
+    min-width: 160px;
+}
+
+/* Tabla */
+.k-table-container {
+    background: var(--k-bg-card);
+    border: 1px solid var(--k-border);
+    border-top: none;
+    border-radius: 0 0 var(--k-radius-lg) var(--k-radius-lg);
+    overflow-x: auto;
+}
+
+.k-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+.k-table th {
+    background-color: #fcfcfc;
+    color: var(--k-text-muted);
+    font-weight: 600;
+    text-align: left;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--k-border);
+    white-space: nowrap;
+}
+
+.k-table td {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--k-border);
+    vertical-align: middle;
+}
+
+.k-table tbody tr:hover {
+    background-color: #fcfdff;
+}
+
+.k-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Badges */
+.k-badge {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    font-size: 0.85rem; /* Ajusta el tamaño de fuente si es necesario */
+    padding: 0.35em 0.65em;
+    font-size: 0.75em;
+    font-weight: 600;
+    line-height: 1;
     text-align: center;
-    padding: 0.375rem 0.75rem; /* Ajusta el padding para que el badge tenga espaciado apropiado */
-    border-radius: var(--border-radius-md);
-    white-space: nowrap; /* Cambiado de normal a nowrap para evitar que el texto se rompa en varias líneas */
-    line-height: 1.2; /* Ajustar el espaciado entre líneas */
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: var(--k-radius-md);
 }
 
-/* Estilos específicos para los badges de tipo y estado */
-.capacitaciones-container .table .badge.bg-primary,
-.capacitaciones-container .table .badge.bg-info {
-    background-color: #0d6efd !important;
-    color: white !important;
+.k-badge-primary { background-color: var(--k-primary-light); color: var(--k-primary); }
+.k-badge-info { background-color: var(--k-info-light); color: var(--k-info); }
+.k-badge-success { background-color: var(--k-success-light); color: var(--k-success); }
+.k-badge-warning { background-color: var(--k-warning-light); color: #856404; }
+.k-badge-danger { background-color: var(--k-danger-light); color: var(--k-danger); }
+
+/* Modales */
+.k-modal-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1050;
+    display: none;
+    justify-content: center;
+    align-items: center;
 }
 
-.capacitaciones-container .table .badge.bg-success {
-    background-color: #198754 !important;
-    color: white !important;
+.k-modal-overlay.open {
+    display: flex;
 }
 
-.capacitaciones-container .table .badge.bg-warning {
-    background-color: #ffc107 !important;
-    color: #212529 !important;
+.k-modal {
+    background: white;
+    border-radius: var(--k-radius-lg);
+    width: 100%;
+    max-width: 600px;
+    box-shadow: var(--k-shadow-md);
+    animation: slideUp 0.3s ease;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
 }
 
-.capacitaciones-container .table .badge.bg-danger {
-    background-color: #dc3545 !important;
-    color: white !important;
+.k-modal-header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--k-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #fcfcfc;
+    border-radius: var(--k-radius-lg) var(--k-radius-lg) 0 0;
+}
+
+.k-modal-title {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--k-primary);
+    margin: 0;
+}
+
+.k-modal-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+}
+
+.k-modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--k-border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    background-color: #fcfcfc;
+    border-radius: 0 0 var(--k-radius-lg) var(--k-radius-lg);
+}
+
+/* Notificaciones (Toast) */
+.k-toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.k-toast {
+    background: white;
+    border-left: 4px solid var(--k-primary);
+    padding: 1rem 1.5rem;
+    border-radius: var(--k-radius-md);
+    box-shadow: var(--k-shadow-md);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    min-width: 300px;
+    animation: slideInRight 0.3s ease;
+    transition: all 0.3s ease;
+}
+
+/* Utilidades */
+.d-flex { display: flex; }
+.align-center { align-items: center; }
+.gap-2 { gap: 0.5rem; }
+.text-right { text-align: right; }
+.form-label { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; }
+.form-control { width: 100%; padding: 0.6rem 0.8rem; border: 1px solid var(--k-border); border-radius: var(--k-radius-md); font-family: inherit; font-size: 0.95rem; }
+.form-control:focus { outline: none; border-color: var(--k-primary); box-shadow: 0 0 0 3px var(--k-primary-light); }
+
+@media (max-width: 992px) {
+    .dashboard-grid { grid-template-columns: 1fr; }
 }
