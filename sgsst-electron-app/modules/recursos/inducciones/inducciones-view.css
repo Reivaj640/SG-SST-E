@@ -1,17 +1,40 @@
-/* inducciones-viewer.css - Estilos específicos para el submódulo de inducciones */
-
-/* Contenedor principal del viewer de inducciones */
-.submodule-content.inducciones-viewer {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    width: 100%;
-    overflow: hidden;
-    background-color: #f8f9fa;
-}
-
-/* Asegurar que el contenido no cause desbordamiento */
+/* =========================================
+   1. SISTEMA VISUAL K+AIR (OFICIAL) - Inducciones
+   ========================================= */
 .inducciones-container {
+    /* Colores Principales */
+    --k-primary: #174ea6;
+    --k-primary-hover: #185abd;
+    --k-primary-light: rgba(23, 78, 166, 0.1);
+    
+    --k-success: #28a745;
+    --k-success-light: rgba(40, 167, 69, 0.1);
+    
+    --k-warning: #ffc107;
+    --k-warning-light: rgba(255, 193, 7, 0.1);
+    
+    --k-danger: #dc3545;
+    --k-danger-light: rgba(220, 53, 69, 0.1);
+    
+    --k-bg-app: #f8f9fa;
+    --k-bg-card: #ffffff;
+    --k-border: #dee2e6;
+    
+    /* Tipografía */
+    --k-font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+    --k-text-main: #212529;
+    --k-text-muted: #6c757d;
+    
+    /* Estructura */
+    --k-radius-md: 0.375rem;
+    --k-radius-lg: 0.5rem;
+    --k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
+    --k-shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.08);
+    --k-header-height: 60px;
+
+    font-family: var(--k-font-family);
+    background-color: var(--k-bg-app);
+    color: var(--k-text-main);
     height: 100%;
     width: 100%;
     display: flex;
@@ -19,538 +42,245 @@
     overflow: hidden;
 }
 
-/* Estilos específicos para evitar conflictos con estilos globales */
-.inducciones-container .app-layout {
-    height: 100%;
+/* =========================================
+   2. LAYOUT
+   ========================================= */
+.k-app-layout {
     display: flex;
     flex-direction: column;
-    overflow: hidden;
-    position: relative; /* Añadido para que el z-index funcione correctamente */
-}
-
-.inducciones-container .app-header {
-    position: relative;
-    z-index: 1000; /* Asegurar que el header esté por debajo del sidebar cuando se abre */
-}
-
-.inducciones-container .app-body {
-    flex: 1;
+    height: 100%;
+    width: 100%;
     overflow: hidden;
 }
 
-.inducciones-container .main-content {
-    overflow: auto;
-    flex: 1;
+.k-module-header {
+    background-color: var(--k-bg-card);
+    border-bottom: 1px solid var(--k-border);
+    padding: 0 1.5rem;
+    height: var(--k-header-height);
     display: flex;
-    flex-direction: column;
-}
-
-/* Ajustes para modales dentro del contenedor de inducciones */
-.inducciones-container .modal {
-    z-index: 1051; /* Asegurar que los modales se muestren correctamente */
-}
-
-/* Evitar conflictos con estilos de tablas globales */
-.inducciones-container .table {
-    margin-bottom: 0;
-}
-
-/* Ajustes para elementos específicos de la interfaz de inducciones */
-.inducciones-container .top-nav {
-    position: relative;
-    z-index: 100; /* Este valor debe ser menor que el z-index del sidebar cuando se abre */
-}
-
-.inducciones-container .nav-link {
-    cursor: pointer;
-}
-
-/* Ajustes para dispositivos móviles */
-@media (max-width: 768px) {
-    .inducciones-container .main-content {
-        padding: 1rem;
-    }
-
-    .inducciones-container .top-nav {
-        padding: 0 1rem;
-    }
-
-    .inducciones-container .app-header {
-        padding: 1rem;
-    }
-}
-
-/* Solución para el problema de superposición del sidebar */
-/* Asegurar que el header no se quede por encima del sidebar al abrirse */
-.sidebar-open .inducciones-container .app-header,
-body.sidebar-open .inducciones-container .app-header {
-    z-index: 1000 !important; /* Asegurar que el header esté por debajo del sidebar */
-}
-
-/* Ajuste adicional para el layout principal */
-.inducciones-container .app-layout {
-    z-index: 1001; /* Asegurar que el layout esté por encima del header */
-}
-
-/* Estilos para las secciones de vista */
-.view-section {
-    display: none;
-}
-
-.view-section.active {
-    display: block;
-    animation: fadeIn 0.3s ease-in;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-/* Estilos para las tarjetas de dashboard */
-.dashboard-card {
-    background-color: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-    padding: 20px;
-    margin-bottom: 20px;
-    transition: transform 0.3s;
-    height: 100%;
-}
-
-.dashboard-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-}
-
-.card-header-custom {
-    display: flex;
+    align-items: center;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
+    flex-shrink: 0;
+    z-index: 10;
 }
 
-.card-title {
-    font-size: 1.1rem;
+.k-module-title {
+    font-size: 1.25rem;
     font-weight: 600;
-    color: #202124;
-}
-
-.card-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
+    color: var(--k-primary);
     display: flex;
     align-items: center;
-    justify-content: center;
-    color: white;
+    gap: 0.75rem;
 }
 
-.card-icon.primary {
-    background-color: #1a73e8;
+.k-tabs-container {
+    background-color: var(--k-bg-card);
+    padding: 0 1.5rem;
+    border-bottom: 1px solid var(--k-border);
+    flex-shrink: 0;
 }
 
-.card-icon.success {
-    background-color: #0f9d58;
-}
-
-.card-icon.warning {
-    background-color: #f4b400;
-}
-
-.card-icon.danger {
-    background-color: #ea4335;
-}
-
-.card-value {
-    font-size: 2rem;
-    font-weight: 700;
-    margin-bottom: 5px;
-    color: #202124;
-}
-
-.card-description {
-    color: #5f6368;
-    font-size: 0.9rem;
-}
-
-/* Estilos para tablas */
-.custom-table {
-    background-color: white;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-    margin-bottom: 20px;
-}
-
-.table-header {
-    padding: 15px 20px;
-    background-color: white;
-    border-bottom: 1px solid #e0e0e0;
+.k-nav-tabs {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    gap: 2rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
 }
 
-.table-title {
-    font-size: 1.2rem;
-    font-weight: 600;
-}
-
-.table-actions {
-    display: flex;
-    gap: 10px;
-}
-
-/* Estilos para botones */
-.btn-custom {
-    padding: 8px 16px;
-    border-radius: 6px;
-    border: none;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-    text-decoration: none;
-    display: inline-block;
-}
-
-.btn-primary-custom {
-    background-color: #1a73e8;
-    color: white;
-}
-
-.btn-primary-custom:hover {
-    background-color: #4285f4;
-}
-
-.btn-secondary-custom {
-    background-color: white;
-    color: #202124;
-    border: 1px solid #e0e0e0;
-}
-
-.btn-secondary-custom:hover {
-    background-color: #f1f3f4;
-}
-
-/* Estilos para formularios */
-.form-section {
-    background-color: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-    padding: 20px;
-    margin-bottom: 20px;
-}
-
-.form-title {
-    font-size: 1.2rem;
-    font-weight: 600;
-    margin-bottom: 20px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #e0e0e0;
-}
-
-.form-group {
-    margin-bottom: 20px;
-}
-
-.form-label {
-    font-weight: 500;
-    margin-bottom: 8px;
-    display: block;
-}
-
-.form-control-custom {
-    width: 100%;
-    padding: 10px 15px;
-    border: 1px solid #e0e0e0;
-    border-radius: 6px;
-    transition: all 0.2s;
-    box-sizing: border-box;
-}
-
-.form-control-custom:focus {
-    outline: none;
-    border-color: #1a73e8;
-    box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.1);
-}
-
-/* Estilos para badges de estado */
-.status-badge {
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 0.85rem;
-    font-weight: 500;
-    display: inline-block;
-}
-
-.status-approved {
-    background-color: rgba(15, 157, 88, 0.1);
-    color: #0f9d58;
-}
-
-.status-failed {
-    background-color: rgba(234, 67, 53, 0.1);
-    color: #ea4335;
-}
-
-/* Estilos para el contenedor de gráficos */
-.chart-container {
+.k-nav-item {
+    padding: 1rem 0;
     position: relative;
-    height: 300px;
-    width: 100%;
-}
-
-/* Estilos para el botón flotante de acción */
-.floating-action-btn {
-    position: fixed;
-    bottom: 30px;
-    right: 30px;
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    background-color: #1a73e8;
-    color: white;
-    border: none;
-    font-size: 24px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
     cursor: pointer;
+    color: var(--k-text-muted);
+    font-weight: 500;
+    transition: color 0.2s ease;
+    font-size: 0.95rem;
     display: flex;
     align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    transition: all 0.3s;
 }
-
-.floating-action-btn:hover {
-    transform: scale(1.1);
-    background-color: #4285f4;
+.k-nav-item:hover { color: var(--k-primary); }
+.k-nav-item.active {
+    color: var(--k-primary);
+    font-weight: 600;
 }
-
-/* Estilos para modales */
-.modal-custom {
-    display: none;
-    position: fixed;
-    top: 0;
+.k-nav-item.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
     left: 0;
     width: 100%;
-    height: 100%;
-    background-color: rgba(0,0,0,0.5);
-    z-index: 2000;
-    align-items: center;
-    justify-content: center;
+    height: 3px;
+    background-color: var(--k-primary);
+    border-radius: 3px 3px 0 0;
 }
 
-.modal-custom.active {
-    display: flex;
-}
-
-.modal-content-custom {
-    background-color: white;
-    border-radius: 8px;
-    width: 90%;
-    max-width: 800px;
-    max-height: 90vh;
+.k-main-content {
+    flex: 1;
     overflow-y: auto;
-    animation: modalFadeIn 0.3s;
+    padding: 1.5rem;
+    position: relative;
 }
 
-@keyframes modalFadeIn {
-    from { opacity: 0; transform: translateY(-30px); }
+.k-view-section {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+.k-view-section.active { display: block; }
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
-.modal-header-custom {
-    padding: 20px;
-    border-bottom: 1px solid #e0e0e0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+/* =========================================
+   3. COMPONENTES UI
+   ========================================= */
+.k-btn {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.5rem 1rem; font-size: 0.9rem; font-weight: 500;
+    border-radius: var(--k-radius-md); border: 1px solid transparent;
+    cursor: pointer; transition: all 0.2s ease;
+    text-decoration: none;
+}
+.k-btn-primary {
+    background-color: var(--k-primary); color: white;
+    box-shadow: 0 2px 4px rgba(23, 78, 166, 0.2);
+}
+.k-btn-primary:hover { background-color: var(--k-primary-hover); transform: translateY(-1px); color: white; }
+.k-btn-outline {
+    background-color: transparent; border-color: var(--k-border); color: var(--k-text-main);
+}
+.k-btn-outline:hover { border-color: var(--k-primary); color: var(--k-primary); background-color: var(--k-primary-light); }
+
+/* Grids */
+.k-grid-dashboard {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
 }
 
-.modal-title-custom {
-    font-size: 1.3rem;
-    font-weight: 600;
+/* Cards */
+.k-stat-card {
+    background: var(--k-bg-card); border: 1px solid var(--k-border);
+    border-radius: var(--k-radius-lg); padding: 1.25rem;
+    display: flex; flex-direction: column; position: relative; overflow: hidden;
 }
-
-.modal-close {
-    background: none;
-    border: none;
-    font-size: 1.5rem;
-    cursor: pointer;
-    color: #5f6368;
+.k-stat-card::before {
+    content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%;
 }
+.k-stat-card.primary::before { background-color: var(--k-primary); }
+.k-stat-card.success::before { background-color: var(--k-success); }
+.k-stat-card.warning::before { background-color: var(--k-warning); }
+.k-stat-card.danger::before { background-color: var(--k-danger); }
 
-.modal-body-custom {
-    padding: 20px;
+.k-stat-label { font-size: 0.8rem; color: var(--k-text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.25rem; }
+.k-stat-value { font-size: 1.75rem; font-weight: 700; color: var(--k-text-main); line-height: 1.1; }
+.k-stat-meta { margin-top: auto; padding-top: 0.5rem; font-size: 0.8rem; color: var(--k-text-muted); }
+
+/* Charts */
+.k-chart-container {
+    background: var(--k-bg-card); border: 1px solid var(--k-border);
+    border-radius: var(--k-radius-lg); padding: 1.5rem;
+    margin-bottom: 2rem; box-shadow: var(--k-shadow-sm);
+    height: 100%;
+    display: flex; flex-direction: column;
 }
+.k-chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.k-chart-title { font-size: 1.1rem; font-weight: 600; color: var(--k-text-main); }
 
-.modal-footer-custom {
-    padding: 15px 20px;
-    border-top: 1px solid #e0e0e0;
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-}
-
-/* Estilos para el título "Programa de Inducciones" en el header */
-.submodule-content.inducciones-viewer .top-header .logo-section h3 {
-    color: white !important;
-    margin: 0 !important;
-    opacity: 0.9 !important;
-    font-size: 1.5rem !important;
-    font-weight: 600 !important;
-}
-
-/* Estilos para pestañas */
-.tabs-container {
-    margin-bottom: 20px;
-}
-
-.tabs-nav {
-    display: flex;
-    border-bottom: 1px solid #e0e0e0;
-}
-
-.tab-button {
-    padding: 12px 20px;
-    background: none;
-    border: none;
-    border-bottom: 3px solid transparent;
-    cursor: pointer;
-    font-weight: 500;
-    color: #5f6368;
-    transition: all 0.2s;
-}
-
-.tab-button:hover {
-    color: #202124;
-}
-
-.tab-button.active {
-    color: #1a73e8;
-    border-bottom-color: #1a73e8;
-}
-
-.tab-content {
-    display: none;
-    padding: 20px 0;
-}
-
-.tab-content.active {
-    display: block;
-}
-
-/* Ajustes de responsive */
-@media (max-width: 768px) {
-    .inducciones-container .top-nav .nav-link {
-        padding: 10px 15px;
-        font-size: 0.9rem;
-    }
-
-    .table-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
-    }
-
-    .table-actions {
-        width: 100%;
-        justify-content: flex-end;
-    }
-
-    .dashboard-card {
-        margin-bottom: 15px;
-    }
-
-    .card-value {
-        font-size: 1.5rem;
-    }
-
-    .modal-content-custom {
-        width: 95%;
-        margin: 20px;
-    }
-}
-
-/* ============================================================= */
-/* ESPACIADO VERTICAL EXCLUSIVO PARA EL DASHBOARD DE INDUCCIONES */
-/* No afecta a ningún otro módulo del sistema                     */
-/* ============================================================= */
-
-/* ✅ SOBREESCRITURA DEFINITIVA — Solo para el dashboard de inducciones */
-.inducciones-container #dashboard-page {
-    display: flex;
-    flex-direction: column;
+/* BUG FIX: Contenedor del canvas para evitar desbordes */
+.k-chart-body {
+    position: relative;
     flex: 1;
+    width: 100%;
+    min-height: 250px;
+    height: 300px; /* Altura base */
     overflow: hidden;
 }
 
-#dashboard-view {
-    flex: 1;
-    overflow-y: auto;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 2rem; /* espacio uniforme ENTRE LAS FILAS */
-}
-
-/* Cada fila del dashboard */
-#dashboard-view > .row {
-    display: flex !important;
-    flex-wrap: wrap !important;
-    gap: 1.5rem !important; /* espacio ENTRE TARJETAS dentro de la fila */
-    margin: 0 !important;
-    padding: 0 !important;
+.k-chart-body canvas {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
     width: 100% !important;
-    min-width: 0 !important;
-    align-items: stretch !important;
+    height: 100% !important;
 }
 
-/* Cada columna/tarjeta dentro de las filas */
-#dashboard-view .row > [class*="col-"] {
-    display: flex !important;
-    flex-direction: column !important;
-    margin: 0 !important;
-    padding: 0 !important;
+/* Tables */
+.k-table-container {
+    background: var(--k-bg-card); border: 1px solid var(--k-border);
+    border-radius: var(--k-radius-lg); overflow-x: auto;
+    box-shadow: var(--k-shadow-sm);
+}
+.k-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.k-table th {
+    background-color: #fcfcfc; color: var(--k-text-muted); font-weight: 600;
+    text-align: left; padding: 1rem 1.5rem; border-bottom: 1px solid var(--k-border); white-space: nowrap;
+}
+.k-table td { padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--k-border); vertical-align: middle; }
+.k-table tbody tr:hover { background-color: #fcfdff; }
+
+/* Badges */
+.k-badge {
+    display: inline-flex; align-items: center; padding: 0.35em 0.65em;
+    font-size: 0.75em; font-weight: 600; line-height: 1; text-align: center;
+    white-space: nowrap; vertical-align: baseline; border-radius: var(--k-radius-md);
+}
+.k-badge-success { background-color: var(--k-success-light); color: var(--k-success); }
+.k-badge-danger { background-color: var(--k-danger-light); color: var(--k-danger); }
+
+/* Forms & Filters */
+.form-label { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; color: var(--k-text-main); }
+.form-control {
+    width: 100%; padding: 0.6rem 0.8rem; border: 1px solid var(--k-border);
+    border-radius: var(--k-radius-md); font-family: inherit; font-size: 0.9rem;
+}
+.form-control:focus { outline: none; border-color: var(--k-primary); box-shadow: 0 0 0 3px var(--k-primary-light); }
+
+.k-filter-group {
+    display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin-bottom: 1.5rem;
+    background: var(--k-bg-card); padding: 1rem; border: 1px solid var(--k-border);
+    border-radius: var(--k-radius-lg); border-bottom: none;
+}
+.k-form-select {
+    padding: 0.5rem 2rem 0.5rem 1rem; border: 1px solid var(--k-border);
+    border-radius: var(--k-radius-md); background-color: var(--k-bg-app);
+    font-size: 0.9rem; color: var(--k-text-main); cursor: pointer;
 }
 
-/* Componentes visuales reales: tarjetas */
-#dashboard-view .stat-card,
-#dashboard-view .chart-container,
-#dashboard-view .action-card,
-#dashboard-view .training-list {
-    background-color: white !important;
-    border-radius: 8px !important;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.05) !important;
-    padding: 1.5rem !important;
-    margin: 0 !important; /* ← clave: anular margin heredado */
-    flex: 1 1 auto !important;
-    min-width: 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow: hidden !important;
+/* Modal */
+.k-modal-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5); z-index: 1050; display: none;
+    justify-content: center; align-items: center;
 }
+.k-modal-overlay.open { display: flex; }
+.k-modal {
+    background: white; border-radius: var(--k-radius-lg); width: 100%; max-width: 500px;
+    box-shadow: var(--k-shadow-md); animation: slideUp 0.3s ease;
+    max-height: 90vh; display: flex; flex-direction: column;
+}
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+.k-modal-header { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--k-border); display: flex; justify-content: space-between; align-items: center; }
+.k-modal-title { font-size: 1.15rem; font-weight: 600; color: var(--k-primary); margin: 0; }
+.k-modal-body { padding: 1.5rem; overflow-y: auto; }
+.k-modal-footer { padding: 1rem 1.5rem; border-top: 1px solid var(--k-border); display: flex; justify-content: flex-end; gap: 0.75rem; }
 
-/* Asegurar que no haya margin collapse ni paddings fantasma */
-#dashboard-view .stat-card > *,
-#dashboard-view .chart-container > *,
-#dashboard-view .action-card > *,
-#dashboard-view .training-list > * {
-    margin-top: 0 !important;
-    margin-bottom: 0 !important;
+/* Toasts */
+.k-toast-container { position: fixed; top: 20px; right: 20px; z-index: 2000; display: flex; flex-direction: column; gap: 10px; }
+.k-toast {
+    background: white; border-left:4px solid var(--k-primary); padding: 1rem 1.5rem;
+    border-radius: var(--k-radius-md); box-shadow: var(--k-shadow-md);
+    display: flex; align-items: center; gap: 1rem; min-width: 300px;
+    animation: slideInRight 0.3s ease;
 }
+@keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
-/* Títulos dentro de tarjetas */
-#dashboard-view .stat-card h3,
-#dashboard-view .chart-container h3,
-#dashboard-view .action-card h3,
-#dashboard-view .training-list h3 {
-    margin-top: 0 !important;
-    margin-bottom: 1rem !important;
-}
+/* Layout Grids */
+.grid-2-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
+.grid-1-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
+.grid-1-1 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
 
-/* Última fila: sin gap extra abajo */
-#dashboard-view > .row:last-child {
-    margin-bottom: 0 !important;
-}
+@media (max-width: 900px) { .grid-2-1, .grid-1-2, .grid-1-1 { grid-template-columns: 1fr; } }
