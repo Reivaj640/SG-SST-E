@@ -693,20 +693,61 @@ class RecursosHome {
         // Usar los datos ya cargados en resourceStats
         const stats = this.resourceStats?.capacitaciones || { totalCapacitaciones: 0, programadas: 0, realizadas: 0, porcentajeCumplimiento: 0 };
 
-        const title = 'Capacitaciones';
-        const value = `${stats.porcentajeCumplimiento}%`;
-        const desc = stats.programadas > 0
-            ? `Realizadas: ${stats.realizadas} / ${stats.programadas}`
-            : 'Sin datos';
+        const total = stats.programadas;
+        const realizadas = stats.realizadas;
+        const restante = Math.max(0, total - realizadas); // Calcular restante
+        const porcentaje = stats.porcentajeCumplimiento;
+        const currentYear = new Date().getFullYear();
 
-        const w = document.createElement('div');
-        w.className = 'widget';
-        w.innerHTML = `
-            <h4>${title}</h4>
-            <div class="widget-value">${value}</div>
-            <div class="widget-description">${desc}</div>
+        // 1. Determinar Color (Semáforo)
+        let colorVar = 'var(--k-success)';
+        let colorClass = 'bg-success';
+
+        if (porcentaje < 50) {
+            colorVar = 'var(--k-danger)';
+            colorClass = 'bg-danger';
+        } else if (porcentaje < 80) {
+            colorVar = 'var(--k-warning)';
+            colorClass = 'bg-warning';
+        }
+
+        // 2. Crear Elemento con estructura de "Budget Card" (Reutilizando clases kb-*)
+        const widget = document.createElement('div');
+        widget.className = 'widget k-budget-card'; 
+
+        widget.innerHTML = `
+            <div class="kb-header">
+                <span class="kb-title">Plan Capacitación ${currentYear}</span>
+                <span class="kb-badge ${colorClass}">${porcentaje}%</span>
+            </div>
+
+            <div class="kb-amount" style="font-size: 1.8rem;">${realizadas} / ${total}</div>
+
+            <div class="kb-progress-track">
+                <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};"></div>
+            </div>
+
+            <div class="kb-footer">
+                <div>
+                    <div class="kb-label">Realizadas</div>
+                    <div class="kb-value kb-exec" style="color: var(--k-success);">${realizadas}</div>
+                </div>
+                <div style="text-align: right;">
+                    <div class="kb-label">Restante</div>
+                    <div class="kb-value kb-rem" style="color: var(--k-text-muted);">${restante}</div>
+                </div>
+            </div>
         `;
-        return w;
+
+        // 3. Animación de barra (después de insertar en DOM)
+        setTimeout(() => {
+            const bar = widget.querySelector('.kb-progress-bar');
+            if (bar) {
+                bar.style.width = `${Math.min(porcentaje, 100)}%`;
+            }
+        }, 100);
+
+        return widget;
     }
 
     // Nuevo método para crear widget de EPPs con datos reales
