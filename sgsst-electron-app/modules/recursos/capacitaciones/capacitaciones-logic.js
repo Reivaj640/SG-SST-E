@@ -547,11 +547,27 @@ class CapacitacionesComponent {
     async saveTraining() {
         const name = document.getElementById('trainingName').value;
         const type = document.getElementById('trainingType').value;
-        const dateInput = document.getElementById('trainingDate').value;
         const instructor = document.getElementById('trainingInstructor').value;
         const duration = document.getElementById('trainingDuration').value;
 
-        if (!name || !dateInput) {
+        // Validar la fecha antes de guardar (Restaurado del backup)
+        const newDate = document.getElementById('trainingDate').value;
+        let fechaProgramada = 'No especificada';
+
+        if (newDate && newDate !== '') {
+            const parsedDate = new Date(newDate.replace(/-/g, '/'));
+            if (!isNaN(parsedDate.getTime()) && parsedDate.getFullYear() >= 1900) {
+                const year = parsedDate.getFullYear();
+                const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
+                const day = String(parsedDate.getDate()).padStart(2, '0');
+                fechaProgramada = `${year}-${month}-${day}`;
+            } else {
+                this.showNotification('La fecha ingresada no es válida.', 'warning');
+                return;
+            }
+        }
+
+        if (!name || !newDate) {
             this.showNotification('Nombre y Fecha son obligatorios.', 'warning');
             return;
         }
@@ -561,7 +577,7 @@ class CapacitacionesComponent {
             rowIndex: this.capacitaciones.length > 0 ? Math.max(...this.capacitaciones.map(c => c.rowIndex)) + 1 : 6,
             nombre: name,
             tipo: type,
-            fechaProgramada: dateInput, 
+            fechaProgramada: fechaProgramada, 
             instructor: instructor,
             duracion: `${duration} Horas`,
             participantes: 0,
