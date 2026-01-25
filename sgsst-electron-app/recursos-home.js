@@ -473,7 +473,7 @@ class RecursosHome {
     async loadResourceStats() {
         try {
             console.log('🔄 [RecursosHome] Cargando estadísticas reales de recursos para:', this.currentCompany);
-            
+
             // Inicializar estructura base
             this.resourceStats = {
                 inducciones: { totalInducciones: 0, completadas: 0, pendientes: 0, porcentajeCompletado: 0, mensual: new Array(12).fill(0) },
@@ -503,7 +503,7 @@ class RecursosHome {
     async calculateCapacitacionesClientSide() {
         try {
             console.log('📊 [RecursosHome] Calculando estadísticas de Capacitaciones (Cliente)...');
-            
+
             // A. Buscar ruta del submódulo
             const submodulePathResult = await window.electronAPI.findSubmodulePath(this.currentCompany, 'Recursos', '1.2.1 Programa de capacitación Anual');
             if (!submodulePathResult.success) throw new Error("Ruta submódulo no encontrada");
@@ -522,16 +522,16 @@ class RecursosHome {
 
             if (excelFiles.length === 0) {
                 console.warn('⚠️ [RecursosHome] No se encontró Excel de capacitaciones (ACT-FO-005)');
-                return; 
+                return;
             }
             // Preferir el más reciente o específico si hay varios
-            const excelFile = excelFiles[0]; 
+            const excelFile = excelFiles[0];
             const filePath = `${submodulePath}/${excelFile.name || path.basename(excelFile.path)}`;
 
             // C. Determinar Hoja (Año Actual)
             const sheetsResult = await window.electronAPI.getCapacitacionesSheets(filePath);
             if (!sheetsResult.success) throw new Error("Error leyendo hojas");
-            
+
             const currentYear = new Date().getFullYear();
             let sheetName = sheetsResult.sheets.find(s => s.toLowerCase().includes(`matriz cap`) && s.includes(currentYear.toString()));
             if (!sheetName) sheetName = sheetsResult.sheets.find(s => s.includes(currentYear.toString()));
@@ -542,6 +542,9 @@ class RecursosHome {
                 return;
             }
 
+            // Log para mostrar de qué hoja se están obteniendo los datos
+            console.log('📊 [RecursosHome] Obteniendo datos de capacitaciones de la hoja:', sheetName, 'para el año:', currentYear);
+
             // D. Leer Datos y Procesar
             const excelResult = await window.electronAPI.initExcel({ filePath, sheetName });
             if (!excelResult.success) throw new Error("Error initExcel");
@@ -550,16 +553,16 @@ class RecursosHome {
             const dataRows = processedData; // Iteramos desde el inicio para encontrar los datos reales
 
             // --- LÓGICA DE CONTEO AJUSTADA A TUS LOGS ---
-            const stats = { 
-                totalCapacitaciones: 0, 
-                programadas: 0, 
-                realizadas: 0, 
-                porcentajeCumplimiento: 0, 
-                mensual: { programadas: new Array(12).fill(0), realizadas: new Array(12).fill(0) } 
+            const stats = {
+                totalCapacitaciones: 0,
+                programadas: 0,
+                realizadas: 0,
+                porcentajeCumplimiento: 0,
+                mensual: { programadas: new Array(12).fill(0), realizadas: new Array(12).fill(0) }
             };
 
             console.groupCollapsed('🔍 [RecursosHome] Procesamiento de filas detallado');
-            
+
             for (let i = 0; i < dataRows.length; i++) {
                 const row = dataRows[i];
                 if (!Array.isArray(row) || row.length < 2) continue;
@@ -567,7 +570,7 @@ class RecursosHome {
                 // Helper para extraer valor de celda (Maneja objetos/texto)
                 const getVal = (cell) => {
                     if (cell === null || cell === undefined) return '';
-                    if (typeof cell === 'object' && cell.value !== undefined) return String(cell.value); 
+                    if (typeof cell === 'object' && cell.value !== undefined) return String(cell.value);
                     return String(cell);
                 };
 
@@ -575,7 +578,7 @@ class RecursosHome {
                 // Columna 2 (C) -> Nombre
                 // Columna 4 (E) -> Fecha Programada
                 // Columna 9 (J) -> Indicador de realización (0% o 100%)
-                
+
                 const nombre = getVal(row[2]).trim(); // Índice 2: Nombre
                 const nombreLower = nombre.toLowerCase();
 
@@ -585,7 +588,7 @@ class RecursosHome {
                     console.log(`Skipping Header Row ${i}: ${nombre}`);
                     continue;
                 }
-                
+
                 // 2. Filtro de Totalizador (Break)
                 if (nombreLower.includes('total capacitaciones') || nombreLower.includes('total')) {
                     console.log(`Break at Row ${i}: ${nombre} (Totalizador detectado)`);
@@ -595,7 +598,7 @@ class RecursosHome {
                 // 3. Validación Adicional: Debe tener fecha o tipo para ser real
                 const fechaRaw = row[4]; // Índice 4
                 const tipoRaw = getVal(row[3]); // Índice 3
-                
+
                 // Si no tiene fecha Y no tiene tipo, probablemente es basura
                 if (!fechaRaw && (!tipoRaw || tipoRaw.length < 2)) {
                      console.log(`Skipping Row ${i}: ${nombre} (Sin fecha ni tipo válido)`);
@@ -607,12 +610,12 @@ class RecursosHome {
                 stats.programadas++;
 
                 // ESTADO: Verificar columna 9 (J)
-                const estadoRaw = getVal(row[9]); 
+                const estadoRaw = getVal(row[9]);
                 const estadoNorm = estadoRaw.toLowerCase();
-                
+
                 // Es realizada si dice "100", "ejecutada", "realizada", etc.
-                const isRealizada = estadoNorm.includes('100') || 
-                                    estadoNorm.includes('realizada') || 
+                const isRealizada = estadoNorm.includes('100') ||
+                                    estadoNorm.includes('realizada') ||
                                     estadoNorm.includes('ejecutada') ||
                                     estadoNorm.includes('completada');
 
@@ -630,7 +633,7 @@ class RecursosHome {
                         // En tu log vi "7/4/25" y mes "julio", así que es mes/dia/año
                         const parts = fStr.split('/');
                         if (parts.length === 3) {
-                            monthIndex = parseInt(parts[0]) - 1; 
+                            monthIndex = parseInt(parts[0]) - 1;
                         } else {
                             const d = new Date(fStr);
                             if (!isNaN(d.getTime())) monthIndex = d.getMonth();
@@ -713,7 +716,7 @@ class RecursosHome {
 
         // 2. Crear Elemento con estructura de "Budget Card" (Reutilizando clases kb-*)
         const widget = document.createElement('div');
-        widget.className = 'widget k-budget-card'; 
+        widget.className = 'widget k-budget-card';
 
         widget.innerHTML = `
             <div class="kb-header">
@@ -962,10 +965,10 @@ class RecursosHome {
         }
 
         const pct = totalP > 0 ? ((totalE / totalP) * 100) : 0;
-        return { 
-            totalPresupuesto: totalP, 
-            totalEjecutado: totalE, 
-            porcentajeCumplimiento: pct, 
+        return {
+            totalPresupuesto: totalP,
+            totalEjecutado: totalE,
+            porcentajeCumplimiento: pct,
             saldoDisponible: totalP - totalE,
             mensual: { ejecutado: cumulativeExecution, planeado: cumulativePlanned }
         };
@@ -1020,7 +1023,7 @@ class RecursosHome {
         const ctxBudget = document.getElementById('budgetChart');
         if(ctxBudget && typeof Chart !== 'undefined') {
             const bData = this.budgetData?.mensual || { planeado: Array(12).fill(0), ejecutado: Array(12).fill(0) };
-            
+
             this.charts.budget = new Chart(ctxBudget, {
                 type: 'line',
                 data: {
@@ -1056,10 +1059,18 @@ class RecursosHome {
         // 2. Training Chart (Bar: Programadas vs Realizadas)
         const ctxTraining = document.getElementById('trainingChart');
         if(ctxTraining && typeof Chart !== 'undefined') {
-            const stats = this.resourceStats?.capacitaciones?.mensual || {
+            // Obtener datos específicos del dashboard de capacitaciones para esta gráfica
+            const stats = this.getCapacitacionesChartDataForGraph() || {
                 programadas: new Array(12).fill(0),
                 realizadas: new Array(12).fill(0)
             };
+
+            // Log para mostrar qué datos está visualizando la gráfica y de dónde los obtiene
+            console.log('📊 [TrainingChart] Datos para gráfica de capacitaciones mensuales:');
+            console.log('   - Fuente: this.getCapacitacionesChartDataForGraph()');
+            console.log('   - Programadas:', stats.programadas);
+            console.log('   - Realizadas:', stats.realizadas);
+            console.log('   - Empresa actual:', this.currentCompany);
 
             this.charts.training = new Chart(ctxTraining, {
                 type: 'bar',
@@ -1084,12 +1095,12 @@ class RecursosHome {
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: { x: { stacked: false }, y: { beginAtZero: true, ticks: { precision: 0 } } },
-                    plugins: { 
-                        legend: { 
+                    plugins: {
+                        legend: {
                             display: true,
                             position: 'bottom',
                             labels: { boxWidth: 12, padding: 15 }
-                        } 
+                        }
                     }
                 }
             });
@@ -1120,6 +1131,51 @@ class RecursosHome {
                     scales: { y: { beginAtZero: true } }
                 }
             });
+        }
+    }
+
+    // Método para obtener datos específicos del dashboard de capacitaciones para la gráfica
+    async getCapacitacionesChartDataForGraph() {
+        try {
+            // Usar los mismos datos que ya fueron calculados en calculateCapacitacionesClientSide()
+            // para asegurar consistencia con la información mostrada en la tarjeta de estadísticas
+            // Acceder directamente a la estructura que se creó en calculateCapacitacionesClientSide()
+            const stats = this.resourceStats?.capacitaciones?.mensual;
+
+            console.log('📊 [getCapacitacionesChartDataForGraph] Datos mensuales completos:', stats);
+
+            if (stats && stats.programadas && stats.realizadas) {
+                // Asegurar que los arrays tienen 12 meses
+                const programadas = Array.isArray(stats.programadas) ? stats.programadas : new Array(12).fill(0);
+                const realizadas = Array.isArray(stats.realizadas) ? stats.realizadas : new Array(12).fill(0);
+
+                // Asegurar que cada array tiene 12 elementos
+                while (programadas.length < 12) programadas.push(0);
+                while (realizadas.length < 12) realizadas.push(0);
+
+                // Tomar solo los primeros 12 elementos por si acaso
+                const programadasFinal = programadas.slice(0, 12);
+                const realizadasFinal = realizadas.slice(0, 12);
+
+                console.log('📊 [getCapacitacionesChartDataForGraph] Datos encontrados - Programadas:', programadasFinal, 'Realizadas:', realizadasFinal);
+                return {
+                    programadas: programadasFinal,
+                    realizadas: realizadasFinal
+                };
+            } else {
+                console.log('📊 [getCapacitacionesChartDataForGraph] No se encontraron datos mensuales, usando arrays vacíos');
+                // Si no hay datos disponibles, retornar arrays vacíos
+                return {
+                    programadas: new Array(12).fill(0),
+                    realizadas: new Array(12).fill(0)
+                };
+            }
+        } catch (error) {
+            console.error('❌ [RecursosHome] Error obteniendo datos de capacitaciones para gráfica:', error);
+            return {
+                programadas: new Array(12).fill(0),
+                realizadas: new Array(12).fill(0)
+            };
         }
     }
 
