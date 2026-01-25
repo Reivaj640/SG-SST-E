@@ -172,12 +172,12 @@ function searchInStructure(node, searchTerm) {
     // Si el término parece un código (ej. "2.4.1"), buscar coincidencia exacta al inicio
     // Esto evita que "2.4.1" coincida con "4.2.4.1"
     const isCode = /^[0-9.]+$/.test(searchTerm);
-    
+
     if (isCode) {
       // Verificar si empieza con el código seguido de un espacio o punto, o es igual
       // Ej: "2.4.1 " o "2.4.1." o "2.4.1"
-      if (node.name.startsWith(searchTerm + ' ') || 
-          node.name.startsWith(searchTerm + '.') || 
+      if (node.name.startsWith(searchTerm + ' ') ||
+          node.name.startsWith(searchTerm + '.') ||
           node.name === searchTerm) {
         return node.path;
       }
@@ -283,6 +283,8 @@ ipcMain.handle('get-app-version', async () => {
     return '1.0.0'; // Valor por defecto en caso de error
   }
 });
+
+
 
 // Manejar lectura de carpetas de documentos (versión corregida y unificada)
 ipcMain.handle('get-document-folders', async (event, payload) => {
@@ -580,11 +582,11 @@ ipcMain.handle('get-file-path', async (event, { directory, fileName }) => {
     if (!directory || !fileName) {
       throw new Error('Directorio o nombre de archivo no proporcionados');
     }
-    
+
     // Construir la ruta
     const filePath = path.join(directory, fileName);
     console.log('[MAIN] Construyendo ruta de archivo:', filePath);
-    
+
     // Verificar si existe (opcional, pero útil)
     if (fs.existsSync(filePath)) {
       return { success: true, path: filePath, exists: true };
@@ -691,39 +693,39 @@ ipcMain.handle('process-excel-data', async (event, { buffer, company, period }) 
         row.forEach(cell => {
             const val = normalize(cell);
             // Búsqueda más estricta para actividad/responsable para evitar falsos positivos como "Act. Prog."
-            if (keywords.actividad.some(k => val === k || val.startsWith(k + ' ') || val.includes(' ' + k))) { 
-                matches++; 
+            if (keywords.actividad.some(k => val === k || val.startsWith(k + ' ') || val.includes(' ' + k))) {
+                matches++;
                 actOrRespFound = true;
-                foundKeywords.push('actividad'); 
+                foundKeywords.push('actividad');
             }
-            if (keywords.responsable.some(k => val === k || val.startsWith(k + ' ') || val.includes(' ' + k))) { 
-                matches++; 
+            if (keywords.responsable.some(k => val === k || val.startsWith(k + ' ') || val.includes(' ' + k))) {
+                matches++;
                 actOrRespFound = true;
-                foundKeywords.push('responsable'); 
+                foundKeywords.push('responsable');
             }
-            
+
             // Verificación de meses (muy importante para confirmar que es la cabecera del cronograma)
-            if (keywords.meses.some(k => val === k)) { 
-                monthMatches++; 
-                foundKeywords.push('mes'); 
+            if (keywords.meses.some(k => val === k)) {
+                monthMatches++;
+                foundKeywords.push('mes');
             }
         });
 
         sendLog(`[MAIN][DEBUG] Escaneando fila ${i}: ${matches} coincidencias clave, ${monthMatches} meses encontrados. (${foundKeywords.join(', ')})`, 'DEBUG');
 
-        // CRITERIO REFORZADO: 
+        // CRITERIO REFORZADO:
         // 1. Debe haber encontrado al menos una palabra clave de actividad/responsable Y al menos 2 meses.
         // 2. O si encontramos muchos meses (>= 6) aunque la palabra 'actividad' sea sutil.
         if ((actOrRespFound && monthMatches >= 2) || monthMatches >= 6) {
             headerRowIndex = i;
             sendLog(`[MAIN] Encabezados encontrados en la fila ${i + 1}`, 'INFO');
-            
+
             // Mapear índices de columnas basándose en esta fila
             row.forEach((cell, colIndex) => {
                 const val = normalize(cell);
                 if (keywords.actividad.some(k => val.includes(k))) columnMap['actividad'] = colIndex;
                 else if (keywords.responsable.some(k => val.includes(k))) columnMap['responsable'] = colIndex;
-                
+
                 // Mapeo específico de meses (buscando abreviaturas comunes)
                 else if (val === 'ene' || val === 'enero') columnMap['enero'] = colIndex;
                 else if (val === 'feb' || val === 'febrero') columnMap['febrero'] = colIndex;
@@ -737,7 +739,7 @@ ipcMain.handle('process-excel-data', async (event, { buffer, company, period }) 
                 else if (val === 'oct' || val === 'octubre') columnMap['octubre'] = colIndex;
                 else if (val === 'nov' || val === 'noviembre') columnMap['noviembre'] = colIndex;
                 else if (val === 'dic' || val === 'diciembre') columnMap['diciembre'] = colIndex;
-                
+
                 else if (['observaciones', 'notas', 'comentarios'].some(k => val.includes(k))) columnMap['observaciones'] = colIndex;
             });
             break;
@@ -776,10 +778,10 @@ ipcMain.handle('process-excel-data', async (event, { buffer, company, period }) 
         for (let i = headerRowIndex + 1; i < rawData.length; i++) {
             const row = rawData[i];
             const actividad = String(row[columnMap['actividad']] || '').trim();
-            
+
             if (actividad.length > 0) {
                 // Determinar nivel jerárquico
-                let level = 4; 
+                let level = 4;
                 let type = 'activity';
                 const colA = String(row[0] || '').trim();
                 const normalizedAct = actividad.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -808,7 +810,7 @@ ipcMain.handle('process-excel-data', async (event, { buffer, company, period }) 
                 const activity = {
                   id: i + 1,
                   name: actividad,
-                  level: level, 
+                  level: level,
                   type: type,
                   expanded: true,
                   responsible: row[columnMap['responsable']] || 'Profesional SST',
@@ -1016,7 +1018,7 @@ ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacita
       // Determinar nombre de la nueva hoja
       // Intentar mantener el formato "Matriz Cap. YYYY"
       let newSheetName = `Matriz Cap. ${newYear}`;
-      
+
       // Si el nombre origen no sigue el patrón estándar, intentar adaptarlo o usar el estándar
       if (!currentSheetName.includes('Matriz Cap.')) {
           // Si tiene el año viejo, reemplazarlo
@@ -1038,7 +1040,7 @@ ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacita
       // Copiar configuración de página y vistas
       newSheet.pageSetup = sourceSheet.pageSetup;
       newSheet.views = sourceSheet.views;
-      
+
       // Copiar columnas (ancho, etc)
       if (sourceSheet.columns) {
           newSheet.columns = sourceSheet.columns.map(col => ({ ...col }));
@@ -1047,25 +1049,25 @@ ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacita
       // Copiar filas y celdas
       sourceSheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
         const newRow = newSheet.getRow(rowNumber);
-        
+
         // Copiar altura de fila
         if (row.height) newRow.height = row.height;
-        
+
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
           const newCell = newRow.getCell(colNumber);
           newCell.value = cell.value;
           newCell.style = JSON.parse(JSON.stringify(cell.style)); // Copia profunda de estilos
-          
+
           // Clonar datos pero LIMPIAR información de ejecución para el nuevo año
           // Suponiendo que las filas de datos empiezan en la fila 7 (según update-capacitaciones-excel startRow=7)
           if (rowNumber >= 7) {
               // Columna D (4): Fecha Programada -> Limpiar o poner fecha futura tentativa? Mejor limpiar.
               // Columna I (9): Estado -> Resetear a pendiente
-              
+
               if (colNumber === 4) { // Fecha
                   // newCell.value = 'No especificada'; // O dejar vacío
                   // Si queremos mantener la estructura pero sin fechas viejas:
-                  newCell.value = null; 
+                  newCell.value = null;
               }
               if (colNumber === 9) { // Estado (columna I)
                   // Resetear visualmente si hay texto
@@ -3297,9 +3299,425 @@ ipcMain.handle('duplicate-budget-file', async (event, { currentFilePath, newYear
     }
 });
 
+// Manejador para obtener datos detallados de inducciones
+ipcMain.handle('get-inducciones-data', async (event, companyName) => {
+  sendLog(`[MAIN] Obteniendo datos DETALLADOS de inducciones para: ${companyName}`, 'INFO');
+  try {
+    const rootPath = await getCompanyRootPath(companyName);
+    if (!rootPath) throw new Error(`No se encontró ruta raíz para la empresa: ${companyName}`);
+
+    const recursosPath = path.join(rootPath, '1. Recursos');
+    let targetPath = path.join(recursosPath, '1.1 Inducción y Reinducción');
+
+    if (!fs.existsSync(targetPath)) {
+       if (fs.existsSync(recursosPath)) {
+            const subs = await fsp.readdir(recursosPath);
+            const indFolder = subs.find(s => s.includes('1.1') || s.toLowerCase().includes('inducci'));
+            if (indFolder) targetPath = path.join(recursosPath, indFolder);
+        }
+    }
+
+    if (!fs.existsSync(targetPath)) throw new Error('No se encontró la carpeta de inducciones');
+
+    const files = await fsp.readdir(targetPath);
+    const excelFile = files.find(f => 
+        !f.startsWith('~$') && (f.endsWith('.xlsx') || f.endsWith('.xls')) &&
+        (f.includes('046') || f.toLowerCase().includes('induccion'))
+    );
+
+    if (!excelFile) throw new Error('No se encontró el archivo Excel de inducciones (FO-046)');
+
+    const filePath = path.join(targetPath, excelFile);
+    const wb = xlsx.readFile(filePath);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rawData = xlsx.utils.sheet_to_json(ws, { header: 1 });
+    
+    const inducciones = [];
+    // Según backup, los datos reales empiezan en la fila 2 (índice 1)
+    for (let i = 1; i < rawData.length; i++) {
+        const row = rawData[i];
+        if (!row) continue;
+        
+        // Empleado en Col G (índice 6)
+        const empleado = row[6] ? String(row[6]).trim() : '';
+        if (!empleado || empleado === 'Nombre del empleado' || empleado === '') continue;
+        
+        // Detener si es la fila de totalizadores
+        if (empleado.toLowerCase().includes('total inducciones')) break;
+
+        // Fecha en Col D (índice 3)
+        let fecha = row[3];
+        if (typeof fecha === 'number') {
+            const dateCode = xlsx.SSF.parse_date_code(fecha);
+            fecha = `${dateCode.y}-${String(dateCode.m).padStart(2, '0')}-${String(dateCode.d).padStart(2, '0')}`;
+        } else if (fecha instanceof Date) {
+            fecha = fecha.toISOString().split('T')[0];
+        }
+
+        // Mapeo según Backup:
+        // Col B (1): Puntaje
+        // Col C (2): Estado
+        // Col E (4): Año
+        // Col H (7): Cédula
+        // Col I (8): Cargo
+        // Col L (11): Género
+
+        inducciones.push({
+            id: i,
+            date: fecha || '',
+            year: row[4] || '',
+            name: empleado,
+            idCard: row[7] || 'N/A',
+            position: row[8] || 'N/A',
+            gender: row[11] || '',
+            score: row[1] || '0 / 22',
+            status: (row[2] && row[2].toString().toLowerCase().includes('aprob')) ? 'approved' : 'failed'
+        });
+    }
+
+    return { success: true, data: inducciones, filePath };
+  } catch (error) {
+    sendLog(`[MAIN] Error en get-inducciones-data: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
 ipcMain.on('restart_app', () => {
   log.info('El usuario ha aceptado la actualización. Reiniciando para instalar...');
-
   autoUpdater.quitAndInstall();
-
 });
+
+// --- FUNCIONES AUXILIARES INTERNAS PARA ESTADÍSTICAS ---
+
+async function getCompanyRootPath(companyName) {
+  try {
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+
+    const normalized = companyName.toLowerCase().trim();
+    const companyKey = Object.keys(config.companyPaths || {}).find(
+      k => k.toLowerCase().trim() === normalized
+    );
+
+    if (!companyKey) return null;
+    
+    // Preferir la estructura mapeada si existe, sino la ruta raíz
+    const companyConfig = config.companyPaths[companyKey];
+    return companyConfig.root || companyConfig.ruta_base;
+  } catch (e) {
+    console.error('Error obteniendo ruta empresa:', e);
+    return null;
+  }
+}
+
+async function calculateCapacitacionesStats(basePath) {
+  const stats = { 
+    totalCapacitaciones: 0, 
+    programadas: 0, 
+    realizadas: 0, 
+    porcentajeCumplimiento: 0,
+    mensual: {
+        programadas: new Array(12).fill(0),
+        realizadas: new Array(12).fill(0)
+    }
+  };
+  try {
+    if (!basePath) return stats;
+    
+    const recursosPath = path.join(basePath, '1. Recursos');
+    
+    // Búsqueda prioritaria de la carpeta "1.2.1"
+    let targetPath = path.join(recursosPath, '1.2.1 Programa de capacitación Anual');
+    
+    if (!fs.existsSync(targetPath)) {
+        if (fs.existsSync(recursosPath)) {
+            const subs = await fsp.readdir(recursosPath);
+            // Intentar encontrar carpeta que empiece por 1.2.1 o contenga capacitación
+            let capFolder = subs.find(s => s.startsWith('1.2.1') && s.toLowerCase().includes('capacita'));
+            if (!capFolder) {
+                capFolder = subs.find(s => (s.includes('1.2') || s.includes('Capacita')) && !s.startsWith('.'));
+            }
+            if (capFolder) targetPath = path.join(recursosPath, capFolder);
+        }
+    }
+
+    if (!fs.existsSync(targetPath)) return stats;
+
+    const files = await fsp.readdir(targetPath);
+    // Buscar archivo cronograma (ACT-FO-005 o similar) de forma insensible a mayúsculas
+    const excelFile = files.find(f => 
+        (f.toLowerCase().includes('act-fo-005') || f.toLowerCase().includes('cronograma')) && 
+        !f.startsWith('~$') && 
+        (f.endsWith('.xlsx') || f.endsWith('.xls'))
+    );
+
+    if (!excelFile) {
+        sendLog(`[WARN] No se encontró archivo de cronograma (ACT-FO-005) en: ${targetPath}`, 'WARN');
+        return stats;
+    }
+
+    const workbook = xlsx.readFile(path.join(targetPath, excelFile));
+    const currentYear = new Date().getFullYear();
+    
+    // Buscar hoja del año actual, preferiblemente con "Matriz Cap."
+    let sheetName = workbook.SheetNames.find(s => 
+        s.toLowerCase().includes('matriz cap') && s.includes(currentYear.toString())
+    );
+    
+    // Fallback: buscar solo por año
+    if (!sheetName) {
+        sheetName = workbook.SheetNames.find(s => s.includes(currentYear.toString()));
+    }
+    // Fallback final: primera hoja
+    if (!sheetName) sheetName = workbook.SheetNames[0];
+
+    sendLog(`[INFO] Calculando stats desde archivo: ${excelFile}, Hoja: ${sheetName}`, 'INFO');
+
+    const worksheet = workbook.Sheets[sheetName];
+    const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
+
+    // Empezar en fila 6 (índice 5) igual que el viewer
+    let startIndex = 5; 
+    
+    for (let i = startIndex; i < data.length; i++) {
+        const row = data[i];
+        if (!Array.isArray(row) || row.length < 2) continue;
+        
+        // Columna B (1): Nombre
+        const nombre = row[1];
+        if (!nombre || typeof nombre !== 'string' || nombre.includes('Nombre de la capacitación')) continue;
+        if (nombre.toLowerCase().includes('total')) break;
+
+        stats.totalCapacitaciones++;
+        stats.programadas++;
+
+        // Columna D (3): Fecha
+        let monthIndex = -1;
+        const fechaVal = row[3];
+        if (fechaVal) {
+            if (typeof fechaVal === 'number') {
+                const dateCode = xlsx.SSF.parse_date_code(fechaVal);
+                monthIndex = dateCode.m - 1;
+            } else if (fechaVal instanceof Date) {
+                monthIndex = fechaVal.getMonth();
+            } else if (typeof fechaVal === 'string') {
+                const parts = fechaVal.split(/[-/]/);
+                if (parts.length >= 2) {
+                    // Asumir formato dd/mm/yyyy o yyyy-mm-dd
+                    const p1 = parseInt(parts[1]);
+                    if (p1 >= 1 && p1 <= 12) monthIndex = p1 - 1;
+                }
+            }
+        }
+
+        if (monthIndex >= 0 && monthIndex < 12) {
+            stats.mensual.programadas[monthIndex]++;
+        }
+
+        // Columna I (8): Estado
+        // Verificar específicamente la columna de estado para mayor precisión
+        const estadoVal = row[8]; 
+        let isRealizada = false;
+        
+        if (estadoVal && typeof estadoVal === 'string') {
+            const estadoStr = estadoVal.toLowerCase();
+            isRealizada = estadoStr.includes('ejecutado') || estadoStr.includes('realizado') || estadoStr.includes('completado');
+        } else {
+            // Fallback: Si no hay estado explícito, buscar en la fila pero con cuidado
+            // (Deshabilitado para coincidir con la precisión del viewer, pero se puede reactivar si es necesario)
+            // const rowStr = JSON.stringify(row).toLowerCase();
+            // isRealizada = rowStr.includes('ejecutado') || ...
+        }
+        
+        if (isRealizada) {
+            stats.realizadas++;
+            if (monthIndex >= 0 && monthIndex < 12) {
+                stats.mensual.realizadas[monthIndex]++;
+            }
+        }
+    }
+
+    if (stats.programadas > 0) {
+        stats.porcentajeCumplimiento = Math.round((stats.realizadas / stats.programadas) * 100);
+    }
+
+  } catch (e) {
+    sendLog(`Error calculando capacitaciones: ${e.message}`, 'WARN');
+  }
+  return stats;
+}
+
+async function calculateInduccionesStats(basePath) {
+  const currentYear = new Date().getFullYear();
+  const stats = { 
+    totalInducciones: 0, 
+    completadas: 0, 
+    pendientes: 0, 
+    porcentajeCompletado: 0,
+    mensual: new Array(12).fill(0)
+  };
+  try {
+    if (!basePath) return stats;
+    
+    const recursosPath = path.join(basePath, '1. Recursos');
+    let targetPath = path.join(recursosPath, '1.1 Inducción y Reinducción');
+
+    if (!fs.existsSync(targetPath)) {
+       if (fs.existsSync(recursosPath)) {
+            const subs = await fsp.readdir(recursosPath);
+            const indFolder = subs.find(s => s.includes('1.1') || s.toLowerCase().includes('inducci'));
+            if (indFolder) targetPath = path.join(recursosPath, indFolder);
+        }
+    }
+
+    if (!fs.existsSync(targetPath)) return stats;
+
+    const files = await fsp.readdir(targetPath);
+    // Filtrar archivos Excel que coincidan con ACT-FO-046
+    const excelFiles = files.filter(f => 
+        !f.startsWith('~$') && (f.endsWith('.xlsx') || f.endsWith('.xls')) &&
+        f.toLowerCase().includes('act-fo-046')
+    );
+
+    for (const file of excelFiles) {
+        try {
+            const wb = xlsx.readFile(path.join(targetPath, file));
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const data = xlsx.utils.sheet_to_json(ws, { header: 1 });
+            
+            // Según backup, los datos reales empiezan en la fila 2 (índice 1)
+            for (let i = 1; i < data.length; i++) {
+                const row = data[i];
+                if (!row) continue;
+
+                // Empleado en Col G (6)
+                const empleado = row[6] ? String(row[6]).trim() : '';
+                if (!empleado || empleado.toLowerCase().includes('total')) break;
+
+                // Fecha en Col D (3)
+                let rowDate = null;
+                const fechaVal = row[3];
+                
+                if (fechaVal) {
+                    if (typeof fechaVal === 'number') {
+                        const dateCode = xlsx.SSF.parse_date_code(fechaVal);
+                        rowDate = new Date(dateCode.y, dateCode.m - 1, dateCode.d);
+                    } else {
+                        const parsed = new Date(fechaVal);
+                        if (!isNaN(parsed.getTime())) rowDate = parsed;
+                    }
+                }
+
+                // Año en Col E (4) como respaldo
+                const yearVal = row[4] ? parseInt(row[4]) : null;
+
+                // Contar si es del año actual
+                if ((rowDate && rowDate.getFullYear() === currentYear) || yearVal === currentYear) {
+                    stats.totalInducciones++;
+                    stats.completadas++;
+                    if (rowDate) stats.mensual[rowDate.getMonth()]++;
+                }
+            }
+        } catch (err) { continue; }
+    }
+    
+    // Convertir mensual a acumulado para el gráfico de tendencia
+    let cumulative = 0;
+    const trendData = [...stats.mensual];
+    for (let i = 0; i < 12; i++) {
+        cumulative += trendData[i];
+        stats.mensual[i] = cumulative;
+    }
+
+    stats.porcentajeCompletado = stats.totalInducciones > 0 ? 100 : 0;
+
+  } catch (e) {
+    sendLog(`Error calculando inducciones: ${e.message}`, 'WARN');
+  }
+  return stats;
+}
+
+async function calculateEppsStats(basePath) {
+  const stats = { totalEPPs: 0, entregados: 0, pendientes: 0, stockActual: 0 };
+  try {
+    if (!basePath) return stats;
+    
+    const recursosPath = path.join(basePath, '1. Recursos');
+    let targetPath = path.join(recursosPath, '1.3 EPP'); // O nombre similar
+
+    if (!fs.existsSync(targetPath)) {
+       if (fs.existsSync(recursosPath)) {
+            const subs = await fsp.readdir(recursosPath);
+            const eppFolder = subs.find(s => s.includes('1.3') || s.toLowerCase().includes('epp'));
+            if (eppFolder) targetPath = path.join(recursosPath, eppFolder);
+        }
+    }
+
+    if (!fs.existsSync(targetPath)) return stats;
+
+    const files = await fsp.readdir(targetPath);
+    const matrizFile = files.find(f => (f.includes('Matriz') || f.includes('Entrega')) && !f.startsWith('~$') && f.endsWith('.xlsx'));
+
+    if (matrizFile) {
+        const wb = xlsx.readFile(path.join(targetPath, matrizFile));
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const data = xlsx.utils.sheet_to_json(ws, { header: 1 });
+
+        for (let i = 5; i < data.length; i++) {
+            const row = data[i];
+            if (row && row[1]) { // Si hay item
+                stats.totalEPPs++;
+                stats.entregados++; // Simplificación
+            }
+        }
+        stats.stockActual = stats.totalEPPs; // Simplificación
+    }
+
+  } catch (e) {
+    sendLog(`Error calculando EPPs: ${e.message}`, 'WARN');
+  }
+  return stats;
+}
+
+// --- API Estadísticas de Recursos (Implementación Real) ---
+ipcMain.handle('get-recursos-stats', async (event, companyName) => {
+  try {
+    sendLog(`[MAIN] Obteniendo estadísticas REALES de recursos para: ${companyName}`, 'INFO');
+    
+    const rootPath = await getCompanyRootPath(companyName);
+    
+    if (!rootPath) {
+        sendLog(`[MAIN] No se encontró ruta raíz para ${companyName}. Retornando ceros.`, 'WARN');
+        return {
+            success: true,
+            stats: {
+                inducciones: { totalInducciones: 0, completadas: 0, pendientes: 0, porcentajeCompletado: 0 },
+                capacitaciones: { totalCapacitaciones: 0, programadas: 0, realizadas: 0, porcentajeCumplimiento: 0 },
+                epps: { totalEPPs: 0, entregados: 0, pendientes: 0, stockActual: 0 }
+            }
+        };
+    }
+
+    // Ejecutar cálculos en paralelo
+    const [capacitaciones, inducciones, epps] = await Promise.all([
+        calculateCapacitacionesStats(rootPath),
+        calculateInduccionesStats(rootPath),
+        calculateEppsStats(rootPath)
+    ]);
+
+    const stats = {
+      inducciones,
+      capacitaciones,
+      epps
+    };
+
+    sendLog(`[MAIN] Estadísticas calculadas: ${JSON.stringify(stats)}`, 'DEBUG');
+    return { success: true, stats };
+
+  } catch (error) {
+    sendLog(`[MAIN] Error crítico en estadísticas: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+

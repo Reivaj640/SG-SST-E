@@ -10,42 +10,70 @@ class InduccionesComponent {
         
         this.state = {
             currentView: 'dashboard',
-            data: [
-                { id: 1, date: '2024-01-10', name: 'Carlos Pérez', idCard: '80123456', position: 'Supernumerario', score: 22, status: 'approved', gender: 'Hombre' },
-                { id: 2, date: '2024-02-15', name: 'Ana Gómez', idCard: '80234567', position: 'Mesera', score: 21, status: 'approved', gender: 'Mujer' },
-                { id: 3, date: '2024-03-05', name: 'Jorge Torres', idCard: '80345678', position: 'Cocina', score: 14, status: 'failed', gender: 'Hombre' },
-                { id: 4, date: '2024-04-20', name: 'Luisa Méndez', idCard: '80456789', position: 'Operaria Integral', score: 18, status: 'failed', gender: 'Mujer' },
-                { id: 5, date: '2024-05-12', name: 'Pedro Castillo', idCard: '80567890', position: 'Portero', score: 20, status: 'approved', gender: 'Hombre' },
-                { id: 6, date: '2024-06-02', name: 'Marta Ruíz', idCard: '80678901', position: 'Mesera', score: 22, status: 'approved', gender: 'Mujer' },
-                { id: 7, date: '2024-07-15', name: 'Andrés López', idCard: '80789012', position: 'Administrativo', score: 19, status: 'approved', gender: 'Hombre' },
-                { id: 8, date: '2024-08-01', name: 'Claudia Vega', idCard: '80890123', position: 'Técnico', score: 10, status: 'failed', gender: 'Mujer' },
-                { id: 9, date: '2023-11-20', name: 'Roberto Díaz', idCard: '80901234', position: 'Cocina', score: 16, status: 'failed', gender: 'Hombre' }, 
-                { id: 10, date: '2023-12-05', name: 'Elena Silva', idCard: '81012345', position: 'Supernumerario', score: 22, status: 'approved', gender: 'Mujer' }
-            ],
+            data: [], // Se llenará con datos reales del Excel
             filteredData: [],
             charts: {}
         };
     }
 
-    render() {
+    async render() {
         this.container.innerHTML = '';
         this.container.classList.add('inducciones-container');
         window.currentInduccionesComponent = this;
 
-        fetch('./modules/recursos/inducciones/inducciones-view.html')
-            .then(response => response.text())
-            .then(html => {
-                this.container.innerHTML = html;
-                setTimeout(() => {
-                    this.updateHeaderContext();
-                    this.initializeEventListeners();
-                    this.init(); // Carga de datos inicial
-                }, 100);
-            })
-            .catch(error => {
-                console.error('Error cargando inducciones-view.html:', error);
-                this.container.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
-            });
+        try {
+            const response = await fetch('./modules/recursos/inducciones/inducciones-view.html');
+            const html = await response.text();
+            this.container.innerHTML = html;
+            
+            setTimeout(async () => {
+                this.updateHeaderContext();
+                this.initializeEventListeners();
+                await this.loadData(); // Carga de datos real
+            }, 100);
+        } catch (error) {
+            console.error('Error cargando inducciones-view.html:', error);
+            this.container.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+        }
+    }
+
+    async loadData() {
+        try {
+            console.log('🔄 [Inducciones] Cargando datos reales para:', this.currentCompany);
+            this.showToast('Cargando datos desde Excel...', 'info');
+
+            if (!window.electronAPI || !window.electronAPI.getInduccionesData) {
+                throw new Error('API de inducciones no disponible');
+            }
+
+            const result = await window.electronAPI.getInduccionesData(this.currentCompany);
+            
+            if (result.success) {
+                console.log('✅ [Inducciones] Datos cargados:', result.data.length, 'registros');
+                this.state.data = result.data;
+                this.populateYearFilter();
+                this.applyFilters();
+                this.switchView('dashboard');
+                this.showToast(`Se cargaron ${result.data.length} registros exitosamente`, 'success');
+            } else {
+                console.warn('⚠️ [Inducciones] No se pudieron cargar datos reales:', result.error);
+                this.showToast('No se encontró el archivo Excel. Usando datos de ejemplo.', 'warning');
+                this.loadSampleData();
+            }
+        } catch (error) {
+            console.error('❌ [Inducciones] Error en loadData:', error);
+            this.showToast('Error al acceder al archivo Excel', 'danger');
+            this.loadSampleData();
+        }
+    }
+
+    loadSampleData() {
+        this.state.data = [
+            { id: 1, date: '2024-01-10', name: 'Carlos Pérez (Simulado)', idCard: '80123456', position: 'Supernumerario', score: 22, status: 'approved', gender: 'Hombre' },
+            { id: 2, date: '2024-02-15', name: 'Ana Gómez (Simulado)', idCard: '80234567', position: 'Mesera', score: 21, status: 'approved', gender: 'Mujer' }
+        ];
+        this.populateYearFilter();
+        this.applyFilters();
     }
 
     updateHeaderContext() {
@@ -64,9 +92,7 @@ class InduccionesComponent {
     }
 
     init() {
-        this.populateYearFilter();
-        this.applyFilters();
-        this.switchView('dashboard'); // Vista por defecto
+        // El init ahora se llama desde render() después de cargar el HTML
     }
 
     initializeEventListeners() {
@@ -128,7 +154,11 @@ class InduccionesComponent {
     }
 
     populateYearFilter() {
-        const years = [...new Set(this.state.data.map(d => new Date(d.date).getFullYear()))].sort((a,b) => b-a);
+        const years = [...new Set(this.state.data.map(d => {
+            const date = new Date(d.date);
+            return isNaN(date.getFullYear()) ? null : date.getFullYear();
+        }))].filter(y => y !== null).sort((a,b) => b-a);
+        
         const options = `<option value="">Todos los años</option>` + years.map(y => `<option value="${y}">${y}</option>`).join('');
         
         const filterList = document.getElementById('filter-year-list');
@@ -158,7 +188,7 @@ class InduccionesComponent {
         this.state.filteredData = this.state.data.filter(item => {
             const itemYear = new Date(item.date).getFullYear();
             const matchYear = year ? itemYear == year : true;
-            const matchSearch = item.name.toLowerCase().includes(search) || item.idCard.includes(search);
+            const matchSearch = item.name.toLowerCase().includes(search) || item.idCard.toString().includes(search);
             return matchYear && matchSearch;
         });
 
@@ -179,18 +209,18 @@ class InduccionesComponent {
         const approved = data.filter(i => i.status === 'approved').length;
         const failed = data.filter(i => i.status === 'failed').length;
         
-        const scoreSum = data.reduce((acc, i) => acc + parseFloat(i.score), 0);
+        const scoreSum = data.reduce((acc, i) => acc + parseFloat(i.score || 0), 0);
         const avgScore = total > 0 ? (scoreSum / total).toFixed(1) : '0.0';
 
         this.setSafeText('stat-total', total);
         this.setSafeText('stat-approved', approved);
         this.setSafeText('stat-failed', failed);
         this.setSafeText('stat-score', avgScore);
-        this.setSafeText('stat-rate', `${Math.round((approved/total)*100) || 0}% Tasa de éxito`);
+        this.setSafeText('stat-rate', `${total > 0 ? Math.round((approved/total)*100) : 0}% Tasa de éxito`);
 
         // Género
-        const women = data.filter(i => i.gender === 'Mujer');
-        const men = data.filter(i => i.gender === 'Hombre');
+        const women = data.filter(i => i.gender && i.gender.toLowerCase().includes('muj'));
+        const men = data.filter(i => i.gender && i.gender.toLowerCase().includes('hom'));
         const womenApproved = women.filter(i => i.status === 'approved').length;
         const menApproved = men.filter(i => i.status === 'approved').length;
 
@@ -214,9 +244,12 @@ class InduccionesComponent {
         const monthlyApproved = Array(12).fill(0);
 
         data.forEach(i => {
-            const m = new Date(i.date).getMonth();
-            monthlyTotal[m]++;
-            if(i.status === 'approved') monthlyApproved[m]++;
+            const date = new Date(i.date);
+            if (!isNaN(date.getMonth())) {
+                const m = date.getMonth();
+                monthlyTotal[m]++;
+                if(i.status === 'approved') monthlyApproved[m]++;
+            }
         });
 
         this.initOrUpdateChart('mainChart', {
@@ -231,21 +264,26 @@ class InduccionesComponent {
             options: { 
                 responsive: true, 
                 maintainAspectRatio: false, 
-                scales: { y: { beginAtZero: true } },
+                scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
                 plugins: { legend: { position: 'bottom' } }
             }
         });
 
         // --- Gráfico 2: Top Cargos ---
         const positions = {};
-        data.forEach(i => positions[i.position] = (positions[i.position] || 0) + 1);
+        data.forEach(i => {
+            if (i.position) positions[i.position] = (positions[i.position] || 0) + 1;
+        });
         
+        const posLabels = Object.keys(positions).slice(0, 5);
+        const posData = posLabels.map(l => positions[l]);
+
         this.initOrUpdateChart('positionChart', {
             type: 'doughnut',
             data: { 
-                labels: Object.keys(positions), 
+                labels: posLabels, 
                 datasets: [{ 
-                    data: Object.values(positions), 
+                    data: posData, 
                     backgroundColor: ['#174ea6', '#28a745', '#ffc107', '#17a2b8', '#e91e63'], 
                     borderWidth: 0 
                 }] 
@@ -274,9 +312,13 @@ class InduccionesComponent {
         this.state.filteredData.forEach(item => {
             const badgeClass = item.status === 'approved' ? 'k-badge-success' : 'k-badge-danger';
             const statusText = item.status === 'approved' ? 'Aprobado' : 'Reprobado';
+            
             // Manejo seguro de fechas
-            const dateParts = item.date.split('-');
-            const dateFormatted = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : item.date;
+            let dateFormatted = 'N/A';
+            if (item.date) {
+                const dateParts = item.date.split('-');
+                dateFormatted = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : item.date;
+            }
 
             const row = document.createElement('tr');
             row.innerHTML = `
@@ -284,8 +326,8 @@ class InduccionesComponent {
                 <td><strong>${item.name}</strong></td>
                 <td>${item.idCard}</td>
                 <td>${item.position}</td>
-                <td>${item.gender}</td>
-                <td><span style="font-weight:bold">${item.score}</span> / 22</td>
+                <td>${item.gender || 'N/A'}</td>
+                <td><span style="font-weight:bold">${item.score}</span></td>
                 <td><span class="k-badge ${badgeClass}">${statusText}</span></td>
                 <td style="text-align:right;">
                     <button class="k-btn k-btn-outline edit-btn" style="padding:0.25rem 0.5rem;" data-id="${item.id}"><i class="bi bi-pencil"></i></button>
@@ -296,7 +338,6 @@ class InduccionesComponent {
 
         tbody.querySelectorAll('.edit-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                // stopPropagation si es necesario, pero data-id está en el botón o en el icono
                 const id = btn.dataset.id || btn.closest('button').dataset.id;
                 this.editInduction(parseInt(id));
             });
@@ -315,9 +356,12 @@ class InduccionesComponent {
         const monthlyStats = Array(12).fill(0).map(() => ({ total: 0, approved: 0 }));
         
         data.forEach(i => {
-            const m = new Date(i.date).getMonth();
-            monthlyStats[m].total++;
-            if(i.status === 'approved') monthlyStats[m].approved++;
+            const date = new Date(i.date);
+            if (!isNaN(date.getMonth())) {
+                const m = date.getMonth();
+                monthlyStats[m].total++;
+                if(i.status === 'approved') monthlyStats[m].approved++;
+            }
         });
         const approvalRates = monthlyStats.map(m => m.total > 0 ? ((m.approved / m.total) * 100).toFixed(1) : 0);
 
@@ -327,27 +371,14 @@ class InduccionesComponent {
             options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 100 } } }
         });
 
-        // 2. Error Rate (Simulado)
-        const avgScore = data.length > 0 ? data.reduce((a,b)=>a+b.score,0)/data.length : 22;
-        const errorFactor = (22 - avgScore) / 22; 
-        const errorData = [
-            Math.round(35 * errorFactor), Math.round(28 * errorFactor), Math.round(22 * errorFactor),
-            Math.round(15 * errorFactor), Math.round(10 * errorFactor)
-        ];
-
-        this.initOrUpdateChart('errorRateChart', {
-            type: 'bar',
-            data: { labels: ['P7', 'P8', 'P9', 'P10', 'P11'], datasets: [{ label: '% Error', data: errorData, backgroundColor: '#dc3545', borderRadius: 4 }] },
-            options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { beginAtZero: true, max: 100 } } }
-        });
-
-        // 3. Gender Stack
-        const genderStats = { 'Hombre': {approved:0, failed:0}, 'Mujer': {approved:0, failed:0} };
+        // 2. Error Rate (Basado en datos reales)
+        // Agrupar por género o por temas si tuviéramos esa info. Usaremos género como ejemplo.
+        const genderStats = { 'Hombre': {approved:0, failed:0, total:0}, 'Mujer': {approved:0, failed:0, total:0} };
         data.forEach(i => {
-            if(genderStats[i.gender]) {
-                if(i.status === 'approved') genderStats[i.gender].approved++;
-                else genderStats[i.gender].failed++;
-            }
+            const g = (i.gender && i.gender.toLowerCase().includes('muj')) ? 'Mujer' : 'Hombre';
+            genderStats[g].total++;
+            if(i.status === 'approved') genderStats[g].approved++;
+            else genderStats[g].failed++;
         });
 
         this.initOrUpdateChart('genderStackChart', {
@@ -361,7 +392,7 @@ class InduccionesComponent {
             },
             options: { 
                 responsive: true, maintainAspectRatio: false, 
-                scales: { x: { stacked: true }, y: { stacked: true } }, 
+                scales: { x: { stacked: true }, y: { stacked: true, ticks: { precision: 0 } } }, 
                 plugins: { legend: { position: 'bottom' } } 
             }
         });
@@ -372,11 +403,8 @@ class InduccionesComponent {
             data: { 
                 labels: ['Hombres', 'Mujeres'], 
                 datasets: [{ 
-                    data: [
-                        genderStats['Hombre'].approved + genderStats['Hombre'].failed,
-                        genderStats['Mujer'].approved + genderStats['Mujer'].failed
-                    ], 
-                    backgroundColor: ['#0f9d58', '#e91e63'], 
+                    data: [ genderStats['Hombre'].total, genderStats['Mujer'].total ], 
+                    backgroundColor: ['#174ea6', '#e91e63'], 
                     borderWidth: 0 
                 }] 
             },
@@ -435,39 +463,8 @@ class InduccionesComponent {
     }
 
     saveInduction() {
-        const id = document.getElementById('edit-id').value;
-        const date = document.getElementById('input-date').value;
-        const name = document.getElementById('input-name').value;
-        const score = parseFloat(document.getElementById('input-score').value);
-
-        if(!name || isNaN(score)) { 
-            this.showToast('Nombre y puntaje son obligatorios', 'danger'); 
-            return; 
-        }
-
-        const newData = {
-            date, name, 
-            idCard: document.getElementById('input-idcard').value,
-            gender: document.getElementById('input-gender').value,
-            position: document.getElementById('input-position').value, 
-            score,
-            status: document.getElementById('input-status').value
-        };
-
-        if(id) {
-            const idx = this.state.data.findIndex(i => i.id == id);
-            if(idx !== -1) {
-                this.state.data[idx] = { ...this.state.data[idx], ...newData };
-                this.showToast('Inducción actualizada', 'success');
-            }
-        } else {
-            const newId = this.state.data.length > 0 ? Math.max(...this.state.data.map(i => i.id)) + 1 : 1;
-            this.state.data.push({ id: newId, ...newData });
-            this.showToast('Inducción registrada', 'success');
-        }
-
+        this.showToast('Esta funcionalidad requiere permisos de escritura en Excel (Próximamente)', 'info');
         this.closeModal();
-        this.applyFilters(); 
     }
 
     editInduction(id) {
@@ -483,6 +480,7 @@ class InduccionesComponent {
         let color = 'var(--k-primary)';
         if(type === 'success') color = 'var(--k-success)';
         if(type === 'danger') color = 'var(--k-danger)';
+        if(type === 'warning') color = 'var(--k-warning)';
         
         toast.style.borderLeftColor = color;
         toast.innerHTML = `<i class="bi ${type==='success'?'bi-check-circle-fill':type==='danger'?'bi-exclamation-circle-fill':'bi-info-circle-fill'}" style="color:${color}; font-size:1.2rem; margin-right:10px;"></i><span>${msg}</span>`;

@@ -10,6 +10,7 @@ function log(level, message) {
 contextBridge.exposeInMainWorld('electronAPI', {
   // --- App & Configuración ---
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  getRecursosStats: (companyName) => ipcRenderer.invoke('get-recursos-stats', companyName),
   saveConfig: (config) => ipcRenderer.invoke('save-config', config),
   loadConfig: () => ipcRenderer.invoke('load-config'),
 
@@ -117,6 +118,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('buscar-cie10-descripcion', { companyName, cie10Code }),
   procesarAusentismo: (empresa, formData) =>
     ipcRenderer.invoke('procesar-ausentismo', empresa, formData),
+
+  // --- Inducciones ---
+  getInduccionesData: (companyName) => ipcRenderer.invoke('get-inducciones-data', companyName),
 
   // --- Actas ---
   getActaData: () => ipcRenderer.invoke('get-acta-data'),

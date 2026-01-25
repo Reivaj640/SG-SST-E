@@ -398,10 +398,13 @@ class RecursosHome {
         const widgetsContainer = document.createElement('div');
         widgetsContainer.className = 'widgets-container';
 
-        // Widgets Simples (Actualizados)
-        widgetsContainer.appendChild(this.createWidget('Inducciones', '124 / 150', '⚠️ 26 Pendientes (Crítico)'));
-        widgetsContainer.appendChild(this.createWidget('Capacitaciones', '82%', '✔ Al cumplimiento normativo'));
-        widgetsContainer.appendChild(this.createWidget('EPPs Entregados', '1,020', 'Stock actual óptimo'));
+        // Cargar estadísticas reales de recursos
+        await this.loadResourceStats();
+
+        // Widgets Simples (Actualizados con datos reales)
+        widgetsContainer.appendChild(this.createInductionWidget());
+        widgetsContainer.appendChild(this.createTrainingWidget());
+        widgetsContainer.appendChild(this.createEPPWidget());
 
         // Widget de Presupuesto (MODERNIZADO)
         const budgetWidget = await this.createBudgetWidget();
@@ -466,6 +469,266 @@ class RecursosHome {
         container.appendChild(submodulesContainer);
     }
 
+    // Nuevo método para cargar estadísticas reales de recursos
+    async loadResourceStats() {
+        try {
+            console.log('🔄 [RecursosHome] Cargando estadísticas reales de recursos para:', this.currentCompany);
+            
+            // Inicializar estructura base
+            this.resourceStats = {
+                inducciones: { totalInducciones: 0, completadas: 0, pendientes: 0, porcentajeCompletado: 0, mensual: new Array(12).fill(0) },
+                capacitaciones: { totalCapacitaciones: 0, programadas: 0, realizadas: 0, porcentajeCumplimiento: 0, mensual: { programadas: new Array(12).fill(0), realizadas: new Array(12).fill(0) } },
+                epps: { totalEPPs: 0, entregados: 0, pendientes: 0, stockActual: 0 }
+            };
+
+            // 1. Cargar Estadísticas Generales (Backend) - Para Inducciones y EPPs (por ahora)
+            if (window.electronAPI && window.electronAPI.getRecursosStats) {
+                const result = await window.electronAPI.getRecursosStats(this.currentCompany);
+                if (result.success) {
+                    this.resourceStats = { ...this.resourceStats, ...result.stats };
+                    console.log('✅ [RecursosHome] Estadísticas generales cargadas (Backend).');
+                }
+            }
+
+            // 2. CALCULAR CAPACITACIONES (CLIENT-SIDE) - Lógica espejo del submódulo
+            // Esto sobrescribe lo que venga del backend para Capacitaciones con la lógica exacta del visor
+            await this.calculateCapacitacionesClientSide();
+
+        } catch (error) {
+            console.error('❌ [RecursosHome] Error al cargar estadísticas de recursos:', error);
+        }
+    }
+
+    // Lógica portada de CapacitacionesComponent para asegurar consistencia
+    async calculateCapacitacionesClientSide() {
+        try {
+            console.log('📊 [RecursosHome] Calculando estadísticas de Capacitaciones (Cliente)...');
+            
+            // A. Buscar ruta del submódulo
+            const submodulePathResult = await window.electronAPI.findSubmodulePath(this.currentCompany, 'Recursos', '1.2.1 Programa de capacitación Anual');
+            if (!submodulePathResult.success) throw new Error("Ruta submódulo no encontrada");
+            const submodulePath = submodulePathResult.path;
+
+            // B. Buscar archivo Excel
+            const filesResult = await window.electronAPI.readDirectory(submodulePath);
+            if (!filesResult.success) throw new Error("No se pudo leer directorio");
+
+            const excelFiles = (filesResult.files || []).filter(item => {
+                const name = (item.name || item.path || '').toLowerCase();
+                return (name.includes('act-fo-005') || name.includes('cronograma')) &&
+                       (name.endsWith('.xlsx') || name.endsWith('.xls')) &&
+                       !name.startsWith('~$');
+            });
+
+            if (excelFiles.length === 0) {
+                console.warn('⚠️ [RecursosHome] No se encontró Excel de capacitaciones (ACT-FO-005)');
+                return; 
+            }
+            // Preferir el más reciente o específico si hay varios
+            const excelFile = excelFiles[0]; 
+            const filePath = `${submodulePath}/${excelFile.name || path.basename(excelFile.path)}`;
+
+            // C. Determinar Hoja (Año Actual)
+            const sheetsResult = await window.electronAPI.getCapacitacionesSheets(filePath);
+            if (!sheetsResult.success) throw new Error("Error leyendo hojas");
+            
+            const currentYear = new Date().getFullYear();
+            let sheetName = sheetsResult.sheets.find(s => s.toLowerCase().includes(`matriz cap`) && s.includes(currentYear.toString()));
+            if (!sheetName) sheetName = sheetsResult.sheets.find(s => s.includes(currentYear.toString()));
+            if (!sheetName) sheetName = sheetsResult.sheets[0];
+
+            if (!sheetName) {
+                console.warn('⚠️ [RecursosHome] No se encontró hoja válida en Excel capacitaciones');
+                return;
+            }
+
+            // D. Leer Datos y Procesar
+            const excelResult = await window.electronAPI.initExcel({ filePath, sheetName });
+            if (!excelResult.success) throw new Error("Error initExcel");
+
+            const { processedData } = excelResult.data;
+            const dataRows = processedData; // Iteramos desde el inicio para encontrar los datos reales
+
+            // --- LÓGICA DE CONTEO AJUSTADA A TUS LOGS ---
+            const stats = { 
+                totalCapacitaciones: 0, 
+                programadas: 0, 
+                realizadas: 0, 
+                porcentajeCumplimiento: 0, 
+                mensual: { programadas: new Array(12).fill(0), realizadas: new Array(12).fill(0) } 
+            };
+
+            console.groupCollapsed('🔍 [RecursosHome] Procesamiento de filas detallado');
+            
+            for (let i = 0; i < dataRows.length; i++) {
+                const row = dataRows[i];
+                if (!Array.isArray(row) || row.length < 2) continue;
+
+                // Helper para extraer valor de celda (Maneja objetos/texto)
+                const getVal = (cell) => {
+                    if (cell === null || cell === undefined) return '';
+                    if (typeof cell === 'object' && cell.value !== undefined) return String(cell.value); 
+                    return String(cell);
+                };
+
+                // Según tus logs, los datos reales empiezan en la fila 7 (índice 6)
+                // Columna 2 (C) -> Nombre
+                // Columna 4 (E) -> Fecha Programada
+                // Columna 9 (J) -> Indicador de realización (0% o 100%)
+                
+                const nombre = getVal(row[2]).trim(); // Índice 2: Nombre
+                const nombreLower = nombre.toLowerCase();
+
+                // 1. Filtros de Encabezados y Basura
+                if (!nombre || nombre.length < 3) continue; // Muy corto
+                if (nombreLower.includes('nombre de la') || nombreLower === 'contenido de la capacitación') {
+                    console.log(`Skipping Header Row ${i}: ${nombre}`);
+                    continue;
+                }
+                
+                // 2. Filtro de Totalizador (Break)
+                if (nombreLower.includes('total capacitaciones') || nombreLower.includes('total')) {
+                    console.log(`Break at Row ${i}: ${nombre} (Totalizador detectado)`);
+                    break;
+                }
+
+                // 3. Validación Adicional: Debe tener fecha o tipo para ser real
+                const fechaRaw = row[4]; // Índice 4
+                const tipoRaw = getVal(row[3]); // Índice 3
+                
+                // Si no tiene fecha Y no tiene tipo, probablemente es basura
+                if (!fechaRaw && (!tipoRaw || tipoRaw.length < 2)) {
+                     console.log(`Skipping Row ${i}: ${nombre} (Sin fecha ni tipo válido)`);
+                     continue;
+                }
+
+                // --- PROCESAMIENTO ---
+                stats.totalCapacitaciones++;
+                stats.programadas++;
+
+                // ESTADO: Verificar columna 9 (J)
+                const estadoRaw = getVal(row[9]); 
+                const estadoNorm = estadoRaw.toLowerCase();
+                
+                // Es realizada si dice "100", "ejecutada", "realizada", etc.
+                const isRealizada = estadoNorm.includes('100') || 
+                                    estadoNorm.includes('realizada') || 
+                                    estadoNorm.includes('ejecutada') ||
+                                    estadoNorm.includes('completada');
+
+                console.log(`✅ Fila ${i}: "${nombre}" | Estado (Col J): "${estadoRaw}" -> ${isRealizada ? 'REALIZADA' : 'PENDIENTE'}`);
+
+                // FECHA: Columna 4 (E)
+                let monthIndex = -1;
+                if (typeof fechaRaw === 'number' && fechaRaw > 1000) {
+                     const dateCode = new Date((fechaRaw - 25569) * 86400 * 1000);
+                     monthIndex = dateCode.getMonth();
+                } else {
+                    const fStr = getVal(fechaRaw);
+                    if (fStr) {
+                        // Intentar parsear fecha dd/mm/yyyy o mm/dd/yyyy
+                        // En tu log vi "7/4/25" y mes "julio", así que es mes/dia/año
+                        const parts = fStr.split('/');
+                        if (parts.length === 3) {
+                            monthIndex = parseInt(parts[0]) - 1; 
+                        } else {
+                            const d = new Date(fStr);
+                            if (!isNaN(d.getTime())) monthIndex = d.getMonth();
+                        }
+                    }
+                }
+
+                if (monthIndex >= 0 && monthIndex < 12) {
+                    stats.mensual.programadas[monthIndex]++;
+                    if (isRealizada) stats.mensual.realizadas[monthIndex]++;
+                }
+
+                if (isRealizada) stats.realizadas++;
+            }
+            console.groupEnd();
+
+            if (stats.programadas > 0) {
+                stats.porcentajeCumplimiento = Math.round((stats.realizadas / stats.programadas) * 100);
+            }
+
+            // Actualizar estado
+            this.resourceStats.capacitaciones = stats;
+            console.log('📊 [RecursosHome] Capacitaciones calculadas (Cliente):', stats);
+
+        } catch (error) {
+            console.error('❌ [RecursosHome] Error calculando capacitaciones client-side:', error);
+        }
+    }
+
+    // Nuevo método para crear widget de inducciones con datos reales
+    createInductionWidget() {
+        const stats = this.resourceStats?.inducciones || { totalInducciones: 0, completadas: 0, pendientes: 0, porcentajeCompletado: 0 };
+
+        const title = 'Inducciones';
+        const value = `${stats.completadas} / ${stats.totalInducciones}`;
+
+        let desc = '';
+        const porcentaje = stats.totalInducciones > 0 ? Math.round((stats.completadas / stats.totalInducciones) * 100) : 0;
+
+        if (porcentaje >= 80) {
+            desc = `✔ ${porcentaje}% Completado`;
+        } else if (porcentaje >= 50) {
+            desc = `⚠ ${porcentaje}% Completado`;
+        } else {
+            desc = `❌ ${porcentaje}% Completado (${stats.pendientes} Pendientes)`;
+        }
+
+        const w = document.createElement('div');
+        w.className = 'widget';
+        w.innerHTML = `
+            <h4>${title}</h4>
+            <div class="widget-value">${value}</div>
+            <div class="widget-description">${desc}</div>
+        `;
+        return w;
+    }
+
+    // Nuevo método para crear widget de capacitaciones con datos reales
+    createTrainingWidget() {
+        // Usar los datos ya cargados en resourceStats
+        const stats = this.resourceStats?.capacitaciones || { totalCapacitaciones: 0, programadas: 0, realizadas: 0, porcentajeCumplimiento: 0 };
+
+        const title = 'Capacitaciones';
+        const value = `${stats.porcentajeCumplimiento}%`;
+        const desc = stats.programadas > 0
+            ? `Realizadas: ${stats.realizadas} / ${stats.programadas}`
+            : 'Sin datos';
+
+        const w = document.createElement('div');
+        w.className = 'widget';
+        w.innerHTML = `
+            <h4>${title}</h4>
+            <div class="widget-value">${value}</div>
+            <div class="widget-description">${desc}</div>
+        `;
+        return w;
+    }
+
+    // Nuevo método para crear widget de EPPs con datos reales
+    createEPPWidget() {
+        const stats = this.resourceStats?.epps || { totalEPPs: 0, entregados: 0, pendientes: 0, stockActual: 0 };
+
+        const title = 'EPPs Entregados';
+        const value = stats.entregados;
+        const desc = stats.stockActual > 0
+            ? `Stock actual: ${stats.stockActual}`
+            : 'Sin datos';
+
+        const w = document.createElement('div');
+        w.className = 'widget';
+        w.innerHTML = `
+            <h4>${title}</h4>
+            <div class="widget-value">${value}</div>
+            <div class="widget-description">${desc}</div>
+        `;
+        return w;
+    }
+
     // =========================================
     // MÉTODO CORREGIDO: Crear Widget de Presupuesto
     // =========================================
@@ -503,20 +766,20 @@ class RecursosHome {
             const dataResult = await window.electronAPI.readPresupuestoData(file.path);
             if (!dataResult.success) return this.renderBudgetWidgetError('Error lectura');
 
-            const { totalPresupuesto, totalEjecutado, porcentajeCumplimiento, saldoDisponible } =
-                this.calculateBudgetSummary(dataResult.data.processedData);
+            const summary = this.calculateBudgetSummary(dataResult.data.processedData);
 
-            const validTotal = typeof totalPresupuesto === 'number' ? totalPresupuesto : 0;
-            const validEjecutado = typeof totalEjecutado === 'number' ? totalEjecutado : 0;
-            const validPct = typeof porcentajeCumplimiento === 'number' ? porcentajeCumplimiento : 0;
-            const validSaldo = typeof saldoDisponible === 'number' ? saldoDisponible : (validTotal - validEjecutado);
+            const validTotal = typeof summary.totalPresupuesto === 'number' ? summary.totalPresupuesto : 0;
+            const validEjecutado = typeof summary.totalEjecutado === 'number' ? summary.totalEjecutado : 0;
+            const validPct = typeof summary.porcentajeCumplimiento === 'number' ? summary.porcentajeCumplimiento : 0;
+            const validSaldo = typeof summary.saldoDisponible === 'number' ? summary.saldoDisponible : (validTotal - validEjecutado);
 
             this.budgetData = {
                 company: this.currentCompany,
                 totalPresupuesto: validTotal,
                 totalEjecutado: validEjecutado,
                 porcentajeCumplimiento: validPct,
-                saldoDisponible: validSaldo
+                saldoDisponible: validSaldo,
+                mensual: summary.mensual
             };
 
             // 4. Renderizar Widget Moderno
@@ -628,15 +891,43 @@ class RecursosHome {
         console.log('📊 [calculateBudgetSummary] Calculando resumen...');
 
         let totalP = 0, totalE = 0;
+        const monthlyExecution = new Array(12).fill(0);
+        const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
         processedData.forEach(row => {
             if (row.id && typeof row.id === 'string' && row.id.toUpperCase().includes('TOTAL')) return;
             const valP = this.parseFormattedNumber(row.asignacion);
             const valE = this.parseFormattedNumber(row.ejecutado_acumulado);
             if(!isNaN(valP)) totalP += valP;
             if(!isNaN(valE)) totalE += valE;
+
+            // Monthly execution
+            months.forEach((m, idx) => {
+                const mVal = this.parseFormattedNumber(row[m]);
+                if (!isNaN(mVal)) monthlyExecution[idx] += mVal;
+            });
         });
+
+        // Cumulative data for S-curve
+        const cumulativeExecution = [];
+        const cumulativePlanned = [];
+        let cumE = 0;
+        let cumP = 0;
+        for (let i = 0; i < 12; i++) {
+            cumE += monthlyExecution[i];
+            cumulativeExecution.push(cumE);
+            cumP += totalP / 12; // Approximation: even distribution
+            cumulativePlanned.push(cumP);
+        }
+
         const pct = totalP > 0 ? ((totalE / totalP) * 100) : 0;
-        return { totalPresupuesto: totalP, totalEjecutado: totalE, porcentajeCumplimiento: pct, saldoDisponible: totalP - totalE };
+        return { 
+            totalPresupuesto: totalP, 
+            totalEjecutado: totalE, 
+            porcentajeCumplimiento: pct, 
+            saldoDisponible: totalP - totalE,
+            mensual: { ejecutado: cumulativeExecution, planeado: cumulativePlanned }
+        };
     }
 
     parseFormattedNumber(value) {
@@ -682,26 +973,30 @@ class RecursosHome {
             Chart.defaults.color = '#6c757d';
         }
 
+        const labels12 = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
         // 1. Budget Chart (Line: Planned vs Real)
         const ctxBudget = document.getElementById('budgetChart');
         if(ctxBudget && typeof Chart !== 'undefined') {
+            const bData = this.budgetData?.mensual || { planeado: Array(12).fill(0), ejecutado: Array(12).fill(0) };
+            
             this.charts.budget = new Chart(ctxBudget, {
                 type: 'line',
                 data: {
-                    labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago'],
+                    labels: labels12,
                     datasets: [
                         {
                             label: 'Planeado (S-Curve)',
-                            data: [5, 12, 20, 28, 35, 42, 50, 58],
-                            borderColor: '#dee2e6', // Gris suave para lo planeado
+                            data: bData.planeado,
+                            borderColor: '#dee2e6',
                             borderDash: [5, 5],
                             fill: false,
                             tension: 0.4
                         },
                         {
                             label: 'Ejecutado Real',
-                            data: [4.5, 11, 19, 25, 32, 40, 48, 55],
-                            borderColor: '#174ea6', // K+AIR Primary
+                            data: bData.ejecutado,
+                            borderColor: '#174ea6',
                             backgroundColor: 'rgba(23, 78, 166, 0.1)',
                             fill: true,
                             tension: 0.4
@@ -720,20 +1015,25 @@ class RecursosHome {
         // 2. Training Chart (Bar: Programadas vs Realizadas)
         const ctxTraining = document.getElementById('trainingChart');
         if(ctxTraining && typeof Chart !== 'undefined') {
+            const stats = this.resourceStats?.capacitaciones?.mensual || {
+                programadas: new Array(12).fill(0),
+                realizadas: new Array(12).fill(0)
+            };
+
             this.charts.training = new Chart(ctxTraining, {
                 type: 'bar',
                 data: {
-                    labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago'],
+                    labels: labels12,
                     datasets: [
                         {
                             label: 'Programadas',
-                            data: [5, 6, 5, 7, 6, 8, 5, 6],
+                            data: stats.programadas,
                             backgroundColor: '#dee2e6',
                             borderRadius: 4
                         },
                         {
                             label: 'Realizadas',
-                            data: [5, 5, 6, 6, 7, 7, 5, 5],
+                            data: stats.realizadas,
                             backgroundColor: '#28a745', // Success
                             borderRadius: 4
                         }
@@ -743,7 +1043,13 @@ class RecursosHome {
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: { x: { stacked: false }, y: { beginAtZero: true, ticks: { precision: 0 } } },
-                    plugins: { legend: { display: false } } // Ocultar leyenda para ahorrar espacio
+                    plugins: { 
+                        legend: { 
+                            display: true,
+                            position: 'bottom',
+                            labels: { boxWidth: 12, padding: 15 }
+                        } 
+                    }
                 }
             });
         }
@@ -751,14 +1057,16 @@ class RecursosHome {
         // 3. Induction Chart (Line: Tendencia)
         const ctxInduction = document.getElementById('inductionChart');
         if(ctxInduction && typeof Chart !== 'undefined') {
+            const iData = this.resourceStats?.inducciones?.mensual || new Array(12).fill(0);
+
             this.charts.induction = new Chart(ctxInduction, {
                 type: 'line',
                 data: {
-                    labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago'],
+                    labels: labels12,
                     datasets: [{
                         label: 'Inducciones Acumuladas',
-                        data: [15, 28, 45, 60, 78, 92, 110, 124],
-                        borderColor: '#ffc107', // Warning color (Induction is usually urgent)
+                        data: iData,
+                        borderColor: '#ffc107',
                         backgroundColor: 'rgba(255, 193, 7, 0.1)',
                         fill: true,
                         tension: 0.3
