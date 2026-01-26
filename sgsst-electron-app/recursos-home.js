@@ -607,51 +607,114 @@ class RecursosHome {
 
                 // --- PROCESAMIENTO ---
                 stats.totalCapacitaciones++;
-                stats.programadas++;
 
-                // ESTADO: Verificar columna 9 (J)
-                const estadoRaw = getVal(row[9]);
-                const estadoNorm = estadoRaw.toLowerCase();
+                // ESTADO: Verificar múltiples columnas posibles para determinar si está realizada
+                // Probamos varias columnas que comúnmente contienen información de estado
+                const estadoColumnas = [9, 8, 7, 10, 11, 6]; // J, I, H, K, L, G
+                let estadoRaw = '';
 
-                // Es realizada si dice "100", "ejecutada", "realizada", etc.
+                for (const colIndex of estadoColumnas) {
+                    if (colIndex < row.length) {
+                        const cellValue = getVal(row[colIndex]);
+                        if (cellValue && cellValue.toString().trim() !== '') {
+                            estadoRaw = cellValue;
+                            break;
+                        }
+                    }
+                }
+
+                const estadoNorm = (estadoRaw || '').toString().toLowerCase().trim();
+
+                // Es realizada si dice "100", "ejecutada", "realizada", "completada", "si", "sí", "cumplida", "ok", "true", etc.
                 const isRealizada = estadoNorm.includes('100') ||
                                     estadoNorm.includes('realizada') ||
                                     estadoNorm.includes('ejecutada') ||
-                                    estadoNorm.includes('completada');
-
-                console.log(`✅ Fila ${i}: "${nombre}" | Estado (Col J): "${estadoRaw}" -> ${isRealizada ? 'REALIZADA' : 'PENDIENTE'}`);
+                                    estadoNorm.includes('completada') ||
+                                    estadoNorm.includes('completadas') ||
+                                    estadoNorm.includes('cumplida') ||
+                                    estadoNorm.includes('si') ||
+                                    estadoNorm.includes('sí') ||
+                                    estadoNorm.includes('ok') ||
+                                    estadoNorm.includes('true') ||
+                                    estadoNorm.includes('activo') ||
+                                    estadoNorm.includes('aprobada') ||
+                                    estadoNorm.includes('exitosa') ||
+                                    estadoNorm.includes('1') ||
+                                    estadoNorm.includes('x') ||
+                                    estadoNorm.includes('v') ||
+                                    estadoNorm.includes('verdadero') ||
+                                    estadoNorm.includes('yes') ||
+                                    estadoNorm.includes('done') ||
+                                    estadoNorm.includes('completa') ||
+                                    estadoNorm.includes('finalizada') ||
+                                    estadoNorm.includes('terminada') ||
+                                    estadoNorm.includes('efectuada') ||
+                                    estadoNorm.includes('realizado') ||
+                                    estadoNorm.includes('ejecutado') ||
+                                    estadoNorm.includes('aplicada') ||
+                                    estadoNorm.includes('aplicado') ||
+                                    estadoNorm.includes('asistida') ||
+                                    estadoNorm.includes('asistieron') ||
+                                    estadoNorm.includes('asistencia') ||
+                                    estadoNorm.includes('participaron') ||
+                                    estadoNorm.includes('participación') ||
+                                    estadoNorm.includes('certificada') ||
+                                    estadoNorm.includes('certificado') ||
+                                    estadoNorm.includes('evaluada') ||
+                                    estadoNorm.includes('evaluado') ||
+                                    estadoNorm.includes('verificada') ||
+                                    estadoNorm.includes('verificado');
 
                 // FECHA: Columna 4 (E)
                 let monthIndex = -1;
+                let fechaValida = false;
+
                 if (typeof fechaRaw === 'number' && fechaRaw > 1000) {
                      const dateCode = new Date((fechaRaw - 25569) * 86400 * 1000);
                      monthIndex = dateCode.getMonth();
+                     fechaValida = true;
                 } else {
                     const fStr = getVal(fechaRaw);
-                    if (fStr) {
+                    if (fStr && fStr !== 'No especificada' && fStr !== '') {
                         // Intentar parsear fecha dd/mm/yyyy o mm/dd/yyyy
                         // En tu log vi "7/4/25" y mes "julio", así que es mes/dia/año
                         const parts = fStr.split('/');
                         if (parts.length === 3) {
                             monthIndex = parseInt(parts[0]) - 1;
+                            fechaValida = true;
                         } else {
                             const d = new Date(fStr);
-                            if (!isNaN(d.getTime())) monthIndex = d.getMonth();
+                            if (!isNaN(d.getTime())) {
+                                monthIndex = d.getMonth();
+                                fechaValida = true;
+                            }
                         }
                     }
                 }
 
-                if (monthIndex >= 0 && monthIndex < 12) {
-                    stats.mensual.programadas[monthIndex]++;
-                    if (isRealizada) stats.mensual.realizadas[monthIndex]++;
+                // Incrementar programadas si tiene nombre válido (independientemente de si tiene fecha válida)
+                // Esto asegura que contemos todas las capacitaciones que están en la lista, incluso si no tienen fecha
+                if (nombre && nombre.trim() !== '' && !nombreLower.includes('nombre de la capacitación')) {
+                    stats.programadas++;
+
+                    if (monthIndex >= 0 && monthIndex < 12) {
+                        stats.mensual.programadas[monthIndex]++;
+                        if (isRealizada) {
+                            stats.mensual.realizadas[monthIndex]++;
+                        }
+                    }
                 }
 
-                if (isRealizada) stats.realizadas++;
+                console.log(`✅ Fila ${i}: "${nombre}" | Estado: "${estadoRaw}" -> ${isRealizada ? 'REALIZADA' : 'PENDIENTE'} | Fecha válida: ${fechaValida ? 'SÍ' : 'NO'}`);
+
+                if (isRealizada) stats.realizadas++; // Incrementar realizadas si está realizada (sin importar si tiene fecha válida)
             }
             console.groupEnd();
 
             if (stats.programadas > 0) {
                 stats.porcentajeCumplimiento = Math.round((stats.realizadas / stats.programadas) * 100);
+            } else {
+                stats.porcentajeCumplimiento = 0;
             }
 
             // Actualizar estado
@@ -693,7 +756,7 @@ class RecursosHome {
 
     // Nuevo método para crear widget de capacitaciones con datos reales
     createTrainingWidget() {
-        // Usar los datos ya cargados en resourceStats
+        // Usar los datos ya calculados en calculateCapacitacionesClientSide()
         const stats = this.resourceStats?.capacitaciones || { totalCapacitaciones: 0, programadas: 0, realizadas: 0, porcentajeCumplimiento: 0 };
 
         const total = stats.programadas;
@@ -701,6 +764,13 @@ class RecursosHome {
         const restante = Math.max(0, total - realizadas); // Calcular restante
         const porcentaje = stats.porcentajeCumplimiento;
         const currentYear = new Date().getFullYear();
+
+        console.log('📊 [createTrainingWidget] Datos para widget de capacitaciones:', {
+            total,
+            realizadas,
+            restante,
+            porcentaje
+        });
 
         // 1. Determinar Color (Semáforo)
         let colorVar = 'var(--k-success)';
@@ -1010,7 +1080,7 @@ class RecursosHome {
     }
 
     // --- CHART INITIALIZATION ---
-    initCharts() {
+    async initCharts() {
         // Configuración Global
         if (typeof Chart !== 'undefined') {
             Chart.defaults.font.family = "'Segoe UI', sans-serif";
@@ -1056,17 +1126,17 @@ class RecursosHome {
             });
         }
 
-        // 2. Training Chart (Bar: Programadas vs Realizadas)
+        // 2. Training Chart (Bar: Programadas vs Realizadas - similar a Ejecución Mensual del dashboard)
         const ctxTraining = document.getElementById('trainingChart');
         if(ctxTraining && typeof Chart !== 'undefined') {
-            // Obtener datos específicos del dashboard de capacitaciones para esta gráfica
-            const stats = this.getCapacitacionesChartDataForGraph() || {
+            // Obtener datos específicos del dashboard de capacitaciones para esta gráfica (esperar a que se completen)
+            const stats = await this.getCapacitacionesChartDataForGraph() || {
                 programadas: new Array(12).fill(0),
                 realizadas: new Array(12).fill(0)
             };
 
             // Log para mostrar qué datos está visualizando la gráfica y de dónde los obtiene
-            console.log('📊 [TrainingChart] Datos para gráfica de capacitaciones mensuales:');
+            console.log('📊 [TrainingChart] Datos para gráfica de capacitaciones mensuales (Programadas vs Realizadas):');
             console.log('   - Fuente: this.getCapacitacionesChartDataForGraph()');
             console.log('   - Programadas:', stats.programadas);
             console.log('   - Realizadas:', stats.realizadas);
@@ -1080,13 +1150,13 @@ class RecursosHome {
                         {
                             label: 'Programadas',
                             data: stats.programadas,
-                            backgroundColor: '#dee2e6',
+                            backgroundColor: '#ffc107', // var(--k-warning) - amarillo para programadas
                             borderRadius: 4
                         },
                         {
                             label: 'Realizadas',
                             data: stats.realizadas,
-                            backgroundColor: '#28a745', // Success
+                            backgroundColor: '#174ea6', // var(--k-primary) - azul para realizadas
                             borderRadius: 4
                         }
                     ]
@@ -1137,39 +1207,219 @@ class RecursosHome {
     // Método para obtener datos específicos del dashboard de capacitaciones para la gráfica
     async getCapacitacionesChartDataForGraph() {
         try {
-            // Usar los mismos datos que ya fueron calculados en calculateCapacitacionesClientSide()
-            // para asegurar consistencia con la información mostrada en la tarjeta de estadísticas
-            // Acceder directamente a la estructura que se creó en calculateCapacitacionesClientSide()
-            const stats = this.resourceStats?.capacitaciones?.mensual;
-
-            console.log('📊 [getCapacitacionesChartDataForGraph] Datos mensuales completos:', stats);
-
-            if (stats && stats.programadas && stats.realizadas) {
-                // Asegurar que los arrays tienen 12 meses
-                const programadas = Array.isArray(stats.programadas) ? stats.programadas : new Array(12).fill(0);
-                const realizadas = Array.isArray(stats.realizadas) ? stats.realizadas : new Array(12).fill(0);
-
-                // Asegurar que cada array tiene 12 elementos
-                while (programadas.length < 12) programadas.push(0);
-                while (realizadas.length < 12) realizadas.push(0);
-
-                // Tomar solo los primeros 12 elementos por si acaso
-                const programadasFinal = programadas.slice(0, 12);
-                const realizadasFinal = realizadas.slice(0, 12);
-
-                console.log('📊 [getCapacitacionesChartDataForGraph] Datos encontrados - Programadas:', programadasFinal, 'Realizadas:', realizadasFinal);
-                return {
-                    programadas: programadasFinal,
-                    realizadas: realizadasFinal
-                };
-            } else {
-                console.log('📊 [getCapacitacionesChartDataForGraph] No se encontraron datos mensuales, usando arrays vacíos');
-                // Si no hay datos disponibles, retornar arrays vacíos
+            // Obtener datos de capacitaciones para mostrar Programadas vs Realizadas como en el dashboard
+            // Similar a la lógica de updateCharts() en CapacitacionesComponent
+            const submodulePathResult = await window.electronAPI.findSubmodulePath(this.currentCompany, 'Recursos', '1.2.1 Programa de capacitación Anual');
+            if (!submodulePathResult.success) {
+                console.warn('⚠️ [RecursosHome] No se encontró ruta del submódulo de capacitaciones');
                 return {
                     programadas: new Array(12).fill(0),
                     realizadas: new Array(12).fill(0)
                 };
             }
+
+            const submodulePath = submodulePathResult.path;
+
+            const filesResult = await window.electronAPI.readDirectory(submodulePath);
+            if (!filesResult.success) {
+                console.warn('⚠️ [RecursosHome] No se pudo leer directorio de capacitaciones');
+                return {
+                    programadas: new Array(12).fill(0),
+                    realizadas: new Array(12).fill(0)
+                };
+            }
+
+            // Filtrar archivos Excel de capacitaciones
+            const allExcelFiles = (filesResult.files || []).filter(item => {
+                const fileName = (item.name || item.path || '').toLowerCase();
+                return fileName.includes('act-fo-005') &&
+                       (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) &&
+                       !fileName.startsWith('~$');
+            }).map(item => item.name || item.path);
+
+            // Ordenar: .xlsx preferido
+            allExcelFiles.sort((a, b) => {
+                const aIsXlsx = a.toLowerCase().endsWith('.xlsx');
+                const bIsXlsx = b.toLowerCase().endsWith('.xlsx');
+                if (aIsXlsx && !bIsXlsx) return -1;
+                if (!aIsXlsx && bIsXlsx) return 1;
+                return a.localeCompare(b);
+            });
+
+            if (allExcelFiles.length === 0) {
+                console.warn('⚠️ [RecursosHome] No se encontró archivo "ACT-FO-005"');
+                return {
+                    programadas: new Array(12).fill(0),
+                    realizadas: new Array(12).fill(0)
+                };
+            }
+
+            const excelFilePath = `${submodulePath}/${allExcelFiles[0]}`;
+
+            // Obtener hojas disponibles
+            const sheetsResult = await window.electronAPI.getCapacitacionesSheets(excelFilePath);
+            if (!sheetsResult.success) {
+                console.warn('⚠️ [RecursosHome] Error al leer hojas del Excel');
+                return {
+                    programadas: new Array(12).fill(0),
+                    realizadas: new Array(12).fill(0)
+                };
+            }
+
+            const availableSheets = sheetsResult.sheets.filter(sheet => sheet && typeof sheet === 'string');
+
+            // Determinar año actual
+            const currentYear = new Date().getFullYear();
+
+            // Lógica robusta para encontrar la hoja
+            let sheetName = availableSheets.find(s =>
+                s.trim().toLowerCase().includes(`matriz cap.`) && s.includes(currentYear.toString())
+            ) || availableSheets.find(s => s.includes(currentYear.toString()));
+
+            if (!sheetName) {
+                console.warn(`⚠️ [RecursosHome] No hay hoja para el año ${currentYear}`);
+                return {
+                    programadas: new Array(12).fill(0),
+                    realizadas: new Array(12).fill(0)
+                };
+            }
+
+            const excelResult = await window.electronAPI.initExcel({ filePath: excelFilePath, sheetName });
+            if (!excelResult.success) {
+                console.warn('⚠️ [RecursosHome] Error al inicializar Excel');
+                return {
+                    programadas: new Array(12).fill(0),
+                    realizadas: new Array(12).fill(0)
+                };
+            }
+
+            const { processedData, headers } = excelResult.data;
+            const dataRows = processedData.slice(5); // Datos empiezan en fila 6 (índice 5)
+
+            // Arrays para contar programadas y realizadas por mes
+            const programadasData = Array(12).fill(0);
+            const realizadasData = Array(12).fill(0);
+
+            console.log('🔍 [getCapacitacionesChartDataForGraph] Iniciando procesamiento de filas...');
+
+            for (let i = 0; i < dataRows.length; i++) {
+                const row = dataRows[i];
+                if (!Array.isArray(row) || row.length < 9) continue;
+
+                const getCellValue = (cell) => {
+                    if (cell === null || cell === undefined) return '';
+                    if (typeof cell === 'object' && cell.value !== undefined) return cell.value;
+                    return String(cell);
+                };
+
+                const nombreRaw = getCellValue(row[1]);
+                const nombre = String(nombreRaw || '').trim();
+
+                if (!nombre || nombre === 'Nombre de la capacitación' || nombre === '') continue;
+                if (nombre.toLowerCase().includes('total capacitaciones')) break;
+
+                // Fecha
+                let fechaProgramada = 'No especificada';
+                const fechaValue = getCellValue(row[3]);
+                if (fechaValue) {
+                    if (typeof fechaValue === 'number' && fechaValue >= 1) {
+                        const utcDate = new Date((fechaValue - 25569) * 86400 * 1000);
+                        const localDate = new Date(utcDate.getUTCFullYear(), utcDate.getUTCMonth(), utcDate.getUTCDate());
+                        fechaProgramada = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`;
+                    } else {
+                        const fechaStr = String(fechaValue);
+                        let parsedDate = new Date(fechaStr);
+                        if (isNaN(parsedDate.getTime())) {
+                            const parts = fechaStr.split('/');
+                            if (parts.length === 3) parsedDate = new Date(parts[2], parts[1] - 1, parts[0]);
+                        }
+                        if (!isNaN(parsedDate.getTime()) && parsedDate.getFullYear() >= 1900) {
+                            fechaProgramada = `${parsedDate.getFullYear()}-${String(parsedDate.getMonth() + 1).padStart(2, '0')}-${String(parsedDate.getDate()).padStart(2, '0')}`;
+                        }
+                    }
+                }
+
+                // Estado: Verificar múltiples columnas posibles para determinar si está realizada
+                // Probamos varias columnas que comúnmente contienen información de estado
+                const estadoColumnas = [9, 8, 7, 10, 11, 6]; // J, I, H, K, L, G
+                let estadoRaw = '';
+
+                for (const colIndex of estadoColumnas) {
+                    if (colIndex < row.length) {
+                        const cellValue = getCellValue(row[colIndex]);
+                        if (cellValue && cellValue.toString().trim() !== '') {
+                            estadoRaw = cellValue;
+                            break;
+                        }
+                    }
+                }
+
+                const estadoNorm = (estadoRaw || '').toString().toLowerCase().trim();
+
+                console.log(`🔍 Fila ${i}: Nombre="${nombre}", Estado="${estadoRaw}", Fecha="${fechaProgramada}"`);
+
+                // Es realizada si dice "100", "ejecutada", "realizada", "completada", "si", "sí", "cumplida", "ok", "true", etc.
+                const isRealizada = estadoNorm.includes('100') ||
+                                    estadoNorm.includes('realizada') ||
+                                    estadoNorm.includes('ejecutada') ||
+                                    estadoNorm.includes('completada') ||
+                                    estadoNorm.includes('completadas') ||
+                                    estadoNorm.includes('cumplida') ||
+                                    estadoNorm.includes('si') ||
+                                    estadoNorm.includes('sí') ||
+                                    estadoNorm.includes('ok') ||
+                                    estadoNorm.includes('true') ||
+                                    estadoNorm.includes('activo') ||
+                                    estadoNorm.includes('aprobada') ||
+                                    estadoNorm.includes('exitosa') ||
+                                    estadoNorm.includes('1') ||
+                                    estadoNorm.includes('x') ||
+                                    estadoNorm.includes('v') ||
+                                    estadoNorm.includes('verdadero') ||
+                                    estadoNorm.includes('yes') ||
+                                    estadoNorm.includes('done') ||
+                                    estadoNorm.includes('completa') ||
+                                    estadoNorm.includes('finalizada') ||
+                                    estadoNorm.includes('terminada') ||
+                                    estadoNorm.includes('efectuada') ||
+                                    estadoNorm.includes('realizado') ||
+                                    estadoNorm.includes('ejecutado') ||
+                                    estadoNorm.includes('aplicada') ||
+                                    estadoNorm.includes('aplicado') ||
+                                    estadoNorm.includes('asistida') ||
+                                    estadoNorm.includes('asistieron') ||
+                                    estadoNorm.includes('asistencia') ||
+                                    estadoNorm.includes('participaron') ||
+                                    estadoNorm.includes('participación') ||
+                                    estadoNorm.includes('certificada') ||
+                                    estadoNorm.includes('certificado') ||
+                                    estadoNorm.includes('evaluada') ||
+                                    estadoNorm.includes('evaluado') ||
+                                    estadoNorm.includes('verificada') ||
+                                    estadoNorm.includes('verificado');
+
+                // Procesar fecha y aumentar contador por estado y mes
+                const date = new Date(fechaProgramada);
+                if (!isNaN(date.getTime())) {
+                    const month = date.getMonth(); // 0-11
+                    if (month >= 0 && month < 12) {
+                        programadasData[month]++; // Siempre incrementa programadas
+                        if (isRealizada) {
+                            realizadasData[month]++; // Solo incrementa realizadas si está realizada
+                        }
+
+                        if (isRealizada) {
+                            console.log(`✅ Capacitación "${nombre}" marcada como realizada en mes ${month + 1} (${['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][month]})`);
+                        }
+                    }
+                }
+            }
+
+            console.log('📊 [getCapacitacionesChartDataForGraph] Datos encontrados - Programadas:', programadasData, 'Realizadas:', realizadasData);
+            return {
+                programadas: programadasData,
+                realizadas: realizadasData
+            };
         } catch (error) {
             console.error('❌ [RecursosHome] Error obteniendo datos de capacitaciones para gráfica:', error);
             return {
