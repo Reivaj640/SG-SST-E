@@ -3,279 +3,152 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestión de Presupuesto</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <title>Gestión de Presupuesto - K+AIR</title>
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;600;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <style>
+        /* =========================================
+           SISTEMA VISUAL K+AIR (CORE)
+           ========================================= */
         :root {
-            --primary-color: #4a6bdf;
-            --secondary-color: #f5f7ff;
-            --accent-color: #ff6b6b;
-            --text-color: #333;
-            --light-text: #777;
-            --border-color: #e0e6ed;
-            --success-color: #4caf50;
-            --warning-color: #ff9800;
-            --danger-color: #f44336;
-            --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            --hover-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
-        }
-
-        html, body {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+            --k-primary: #174ea6;
+            --k-primary-hover: #185abd;
+            --k-primary-light: rgba(23, 78, 166, 0.1);
+            --k-success: #28a745;
+            --k-warning: #ffc107;
+            --k-danger: #dc3545;
+            --k-bg-app: #f8f9fa;
+            --k-bg-card: #ffffff;
+            --k-border: #dee2e6;
+            --k-text-main: #212529;
+            --k-text-muted: #6c757d;
+            --k-radius-md: 0.375rem;
+            --k-radius-lg: 0.5rem;
+            --k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
+            --k-header-height: 60px;
+            --k-font-family: 'Segoe UI', 'Roboto', sans-serif;
         }
 
         body {
-            font-family: 'Roboto', sans-serif;
-            background-color: #f8f9fa;
-            color: var(--text-color);
-            line-height: 1.6;
-            height: 100vh;
-            overflow: hidden; /* Cambiado de hidden a auto para permitir scroll en el body */
+            margin: 0; padding: 0;
+            font-family: var(--k-font-family);
+            background-color: var(--k-bg-app);
+            color: var(--k-text-main);
+            height: 100vh; overflow: hidden;
+            display: flex; flex-direction: column;
         }
 
-        .dashboard-wrapper {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            width: 100%;
-            overflow: hidden; /* Cambiado de hidden a auto para permitir scroll */
-            margin: 0;  /* Asegurar que no haya margen */
-            padding: 0; /* Asegurar que no haya padding */
-        }
-
+        /* HEADER */
         header {
-            background: linear-gradient(135deg, var(--primary-color), #6b8cff);
-            color: white;
-            padding: 15px 20px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            background-color: var(--k-bg-card);
+            border-bottom: 1px solid var(--k-border);
+            padding: 0 1.5rem;
+            height: var(--k-header-height);
+            display: flex; align-items: center; justify-content: space-between;
+            flex-shrink: 0; z-index: 20;
+        }
+
+        .header-left { display: flex; align-items: center; gap: 1rem; }
+        .k-module-title { font-size: 1.2rem; font-weight: 600; color: var(--k-primary); line-height: 1.2; }
+        .k-module-subtitle { font-size: 0.8rem; color: var(--k-text-muted); font-weight: 400; }
+
+        .header-actions { display: flex; gap: 0.75rem; }
+
+        /* BOTONES */
+        .k-btn {
+            border: 1px solid var(--k-border); background: white;
+            color: var(--k-text-main); padding: 0.5rem 1rem;
+            border-radius: var(--k-radius-md); font-size: 0.9rem; font-weight: 500;
+            cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;
+            transition: all 0.2s;
+        }
+        .k-btn:hover { background: #f8f9fa; border-color: var(--k-text-muted); }
+
+        .k-btn-primary { background: var(--k-primary); color: white; border-color: var(--k-primary); }
+        .k-btn-primary:hover { background: var(--k-primary-hover); }
+
+        .k-btn-success { background: var(--k-success); color: white; border-color: var(--k-success); }
+        .k-btn-success:hover { background: #218838; }
+        
+        /* CONTENIDO PRINCIPAL */
+        .content-wrapper {
+            flex: 1; display: flex; flex-direction: column;
+            overflow: hidden; padding: 1.5rem; gap: 1.5rem;
+        }
+
+        /* KPI CARDS */
+        .kpi-container {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;
             flex-shrink: 0;
-            margin: 0; /* Margen explícito en 0 */
         }
 
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 10px;
+        .kpi-card {
+            background: var(--k-bg-card); border: 1px solid var(--k-border);
+            border-radius: var(--k-radius-lg); padding: 1.25rem;
+            box-shadow: var(--k-shadow-sm); display: flex; flex-direction: column;
+            border-left: 4px solid transparent; /* Indicador de color */
+        }
+        
+        .kpi-label { font-size: 0.8rem; color: var(--k-text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 0.5rem; }
+        .kpi-value { font-size: 1.5rem; font-weight: 700; color: var(--k-text-main); }
+        
+        /* Bordes de color semántico */
+        .kpi-card:nth-child(1) { border-left-color: var(--k-primary); }
+        .kpi-card:nth-child(2) { border-left-color: var(--k-warning); }
+        .kpi-card:nth-child(3) { border-left-color: var(--k-success); }
+        .kpi-card:nth-child(4) { border-left-color: #17a2b8; }
+
+        /* TABLA STICKY */
+        .table-wrapper {
+            flex: 1; overflow: auto;
+            background: var(--k-bg-card); border: 1px solid var(--k-border);
+            border-radius: var(--k-radius-lg); box-shadow: var(--k-shadow-sm);
+            position: relative;
         }
 
-        .logo i {
-            font-size: 24px;
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; table-layout: fixed; }
+
+        thead th {
+            background: #f8f9fa; position: sticky; top: 0; z-index: 10;
+            padding: 1rem; text-align: left; font-weight: 600; color: var(--k-text-muted);
+            border-bottom: 2px solid var(--k-border); white-space: nowrap;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05); /* Sombra sutil para separar header */
         }
 
-        .logo h1 {
-            font-weight: 500;
-            font-size: 20px;
-            margin: 0; /* Eliminar cualquier margen predeterminado */
-            line-height: 1; /* Ajustar line-height para control preciso */
+        tbody td {
+            padding: 0.75rem 1rem; border-bottom: 1px solid var(--k-border);
+            vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
 
-        .header-actions {
-            display: flex;
-            gap: 10px;
-        }
+        tbody tr:hover { background-color: rgba(23, 78, 166, 0.03); }
 
-        .btn {
-            padding: 8px 16px;
-            border: none;
+        /* INPUTS EDITABLES */
+        .editable-cell-input {
+            width: 100%; padding: 0.4rem 0.6rem;
+            border: 1px solid transparent; border-radius: 4px; background: transparent;
+            font-family: inherit; font-size: inherit; color: inherit;
+            transition: all 0.2s;
+        }
+        .editable-cell-input:hover { background: #f1f3f4; }
+        .editable-cell-input:focus {
+            background: white; border-color: var(--k-primary);
+            outline: none; box-shadow: 0 0 0 2px var(--k-primary-light);
+        }
+        
+        /* Estilos para Celdas Editables */
+        .editable-cell {
+            cursor: pointer;
+            padding: 4px 8px;
             border-radius: 4px;
-            cursor: pointer;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
+            transition: background-color 0.2s;
+            display: block;
+            min-height: 1.5em;
         }
 
-        .btn-primary {
-            background-color: white;
-            color: var(--primary-color);
-        }
-
-        .btn-primary:hover {
-            background-color: rgba(255, 255, 255, 0.9);
-            transform: translateY(-2px);
-        }
-
-        .btn-success {
-            background-color: var(--success-color);
-            color: white;
-        }
-
-        .btn-success:hover {
-            background-color: #3d8b40;
-        }
-
-        .content {
-            flex: 1;
-            display: flex; /* Rompe definitivamente el colapso de márgenes */
-            flex-direction: column;
-            overflow: auto; /* Cambiado de hidden a auto para permitir scroll */
-            padding: 10px;
-        }
-
-        .content > *:first-child {
-            margin-top: 0 !important;
-        }
-
-        .budget-summary {
-            background-color: white;
-            border-radius: 8px;
-            padding: 10px;
-            margin: 0 0 20px 0; /* Añadido margen inferior para crear espacio con la tabla */
-            box-shadow: var(--card-shadow);
-            }
-
-        .summary-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-        }
-
-        .summary-card {
-            text-align: center;
-            padding: 0px 15px;
-            border-radius: 8px;
-            background-color: var(--secondary-color);
-        }
-
-        .summary-value {
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--primary-color);
-        }
-
-        .summary-label {
-            font-size: 14px;
-            color: var(--light-text);
-            margin-top: 5px;
-        }
-
-        .budget-table-container {
-            background-color: white;
-            border-radius: 8px;
-            padding: 20px;
-            margin-top: 10;
-            box-shadow: var(--card-shadow);
-            flex: 1;
-            overflow: auto;
-        }
-
-        table {
-            width: auto; /* Cambiado de 100% a auto para permitir que min-width funcione */
-            border-collapse: collapse;
-            table-layout: fixed; /* Añadido para respetar los anchos de columna */
-            min-width: 1500px; /* Añadido para asegurar un ancho mínimo y permitir scroll */
-        }
-
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        th {
-            background-color: white; /* Asegura un fondo sólido y opaco */
-            font-weight: 500;
-            color: var(--text-color);
-            position: sticky;
-            top: 0; /* Revertido a 0 para que se pegue al borde superior del contenido del contenedor */
-            z-index: 10;
-            box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1); /* Sutil sombra para efecto de elevación */
-        }
-
-        tr:hover {
-            background-color: #f8fafc;
-        }
-
-        .actions-column {
-            text-align: center;
-        }
-
-        .action-btn {
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 16px;
-            padding: 5px;
-            margin: 0 2px;
-        }
-
-        .edit-btn {
-            color: var(--primary-color);
-        }
-
-        .delete-btn {
-            color: var(--danger-color);
-        }
-
-        .notification {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background-color: white;
-            padding: 15px 20px;
-            border-radius: 8px;
-            box-shadow: var(--hover-shadow);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            transform: translateX(120%);
-            transition: transform 0.3s ease;
-            z-index: 1000;
-        }
-
-        .notification.show {
-            transform: translateX(0);
-        }
-
-        .notification-icon {
-            font-size: 20px;
-        }
-
-        .notification.success .notification-icon {
-            color: var(--success-color);
-        }
-
-        .notification.error .notification-icon {
-            color: var(--danger-color);
-        }
-
-        .notification.warning .notification-icon {
-            color: var(--warning-color);
-        }
-
-        .empty-state {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            text-align: center;
-            padding: 40px;
-            color: var(--light-text);
-        }
-
-        .empty-state i {
-            font-size: 64px;
-            margin-bottom: 20px;
-            color: #e0e6ed;
-        }
-
-        .empty-state h3 {
-            color: var(--text-color);
-            margin-bottom: 10px;
+        .editable-cell:hover {
+            background-color: #f0f0f0;
+            color: var(--k-primary);
         }
 
         .formula-cell {
@@ -283,178 +156,132 @@
             background-color: #f4f4f4;
             cursor: not-allowed;
             display: block;
-            width: 100%;
-            height: 100%;
-            padding: 12px; /* Asegurarse que el padding sea consistente */
-        }
-
-        .editable-cell {
-            cursor: pointer;
-            padding: 8px;
+            padding: 4px 8px;
             border-radius: 4px;
-            transition: background-color 0.2s;
         }
 
-        .editable-cell:hover {
-            background-color: #f0f0f0;
+        /* ACTIONS COLUMN */
+        .actions-col { width: 100px; text-align: center; }
+        .action-btn {
+            color: var(--k-text-muted); cursor: pointer; margin: 0 0.4rem; font-size: 1rem;
+            transition: color 0.2s; background: none; border: none; padding: 0.25rem;
         }
+        .action-btn:hover { color: var(--k-primary); transform: scale(1.1); }
+        .action-btn.delete-btn:hover { color: var(--k-danger); }
 
-        .editable-cell-input {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid var(--primary-color);
-            border-radius: 4px;
-            font-family: inherit;
-            font-size: inherit;
+        /* NOTIFICACIÓN */
+        .k-toast {
+            position: fixed; bottom: 2rem; right: 2rem;
+            background: white; padding: 1rem 1.5rem;
+            border-radius: var(--k-radius-lg);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.12);
+            display: flex; align-items: center; gap: 0.75rem;
+            transform: translateY(150%); transition: transform 0.3s;
+            z-index: 2000; border-left: 4px solid var(--k-primary); font-weight: 500;
         }
+        .k-toast.show { transform: translateY(0); }
+        .k-toast.success { border-left-color: var(--k-success); }
+        .k-toast.warning { border-left-color: var(--k-warning); }
+        .k-toast.error { border-left-color: var(--k-danger); }
+        .k-toast.info { border-left-color: var(--k-primary); }
 
-        .btn-warning {
-            background-color: var(--warning-color);
-            color: white;
+        /* SPINNER */
+        .spinner {
+            width: 24px; height: 24px; border: 3px solid rgba(23,78,166,0.2);
+            border-top-color: var(--k-primary); border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto;
         }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
-        .btn-warning:hover {
-            background-color: #e68900;
-        }
-
-        /* Estilos adicionales para celdas editables */
-        .editable-cell {
-            cursor: pointer;
-            padding: 8px;
-            border-radius: 4px;
-            transition: background-color 0.2s;
-        }
-
-        .editable-cell:hover {
-            background-color: #f0f0f0;
-        }
-
-        .editable-cell-input {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid var(--primary-color);
-            border-radius: 4px;
-            font-family: inherit;
-            font-size: inherit;
-        }
-
-        .formula-cell {
-            color: #777;
-            background-color: #f4f4f4;
-            cursor: not-allowed;
-        }
-
-        @media (max-width: 768px) {
-            .summary-grid {
-                grid-template-columns: 1fr;
-            }
-        }
     </style>
 </head>
 <body>
-    <div class="dashboard-wrapper">
-        <header>
-            <div class="logo">
-                <i class="fas fa-file-invoice-dollar"></i>
-                <h1>Gestión de Presupuesto</h1>
-            </div>
-            <div class="header-actions">
-                <button class="btn btn-primary" id="backToSubmodulesBtn">
-                    <i class="fas fa-arrow-left"></i>
-                    Volver a Submódulos
-                </button>
-                <button class="btn btn-primary" id="backBtn">
-                    <i class="fas fa-arrow-left"></i>
-                    Volver al Selector
-                </button>
-                <button class="btn btn-primary" id="addRowBtn">
-                    <i class="fas fa-plus"></i>
-                    Agregar Item
-                </button>
-                <button class="btn btn-success" id="saveBtn">
-                    <i class="fas fa-save"></i>
-                    Guardar
-                </button>
-            </div>
-        </header>
 
-        <div class="content">
-            <div class="budget-summary">
-                <div class="summary-grid">
-                    <div class="summary-card">
-                        <div class="summary-value" id="totalPresupuesto">$0</div>
-                        <div class="summary-label">Presupuesto Total</div>
-                    </div>
-                    <div class="summary-card">
-                        <div class="summary-value" id="totalEmpresa">$0</div>
-                        <div class="summary-label">Aporte Empresa</div>
-                    </div>
-                    <div class="summary-card">
-                        <div class="summary-value" id="totalArl">0%</div>
-                        <div class="summary-label">% de Cumplimiento</div>
-                    </div>
-                    <div class="summary-card">
-                        <div class="summary-value" id="saldoDisponible">$0</div>
-                        <div class="summary-label">Saldo Disponible</div>
-                    </div>
-                </div>
+    <header>
+        <div class="header-left">
+            <button class="k-btn" id="backToSelectorBtn">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <button class="k-btn" id="backToSubmodulesBtn">
+                <i class="fas fa-home"></i>
+            </button>
+            <div>
+                <div class="k-module-title" id="moduleTitle">Gestión Presupuestal</div>
+                <div class="k-module-subtitle">Asignación y Control de Recursos</div>
             </div>
+        </div>
+        <div class="header-actions">
+            <button class="k-btn" id="backBtn" style="display:none;">Volver</button>
+            <button class="k-btn k-btn-primary" id="addRowBtn">
+                <i class="fas fa-plus"></i> Nueva Partida
+            </button>
+            <button class="k-btn k-btn-success" id="saveBtn">
+                <i class="fas fa-save"></i> Guardar Cambios
+            </button>
+        </div>
+    </header>
 
-            <div class="budget-table-container">
-                <table id="budgetTable">
-                    <colgroup>
-                        <col style="width: 11%;">   <!-- Columna ID -->
-                        <col style="width: 40%;">  <!-- Columna Detalle -->
-                        <col style="width: 15%;">  <!-- Columna Asignación -->
-                        <col style="width: 15%;">  <!-- Columna Ejecutado Acumulado -->
-                        <col style="width: 8%;">   <!-- Columna % Eje. -->
-                        <col style="width: 15%;">   <!-- Columna Enero -->
-                        <col style="width: 15%;">   <!-- Columna Febrero -->
-                        <col style="width: 15%;">   <!-- Columna Marzo -->
-                        <col style="width: 15%;">   <!-- Columna Abril -->
-                        <col style="width: 15%;">   <!-- Columna Mayo -->
-                        <col style="width: 15%;">   <!-- Columna Junio -->
-                        <col style="width: 15%;">   <!-- Columna Julio -->
-                        <col style="width: 15%;">   <!-- Columna Agosto -->
-                        <col style="width: 15%;">   <!-- Columna Septiembre -->
-                        <col style="width: 15%;">   <!-- Columna Octubre -->
-                        <col style="width: 15%;">   <!-- Columna Noviembre -->
-                        <col style="width: 15%;">   <!-- Columna Diciembre -->
-                        <col style="width: 15%;">  <!-- Columna Acciones -->
-                    </colgroup>
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Detalle</th>
-                            <th>Asignación</th>
-                            <th>Ejecutado Acumulado</th>
-                            <th>% Eje.</th>
-                            <th>Enero</th>
-                            <th>Febrero</th>
-                            <th>Marzo</th>
-                            <th>Abril</th>
-                            <th>Mayo</th>
-                            <th>Junio</th>
-                            <th>Julio</th>
-                            <th>Agosto</th>
-                            <th>Septiembre</th>
-                            <th>Octubre</th>
-                            <th>Noviembre</th>
-                            <th>Diciembre</th>
-                            <th class="actions-column">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody id="budgetTableBody">
-                        <!-- Los datos se cargarán dinámicamente -->
-                    </tbody>
-                </table>
+    <div class="content-wrapper">
+        <!-- KPIs -->
+        <div class="kpi-container">
+            <div class="kpi-card">
+                <div class="kpi-label">Presupuesto Total</div>
+                <div class="kpi-value" id="totalPresupuesto">$0</div>
             </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Aporte Empresa (Ejecutado)</div>
+                <div class="kpi-value" id="totalEmpresa">$0</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">% Cumplimiento</div>
+                <div class="kpi-value" id="totalArl">0%</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Saldo Disponible</div>
+                <div class="kpi-value" id="saldoDisponible">$0</div>
+            </div>
+        </div>
+
+        <!-- TABLA -->
+        <div class="table-wrapper">
+            <table id="budgetTable">
+                <colgroup>
+                    <col style="width: 50px;">   <!-- ID -->
+                    <col style="width: 250px;"> <!-- Detalle -->
+                    <col style="width: 130px;"> <!-- Asignación -->
+                    <col style="width: 130px;"> <!-- Ejecutado -->
+                    <col style="width: 70px;">   <!-- % -->
+                    <!-- Meses -->
+                    <col style="width: 100px;"> <col style="width: 100px;"> <col style="width: 100px;">
+                    <col style="width: 100px;"> <col style="width: 100px;"> <col style="width: 100px;">
+                    <col style="width: 100px;"> <col style="width: 100px;"> <col style="width: 100px;">
+                    <col style="width: 100px;"> <col style="width: 100px;"> <col style="width: 100px;">
+                    <col style="width: 100px;">  <!-- Acciones -->
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Concepto / Detalle</th>
+                        <th>Asignado</th>
+                        <th>Ejecutado</th>
+                        <th>%</th>
+                        <th>Ene</th> <th>Feb</th> <th>Mar</th> <th>Abr</th> <th>May</th> <th>Jun</th>
+                        <th>Jul</th> <th>Ago</th> <th>Sep</th> <th>Oct</th> <th>Nov</th> <th>Dic</th>
+                        <th class="actions-col">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="budgetTableBody">
+                    <!-- JS inyectará filas aquí -->
+                </tbody>
+            </table>
         </div>
     </div>
 
-    <div class="notification" id="notification">
-        <i class="notification-icon fas fa-check-circle"></i>
-        <div class="notification-message">Operación completada con éxito</div>
+    <!-- TOAST -->
+    <div class="k-toast" id="notification">
+        <i class="fas fa-info-circle notification-icon"></i>
+        <span class="notification-message">Operación realizada</span>
     </div>
 
     <script>
@@ -462,108 +289,51 @@
         let calculationData = [];
         let currentFile = null;
         let formulaCells = [];
-        // Agregar esta variable al principio del script
         let hasPendingChanges = false;
 
         document.addEventListener('DOMContentLoaded', function() {
             setupEventListeners();
 
-            // --- INICIO: MANEJADOR MEJORADO DE MENSAJES ---
+            // Mensajes del padre
             window.addEventListener('message', async (event) => {
-                // Verificar el origen del mensaje por seguridad
                 if (event.source !== parent) return;
 
-                // Lógica de carga de datos
                 if (event.data.file) {
                     currentFile = event.data.file;
                     updateFileInfo();
                     await loadData();
                 } else if (event.data.budgetData) {
-                    // Validar los datos recibidos antes de procesarlos
-                    if (!validateBudgetData(event.data.budgetData)) {
-                        showNotification('Datos recibidos no válidos', 'error');
-                        return;
-                    }
-
                     budgetData = event.data.budgetData;
-                    // Usar calculationData para cálculos si está disponible, de lo contrario usar budgetData
                     calculationData = event.data.calculationData || budgetData;
-                    if (event.data.formulaCells) {
-                        formulaCells = event.data.formulaCells;
-                    }
+                    if (event.data.formulaCells) formulaCells = event.data.formulaCells;
                     renderBudgetTable();
                     updateSummary();
-                    markNoPendingChanges(); // Marcar que no hay cambios pendientes al cargar nuevos datos
+                    markNoPendingChanges();
                 }
 
-                // Lógica de confirmación de guardado
-                if (event.data.action === 'saveComplete') {
+                if (event.data.action === 'saveComplete' || (event.data.action === 'saveBudgetChanges' && event.data.success)) {
                     showNotification('Cambios guardados exitosamente', 'success');
-                    markNoPendingChanges(); // Marcar que no hay cambios pendientes
-                } else if (event.data.action === 'saveError') {
-                    showNotification(`Error al guardar: ${event.data.error}`, 'error');
-                } else if (event.data.action === 'saveBudgetChanges') {
-                    // Recibir confirmación de guardado del proceso principal
-                    if (event.data.success) {
-                        showNotification('Cambios guardados exitosamente', 'success');
-                        markNoPendingChanges(); // Marcar que no hay cambios pendientes
-                    } else {
-                        showNotification(`Error al guardar: ${event.data.error || 'Error desconocido'}`, 'error');
-                    }
+                    markNoPendingChanges();
+                } else if (event.data.action === 'saveError' || (event.data.action === 'saveBudgetChanges' && !event.data.success)) {
+                    showNotification(`Error al guardar: ${event.data.error || 'Error desconocido'}`, 'error');
                 }
             });
-            // --- FIN: MANEJADOR MEJORADO DE MENSAJES ---
         });
 
-        // Función para validar los datos recibidos
-        function validateBudgetData(data) {
-            if (!Array.isArray(data)) {
-                console.error('Los datos recibidos no son un array');
-                return false;
-            }
-
-            // Validar estructura básica de cada elemento
-            for (let i = 0; i < data.length; i++) {
-                const item = data[i];
-                if (typeof item !== 'object' || item === null) {
-                    console.error(`El elemento en la posición ${i} no es un objeto válido`);
-                    return false;
-                }
-
-                // Verificar propiedades esenciales (excepto filas especiales)
-                if (item.id && item.id !== 'TOTAL AÑO' && item.id !== 'ANALISIS PRESUPUESTAL') {
-                    if (typeof item.detalle === 'undefined' ||
-                        typeof item.asignacion === 'undefined' ||
-                        typeof item.ejecutado_acumulado === 'undefined') {
-                        console.error(`El elemento en la posición ${i} no tiene las propiedades esenciales`);
-                        return false;
-                    }
-                }
-            }
-
-            return true;
-        }
-
-
         function setupEventListeners() {
-            document.getElementById('backBtn').addEventListener('click', () => {
-                if (hasPendingChanges) {
-                    if (confirm('Tiene cambios sin guardar. ¿Está seguro de que desea salir sin guardar?')) {
-                        window.parent.postMessage({ action: 'backToSelector' }, '*');
-                    }
-                } else {
+            const backToSelector = () => {
+                if (!hasPendingChanges || confirm('Tiene cambios sin guardar. ¿Está seguro de que desea salir?')) {
                     window.parent.postMessage({ action: 'backToSelector' }, '*');
                 }
-            });
-            document.getElementById('backToSubmodulesBtn').addEventListener('click', () => {
-                if (hasPendingChanges) {
-                    if (confirm('Tiene cambios sin guardar. ¿Está seguro de que desea salir sin guardar?')) {
-                        window.parent.postMessage({ action: 'backToSubmodules' }, '*');
-                    }
-                } else {
+            };
+            const backToSubmodules = () => {
+                if (!hasPendingChanges || confirm('Tiene cambios sin guardar. ¿Está seguro de que desea salir?')) {
                     window.parent.postMessage({ action: 'backToSubmodules' }, '*');
                 }
-            });
+            };
+
+            document.getElementById('backToSelectorBtn').addEventListener('click', backToSelector);
+            document.getElementById('backToSubmodulesBtn').addEventListener('click', backToSubmodules);
             document.getElementById('addRowBtn').addEventListener('click', addNewRow);
             document.getElementById('saveBtn').addEventListener('click', saveChanges);
         }
@@ -571,7 +341,7 @@
         function updateFileInfo() {
             if (!currentFile) return;
             const year = extractYearFromFileName(currentFile.name);
-            document.querySelector('.logo h1').textContent = `Gestión de Presupuesto - ${year}`;
+            document.getElementById('moduleTitle').textContent = `Presupuesto ${year}`;
         }
 
         function extractYearFromFileName(fileName) {
@@ -580,133 +350,55 @@
         }
 
         async function loadData() {
-            console.log('[DEBUG] Iniciando carga de datos...');
-            console.time('[PERFORMANCE] Carga de datos');
-
             try {
                 showLoading();
                 window.parent.postMessage({ action: 'requestBudgetData', file: currentFile }, '*');
             } catch (error) {
                 console.error('Error al cargar datos:', error);
                 showNotification(`Error al cargar datos: ${error.message}`, 'error');
-                hideLoading();
             }
         }
 
         function getCellAddress(rowIndex, propertyName) {
             const row = rowIndex + 10;
             const columnMap = {
-                'id': [0, 'A'],                    // Columna A (índice 0)
-                'empty_b': [1, 'B'],               // Columna B (índice 1) - Vacía (o intermedia)
-                'detalle': [2, 'C'],               // Columna C (índice 2)
-                'asignacion': [3, 'D'],            // Columna D (índice 3)
-                'ejecutado_acumulado': [4, 'E'],   // Columna E (índice 4)
-                'porcentaje_ejecutado': [5, 'F'],  // Columna F (índice 5)
-                'enero': [6, 'G'],                 // Columna G (índice 6)
-                'febrero': [7, 'H'],               // Columna H (índice 7)
-                'marzo': [8, 'I'],                 // Columna I (índice 8)
-                'abril': [9, 'J'],                 // Columna J (índice 9)
-                'mayo': [10, 'K'],                // Columna K (índice 10)
-                'junio': [11, 'L'],               // Columna L (índice 11)
-                'julio': [12, 'M'],               // Columna M (índice 12)
-                'agosto': [13, 'N'],              // Columna N (índice 13)
-                'septiembre': [14, 'O'],          // Columna O (índice 14)
-                'octubre': [15, 'P'],             // Columna P (índice 15)
-                'noviembre': [16, 'Q'],           // Columna Q (índice 16)
-                'diciembre': [17, 'R']            // Columna R (índice 17)
-    };
+                'id': 'A', 'detalle': 'C', 'asignacion': 'D', 'ejecutado_acumulado': 'E',
+                'porcentaje_ejecutado': 'F', 'enero': 'G', 'febrero': 'H', 'marzo': 'I',
+                'abril': 'J', 'mayo': 'K', 'junio': 'L', 'julio': 'M', 'agosto': 'N',
+                'septiembre': 'O', 'octubre': 'P', 'noviembre': 'Q', 'diciembre': 'R'
+            };
             const col = columnMap[propertyName];
-            return col ? `${col[1]}${row}` : null;
+            return col ? `${col}${row}` : null;
         }
 
-        // Función para marcar cambios pendientes
         function markPendingChanges() {
             hasPendingChanges = true;
-            const saveBtn = document.getElementById('saveBtn');
-            saveBtn.classList.add('btn-warning');
-            saveBtn.classList.remove('btn-success');
-            saveBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Guardar cambios pendientes';
+            const btn = document.getElementById('saveBtn');
+            btn.classList.add('k-btn-primary');
+            btn.classList.remove('k-btn-success');
+            btn.innerHTML = '<i class="fas fa-save"></i> Guardar (Pendiente)';
         }
 
-        // Función para marcar que no hay cambios pendientes
         function markNoPendingChanges() {
             hasPendingChanges = false;
-            const saveBtn = document.getElementById('saveBtn');
-            saveBtn.classList.remove('btn-warning');
-            saveBtn.classList.add('btn-success');
-            saveBtn.innerHTML = '<i class="fas fa-save"></i> Guardar';
+            const btn = document.getElementById('saveBtn');
+            btn.classList.remove('k-btn-primary');
+            btn.classList.add('k-btn-success');
+            btn.innerHTML = '<i class="fas fa-save"></i> Guardar Cambios';
         }
 
-        // Función para confirmar antes de salir si hay cambios pendientes
-        function confirmExitIfHasPendingChanges() {
-            if (hasPendingChanges) {
-                return confirm('Tiene cambios sin guardar. ¿Está seguro de que desea salir sin guardar?');
-            }
-            return true;
-        }
-
-        // Modificar el evento de cierre de ventana si es necesario
-        window.addEventListener('beforeunload', (e) => {
-            if (hasPendingChanges) {
-                e.preventDefault();
-                e.returnValue = ''; // Necesario para que el navegador muestre el diálogo de confirmación
-                return '';
-            }
-        });
-
-        // Función mejorada para convertir valores formateados a números
         function parseFormattedNumber(value) {
-            if (value === null || value === undefined || value === '') {
-                return 0;
-            }
-
-            if (typeof value === 'number') {
-                return value;
-            }
-
-            if (typeof value === 'string') {
-                // Remover signos de dólar y espacios
-                let cleanValue = value.toString()
-                    .replace(/\$/g, '')  // Eliminar signos de dólar
-                    .replace(/\s/g, ''); // Eliminar espacios
-
-                // Si hay un guion, representativo de un valor cero
-                if (cleanValue === '-' || cleanValue === '-  ' || cleanValue.trim() === '') {
-                    return 0;
-                }
-
-                // Detectar formato: si tiene punto antes de la coma, es formato colombiano (1.000.000,50)
-                // Si tiene coma antes del punto o solo comas, es formato internacional (1,000,000.50)
-
-                const hasCommaAfterDot = /\.\d+,\d+/.test(cleanValue); // Ej: 1.000,50
-                const hasDotAfterComma = /,\d+\.\d+/.test(cleanValue); // Ej: 1,000.50
-
-                if (hasCommaAfterDot) {
-                    // Formato colombiano: 1.000.000,50
-                    cleanValue = cleanValue
-                        .replace(/\./g, '')  // Eliminar puntos (separadores de miles)
-                        .replace(/,/g, '.'); // Convertir coma decimal a punto
-                } else if (hasDotAfterComma || cleanValue.includes(',')) {
-                    // Formato internacional: 1,000,000.50 o solo tiene comas
-                    cleanValue = cleanValue.replace(/,/g, ''); // Eliminar comas (separadores de miles)
-                }
-
-                const parsed = parseFloat(cleanValue);
-                return isNaN(parsed) ? 0 : parsed;
-            }
-
-            return 0;
+            if (value === null || value === undefined || value === '') return 0;
+            if (typeof value === 'number') return value;
+            let clean = value.toString().replace(/\$/g, '').replace(/\s/g, '').replace(/,/g, '');
+            const parsed = parseFloat(clean);
+            return isNaN(parsed) ? 0 : parsed;
         }
 
-        // Función para formatear números con separadores de miles
-        function formatNumberWithThousands(value) {
-            if (typeof value === 'number') {
-                return value.toLocaleString('es-CO', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                }).replace(/\,/g, '.'); // Reemplazar coma por punto según sistema latinoamericano
-            }
-            return value;
+        function formatNumber(num) {
+            if (num === null || num === undefined || num === '') return '0,00';
+            const numberValue = isNaN(parseFloat(num)) ? 0 : parseFloat(num);
+            return numberValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
         function renderBudgetTable() {
@@ -716,493 +408,132 @@
 
             budgetData.forEach((item, index) => {
                 const row = document.createElement('tr');
+                const isSpecial = item.id === 'TOTAL AÑO' || item.id === 'ANALISIS PRESUPUESTAL';
 
-                // Verificar si es una fila especial que no debe ser editable
-                const isSpecialRow = item.id === 'TOTAL AÑO' || item.id === 'ANALISIS PRESUPUESTAL';
-
-                // Generar celdas de meses
-                let monthCellsHTML = '';
-                months.forEach(month => {
-                    const cellAddress = getCellAddress(index, month);
-                    const isFormula = formulaCells.includes(cellAddress);
-
-                    if (isFormula || isSpecialRow) {
-                        monthCellsHTML += `<td><span class="formula-cell">${formatNumber(item[month] || 0)}</span></td>`;
+                let monthHTML = '';
+                months.forEach(m => {
+                    const addr = getCellAddress(index, m);
+                    if (formulaCells.includes(addr) || isSpecial) {
+                        monthHTML += `<td><span class="formula-cell">${formatNumber(item[m] || 0)}</span></td>`;
                     } else {
-                        monthCellsHTML += `<td><span onclick="makeCellEditable(event, ${index}, '${month}')" class="editable-cell">${formatNumber(item[month] || 0)}</span></td>`;
+                        monthHTML += `<td><span onclick="makeCellEditable(event, ${index}, '${m}')" class="editable-cell">${formatNumber(item[m] || 0)}</span></td>`;
                     }
                 });
 
-                // Generar celdas de asignación y ejecutado
-                const asignacionCell = isSpecialRow ?
-                    `<td><span class="formula-cell">${formatNumber(item.asignacion || 0)}</span></td>` :
-                    `<td><span onclick="makeCellEditable(event, ${index}, 'asignacion')" class="editable-cell">${formatNumber(item.asignacion || 0)}</span></td>`;
-
-                const ejecutadoCell = isSpecialRow ?
-                    `<td><span class="formula-cell">${formatNumber(item.ejecutado_acumulado || 0)}</span></td>` :
-                    `<td><span onclick="makeCellEditable(event, ${index}, 'ejecutado_acumulado')" class="editable-cell">${formatNumber(item.ejecutado_acumulado || 0)}</span></td>`;
-
-                // Calcular el porcentaje de ejecución dinámicamente para cada fila
                 const asignacion = parseFormattedNumber(item.asignacion || 0);
                 const ejecutado = parseFormattedNumber(item.ejecutado_acumulado || 0);
-                const porcentajeEjecutado = asignacion > 0 ? ((ejecutado / asignacion) * 100).toFixed(2) : 0;
+                const pct = asignacion > 0 ? ((ejecutado / asignacion) * 100).toFixed(2) : 0;
 
                 row.innerHTML = `
-                    <td>${item.id === 'TOTAL AÑO' ? 'TOTAL AÑO' : item.id === 'ANALISIS PRESUPUESTAL' ? 'IPC' : index + 1}</td>
-                    <td>${item.id === 'TOTAL AÑO' ? 'TOTAL AÑO' : item.detalle || 'Sin detalle'}</td>
-                    ${asignacionCell}
-                    ${ejecutadoCell}
-                    <td id="porcentaje_ejecutado_${index}">${porcentajeEjecutado}%</td>
-                    ${monthCellsHTML}
-                    <td class="actions-column">
-                        ${!isSpecialRow ? `
-                            <button class="action-btn edit-btn" onclick="editRow(${index})"><i class="fas fa-edit"></i></button>
-                            <button class="action-btn delete-btn" onclick="deleteRow(${index})"><i class="fas fa-trash"></i></button>
-                        ` : ''}
+                    <td>${isSpecial ? item.id : index + 1}</td>
+                    <td>${isSpecial ? item.id : item.detalle || '-'}</td>
+                    <td>${isSpecial ? `<span class="formula-cell">${formatNumber(asignacion)}</span>` : `<span onclick="makeCellEditable(event, ${index}, 'asignacion')" class="editable-cell">${formatNumber(asignacion)}</span>`}</td>
+                    <td>${isSpecial ? `<span class="formula-cell">${formatNumber(ejecutado)}</span>` : `<span onclick="makeCellEditable(event, ${index}, 'ejecutado_acumulado')" class="editable-cell">${formatNumber(ejecutado)}</span>`}</td>
+                    <td id="pct_${index}">${pct}%</td>
+                    ${monthHTML}
+                    <td class="actions-col">
+                        ${!isSpecial ? `<button class="action-btn delete-btn" onclick="deleteRow(${index})"><i class="fas fa-trash"></i></button>` : ''}
                     </td>
                 `;
                 tableBody.appendChild(row);
             });
-
-            // Asegurar que todos los valores estén correctamente formateados en la interfaz
-            // Recorrer cada celda editable y aplicar formato numérico
-            document.querySelectorAll('.editable-cell').forEach(cell => {
-                if (cell.textContent && !isNaN(parseFormattedNumber(cell.textContent))) {
-                    const numericValue = parseFormattedNumber(cell.textContent);
-                    cell.textContent = formatNumber(numericValue);
-                }
-            });
         }
 
         function updateSummary() {
-            console.log('updateSummary() llamado');
+            let totalP = 0, totalE = 0;
+            budgetData.forEach(item => {
+                if (item.id === 'TOTAL AÑO') return;
+                totalP += parseFormattedNumber(item.asignacion);
+                totalE += parseFormattedNumber(item.ejecutado_acumulado);
+            });
 
-            // Verificar que budgetData exista y sea un array
-            if (!budgetData || !Array.isArray(budgetData)) {
-                console.warn('budgetData no está definido o no es un array');
-                // Actualizar valores predeterminados
-                document.getElementById('totalPresupuesto').textContent = '$0';
-                document.getElementById('totalEmpresa').textContent = '$0';
-                document.getElementById('totalArl').textContent = '0%';
-                document.getElementById('saldoDisponible').textContent = '$0';
-                return;
-            }
-
-            console.log('Datos recibidos:', JSON.stringify(budgetData, null, 2)); // Agregar log de datos completos
-            console.log('Iniciando cálculo de resumen con', budgetData.length, 'elementos');
-
-            // Calcular el total asignado (presupuesto total)
-            let totalPresupuesto = 0;
-            let totalEjecutado = 0;
-
-            for (let i = 0; i < budgetData.length; i++) {
-                const item = budgetData[i];
-                console.log('Procesando item', i, ': id=', item.id, 'asignacion=', item.asignacion, 'ejecutado_acumulado=', item.ejecutado_acumulado);
-
-                // Excluir solo filas especiales que son totales del informe, no todas las filas con ciertos IDs
-                // Queremos incluir todas las filas que tengan valores reales de presupuesto
-                if (item.id === 'TOTAL AÑO') {
-                    console.log('Excluyendo fila TOTAL AÑO del cálculo');
-                    continue;
-                }
-
-                // Procesar asignación
-                let asignacionValue = 0;
-                if (typeof item.asignacion !== 'undefined' && item.asignacion !== null) {
-                    if (typeof item.asignacion === 'string') {
-                        console.log('Parseando asignacion como string:', item.asignacion);
-                        asignacionValue = parseFormattedNumber(item.asignacion);
-                    } else if (typeof item.asignacion === 'number') {
-                        console.log('Usando asignacion como number:', item.asignacion);
-                        asignacionValue = item.asignacion;
-                    } else {
-                        console.log('Tipo desconocido para asignacion:', typeof item.asignacion, item.asignacion);
-                        asignacionValue = 0;
-                    }
-                } else {
-                    console.log('Asignacion indefinida para item', i);
-                }
-
-                // Procesar ejecutado acumulado
-                let ejecutadoValue = 0;
-                if (typeof item.ejecutado_acumulado !== 'undefined' && item.ejecutado_acumulado !== null) {
-                    if (typeof item.ejecutado_acumulado === 'string') {
-                        console.log('Parseando ejecutado_acumulado como string:', item.ejecutado_acumulado);
-                        ejecutadoValue = parseFormattedNumber(item.ejecutado_acumulado);
-                    } else if (typeof item.ejecutado_acumulado === 'number') {
-                        console.log('Usando ejecutado_acumulado como number:', item.ejecutado_acumulado);
-                        ejecutadoValue = item.ejecutado_acumulado;
-                    } else {
-                        console.log('Tipo desconocido para ejecutado_acumulado:', typeof item.ejecutado_acumulado, item.ejecutado_acumulado);
-                        ejecutadoValue = 0;
-                    }
-                } else {
-                    console.log('Ejecutado_acumulado indefinido para item', i);
-                }
-
-                // Solo sumar a los totales si los valores son números válidos y mayores a 0
-                if (typeof asignacionValue === 'number' && !isNaN(asignacionValue)) {
-                    totalPresupuesto += asignacionValue;
-                }
-                if (typeof ejecutadoValue === 'number' && !isNaN(ejecutadoValue)) {
-                    totalEjecutado += ejecutadoValue;
-                }
-
-                console.log(`Item ${i}: asignacion=${asignacionValue}, ejecutado=${ejecutadoValue}, sumas parciales: totalPresupuesto=${totalPresupuesto}, totalEjecutado=${totalEjecutado}`);
-            }
-
-            console.log('Sumas finales antes de formato - Total presupuesto:', totalPresupuesto, 'Total ejecutado:', totalEjecutado);
-
-            // Calcular el % de cumplimiento del presupuesto
-            const porcentajeCumplimiento = totalPresupuesto > 0 ? ((totalEjecutado / totalPresupuesto) * 100) : 0;
-            console.log('Cálculos finales - Total presupuesto:', totalPresupuesto, 'Total ejecutado:', totalEjecutado, 'Porcentaje cumplimiento:', porcentajeCumplimiento);
-
-            // Calcular el saldo disponible
-            const saldoDisponible = totalPresupuesto - totalEjecutado;
-
-            // Asegurar que los elementos existan antes de actualizarlos
-            const totalPresupuestoEl = document.getElementById('totalPresupuesto');
-            const totalEmpresaEl = document.getElementById('totalEmpresa');
-            const cumplimientoEl = document.getElementById('totalArl'); // Mantener el mismo ID pero cambiar el propósito
-            const saldoDisponibleEl = document.getElementById('saldoDisponible');
-
-            console.log('Actualizando elementos del DOM...');
-            if (totalPresupuestoEl) {
-                console.log('Actualizando totalPresupuesto con valor:', totalPresupuesto);
-                totalPresupuestoEl.textContent = '$' + formatNumber(totalPresupuesto);
-            } else {
-                console.error('Elemento totalPresupuesto no encontrado');
-            }
-
-            if (totalEmpresaEl) {
-                console.log('Actualizando totalEmpresa con valor:', totalEjecutado);
-                totalEmpresaEl.textContent = '$' + formatNumber(totalEjecutado); // Mostrar lo ejecutado como "Aporte Empresa"
-            } else {
-                console.error('Elemento totalEmpresa no encontrado');
-            }
-
-            if (cumplimientoEl) {
-                console.log('Actualizando cumplimiento con valor:', porcentajeCumplimiento);
-                cumplimientoEl.textContent = porcentajeCumplimiento.toFixed(2) + '%'; // Mostrar % de cumplimiento
-            } else {
-                console.error('Elemento totalArl no encontrado');
-            }
-
-            if (saldoDisponibleEl) {
-                console.log('Actualizando saldoDisponible con valor:', saldoDisponible);
-                saldoDisponibleEl.textContent = '$' + formatNumber(saldoDisponible);
-            } else {
-                console.error('Elemento saldoDisponible no encontrado');
-            }
-        }
-
-        function formatNumber(num) {
-            // Manejar casos especiales
-            if (num === null || num === undefined || num === '') {
-                return '0.00';
-            }
-
-            // Si ya es un string formateado, devolverlo tal cual
-            if (typeof num === 'string' && isNaN(parseFloat(num))) {
-                return num;
-            }
-
-            // Convertimos a número si es un string numérico, o usamos 0 si no es un número válido
-            const numberValue = isNaN(parseFloat(num)) ? 0 : parseFloat(num);
-            // Aplicamos formato con separador de miles y 2 decimales para Colombia
-            // En Colombia: 1.000.000,50 (punto como separador de miles, coma como decimal)
-            return numberValue.toLocaleString('es-CO', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            }); // No reemplazamos nada, ya que toLocaleString('es-CO') da el formato correcto
+            document.getElementById('totalPresupuesto').textContent = '$' + formatNumber(totalP);
+            document.getElementById('totalEmpresa').textContent = '$' + formatNumber(totalE);
+            document.getElementById('totalArl').textContent = (totalP > 0 ? ((totalE / totalP) * 100) : 0).toFixed(2) + '%';
+            document.getElementById('saldoDisponible').textContent = '$' + formatNumber(totalP - totalE);
         }
 
         function addNewRow() {
-            const newItem = {
-                detalle: "Unidad", asignacion: 0, ejecutado_acumulado: 0, porcentaje_ejecutado: 0,
+            budgetData.push({
+                detalle: "Nueva Partida", asignacion: 0, ejecutado_acumulado: 0,
                 enero: 0, febrero: 0, marzo: 0, abril: 0, mayo: 0, junio: 0,
-                julio: 0, agosto: 0, septiembre: 0, octubre: 0, noviembre: 0, diciembre: 0,
-                Total: 0, 'Fuente de Financiación': ''
-            };
-            budgetData.push(newItem);
+                julio: 0, agosto: 0, septiembre: 0, octubre: 0, noviembre: 0, diciembre: 0
+            });
             renderBudgetTable();
-            updateSummary();
-            showNotification('Nuevo ítem agregado', 'success');
-        }
-
-        function editRow(index) {
-            const item = budgetData[index];
-            const detalle = prompt('Detalle:', item.detalle) || item.detalle;
-            const asignacion = parseFloat(prompt('Asignación:', item.asignacion)) || item.asignacion;
-            const ejecutadoAcumulado = parseFloat(prompt('Ejecutado Acumulado:', item.ejecutado_acumulado)) || item.ejecutado_acumulado;
-            budgetData[index] = {
-                ...item,
-                detalle: detalle,
-                asignacion: asignacion,
-                ejecutado_acumulado: ejecutadoAcumulado,
-                porcentaje_ejecutado: asignacion > 0 ? ((ejecutadoAcumulado / asignacion) * 100).toFixed(2) : 0,
-            };
-            renderBudgetTable();
-            updateSummary();
-            showNotification('Ítem actualizado', 'success');
+            markPendingChanges();
         }
 
         function deleteRow(index) {
-            if (confirm('¿Estás seguro de que deseas eliminar este ítem?')) {
+            if (confirm('¿Eliminar este ítem?')) {
                 budgetData.splice(index, 1);
                 renderBudgetTable();
                 updateSummary();
-                showNotification('Ítem eliminado', 'warning');
+                markPendingChanges();
             }
         }
 
-        // Función para validar que los datos a guardar tienen el formato correcto
-        function validateDataForSave(data) {
-            if (!Array.isArray(data)) {
-                console.error('La función validateDataForSave recibió un valor no-array:', typeof data);
-                return false;
-            }
-
-            for (let i = 0; i < data.length; i++) {
-                const item = data[i];
-
-                // Solo validar filas que no sean especiales y tengan un id definido
-                if (item.id && item.id !== 'TOTAL AÑO' && item.id !== 'ANALISIS PRESUPUESTAL') {
-                    // Validar que los campos requeridos existan
-                    if (typeof item.detalle === 'undefined') {
-                        console.error(`El ítem en la posición ${i} no tiene la propiedad 'detalle'`);
-                        return false;
-                    }
-
-                    if (typeof item.asignacion === 'undefined') {
-                        console.error(`El ítem en la posición ${i} no tiene la propiedad 'asignacion'`);
-                        return false;
-                    }
-
-                    if (typeof item.ejecutado_acumulado === 'undefined') {
-                        console.error(`El ítem en la posición ${i} no tiene la propiedad 'ejecutado_acumulado'`);
-                        return false;
-                    }
-
-                    // Validar que los valores numéricos sean realmente números válidos
-                    if (typeof item.asignacion !== 'number' || isNaN(item.asignacion)) {
-                        console.error(`El ítem en la posición ${i} tiene un valor inválido para 'asignacion': ${item.asignacion}`);
-                        return false;
-                    }
-
-                    if (typeof item.ejecutado_acumulado !== 'number' || isNaN(item.ejecutado_acumulado)) {
-                        console.error(`El ítem en la posición ${i} tiene un valor inválido para 'ejecutado_acumulado': ${item.ejecutado_acumulado}`);
-                        return false;
-                    }
-                }
-            }
-
-            return true;
-        }
-
-        function saveChanges() {
-            if (!hasPendingChanges) {
-                showNotification('No hay cambios para guardar', 'info');
-                return;
-            }
-
-            // Preparar datos para guardar (convertir a formato numérico)
-            const dataToSave = budgetData.map(item => {
-                const newItem = { ...item };
-
-                // Convertir valores formateados a números
-                for (const key in newItem) {
-                    // Solo procesar campos numéricos, no el id o detalle
-                    if (key !== 'id' && key !== 'detalle' && key !== 'fuente_financiacion' && typeof newItem[key] === 'string') {
-                        const parsedValue = parseFormattedNumber(newItem[key]);
-
-                        // Solo actualizar si el valor era originalmente un string formateado
-                        if (typeof newItem[key] === 'string') {
-                            newItem[key] = parsedValue;
-                        }
-                    }
-                }
-
-                return newItem;
-            });
-
-            // Validar los datos antes de enviarlos
-            if (!validateDataForSave(dataToSave)) {
-                showNotification('Error de validación: Datos no válidos para guardar', 'error');
-                return;
-            }
-
-            window.parent.postMessage({
-                action: 'saveBudgetChanges',
-                file: currentFile,
-                changes: 'Actualización de presupuesto',
-                data: dataToSave
-            }, '*');
-
-            showNotification('Guardando cambios...', 'info');
-        }
-
-        function showNotification(message, type = 'success') {
-            const notification = document.getElementById('notification');
-            const messageElement = notification.querySelector('.notification-message');
-            const iconElement = notification.querySelector('.notification-icon');
-            messageElement.textContent = message;
-            notification.className = 'notification ' + type;
-            if (type === 'success') iconElement.className = 'notification-icon fas fa-check-circle';
-            else if (type === 'error') iconElement.className = 'notification-icon fas fa-times-circle';
-            else if (type === 'warning') iconElement.className = 'notification-icon fas fa-exclamation-circle';
-            else if (type === 'info') iconElement.className = 'notification-icon fas fa-info-circle';
-            notification.classList.add('show');
-            setTimeout(() => notification.classList.remove('show'), 3000);
-        }
-
-        function showLoading() {
-            const tableBody = document.getElementById('budgetTableBody');
-            tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px;"><div class="spinner"></div><p>Cargando datos...</p></td></tr>';
-        }
-
-        function hideLoading() {}
-
-        // Función para convertir valores formateados a números
-        function parseFormattedNumber(value) {
-            if (value === null || value === undefined || value === '') {
-                return 0;
-            }
-
-            if (typeof value === 'number') {
-                return value;
-            }
-
-            if (typeof value === 'string') {
-                // Remover signos de dólar, espacios y caracteres no numéricos excepto puntos decimales
-                let cleanValue = value.toString()
-                    .replace(/\$/g, '')  // Eliminar signos de dólar
-                    .replace(/\s/g, '')  // Eliminar espacios
-                    .replace(/,/g, '');  // Eliminar comas (separadores de miles en este formato)
-
-                // Manejar casos especiales como "$ -" o "-  " que representan ceros
-                if (cleanValue.trim() === '-' || cleanValue.trim() === '-  ' || cleanValue.trim() === '') {
-                    return 0;
-                }
-
-                const parsed = parseFloat(cleanValue);
-                return isNaN(parsed) ? 0 : parsed;
-            }
-
-            return 0;
-        }
-
-        // Función para formatear números con separadores de miles
-        function formatNumberWithThousands(value) {
-            if (typeof value === 'number') {
-                return value.toLocaleString('es-CO', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                }).replace(/\,/g, '.');  // En Colombia se usa punto como separador de miles
-            }
-            return value;
-        }
-
-        function makeCellEditable(event, index, propertyName) {
+        function makeCellEditable(event, index, prop) {
             const span = event.target;
-            const currentValue = budgetData[index][propertyName];
-
-            // Convertir el valor formateado a número
-            const numericValue = parseFormattedNumber(currentValue);
-
+            const numeric = parseFormattedNumber(budgetData[index][prop]);
             const input = document.createElement('input');
             input.type = 'number';
-            input.value = numericValue;
+            input.value = numeric;
             input.className = 'editable-cell-input';
-            input.step = '0.01'; // Permitir decimales
-            input.min = '0'; // Asegurar que no se ingresen valores negativos para campos numéricos
-
-            // Reemplazar el span con el input
+            
             const cell = span.parentNode;
             cell.replaceChild(input, span);
             input.focus();
             input.select();
 
-            input.onblur = (e) => saveCellEdit(e, index, propertyName);
-            input.onkeydown = (e) => {
-                if (e.key === 'Enter') {
-                    input.blur();
-                } else if (e.key === 'Escape') {
-                    // Cancelar edición y restaurar valor original
-                    const newSpan = document.createElement('span');
-                    newSpan.textContent = formatNumber(currentValue);
-                    newSpan.onclick = (e) => makeCellEditable(e, index, propertyName);
-                    newSpan.className = 'editable-cell';
-                    cell.replaceChild(newSpan, input);
+            input.onblur = () => {
+                const newValue = parseFloat(input.value) || 0;
+                budgetData[index][prop] = newValue;
+
+                // Recalcular acumulado si es mes
+                const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+                if (months.includes(prop)) {
+                    let sum = 0;
+                    months.forEach(m => sum += parseFormattedNumber(budgetData[index][m]));
+                    budgetData[index].ejecutado_acumulado = sum;
                 }
+
+                renderBudgetTable();
+                updateSummary();
+                markPendingChanges();
             };
+            input.onkeydown = (e) => { if(e.key === 'Enter') input.blur(); };
         }
 
-        function saveCellEdit(event, index, propertyName) {
-            const input = event.target;
-            const newValue = parseFloat(input.value) || 0;
-
-            // Actualizar el valor en los datos
-            budgetData[index][propertyName] = newValue;
-
-            // Definir los meses para calcular el acumulado
-            const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-
-            // Verificar si el campo editado es un mes
-            const isMonthField = months.includes(propertyName);
-
-            if (isMonthField) {
-                // Si se editó un mes, recalcular el ejecutado acumulado como la suma de todos los meses
-                let totalEjecutado = 0;
-                months.forEach(month => {
-                    const monthValue = parseFormattedNumber(budgetData[index][month] || 0);
-                    totalEjecutado += monthValue;
-                });
-
-                // Actualizar el ejecutado acumulado en los datos
-                budgetData[index].ejecutado_acumulado = totalEjecutado;
-
-                // Actualizar dinámicamente el ejecutado acumulado en la interfaz
-                // Para hacerlo, necesitamos encontrar la celda de ejecutado acumulado en esta fila
-                const row = document.querySelector(`#budgetTableBody tr:nth-child(${index + 1})`);
-                if (row) {
-                    const cells = row.querySelectorAll('td');
-                    // La celda de ejecutado acumulado es la cuarta (índice 3) después de ID, Detalle, Asignación
-                    if (cells.length > 3) {
-                        cells[3].querySelector('span').textContent = formatNumber(totalEjecutado);
+        function saveChanges() {
+            if (!hasPendingChanges) return showNotification('No hay cambios', 'info');
+            
+            // Convertir todo a número antes de enviar
+            const dataToSave = budgetData.map(item => {
+                const newItem = { ...item };
+                for (const k in newItem) {
+                    if (k !== 'id' && k !== 'detalle' && typeof newItem[k] === 'string') {
+                        newItem[k] = parseFormattedNumber(newItem[k]);
                     }
                 }
-            }
+                return newItem;
+            });
 
-            // Si cambiamos la asignación o el ejecutado, recalcular el porcentaje
-            if (propertyName === 'asignacion' || propertyName === 'ejecutado_acumulado' || isMonthField) {
-                const asignacion = parseFormattedNumber(budgetData[index].asignacion || 0);
-                const ejecutado = parseFormattedNumber(budgetData[index].ejecutado_acumulado || 0);
-                const porcentajeEjecutado = asignacion > 0 ? ((ejecutado / asignacion) * 100).toFixed(2) : 0;
+            window.parent.postMessage({
+                action: 'saveBudgetChanges',
+                file: currentFile,
+                data: dataToSave
+            }, '*');
+        }
 
-                // Actualizar el porcentaje en los datos
-                budgetData[index].porcentaje_ejecutado = porcentajeEjecutado;
+        function showNotification(msg, type = 'success') {
+            const el = document.getElementById('notification');
+            el.querySelector('.notification-message').textContent = msg;
+            el.className = `k-toast ${type} show`;
+            setTimeout(() => el.classList.remove('show'), 3000);
+        }
 
-                // Actualizar dinámicamente el porcentaje en la interfaz
-                const porcentajeCell = document.getElementById(`porcentaje_ejecutado_${index}`);
-                if (porcentajeCell) {
-                    porcentajeCell.textContent = `${porcentajeEjecutado}%`;
-                }
-            }
-
-            // Reemplazar el input con el span actualizado
-            const span = document.createElement('span');
-            span.textContent = formatNumber(newValue);
-            span.onclick = (e) => makeCellEditable(e, index, propertyName);
-            span.className = 'editable-cell';
-            input.parentNode.replaceChild(span, input);
-
-            // Actualizar resumen y mostrar notificación
-            updateSummary();
-            showNotification('Celda actualizada', 'info');
-
-            // Marcar que hay cambios pendientes de guardar
-            markPendingChanges();
+        function showLoading() {
+            document.getElementById('budgetTableBody').innerHTML = '<tr><td colspan="18"><div class="spinner"></div></td></tr>';
         }
     </script>
 </body>

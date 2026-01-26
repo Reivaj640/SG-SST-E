@@ -3,629 +3,442 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Selector de Archivos de Presupuesto</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <title>Selector de Archivos - K+AIR</title>
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;600;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <style>
+        /* =========================================
+           SISTEMA VISUAL K+AIR (CORE)
+           ========================================= */
         :root {
-            --primary-color: #4a6bdf;
-            --secondary-color: #f5f7ff;
-            --accent-color: #ff6b6b;
-            --text-color: #333;
-            --light-text: #777;
-            --border-color: #e0e6ed;
-            --success-color: #4caf50;
-            --warning-color: #ff9800;
-            --danger-color: #f44336;
-            --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            --hover-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+            --k-primary: #174ea6;
+            --k-primary-hover: #185abd;
+            --k-primary-light: rgba(23, 78, 166, 0.08);
+            --k-success: #28a745;
+            --k-warning: #ffc107;
+            --k-danger: #dc3545;
+            --k-bg-app: #f8f9fa;
+            --k-bg-card: #ffffff;
+            --k-border: #dee2e6;
+            --k-text-main: #212529;
+            --k-text-muted: #6c757d;
+            --k-radius-md: 0.375rem;
+            --k-radius-lg: 0.5rem;
+            --k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
+            --k-shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.08);
+            --k-header-height: 60px;
+            --k-font-family: 'Segoe UI', 'Roboto', sans-serif;
         }
 
         body {
-            font-family: 'Roboto', sans-serif;
-            background-color: #f8f9fa;
-            color: var(--text-color);
-            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            font-family: var(--k-font-family);
+            background-color: var(--k-bg-app);
+            color: var(--k-text-main);
             height: 100vh;
             overflow: hidden;
-        }
-
-        .dashboard-wrapper {
             display: flex;
             flex-direction: column;
-            height: 100%;
-            width: 100%;
         }
 
+        /* Header Estándar K+AIR */
         header {
-            background: linear-gradient(135deg, var(--primary-color), #6b8cff);
-            color: white;
-            padding: 15px 20px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            background-color: var(--k-bg-card);
+            border-bottom: 1px solid var(--k-border);
+            padding: 0 1.5rem;
+            height: var(--k-header-height);
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            justify-content: space-between;
             flex-shrink: 0;
         }
 
-        .logo {
+        .k-module-title {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--k-primary);
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 0.75rem;
         }
 
-        .logo i {
-            font-size: 24px;
+        .k-breadcrumb {
+            font-size: 0.8rem;
+            color: var(--k-text-muted);
+            font-weight: 400;
+            margin-left: 0.5rem;
+            padding-left: 0.5rem;
+            border-left: 1px solid var(--k-border);
         }
 
-        .logo h1 {
-            font-weight: 500;
-            font-size: 20px;
-        }
-
-        .header-actions {
-            display: flex;
-            gap: 10px;
-        }
-
-        .btn {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 4px;
+        .k-btn-back {
+            background: transparent;
+            border: 1px solid var(--k-border);
+            color: var(--k-text-muted);
+            padding: 0.4rem 0.8rem;
+            border-radius: var(--k-radius-md);
+            font-size: 0.9rem;
             cursor: pointer;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            display: inline-flex;
+            transition: all 0.2s;
+            display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 0.5rem;
         }
 
-        .btn-primary {
-            background-color: white;
-            color: var(--primary-color);
+        .k-btn-back:hover {
+            background-color: #e9ecef;
+            color: var(--k-text-main);
         }
 
-        .btn-primary:hover {
-            background-color: rgba(255, 255, 255, 0.9);
-            transform: translateY(-2px);
-        }
-
-        .btn-success {
-            background-color: var(--success-color);
-            color: white;
-        }
-
-        .btn-success:hover {
-            background-color: #3d8b40;
-        }
-
-        .content {
+        /* Contenido Principal */
+        .content-area {
             flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
             display: flex;
             flex-direction: column;
-            overflow: auto; /* Permitir scroll cuando el contenido excede el espacio */
-            padding: 20px;
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+            box-sizing: border-box;
         }
 
-        .year-selector {
-            background-color: white;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: var(--card-shadow);
-            margin-bottom: 20px;
-            flex-shrink: 0;
-        }
-
-        .year-selector-title {
-            font-size: 18px;
-            font-weight: 500;
-            margin-bottom: 15px;
-            color: var(--text-color);
-        }
-
-        .year-options {
+        /* Grid de Años */
+        .year-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 15px;
+            gap: 1.5rem;
         }
 
         .year-card {
-            background-color: var(--secondary-color);
-            border-radius: 8px;
-            padding: 15px;
-            text-align: center;
+            background: var(--k-bg-card);
+            border: 1px solid var(--k-border);
+            border-radius: var(--k-radius-lg);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
-            transition: all 0.3s ease;
-            border: 2px solid transparent;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            box-shadow: var(--k-shadow-sm);
         }
 
         .year-card:hover {
-            transform: translateY(-5px);
-            box-shadow: var(--hover-shadow);
+            transform: translateY(-4px);
+            box-shadow: var(--k-shadow-md);
+            border-color: var(--k-primary-hover);
         }
 
         .year-card.selected {
-            border-color: var(--primary-color);
-            background-color: rgba(74, 107, 223, 0.1);
+            border: 2px solid var(--k-primary);
+            background-color: var(--k-primary-light);
+        }
+
+        .year-card.selected .year-icon {
+            color: var(--k-primary);
+            transform: scale(1.1);
         }
 
         .year-icon {
-            font-size: 36px;
-            color: var(--primary-color);
-            margin-bottom: 10px;
+            font-size: 2.5rem;
+            color: var(--k-text-muted);
+            margin-bottom: 1rem;
+            transition: transform 0.2s;
+            opacity: 0.8;
         }
 
-        .year-title {
-            font-size: 18px;
-            font-weight: 500;
-            margin-bottom: 5px;
+        .year-number {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--k-text-main);
         }
 
-        .year-description {
-            font-size: 14px;
-            color: var(--light-text);
+        .year-meta {
+            font-size: 0.8rem;
+            color: var(--k-text-muted);
+            margin-top: 0.25rem;
         }
 
-        .file-details {
-            background-color: white;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: var(--card-shadow);
-            margin-bottom: 20px;
-            flex-shrink: 0;
-            display: none;
+        /* Panel de Detalles (Contextual) */
+        .file-context-panel {
+            background: var(--k-bg-card);
+            border: 1px solid var(--k-border);
+            border-left: 4px solid var(--k-primary);
+            border-radius: var(--k-radius-md);
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: var(--k-shadow-sm);
+            animation: slideUp 0.3s ease-out;
         }
 
-        .file-details.active {
-            display: block;
-        }
-
-        .file-details-title {
-            font-size: 18px;
-            font-weight: 500;
-            margin-bottom: 15px;
-            color: var(--text-color);
-        }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
         .file-info {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
-        }
-
-        .file-info-item {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 1rem;
+            flex: 1;
         }
 
-        .file-info-icon {
-            font-size: 20px;
-            color: var(--primary-color);
+        .file-icon-lg {
+            font-size: 2rem;
+            color: #217346; /* Excel Color */
         }
 
-        .file-info-label {
+        .file-data h3 { margin: 0; font-size: 1.1rem; font-weight: 600; }
+        .file-data p { margin: 0.25rem 0 0; color: var(--k-text-muted); font-size: 0.85rem; font-family: monospace; }
+
+        .file-actions {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .k-btn {
+            border: none;
+            border-radius: var(--k-radius-md);
+            padding: 0.6rem 1.2rem;
+            font-size: 0.9rem;
             font-weight: 500;
-            margin-right: 5px;
-        }
-
-        .file-info-value {
-            color: var(--light-text);
-        }
-
-        .action-buttons {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            margin-top: 20px;
-        }
-
-        .notification {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background-color: white;
-            padding: 15px 20px;
-            border-radius: 8px;
-            box-shadow: var(--hover-shadow);
-            display: flex;
+            cursor: pointer;
+            display: inline-flex;
             align-items: center;
-            gap: 10px;
-            transform: translateX(120%);
-            transition: transform 0.3s ease;
-            z-index: 1000;
+            gap: 0.5rem;
+            transition: all 0.2s;
         }
 
-        .notification.show {
-            transform: translateX(0);
-        }
+        .k-btn-primary { background-color: var(--k-primary); color: white; box-shadow: 0 2px 4px rgba(23,78,166,0.3); }
+        .k-btn-primary:hover { background-color: var(--k-primary-hover); transform: translateY(-1px); }
 
-        .notification-icon {
-            font-size: 20px;
-        }
+        .k-btn-outline { background: white; border: 1px solid var(--k-border); color: var(--k-text-main); }
+        .k-btn-outline:hover { background: #f8f9fa; border-color: var(--k-text-muted); }
 
-        .notification.success .notification-icon {
-            color: var(--success-color);
+        /* Estado Vacío */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--k-text-muted);
         }
+        .empty-state i { font-size: 3rem; margin-bottom: 1rem; opacity: 0.2; }
 
-        .notification.error .notification-icon {
-            color: var(--danger-color);
+        /* Loading */
+        .loading-overlay {
+            position: fixed; inset: 0; background: rgba(255,255,255,0.9);
+            display: none; align-items: center; justify-content: center; z-index: 1000;
+            flex-direction: column; gap: 1rem;
         }
-
-        .notification.warning .notification-icon {
-            color: var(--warning-color);
-        }
-
-        .loading {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 200px;
-        }
-
         .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid rgba(74, 107, 223, 0.1);
-            border-radius: 50%;
-            border-top-color: var(--primary-color);
-            animation: spin 1s ease-in-out infinite;
+            width: 32px; height: 32px; border: 3px solid rgba(23,78,166,0.2);
+            border-top-color: var(--k-primary); border-radius: 50%;
+            animation: spin 0.8s linear infinite;
         }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        /* Toast */
+        .k-toast {
+            position: fixed; bottom: 2rem; right: 2rem;
+            background: white; padding: 1rem 1.5rem;
+            border-radius: var(--k-radius-lg);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.12);
+            display: flex; align-items: center; gap: 0.75rem;
+            transform: translateY(150%); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 2000; border-left: 4px solid var(--k-primary); font-weight: 500;
         }
+        .k-toast.show { transform: translateY(0); }
+        .k-toast.success { border-left-color: var(--k-success); }
+        .k-toast.error { border-left-color: var(--k-danger); }
 
-        @media (max-width: 768px) {
-            .year-options {
-                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            }
-
-            .file-info {
-                grid-template-columns: 1fr;
-            }
-        }
     </style>
 </head>
 <body>
-    <div class="dashboard-wrapper">
-        <header>
-            <div class="logo">
-                <i class="fas fa-folder-open"></i>
-                <h1>Selector de Archivos de Presupuesto</h1>
-            </div>
-            <div class="header-actions">
-                <button class="btn btn-primary" id="backToSubmodulesBtn">
-                    <i class="fas fa-arrow-left"></i>
-                    Volver a Submódulos
-                </button>
-                <button class="btn btn-primary" id="refreshBtn">
-                    <i class="fas fa-sync-alt"></i>
-                    Actualizar
-                </button>
-                <button class="btn btn-success" id="createNewFileBtn">
-                    <i class="fas fa-file-medical"></i>
-                    Crear Nuevo Archivo
-                </button>
-            </div>
-        </header>
 
-        <div class="content">
-            <div class="year-selector">
-                <div class="year-selector-title">Seleccione el año del presupuesto que desea gestionar</div>
-                <div class="year-options" id="yearOptions">
-                    <!-- Las opciones de año se cargarán dinámicamente -->
+    <header>
+        <div class="k-module-title">
+            <i class="fas fa-coins"></i>
+            <div>
+                Asignación de Recursos
+                <span class="k-breadcrumb">Histórico de Presupuestos</span>
+            </div>
+        </div>
+        <button id="backToSubmodulesBtn" class="k-btn-back">
+            <i class="fas fa-arrow-left"></i> Volver al módulo
+        </button>
+    </header>
+
+    <div class="content-area">
+        <!-- Grid Container -->
+        <div>
+            <h3 style="margin-top:0; font-weight:600; font-size:1.1rem; margin-bottom:1rem;">Seleccione Año Fiscal</h3>
+            <div class="year-grid" id="yearOptions">
+                <!-- Inyectado por JS -->
+            </div>
+        </div>
+
+        <!-- Panel de Archivo Seleccionado (Hidden by default) -->
+        <div id="fileDetails" class="file-context-panel" style="display: none;">
+            <div class="file-info">
+                <i class="fas fa-file-excel file-icon-lg"></i>
+                <div class="file-data">
+                    <h3 id="fileName">presupuesto_2025.xlsx</h3>
+                    <p id="filePath">C:/Ruta/Ejemplo/...</p>
                 </div>
             </div>
-
-            <div class="file-details" id="fileDetails">
-                <div class="file-details-title">Detalles del archivo seleccionado</div>
-                <div class="file-info">
-                    <div class="file-info-item">
-                        <i class="file-info-icon fas fa-file"></i>
-                        <div>
-                            <span class="file-info-label">Nombre:</span>
-                            <span class="file-info-value" id="fileName">-</span>
-                        </div>
-                    </div>
-                    <div class="file-info-item">
-                        <i class="file-info-icon fas fa-calendar"></i>
-                        <div>
-                            <span class="file-info-label">Año:</span>
-                            <span class="file-info-value" id="fileYear">-</span>
-                        </div>
-                    </div>
-                    <div class="file-info-item">
-                        <i class="file-info-icon fas fa-folder"></i>
-                        <div>
-                            <span class="file-info-label">Ruta:</span>
-                            <span class="file-info-value" id="filePath">-</span>
-                        </div>
-                    </div>
-                    <div class="file-info-item">
-                        <i class="file-info-icon fas fa-clock"></i>
-                        <div>
-                            <span class="file-info-label">Modificado:</span>
-                            <span class="file-info-value" id="fileModified">-</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="action-buttons">
-                    <button class="btn btn-success" id="openFileBtn">
-                        <i class="fas fa-edit"></i>
-                        Gestionar Presupuesto
-                    </button>
-                </div>
+            <div class="file-actions">
+                <button id="duplicateFileBtn" class="k-btn k-btn-outline">
+                    <i class="fas fa-copy"></i> Clonar Año
+                </button>
+                <button id="openFileBtn" class="k-btn k-btn-primary">
+                    <i class="fas fa-external-link-alt"></i> Gestionar Presupuesto
+                </button>
             </div>
         </div>
     </div>
 
-    <div class="notification" id="notification">
-        <i class="notification-icon fas fa-check-circle"></i>
-        <div class="notification-message">Operación completada con éxito</div>
+    <!-- UI Elements -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <div style="font-weight: 500; color: var(--k-primary);">Procesando solicitud...</div>
+    </div>
+
+    <div class="k-toast" id="notification">
+        <i class="fas fa-check-circle"></i>
+        <span class="toast-msg">Mensaje del sistema</span>
     </div>
 
     <script>
-        // Variables globales
-        let selectedFile = null;
-        let availableFiles = [];
-
-        // Inicialización
+        // Lógica de Renderizado y Eventos (Conecta con tu JS existente)
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('🎬 [presupuesto-selector] DOM completamente cargado');
-            setupEventListeners();
-            console.log('📡 [presupuesto-selector] Solicitando archivos al padre...');
-            loadAvailableFiles();
+            console.log('✅ [UI Selector] Inicializado. Esperando datos...');
+
+            // Listeners globales
+            window.addEventListener('message', (event) => {
+                if (event.source !== window.parent) return;
+                
+                if (event.data.files) {
+                    renderYearCards(event.data.files);
+                } else if (event.data.action === 'duplicateBudgetFile') {
+                    handleDuplicateResponse(event.data);
+                } else if (event.data.error) {
+                    showNotification(event.data.error, 'error');
+                    hideLoading();
+                }
+            });
+
+            // Navegación
+            document.getElementById('backToSubmodulesBtn').addEventListener('click', () => {
+                window.parent.postMessage({ action: 'backToSubmodules' }, '*');
+            });
+
+            // Acciones de Archivo
+            document.getElementById('openFileBtn')?.addEventListener('click', () => {
+                const selectedFile = window.parent.selectedFile;
+                if (selectedFile) {
+                    window.parent.postMessage({ action: 'openBudgetFile', file: selectedFile }, '*');
+                }
+            });
+
+            document.getElementById('duplicateFileBtn')?.addEventListener('click', () => {
+                const selectedFile = window.parent.selectedFile;
+                if (selectedFile) {
+                    const yearMatch = selectedFile.name.match(/(20\d{2})/);
+                    const currentYear = yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear();
+                    const nextYear = currentYear + 1;
+                    
+                    if(confirm(`¿Desea clonar este presupuesto para el año ${nextYear}? Se mantendrán las partidas pero se reiniciarán los valores ejecutados.`)) {
+                        window.parent.postMessage({
+                            action: 'duplicate-budget-file',
+                            currentFilePath: selectedFile.path,
+                            newYear: nextYear
+                        }, '*');
+                        showLoading();
+                    }
+                }
+            });
+
+            // Cargar datos iniciales
+            window.parent.postMessage({ action: 'requestBudgetFiles' }, '*');
+            showLoading();
         });
 
-        // Configurar event listeners
-        function setupEventListeners() {
-            document.getElementById('refreshBtn').addEventListener('click', loadAvailableFiles);
-            document.getElementById('openFileBtn').addEventListener('click', openSelectedFile);
-            document.getElementById('createNewFileBtn').addEventListener('click', createNewBudgetFile);
-            document.getElementById('backToSubmodulesBtn').addEventListener('click', backToSubmodules);
-        }
-
-        // Función para volver a la vista de submódulos
-        function backToSubmodules() {
-            window.parent.postMessage({ action: 'backToSubmodules' }, '*');
-        }
-
-        // Crear nuevo archivo de presupuesto
-        async function createNewBudgetFile() {
-            if (!selectedFile) {
-                showNotification('Por favor, seleccione un archivo existente para clonar', 'warning');
+        function renderYearCards(files) {
+            hideLoading();
+            const container = document.getElementById('yearOptions');
+            container.innerHTML = '';
+            
+            if (!files || files.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1/-1;">
+                        <i class="fas fa-folder-open"></i>
+                        <p>No se encontraron archivos de presupuesto en el directorio.</p>
+                    </div>
+                `;
                 return;
             }
 
-            try {
-                // Extraer el año actual del archivo seleccionado
-                const currentYear = extractYearFromFileName(selectedFile.name);
-
-                // Verificar que se haya extraído correctamente el año
-                if (currentYear === 'Desconocido' || isNaN(parseInt(currentYear))) {
-                    showNotification('No se pudo determinar el año del archivo seleccionado. Por favor, elija un archivo con un nombre que contenga el año (ej. 2024).', 'error');
-                    return;
-                }
-
-                const nextYear = parseInt(currentYear) + 1;
-
-                // Confirmar con el usuario antes de crear el nuevo archivo
-                const confirmMessage = `¿Está seguro de que desea crear un nuevo archivo de presupuesto para el año ${nextYear} basado en "${selectedFile.name}"?`;
-                if (!confirm(confirmMessage)) {
-                    return;
-                }
-
-                showNotification(`Creando nuevo archivo para el año ${nextYear}...`, 'success');
-
-                // Enviar solicitud al proceso principal para duplicar el archivo
-                window.parent.postMessage({
-                    action: 'duplicate-budget-file',
-                    currentFilePath: selectedFile.path,
-                    newYear: nextYear
-                }, '*');
-
-            } catch (error) {
-                console.error('Error al crear nuevo archivo de presupuesto:', error);
-                showNotification(`Error al crear nuevo archivo: ${error.message}`, 'error');
-            }
-        }
-
-        // Cargar archivos disponibles
-        async function loadAvailableFiles() {
-            try {
-                showLoading();
-
-                // Solicitar archivos al padre
-                console.log('📤 [presupuesto-selector] Enviando solicitud de archivos al padre...');
-                window.parent.postMessage({ action: 'requestBudgetFiles' }, '*');
-            } catch (error) {
-                console.error('Error al cargar archivos:', error);
-                showNotification(`Error al cargar archivos: ${error.message}`, 'error');
-                hideLoading();
-            }
-        }
-
-        // Renderizar opciones de año
-        function renderYearOptions() {
-            const yearOptions = document.getElementById('yearOptions');
-            yearOptions.innerHTML = '';
-
-            // Agrupar archivos por año
             const filesByYear = {};
-            availableFiles.forEach(file => {
-                const year = extractYearFromFileName(file.name);
-                if (!filesByYear[year]) {
-                    filesByYear[year] = [];
-                }
+            files.forEach(file => {
+                const yearMatch = file.name.match(/(20\d{2})/);
+                const year = yearMatch ? yearMatch[1] : 'General';
+                if (!filesByYear[year]) filesByYear[year] = [];
                 filesByYear[year].push(file);
             });
 
-            // Crear tarjetas para cada año
-            Object.keys(filesByYear).sort().forEach(year => {
-                const yearCard = document.createElement('div');
-                yearCard.className = 'year-card';
-                yearCard.dataset.year = year;
-
-                yearCard.innerHTML = `
-                    <div class="year-icon">
-                        <i class="fas fa-calendar-alt"></i>
-                    </div>
-                    <div class="year-title">${year}</div>
-                    <div class="year-description">${filesByYear[year].length} archivo(s) disponible(s)</div>
+            Object.keys(filesByYear).sort((a, b) => b.localeCompare(a)).forEach(year => {
+                const card = document.createElement('div');
+                card.className = 'year-card';
+                card.innerHTML = `
+                    <i class="fas fa-calendar-alt year-icon"></i>
+                    <div class="year-number">${year}</div>
+                    <div class="year-meta">${filesByYear[year].length} Versión(es)</div>
                 `;
-
-                yearCard.addEventListener('click', () => selectYear(year, filesByYear[year]));
-
-                yearOptions.appendChild(yearCard);
+                card.onclick = () => selectYear(year, filesByYear[year]);
+                container.appendChild(card);
             });
         }
 
-        // Extraer año del nombre del archivo
-        function extractYearFromFileName(fileName) {
-            const yearMatch = fileName.match(/(20\d{2})/);
-            return yearMatch ? yearMatch[1] : 'Desconocido';
-        }
-
-        // Seleccionar año
         function selectYear(year, files) {
-            // Actualizar tarjetas seleccionadas
-            document.querySelectorAll('.year-card').forEach(card => {
-                card.classList.remove('selected');
-            });
-            document.querySelector(`.year-card[data-year="${year}"]`).classList.add('selected');
+            // Visual feedback
+            document.querySelectorAll('.year-card').forEach(c => c.classList.remove('selected'));
+            const cards = document.querySelectorAll('.year-card');
+            for(let c of cards) { if(c.innerText.includes(year)) c.classList.add('selected'); }
 
-            // Seleccionar el archivo más reciente de ese año
+            // Logic: Pick latest file
             const sortedFiles = files.sort((a, b) => new Date(b.modified) - new Date(a.modified));
-            selectedFile = sortedFiles[0];
+            const latestFile = sortedFiles[0];
+            window.parent.selectedFile = latestFile; // Global state for parent access
 
-            // Mostrar detalles del archivo
-            showFileDetails();
+            // Update & Show Context Panel
+            const detailsDiv = document.getElementById('fileDetails');
+            document.getElementById('fileName').textContent = latestFile.name;
+            document.getElementById('filePath').textContent = latestFile.path;
+            
+            detailsDiv.style.display = 'flex';
+            // Simple animation reset
+            detailsDiv.style.animation = 'none';
+            detailsDiv.offsetHeight; /* trigger reflow */
+            detailsDiv.style.animation = 'slideUp 0.3s ease-out';
         }
 
-        // Mostrar detalles del archivo seleccionado
-        function showFileDetails() {
-            if (!selectedFile) return;
+        function showLoading() { document.getElementById('loadingOverlay').style.display = 'flex'; }
+        function hideLoading() { document.getElementById('loadingOverlay').style.display = 'none'; }
 
-            const fileDetails = document.getElementById('fileDetails');
-            fileDetails.classList.add('active');
-
-            document.getElementById('fileName').textContent = selectedFile.name;
-            document.getElementById('fileYear').textContent = extractYearFromFileName(selectedFile.name);
-            document.getElementById('filePath').textContent = selectedFile.path;
-            document.getElementById('fileModified').textContent = new Date(selectedFile.modified).toLocaleString();
+        function handleDuplicateResponse(data) {
+            hideLoading();
+            showNotification(data.success ? (data.message || 'Clonado exitoso') : (data.error || 'Error al clonar'), data.success ? 'success' : 'error');
+            if (data.success) window.parent.postMessage({ action: 'requestBudgetFiles' }, '*');
         }
 
-        // Abrir archivo seleccionado
-        function openSelectedFile() {
-            if (!selectedFile) {
-                showNotification('Por favor, seleccione un archivo primero', 'warning');
-                return;
-            }
-
-            // Enviar mensaje al padre con el archivo seleccionado
-            window.parent.postMessage({
-                action: 'openBudgetFile',
-                file: selectedFile
-            }, '*');
-        }
-
-        // Mostrar notificación
-        function showNotification(message, type = 'success') {
-            const notification = document.getElementById('notification');
-            const messageElement = notification.querySelector('.notification-message');
-            const iconElement = notification.querySelector('.notification-icon');
-
-            // Actualizar mensaje
-            messageElement.textContent = message;
-
-            // Actualizar clase y icono según el tipo
-            notification.className = 'notification ' + type;
-
-            if (type === 'success') {
-                iconElement.className = 'notification-icon fas fa-check-circle';
-            } else if (type === 'error') {
-                iconElement.className = 'notification-icon fas fa-times-circle';
-            } else if (type === 'warning') {
-                iconElement.className = 'notification-icon fas fa-exclamation-circle';
-            }
-
-            // Mostrar notificación
-            notification.classList.add('show');
-
-            // Ocultar después de 3 segundos
-            setTimeout(() => {
-                notification.classList.remove('show');
-            }, 3000);
-        }
-
-        // Mostrar indicador de carga
-        function showLoading() {
-            const yearOptions = document.getElementById('yearOptions');
-            yearOptions.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-        }
-
-        // Ocultar indicador de carga
-        function hideLoading() {
-            // La función renderYearOptions se encargará de actualizar el contenido
-        }
-
-        // Escuchar mensajes del padre
-        window.addEventListener('message', async (event) => {
-            console.log('📥 [presupuesto-selector] Mensaje recibido del padre:', event.data);
-
-            if (event.data.files !== undefined) {
-                console.log('📊 [presupuesto-selector] Archivos recibidos:', event.data.files.length);
-                availableFiles = event.data.files;
-                if (event.data.empty) {
-                    console.log('⚠️ [presupuesto-selector] No hay archivos disponibles, mostrando mensaje');
-                    // Mostrar mensaje cuando no hay archivos
-                    showNoFilesMessage(event.data.message || 'No se encontraron archivos de presupuesto disponibles.');
-                } else {
-                    console.log('✅ [presupuesto-selector] Renderizando opciones de años');
-                    renderYearOptions();
-                }
-                hideLoading();
-            } else if (event.data.error) {
-                console.error('❌ [presupuesto-selector] Error recibido:', event.data.error);
-                showNotification(`Error al cargar archivos: ${event.data.error}`, 'error');
-                hideLoading();
-            } else if (event.data.action === 'duplicateBudgetFile') {
-                // Manejar respuesta de duplicación de archivo
-                if (event.data.success) {
-                    showNotification(event.data.message || `Archivo duplicado exitosamente como ${event.data.newFileName}`, 'success');
-                    // Recargar la lista de archivos para mostrar el nuevo archivo
-                    loadAvailableFiles();
-                } else {
-                    showNotification(`Error al duplicar archivo: ${event.data.error || 'Error desconocido'}`, 'error');
-                }
-            }
-        });
-
-        // Mostrar mensaje cuando no hay archivos disponibles
-        function showNoFilesMessage(message) {
-            const yearOptions = document.getElementById('yearOptions');
-            yearOptions.innerHTML = `
-                <div style="grid-column: 1 / -1; text-align: center; padding: 40px; background: #f8f9fa; border-radius: 8px; border: 2px dashed #ddd;">
-                    <i class="fas fa-folder-open" style="font-size: 64px; color: #ccc; margin-bottom: 20px;"></i>
-                    <h3 style="color: #666; margin-bottom: 10px;">No hay archivos de presupuesto</h3>
-                    <p style="color: #888; margin-bottom: 20px; max-width: 500px; margin-left: auto; margin-right: auto;">${message}</p>
-                    <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
-                        <div style="background: #e3f2fd; padding: 10px; border-radius: 4px; font-size: 14px;">
-                            <i class="fas fa-info-circle" style="margin-right: 5px;"></i> Nombres comunes: "presupuesto", "costo", "gasto", "recurso"
-                        </div>
-                        <div style="background: #e8f5e9; padding: 10px; border-radius: 4px; font-size: 14px;">
-                            <i class="fas fa-file-excel" style="margin-right: 5px;"></i> Formato: .xlsx
-                        </div>
-                    </div>
-                </div>
-            `;
+        function showNotification(msg, type = 'success') {
+            const el = document.getElementById('notification');
+            el.querySelector('.toast-msg').textContent = msg;
+            el.className = `k-toast ${type} show`;
+            setTimeout(() => el.classList.remove('show'), 3000);
         }
     </script>
 </body>
