@@ -3,1020 +3,1279 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Configuraciones SG-SST</title>
+    <title>K+AIR | Configuración</title>
+
+    <!-- Fuentes Oficiales -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+
     <style>
-        /* --- VARIABLES CSS --- */
+        /* =========================================
+           1. SISTEMA VISUAL & VARIABLES
+           ========================================= */
         :root {
-            /* Tema Claro (Por defecto) */
-            --primary-color: #007bff;
-            --primary-dark: #0056b3;
-            --secondary-color: #6c757d;
-            --success-color: #28a745;
-            --danger-color: #dc3545;
+            --primary: #174ea6;
+            --primary-hover: #185abd;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --info: #17a2b8;
+            --dark: #343a40;
 
-            --bg-body: #f4f6f9;
+            --bg-general: #f8f9fa;
             --bg-card: #ffffff;
-            --bg-input: #ffffff;
+            --border-color: #dee2e6;
 
-            --text-main: #1a202c;
-            --text-secondary: #718096;
-            --text-on-primary: #ffffff;
+            --text-main: #212529;
+            --text-muted: #6c757d;
+            --text-light: #ffffff;
 
-            --border-color: #e2e8f0;
-            --shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            --font-heading: 'Lexend', sans-serif;
+            --font-body: 'Roboto', sans-serif;
 
-            --sidebar-width: 260px;
+            --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            --shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 1rem 3rem rgba(0, 0, 0, 0.175);
+            --radius: 0.375rem;
+            --radius-lg: 0.5rem;
         }
 
-        /* Variables para Tema Oscuro (Noche) */
-        [data-theme="dark"] {
-            --bg-body: #1a202c;
-            --bg-card: #2d3748;
-            --bg-input: #4a5568;
-
-            --text-main: #f7fafc;
-            --text-secondary: #cbd5e0;
-
-            --border-color: #4a5568;
-            --shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
-        }
-
-        /* --- ESTILOS BASE --- */
-        body {
+        * {
+            box-sizing: border-box;
             margin: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-body);
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background-color: var(--bg-general);
             color: var(--text-main);
             height: 100vh;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
-            overflow: hidden;
-            transition: background-color 0.3s, color 0.3s;
         }
 
-        /* Header */
-        header {
+        /* =========================================
+           2. LAYOUT PRINCIPAL K+AIR
+           ========================================= */
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* Cabecera del módulo */
+        .module-header {
             background-color: var(--bg-card);
-            padding: 15px 30px;
+            padding: 1.2rem 2rem;
+            border-bottom: 1px solid var(--border-color);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid var(--border-color);
-            box-shadow: var(--shadow);
-            z-index: 10;
+            flex-shrink: 0;
         }
 
-        header h1 {
-            font-size: 1.2rem;
-            margin: 0;
-            color: var(--text-main);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        /* Main Layout */
-        .main-container {
-            display: flex;
-            flex: 1;
-            overflow: hidden;
-        }
-
-        /* Sidebar */
-        aside {
-            width: var(--sidebar-width);
-            background-color: var(--bg-card);
-            border-right: 1px solid var(--border-color);
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            transition: background-color 0.3s, border-color 0.3s;
-        }
-
-        .sidebar-title {
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: var(--text-secondary);
+        .module-title {
+            font-family: var(--font-heading);
+            color: var(--primary);
+            font-size: 1.4rem;
             font-weight: 700;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
         }
 
-        .sidebar-btn {
-            padding: 14px 16px;
-            margin-bottom: 8px;
-            background: none;
-            border: none;
-            text-align: left;
-            cursor: pointer;
-            border-radius: 8px;
-            color: var(--text-secondary);
+        .module-context {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-top: 0.25rem;
+        }
+
+        /* Navegación de configuración */
+        .settings-top-nav {
+            background-color: var(--bg-card);
+            padding: 0 2rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            gap: 2rem;
+            flex-shrink: 0;
+            overflow-x: auto;
+        }
+
+        .nav-tab {
+            padding: 1rem 0.5rem;
+            color: var(--text-muted);
             font-weight: 500;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .sidebar-btn:hover {
-            background-color: rgba(0, 123, 255, 0.05);
-            color: var(--primary-color);
-        }
-
-        .sidebar-btn.active {
-            background-color: var(--primary-color);
-            color: white;
-            box-shadow: 0 4px 6px rgba(0, 123, 255, 0.3);
-        }
-
-        /* Content Area */
-        #content-area {
-            flex: 1;
-            padding: 0;
-            overflow-y: auto;
-            position: relative;
-            background-color: var(--bg-body);
-        }
-
-        /* --- ESTILOS DE COMPONENTES --- */
-
-        /* Botones */
-        .action-btn {
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 600;
             cursor: pointer;
-            transition: background 0.2s, transform 0.1s;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
+            position: relative;
+            transition: color 0.2s;
+            white-space: nowrap;
+            font-size: 0.95rem;
         }
 
-        .action-btn:hover {
-            background-color: var(--primary-dark);
-            transform: translateY(-1px);
+        .nav-tab:hover {
+            color: var(--primary);
         }
 
-        .action-btn.secondary {
-            background-color: var(--bg-input);
-            color: var(--text-main);
-            border: 1px solid var(--border-color);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        .nav-tab.active {
+            color: var(--primary);
+            font-weight: 600;
         }
 
-        .action-btn.secondary:hover {
-            background-color: var(--border-color);
+        .nav-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background-color: var(--primary);
         }
 
-        /* Tarjetas */
-        .card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 24px;
-            box-shadow: var(--shadow);
-            margin-bottom: 20px;
+        /* Contenedor Principal de Contenido */
+        .settings-content {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+            background-color: var(--bg-general);
         }
 
-        .settings-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .settings-header h2 {
-            margin: 0;
-            color: var(--text-main);
-        }
-
-        /* --- ESTILOS ACERCA DE APP (NUEVOS) --- */
-        .about-container {
-            max-width: 600px;
+        .section-container {
+            display: none;
+            animation: fadeIn 0.3s ease-out;
+            max-width: 1200px;
             margin: 0 auto;
-            text-align: center;
-            padding-top: 40px;
         }
 
-        .app-logo-large {
-            font-size: 4rem;
-            margin-bottom: 20px;
-            color: var(--primary-color);
-            background: rgba(0, 123, 255, 0.1);
-            width: 120px;
-            height: 120px;
-            line-height: 120px;
-            border-radius: 24px;
-            margin-left: auto;
-            margin-right: auto;
+        .section-container.active {
             display: block;
         }
 
-        .info-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 12px 0;
-            border-bottom: 1px solid var(--border-color);
-            color: var(--text-main);
-        }
-        .info-label { font-weight: 600; color: var(--text-secondary); }
-        .info-value { font-weight: 500; text-align: right; }
-
-        .update-card {
-            background: rgba(40, 167, 69, 0.1); /* Verde claro */
-            border: 1px solid rgba(40, 167, 69, 0.2);
-        }
-        .update-card h3 { color: var(--success-color); margin-top: 0; }
-
-        /* --- TOAST NOTIFICATIONS --- */
-        .toast-container {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            z-index: 2000;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .toast {
-            background: var(--bg-card);
-            color: var(--text-main);
-            padding: 15px 20px;
-            border-radius: 8px;
-            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
-            border-left: 4px solid var(--primary-color);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            min-width: 300px;
-            animation: slideIn 0.3s ease-out;
-        }
-        .toast.success { border-left-color: var(--success-color); }
-        .toast.error { border-left-color: var(--danger-color); }
-
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Grillas y Contenedores */
-        .companies-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; margin-top: 20px; }
+        /* =========================================
+           3. COMPONENTES UI ESPECÍFICOS
+           ========================================= */
 
-        /* Estilos Específicos por Sección (Resto mantenido igual) */
+        /* --- Gestión de Empresas --- */
+        .section-header {
+            margin-bottom: 1.5rem;
+        }
+
+        .section-title {
+            font-family: var(--font-heading);
+            font-size: 1.3rem;
+            color: var(--primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .section-subtitle {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .company-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1.5rem;
+        }
+
         .company-card {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 20px;
-            position: relative;
-            transition: transform 0.2s;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+            border-top: 4px solid transparent;
+            transition: transform 0.2s, box-shadow 0.2s;
         }
-        .company-card:hover { transform: translateY(-3px); border-color: var(--primary-color); }
-        .company-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0; }
-        .stat-box { background: var(--bg-input); padding: 10px; border-radius: 8px; text-align: center; }
-        .stat-val { font-weight: bold; font-size: 1.1rem; color: var(--text-main); }
-        .stat-lbl { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; }
-        .theme-selector { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 30px; }
+
+        .company-card:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-md);
+        }
+
+        /* Borde superior según riesgo */
+        .company-card.risk-I { border-top-color: var(--success); }
+        .company-card.risk-II { border-top-color: var(--info); }
+        .company-card.risk-III { border-top-color: var(--warning); }
+        .company-card.risk-IV { border-top-color: #fd7e14; }
+        .company-card.risk-V { border-top-color: var(--danger); }
+
+        .card-body {
+            padding: 1.5rem;
+        }
+
+        .card-title-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .company-name {
+            font-weight: 600;
+            font-size: 1.2rem;
+            font-family: var(--font-heading);
+        }
+
+        .risk-badge {
+            padding: 0.25rem 0.7rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: white;
+        }
+
+        /* Grid de datos internos */
+        .company-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+            margin-bottom: 1.2rem;
+            background: #f8f9fa;
+            padding: 0.9rem;
+            border-radius: var(--radius);
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.2rem;
+        }
+        .stat-value {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--text-main);
+        }
+
+        .normativa-pill {
+            display: inline-flex;
+            align-items: center;
+            background-color: #e7f1ff;
+            color: var(--primary);
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-bottom: 1.5rem;
+        }
+
+        /* --- Gestión de Usuarios (Tabla) --- */
+        .users-header-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .table-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background-color: #f1f3f5;
+        }
+
+        th {
+            text-align: left;
+            padding: 1rem 1.2rem;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        td {
+            padding: 1rem 1.2rem;
+            border-top: 1px solid var(--border-color);
+            vertical-align: middle;
+        }
+
+        tr:hover {
+            background-color: rgba(23, 78, 166, 0.03);
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background-color: #e9ecef;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 0.75rem;
+            font-weight: bold;
+            color: var(--primary);
+            font-size: 0.9rem;
+        }
+
+        .role-badge {
+            background: #e7f1ff;
+            color: var(--primary);
+            padding: 0.3rem 0.7rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .status-active { color: var(--success); }
+        .status-inactive { color: var(--text-muted); }
+
+        /* --- Configuración IA --- */
+        .ai-dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .ai-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .ai-card.full-width {
+            grid-column: span 2;
+        }
+
+        .ai-card h3 {
+            font-family: var(--font-heading);
+            margin-bottom: 1.2rem;
+            color: var(--text-main);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.7rem;
+            font-size: 1.1rem;
+        }
+
+        .model-info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.2rem;
+        }
+
+        .slider-group {
+            margin-bottom: 1.8rem;
+        }
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.6rem;
+            font-size: 0.9rem;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--primary);
+            height: 6px;
+            border-radius: 3px;
+        }
+
+        .ai-textarea {
+            width: 100%;
+            padding: 0.8rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            font-family: monospace;
+            font-size: 0.85rem;
+            resize: vertical;
+            min-height: 120px;
+        }
+
+        /* --- Interfaz Usuario (Control Segmentado) --- */
+        .theme-control-group {
+            background: var(--bg-card);
+            padding: 2rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            text-align: center;
+            max-width: 500px;
+            margin: 0 auto 2rem;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .theme-segmented {
+            display: flex;
+            background: #e9ecef;
+            padding: 4px;
+            border-radius: 10px;
+            margin: 1.5rem 0;
+        }
+
         .theme-option {
-            border: 2px solid var(--border-color);
-            border-radius: 12px; padding: 20px; cursor: pointer;
-            text-align: center; transition: all 0.2s; background: var(--bg-input);
+            flex: 1;
+            padding: 0.7rem;
+            cursor: pointer;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            color: var(--text-muted);
         }
-        .theme-option:hover { border-color: var(--primary-color); }
-        .theme-option.selected {
-            border-color: var(--primary-color);
-            background-color: rgba(0, 123, 255, 0.1);
-            position: relative;
+
+        .theme-option.active {
+            background: white;
+            color: var(--primary);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            font-weight: 600;
         }
-        .theme-icon { font-size: 2rem; margin-bottom: 10px; display: block; }
-        .form-group { margin-bottom: 20px; }
-        .form-label { display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-main); font-size: 0.9rem; }
-        .form-control {
-            width: 100%; padding: 12px; border: 1px solid var(--border-color);
-            border-radius: 8px; background-color: var(--bg-input); color: var(--text-main);
-            font-size: 1rem; box-sizing: border-box; transition: border-color 0.2s;
+
+        /* --- Acerca de --- */
+        .about-layout {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 1.5rem;
         }
-        .form-control:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1); }
+
+        .about-main {
+            flex: 2;
+        }
+        .about-sidebar {
+            flex: 1;
+        }
+
+        .info-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 1.8rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .dev-avatar {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: #e7f1ff;
+            margin: 0 auto 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+        }
+
+        .system-diag-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid #f1f3f5;
+            font-size: 0.9rem;
+        }
+
+        .system-diag-row:last-child {
+            border-bottom: none;
+        }
+
+        /* --- Botones Generales --- */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.6rem 1.2rem;
+            border-radius: var(--radius);
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+            text-decoration: none;
+            gap: 0.5rem;
+        }
+
+        .btn-sm {
+            padding: 0.35rem 0.8rem;
+            font-size: 0.85rem;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn-outline {
+            border: 1px solid var(--border-color);
+            background: white;
+            color: var(--text-main);
+        }
+        .btn-outline:hover {
+            background: #f8f9fa;
+        }
+
+        .btn-danger-ghost {
+            background: transparent;
+            color: var(--danger);
+        }
+        .btn-danger-ghost:hover {
+            background: rgba(220, 53, 69, 0.1);
+        }
+
+        .btn-icon {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* --- Modal --- */
         .modal-overlay {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center;
-            z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.3s; backdrop-filter: blur(2px);
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
         }
-        .modal-overlay.active { opacity: 1; pointer-events: auto; }
-        .modal-content {
-            background: var(--bg-card); width: 90%; max-width: 600px; border-radius: 16px; padding: 30px;
-            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); transform: scale(0.95); transition: transform 0.3s; color: var(--text-main);
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
         }
-        .modal-overlay.active .modal-content { transform: scale(1); }
-        .log-box {
-            background: #000; color: #0f0; font-family: monospace; padding: 15px;
-            border-radius: 8px; height: 180px; overflow-y: auto; margin-top: 15px; font-size: 0.85rem;
+        .modal-container {
+            background: var(--bg-card);
+            width: 90%;
+            max-width: 500px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            transform: translateY(20px);
+            transition: transform 0.3s;
+            padding: 2rem;
         }
-        .toggle-switch { position: relative; display: inline-block; width: 50px; height: 26px; }
-        .toggle-switch input { opacity: 0; width: 0; height: 0; }
-        .slider {
-            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
-            background-color: var(--border-color); transition: .4s; border-radius: 34px;
+        .modal-overlay.active .modal-container {
+            transform: translateY(0);
         }
-        .slider:before {
-            position: absolute; content: ""; height: 18px; width: 18px; left: 4px; bottom: 4px;
-            background-color: white; transition: .4s; border-radius: 50%;
+
+        .form-group {
+            margin-bottom: 1.2rem;
         }
-        input:checked + .slider { background-color: var(--primary-color); }
-        input:checked + .slider:before { transform: translateX(24px); }
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+        .form-control {
+            width: 100%;
+            padding: 0.7rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            font-family: inherit;
+            font-size: 0.95rem;
+        }
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.1);
+        }
+
+        /* =========================================
+           4. RESPONSIVE DESIGN
+           ========================================= */
+        @media (max-width: 1200px) {
+            .ai-dashboard {
+                grid-template-columns: 1fr;
+            }
+
+            .ai-card.full-width {
+                grid-column: span 1;
+            }
+
+            .about-layout {
+                flex-direction: column;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .app-container {
+                flex-direction: column;
+            }
+
+            .settings-top-nav {
+                padding: 0 1rem;
+                gap: 1.2rem;
+            }
+
+            .company-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .model-info-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
 
-    <header>
-        <h1><img src="../../assets/KIAR256.ico" alt="App Icon" style="height: 32px; width: 32px; vertical-align: middle; margin-right: 8px;">K+AIR <small style="font-size: 0.6em; color: var(--text-secondary); font-weight: normal;">(Configuración)</small></h1>
-        <button class="action-btn secondary" id="back-to-app">🏠 Volver a la App</button>
+<div class="app-container">
+
+    <!-- CABECERA DEL MÓDULO -->
+    <header class="module-header">
+        <div>
+            <div class="module-title">
+                <span>⚙️</span>
+                <span>Configuración del Sistema</span>
+            </div>
+            <div class="module-context">
+                Gestión de empresas, usuarios, IA y apariencia de K+AIR
+            </div>
+        </div>
     </header>
 
-    <div class="main-container">
-        <aside>
-            <div class="sidebar-title">Menú Configuración</div>
+    <!-- NAVEGACIÓN DE CONFIGURACIÓN -->
+    <nav class="settings-top-nav">
+        <div class="nav-tab active" onclick="switchTab('empresas', this)">Gestión de Empresas</div>
+        <div class="nav-tab" onclick="switchTab('usuarios', this)">Ajustes de Usuario</div>
+        <div class="nav-tab" onclick="switchTab('ia', this)">Configuración IA</div>
+        <div class="nav-tab" onclick="switchTab('interfaz', this)">Interfaz de Usuario</div>
+        <div class="nav-tab" onclick="switchTab('acerca', this)">Acerca de la App</div>
+    </nav>
 
-            <button class="sidebar-btn active" id="nav-empresas" onclick="navigate('empresas')">🏢 Gestión de Empresas</button>
-            <button class="sidebar-btn" id="nav-usuario" onclick="navigate('usuario')">👤 Ajustes de Usuario</button>
-            <button class="sidebar-btn" id="nav-ia" onclick="navigate('ia')">🤖 Configuración de IA</button>
-            <button class="sidebar-btn" id="nav-ui" onclick="navigate('ui')">🎨 Interfaz de Usuario</button>
+    <!-- ÁREA DE CONTENIDO -->
+    <div class="settings-content">
 
-            <!-- NUEVA SECCIÓN ACERCA DE APP -->
-            <button class="sidebar-btn" id="nav-about" onclick="navigate('about')">ℹ️ Acerca de App</button>
-
-            <div style="margin-top: auto; padding-top: 20px; border-top: 1px solid var(--border-color);">
-                <small style="color: var(--text-secondary);">Versión <span id="app-version">2.0.1</span></small>
+        <!-- SECCIÓN 1: GESTIÓN DE EMPRESAS -->
+        <div id="tab-empresas" class="section-container active">
+            <div class="section-header">
+                <h2 class="section-title">Gestión de Empresas</h2>
+                <p class="section-subtitle">Administra las empresas vinculadas y sus configuraciones normativas</p>
             </div>
-        </aside>
 
-        <main id="content-area"></main>
-    </div>
+            <div class="company-grid" id="company-grid">
+                <!-- Se rellena con JS -->
+            </div>
+        </div>
 
-    <!-- Toast Container -->
-    <div id="toast-container" class="toast-container"></div>
+        <!-- SECCIÓN 2: AJUSTES DE USUARIO (Gestión de Perfiles) -->
+        <div id="tab-usuarios" class="section-container">
+            <div class="section-header">
+                <h2 class="section-title">Usuarios y Accesos</h2>
+                <p class="section-subtitle">Administra quiénes pueden acceder a K+AIR y sus roles</p>
+            </div>
 
-    <!-- Modal Overlay -->
-    <div id="modal-overlay" class="modal-overlay">
-        <div class="modal-content" id="modal-content"></div>
-    </div>
+            <div class="users-header-actions">
+                <div></div> <!-- Espaciador -->
+                <button class="btn btn-primary" onclick="openUserModal()">
+                    <span>+</span>
+                    <span>Nuevo Usuario</span>
+                </button>
+            </div>
 
-    <script>
-        // --- ESTADO Y NAVEGACIÓN ---
-        const contentArea = document.getElementById('content-area');
-        const modalOverlay = document.getElementById('modal-overlay');
-        const modalContent = document.getElementById('modal-content');
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Usuario</th>
+                            <th>Rol</th>
+                            <th>Último Acceso</th>
+                            <th>Estado</th>
+                            <th style="text-align: right;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-table-body">
+                        <!-- JS populate -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
-        // Cargar versión de la aplicación
-        document.addEventListener('DOMContentLoaded', async () => {
-            try {
-                // Verificar que la API de Electron esté disponible
-                if (window.electronAPI && typeof window.electronAPI.getAppVersion === 'function') {
-                    const version = await window.electronAPI.getAppVersion();
-                    document.getElementById('app-version').textContent = version;
-                } else {
-                    // Si no está disponible directamente, intentar acceder a través del padre
-                    if (window.parent && window.parent !== window && window.parent.electronAPI) {
-                        const version = await window.parent.electronAPI.getAppVersion();
-                        document.getElementById('app-version').textContent = version;
-                    } else {
-                        // Si no está disponible, usar una versión por defecto
-                        document.getElementById('app-version').textContent = '2.0.1';
-                    }
-                }
-            } catch (error) {
-                console.error('Error al obtener la versión:', error);
-                document.getElementById('app-version').textContent = '2.0.1'; // Valor por defecto
-            }
-            applyThemePreference();
-            navigate('empresas');
-        });
+        <!-- SECCIÓN 3: CONFIGURACIÓN IA -->
+        <div id="tab-ia" class="section-container">
+            <div class="section-header">
+                <h2 class="section-title">Configuración de Inteligencia Artificial</h2>
+                <p class="section-subtitle">Ajusta el comportamiento del modelo y consulta la información técnica</p>
+            </div>
 
-        // Botón para volver a la app principal
-        document.getElementById('back-to-app').addEventListener('click', async () => {
-            if (window.parent && window.parent !== window) {
-                // Si estamos en un iframe, enviar mensaje al padre
-                window.parent.postMessage({ type: 'back-to-main-app' }, '*');
-            } else {
-                // Si no estamos en un iframe, determinar a dónde regresar según el estado actual
-                try {
-                    // Intentar cargar la configuración para ver si hay una empresa seleccionada
-                    if (window.electronAPI && typeof window.electronAPI.loadConfig === 'function') {
-                        const config = await window.electronAPI.loadConfig();
-                        const selectedCompany = config.selectedCompany || null;
-
-                        // Si hay una empresa seleccionada, ir al home de la empresa
-                        if (selectedCompany) {
-                            if (typeof showCompanyHomePage === 'function') {
-                                showCompanyHomePage();
-                            } else if (typeof showHomePage === 'function') {
-                                showHomePage();
-                            } else {
-                                window.history.back();
-                            }
-                        } else {
-                            // Si no hay empresa seleccionada, ir al home general
-                            if (typeof showHomePage === 'function') {
-                                showHomePage();
-                            } else {
-                                window.history.back();
-                            }
-                        }
-                    } else {
-                        // Si no podemos acceder a la API, usar la función global si está disponible
-                        if (typeof showHomePage === 'function') {
-                            showHomePage();
-                        } else {
-                            window.history.back();
-                        }
-                    }
-                } catch (error) {
-                    console.error('Error al determinar el estado de la empresa:', error);
-                    // Si hay un error, ir al home general por defecto
-                    if (typeof showHomePage === 'function') {
-                        showHomePage();
-                    } else {
-                        window.history.back();
-                    }
-                }
-            }
-        });
-
-        function navigate(section) {
-            document.querySelectorAll('.sidebar-btn').forEach(btn => btn.classList.remove('active'));
-            const activeBtn = document.getElementById(`nav-${section}`);
-            if(activeBtn) activeBtn.classList.add('active');
-            contentArea.innerHTML = '';
-
-            switch(section) {
-                case 'empresas': renderCompanyManagement(); break;
-                case 'usuario': renderUserSettings(); break;
-                case 'ia': renderIASettings(); break;
-                case 'ui': renderUISettings(); break;
-                case 'about': renderAboutPage(); break; // NUEVO CASO
-            }
-        }
-
-        // --- 1. GESTIÓN DE EMPRESAS ---
-        async function renderCompanyManagement() {
-            try {
-                const config = await window.electronAPI.loadConfig();
-                const companies = config.companyPaths || {};
-
-                const container = document.createElement('div');
-                container.innerHTML = `
-                    <div class="settings-header">
-                        <h2>🏢 Gestión de Empresas</h2>
-                        <button class="action-btn" onclick="openAddCompanyModal()">+ Agregar Empresa</button>
+            <div class="ai-dashboard">
+                <!-- Tarjeta de Estado del Modelo -->
+                <div class="ai-card full-width" style="border-left: 5px solid var(--primary);">
+                    <h3>Estado del Modelo Activo</h3>
+                    <div class="model-info-grid">
+                        <div>
+                            <span class="stat-label">Proveedor</span>
+                            <div class="stat-value" style="font-size: 1.2rem;">OpenAI</div>
+                        </div>
+                        <div>
+                            <span class="stat-label">Modelo</span>
+                            <div class="stat-value">GPT-4 Turbo</div>
+                        </div>
+                        <div>
+                            <span class="stat-label">Versión API</span>
+                            <div class="stat-value">v1.5.0</div>
+                        </div>
+                        <div>
+                            <span class="stat-label">Contexto Máximo</span>
+                            <div class="stat-value">128k Tokens</div>
+                        </div>
                     </div>
-                    <div class="companies-grid" id="companies-grid"></div>
-                `;
-                contentArea.appendChild(container);
-                renderCompanyCards(Object.keys(companies).map(name => ({
+                </div>
+
+                <!-- Parámetros -->
+                <div class="ai-card">
+                    <h3>Parámetros de Generación</h3>
+                    <div class="slider-group">
+                        <div class="slider-label"><span>Temperatura (Creatividad)</span> <span id="temp-val">0.7</span></div>
+                        <input type="range" min="0" max="1" step="0.1" value="0.7" oninput="document.getElementById('temp-val').innerText = this.value">
+                        <small style="color: var(--text-muted); display: block; margin-top: 0.5rem;">Valores bajos son más precisos, altos más creativos.</small>
+                    </div>
+                    <div class="slider-group">
+                        <div class="slider-label"><span>Max Tokens (Longitud)</span> <span id="token-val">2048</span></div>
+                        <input type="range" min="256" max="4096" step="256" value="2048" oninput="document.getElementById('token-val').innerText = this.value">
+                    </div>
+                    <button class="btn btn-primary" style="width: 100%;">Guardar Parámetros</button>
+                </div>
+
+                <!-- Configuración del Prompt -->
+                <div class="ai-card">
+                    <h3>Configuración del Asistente (Prompt)</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.8rem;">Define cómo se comporta la IA como experto SST.</p>
+                    <textarea class="ai-textarea" rows="6" id="ai-prompt">Eres un asistente experto en Seguridad y Salud en el Trabajo (SG-SST) normatividad colombiana. Tu tono es profesional, técnico y directo. Ayudas a interpretar la resolución 0312 de 2019.</textarea>
+                    <button class="btn btn-outline" style="width: 100%; margin-top: 1rem;" onclick="resetAIPrompt()">Restaurar Configuración por Defecto</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 4: INTERFAZ DE USUARIO -->
+        <div id="tab-interfaz" class="section-container">
+            <div class="section-header">
+                <h2 class="section-title">Apariencia y Accesibilidad</h2>
+                <p class="section-subtitle">Personaliza la experiencia visual de K+AIR</p>
+            </div>
+
+            <div class="theme-control-group">
+                <h3 style="margin-bottom: 1rem;">Modo de Visualización</h3>
+                <div class="theme-segmented">
+                    <div class="theme-option" onclick="setTheme('light', this)">☀️ Claro</div>
+                    <div class="theme-option active" onclick="setTheme('system', this)">💻 Sistema</div>
+                    <div class="theme-option" onclick="setTheme('dark', this)">🌙 Oscuro</div>
+                </div>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.8rem;">
+                    "Sistema" ajusta automáticamente los colores según la configuración de tu operativo (Windows/Mac).
+                </p>
+            </div>
+
+            <div class="theme-control-group">
+                <h3 style="margin-bottom: 1rem;">Tamaño de Fuente</h3>
+                <div class="slider-group" style="max-width: 300px; margin: 0 auto;">
+                    <input type="range" min="14" max="20" value="16" oninput="document.body.style.fontSize = this.value + 'px'">
+                    <div style="display: flex; justify-content: space-between; margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-muted);">
+                        <span>Pequeño</span>
+                        <span>Grande</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ai-card" style="max-width: 500px; margin: 0 auto;">
+                <h3>Recomendación de Accesibilidad</h3>
+                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem;">
+                    Para trabajar largas jornadas frente a informes de accidentalidad, recomendamos activar el <strong>Modo Oscuro</strong> o usar el tema claro con alto contraste si tu iluminación ambiente es baja.
+                </p>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 5: ACERCA DE LA APP -->
+        <div id="tab-acerca" class="section-container">
+            <div class="section-header">
+                <h2 class="section-title">Acerca de K+AIR</h2>
+                <p class="section-subtitle">Plataforma Integral de Gestión SST</p>
+            </div>
+
+            <div class="about-layout">
+                <div class="about-main">
+                    <div class="info-card">
+                        <h2 style="font-family: var(--font-heading); color: var(--primary);">K+AIR</h2>
+                        <p style="font-size: 1.1rem; margin-bottom: 1rem; color: var(--text-muted);">Plataforma Integral de Gestión SST</p>
+                        <p style="line-height: 1.6;">
+                            K+AIR es una solución empresarial diseñada para optimizar la gestión de la Seguridad y Salud en el Trabajo bajo los estándares colombianos. Permite la centralización de documentación, trazabilidad normativa y asistencia inteligente mediante IA.
+                        </p>
+                    </div>
+
+                    <div class="info-card">
+                        <h3>Equipo de Desarrollo</h3>
+                        <div style="margin-top: 1rem; display: flex; gap: 1.5rem; flex-wrap: wrap;">
+                            <div style="text-align: center; flex: 1; min-width: 120px;">
+                                <div class="dev-avatar">👨‍💻</div>
+                                <strong>Arquitecto UI</strong>
+                                <div style="font-size: 0.8rem; color: var(--text-muted);">UX/UI Senior</div>
+                            </div>
+                            <div style="text-align: center; flex: 1; min-width: 120px;">
+                                <div class="dev-avatar">👩‍💻</div>
+                                <strong>Backend Lead</strong>
+                                <div style="font-size: 0.8rem; color: var(--text-muted);">Node/Electron</div>
+                            </div>
+                            <div style="text-align: center; flex: 1; min-width: 120px;">
+                                <div class="dev-avatar">👨‍⚕️</div>
+                                <strong>Consultor SST</strong>
+                                <div style="font-size: 0.8rem; color: var(--text-muted);">Especialista Normativa</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="about-sidebar">
+                    <div class="info-card">
+                        <h3>Información del Sistema</h3>
+                        <div style="margin-top: 1rem;">
+                            <div class="system-diag-row"><span>Versión</span> <strong>2.4.0</strong></div>
+                            <div class="system-diag-row"><span>Build</span> <strong>2023.10.15</strong></div>
+                            <div class="system-diag-row"><span>Licencia</span> <strong>Empresa</strong></div>
+                            <div class="system-diag-row"><span>Electron</span> <strong>v27.0.0</strong></div>
+                            <div class="system-diag-row"><span>Node</span> <strong>v18.16.0</strong></div>
+                        </div>
+                        <button class="btn btn-outline" style="width: 100%; margin-top: 1.5rem;" onclick="showThirdPartyLicenses()">Ver Licencias de Terceros</button>
+                    </div>
+
+                    <div class="info-card" style="text-align: center;">
+                        <div style="font-size: 3rem;">🇨🇴</div>
+                        <h4 style="margin-top: 0.5rem;">Hecho en Colombia</h4>
+                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem;">
+                            Diseñado para cumplir con la resolución 0312 del Ministerio de Trabajo.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- MODAL DE VINCULACIÓN DE EMPRESA -->
+<div class="modal-overlay" id="link-modal">
+    <div class="modal-container">
+        <h3 style="font-family: var(--font-heading); margin-bottom: 1.5rem;">Vincular Carpeta de Documentos</h3>
+        <div class="form-group">
+            <label class="form-label">Empresa Seleccionada</label>
+            <input type="text" class="form-control" value="Tempoactiva" disabled style="background: #f1f3f5;" id="selected-company">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Ruta de Documentos</label>
+            <div style="display: flex; gap: 0.5rem;">
+                <input type="text" class="form-control" placeholder="C:/" readonly id="link-path">
+                <button class="btn btn-primary" onclick="selectDirectory()">Buscar</button>
+            </div>
+        </div>
+        <div style="display: flex; gap: 1rem; margin-top: 2rem; justify-content: flex-end;">
+            <button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
+            <button class="btn btn-primary" onclick="saveLink()">Vincular Carpeta</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DE USUARIO (Crear/Editar) -->
+<div class="modal-overlay" id="user-modal">
+    <div class="modal-container">
+        <h3 style="font-family: var(--font-heading); margin-bottom: 1.5rem;">Gestión de Usuario</h3>
+        <div class="form-group">
+            <label class="form-label">Nombre Completo</label>
+            <input type="text" class="form-control" placeholder="Ej. Juan Pérez" id="user-fullname">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Correo Electrónico (Login)</label>
+            <input type="email" class="form-control" placeholder="usuario@empresa.com" id="user-email">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Contraseña</label>
+            <input type="password" class="form-control" placeholder="••••••••" id="user-password">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Rol en el Sistema</label>
+            <select class="form-control" id="user-role">
+                <option>Administrador</option>
+                <option>Responsable SST</option>
+                <option>Auditor (Solo lectura)</option>
+            </select>
+        </div>
+        <div style="display: flex; gap: 1rem; margin-top: 2rem; justify-content: flex-end;">
+            <button class="btn btn-outline" onclick="closeUserModal()">Cancelar</button>
+            <button class="btn btn-primary" onclick="saveUser()">Guardar Usuario</button>
+        </div>
+    </div>
+</div>
+
+<!-- TOAST NOTIFICATIONS -->
+<div class="toast-container" id="toast-container" style="position: fixed; bottom: 20px; right: 20px; z-index: 2000;"></div>
+
+<script>
+    // Variable para acceder a la API de Electron
+    let electronAPI = null;
+
+    // Verificar si estamos en un iframe y si hay acceso a la API de Electron
+    if (window.parent && window.parent !== window && window.parent.electronAPI) {
+        electronAPI = window.parent.electronAPI;
+    } else if (window.electronAPI) {
+        electronAPI = window.electronAPI;
+    } else {
+        // Si no hay acceso directo, intentar recibirlo a través de mensajes
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'SET_ELECTRON_API') {
+                electronAPI = event.data.api;
+            }
+        });
+    }
+
+    /* ================= LÓGICA DE NAVEGACIÓN ================= */
+    function switchTab(tabId, element) {
+        // Remover clase activa de todos los tabs
+        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+        // Agregar clase activa al elemento clickeado
+        element.classList.add('active');
+
+        // Ocultar todas las secciones
+        document.querySelectorAll('.section-container').forEach(s => s.classList.remove('active'));
+        // Mostrar la sección correspondiente
+        document.getElementById('tab-' + tabId).classList.add('active');
+    }
+
+    /* ================= GESTIÓN DE EMPRESAS ================= */
+    let companies = [];
+
+    // Función para cargar las empresas
+    async function loadCompanies() {
+        try {
+            if (electronAPI && typeof electronAPI.loadConfig === 'function') {
+                const config = await electronAPI.loadConfig();
+                const companyPaths = config.companyPaths || {};
+
+                companies = Object.keys(companyPaths).map(name => ({
                     name: name,
-                    path: companies[name].root || '',
-                    stats: companies[name].stats || { employees: 0, risk: '-' }
-                })));
-            } catch (error) {
-                console.error('Error al cargar la configuración:', error);
-                contentArea.innerHTML = '<div class="card"><p>Error al cargar la configuración de empresas.</p></div>';
+                    path: companyPaths[name].root || '',
+                    stats: companyPaths[name].stats || { employees: 0, risk: '-', agropecuaria: false }
+                }));
+
+                renderCompanyCards();
+            } else {
+                // Datos de ejemplo si no hay API
+                companies = [
+                    { name: "Tempoactiva", risk: "IV", employees: 120, agro: true, items: 45, path: "C:/SST/Tempo" },
+                    { name: "Temposum", risk: "II", employees: 45, agro: false, items: 38, path: "" },
+                    { name: "Aseplus", risk: "V", employees: 210, agro: false, items: 50, path: "D:/Aseplus" },
+                    { name: "Asel", risk: "I", employees: 15, agro: true, items: 28, path: "" }
+                ];
+                renderCompanyCards();
             }
+        } catch (error) {
+            console.error('Error al cargar las empresas:', error);
+            showToast('Error al cargar la configuración de empresas', 'error');
         }
+    }
 
-        function renderCompanyCards(companies) {
-            const grid = document.getElementById('companies-grid');
-            if (!grid) return;
+    function renderCompanyCards() {
+        const companyGrid = document.getElementById('company-grid');
+        companyGrid.innerHTML = ''; // Limpiar antes de renderizar
 
-            grid.innerHTML = '';
-            companies.forEach(comp => {
-                const hasPath = comp.path ? true : false;
-                const div = document.createElement('div');
-                div.className = 'company-card';
-                div.innerHTML = `
-                    <div style="display:flex; justify-content:space-between;">
-                        <h3>${comp.name}</h3>
-                        <div style="display:flex; gap:5px;">
-                            <span class="badge" style="background:${hasPath ? 'var(--success-color)' : '#ed8936'}; color:white; padding:4px 8px; border-radius:4px; font-size:0.8rem;">${hasPath ? 'Vinculada' : 'Sin Ruta'}</span>
-                            <button class="action-btn" style="background-color: var(--danger-color); padding: 4px 8px; font-size: 0.8rem;" onclick="eliminarEmpresa('${comp.name}')">Eliminar</button>
-                        </div>
+        companies.forEach(comp => {
+            const card = document.createElement('div');
+            card.className = `company-card risk-${comp.risk || 'I'}`;
+            card.innerHTML = `
+                <div class="card-body">
+                    <div class="card-title-row">
+                        <div class="company-name">\${comp.name}</div>
+                        <div class="risk-badge" style="background-color: \${getRiskColor(comp.risk || 'I')}">Riesgo \${comp.risk || 'I'}</div>
                     </div>
+
                     <div class="company-stats">
-                        <div class="stat-box"><div class="stat-val">${comp.stats?.employees || 0}</div><div class="stat-lbl">Empleados</div></div>
-                        <div class="stat-box"><div class="stat-val">Clase ${comp.stats?.risk || '-'}</div><div class="stat-lbl">Riesgo</div></div>
-                    </div>
-                    <div style="background:var(--bg-input); padding:8px; border-radius:6px; font-family:monospace; font-size:0.85rem; color:var(--text-secondary); margin-bottom:15px; word-break: break-all;">${comp.path || 'Ruta no seleccionada'}</div>
-                    <div style="display:flex; gap:10px;">
-                        <button class="action-btn secondary" style="flex:1; justify-content:center;" onclick="linkPath('${comp.name}')">${hasPath ? 'Cambiar Ruta' : 'Vincular'}</button>
-                        ${hasPath ? `<button class="action-btn" style="flex:1; justify-content:center;" onclick="openPath('${comp.path}')">Abrir</button>` : ''}
-                    </div>
-                `;
-                grid.appendChild(div);
-            });
-        }
-
-        async function linkPath(name) {
-            try {
-                const path = await window.electronAPI.selectDirectory();
-                if(path) {
-                    showToast('Mapeando directorio, esto puede tomar unos segundos...', 'info');
-
-                    // Mapear el directorio seleccionado
-                    let structure = null;
-                    try {
-                        const mapResult = await window.electronAPI.mapDirectory(path);
-                        if (mapResult && mapResult.success) {
-                            structure = mapResult.structure;
-                        } else {
-                            console.warn('El mapeo de directorio no devolvió éxito:', mapResult);
-                            showToast('Advertencia: No se pudo mapear la estructura completa.', 'error');
-                        }
-                    } catch (mapError) {
-                        console.error('Error al mapear directorio:', mapError);
-                        showToast('Error al mapear la estructura de carpetas.', 'error');
-                    }
-
-                    const config = await window.electronAPI.loadConfig();
-                    if (!config.companyPaths) config.companyPaths = {};
-
-                    // Actualizar la ruta de la empresa
-                    config.companyPaths[name] = {
-                        ...config.companyPaths[name],
-                        root: path,
-                        structure: structure // Guardar la estructura mapeada
-                    };
-
-                    await window.electronAPI.saveConfig(config);
-                    renderCompanyManagement();
-                    showToast('Ruta actualizada y estructura mapeada correctamente', 'success');
-                }
-            } catch (error) {
-                console.error('Error al vincular ruta:', error);
-                showToast('Error al vincular la ruta', 'error');
-            }
-        }
-
-        async function openPath(path) {
-            try {
-                await window.electronAPI.openPath(path);
-            } catch (error) {
-                console.error('Error al abrir la ruta:', error);
-                showToast('Error al abrir la ruta', 'error');
-            }
-        }
-
-        async function openAddCompanyModal() {
-            // Primero mostramos un formulario para ingresar los datos básicos de la empresa
-            showModal(`
-                <h3>Nueva Empresa</h3>
-                <form id="new-co-form-initial">
-                    <div class="form-group">
-                        <label class="form-label">Nombre de la Empresa *</label>
-                        <input class="form-control" id="nc-name" required>
-                    </div>
-                    <div style="display:flex; gap:10px;">
-                        <div class="form-group" style="flex:1">
-                            <label class="form-label">Número de Empleados *</label>
-                            <input type="number" class="form-control" id="nc-emp" required min="1">
+                        <div class="stat-item">
+                            <span class="stat-label">Empleados</span>
+                            <span class="stat-value">\${comp.stats?.employees || 0}</span>
                         </div>
-                        <div class="form-group" style="flex:1">
-                            <label class="form-label">Nivel de Riesgo *</label>
-                            <select class="form-control" id="nc-risk" required>
-                                <option value="">Seleccione...</option>
-                                <option value="I">Clase I - Bajo</option>
-                                <option value="II">Clase II - Medio</option>
-                                <option value="III">Clase III - Alto</option>
-                                <option value="IV">Clase IV - Muy Alto</option>
-                                <option value="V">Clase V - Extremadamente Alto</option>
-                            </select>
+                        <div class="stat-item">
+                            <span class="stat-label">Agropecuaria</span>
+                            <span class="stat-value">\${comp.stats?.agropecuaria ? 'Sí' : 'No'}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Normativa</span>
+                            <span class="stat-value">\${comp.stats?.items || 0} Items</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Estado</span>
+                            <span class="stat-value" style="color: \${comp.path ? 'var(--success)' : 'var(--text-muted)'}">
+                                \${comp.path ? 'Vinculada' : 'Pendiente'}
+                            </span>
                         </div>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">¿Es una Unidad Agropecuaria? *</label>
-                        <select class="form-control" id="nc-agro" required>
-                            <option value="false">No</option>
-                            <option value="true">Sí</option>
-                        </select>
+
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-outline" style="flex: 1;" onclick="viewCompanyDetails('\${comp.name}')">Ver Detalles</button>
+                        <button class="btn btn-primary" style="flex: 1;" onclick="prepareLinkModal('\${comp.name}')">\${comp.path ? 'Reconfigurar' : 'Vincular'}</button>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Descripción (Opcional)</label>
-                        <textarea class="form-control" id="nc-desc" placeholder="Breve descripción de la empresa"></textarea>
-                    </div>
-                    <div style="display:flex; gap:10px; margin-top:20px;">
-                        <button type="submit" class="action-btn" style="flex:1;">Siguiente</button>
-                        <button type="button" class="action-btn secondary" onclick="closeModal()" style="flex:1;">Cancelar</button>
-                    </div>
-                </form>
-            `);
-
-            // Manejar el evento de submit del formulario inicial
-            document.getElementById('new-co-form-initial').onsubmit = async (e) => {
-                e.preventDefault();
-
-                const name = document.getElementById('nc-name').value.trim();
-                const employees = document.getElementById('nc-emp').value;
-                const risk = document.getElementById('nc-risk').value;
-                const isAgro = document.getElementById('nc-agro').value === 'true';
-                const description = document.getElementById('nc-desc').value.trim();
-
-                if (!name || !employees || !risk) {
-                    showToast('Por favor complete todos los campos obligatorios', 'error');
-                    return;
-                }
-
-                if (parseInt(employees) <= 0) {
-                    showToast('El número de empleados debe ser mayor a 0', 'error');
-                    return;
-                }
-
-                // Ahora pedimos seleccionar la carpeta para la empresa
-                try {
-                    const path = await window.electronAPI.selectDirectory();
-                    if(!path) {
-                        showToast('Debe seleccionar una carpeta para la empresa', 'error');
-                        return;
-                    }
-
-                    // Guardar la información en la configuración
-                    const config = await window.electronAPI.loadConfig();
-                    if (!config.companyPaths) config.companyPaths = {};
-
-                    // Verificar que no exista una empresa con el mismo nombre
-                    if (config.companyPaths[name]) {
-                        showToast('Ya existe una empresa con este nombre', 'error');
-                        return;
-                    }
-
-                    showToast('Mapeando directorio, esto puede tomar unos segundos...', 'info');
-
-                    // Mapear el directorio seleccionado
-                    let structure = null;
-                    try {
-                        const mapResult = await window.electronAPI.mapDirectory(path);
-                        if (mapResult && mapResult.success) {
-                            structure = mapResult.structure;
-                        } else {
-                            console.warn('El mapeo de directorio no devolvió éxito:', mapResult);
-                            showToast('Advertencia: No se pudo mapear la estructura completa.', 'error');
-                        }
-                    } catch (mapError) {
-                        console.error('Error al mapear directorio:', mapError);
-                        showToast('Error al mapear la estructura de carpetas.', 'error');
-                    }
-
-                    // Calcular el escenario normativo basado en los datos de la empresa
-                    const escenarioNormativo = calcularEscenarioNormativo(parseInt(employees), risk, isAgro);
-
-                    // Guardar la información de la empresa
-                    config.companyPaths[name] = {
-                        root: path,
-                        stats: {
-                            employees: parseInt(employees),
-                            risk: risk,
-                            isAgropecuaria: isAgro,
-                            description: description
-                        },
-                        escenario_normativo: escenarioNormativo,
-                        structure: structure, // Guardar la estructura mapeada
-                        createdAt: new Date().toISOString()
-                    };
-
-                    await window.electronAPI.saveConfig(config);
-                    closeModal();
-                    renderCompanyManagement();
-                    showToast('Empresa agregada correctamente', 'success');
-                } catch (error) {
-                    console.error('Error al guardar la empresa:', error);
-                    showToast('Error al guardar la empresa', 'error');
-                }
-            };
-        }
-
-        // Función para eliminar una empresa
-        async function eliminarEmpresa(nombreEmpresa) {
-            const confirmacion = confirm(`¿Está seguro de que desea eliminar la empresa "${nombreEmpresa}" y toda su configuración? Esta acción no se puede deshacer.`);
-
-            if (!confirmacion) {
-                return; // Si el usuario cancela, no hacemos nada
-            }
-
-            try {
-                // Cargar la configuración actual
-                const config = await window.electronAPI.loadConfig();
-
-                // Verificar que la empresa exista en la configuración
-                if (!config.companyPaths || !config.companyPaths[nombreEmpresa]) {
-                    showToast(`La empresa "${nombreEmpresa}" no existe en la configuración.`, 'error');
-                    return;
-                }
-
-                // Eliminar la empresa de la configuración
-                delete config.companyPaths[nombreEmpresa];
-
-                // Guardar la configuración actualizada
-                await window.electronAPI.saveConfig(config);
-
-                // Actualizar la vista de gestión de empresas
-                renderCompanyManagement();
-
-                showToast(`Empresa "${nombreEmpresa}" eliminada correctamente`, 'success');
-            } catch (error) {
-                console.error('Error al eliminar la empresa:', error);
-                showToast('Error al eliminar la empresa', 'error');
-            }
-        }
-
-        // Función para calcular el escenario normativo basado en los datos de la empresa
-        function calcularEscenarioNormativo(numeroTrabajadores, nivelRiesgo, isAgropecuaria = false) {
-            // Si es una unidad agropecuaria, aplicar reglas específicas
-            if (isAgropecuaria) {
-                if (numeroTrabajadores <= 10) {
-                    return 'AGROPECUARIO_SIMPLIFICADO_≤10';
-                } else if (numeroTrabajadores >= 11 && numeroTrabajadores <= 50) {
-                    return 'AGROPECUARIO_INTERMEDIO_11-50';
-                } else {
-                    return 'AGROPECUARIO_COMPLETO_50+';
-                }
-            } else {
-                // Reglas estándar para empresas no agropecuarias
-                if (numeroTrabajadores <= 10 && ['I', 'II', 'III'].includes(nivelRiesgo)) {
-                    return 'SIMPLIFICADO_≤10_R1-3';
-                } else if (numeroTrabajadores >= 11 && numeroTrabajadores <= 50 && ['I', 'II', 'III'].includes(nivelRiesgo)) {
-                    return 'INTERMEDIO_11-50_R1-3';
-                } else {
-                    return 'COMPLETO_CAP_III';
-                }
-            }
-        }
-
-        // --- 2. AJUSTES DE USUARIO ---
-        function renderUserSettings() {
-            contentArea.innerHTML = `
-                <div class="settings-header"><h2>👤 Ajustes de Usuario</h2></div>
-                <div class="card">
-                    <h3>🔑 Credenciales</h3>
-                    <div class="form-group"><label class="form-label">Usuario</label><input type="text" class="form-control" value="Admin"></div>
-                    <div class="form-group"><label class="form-label">Nueva Contraseña</label><input type="password" class="form-control" placeholder="••••••••"></div>
-                    <button class="action-btn" onclick="showToast('Contraseña actualizada', 'success')">Actualizar</button>
-                </div>
-                <div class="card">
-                    <h3>🛡️ Seguridad</h3>
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <div><strong>Bloqueo Automático</strong><br><small style="color:var(--text-secondary)">Pedir clave al inactividad</small></div>
-                        <label class="toggle-switch"><input type="checkbox"><span class="slider"></span></label>
-                    </div>
-                    <hr style="border:0; border-top:1px solid var(--border-color); margin:20px 0;">
-                    <button class="action-btn" style="background-color:var(--danger-color);" onclick="showToast('Cifrado iniciado...', 'error')">Cifrar Datos</button>
                 </div>
             `;
-        }
+            companyGrid.appendChild(card);
+        });
+    }
 
-        // --- 3. CONFIGURACIÓN DE IA ---
-        async function renderIASettings() {
-            try {
-                const config = await window.electronAPI.loadConfig();
-                const llm = config.llmSettings || {};
+    function getRiskColor(risk) {
+        const map = { 'I': 'var(--success)', 'II': 'var(--info)', 'III': 'var(--warning)', 'IV': '#fd7e14', 'V': 'var(--danger)' };
+        return map[risk] || '#666';
+    }
 
-                contentArea.innerHTML = `
-                    <div class="settings-header"><h2>🤖 Configuración de IA</h2></div>
-                    <div class="card">
-                        <h3>🧠 Modelo Local</h3>
-                        <div class="form-group">
-                            <label class="form-label">Ruta del Modelo</label>
-                            <div style="display:flex; gap:10px;">
-                                <input class="form-control" id="llm-path" value="${llm.modelPath || ''}" disabled>
-                                <button class="action-btn secondary" onclick="selectLLMPath()">Examinar</button>
-                            </div>
-                        </div>
-                        <div style="display:flex; gap:20px;">
-                            <div class="form-group" style="flex:1"><label class="form-label">Contexto</label><input type="number" class="form-control" id="llm-ctx" value="${llm.context || 4096}"></div>
-                            <div class="form-group" style="flex:1"><label class="form-label">Temperatura</label><input type="number" class="form-control" id="llm-temp" value="${llm.temperature || 0.7}"></div>
-                        </div>
-                        <button class="action-btn" onclick="saveLLM()">Guardar</button>
-                    </div>
-                    <div class="card">
-                        <h3>📜 Logs</h3>
-                        <div class="log-box" id="llm-logs">> [INIT] Motor cargado<br>> [INFO] Esperando configuración...</div>
-                    </div>
-                `;
-            } catch (error) {
-                console.error('Error al cargar la configuración de IA:', error);
-                contentArea.innerHTML = '<div class="card"><p>Error al cargar la configuración de IA.</p></div>';
+    function prepareLinkModal(companyName) {
+        document.getElementById('selected-company').value = companyName;
+        openLinkModal();
+    }
+
+    function viewCompanyDetails(companyName) {
+        showToast('Mostrando detalles de ' + companyName, 'success');
+        // Aquí iría la lógica para mostrar los detalles de la empresa
+    }
+
+    /* ================= GESTIÓN DE USUARIOS ================= */
+    let users = [];
+
+    // Función para cargar los usuarios
+    async function loadUsers() {
+        try {
+            if (electronAPI && typeof electronAPI.loadConfig === 'function') {
+                const config = await electronAPI.loadConfig();
+                // Suponiendo que los usuarios están en alguna parte de la configuración
+                // Esta es una implementación de ejemplo
+                users = [
+                    { name: "Admin General", email: "admin@kair.com", role: "Administrador", last: "Hoy 08:00 AM", status: "Activo" },
+                    { name: "Maria SST", email: "maria@tempoactiva.com", role: "Responsable SST", last: "Ayer 16:30 PM", status: "Activo" },
+                    { name: "Carlos Audit", email: "audit@externo.com", role: "Auditor", last: "Hace 3 días", status: "Inactivo" }
+                ];
+                renderUserTable();
+            } else {
+                // Datos de ejemplo si no hay API
+                users = [
+                    { name: "Admin General", email: "admin@kair.com", role: "Administrador", last: "Hoy 08:00 AM", status: "Activo" },
+                    { name: "Maria SST", email: "maria@tempoactiva.com", role: "Responsable SST", last: "Ayer 16:30 PM", status: "Activo" },
+                    { name: "Carlos Audit", email: "audit@externo.com", role: "Auditor", last: "Hace 3 días", status: "Inactivo" }
+                ];
+                renderUserTable();
             }
+        } catch (error) {
+            console.error('Error al cargar los usuarios:', error);
+            showToast('Error al cargar la configuración de usuarios', 'error');
+        }
+    }
+
+    function renderUserTable() {
+        const userTableBody = document.getElementById('users-table-body');
+        userTableBody.innerHTML = ''; // Limpiar antes de renderizar
+
+        users.forEach(u => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>
+                    <div style="display: flex; align-items: center;">
+                        <div class="user-avatar">\${u.name.charAt(0)}</div>
+                        <div>
+                            <div style="font-weight: 500;">\${u.name}</div>
+                            <div style="font-size: 0.8rem; color: var(--text-muted);">\${u.email}</div>
+                        </div>
+                    </div>
+                </td>
+                <td><span class="role-badge">\${u.role}</span></td>
+                <td>\${u.last}</td>
+                <td><span class="status-\${u.status.toLowerCase()}">● \${u.status}</span></td>
+                <td style="text-align: right;">
+                    <button class="btn btn-sm btn-outline" onclick="resetPassword('\${u.email}')">Resetear Contraseña</button>
+                </td>
+            `;
+            userTableBody.appendChild(tr);
+        });
+    }
+
+    /* ================= CONFIGURACIÓN IA ================= */
+    function saveLLMParams() {
+        const temp = document.getElementById('temp-val').textContent;
+        const tokens = document.getElementById('token-val').textContent;
+        showToast('Parámetros de IA guardados: Temp=' + temp + ', Tokens=' + tokens, 'success');
+    }
+
+    function resetAIPrompt() {
+        document.getElementById('ai-prompt').value = 'Eres un asistente experto en Seguridad y Salud en el Trabajo (SG-SST) normatividad colombiana. Tu tono es profesional, técnico y directo. Ayudas a interpretar la resolución 0312 de 2019.';
+        showToast('Prompt de IA restaurado a valor por defecto', 'success');
+    }
+
+    /* ================= INTERFAZ UI ================= */
+    function setTheme(mode, el) {
+        // Remover clase activa de todas las opciones
+        document.querySelectorAll('.theme-option').forEach(o => o.classList.remove('active'));
+        // Agregar clase activa al elemento clickeado
+        el.classList.add('active');
+        
+        showToast('Tema cambiado a: ' + mode, 'success');
+        
+        // Guardar el tema en la configuración si hay API disponible
+        if (electronAPI && typeof electronAPI.saveConfig === 'function') {
+            electronAPI.loadConfig().then(config => {
+                if (!config.uiSettings) config.uiSettings = {};
+                config.uiSettings.theme = mode;
+                return electronAPI.saveConfig(config);
+            }).then(() => {
+                console.log('Tema guardado en configuración');
+            }).catch(error => {
+                console.error('Error al guardar el tema:', error);
+            });
+        }
+    }
+
+    /* ================= MODALES Y UTILIDADES ================= */
+    const linkModal = document.getElementById('link-modal');
+    const userModal = document.getElementById('user-modal');
+
+    function openLinkModal() {
+        linkModal.classList.add('active');
+    }
+
+    function closeModal() {
+        linkModal.classList.remove('active');
+    }
+
+    function openUserModal() {
+        // Limpiar el formulario
+        document.getElementById('user-fullname').value = '';
+        document.getElementById('user-email').value = '';
+        document.getElementById('user-password').value = '';
+        document.getElementById('user-role').value = 'Administrador';
+        userModal.classList.add('active');
+    }
+
+    function closeUserModal() {
+        userModal.classList.remove('active');
+    }
+
+    function selectDirectory() {
+        if (electronAPI && typeof electronAPI.selectDirectory === 'function') {
+            electronAPI.selectDirectory().then(selectedPath => {
+                if (selectedPath) {
+                    document.getElementById('link-path').value = selectedPath;
+                }
+            }).catch(error => {
+                console.error('Error al seleccionar directorio:', error);
+                showToast('Error al seleccionar directorio', 'error');
+            });
+        } else {
+            // Simulación para pruebas sin Electron
+            const path = "C:/Users/Admin/Documents/SST_Files";
+            document.getElementById('link-path').value = path;
+            showToast('Directorio simulado seleccionado', 'success');
+        }
+    }
+
+    function saveLink() {
+        const companyName = document.getElementById('selected-company').value;
+        const path = document.getElementById('link-path').value;
+
+        if (!path) {
+            showToast('Por favor seleccione una ruta válida', 'error');
+            return;
         }
 
-        async function selectLLMPath() {
-            try {
-                const path = await window.electronAPI.selectDirectory();
-                if(path) document.getElementById('llm-path').value = path;
-            } catch (error) {
-                console.error('Error al seleccionar ruta del modelo:', error);
-                showToast('Error al seleccionar ruta del modelo', 'error');
-            }
-        }
-
-        async function saveLLM() {
-            try {
-                const config = await window.electronAPI.loadConfig();
-                if (!config.llmSettings) config.llmSettings = {};
-
-                config.llmSettings = {
-                    ...config.llmSettings,
-                    modelPath: document.getElementById('llm-path').value,
-                    context: parseInt(document.getElementById('llm-ctx').value),
-                    temperature: parseFloat(document.getElementById('llm-temp').value)
+        if (electronAPI && typeof electronAPI.saveConfig === 'function') {
+            electronAPI.loadConfig().then(config => {
+                if (!config.companyPaths) config.companyPaths = {};
+                
+                // Actualizar la ruta de la empresa
+                config.companyPaths[companyName] = {
+                    ...config.companyPaths[companyName],
+                    root: path
                 };
-
-                await window.electronAPI.saveConfig(config);
-                document.getElementById('llm-logs').innerHTML += `<br>> [SUCCESS] Configuración guardada.`;
-                showToast('Configuración IA guardada', 'success');
-            } catch (error) {
-                console.error('Error al guardar la configuración de IA:', error);
-                showToast('Error al guardar la configuración de IA', 'error');
-            }
-        }
-
-        // --- 4. INTERFAZ DE USUARIO ---
-        async function renderUISettings() {
-            const storedTheme = localStorage.getItem('theme') || 'light';
-            const storedMotion = localStorage.getItem('reduceMotion') === 'true';
-
-            contentArea.innerHTML = `
-                <div class="settings-header"><h2>🎨 Interfaz de Usuario</h2></div>
-                <div class="card">
-                    <h3>🌓 Apariencia</h3>
-                    <div class="theme-selector">
-                        <div class="theme-option ${storedTheme === 'light' ? 'selected' : ''}" onclick="setTheme('light')"><span class="theme-icon">☀️</span><strong>Claro</strong></div>
-                        <div class="theme-option ${storedTheme === 'dark' ? 'selected' : ''}" onclick="setTheme('dark')"><span class="theme-icon">🌙</span><strong>Oscuro</strong></div>
-                        <div class="theme-option ${storedTheme === 'system' ? 'selected' : ''}" onclick="setTheme('system')"><span class="theme-icon">💻</span><strong>Sistema</strong></div>
-                    </div>
-                </div>
-                <div class="card">
-                    <h3>♿ Accesibilidad</h3>
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <div><strong>Reducir Movimiento</strong><br><small style="color:var(--text-secondary)">Desactiva animaciones</small></div>
-                        <label class="toggle-switch"><input type="checkbox" id="motion-toggle" ${storedMotion ? 'checked' : ''} onchange="toggleMotion(this)"><span class="slider"></span></label>
-                    </div>
-                </div>
-            `;
-        }
-
-        function setTheme(theme) {
-            localStorage.setItem('theme', theme);
-            applyThemePreference();
-            renderUISettings();
-
-            // Notificar a otros componentes que el tema ha cambiado
-            if (window.parent && window.parent !== window) {
-                // Si estamos en un iframe, enviar mensaje al padre
-                window.parent.postMessage({ type: 'THEME_CHANGED', theme: theme }, '*');
-            }
-
-            // Si estamos en la ventana principal, notificar a iframes
-            const iframes = document.querySelectorAll('iframe');
-            iframes.forEach(iframe => {
-                iframe.contentWindow.postMessage({ type: 'THEME_CHANGED', theme: theme }, '*');
+                
+                return electronAPI.saveConfig(config);
+            }).then(() => {
+                closeModal();
+                loadCompanies(); // Recargar la lista de empresas
+                showToast('Empresa vinculada correctamente', 'success');
+            }).catch(error => {
+                console.error('Error al guardar la vinculación:', error);
+                showToast('Error al vincular la empresa', 'error');
             });
+        } else {
+            closeModal();
+            loadCompanies(); // Recargar la lista de empresas
+            showToast('Empresa vinculada correctamente (simulado)', 'success');
+        }
+    }
+
+    function saveUser() {
+        const fullname = document.getElementById('user-fullname').value;
+        const email = document.getElementById('user-email').value;
+        const password = document.getElementById('user-password').value;
+        const role = document.getElementById('user-role').value;
+
+        if (!fullname || !email) {
+            showToast('Por favor complete los campos obligatorios', 'error');
+            return;
         }
 
-        function applyThemePreference() {
-            const theme = localStorage.getItem('theme') || 'light';
-            if (theme === 'dark') {
-                document.documentElement.setAttribute('data-theme', 'dark');
-            } else if (theme === 'light') {
-                document.documentElement.removeAttribute('data-theme');
-            } else if (theme === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                document.documentElement.setAttribute('data-theme', 'dark');
-            } else {
-                document.documentElement.removeAttribute('data-theme');
-            }
-        }
+        // Aquí iría la lógica para guardar el usuario
+        closeUserModal();
+        loadUsers(); // Recargar la lista de usuarios
+        showToast('Usuario guardado correctamente', 'success');
+    }
 
-        // Añadir un listener para recibir mensajes de cambio de tema
-        window.addEventListener('message', (event) => {
-            if (event.data.type === 'THEME_CHANGED') {
-                applyThemePreference();
-            }
-        });
+    function resetPassword(email) {
+        showToast('Instrucciones de restablecimiento enviadas a ' + email, 'success');
+    }
 
-        function toggleMotion(checkbox) {
-            localStorage.setItem('reduceMotion', checkbox.checked);
-            showToast('Preferencias de movimiento actualizadas', 'success');
-        }
+    function showThirdPartyLicenses() {
+        showToast('Mostrando licencias de terceros...', 'success');
+    }
 
-        // --- 5. NUEVA SECCIÓN: ACERCA DE APP ---
-        async function renderAboutPage() {
-            try {
-                const config = await window.electronAPI.loadConfig();
-                const appVersion = await window.electronAPI.getAppVersion();
+    /* ================= NOTIFICACIONES ================= */
+    function showToast(msg, type = 'success') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.style.cssText = `
+            background: #333; color: white; padding: 12px 24px; border-radius: 6px;
+            margin-bottom: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: flex; align-items: center; animation: slideIn 0.3s forwards;
+            border-left: 4px solid \${type === 'success' ? 'var(--success)' : 'var(--danger)'}
+        `;
+        toast.innerText = msg;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
 
-                contentArea.innerHTML = `
-                    <div class="about-container">
-                        <div class="app-logo-large">🛡️</div>
-                        <h1>SG-SST Electron App</h1>
-                        <p style="color:var(--text-secondary);">Sistema de Gestión de Seguridad y Salud en el Trabajo</p>
+    // Animación simple para los toasts
+    const styleSheet = document.createElement("style");
+    styleSheet.innerText = `
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    `;
+    document.head.appendChild(styleSheet);
 
-                        <br>
+    // Cargar datos cuando se inicialice la página
+    document.addEventListener('DOMContentLoaded', function() {
+        loadCompanies();
+        loadUsers();
+    });
+</script>
 
-                        <div class="card" style="text-align:left;">
-                            <h3 style="margin-top:0;">Desarrollador</h3>
-                            <div style="display:flex; align-items:center; gap:15px; margin-bottom:20px;">
-                                <div style="width:50px; height:50px; background:#ddd; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.5rem;">👤</div>
-                                <div>
-                                    <strong>Javier Robles F.</strong><br>
-                                    <small>Prof. SG-SST - Esp. Gerencia de Proyectos</small>
-                                </div>
-                            </div>
-
-                            <h3 style="margin-top:0;">Detalles Técnicos</h3>
-                            <div class="info-row"><span class="info-label">Versión de App</span><span class="info-value">v${appVersion}</span></div>
-                            <div class="info-row"><span class="info-label">Framework</span><span class="info-value">Electron</span></div>
-                            <div class="info-row"><span class="info-label">Modelo IA</span><span class="info-value">${config.llmSettings?.modelVersion || 'No configurado'}</span></div>
-                        </div>
-
-                        <div class="card update-card">
-                            <h3>Actualizaciones</h3>
-                            <p style="color:var(--text-main); margin-bottom:15px;">Mantén tu aplicación segura y con las últimas funciones.</p>
-                            <button class="action-btn" id="btn-check-updates" onclick="checkUpdates()">
-                                🔍 Verificar Actualizaciones
-                            </button>
-                        </div>
-
-                        <div style="margin-top:30px;">
-                            <a href="https://github.com/javierrobles/sg-sst-app" target="_blank" style="text-decoration:none; color:inherit;">
-                                <button class="action-btn secondary">
-                                    🔗 Repositorio del Proyecto
-                                </button>
-                            </a>
-                        </div>
-                    </div>
-                `;
-            } catch (error) {
-                console.error('Error al cargar la página de acerca de:', error);
-                contentArea.innerHTML = '<div class="card"><p>Error al cargar la información de la aplicación.</p></div>';
-            }
-        }
-
-        // Simular verificación de actualizaciones
-        async function checkUpdates() {
-            const btn = document.getElementById('btn-check-updates');
-            if (!btn) return;
-
-            const originalHTML = btn.innerHTML;
-
-            // Estado de carga
-            btn.disabled = true;
-            btn.innerHTML = `⏳ Verificando...`;
-
-            // Simular delay de red
-            setTimeout(() => {
-                btn.disabled = false;
-                btn.innerHTML = originalHTML;
-
-                // Simular respuesta (Por defecto, 'sin actualizaciones')
-                showToast('¡Estás al día! No hay actualizaciones pendientes.', 'success');
-            }, 2000);
-        }
-
-        // --- UTILIDADES ---
-        function showModal(html) {
-            modalContent.innerHTML = html;
-            modalOverlay.classList.add('active');
-        }
-
-        function closeModal() {
-            modalOverlay.classList.remove('active');
-        }
-
-        modalOverlay.addEventListener('click', (e) => {
-            if(e.target === modalOverlay) closeModal();
-        });
-
-        // Sistema de Toasts (Notificaciones)
-        function showToast(message, type = 'success') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-
-            let icon = type === 'success' ? '✔' : '⚠';
-
-            toast.innerHTML = `<span style="font-size:1.2rem;">${icon}</span> <span>${message}</span>`;
-
-            container.appendChild(toast);
-
-            // Remover después de 3 segundos
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                toast.style.transform = 'translateX(100%)';
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
-    </script>
 </body>
 </html>
