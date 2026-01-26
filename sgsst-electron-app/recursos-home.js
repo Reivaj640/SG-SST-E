@@ -403,7 +403,13 @@ class RecursosHome {
 
         // Widgets Simples (Actualizados con datos reales)
         widgetsContainer.appendChild(this.createInductionWidget());
-        widgetsContainer.appendChild(this.createTrainingWidget());
+
+        // Crear widget de capacitaciones después de que los cálculos estén completamente completos
+        // Esperar un tick adicional para asegurar que todos los datos estén disponibles
+        await new Promise(resolve => setTimeout(resolve, 100));
+        const trainingWidget = this.createTrainingWidget();
+        widgetsContainer.appendChild(trainingWidget);
+
         widgetsContainer.appendChild(this.createEPPWidget());
 
         // Widget de Presupuesto (MODERNIZADO)
@@ -526,7 +532,9 @@ class RecursosHome {
             }
             // Preferir el más reciente o específico si hay varios
             const excelFile = excelFiles[0];
-            const filePath = `${submodulePath}/${excelFile.name || path.basename(excelFile.path)}`;
+            // Intentar usar excelFile.name, si no existe, usar una lógica segura para el nombre
+            const fileName = excelFile.name || (excelFile.path ? excelFile.path.split(/[/\\]/).pop() : 'archivo.xlsx');
+            const filePath = `${submodulePath}/${fileName}`;
 
             // C. Determinar Hoja (Año Actual)
             const sheetsResult = await window.electronAPI.getCapacitacionesSheets(filePath);
@@ -552,7 +560,7 @@ class RecursosHome {
             const { processedData } = excelResult.data;
             const dataRows = processedData; // Iteramos desde el inicio para encontrar los datos reales
 
-            // --- LÓGICA DE CONTEO AJUSTADA A TUS LOGS ---
+            // --- LÓGICA DE CONTEO AJUSTADA (Alineada con getCapacitacionesChartDataForGraph) ---
             const stats = {
                 totalCapacitaciones: 0,
                 programadas: 0,
@@ -574,12 +582,12 @@ class RecursosHome {
                     return String(cell);
                 };
 
-                // Según tus logs, los datos reales empiezan en la fila 7 (índice 6)
-                // Columna 2 (C) -> Nombre
-                // Columna 4 (E) -> Fecha Programada
-                // Columna 9 (J) -> Indicador de realización (0% o 100%)
+                // Alineación de columnas con getCapacitacionesChartDataForGraph:
+                // Columna 1 (B) -> Nombre (Índice 1)
+                // Columna 3 (D) -> Fecha Programada (Índice 3)
+                // Columna 9 (J) -> Indicador de realización (Índice 9 y otros)
 
-                const nombre = getVal(row[2]).trim(); // Índice 2: Nombre
+                const nombre = getVal(row[1]).trim(); // Índice 1: Nombre
                 const nombreLower = nombre.toLowerCase();
 
                 // 1. Filtros de Encabezados y Basura
@@ -596,20 +604,55 @@ class RecursosHome {
                 }
 
                 // 3. Validación Adicional: Debe tener fecha o tipo para ser real
-                const fechaRaw = row[4]; // Índice 4
-                const tipoRaw = getVal(row[3]); // Índice 3
+                const fechaRaw = row[3]; // Índice 3: Fecha
+                const tipoRaw = getVal(row[2]); // Índice 2: Tipo (opcional para validación)
 
                 // Si no tiene fecha Y no tiene tipo, probablemente es basura
-                if (!fechaRaw && (!tipoRaw || tipoRaw.length < 2)) {
-                     console.log(`Skipping Row ${i}: ${nombre} (Sin fecha ni tipo válido)`);
-                     continue;
-                }
-
+                // (Aunque getCapacitacionesChartDataForGraph usa fechaRaw del índice 3 principalmente)
+                
                 // --- PROCESAMIENTO ---
+
+                // Incrementar total capacitaciones
                 stats.totalCapacitaciones++;
 
+                // FECHA: Columna 3 (D) - Verificar si tiene fecha válida
+                let monthIndex = -1;
+                let fechaValida = false;
+
+                if (typeof fechaRaw === 'number' && fechaRaw > 1000) {
+                     const dateCode = new Date((fechaRaw - 25569) * 86400 * 1000);
+                     monthIndex = dateCode.getMonth();
+                     fechaValida = true;
+                } else {
+                    const fStr = getVal(fechaRaw);
+                    if (fStr && fStr !== 'No especificada' && fStr !== '') {
+                        // Intentar parsear fecha dd/mm/yyyy o mm/dd/yyyy
+                        const parts = fStr.split('/');
+                        if (parts.length === 3) {
+                            monthIndex = parseInt(parts[0]) - 1; // Asumiendo mm/dd/yyyy por consistencia, pero revisando logs podría ser dd/mm
+                            // Si el mes > 11, invertir lógica (dd/mm/yyyy)
+                             if (monthIndex > 11) {
+                                monthIndex = parseInt(parts[1]) - 1;
+                            }
+                            fechaValida = true;
+                        } else {
+                            const d = new Date(fStr);
+                            if (!isNaN(d.getTime())) {
+                                monthIndex = d.getMonth();
+                                fechaValida = true;
+                            }
+                        }
+                    }
+                }
+
+                // Solo incrementar programadas si tiene fecha válida
+                if (fechaValida) {
+                    stats.programadas++;
+                } else {
+                    console.log(`ℹ️ Fila ${i}: "${nombre}" tiene nombre pero no fecha válida (${getVal(fechaRaw)}), no se cuenta como programada`);
+                }
+
                 // ESTADO: Verificar múltiples columnas posibles para determinar si está realizada
-                // Probamos varias columnas que comúnmente contienen información de estado
                 const estadoColumnas = [9, 8, 7, 10, 11, 6]; // J, I, H, K, L, G
                 let estadoRaw = '';
 
@@ -625,7 +668,7 @@ class RecursosHome {
 
                 const estadoNorm = (estadoRaw || '').toString().toLowerCase().trim();
 
-                // Es realizada si dice "100", "ejecutada", "realizada", "completada", "si", "sí", "cumplida", "ok", "true", etc.
+                // Es realizada si dice "100", "ejecutada", "realizada", ...
                 const isRealizada = estadoNorm.includes('100') ||
                                     estadoNorm.includes('realizada') ||
                                     estadoNorm.includes('ejecutada') ||
@@ -665,49 +708,20 @@ class RecursosHome {
                                     estadoNorm.includes('verificada') ||
                                     estadoNorm.includes('verificado');
 
-                // FECHA: Columna 4 (E)
-                let monthIndex = -1;
-                let fechaValida = false;
-
-                if (typeof fechaRaw === 'number' && fechaRaw > 1000) {
-                     const dateCode = new Date((fechaRaw - 25569) * 86400 * 1000);
-                     monthIndex = dateCode.getMonth();
-                     fechaValida = true;
-                } else {
-                    const fStr = getVal(fechaRaw);
-                    if (fStr && fStr !== 'No especificada' && fStr !== '') {
-                        // Intentar parsear fecha dd/mm/yyyy o mm/dd/yyyy
-                        // En tu log vi "7/4/25" y mes "julio", así que es mes/dia/año
-                        const parts = fStr.split('/');
-                        if (parts.length === 3) {
-                            monthIndex = parseInt(parts[0]) - 1;
-                            fechaValida = true;
-                        } else {
-                            const d = new Date(fStr);
-                            if (!isNaN(d.getTime())) {
-                                monthIndex = d.getMonth();
-                                fechaValida = true;
-                            }
-                        }
-                    }
-                }
-
-                // Incrementar programadas si tiene nombre válido (independientemente de si tiene fecha válida)
-                // Esto asegura que contemos todas las capacitaciones que están en la lista, incluso si no tienen fecha
-                if (nombre && nombre.trim() !== '' && !nombreLower.includes('nombre de la capacitación')) {
-                    stats.programadas++;
-
-                    if (monthIndex >= 0 && monthIndex < 12) {
-                        stats.mensual.programadas[monthIndex]++;
-                        if (isRealizada) {
-                            stats.mensual.realizadas[monthIndex]++;
-                        }
+                // Actualizar conteo mensual solo si tiene fecha válida
+                if (monthIndex >= 0 && monthIndex < 12 && fechaValida) {
+                    stats.mensual.programadas[monthIndex]++;
+                    if (isRealizada) {
+                        stats.mensual.realizadas[monthIndex]++;
                     }
                 }
 
                 console.log(`✅ Fila ${i}: "${nombre}" | Estado: "${estadoRaw}" -> ${isRealizada ? 'REALIZADA' : 'PENDIENTE'} | Fecha válida: ${fechaValida ? 'SÍ' : 'NO'}`);
 
-                if (isRealizada) stats.realizadas++; // Incrementar realizadas si está realizada (sin importar si tiene fecha válida)
+                // Solo incrementar realizadas si la capacitación está marcada como realizada Y tiene fecha válida
+                if (isRealizada && fechaValida) {
+                    stats.realizadas++;
+                }
             }
             console.groupEnd();
 
@@ -771,6 +785,9 @@ class RecursosHome {
             restante,
             porcentaje
         });
+
+        // Log para mostrar los datos que se están mostrando en la estadística
+        console.log(`📊 [createTrainingWidget] ESTADÍSTICA MOSTRADA: ${realizadas} / ${total} (${porcentaje}%) - Realizadas: ${realizadas}, Restante: ${restante}`);
 
         // 1. Determinar Color (Semáforo)
         let colorVar = 'var(--k-success)';
