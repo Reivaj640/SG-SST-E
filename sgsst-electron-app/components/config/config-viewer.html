@@ -964,30 +964,54 @@
 
     // Función para cargar las empresas
     async function loadCompanies() {
+        console.log('🔍 Iniciando carga de empresas...');
         try {
             if (electronAPI && typeof electronAPI.loadConfig === 'function') {
+                console.log('📡 Cargando configuración desde Electron API...');
                 const config = await electronAPI.loadConfig();
+                console.log('📦 Configuración recibida:', config);
+
                 const companyPaths = config.companyPaths || {};
+                console.log('🏢 Paths de empresas encontrados:', Object.keys(companyPaths));
 
-                companies = Object.keys(companyPaths).map(name => ({
-                    name: name,
-                    path: companyPaths[name].root || '',
-                    stats: companyPaths[name].stats || { employees: 0, risk: '-', agropecuaria: false }
-                }));
+                companies = Object.keys(companyPaths).map(name => {
+                    const companyData = companyPaths[name];
+                    console.log(`📊 Datos de empresa ${name}:`, companyData);
+                    return {
+                        name: name,
+                        path: companyData.root || '',
+                        stats: companyData.stats || { employees: 0, risk: '-', isAgropecuaria: false }
+                    };
+                });
 
+                console.log('📋 Empresas mapeadas:', companies);
+
+                // Determinar el escenario normativo para cada empresa
+                companies = companies.map(company => {
+                    console.log(`🔍 Determinando escenario normativo para: ${company.name}`);
+                    const escenario = determinarEscenarioNormativo(company);
+                    console.log(`📋 Escenario determinado para ${company.name}: ${escenario}`);
+                    return {
+                        ...company,
+                        escenarioNormativo: escenario
+                    };
+                });
+
+                console.log('✅ Empresas procesadas con escenarios normativos:', companies);
                 renderCompanyCards();
             } else {
+                console.warn('⚠️ No se encontró electronAPI, usando datos de ejemplo');
                 // Datos de ejemplo si no hay API
                 companies = [
-                    { name: "Tempoactiva", risk: "IV", employees: 120, agro: true, items: 45, path: "C:/SST/Tempo" },
-                    { name: "Temposum", risk: "II", employees: 45, agro: false, items: 38, path: "" },
-                    { name: "Aseplus", risk: "V", employees: 210, agro: false, items: 50, path: "D:/Aseplus" },
-                    { name: "Asel", risk: "I", employees: 15, agro: true, items: 28, path: "" }
+                    { name: "Tempoactiva", risk: "IV", employees: 120, isAgropecuaria: true, items: 45, path: "C:/SST/Tempo", escenarioNormativo: "COMPLETO_CAP_III" },
+                    { name: "Temposum", risk: "II", employees: 45, isAgropecuaria: false, items: 38, path: "", escenarioNormativo: "INTERMEDIO_11-50_R1-3" },
+                    { name: "Aseplus", risk: "V", employees: 210, isAgropecuaria: false, items: 50, path: "D:/Aseplus", escenarioNormativo: "COMPLETO_CAP_III" },
+                    { name: "Asel", risk: "I", employees: 15, isAgropecuaria: true, items: 28, path: "", escenarioNormativo: "SIMPLIFICADO_≤10_R1-3" }
                 ];
                 renderCompanyCards();
             }
         } catch (error) {
-            console.error('Error al cargar las empresas:', error);
+            console.error('❌ Error al cargar las empresas:', error);
             showToast('Error al cargar la configuración de empresas', 'error');
         }
     }
@@ -1128,9 +1152,9 @@
         document.querySelectorAll('.theme-option').forEach(o => o.classList.remove('active'));
         // Agregar clase activa al elemento clickeado
         el.classList.add('active');
-        
+
         showToast('Tema cambiado a: ' + mode, 'success');
-        
+
         // Guardar el tema en la configuración si hay API disponible
         if (electronAPI && typeof electronAPI.saveConfig === 'function') {
             electronAPI.loadConfig().then(config => {
@@ -1143,6 +1167,97 @@
                 console.error('Error al guardar el tema:', error);
             });
         }
+    }
+
+    /* ================= FUNCIÓN PARA DETERMINAR ESCENARIO NORMATIVO ================= */
+    function determinarEscenarioNormativo(empresa) {
+        console.log('🔍 Iniciando determinación de escenario normativo para empresa:', empresa);
+
+        const { employees: numeroTrabajadores, risk: nivelRiesgo, isAgropecuaria = false } = empresa.stats || {};
+
+        // Validar entradas
+        if (typeof numeroTrabajadores !== 'number' || !nivelRiesgo) {
+            console.warn('⚠️ Datos insuficientes para determinar escenario normativo:', empresa);
+            console.log('📋 Usando escenario por defecto: COMPLETO_CAP_III');
+            return 'COMPLETO_CAP_III'; // Escenario por defecto
+        }
+
+        console.log(`📊 Datos de empresa para escenario normativo - Trabajadores: ${numeroTrabajadores}, Riesgo: ${nivelRiesgo}, Agropecuaria: ${isAgropecuaria}`);
+
+        // Verificar que normativaData esté disponible
+        if (!window.normativaData || !window.normativaData.escenarios) {
+            console.warn('⚠️ Normativa no disponible o con formato incorrecto:', window.normativaData);
+            console.log('📋 Usando escenario por defecto: COMPLETO_CAP_III');
+            return 'COMPLETO_CAP_III'; // Escenario por defecto
+        }
+
+        console.log('📋 Total de escenarios normativos disponibles:', Object.keys(window.normativaData.escenarios).length);
+
+        // Buscar escenario en la normativa
+        for (const [nombreEscenario, escenario] of Object.entries(window.normativaData.escenarios)) {
+            console.log(`🔍 Evaluando escenario: ${nombreEscenario}`);
+            const { condiciones } = escenario;
+
+            // Verificar condiciones de trabajadores
+            const cumpleTrabajadores =
+                (!condiciones.trabajadores_min || numeroTrabajadores >= condiciones.trabajadores_min) &&
+                (!condiciones.trabajadores_max || numeroTrabajadores <= condiciones.trabajadores_max);
+
+            console.log(`👥 Condición trabajadores: Min=${condiciones.trabajadores_min||'N/A'}, Max=${condiciones.trabajadores_max||'N/A'}, Empresa=${numeroTrabajadores}, Cumple=${cumpleTrabajadores}`);
+
+            // Verificar condiciones de riesgo
+            const cumpleRiesgo = !condiciones.riesgo || condiciones.riesgo.includes(nivelRiesgo);
+            console.log(`⚠️ Condición riesgo: Requerido=${condiciones.riesgo||'N/A'}, Empresa=${nivelRiesgo}, Cumple=${cumpleRiesgo}`);
+
+            // Verificar si aplica a empresas agropecuarias
+            const aplicaAgropecuaria = !condiciones.es_agropecuaria || condiciones.es_agropecuaria === isAgropecuaria;
+            console.log(`🌾 Condición agropecuaria: Requerido=${condiciones.es_agropecuaria||'N/A'}, Empresa=${isAgropecuaria}, Cumple=${aplicaAgropecuaria}`);
+
+            // Verificar condiciones adicionales
+            let cumpleAdicional = true;
+            if (condiciones.aplica_si) {
+                console.log(`📝 Evaluando condiciones adicionales:`, condiciones.aplica_si);
+                // Lógica para condiciones complejas
+                cumpleAdicional = evaluarCondicionAdicional(condiciones.aplica_si, numeroTrabajadores, nivelRiesgo, isAgropecuaria);
+                console.log(`📋 Condición adicional cumple: ${cumpleAdicional}`);
+            }
+
+            if (cumpleTrabajadores && cumpleRiesgo && aplicaAgropecuaria && cumpleAdicional) {
+                console.log(`✅ Escenario determinado para ${empresa.name}: ${nombreEscenario}`);
+                return nombreEscenario;
+            } else {
+                console.log(`⏭️ Escenario ${nombreEscenario} no cumple todas las condiciones, continuando...`);
+            }
+        }
+
+        // Si no se encuentra un escenario específico, usar uno por defecto
+        console.warn(`⚠️ No se encontró un escenario específico para la empresa: ${empresa.name}. Trabajadores: ${numeroTrabajadores}, Riesgo: ${nivelRiesgo}, Agropecuaria: ${isAgropecuaria}`);
+        console.log('📋 Usando escenario por defecto: COMPLETO_CAP_III');
+        return 'COMPLETO_CAP_III'; // Escenario por defecto más completo
+    }
+
+    // Función auxiliar para evaluar condiciones adicionales complejas
+    function evaluarCondicionAdicional(condiciones, numeroTrabajadores, nivelRiesgo, isAgropecuaria) {
+        console.log('🔍 Evaluando condiciones adicionales complejas...');
+        // Evaluar cada condición en el array
+        for (const cond of condiciones) {
+            console.log(`📋 Evaluando condición: ${cond}`);
+            if (cond.includes('trabajadores > 50')) {
+                const resultado = numeroTrabajadores > 50;
+                console.log(`📊 Condición 'trabajadores > 50': ${numeroTrabajadores} > 50 = ${resultado}`);
+                if (resultado) return true;
+            } else if (cond.includes('trabajadores <= 50 y riesgo in [IV,V]')) {
+                const resultado = numeroTrabajadores <= 50 && ['IV', 'V'].includes(nivelRiesgo);
+                console.log(`📊 Condición 'trabajadores <= 50 y riesgo in [IV,V]': (${numeroTrabajadores} <= 50) && (${nivelRiesgo} in [IV,V]) = ${resultado}`);
+                if (resultado) return true;
+            } else if (cond.includes('es_agropecuaria')) {
+                const resultado = isAgropecuaria;
+                console.log(`🌾 Condición 'es_agropecuaria': ${resultado}`);
+                if (resultado) return true;
+            }
+        }
+        console.log('❌ Ninguna condición adicional se cumplió');
+        return false;
     }
 
     /* ================= MODALES Y UTILIDADES ================= */
@@ -1200,13 +1315,13 @@
         if (electronAPI && typeof electronAPI.saveConfig === 'function') {
             electronAPI.loadConfig().then(config => {
                 if (!config.companyPaths) config.companyPaths = {};
-                
+
                 // Actualizar la ruta de la empresa
                 config.companyPaths[companyName] = {
                     ...config.companyPaths[companyName],
                     root: path
                 };
-                
+
                 return electronAPI.saveConfig(config);
             }).then(() => {
                 closeModal();
