@@ -118,12 +118,8 @@ let normativaData = null;
 // Cargar la normativa desde el archivo JSON
 async function cargarNormativa() {
   try {
-    // Usar fetch para cargar el archivo JSON
-    const response = await fetch('normativa-0312.json');
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    normativaData = await response.json();
+    // Usar la API de Electron para cargar el archivo JSON
+    normativaData = await window.electronAPI.loadNormativa();
     console.log('Normativa cargada correctamente:', normativaData);
   } catch (error) {
     console.error('Error al cargar la normativa:', error);

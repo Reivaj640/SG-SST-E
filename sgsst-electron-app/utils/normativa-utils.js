@@ -3,12 +3,8 @@
 // Cargar la normativa desde el archivo JSON
 async function cargarNormativa() {
   try {
-    // Usar fetch para cargar el archivo JSON
-    const response = await fetch('normativa-0312.json');
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const normativaData = await response.json();
+    // Usar la API de Electron para cargar el archivo JSON
+    const normativaData = await window.electronAPI.loadNormativa();
     console.log('Normativa cargada correctamente:', normativaData);
     return normativaData;
   } catch (error) {
@@ -41,7 +37,7 @@ function determinarEscenarioNormativo(empresa) {
     const { condiciones } = escenario;
 
     // Verificar condiciones de trabajadores
-    const cumpleTrabajadores = 
+    const cumpleTrabajadores =
       (!condiciones.trabajadores_min || numeroTrabajadores >= condiciones.trabajadores_min) &&
       (!condiciones.trabajadores_max || numeroTrabajadores <= condiciones.trabajadores_max);
 

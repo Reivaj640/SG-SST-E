@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getRecursosStats: (companyName) => ipcRenderer.invoke('get-recursos-stats', companyName),
   saveConfig: (config) => ipcRenderer.invoke('save-config', config),
   loadConfig: () => ipcRenderer.invoke('load-config'),
+  loadNormativa: () => ipcRenderer.invoke('load-normativa'),
 
   // --- Manejo de archivos y directorios ---
   selectDirectory: () => ipcRenderer.invoke('select-directory'),

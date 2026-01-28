@@ -1023,40 +1023,93 @@
         companies.forEach(comp => {
             const card = document.createElement('div');
             card.className = `company-card risk-${comp.risk || 'I'}`;
-            card.innerHTML = `
-                <div class="card-body">
-                    <div class="card-title-row">
-                        <div class="company-name">\${comp.name}</div>
-                        <div class="risk-badge" style="background-color: \${getRiskColor(comp.risk || 'I')}">Riesgo \${comp.risk || 'I'}</div>
-                    </div>
 
-                    <div class="company-stats">
-                        <div class="stat-item">
-                            <span class="stat-label">Empleados</span>
-                            <span class="stat-value">\${comp.stats?.employees || 0}</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Agropecuaria</span>
-                            <span class="stat-value">\${comp.stats?.agropecuaria ? 'Sí' : 'No'}</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Normativa</span>
-                            <span class="stat-value">\${comp.stats?.items || 0} Items</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Estado</span>
-                            <span class="stat-value" style="color: \${comp.path ? 'var(--success)' : 'var(--text-muted)'}">
-                                \${comp.path ? 'Vinculada' : 'Pendiente'}
-                            </span>
-                        </div>
-                    </div>
+            // Crear el contenido de la tarjeta paso a paso para evitar problemas de interpolación
+            const cardBody = document.createElement('div');
+            cardBody.className = 'card-body';
 
-                    <div style="display: flex; gap: 0.5rem;">
-                        <button class="btn btn-outline" style="flex: 1;" onclick="viewCompanyDetails('\${comp.name}')">Ver Detalles</button>
-                        <button class="btn btn-primary" style="flex: 1;" onclick="prepareLinkModal('\${comp.name}')">\${comp.path ? 'Reconfigurar' : 'Vincular'}</button>
-                    </div>
-                </div>
+            const cardTitleRow = document.createElement('div');
+            cardTitleRow.className = 'card-title-row';
+
+            const companyNameDiv = document.createElement('div');
+            companyNameDiv.className = 'company-name';
+            companyNameDiv.textContent = comp.name;
+
+            const riskBadgeDiv = document.createElement('div');
+            riskBadgeDiv.className = 'risk-badge';
+            riskBadgeDiv.style.backgroundColor = getRiskColor(comp.risk || 'I');
+            riskBadgeDiv.textContent = `Riesgo ${comp.risk || 'I'}`;
+
+            cardTitleRow.appendChild(companyNameDiv);
+            cardTitleRow.appendChild(riskBadgeDiv);
+
+            const companyStats = document.createElement('div');
+            companyStats.className = 'company-stats';
+
+            // Empleados
+            const empleadosStat = document.createElement('div');
+            empleadosStat.className = 'stat-item';
+            empleadosStat.innerHTML = `
+                <span class="stat-label">Empleados</span>
+                <span class="stat-value">${comp.stats?.employees || 0}</span>
             `;
+
+            // Agropecuaria
+            const agropecuariaStat = document.createElement('div');
+            agropecuariaStat.className = 'stat-item';
+            agropecuariaStat.innerHTML = `
+                <span class="stat-label">Agropecuaria</span>
+                <span class="stat-value">${comp.stats?.agropecuaria ? 'Sí' : 'No'}</span>
+            `;
+
+            // Normativa
+            const normativaStat = document.createElement('div');
+            normativaStat.className = 'stat-item';
+            normativaStat.innerHTML = `
+                <span class="stat-label">Normativa</span>
+                <span class="stat-value">${comp.stats?.items || 0} Items</span>
+            `;
+
+            // Estado
+            const estadoStat = document.createElement('div');
+            estadoStat.className = 'stat-item';
+            estadoStat.innerHTML = `
+                <span class="stat-label">Estado</span>
+                <span class="stat-value" style="color: ${comp.path ? 'var(--success)' : 'var(--text-muted)'}">
+                    ${comp.path ? 'Vinculada' : 'Pendiente'}
+                </span>
+            `;
+
+            companyStats.appendChild(empleadosStat);
+            companyStats.appendChild(agropecuariaStat);
+            companyStats.appendChild(normativaStat);
+            companyStats.appendChild(estadoStat);
+
+            // Botones
+            const buttonsDiv = document.createElement('div');
+            buttonsDiv.style.display = 'flex';
+            buttonsDiv.style.gap = '0.5rem';
+
+            const detallesButton = document.createElement('button');
+            detallesButton.className = 'btn btn-outline';
+            detallesButton.style.flex = '1';
+            detallesButton.textContent = 'Ver Detalles';
+            detallesButton.onclick = () => viewCompanyDetails(comp.name);
+
+            const vincularButton = document.createElement('button');
+            vincularButton.className = 'btn btn-primary';
+            vincularButton.style.flex = '1';
+            vincularButton.textContent = comp.path ? 'Reconfigurar' : 'Vincular';
+            vincularButton.onclick = () => prepareLinkModal(comp.name);
+
+            buttonsDiv.appendChild(detallesButton);
+            buttonsDiv.appendChild(vincularButton);
+
+            cardBody.appendChild(cardTitleRow);
+            cardBody.appendChild(companyStats);
+            cardBody.appendChild(buttonsDiv);
+
+            card.appendChild(cardBody);
             companyGrid.appendChild(card);
         });
     }
@@ -1386,7 +1439,20 @@
     document.head.appendChild(styleSheet);
 
     // Cargar datos cuando se inicialice la página
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', async function() {
+        // Cargar la normativa antes de procesar las empresas
+        try {
+            console.log('🔍 Iniciando carga de normativa...');
+            window.normativaData = await electronAPI.loadNormativa();
+            console.log('✅ Normativa cargada correctamente:', window.normativaData);
+        } catch (error) {
+            console.error('❌ Error al cargar la normativa:', error);
+            // En caso de error, usar una estructura vacía
+            window.normativaData = {
+                escenarios: {}
+            };
+        }
+
         loadCompanies();
         loadUsers();
     });
