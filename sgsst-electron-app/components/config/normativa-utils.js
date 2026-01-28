@@ -22,8 +22,8 @@ function determinarEscenarioNormativo(empresa) {
 
   // Validar entradas
   if (typeof numeroTrabajadores !== 'number' || !nivelRiesgo) {
-    console.warn('Datos insuficientes para determinar escenario normativo:', empresa);
-    return null;
+    console.warn('⚠️ Datos insuficientes para determinar escenario normativo:', empresa);
+    return 'COMPLETO_CAP_III'; // Escenario por defecto
   }
 
   // Cargar la normativa si no está disponible

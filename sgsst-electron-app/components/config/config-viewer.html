@@ -872,13 +872,33 @@
     </div>
 </div>
 
-<!-- MODAL DE VINCULACIÓN DE EMPRESA -->
+<!-- MODAL DE VINCULACIÓN Y EDICIÓN DE EMPRESA -->
 <div class="modal-overlay" id="link-modal">
     <div class="modal-container">
-        <h3 style="font-family: var(--font-heading); margin-bottom: 1.5rem;">Vincular Carpeta de Documentos</h3>
+        <h3 style="font-family: var(--font-heading); margin-bottom: 1.5rem;">Configuración de Empresa</h3>
         <div class="form-group">
             <label class="form-label">Empresa Seleccionada</label>
             <input type="text" class="form-control" value="Tempoactiva" disabled style="background: #f1f3f5;" id="selected-company">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Número de Empleados</label>
+            <input type="number" class="form-control" id="edit-employees" min="0" value="0">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Nivel de Riesgo</label>
+            <select class="form-control" id="edit-risk">
+                <option value="">Seleccione...</option>
+                <option value="I">I - Mínimo</option>
+                <option value="II">II - Bajo</option>
+                <option value="III">III - Medio</option>
+                <option value="IV">IV - Alto</option>
+                <option value="V">V - Muy Alto</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">
+                <input type="checkbox" id="edit-agropecuaria"> ¿Es Agropecuaria?
+            </label>
         </div>
         <div class="form-group">
             <label class="form-label">Ruta de Documentos</label>
@@ -889,7 +909,7 @@
         </div>
         <div style="display: flex; gap: 1rem; margin-top: 2rem; justify-content: flex-end;">
             <button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
-            <button class="btn btn-primary" onclick="saveLink()">Vincular Carpeta</button>
+            <button class="btn btn-primary" onclick="saveLink()">Guardar y Vincular</button>
         </div>
     </div>
 </div>
@@ -977,23 +997,66 @@
                 companies = Object.keys(companyPaths).map(name => {
                     const companyData = companyPaths[name];
                     console.log(`📊 Datos de empresa ${name}:`, companyData);
+
+                    // Extraer los datos de stats o construirlos a partir de otros campos si no existen
+                    const stats = companyData.stats || {};
+
+                    // Asegurar que los campos necesarios estén presentes
+                    const companyStats = {
+                        employees: stats.employees || stats.employeesCount || stats.numEmployees || 0,
+                        risk: stats.risk || stats.riskLevel || stats.nivelRiesgo || companyData.risk || companyData.riskLevel || companyData.nivelRiesgo || '-',
+                        isAgropecuaria: stats.isAgropecuaria || stats.agropecuaria || stats.agro || companyData.isAgropecuaria || companyData.agro || false,
+                        items: stats.items || stats.itemsCount || stats.numItems || 0
+                    };
+
+                    console.log(`📈 Datos de stats para ${name}:`, companyStats);
+
                     return {
                         name: name,
                         path: companyData.root || '',
-                        stats: companyData.stats || { employees: 0, risk: '-', isAgropecuaria: false }
+                        stats: companyStats
                     };
                 });
 
                 console.log('📋 Empresas mapeadas:', companies);
 
-                // Determinar el escenario normativo para cada empresa
+                // Determinar el escenario normativo para cada empresa y calcular los ítems correspondientes
                 companies = companies.map(company => {
                     console.log(`🔍 Determinando escenario normativo para: ${company.name}`);
                     const escenario = determinarEscenarioNormativo(company);
                     console.log(`📋 Escenario determinado para ${company.name}: ${escenario}`);
+
+                    // Calcular el número de ítems basado en el escenario normativo
+                    let calculatedItems = company.stats.items; // Valor por defecto
+                    if (window.normativaData && window.normativaData.escenarios && window.normativaData.escenarios[escenario]) {
+                        // Intentar obtener los módulos filtrados para este escenario
+                        try {
+                            // Si tenemos acceso a ALL_SUBMODULES (del renderer), usarlo para calcular los ítems
+                            if (typeof ALL_SUBMODULES !== 'undefined') {
+                                const modulosFiltrados = filtrarModulosPorNormativa(escenario, ALL_SUBMODULES);
+                                calculatedItems = Object.values(modulosFiltrados).reduce((total, submodulos) => total + submodulos.length, 0);
+                            } else {
+                                // Si no está disponible ALL_SUBMODULES, usar un cálculo basado en las reglas del escenario
+                                const reglas = window.normativaData.escenarios[escenario];
+                                if (reglas && reglas.modulos && reglas.submodulos) {
+                                    // Este cálculo aproximado se basa en las reglas del escenario
+                                    // En una implementación completa, se debería tener acceso a los módulos reales
+                                    calculatedItems = Math.max(company.stats.items, 10); // Valor por defecto si no se puede calcular exactamente
+                                }
+                            }
+                        } catch (e) {
+                            console.warn(`⚠️ Error al calcular ítems para ${company.name}:`, e);
+                            calculatedItems = company.stats.items; // Usar valor existente
+                        }
+                    }
+
                     return {
                         ...company,
-                        escenarioNormativo: escenario
+                        escenarioNormativo: escenario,
+                        stats: {
+                            ...company.stats,
+                            items: calculatedItems
+                        }
                     };
                 });
 
@@ -1120,13 +1183,64 @@
     }
 
     function prepareLinkModal(companyName) {
-        document.getElementById('selected-company').value = companyName;
+        // Buscar la empresa en la lista de compañías
+        const company = companies.find(c => c.name === companyName);
+
+        if (company) {
+            // Rellenar el formulario con los datos actuales de la empresa
+            document.getElementById('selected-company').value = company.name;
+            document.getElementById('edit-employees').value = company.stats?.employees || 0;
+
+            // Establecer el valor de riesgo
+            const riskSelect = document.getElementById('edit-risk');
+            riskSelect.value = company.stats?.risk || '';
+
+            // Establecer el checkbox de agropecuaria
+            document.getElementById('edit-agropecuaria').checked = company.stats?.isAgropecuaria || false;
+
+            // Establecer la ruta de documentos
+            document.getElementById('link-path').value = company.path || '';
+        } else {
+            // Si no se encuentra la empresa, usar valores por defecto
+            document.getElementById('selected-company').value = companyName;
+            document.getElementById('edit-employees').value = 0;
+            document.getElementById('edit-risk').value = '';
+            document.getElementById('edit-agropecuaria').checked = false;
+            document.getElementById('link-path').value = '';
+        }
+
         openLinkModal();
     }
 
     function viewCompanyDetails(companyName) {
-        showToast('Mostrando detalles de ' + companyName, 'success');
-        // Aquí iría la lógica para mostrar los detalles de la empresa
+        // Buscar la empresa en la lista de compañías
+        const company = companies.find(c => c.name === companyName);
+
+        if (company) {
+            // Rellenar el formulario con los datos actuales de la empresa
+            document.getElementById('selected-company').value = company.name;
+            document.getElementById('edit-employees').value = company.stats?.employees || 0;
+
+            // Establecer el valor de riesgo
+            const riskSelect = document.getElementById('edit-risk');
+            riskSelect.value = company.stats?.risk || '';
+
+            // Establecer el checkbox de agropecuaria
+            document.getElementById('edit-agropecuaria').checked = company.stats?.isAgropecuaria || false;
+
+            // Establecer la ruta de documentos
+            document.getElementById('link-path').value = company.path || '';
+        } else {
+            // Si no se encuentra la empresa, usar valores por defecto
+            document.getElementById('selected-company').value = companyName;
+            document.getElementById('edit-employees').value = 0;
+            document.getElementById('edit-risk').value = '';
+            document.getElementById('edit-agropecuaria').checked = false;
+            document.getElementById('link-path').value = '';
+        }
+
+        // Abrir el modal
+        openLinkModal();
     }
 
     /* ================= GESTIÓN DE USUARIOS ================= */
@@ -1313,6 +1427,74 @@
         return false;
     }
 
+    // Función para filtrar módulos y submódulos según el escenario normativo
+    function filtrarModulosPorNormativa(escenario, allModules) {
+        if (!window.normativaData || !escenario || !window.normativaData.escenarios[escenario]) {
+            console.warn('No se encontró escenario normativo válido:', escenario);
+            // Devolver todos los módulos si no hay normativa
+            return allModules;
+        }
+
+        const reglas = window.normativaData.escenarios[escenario];
+        const { modulos, submodulos } = reglas;
+
+        // Filtrar módulos activos
+        const modulosActivos = modulos.activar || [];
+        const modulosDesactivados = modulos.desactivar || [];
+
+        // Filtrar submódulos activos
+        const submodulosActivos = submodulos.activar || [];
+        const submodulosDesactivados = submodulos.desactivar || [];
+
+        // Crear objeto con módulos filtrados
+        const modulosFiltrados = {};
+
+        for (const [moduloNombre, submodulos] of Object.entries(allModules)) {
+            // Determinar si este módulo está en la lista de activos
+            const moduloNumero = parseInt(moduloNombre.split(' ')[0]); // Extraer número del módulo
+            const moduloActivo = modulosActivos.includes(moduloNumero) && !modulosDesactivados.includes(moduloNumero);
+
+            if (moduloActivo) {
+                // Filtrar submódulos para este módulo
+                const submodulosFiltrados = submodulos.filter(submodulo => {
+                    // Extraer código del submódulo (ej. "1.1.1" de "1.1.1 Responsable del SG")
+                    const codigoSubmodulo = submodulo.split(' ')[0];
+
+                    // Verificar si está en la lista de activos o desactivados
+                    const activo = submodulosActivos.some(pattern => {
+                        if (pattern === '*') return true; // Activar todos
+                        if (pattern.endsWith('*')) {
+                            // Patrón de wildcard (ej. "3.3.*")
+                            const prefix = pattern.slice(0, -1);
+                            return codigoSubmodulo.startsWith(prefix);
+                        }
+                        return pattern === codigoSubmodulo;
+                    });
+
+                    const desactivado = submodulosDesactivados.some(pattern => {
+                        if (pattern === '*') return true; // Desactivar todos
+                        if (pattern.endsWith('*')) {
+                            // Patrón de wildcard (ej. "3.3.*")
+                            const prefix = pattern.slice(0, -1);
+                            return codigoSubmodulo.startsWith(prefix);
+                        }
+                        return pattern === codigoSubmodulo;
+                    });
+
+                    // El submódulo está activo si está en activos y no en desactivados
+                    return activo && !desactivado;
+                });
+
+                // Solo agregar el módulo si tiene submódulos activos
+                if (submodulosFiltrados.length > 0) {
+                    modulosFiltrados[moduloNombre] = submodulosFiltrados;
+                }
+            }
+        }
+
+        return modulosFiltrados;
+    }
+
     /* ================= MODALES Y UTILIDADES ================= */
     const linkModal = document.getElementById('link-modal');
     const userModal = document.getElementById('user-modal');
@@ -1360,6 +1542,11 @@
         const companyName = document.getElementById('selected-company').value;
         const path = document.getElementById('link-path').value;
 
+        // Obtener los nuevos valores editados
+        const employees = parseInt(document.getElementById('edit-employees').value) || 0;
+        const risk = document.getElementById('edit-risk').value || '-';
+        const isAgropecuaria = document.getElementById('edit-agropecuaria').checked;
+
         if (!path) {
             showToast('Por favor seleccione una ruta válida', 'error');
             return;
@@ -1369,25 +1556,32 @@
             electronAPI.loadConfig().then(config => {
                 if (!config.companyPaths) config.companyPaths = {};
 
-                // Actualizar la ruta de la empresa
+                // Actualizar la empresa con todos los datos incluyendo los parámetros editables
                 config.companyPaths[companyName] = {
                     ...config.companyPaths[companyName],
-                    root: path
+                    root: path,
+                    stats: {
+                        employees: employees,
+                        risk: risk,
+                        isAgropecuaria: isAgropecuaria,
+                        // Mantener otros stats existentes si existen
+                        ...(config.companyPaths[companyName]?.stats || {})
+                    }
                 };
 
                 return electronAPI.saveConfig(config);
             }).then(() => {
                 closeModal();
                 loadCompanies(); // Recargar la lista de empresas
-                showToast('Empresa vinculada correctamente', 'success');
+                showToast('Empresa actualizada correctamente', 'success');
             }).catch(error => {
-                console.error('Error al guardar la vinculación:', error);
-                showToast('Error al vincular la empresa', 'error');
+                console.error('Error al guardar la empresa:', error);
+                showToast('Error al actualizar la empresa', 'error');
             });
         } else {
             closeModal();
             loadCompanies(); // Recargar la lista de empresas
-            showToast('Empresa vinculada correctamente (simulado)', 'success');
+            showToast('Empresa actualizada correctamente (simulado)', 'success');
         }
     }
 
