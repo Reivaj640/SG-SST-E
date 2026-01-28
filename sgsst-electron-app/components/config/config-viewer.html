@@ -1048,29 +1048,8 @@
                                 const modulosFiltrados = filtrarModulosPorNormativa(escenario, ALL_SUBMODULES);
                                 calculatedItems = Object.values(modulosFiltrados).reduce((total, submodulos) => total + submodulos.length, 0);
                             } else {
-                                // Si no está disponible ALL_SUBMODULES, usar un cálculo basado en las reglas del escenario
-                                const reglas = window.normativaData.escenarios[escenario];
-                                if (reglas && reglas.modulos && reglas.submodulos) {
-                                    // Este cálculo aproximado se basa en las reglas del escenario
-                                    // En una implementación completa, se debería tener acceso a los módulos reales
-                                    // Contar los submódulos activos según las reglas
-                                    const submodulosActivos = reglas.submodulos.activar || [];
-                                    const submodulosDesactivados = reglas.submodulos.desactivar || [];
-
-                                    // Si se usan patrones comodín '*', entonces es todos los módulos
-                                    if (submodulosActivos.includes('*')) {
-                                        calculatedItems = 100; // Valor estimado si se activan todos los módulos
-                                    } else {
-                                        // Contar los submódulos específicos activados
-                                        calculatedItems = submodulosActivos.length;
-
-                                        // Ajustar si hay submódulos desactivados
-                                        calculatedItems = Math.max(calculatedItems - submodulosDesactivados.length, 0);
-                                    }
-                                } else {
-                                    // Si no hay reglas específicas, usar un valor por defecto según el escenario
-                                    calculatedItems = getDefaultItemCountForScenario(escenario);
-                                }
+                                // Si no está disponible ALL_SUBMODULES, usar un valor por defecto según el escenario
+                                calculatedItems = getDefaultItemCountForScenario(escenario);
                             }
                         } catch (e) {
                             console.warn(`⚠️ Error al calcular ítems para ${company.name}:`, e);
@@ -1431,8 +1410,9 @@
         const { employees: numeroTrabajadores, risk: nivelRiesgo, isAgropecuaria = false } = empresa.stats || {};
 
         // Validar entradas - ahora permitiremos valores 0 para empleados y '-' para riesgo
-        if (typeof numeroTrabajadores !== 'number' || !nivelRiesgo) {
-            console.warn('⚠️ Datos insuficientes para determinar escenario normativo:', empresa);
+        // Pero validaremos que los valores sean válidos antes de procesar
+        if (typeof numeroTrabajadores !== 'number' || !nivelRiesgo || nivelRiesgo === '-') {
+            console.warn('⚠️ Datos insuficientes o inválidos para determinar escenario normativo:', empresa);
             console.log('📋 Usando escenario por defecto: COMPLETO_CAP_III');
             return 'COMPLETO_CAP_III'; // Escenario por defecto
         }
@@ -1461,7 +1441,7 @@
             console.log(`👥 Condición trabajadores: Min=${condiciones.trabajadores_min||'N/A'}, Max=${condiciones.trabajadores_max||'N/A'}, Empresa=${numeroTrabajadores}, Cumple=${cumpleTrabajadores}`);
 
             // Verificar condiciones de riesgo - ahora validaremos que el nivel de riesgo no sea vacío o inválido
-            const cumpleRiesgo = !condiciones.riesgo || (nivelRiesgo && condiciones.riesgo.includes(nivelRiesgo));
+            const cumpleRiesgo = !condiciones.riesgo || (nivelRiesgo && nivelRiesgo !== '-' && condiciones.riesgo.includes(nivelRiesgo));
             console.log(`⚠️ Condición riesgo: Requerido=${condiciones.riesgo||'N/A'}, Empresa=${nivelRiesgo}, Cumple=${cumpleRiesgo}`);
 
             // Verificar si aplica a empresas agropecuarias
