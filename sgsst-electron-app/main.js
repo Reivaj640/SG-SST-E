@@ -3320,7 +3320,7 @@ ipcMain.handle('get-inducciones-data', async (event, companyName) => {
     if (!fs.existsSync(targetPath)) throw new Error('No se encontró la carpeta de inducciones');
 
     const files = await fsp.readdir(targetPath);
-    const excelFile = files.find(f => 
+    const excelFile = files.find(f =>
         !f.startsWith('~$') && (f.endsWith('.xlsx') || f.endsWith('.xls')) &&
         (f.includes('046') || f.toLowerCase().includes('induccion'))
     );
@@ -3331,17 +3331,17 @@ ipcMain.handle('get-inducciones-data', async (event, companyName) => {
     const wb = xlsx.readFile(filePath);
     const ws = wb.Sheets[wb.SheetNames[0]];
     const rawData = xlsx.utils.sheet_to_json(ws, { header: 1 });
-    
+
     const inducciones = [];
     // Según backup, los datos reales empiezan en la fila 2 (índice 1)
     for (let i = 1; i < rawData.length; i++) {
         const row = rawData[i];
         if (!row) continue;
-        
+
         // Empleado en Col G (índice 6)
         const empleado = row[6] ? String(row[6]).trim() : '';
         if (!empleado || empleado === 'Nombre del empleado' || empleado === '') continue;
-        
+
         // Detener si es la fila de totalizadores
         if (empleado.toLowerCase().includes('total inducciones')) break;
 
@@ -3400,7 +3400,7 @@ async function getCompanyRootPath(companyName) {
     );
 
     if (!companyKey) return null;
-    
+
     // Preferir la estructura mapeada si existe, sino la ruta raíz
     const companyConfig = config.companyPaths[companyKey];
     return companyConfig.root || companyConfig.ruta_base;
@@ -3411,10 +3411,10 @@ async function getCompanyRootPath(companyName) {
 }
 
 async function calculateCapacitacionesStats(basePath) {
-  const stats = { 
-    totalCapacitaciones: 0, 
-    programadas: 0, 
-    realizadas: 0, 
+  const stats = {
+    totalCapacitaciones: 0,
+    programadas: 0,
+    realizadas: 0,
     porcentajeCumplimiento: 0,
     mensual: {
         programadas: new Array(12).fill(0),
@@ -3423,12 +3423,12 @@ async function calculateCapacitacionesStats(basePath) {
   };
   try {
     if (!basePath) return stats;
-    
+
     const recursosPath = path.join(basePath, '1. Recursos');
-    
+
     // Búsqueda prioritaria de la carpeta "1.2.1"
     let targetPath = path.join(recursosPath, '1.2.1 Programa de capacitación Anual');
-    
+
     if (!fs.existsSync(targetPath)) {
         if (fs.existsSync(recursosPath)) {
             const subs = await fsp.readdir(recursosPath);
@@ -3445,9 +3445,9 @@ async function calculateCapacitacionesStats(basePath) {
 
     const files = await fsp.readdir(targetPath);
     // Buscar archivo cronograma (ACT-FO-005 o similar) de forma insensible a mayúsculas
-    const excelFile = files.find(f => 
-        (f.toLowerCase().includes('act-fo-005') || f.toLowerCase().includes('cronograma')) && 
-        !f.startsWith('~$') && 
+    const excelFile = files.find(f =>
+        (f.toLowerCase().includes('act-fo-005') || f.toLowerCase().includes('cronograma')) &&
+        !f.startsWith('~$') &&
         (f.endsWith('.xlsx') || f.endsWith('.xls'))
     );
 
@@ -3458,12 +3458,12 @@ async function calculateCapacitacionesStats(basePath) {
 
     const workbook = xlsx.readFile(path.join(targetPath, excelFile));
     const currentYear = new Date().getFullYear();
-    
+
     // Buscar hoja del año actual, preferiblemente con "Matriz Cap."
-    let sheetName = workbook.SheetNames.find(s => 
+    let sheetName = workbook.SheetNames.find(s =>
         s.toLowerCase().includes('matriz cap') && s.includes(currentYear.toString())
     );
-    
+
     // Fallback: buscar solo por año
     if (!sheetName) {
         sheetName = workbook.SheetNames.find(s => s.includes(currentYear.toString()));
@@ -3477,12 +3477,12 @@ async function calculateCapacitacionesStats(basePath) {
     const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
 
     // Empezar en fila 6 (índice 5) igual que el viewer
-    let startIndex = 5; 
-    
+    let startIndex = 5;
+
     for (let i = startIndex; i < data.length; i++) {
         const row = data[i];
         if (!Array.isArray(row) || row.length < 2) continue;
-        
+
         // Columna B (1): Nombre
         const nombre = row[1];
         if (!nombre || typeof nombre !== 'string' || nombre.includes('Nombre de la capacitación')) continue;
@@ -3516,9 +3516,9 @@ async function calculateCapacitacionesStats(basePath) {
 
         // Columna I (8): Estado
         // Verificar específicamente la columna de estado para mayor precisión
-        const estadoVal = row[8]; 
+        const estadoVal = row[8];
         let isRealizada = false;
-        
+
         if (estadoVal && typeof estadoVal === 'string') {
             const estadoStr = estadoVal.toLowerCase();
             isRealizada = estadoStr.includes('ejecutado') || estadoStr.includes('realizado') || estadoStr.includes('completado');
@@ -3528,7 +3528,7 @@ async function calculateCapacitacionesStats(basePath) {
             // const rowStr = JSON.stringify(row).toLowerCase();
             // isRealizada = rowStr.includes('ejecutado') || ...
         }
-        
+
         if (isRealizada) {
             stats.realizadas++;
             if (monthIndex >= 0 && monthIndex < 12) {
@@ -3549,16 +3549,16 @@ async function calculateCapacitacionesStats(basePath) {
 
 async function calculateInduccionesStats(basePath) {
   const currentYear = new Date().getFullYear();
-  const stats = { 
-    totalInducciones: 0, 
-    completadas: 0, 
-    pendientes: 0, 
+  const stats = {
+    totalInducciones: 0,
+    completadas: 0,
+    pendientes: 0,
     porcentajeCompletado: 0,
     mensual: new Array(12).fill(0)
   };
   try {
     if (!basePath) return stats;
-    
+
     const recursosPath = path.join(basePath, '1. Recursos');
     let targetPath = path.join(recursosPath, '1.1 Inducción y Reinducción');
 
@@ -3574,7 +3574,7 @@ async function calculateInduccionesStats(basePath) {
 
     const files = await fsp.readdir(targetPath);
     // Filtrar archivos Excel que coincidan con ACT-FO-046
-    const excelFiles = files.filter(f => 
+    const excelFiles = files.filter(f =>
         !f.startsWith('~$') && (f.endsWith('.xlsx') || f.endsWith('.xls')) &&
         f.toLowerCase().includes('act-fo-046')
     );
@@ -3584,7 +3584,7 @@ async function calculateInduccionesStats(basePath) {
             const wb = xlsx.readFile(path.join(targetPath, file));
             const ws = wb.Sheets[wb.SheetNames[0]];
             const data = xlsx.utils.sheet_to_json(ws, { header: 1 });
-            
+
             // Según backup, los datos reales empiezan en la fila 2 (índice 1)
             for (let i = 1; i < data.length; i++) {
                 const row = data[i];
@@ -3597,7 +3597,7 @@ async function calculateInduccionesStats(basePath) {
                 // Fecha en Col D (3)
                 let rowDate = null;
                 const fechaVal = row[3];
-                
+
                 if (fechaVal) {
                     if (typeof fechaVal === 'number') {
                         const dateCode = xlsx.SSF.parse_date_code(fechaVal);
@@ -3620,7 +3620,7 @@ async function calculateInduccionesStats(basePath) {
             }
         } catch (err) { continue; }
     }
-    
+
     // Convertir mensual a acumulado para el gráfico de tendencia
     let cumulative = 0;
     const trendData = [...stats.mensual];
@@ -3641,7 +3641,7 @@ async function calculateEppsStats(basePath) {
   const stats = { totalEPPs: 0, entregados: 0, pendientes: 0, stockActual: 0 };
   try {
     if (!basePath) return stats;
-    
+
     const recursosPath = path.join(basePath, '1. Recursos');
     let targetPath = path.join(recursosPath, '1.3 EPP'); // O nombre similar
 
@@ -3683,9 +3683,9 @@ async function calculateEppsStats(basePath) {
 ipcMain.handle('get-recursos-stats', async (event, companyName) => {
   try {
     sendLog(`[MAIN] Obteniendo estadísticas REALES de recursos para: ${companyName}`, 'INFO');
-    
+
     const rootPath = await getCompanyRootPath(companyName);
-    
+
     if (!rootPath) {
         sendLog(`[MAIN] No se encontró ruta raíz para ${companyName}. Retornando ceros.`, 'WARN');
         return {
@@ -3725,7 +3725,7 @@ ipcMain.handle('get-recursos-stats', async (event, companyName) => {
 ipcMain.handle('load-normativa', async () => {
   try {
     console.log('Handling load-normativa request');
-    const normativaPath = path.join(__dirname, 'normativa-0312.json');
+    const normativaPath = path.join(__dirname, 'components', 'config', 'normativa-0312.json');
     const normativaData = await fsp.readFile(normativaPath, 'utf8');
     console.log('Normativa loaded successfully');
     return JSON.parse(normativaData);

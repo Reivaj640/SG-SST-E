@@ -653,6 +653,10 @@
                 Gestión de empresas, usuarios, IA y apariencia de K+AIR
             </div>
         </div>
+        <button class="btn btn-outline" onclick="goHome()" style="margin-left: 1rem;">
+            <span>🏠</span>
+            <span>Inicio</span>
+        </button>
     </header>
 
     <!-- NAVEGACIÓN DE CONFIGURACIÓN -->
@@ -672,6 +676,14 @@
             <div class="section-header">
                 <h2 class="section-title">Gestión de Empresas</h2>
                 <p class="section-subtitle">Administra las empresas vinculadas y sus configuraciones normativas</p>
+            </div>
+
+            <div class="users-header-actions">
+                <div></div> <!-- Espaciador -->
+                <button class="btn btn-primary" onclick="agregarNuevaEmpresa()">
+                    <span>+</span>
+                    <span>Nueva Empresa</span>
+                </button>
             </div>
 
             <div class="company-grid" id="company-grid">
@@ -877,8 +889,8 @@
     <div class="modal-container">
         <h3 style="font-family: var(--font-heading); margin-bottom: 1.5rem;">Configuración de Empresa</h3>
         <div class="form-group">
-            <label class="form-label">Empresa Seleccionada</label>
-            <input type="text" class="form-control" value="Tempoactiva" disabled style="background: #f1f3f5;" id="selected-company">
+            <label class="form-label">Nombre de la Empresa</label>
+            <input type="text" class="form-control" placeholder="Ingrese el nombre de la empresa" id="selected-company">
         </div>
         <div class="form-group">
             <label class="form-label">Número de Empleados</label>
@@ -1041,12 +1053,29 @@
                                 if (reglas && reglas.modulos && reglas.submodulos) {
                                     // Este cálculo aproximado se basa en las reglas del escenario
                                     // En una implementación completa, se debería tener acceso a los módulos reales
-                                    calculatedItems = Math.max(company.stats.items, 10); // Valor por defecto si no se puede calcular exactamente
+                                    // Contar los submódulos activos según las reglas
+                                    const submodulosActivos = reglas.submodulos.activar || [];
+                                    const submodulosDesactivados = reglas.submodulos.desactivar || [];
+
+                                    // Si se usan patrones comodín '*', entonces es todos los módulos
+                                    if (submodulosActivos.includes('*')) {
+                                        calculatedItems = 100; // Valor estimado si se activan todos los módulos
+                                    } else {
+                                        // Contar los submódulos específicos activados
+                                        calculatedItems = submodulosActivos.length;
+
+                                        // Ajustar si hay submódulos desactivados
+                                        calculatedItems = Math.max(calculatedItems - submodulosDesactivados.length, 0);
+                                    }
+                                } else {
+                                    // Si no hay reglas específicas, usar un valor por defecto según el escenario
+                                    calculatedItems = getDefaultItemCountForScenario(escenario);
                                 }
                             }
                         } catch (e) {
                             console.warn(`⚠️ Error al calcular ítems para ${company.name}:`, e);
-                            calculatedItems = company.stats.items; // Usar valor existente
+                            // En caso de error, usar un valor por defecto según el escenario
+                            calculatedItems = getDefaultItemCountForScenario(escenario);
                         }
                     }
 
@@ -1165,8 +1194,15 @@
             vincularButton.textContent = comp.path ? 'Reconfigurar' : 'Vincular';
             vincularButton.onclick = () => prepareLinkModal(comp.name);
 
+            const eliminarButton = document.createElement('button');
+            eliminarButton.className = 'btn btn-danger-ghost';
+            eliminarButton.style.flex = '0.5';
+            eliminarButton.textContent = 'Eliminar';
+            eliminarButton.onclick = () => eliminarEmpresa(comp.name);
+
             buttonsDiv.appendChild(detallesButton);
             buttonsDiv.appendChild(vincularButton);
+            buttonsDiv.appendChild(eliminarButton);
 
             cardBody.appendChild(cardTitleRow);
             cardBody.appendChild(companyStats);
@@ -1175,6 +1211,58 @@
             card.appendChild(cardBody);
             companyGrid.appendChild(card);
         });
+    }
+
+    // Función para obtener el conteo de ítems por defecto según el escenario
+    function getDefaultItemCountForScenario(escenario) {
+        // Basado en la complejidad de cada escenario normativo
+        const itemCounts = {
+            'SIMPLIFICADO_≤10_R1-3': 25,
+            'INTERMEDIO_11-50_R1-3': 40,
+            'COMPLETO_CAP_III': 60
+        };
+
+        return itemCounts[escenario] || 30; // Valor por defecto
+    }
+
+    // Función para eliminar una empresa
+    function eliminarEmpresa(nombreEmpresa) {
+        if (!confirm(`¿Estás seguro de que deseas eliminar la empresa "${nombreEmpresa}"?`)) {
+            return;
+        }
+
+        if (electronAPI && typeof electronAPI.saveConfig === 'function') {
+            electronAPI.loadConfig().then(config => {
+                if (config.companyPaths) {
+                    delete config.companyPaths[nombreEmpresa];
+                }
+
+                return electronAPI.saveConfig(config);
+            }).then(() => {
+                loadCompanies(); // Recargar la lista de empresas
+                showToast(`Empresa "${nombreEmpresa}" eliminada correctamente`, 'success');
+            }).catch(error => {
+                console.error('Error al eliminar la empresa:', error);
+                showToast('Error al eliminar la empresa', 'error');
+            });
+        } else {
+            // Simulación para pruebas sin Electron
+            companies = companies.filter(c => c.name !== nombreEmpresa);
+            renderCompanyCards();
+            showToast(`Empresa "${nombreEmpresa}" eliminada correctamente (simulado)`, 'success');
+        }
+    }
+
+    // Función para agregar una nueva empresa
+    function agregarNuevaEmpresa() {
+        // Limpiar el formulario de edición
+        document.getElementById('selected-company').value = '';
+        document.getElementById('edit-employees').value = 0;
+        document.getElementById('edit-risk').value = '';
+        document.getElementById('edit-agropecuaria').checked = false;
+        document.getElementById('link-path').value = '';
+
+        openLinkModal();
     }
 
     function getRiskColor(risk) {
@@ -1342,7 +1430,7 @@
 
         const { employees: numeroTrabajadores, risk: nivelRiesgo, isAgropecuaria = false } = empresa.stats || {};
 
-        // Validar entradas
+        // Validar entradas - ahora permitiremos valores 0 para empleados y '-' para riesgo
         if (typeof numeroTrabajadores !== 'number' || !nivelRiesgo) {
             console.warn('⚠️ Datos insuficientes para determinar escenario normativo:', empresa);
             console.log('📋 Usando escenario por defecto: COMPLETO_CAP_III');
@@ -1372,8 +1460,8 @@
 
             console.log(`👥 Condición trabajadores: Min=${condiciones.trabajadores_min||'N/A'}, Max=${condiciones.trabajadores_max||'N/A'}, Empresa=${numeroTrabajadores}, Cumple=${cumpleTrabajadores}`);
 
-            // Verificar condiciones de riesgo
-            const cumpleRiesgo = !condiciones.riesgo || condiciones.riesgo.includes(nivelRiesgo);
+            // Verificar condiciones de riesgo - ahora validaremos que el nivel de riesgo no sea vacío o inválido
+            const cumpleRiesgo = !condiciones.riesgo || (nivelRiesgo && condiciones.riesgo.includes(nivelRiesgo));
             console.log(`⚠️ Condición riesgo: Requerido=${condiciones.riesgo||'N/A'}, Empresa=${nivelRiesgo}, Cumple=${cumpleRiesgo}`);
 
             // Verificar si aplica a empresas agropecuarias
@@ -1389,6 +1477,7 @@
                 console.log(`📋 Condición adicional cumple: ${cumpleAdicional}`);
             }
 
+            // Solo considerar el escenario como válido si todas las condiciones se cumplen
             if (cumpleTrabajadores && cumpleRiesgo && aplicaAgropecuaria && cumpleAdicional) {
                 console.log(`✅ Escenario determinado para ${empresa.name}: ${nombreEscenario}`);
                 return nombreEscenario;
@@ -1397,10 +1486,20 @@
             }
         }
 
-        // Si no se encuentra un escenario específico, usar uno por defecto
+        // Si no se encuentra un escenario específico, usar uno por defecto basado en los parámetros
         console.warn(`⚠️ No se encontró un escenario específico para la empresa: ${empresa.name}. Trabajadores: ${numeroTrabajadores}, Riesgo: ${nivelRiesgo}, Agropecuaria: ${isAgropecuaria}`);
-        console.log('📋 Usando escenario por defecto: COMPLETO_CAP_III');
-        return 'COMPLETO_CAP_III'; // Escenario por defecto más completo
+
+        // Asignar escenario por defecto basado en los parámetros reales
+        if (numeroTrabajadores <= 10 && ['I', 'II', 'III'].includes(nivelRiesgo)) {
+            console.log('📋 Usando escenario por defecto: SIMPLIFICADO_≤10_R1-3');
+            return 'SIMPLIFICADO_≤10_R1-3';
+        } else if (numeroTrabajadores >= 11 && numeroTrabajadores <= 50 && ['I', 'II', 'III'].includes(nivelRiesgo)) {
+            console.log('📋 Usando escenario por defecto: INTERMEDIO_11-50_R1-3');
+            return 'INTERMEDIO_11-50_R1-3';
+        } else {
+            console.log('📋 Usando escenario por defecto: COMPLETO_CAP_III');
+            return 'COMPLETO_CAP_III'; // Escenario por defecto más completo
+        }
     }
 
     // Función auxiliar para evaluar condiciones adicionales complejas
@@ -1631,6 +1730,57 @@
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     `;
     document.head.appendChild(styleSheet);
+
+    // Función para regresar al home principal
+    function goHome() {
+        console.log('🔍 Iniciando proceso de regreso al home principal...');
+
+        // Verificar si estamos en un iframe y si hay una función para navegar al home
+        if (window.parent && typeof window.parent.navigateToHome === 'function') {
+            console.log('✅ Usando función navigateToHome del padre');
+            window.parent.navigateToHome();
+        } else if (window.parent && typeof window.parent.switchToModule === 'function') {
+            console.log('✅ Usando función switchToModule del padre');
+            // Intentar usar la función de cambio de módulo del padre
+            window.parent.switchToModule('home');
+        } else if (window.navigateToHome) {
+            console.log('✅ Usando función navigateToHome local');
+            window.navigateToHome();
+        } else {
+            console.log('⚠️ No se encontró funciones directas de navegación, intentando con API de Electron');
+
+            // Si no hay una función específica para navegar al home, intentar usar la API de Electron
+            if (electronAPI && typeof electronAPI.navigateToHome === 'function') {
+                console.log('✅ Usando función navigateToHome de Electron API');
+                electronAPI.navigateToHome();
+            } else if (electronAPI && typeof electronAPI.switchToModule === 'function') {
+                console.log('✅ Usando función switchToModule de Electron API');
+                // Intentar usar la función de cambio de módulo de la API de Electron
+                electronAPI.switchToModule('home');
+            } else {
+                console.log('⚠️ No se encontró funciones de Electron API, enviando mensajes al padre');
+
+                // Enviar mensaje al padre para que cambie al módulo de inicio
+                if (window.parent) {
+                    // Enviar mensaje para que el padre cambie al módulo de inicio
+                    // Basado en el análisis del renderer.js, los tipos correctos son 'back-to-main-app' y 'back-to-module-request'
+                    console.log('📤 Enviando mensaje back-to-main-app al padre');
+                    window.parent.postMessage({
+                        type: 'back-to-main-app'
+                    }, '*');
+
+                    // Mensaje alternativo que también podría funcionar según el renderer
+                    console.log('📤 Enviando mensaje back-to-module-request al padre');
+                    window.parent.postMessage({
+                        type: 'back-to-module-request'
+                    }, '*');
+                } else {
+                    console.error('❌ No se pudo navegar al home: no se encontró la función adecuada ni el padre');
+                    showToast('No se pudo regresar al home. Por favor, cierre esta ventana.', 'error');
+                }
+            }
+        }
+    }
 
     // Cargar datos cuando se inicialice la página
     document.addEventListener('DOMContentLoaded', async function() {
