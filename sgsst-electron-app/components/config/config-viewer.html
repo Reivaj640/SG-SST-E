@@ -1762,6 +1762,106 @@
         }
     }
 
+    // Función para cargar la información dinámica de la sección "Acerca de"
+    async function loadAboutSectionInfo() {
+        try {
+            // Obtener la versión de la aplicación
+            const version = await electronAPI.getAppVersion();
+
+            // Actualizar la versión en la interfaz
+            const versionElement = document.querySelector('#tab-acerca .system-diag-row:first-child strong');
+            if (versionElement) {
+                versionElement.textContent = version;
+            }
+
+            // Actualizar la fecha de build con la fecha actual
+            const buildDate = new Date().toLocaleDateString('es-ES');
+            const buildElement = document.querySelector('#tab-acerca .system-diag-row:nth-child(2) strong');
+            if (buildElement) {
+                buildElement.textContent = buildDate;
+            }
+
+            // Actualizar la información del equipo de desarrollo
+            updateDevelopmentTeamInfo();
+
+        } catch (error) {
+            console.error('Error al cargar la información de la sección Acerca de:', error);
+        }
+    }
+
+    // Función para actualizar la información del equipo de desarrollo
+    function updateDevelopmentTeamInfo() {
+        // Definir la información real del equipo de desarrollo
+        const teamInfo = [
+            {
+                role: "Arquitecto UI",
+                specialty: "UX/UI Senior",
+                name: "Javier Robles Fontalvo",
+                avatar: "👨‍💻"
+            },
+            {
+                role: "Backend Lead",
+                specialty: "Node/Electron",
+                name: "Javier Robles Fontalvo",
+                avatar: "🔧"
+            },
+            {
+                role: "Consultor SST",
+                specialty: "Especialista Normativa",
+                name: "Javier Robles Fontalvo",
+                avatar: "👨‍⚕️"
+            }
+        ];
+
+        // Actualizar cada sección del equipo
+        const teamElements = document.querySelectorAll('#tab-acerca .about-main .info-card:nth-child(2) [style*="flex: 1; min-width: 120px;"]');
+
+        teamElements.forEach((element, index) => {
+            if (teamInfo[index]) {
+                const avatarElement = element.querySelector('.dev-avatar');
+                const roleElement = element.querySelector('strong');
+                const specialtyElement = element.querySelector('[style*="font-size: 0.8rem; color: var(--text-muted);"]');
+
+                if (avatarElement) {
+                    avatarElement.textContent = teamInfo[index].avatar;
+                }
+                if (roleElement) {
+                    roleElement.textContent = teamInfo[index].role;
+                }
+                if (specialtyElement) {
+                    specialtyElement.textContent = teamInfo[index].specialty;
+                }
+            }
+        });
+    }
+
+    // Función para inicializar la sección "Acerca de" cuando se active
+    function initializeAboutSection() {
+        const aboutTab = document.getElementById('tab-acerca');
+        if (aboutTab && aboutTab.classList.contains('active')) {
+            loadAboutSectionInfo();
+        }
+
+        // Observar si cambia a la pestaña de "Acerca de"
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                    if (mutation.target.classList.contains('active') &&
+                        mutation.target.id === 'tab-acerca') {
+                        loadAboutSectionInfo();
+                    }
+                }
+            });
+        });
+
+        if (aboutTab) {
+            observer.observe(aboutTab, {
+                attributes: true,
+                attributeFilter: ['class']
+            });
+        }
+    }
+
     // Cargar datos cuando se inicialice la página
     document.addEventListener('DOMContentLoaded', async function() {
         // Cargar la normativa antes de procesar las empresas
@@ -1779,6 +1879,9 @@
 
         loadCompanies();
         loadUsers();
+
+        // Inicializar la sección "Acerca de"
+        setTimeout(initializeAboutSection, 100);
     });
 </script>
 
