@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K+AIR | Rendición de Cuentas SG-SST</title>
+    <!-- Iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Fuentes -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* =========================================
+           4. SISTEMA VISUAL OFICIAL (COHERENTE)
+           ========================================= */
+        :root {
+            --primary: #174ea6;
+            --primary-hover: #185abd;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --info: #17a2b8;
+
+            --bg-body: #f8f9fa;
+            --bg-card: #ffffff;
+            --border-color: #dee2e6;
+
+            --font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            --text-dark: #212529;
+            --text-muted: #6c757d;
+
+            --radius: 0.375rem;
+            --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            --shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg-body);
+            color: var(--text-dark);
+            line-height: 1.5;
+            font-size: 0.9rem;
+        }
+
+        /* =========================================
+           HEADER & NAV (INTEGRADO EN CONTENIDO)
+           ========================================= */
+        .header-container {
+            background: white;
+            border-bottom: 1px solid var(--border-color);
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 1.5rem;
+        }
+
+        .header-top {
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 2rem;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .main-title {
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: var(--primary);
+        }
+        .breadcrumb-context {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .header-nav {
+            background: #fdfdfd;
+            display: flex;
+            align-items: center;
+            padding: 0 2rem;
+            height: 50px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .nav-item {
+            padding: 0 1.5rem;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .nav-item:hover {
+            color: var(--primary);
+            background: #f0f7ff;
+        }
+        .nav-item.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        /* =========================================
+           CONTENIDO PRINCIPAL
+           ========================================= */
+        .container-fluid {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 1.5rem 2rem;
+        }
+        .section-view {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        .section-view.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* =========================================
+           COMPONENTES DE FORMULARIO & TARJETAS
+           ========================================= */
+        .section-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-sm);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Formularios Grid */
+        .form-grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+        .form-grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        .form-control {
+            width: 100%;
+            padding: 0.6rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            font-size: 0.95rem;
+            background: #fdfdfd;
+        }
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: white;
+        }
+        textarea.form-control {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        /* Métricas KPI */
+        .metrics-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .metric-card-mini {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: var(--radius);
+            border-left: 4px solid var(--primary);
+        }
+        .metric-val {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+        .metric-lbl {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        /* Tablas Estándar */
+        .table-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+        }
+        .k-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 1000px;
+            background: white;
+        }
+        .k-table th {
+            background: #f1f3f5;
+            text-align: left;
+            padding: 0.85rem 1rem;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            border-bottom: 2px solid var(--border-color);
+            white-space: nowrap;
+        }
+        .k-table td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: middle;
+            font-size: 0.9rem;
+        }
+        .k-table tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        /* Estados */
+        .badge {
+            padding: 0.35rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .badge-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .badge-danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        /* Botones */
+        .btn {
+            padding: 0.6rem 1.2rem;
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        .btn-primary:hover {
+            background: var(--primary-hover);
+        }
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-dark);
+        }
+        .btn-outline:hover {
+            background: #f1f3f5;
+        }
+
+        /* Firma Digital Placeholder */
+        .signature-box {
+            border: 2px dashed var(--border-color);
+            border-radius: var(--radius);
+            height: 150px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            background: #fdfdfd;
+            margin-bottom: 1rem;
+        }
+
+        /* Toast */
+        #toast {
+            visibility: hidden;
+            min-width: 250px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 4px;
+            padding: 16px;
+            position: fixed;
+            z-index: 2000;
+            bottom: 30px;
+            right: 30px;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+        #toast.show {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header Global -->
+    <header class="global-header">
+        <div class="header-top">
+            <div class="main-title">Rendición de Cuentas SG-SST</div>
+            <div class="breadcrumb-context">Gestión Integral / Rendición de Cuentas (2024)</div>
+        </div>
+
+        <!-- Navegación Horizontal -->
+        <div class="header-nav">
+            <div class="nav-item active" onclick="switchSection('general', this)">1. General</div>
+            <div class="nav-item" onclick="switchSection('resultados', this)">2. Resultados SG-SST</div>
+            <div class="nav-item" onclick="switchSection('normativo', this)">3. Normativo & Riesgos</div>
+            <div class="nav-item" onclick="switchSection('incidentes', this)">4. Incidentes & AT</div>
+            <div class="nav-item" onclick="switchSection('plan', this)">5. Plan de Acción</div>
+            <div class="nav-item" onclick="switchSection('cierre', this)">6. Cierre & Firmas</div>
+        </div>
+    </header>
+
+    <main class="container-fluid">
+
+        <!-- Acciones Globales -->
+        <div style="margin-bottom: 1.5rem; display: flex; justify-content: flex-end; gap: 1rem;">
+            <button class="btn btn-outline" onclick="window.print()"><i class="fas fa-print"></i> Vista Previa Impresión</button>
+            <button class="btn btn-primary" onclick="saveReport()"><i class="fas fa-save"></i> Guardar Cambios</button>
+        </div>
+
+        <!-- SECCIÓN 1: GENERAL -->
+        <div id="general" class="section-view active">
+            <div class="section-card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-file-alt"></i> Información General y Periodo</div>
+                </div>
+                <div class="form-grid-3">
+                    <div class="form-group">
+                        <label class="form-label">Razón Social</label>
+                        <input type="text" class="form-control" value="TEMPOACTIVA EST S.A.S." readonly>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">NIT</label>
+                        <input type="text" class="form-control" value="900511178-1" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Periodo Evaluado</label>
+                        <select class="form-control">
+                            <option selected>2024</option>
+                            <option>2023</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Representante Legal</label>
+                        <input type="text" class="form-control" value="Freedy Enrique Torrez Madariaga">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Responsable SG-SST</label>
+                        <input type="text" class="form-control" value="Javier Robles Fontalvo">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Base Legal Aplicable</label>
+                    <input type="text" class="form-control" value="Decreto 1072/2015, Res. 0312/2019, Res. 2341/2021">
+                </div>
+            </div>
+
+            <div class="form-grid-2">
+                <div class="section-card">
+                    <div class="card-header"><div class="card-title"><i class="fas fa-users"></i> Equipo de Trabajo</div></div>
+                    <div class="form-group"><label class="form-label">Coordinador COPASST</label><input type="text" class="form-control" placeholder="Nombre"></div>
+                    <div class="form-group"><label class="form-label">Vigía SST</label><input type="text" class="form-control" placeholder="Nombre"></div>
+                </div>
+                <div class="section-card">
+                    <div class="card-header"><div class="card-title"><i class="fas fa-chart-line"></i> Estado Actual</div></div>
+                    <div class="metrics-row">
+                        <div class="metric-card-mini" style="border-color: var(--primary);">
+                            <div class="metric-val">91%</div>
+                            <div class="metric-lbl">Cumplimiento Global</div>
+                        </div>
+                        <div class="metric-card-mini" style="border-color: var(--success);">
+                            <div class="metric-val">154</div>
+                            <div class="metric-lbl">Trabajadores</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 2: RESULTADOS SG-SST -->
+        <div id="resultados" class="section-view">
+            <div class="section-card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-chart-bar"></i> Resultados del SG-SST por Estándar</div>
+                    <button class="btn btn-outline" style="font-size: 0.8rem;"><i class="fas fa-sync-alt"></i> Actualizar Datos</button>
+                </div>
+
+                <div class="table-wrapper">
+                    <table class="k-table">
+                        <thead>
+                            <tr>
+                                <th>Estándar</th>
+                                <th>Descripción</th>
+                                <th>Estado</th>
+                                <th>% Cumplimiento</th>
+                                <th>Observaciones</th>
+                                <th>Editar</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>1</strong></td>
+                                <td>Política del SG-SST</td>
+                                <td><span class="badge badge-success">Sí</span></td>
+                                <td>100%</td>
+                                <td>-</td>
+                                <td><button class="btn btn-outline" style="padding: 0.2rem 0.5rem;"><i class="fas fa-edit"></i></button></td>
+                            </tr>
+                            <tr>
+                                <td><strong>2</strong></td>
+                                <td>Gestión de Riesgos</td>
+                                <td><span class="badge badge-success">Sí</span></td>
+                                <td>95%</td>
+                                <td>-</td>
+                                <td><button class="btn btn-outline" style="padding: 0.2rem 0.5rem;"><i class="fas fa-edit"></i></button></td>
+                            </tr>
+                            <tr>
+                                <td><strong>3</strong></td>
+                                <td>Planificación y Programas</td>
+                                <td><span class="badge badge-warning">Parcial</span></td>
+                                <td>75%</td>
+                                <td>Falta actualizar PTA</td>
+                                <td><button class="btn btn-outline" style="padding: 0.2rem 0.5rem;"><i class="fas fa-edit"></i></button></td>
+                            </tr>
+                            <tr>
+                                <td><strong>10</strong></td>
+                                <td>Auditoría y Revisión</td>
+                                <td><span class="badge badge-warning">Parcial</span></td>
+                                <td>70%</td>
+                                <td>Pendiente auditoría interna</td>
+                                <td><button class="btn btn-outline" style="padding: 0.2rem 0.5rem;"><i class="fas fa-edit"></i></button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="section-card">
+                <div class="card-header"><div class="card-title"><i class="fas fa-chart-pie"></i> Indicadores de Desempeño (2024)</div></div>
+                <div class="form-grid-3">
+                    <div class="form-group">
+                        <label class="form-label">Tasa de Accidentalidad</label>
+                        <input type="text" class="form-control" value="1.8%">
+                        <small class="text-muted">Meta: < 2%</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Tasa de Ausentismo (EL)</label>
+                        <input type="text" class="form-control" value="0.8%">
+                        <small class="text-muted">Meta: < 1%</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">% Capacitaciones Ejecutadas</label>
+                        <input type="text" class="form-control" value="92%">
+                        <small class="text-muted">Meta: 95%</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 3: NORMATIVO & RIESGOS -->
+        <div id="normativo" class="section-view">
+            <div class="form-grid-2">
+                <!-- Matriz Legal -->
+                <div class="section-card">
+                    <div class="card-header"><div class="card-title"><i class="fas fa-balance-scale"></i> Matriz de Cumplimiento Legal</div></div>
+                    <div class="table-wrapper">
+                        <table class="k-table" style="min-width: 600px;">
+                            <thead><tr><th>Requisito Legal</th><th>Norma</th><th>Cumple</th></tr></thead>
+                            <tbody>
+                                <tr><td>Política SG-SST</td><td>D.1072/15</td><td><span class="badge badge-success">Sí</span></td></tr>
+                                <tr><td>Plan Anual</td><td>D.1072/15</td><td><span class="badge badge-success">Sí</span></td></tr>
+                                <tr><td>Riesgo Psicosocial</td><td>Res. 2646/08</td><td><span class="badge badge-warning">Parcial</span></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Brechas -->
+                <div class="section-card">
+                    <div class="card-header"><div class="card-title"><i class="fas fa-search"></i> Brechas y Hallazgos</div></div>
+                    <div class="form-group">
+                        <label class="form-label">No Conformidad Principal</label>
+                        <textarea class="form-control">NC-001: Auditoría interna no programada para el periodo 2024.</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Riesgos Críticos No Controlados</label>
+                        <textarea class="form-control">R-001: Caídas en mismo nivel (En proceso de señalización).</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 4: INCIDENTES & AT -->
+        <div id="incidentes" class="section-view">
+            <div class="section-card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-first-aid"></i> Análisis de Accidentes de Trabajo</div>
+                </div>
+                <!-- Resumen -->
+                <div class="metrics-row" style="margin-bottom: 2rem;">
+                    <div class="metric-card-mini" style="border-color: var(--danger);">
+                        <div class="metric-val">4</div>
+                        <div class="metric-lbl">AT Totales</div>
+                    </div>
+                    <div class="metric-card-mini">
+                        <div class="metric-val">0</div>
+                        <div class="metric-lbl">Mortalidad</div>
+                    </div>
+                    <div class="metric-card-mini" style="border-color: var(--warning);">
+                        <div class="metric-val">0</div>
+                        <div class="metric-lbl">Enf. Laborales</div>
+                    </div>
+                </div>
+
+                <!-- Tabla Detalle -->
+                <div class="table-wrapper">
+                    <table class="k-table">
+                        <thead>
+                            <tr>
+                                <th>N°</th>
+                                <th>Fecha</th>
+                                <th>Trabajador</th>
+                                <th>Tipo de Lesión</th>
+                                <th>Días Perdidos</th>
+                                <th>Investigación</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>AT-001</td><td>15/03/2024</td><td>[Nombre 1]</td><td>Corte superficial</td><td>2</td>
+                                <td><span class="badge badge-success">Completada</span></td>
+                            </tr>
+                            <tr>
+                                <td>AT-002</td><td>22/06/2024</td><td>[Nombre 2]</td><td>Esguince tobillo</td><td>5</td>
+                                <td><span class="badge badge-success">Completada</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 5: PLAN DE MEJORAMIENTO -->
+        <div id="plan" class="section-view">
+            <div class="section-card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-rocket"></i> Plan de Acción Correctiva y Preventiva</div>
+                    <button class="btn btn-primary" style="font-size: 0.8rem;"><i class="fas fa-plus"></i> Nueva Acción</button>
+                </div>
+                <div class="table-wrapper">
+                    <table class="k-table">
+                        <thead>
+                            <tr>
+                                <th>Acción</th>
+                                <th>Tipo</th>
+                                <th>Responsable</th>
+                                <th>Fechas (Inicio - Fin)</th>
+                                <th>Estado</th>
+                                <th>Avance</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Auditoría Interna SG-SST</td>
+                                <td>Correctiva</td>
+                                <td>Coordinador SST</td>
+                                <td>15/01/2025 - 28/02/2025</td>
+                                <td><span class="badge badge-warning">Programada</span></td>
+                                <td>0%</td>
+                            </tr>
+                            <tr>
+                                <td>Aplicación Batería Psicosocial</td>
+                                <td>Preventiva</td>
+                                <td>ARL</td>
+                                <td>01/02/2025 - 31/03/2025</td>
+                                <td><span class="badge badge-warning">Programada</span></td>
+                                <td>0%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 6: CIERRE & FIRMAS -->
+        <div id="cierre" class="section-view">
+            <div class="section-card">
+                <div class="card-header"><div class="card-title"><i class="fas fa-clipboard"></i> Conclusiones y Decisiones de la Alta Dirección</div></div>
+                <div class="form-group">
+                    <label class="form-label">Conclusiones del Periodo 2024</label>
+                    <textarea class="form-control" style="height: 150px;">El Sistema de Gestión ha mantenido un nivel de cumplimiento del 91%. Se redujo la tasa de accidentalidad en un 28% respecto al año anterior. Se identifica la necesidad de programar la auditoría interna para el primer trimestre de 2025.</textarea>
+                </div>
+                <div class="form-grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Decisión 1</label>
+                        <input type="text" class="form-control" value="Aprobar presupuesto para auditoría interna SG-SST">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Decisión 2</label>
+                        <input type="text" class="form-control" value="Contratar servicio de batería de riesgo psicosocial">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-grid-2">
+                <div class="section-card">
+                    <div class="card-header"><div class="card-title"><i class="fas fa-signature"></i> Firma Representante Legal</div></div>
+                    <div class="signature-box">
+                        Arrastre firma aquí o haga clic para firmar
+                    </div>
+                    <div style="text-align: center; font-weight: bold;">Freedy Enrique Torrez Madariaga</div>
+                    <div style="text-align: center; font-size: 0.8rem; color: var(--text-muted);">Representante Legal</div>
+                </div>
+                <div class="section-card">
+                    <div class="card-header"><div class="card-title"><i class="fas fa-signature"></i> Firma Responsable SG-SST</div></div>
+                    <div class="signature-box">
+                        Arrastre firma aquí o haga clic para firmar
+                    </div>
+                    <div style="text-align: center; font-weight: bold;">Javier Robles Fontalvo</div>
+                    <div style="text-align: center; font-size: 0.8rem; color: var(--text-muted);">Responsable SG-SST</div>
+                </div>
+            </div>
+
+            <div style="margin-top: 2rem; text-align: center;">
+                <button class="btn btn-primary" style="padding: 1rem 3rem; font-size: 1.1rem;" onclick="finalizeReport()">
+                    <i class="fas fa-file-pdf"></i> CERRAR Y GENERAR INFORME FINAL
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast">Guardado exitosamente</div>
+
+    <script>
+        // =========================================
+        // LÓGICA DE NAVEGACIÓN Y GESTIÓN
+        // =========================================
+
+        function switchSection(sectionId, navElement) {
+            // Ocultar todas las secciones
+            document.querySelectorAll('.section-view').forEach(el => el.classList.remove('active'));
+            // Quitar clase active de botones
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+
+            // Mostrar sección seleccionada
+            document.getElementById(sectionId).classList.add('active');
+            // Activar botón
+            navElement.classList.add('active');
+        }
+
+        function saveReport() {
+            // Simulación de guardado
+            const toast = document.getElementById("toast");
+            toast.textContent = "Información guardada exitosamente en borrador";
+            toast.className = "show";
+            setTimeout(function(){ toast.className = toast.className.replace("show", ""); }, 3000);
+        }
+
+        function finalizeReport() {
+            const confirmed = confirm("¿Está seguro de cerrar el periodo de Rendición de Cuentas? Esta acción generará el informe oficial PDF.");
+            if (confirmed) {
+                const toast = document.getElementById("toast");
+                toast.textContent = "Generando Informe PDF Oficial...";
+                toast.className = "show";
+                setTimeout(function(){ toast.className = toast.className.replace("show", ""); }, 3000);
+                // Aquí iría la lógica real de generación de PDF
+            }
+        }
+    </script>
+</body>
+</html>
