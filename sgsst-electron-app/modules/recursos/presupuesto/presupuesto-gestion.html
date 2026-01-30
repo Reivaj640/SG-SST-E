@@ -6,7 +6,7 @@
     <title>Gestión de Presupuesto - K+AIR</title>
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;600;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+
     <style>
         /* =========================================
            SISTEMA VISUAL K+AIR (CORE)
@@ -70,7 +70,7 @@
 
         .k-btn-success { background: var(--k-success); color: white; border-color: var(--k-success); }
         .k-btn-success:hover { background: #218838; }
-        
+
         /* CONTENIDO PRINCIPAL */
         .content-wrapper {
             flex: 1; display: flex; flex-direction: column;
@@ -89,10 +89,10 @@
             box-shadow: var(--k-shadow-sm); display: flex; flex-direction: column;
             border-left: 4px solid transparent; /* Indicador de color */
         }
-        
+
         .kpi-label { font-size: 0.8rem; color: var(--k-text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 0.5rem; }
         .kpi-value { font-size: 1.5rem; font-weight: 700; color: var(--k-text-main); }
-        
+
         /* Bordes de color semántico */
         .kpi-card:nth-child(1) { border-left-color: var(--k-primary); }
         .kpi-card:nth-child(2) { border-left-color: var(--k-warning); }
@@ -121,6 +121,16 @@
             vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
 
+        /* Especificar estilo diferente para la columna de Concepto/Detalle */
+        tbody td:nth-child(2) { /* Columna de Concepto/Detalle */
+            white-space: normal; /* Permitir saltos de línea */
+            overflow: visible; /* Mostrar todo el contenido */
+            text-overflow: clip; /* No truncar el texto */
+            max-width: 250px; /* Ancho máximo razonable */
+            min-width: 200px; /* Ancho mínimo para legibilidad */
+            word-break: break-word; /* Romper palabras largas si es necesario */
+        }
+
         tbody tr:hover { background-color: rgba(23, 78, 166, 0.03); }
 
         /* INPUTS EDITABLES */
@@ -135,7 +145,7 @@
             background: white; border-color: var(--k-primary);
             outline: none; box-shadow: 0 0 0 2px var(--k-primary-light);
         }
-        
+
         /* Estilos para Celdas Editables */
         .editable-cell {
             cursor: pointer;
@@ -479,7 +489,7 @@
             input.type = 'number';
             input.value = numeric;
             input.className = 'editable-cell-input';
-            
+
             const cell = span.parentNode;
             cell.replaceChild(input, span);
             input.focus();
@@ -506,7 +516,7 @@
 
         function saveChanges() {
             if (!hasPendingChanges) return showNotification('No hay cambios', 'info');
-            
+
             // Convertir todo a número antes de enviar
             const dataToSave = budgetData.map(item => {
                 const newItem = { ...item };
