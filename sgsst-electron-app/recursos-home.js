@@ -543,10 +543,15 @@ class RecursosHome {
             const currentYear = new Date().getFullYear();
             let sheetName = sheetsResult.sheets.find(s => s.toLowerCase().includes(`matriz cap`) && s.includes(currentYear.toString()));
             if (!sheetName) sheetName = sheetsResult.sheets.find(s => s.includes(currentYear.toString()));
-            if (!sheetName) sheetName = sheetsResult.sheets[0];
-
+            
+            // 🔒 VALIDACIÓN ESTRICTA: Si no hay hoja para el año actual, NO usar fallback. Reportar error.
             if (!sheetName) {
-                console.warn('⚠️ [RecursosHome] No se encontró hoja válida en Excel capacitaciones');
+                console.warn(`⚠️ [RecursosHome] No se encontró hoja de capacitaciones para el año ${currentYear}`);
+                this.resourceStats.capacitaciones = {
+                    ...this.resourceStats.capacitaciones,
+                    error: `No hay cronograma ${currentYear}`,
+                    hasDataForCurrentYear: false
+                };
                 return;
             }
 
@@ -772,12 +777,17 @@ class RecursosHome {
     createTrainingWidget() {
         // Usar los datos ya calculados en calculateCapacitacionesClientSide()
         const stats = this.resourceStats?.capacitaciones || { totalCapacitaciones: 0, programadas: 0, realizadas: 0, porcentajeCumplimiento: 0 };
+        const currentYear = new Date().getFullYear();
+
+        // 🔒 REGLA: Si hay un error registrado o flag de "no data" explícito, mostrar mensaje de error (Igual que Presupuesto)
+        if (stats.error || stats.hasDataForCurrentYear === false) {
+            return this.renderTrainingWidgetError(stats.error || `Sin datos para ${currentYear}`);
+        }
 
         const total = stats.programadas;
         const realizadas = stats.realizadas;
         const restante = Math.max(0, total - realizadas); // Calcular restante
         const porcentaje = stats.porcentajeCumplimiento;
-        const currentYear = new Date().getFullYear();
 
         console.log('📊 [createTrainingWidget] Datos para widget de capacitaciones:', {
             total,
@@ -838,6 +848,14 @@ class RecursosHome {
         }, 100);
 
         return widget;
+    }
+
+    renderTrainingWidgetError(msg) {
+        const w = document.createElement('div');
+        w.className = 'widget';
+        // Usamos el mismo estilo visual que renderBudgetWidgetError
+        w.innerHTML = `<h4>Capacitaciones</h4><div class="widget-value" style="font-size:1.2rem; color:var(--k-danger)">Sin Datos</div><div class="widget-description">${msg}</div>`;
+        return w;
     }
 
     // Nuevo método para crear widget de EPPs con datos reales
