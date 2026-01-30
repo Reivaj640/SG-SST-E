@@ -628,6 +628,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                   }, '*');
                   return;
               default:
+                  // Verificar si es un mensaje de respuesta (ya procesado), para evitar bucles
+                  if (type.endsWith('-response')) {
+                      console.log(`RENDERER: Ignoring response message type (likely already processed): ${type}`);
+                      return; // No responder a mensajes de respuesta para evitar bucles
+                  }
+
                   console.warn(`RENDERER: Unknown message type received from source: ${type}`);
                   targetWindow.postMessage({
                       type: responseType,
