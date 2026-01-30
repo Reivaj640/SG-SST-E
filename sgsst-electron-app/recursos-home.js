@@ -891,8 +891,13 @@ class RecursosHome {
             }
 
             const currentYear = new Date().getFullYear();
-            let file = result.files.find(f => f.name.includes(currentYear.toString()));
-            if(!file) file = result.files[0];
+            const file = result.files.find(f => f.name.includes(currentYear.toString()));
+            
+            // 🔒 REGLA: Solo mostrar datos si existe archivo para el periodo actual
+            if (!file) {
+                console.warn(`⚠️ [createBudgetWidget] No se encontró archivo de presupuesto para el año ${currentYear}`);
+                return this.renderBudgetWidgetError(`No hay archivo de presupuesto para ${currentYear}`);
+            }
 
             const dataResult = await window.electronAPI.readPresupuestoData(file.path);
             if (!dataResult.success) return this.renderBudgetWidgetError('Error lectura');

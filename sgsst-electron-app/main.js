@@ -1868,6 +1868,18 @@ async function handleSaveBudgetFile(event, filePath, dataToSave) {
 
     sendLog(`[DEBUG] Hoja seleccionada: ${worksheet.name || 'Hoja sin nombre'}`, 'DEBUG');
 
+    // ============================================================================
+    // 🛡️ PRESERVACIÓN DE MERGES - LEER Y GUARDAR TODOS LOS MERGES EXISTENTES
+    // ============================================================================
+    const existingMerges = [];
+    if (worksheet.model && worksheet.model.merges) {
+      for (const mergeRange of worksheet.model.merges) {
+        existingMerges.push(mergeRange);
+        sendLog(`[DEBUG] Merge encontrado: ${mergeRange}`, 'DEBUG');
+      }
+    }
+    sendLog(`[DEBUG] Total de merges preservados: ${existingMerges.length}`, 'DEBUG');
+
     // Mapeo de propiedades a columnas basado en el archivo Excel real de presupuesto
     // Basado en el mapeo de la función de lectura: [índice, columna]
     const columnMapping = {
@@ -1918,42 +1930,66 @@ async function handleSaveBudgetFile(event, filePath, dataToSave) {
           return 0;
       };
 
-      // Asignar valores a los índices correctos del array
-      values[0] = rowData.id;
-      values[1] = ''; // Columna B explícitamente vacía
-      values[2] = rowData.detalle;
+      // Asignar valores CÉLULA POR CÉLULA para preservar completamente la columna B
+      // (incluyendo merges, formato y otras propiedades)
+      
+      // Columna A (índice 0) - ID
+      row.getCell(1).value = rowData.id; // ExcelJS usa índice base 1, así que 1 = columna A
 
-      values[3] = parseValue(rowData.asignacion);
-      values[4] = parseValue(rowData.ejecutado_acumulado);
-      values[5] = parsePercentage(rowData.porcentaje_ejecutado);
+      // ⚠️ COLUMNA B (índice 1) - NO SE TOCA - Se preserva valor, formato y merges
+      // No asignamos nada a row.getCell(2) para mantener la celda intacta
 
-      values[6] = parseValue(rowData.enero);
-      values[7] = parseValue(rowData.febrero);
-      values[8] = parseValue(rowData.marzo);
-      values[9] = parseValue(rowData.abril);
-      values[10] = parseValue(rowData.mayo);
-      values[11] = parseValue(rowData.junio);
-      values[12] = parseValue(rowData.julio);
-      values[13] = parseValue(rowData.agosto);
-      values[14] = parseValue(rowData.septiembre);
-      values[15] = parseValue(rowData.octubre);
-      values[16] = parseValue(rowData.noviembre);
-      values[17] = parseValue(rowData.diciembre);
+      // Columna C (índice 2) - Detalle
+      row.getCell(3).value = rowData.detalle;
 
-      row.values = values;
+      // Columna D (índice 3) - Asignación
+      row.getCell(4).value = parseValue(rowData.asignacion);
+      row.getCell(4).numFmt = '#,##0.00';
 
-      // Aplicar formato de número a las celdas para correcta visualización en Excel
-      row.getCell('D').numFmt = '#,##0.00'; // Asignación
-      row.getCell('E').numFmt = '#,##0.00'; // Ejecutado
-      row.getCell('F').numFmt = '0.00%';    // Porcentaje
+      // Columna E (índice 4) - Ejecutado Acumulado
+      row.getCell(5).value = parseValue(rowData.ejecutado_acumulado);
+      row.getCell(5).numFmt = '#,##0.00';
 
-      // Formato para meses (columnas G a R)
-      for (let col = 7; col <= 18; col++) { // 7 es 'G', 18 es 'R'
-        row.getCell(col).numFmt = '#,##0.00';
-      }
+      // Columna F (índice 5) - Porcentaje Ejecutado
+      row.getCell(6).value = parsePercentage(rowData.porcentaje_ejecutado);
+      row.getCell(6).numFmt = '0.00%';
+
+      // Columnas G a R (índices 6-17) - Meses
+      const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                     'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+      
+      meses.forEach((mes, idx) => {
+        const colIndex = 7 + idx; // 7 = columna G (índice base 1 de ExcelJS)
+        row.getCell(colIndex).value = parseValue(rowData[mes]);
+        row.getCell(colIndex).numFmt = '#,##0.00';
+      });
 
       sendLog(`[DEBUG] handleSaveBudgetFile - Escribiendo valores en fila ${rowIndex}`, 'DEBUG');
     }
+
+    // ============================================================================
+    // 🛡️ RESTAURACIÓN DE MERGES - REAPLICAR TODOS LOS MERGES ORIGINALES
+    // ============================================================================
+    sendLog(`[DEBUG] Restaurando ${existingMerges.length} merges...`, 'DEBUG');
+    for (const mergeRange of existingMerges) {
+      try {
+        // Decodificar el rango del merge (ej: "B11:B20")
+        const decodedRange = xlsx.utils.decode_range(mergeRange);
+        
+        // Convertir a formato de ExcelJS (1-based)
+        const startRow = decodedRange.s.r + 1;
+        const startCol = decodedRange.s.c + 1;
+        const endRow = decodedRange.e.r + 1;
+        const endCol = decodedRange.e.c + 1;
+        
+        // Reaplicar el merge usando ExcelJS
+        worksheet.mergeCells(startRow, startCol, endRow, endCol);
+        sendLog(`[DEBUG] Merge restaurado: ${mergeRange} -> (${startRow},${startCol}):(${endRow},${endCol})`, 'DEBUG');
+      } catch (mergeError) {
+        sendLog(`[WARN] Error al restaurar merge ${mergeRange}: ${mergeError.message}`, 'WARN');
+      }
+    }
+    sendLog(`[DEBUG] Todos los merges han sido restaurados`, 'DEBUG');
 
     // Guardar el archivo actualizado
     await workbook.xlsx.writeFile(filePath);
