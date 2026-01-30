@@ -457,6 +457,24 @@ function initializeEvents() {
         }
     });
 
+    const breadcrumbPeriod = document.getElementById('breadcrumb-period');
+    if (breadcrumbPeriod) {
+        breadcrumbPeriod.textContent = rendicionCurrentPeriod;
+    }
+
+    // Evento para el botón Volver
+    const backBtn = document.getElementById('backBtn');
+    if (backBtn) {
+        backBtn.onclick = () => {
+            console.log('Botón volver clickeado');
+            // Solo enviamos el mensaje al padre para evitar bucle infinito
+            const message = { type: 'back-to-module-request' };
+            if (window.parent !== window) {
+                window.parent.postMessage(message, '*');
+            }
+        };
+    }
+
     // Agregar botón para cargar datos desde Excel
     const actionsDiv = document.querySelector('div[style*="justify-content: flex-end"]');
     if (actionsDiv && !document.getElementById('load-excel-btn')) {

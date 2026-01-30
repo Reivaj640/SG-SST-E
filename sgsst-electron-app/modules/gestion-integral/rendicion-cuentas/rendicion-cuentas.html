@@ -60,23 +60,60 @@
         }
 
         .header-top {
-            height: 80px;
+            height: auto;
+            min-height: 80px;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            padding: 0 2rem;
+            justify-content: flex-start;
+            padding: 1rem 2rem;
             border-bottom: 1px solid #f0f0f0;
+            gap: 1.5rem;
+        }
+
+        .header-left-side {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .title-container {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .btn-back {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--primary);
+            transition: all 0.2s;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .btn-back:hover {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+            transform: translateX(-3px);
         }
 
         .main-title {
             font-size: 1.4rem;
             font-weight: 800;
             color: var(--primary);
+            line-height: 1.2;
         }
         .breadcrumb-context {
             font-size: 0.9rem;
             color: var(--text-muted);
             font-weight: 500;
+            margin-top: 0.2rem;
         }
 
         .header-nav {
@@ -343,8 +380,15 @@
     <!-- Header Global -->
     <header class="global-header">
         <div class="header-top">
-            <div class="main-title">Rendición de Cuentas SG-SST</div>
-            <div class="breadcrumb-context">Gestión Integral / Rendición de Cuentas (2024)</div>
+            <div class="header-left-side">
+                <button id="backBtn" class="btn-back" title="Volver a Gestión Integral">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <div class="title-container">
+                    <div class="main-title">Rendición de Cuentas SG-SST</div>
+                    <div class="breadcrumb-context">Gestión Integral / Rendición de Cuentas (<span id="breadcrumb-period">2024</span>)</div>
+                </div>
+            </div>
         </div>
 
         <!-- Navegación Horizontal -->

@@ -518,8 +518,19 @@ document.addEventListener('DOMContentLoaded', async () => {
           }
       }
 
-      if (!sourceIframe) {
+      // Allow messages from the window itself (for directly injected modules)
+      const isFromSelf = event.source === window;
+
+      if (!sourceIframe && !isFromSelf) {
           console.warn('RENDERER: Message received from an unknown source. Ignoring.');
+          return;
+      }
+
+      // Determine where to send the response back
+      const targetWindow = sourceIframe ? sourceIframe.contentWindow : (isFromSelf ? window : null);
+
+      if (!targetWindow) {
+          console.error('RENDERER: Could not determine target window for response.');
           return;
       }
 
@@ -562,7 +573,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                   console.log('RENDERER: Received back-to-module-request from iframe.');
                   // Assuming showModuleContent is available in renderer.js scope
                   // and currentModule is correctly set.
-                  if (currentModule) {
+                  if (typeof currentModule !== 'undefined' && currentModule) {
                       currentSubmodule = null; // Clear submodule state
                       showModuleContent(currentModule);
                   } else {
@@ -573,89 +584,56 @@ document.addEventListener('DOMContentLoaded', async () => {
                   // Handle request to get absenteeism data
                   apiCallFunction = window.electronAPI.readAusentismoData;
                   apiCallArgs = [currentCompany]; // Use current company for the request
-                  responseType = 'AUSENTISMO_DATA_RESPONSE';
                   break;
-              case 'SAVE_FOLLOW_UP':
-                  // Handle request to save follow-up data
-                  apiCallFunction = window.electronAPI.saveFollowUp;
-                  apiCallArgs = [payload.followUpData, currentCompany]; // Use current company for the request
-                  responseType = 'FOLLOW_UP_SAVE_RESPONSE';
-                  break;
-              case 'EXPORT_INCAPACITY_DATA':
-                  // Handle request to export incapacity data
-                  apiCallFunction = window.electronAPI.exportIncapacityData;
-                  apiCallArgs = [currentCompany]; // Use current company for the request
-                  responseType = 'EXPORT_DATA_RESPONSE';
-                  break;
-              case 'LOAD_FOLLOW_UP_DATA':
-                  // Handle request to load follow-up data
-                  apiCallFunction = window.electronAPI.loadFollowUpData;
-                  apiCallArgs = [payload.companyName];
-                  responseType = 'FOLLOW_UP_LOAD_RESPONSE';
-                  break;
-                          case 'duplicate-budget-file-request':
-                              // Handle request to duplicate budget file
-                              apiCallFunction = window.electronAPI.duplicateBudgetFile;
-                              apiCallArgs = [payload];
-                              responseType = 'duplicate-budget-file-response';
-                              break;              case 'back-to-main-app':
-                  // This is a UI navigation request to return to the main app
-                  // We handle it directly here and don't send a response back to iframe
-                  console.log('RENDERER: Received back-to-main-app request from iframe.');
-                  // Determine where to go based on current state
-                  try {
-                      // Check if there's a selected company in the configuration
-                      if (window.electronAPI && typeof window.electronAPI.loadConfig === 'function') {
-                          const config = await window.electronAPI.loadConfig();
-                          const selectedCompany = config.selectedCompany || currentCompany || null;
-
-                          // If there's a selected company, go to the company home page
-                          if (selectedCompany) {
-                              currentCompany = selectedCompany; // Ensure currentCompany is set
-                              showCompanyHomePage();
-                          } else {
-                              // If no company is selected, go to the main home page
-                              showHomePage();
-                          }
-                      } else {
-                          // Fallback to home if electronAPI is not available
-                          showHomePage();
-                      }
-                  } catch (error) {
-                      console.error('Error determining where to navigate:', error);
-                      // Fallback to home page if there's an error
-                      showHomePage();
-                  }
-                  return; // Exit after handling navigation
               case 'find-submodule-path-request':
-                  // Handle request to find the path of a submodule
                   apiCallFunction = window.electronAPI.findSubmodulePath;
                   apiCallArgs = [payload.company, payload.module, payload.submodule];
                   break;
-              case 'get-file-path-request':
-                  // Handle request to construct a file path
-                  apiCallFunction = window.electronAPI.getFilePath;
-                  apiCallArgs = [payload]; // payload is { directory, fileName }
-                  break;
               case 'read-excel-file-request':
-                  // Handle request to read an Excel file
                   apiCallFunction = window.electronAPI.readExcelFile;
-                  // payload from plan-viewer.js is { filePath: '...' }
-                  // The API expects just the string, so we extract it if it's an object
-                  apiCallArgs = [payload.filePath || payload];
+                  apiCallArgs = [payload.filePath];
+                  break;
+              case 'save-excel-data-request':
+                  apiCallFunction = window.electronAPI.saveExcelData;
+                  apiCallArgs = [payload];
+                  break;
+              case 'get-file-path-request':
+                  apiCallFunction = window.electronAPI.getFilePath;
+                  apiCallArgs = [payload];
                   break;
               case 'process-excel-data-request':
-                  // Handle request to process Excel data
                   apiCallFunction = window.electronAPI.processExcelData;
-                  apiCallArgs = [payload]; // payload is { buffer, company, period }
+                  apiCallArgs = [payload];
                   break;
+              case 'duplicate-budget-file-request':
+                  apiCallFunction = window.electronAPI.duplicateBudgetFile;
+                  apiCallArgs = [payload];
+                  break;
+              case 'save-report-request':
+                  // Funcionalidad no implementada aún
+                  console.warn('RENDERER: save-report-request received but not implemented');
+                  targetWindow.postMessage({
+                      type: responseType,
+                      payload: { success: false, error: 'Funcionalidad de guardar informe no implementada' },
+                      requestId: requestId
+                  }, '*');
+                  return;
+              case 'generate-pdf-request':
+                  // Funcionalidad no implementada aún
+                  console.warn('RENDERER: generate-pdf-request received but not implemented');
+                  targetWindow.postMessage({
+                      type: responseType,
+                      payload: { success: false, error: 'Funcionalidad de generar PDF no implementada' },
+                      requestId: requestId
+                  }, '*');
+                  return;
               default:
-                  console.warn(`RENDERER: Unknown message type received from iframe: ${type}`);
-                  sourceIframe.contentWindow.postMessage({
+                  console.warn(`RENDERER: Unknown message type received from source: ${type}`);
+                  targetWindow.postMessage({
                       type: responseType,
                       payload: { success: false, error: `Unknown request type: ${type}` },
-                      requestId: requestId // <-- Pass back the original ID
-                  }, 'file://');
+                      requestId: requestId
+                  }, '*');
                   return;
           }
 
@@ -663,19 +641,19 @@ document.addEventListener('DOMContentLoaded', async () => {
           const result = await apiCallFunction(...apiCallArgs);
           console.log('RENDERER: 📥 Result from main process:', result);
 
-          sourceIframe.contentWindow.postMessage({
+          targetWindow.postMessage({
               type: responseType,
               payload: result,
-              requestId: requestId // <-- FIX: Use 'requestId' to match what the iframe is waiting for
-          }, 'file://');
+              requestId: requestId
+          }, '*');
 
       } catch (error) {
           console.error(`RENDERER: 😭 Error processing ${type}:`, error);
-          sourceIframe.contentWindow.postMessage({
+          targetWindow.postMessage({
               type: responseType,
               payload: { success: false, error: error.message },
-              requestId: requestId // <-- Pass back the original ID on error too
-          }, 'file://');
+              requestId: requestId
+          }, '*');
       }
   });
   // --- END: Iframe Communication Logic ---

@@ -190,7 +190,7 @@ class Config:
             "investigaciones": RUTA_BASE / "19. Asel S.A.S/3. Gestión de la Salud/3.2.2 Investigación de Accidentes, incidentes y Enfermedades/Investigaciones/2. Accidentes",
             "plantilla": RUTA_BASE / "19. Asel S.A.S/3. Gestión de la Salud/3.2.2 Investigación de Accidentes, incidentes y Enfermedades/Investigaciones/4. Procedimientos/GI-FO-020 INVESTIGACION.docx"
         }
-    },
+    } # se ilimino una coma que causaba un problema de duppla.
     
     @classmethod
     def get_empresa_paths(cls, empresa):
@@ -202,7 +202,7 @@ class Config:
 
     @classmethod
     def get_output_dir(cls, empresa):
-        return str(cls.get_empresa_paths(empresa)["generated_reports"])
+        return str(cls.get_empresa_paths(empresa)["investigaciones"]) # se cambio "generated_reports" por "investigaciones".
 
 #-------------------------------------------------------------------------------------------------------------------
 class PdfProcessor:
@@ -756,6 +756,16 @@ if __name__ == "__main__":
         empresa = sys.argv[2]
         paths = Config.get_empresa_paths(empresa)
         print(json.dumps({"template_path": str(paths["plantilla"]) }))
+        sys.exit(0)
+
+    if len(sys.argv) > 1 and sys.argv[1] == '--get-config' and len(sys.argv) > 2:
+        empresa = sys.argv[2]
+        paths = Config.get_empresa_paths(empresa)
+        config = {
+            "investigaciones": str(paths["investigaciones"]),
+            "plantilla": str(paths["plantilla"])
+        }
+        print(json.dumps(config))
         sys.exit(0)
 
     if not torch.cuda.is_available():
