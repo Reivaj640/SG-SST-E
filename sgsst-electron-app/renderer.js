@@ -1861,6 +1861,21 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 
+    } else if (submoduleName === "2.2.1 Objetivos SST") {
+      if (window.ObjetivosSSTComponent) {
+        const objetivosSSTComponent = new window.ObjetivosSSTComponent(
+          submoduleContentDiv,
+          currentCompany,
+          moduleName,
+          submoduleName,
+          safeBackToModuleCallback // <-- USAR EL CALLBACK SEGURO
+        );
+        objetivosSSTComponent.render();
+      } else {
+        console.error('❌ ObjetivosSSTComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
     } else if (submoduleName === "2.4.1 Plan de Trabajo Anual") {
       if (window.PlanTrabajoComponent) {
         const planTrabajoComponent = new window.PlanTrabajoComponent(

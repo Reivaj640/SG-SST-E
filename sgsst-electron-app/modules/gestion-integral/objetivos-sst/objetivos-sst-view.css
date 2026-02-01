@@ -1,0 +1,267 @@
+/* =========================================
+   OBJETIVOS SST - ESTILOS VISUALES
+   ========================================= */
+
+/* Estilos generales para el módulo de objetivos SST */
+.objetivos-sst-container {
+    font-family: var(--font-family);
+    background-color: var(--bg-body);
+    color: var(--text-dark);
+    line-height: 1.5;
+    font-size: 0.9rem;
+    height: 100%;
+    overflow: auto;
+}
+
+/* Estilo para el header del módulo */
+.objetivos-sst-header {
+    position: sticky;
+    top: 0;
+    background: white;
+    border-bottom: 1px solid var(--border-color);
+    z-index: 1000;
+    box-shadow: var(--shadow-sm);
+    padding: 0.5rem 0;
+}
+
+.objetivos-sst-main-title { 
+    font-size: 1.4rem; 
+    font-weight: 800; 
+    color: var(--primary); 
+    margin: 0;
+}
+
+.objetivos-sst-breadcrumb { 
+    font-size: 0.9rem; 
+    color: var(--text-muted); 
+    font-weight: 500; 
+    margin: 0.25rem 0 0 0;
+}
+
+/* Contenedor principal */
+.objetivos-sst-content {
+    max-width: 1600px; 
+    margin: 0 auto; 
+    padding: 1.5rem 2rem;
+    width: 100%;
+}
+
+/* Layout dividido para política y objetivos */
+.objetivos-split-layout {
+    display: grid;
+    grid-template-columns: 40% 60%; 
+    gap: 1.5rem;
+    align-items: start;
+}
+
+@media (max-width: 992px) {
+    .objetivos-split-layout { 
+        grid-template-columns: 1fr; 
+    }
+}
+
+/* Estilos para las tarjetas */
+.objetivos-section-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    padding: 1.5rem;
+    height: 100%; 
+    display: flex;
+    flex-direction: column;
+}
+
+.objetivos-card-header {
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center;
+    margin-bottom: 1.5rem; 
+    padding-bottom: 1rem; 
+    border-bottom: 1px solid var(--border-color);
+}
+
+.objetivos-card-title { 
+    font-size: 1.1rem; 
+    font-weight: 700; 
+    color: var(--text-dark); 
+    display: flex; 
+    align-items: center; 
+    gap: 0.5rem; 
+    margin: 0;
+}
+
+/* Editor de política */
+.objetivos-policy-container {
+    flex-grow: 1; 
+    display: flex;
+    flex-direction: column;
+}
+
+.objetivos-policy-editor {
+    width: 100%;
+    flex-grow: 1; 
+    min-height: 400px; 
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    font-size: 0.9rem;
+    color: var(--text-dark);
+    line-height: 1.6;
+    resize: none; 
+    font-family: var(--font-family);
+    background-color: #fafafa;
+}
+
+.objetivos-policy-editor:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.1);
+    background-color: white;
+}
+
+/* Tabla de objetivos */
+.objetivos-table-wrapper { 
+    width: 100%; 
+    overflow-x: auto; 
+    border: 1px solid var(--border-color); 
+    border-radius: var(--radius); 
+}
+
+.objetivos-k-table { 
+    width: 100%; 
+    border-collapse: collapse; 
+    min-width: 1200px; 
+    background: white; 
+}
+
+.objetivos-k-table th {
+    background: #f1f3f5; 
+    text-align: left; 
+    padding: 1rem;
+    font-size: 0.8rem; 
+    text-transform: uppercase; 
+    color: var(--text-muted);
+    border-bottom: 2px solid var(--border-color); 
+    white-space: nowrap;
+}
+
+.objetivos-k-table td { 
+    padding: 1rem; 
+    border-bottom: 1px solid var(--border-color); 
+    vertical-align: middle; 
+    font-size: 0.9rem; 
+    transition: background 0.2s;
+}
+
+.objetivos-k-table tr:hover { 
+    background-color: #f8f9fa; 
+}
+
+.objetivos-k-table tr.tr-editing { 
+    background-color: #f0f7ff; 
+}
+
+/* Campos editables */
+.objetivos-editable-field {
+    width: 100%;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: inherit;
+    color: inherit;
+    display: none; 
+}
+
+.tr-editing .objetivos-editable-field { 
+    display: block; 
+}
+
+.tr-editing .objetivos-display-field { 
+    display: none; 
+}
+
+.objetivos-display-field { 
+    display: block; 
+}
+
+/* Indicadores de estado */
+.objetivos-sync-badge {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    background: #e9ecef;
+    color: var(--text-muted);
+}
+
+.objetivos-sync-badge.synced { 
+    background: #d4edda; 
+    color: #155724; 
+}
+
+.objetivos-sync-badge.pending { 
+    background: #fff3cd; 
+    color: #856404; 
+}
+
+/* Botones de acción */
+.objetivos-btn-icon {
+    border: none; 
+    background: none; 
+    cursor: pointer; 
+    font-size: 1.1rem;
+    color: var(--text-muted); 
+    padding: 0.4rem; 
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.objetivos-btn-icon:hover { 
+    background: #e2e6ea; 
+    color: var(--primary); 
+}
+
+.objetivos-btn-icon.delete:hover { 
+    background: #f8d7da; 
+    color: var(--danger); 
+}
+
+/* Toast de notificaciones */
+.objetivos-toast { 
+    visibility: hidden; 
+    min-width: 300px; 
+    background-color: #333; 
+    color: #fff; 
+    text-align: center; 
+    border-radius: 4px; 
+    padding: 16px; 
+    position: fixed; 
+    z-index: 2000; 
+    bottom: 30px; 
+    right: 30px; 
+    opacity: 0; 
+    transition: opacity 0.5s; 
+}
+
+.objetivos-toast.show { 
+    visibility: visible; 
+    opacity: 1; 
+}
+
+.objetivos-toast.success { 
+    background-color: var(--success); 
+}
+
+/* Estilos específicos para fórmulas */
+.objetivos-formula-field {
+    font-family: monospace; 
+    font-size: 0.85rem; 
+    color: var(--text-muted);
+}
+
+/* Estilos para el campo de meta */
+.objetivos-goal-field {
+    font-weight: bold; 
+    color: var(--primary);
+}

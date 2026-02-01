@@ -1,6 +1,6 @@
 /**
  * Archivo de inicialización del sistema modular
- * 
+ *
  * Este archivo debe cargarse antes que renderer.js para que
  * la estructura de módulos esté disponible globalmente.
  */
@@ -14,19 +14,29 @@ try {
   if (typeof require !== 'undefined') {
     // En el contexto de Node.js o con CommonJS disponible
     window.modules.recursos = require('./modules/recursos');
+    window.modules.gestionIntegral = require('./modules/gestion-integral');
   } else {
     // En el contexto del navegador, los módulos deben cargarse individualmente
     // o se debe usar un sistema de módulos diferente
     console.info('Sistema de módulos CommonJS no disponible, usando estructura global');
-    
+
     // La estructura de módulos se construirá a medida que se carguen los scripts individuales
     window.modules.recursos = window.modules.recursos || {};
-    
+    window.modules.gestionIntegral = window.modules.gestionIntegral || {};
+
     // Registrar el componente responsable-sg si está disponible
     if (window.ResponsableSgComponent) {
       window.modules.recursos.responsableSg = {
         logic: window.ResponsableSgComponent,
         // Otros componentes del submódulo responsable-sg
+      };
+    }
+
+    // Registrar el componente de objetivos SST si está disponible
+    if (window.ObjetivosSSTComponent) {
+      window.modules.gestionIntegral.objetivosSST = {
+        logic: window.ObjetivosSSTComponent,
+        // Otros componentes del submódulo objetivos SST
       };
     }
   }

@@ -8,9 +8,11 @@
 const planTrabajo = require('./plan-trabajo');
 const politica = require('./politica');
 const rendicionCuentas = require('./rendicion-cuentas');
+const objetivosSST = require('./objetivos-sst');
 
 module.exports = {
   planTrabajo,
   politica,
-  rendicionCuentas
+  rendicionCuentas,
+  objetivosSST
 };

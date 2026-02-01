@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K+AIR | Objetivos y Metas SST</title>
+    <link rel="stylesheet" href="./objetivos-sst-view.css">
+    <style>
+        /* Estilos adicionales para garantizar la apariencia correcta */
+        :root {
+            --primary: #174ea6;
+            --primary-hover: #185abd;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --info: #17a2b8;
+
+            --bg-body: #f8f9fa;
+            --bg-card: #ffffff;
+            --border-color: #dee2e6;
+
+            --font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            --text-dark: #212529;
+            --text-muted: #6c757d;
+
+            --radius: 0.375rem;
+            --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            --shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+    </style>
+</head>
+<body class="objetivos-sst-container">
+
+    <!-- Header Global -->
+    <header class="objetivos-sst-header">
+        <div class="header-top" style="display: flex; justify-content: space-between; align-items: center; max-width: 1600px; margin: 0 auto; padding: 0 2rem;">
+            <div>
+                <div class="objetivos-sst-main-title">Objetivos y Metas del SG-SST</div>
+                <div class="objetivos-sst-breadcrumb">Gestión Integral / 2.2.1 Objetivos y Metas</div>
+            </div>
+
+            <div class="header-actions">
+                <span id="syncStatus" class="objetivos-sync-badge synced">Sincronizado con Excel</span>
+                <button class="excel-sync-btn" onclick="syncToExcel()" style="padding: 0.5rem 1rem; background: var(--primary); color: white; border: none; border-radius: var(--radius); cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 0.5rem;">
+                    <span>📥</span> Actualizar Archivo Excel
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="objetivos-sst-content">
+
+        <!-- LAYOUT DIVIDIDO: Política (Izq) + Tabla (Der) -->
+        <div class="objetivos-split-layout">
+
+            <!-- COLUMNA IZQUIERDA: POLÍTICA INTEGRAL -->
+            <div class="objetivos-section-card">
+                <div class="objetivos-card-header">
+                    <div class="objetivos-card-title">📜 Política Integral</div>
+                    <button class="objetivos-btn-icon" title="Info" onclick="alert('Este texto corresponde a la celda principal de la hoja GI-FO-044')">ℹ️</button>
+                </div>
+                <div class="objetivos-policy-container">
+                    <label style="display:block; margin-bottom:0.5rem; font-weight:600; font-size:0.85rem; color:var(--text-muted);">Texto de la Política (Extraído de Excel)</label>
+                    <textarea id="policyText" class="objetivos-policy-editor" onchange="markPending()">TEMPOACTIVA S.A.S., ha establecido la elaboración y ejecución del Sistema de Gestión de la Seguridad y Salud en el trabajo SG-SST, y adopta como políticas propias el fomento de las normas de medicina preventiva y del trabajo, higiene y seguridad industrial, encaminadas a mantener el más alto grado de salud y bienestar físico y mental del trabajador, identificando los riesgos derivados de las condiciones laborales; Con el fin de prevenir cualquier tipo de daños a la propiedad e impacto socio ambiental a su entorno, enfocada en el mejoramiento continuo, para lo cual ha adoptado los siguientes principios:
+                • Prevenir lesiones, enfermedades laborales, contaminación, daños a la propiedad de la empresa y del cliente e impactos socio- ambientales; a partir de la identificación de peligros, control de actos y condiciones inseguras.
+                • Promover la satisfacción de las necesidades y los requisitos del cliente así como los legales y reglamentarios en materia de calidad, seguridad, salud en el trabajo, medio ambiente y otros aplicables para la organización.
+                • Proyectar la calidad total de sus servicios, mantener y fortalecer una relación mutuamente beneficiosa con el cliente a fin de satisfacer sus necesidades y exceder sus expectativas.
+                • Proporcionar y Facilitar los recursos financieros así como el personal competente, confiable, calificado, motivado y comprometido con el fortalecimiento de la empresa que nos permitan lograr las metas y los objetivos propuestos para alcanzar el mejoramiento continuo y el liderazgo a nivel nacional e internacional en el sector. Léase, Impleméntese y Cúmplase.</textarea>
+                </div>
+                <div style="text-align: right; margin-top: 1rem; font-size: 0.8rem; color: var(--text-muted);">
+                    Fuente: GI-FO-044 / Celda A2
+                </div>
+            </div>
+
+            <!-- COLUMNA DERECHA: TABLA DE OBJETIVOS -->
+            <div class="objetivos-section-card">
+                <div class="objetivos-card-header">
+                    <div class="objetivos-card-title">🎯 Objetivos Estratégicos e Indicadores</div>
+                    <button class="objetivos-btn-icon" title="Agregar Objetivo" onclick="addNewObjective()">➕</button>
+                </div>
+
+                <div class="objetivos-table-wrapper">
+                    <table class="objetivos-k-table" id="objectivesTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 30%">Objetivo Estratégico</th>
+                                <th style="width: 20%">Indicador de Gestión</th>
+                                <th style="width: 15%">Fórmula</th>
+                                <th style="width: 10%">Meta</th>
+                                <th style="width: 10%">Frecuencia</th>
+                                <th style="width: 10%">Responsable</th>
+                                <th style="width: 5%"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <!-- Renderizado JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div style="margin-top: 1rem; font-size: 0.85rem; color: var(--text-muted);">
+                    * Haga clic en el icono ✏️ para editar cualquier celda. Los cambios se actualizarán en el archivo Excel al pulsar "Actualizar Archivo Excel".
+                </div>
+            </div>
+
+        </div> <!-- Fin Split Layout -->
+
+    </main>
+
+    <div id="toast" class="objetivos-toast">Archivo Excel actualizado exitosamente</div>
+
+    <script src="../../../node_modules/exceljs/dist/exceljs.min.js"></script>
+    <script src="./objetivos-sst-viewer.js?v=fixed_cache_2"></script>
+
+</body>
+</html>

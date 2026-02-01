@@ -165,6 +165,25 @@ const createWindow = () => {
   // mainWindow.webContents.openDevTools();
 };
 
+// Función auxiliar para búsqueda recursiva de archivos en el sistema de archivos
+async function findFileRecursive(dir, fileName) {
+  try {
+    const entries = await fsp.readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        const result = await findFileRecursive(fullPath, fileName);
+        if (result) return result;
+      } else if (entry.name.toLowerCase() === fileName.toLowerCase()) {
+        return fullPath;
+      }
+    }
+  } catch (error) {
+    sendLog(`[MAIN] Error walking directory ${dir}: ` + error.message, 'WARN');
+  }
+  return null;
+}
+
 // Función para buscar rutas en la estructura mapeada
 function searchInStructure(node, searchTerm) {
   // Si el nombre del nodo contiene el término de búsqueda
@@ -373,24 +392,7 @@ ipcMain.handle('get-control-remisiones-data', async (event, companyName) => {
   sendLog(`[MAIN] Handler get-control-remisiones-data llamado para empresa: ${companyName}`);
 
   try {
-    // Función auxiliar para búsqueda recursiva
-    async function findFileRecursive(dir, fileName) {
-      try {
-        const entries = await fsp.readdir(dir, { withFileTypes: true });
-        for (const entry of entries) {
-          const fullPath = path.join(dir, entry.name);
-          if (entry.isDirectory()) {
-            const result = await findFileRecursive(fullPath, fileName);
-            if (result) return result;
-          } else if (entry.name.toLowerCase() === fileName.toLowerCase()) {
-            return fullPath;
-          }
-        }
-      } catch (error) {
-        sendLog(`[MAIN] Error walking directory ${dir}: ` + error.message, 'WARN');
-      }
-      return null;
-    }
+
 
     // Cargar configuración
     sendLog(`[MAIN] Cargando configuración desde: ${configPath}`);
@@ -1581,6 +1583,256 @@ ipcMain.handle('get-pdf-preview', async (event, filePath) => {
   }
 });
 
+// --- Manejadores para el módulo de Objetivos SST ---
+
+// Handler para obtener la ruta del archivo Excel de objetivos
+ipcMain.handle('get-objetivos-excel-path', async (event, companyName) => {
+  try {
+    sendLog(`[MAIN] Obteniendo ruta del archivo Excel de objetivos para la empresa: ${companyName}`, 'INFO');
+
+    // Cargar la configuración para obtener las rutas de la empresa
+    const configData = await fsp.readFile(configPath, 'utf8');
+    const config = JSON.parse(configData);
+
+    if (!config.companyPaths || !config.companyPaths[companyName]) {
+      throw new Error(`No se encontró configuración para la empresa: ${companyName}`);
+    }
+
+    const companyConfig = config.companyPaths[companyName];
+    const companyRootPath = companyConfig.root;
+    const companyStructure = companyConfig.structure?.structure;
+
+    let targetFolderPath = null;
+
+    // 1. Intentar encontrar la carpeta específica del submódulo usando el mapeo
+    if (companyStructure) {
+        // Buscar el submódulo "2.2.1"
+        targetFolderPath = searchInStructure(companyStructure, "2.2.1");
+        if (targetFolderPath) {
+            sendLog(`[MAIN] Carpeta de "2.2.1 Objetivos SST" encontrada en mapeo: ${targetFolderPath}`, 'INFO');
+        }
+    }
+
+    // Si no se encuentra en el mapeo, usar la raíz (fallback, aunque menos preciso)
+    const searchPath = targetFolderPath || companyRootPath;
+
+    if (!searchPath) {
+      throw new Error(`No se encontró la ruta raíz ni la carpeta del submódulo para la empresa: ${companyName}`);
+    }
+
+    // Función de búsqueda local en la carpeta específica (o recursiva si es necesario)
+    async function findObjetivosFile(dir, recursive = false) {
+      try {
+        const entries = await fsp.readdir(dir, { withFileTypes: true });
+        
+        // Prioridad 1: Búsqueda exacta del archivo esperado
+        const exactMatch = entries.find(e => 
+            !e.isDirectory() && 
+            e.name.toUpperCase().includes('GI-FO-044 OBJETIVOS Y METAS DEL SST') && 
+            !e.name.startsWith('~$')
+        );
+        if (exactMatch) return path.join(dir, exactMatch.name);
+
+        // Prioridad 2: Búsqueda flexible pero ROBUSTA dentro de esta carpeta
+        for (const entry of entries) {
+          const name = entry.name.toLowerCase();
+          const fullPath = path.join(dir, entry.name);
+
+          if (entry.isDirectory()) {
+             if (recursive) {
+                 // Evitar carpetas del sistema
+                 if (name.startsWith('.') || name === 'node_modules') continue;
+                 const res = await findObjetivosFile(fullPath, true);
+                 if (res) return res;
+             }
+          } else {
+            // Ignorar archivos temporales
+            if (name.startsWith('~$')) continue;
+            
+            // Ignorar archivos de Psicosocial explícitamente
+            if (name.includes('psicosocial')) continue;
+
+            // Criterios de coincidencia
+            // Debe ser excel y contener (objetivos Y metas) O (objetivos Y sst)
+            if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+                 if ((name.includes('objetivos') && name.includes('metas')) || 
+                     (name.includes('objetivos') && name.includes('sst'))) {
+                     return fullPath;
+                 }
+            }
+          }
+        }
+      } catch (error) {
+         // sendLog(`[MAIN] Error buscando en ${dir}: ${error.message}`, 'WARN');
+      }
+      return null;
+    }
+
+    // Buscar primero solo en la carpeta destino (sin recursividad profunda si es la carpeta del submódulo)
+    // Si targetFolderPath existe, buscamos ahí. Si no, buscamos recursivamente desde la raíz.
+    let excelFilePath = await findObjetivosFile(searchPath, !targetFolderPath);
+
+    if (!excelFilePath) {
+        // Fallback final: Si falló la búsqueda específica, intentar búsqueda recursiva amplia desde la raíz
+        // pero con filtros estrictos
+        if (targetFolderPath) {
+             sendLog(`[MAIN] No se encontró en la carpeta específica. Buscando en toda la empresa...`, 'WARN');
+             excelFilePath = await findObjetivosFile(companyRootPath, true);
+        }
+    }
+
+    if (!excelFilePath) {
+      throw new Error(`No se encontró el archivo "GI-FO-044 OBJETIVOS Y METAS DEL SST.xlsx" en la ruta de la empresa.`);
+    }
+
+    sendLog(`[MAIN] Archivo Excel de objetivos seleccionado: ${excelFilePath}`, 'INFO');
+
+    return {
+      success: true,
+      filePath: excelFilePath
+    };
+  } catch (error) {
+    sendLog(`[MAIN] Error obteniendo ruta del archivo Excel de objetivos: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// Handler para cargar datos del archivo Excel de objetivos
+ipcMain.handle('load-objetivos-excel-data', async (event, filePath) => {
+  try {
+    sendLog(`[MAIN] Cargando datos del archivo Excel de objetivos: ${filePath}`, 'INFO');
+
+    // Verificar que el archivo existe
+    try {
+      await fsp.access(filePath, fs.constants.R_OK);
+      sendLog(`[MAIN] Archivo Excel accesible: ${filePath}`, 'DEBUG');
+    } catch (accessError) {
+      sendLog(`[MAIN] Error de acceso al archivo Excel ${filePath}: ${accessError.message}`, 'ERROR');
+      return { success: false, error: `El archivo no es accesible o no existe: ${filePath}. Error: ${accessError.message}` };
+    }
+
+    // Leer el archivo Excel
+    const workbook = xlsx.readFile(filePath);
+    const sheetName = workbook.SheetNames[0]; // Tomar la primera hoja
+    const worksheet = workbook.Sheets[sheetName];
+
+    // Obtener los datos como JSON
+    const jsonData = xlsx.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+
+    // Extraer la política desde la celda A6
+    let policyText = '';
+    if (worksheet['A6']) {
+        policyText = worksheet['A6'].v ? worksheet['A6'].v.toString() : '';
+    }
+
+    // Extraer los objetivos
+    // Según instrucciones: Titulos en fila 5 (índice 4). Datos inician desde fila 6 o 7.
+    // Asumiremos que los datos inician en la fila 7 (índice 6) porque la fila 6 suele ser la política o espacio.
+    // Mapeo solicitado:
+    // Objetivos (B) -> 1
+    // Indicadores (C) -> 2
+    // Formula (D) -> 3
+    // Meta (E) -> 4
+    // Frecuencia (F) -> 5
+    // Responsable (G) -> 6
+
+    const startIndex = 6; // Fila 7 (índice 6)
+    const objectivesData = [];
+
+    for (let i = startIndex; i < jsonData.length; i++) {
+      const row = jsonData[i];
+      // Verificar si existe el objetivo en la columna B (índice 1)
+      if (row && row[1]) { 
+        objectivesData.push({
+          id: objectivesData.length + 1,
+          objective: row[1] ? row[1].toString() : '',
+          indicator: row[2] ? row[2].toString() : '',
+          formula: row[3] ? row[3].toString() : '',
+          goal: row[4] ? row[4].toString() : '',
+          frequency: row[5] ? row[5].toString() : '',
+          responsible: row[6] ? row[6].toString() : ''
+        });
+      }
+    }
+
+    sendLog(`[MAIN] Datos de objetivos cargados: ${objectivesData.length} registros`, 'INFO');
+
+    return {
+      success: true,
+      data: {
+        policyText: policyText,
+        objectivesData: objectivesData
+      }
+    };
+  } catch (error) {
+    sendLog(`[MAIN] Error cargando datos del archivo Excel de objetivos: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// Handler para guardar datos en el archivo Excel de objetivos
+ipcMain.handle('save-objetivos-excel-data', async (event, filePath, data) => {
+  try {
+    sendLog(`[MAIN] Guardando datos en archivo Excel de objetivos: ${filePath}`, 'INFO');
+
+    // Verificar que el archivo existe
+    try {
+      await fsp.access(filePath, fs.constants.R_OK);
+      sendLog(`[MAIN] Archivo Excel accesible para escritura: ${filePath}`, 'DEBUG');
+    } catch (accessError) {
+      sendLog(`[MAIN] Error de acceso al archivo Excel ${filePath}: ${accessError.message}`, 'ERROR');
+      return { success: false, error: `El archivo no es accesible o no existe: ${filePath}. Error: ${accessError.message}` };
+    }
+
+    // Leer el archivo Excel existente
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+
+    // Obtener la primera hoja
+    const worksheet = workbook.getWorksheet(1);
+
+    // Actualizar la política en la celda A6
+    if (data.policyText) {
+      worksheet.getCell('A6').value = data.policyText;
+    }
+
+    // Actualizar los objetivos
+    // Iniciar escritura desde la fila 7 (índice 7 en ExcelJS que es 1-based)
+    const startIndex = 7; 
+    const dataRows = data.objectivesData || [];
+
+    // Limpiar filas anteriores (eliminar datos pero mantener encabezados y estructura)
+    // Limpiamos columnas 2 a 7 (B a G) desde la fila 7 hacia abajo
+    for (let i = startIndex; i < startIndex + 100; i++) { // Limpiar hasta 100 filas potenciales
+      const row = worksheet.getRow(i);
+      for (let col = 2; col <= 7; col++) {
+          row.getCell(col).value = null;
+      }
+    }
+
+    // Escribir los nuevos datos
+    dataRows.forEach((obj, index) => {
+      const row = worksheet.getRow(startIndex + index);
+      row.getCell(2).value = obj.objective || '';   // Col B
+      row.getCell(3).value = obj.indicator || '';   // Col C
+      row.getCell(4).value = obj.formula || '';     // Col D
+      row.getCell(5).value = obj.goal || '';        // Col E
+      row.getCell(6).value = obj.frequency || '';   // Col F
+      row.getCell(7).value = obj.responsible || ''; // Col G
+    });
+
+    // Guardar el archivo
+    await workbook.xlsx.writeFile(filePath);
+
+    sendLog(`[MAIN] Datos de objetivos guardados exitosamente en: ${filePath}`, 'INFO');
+
+    return { success: true };
+  } catch (error) {
+    sendLog(`[MAIN] Error guardando datos en archivo Excel de objetivos: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
 ipcMain.handle('get-word-preview', async (event, filePath) => {
   sendLog(`[MAIN][get-word-preview] Solicitud recibida para filePath: ${filePath}`, 'INFO');
   let tempPdfPath = '';
@@ -1932,7 +2184,7 @@ async function handleSaveBudgetFile(event, filePath, dataToSave) {
 
       // Asignar valores CÉLULA POR CÉLULA para preservar completamente la columna B
       // (incluyendo merges, formato y otras propiedades)
-      
+
       // Columna A (índice 0) - ID
       row.getCell(1).value = rowData.id; // ExcelJS usa índice base 1, así que 1 = columna A
 
@@ -1957,7 +2209,7 @@ async function handleSaveBudgetFile(event, filePath, dataToSave) {
       // Columnas G a R (índices 6-17) - Meses
       const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
                      'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-      
+
       meses.forEach((mes, idx) => {
         const colIndex = 7 + idx; // 7 = columna G (índice base 1 de ExcelJS)
         row.getCell(colIndex).value = parseValue(rowData[mes]);
@@ -1975,13 +2227,13 @@ async function handleSaveBudgetFile(event, filePath, dataToSave) {
       try {
         // Decodificar el rango del merge (ej: "B11:B20")
         const decodedRange = xlsx.utils.decode_range(mergeRange);
-        
+
         // Convertir a formato de ExcelJS (1-based)
         const startRow = decodedRange.s.r + 1;
         const startCol = decodedRange.s.c + 1;
         const endRow = decodedRange.e.r + 1;
         const endCol = decodedRange.e.c + 1;
-        
+
         // Reaplicar el merge usando ExcelJS
         worksheet.mergeCells(startRow, startCol, endRow, endCol);
         sendLog(`[DEBUG] Merge restaurado: ${mergeRange} -> (${startRow},${startCol}):(${endRow},${endCol})`, 'DEBUG');

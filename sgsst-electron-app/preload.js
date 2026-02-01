@@ -139,6 +139,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadFollowUpData: (companyName) => ipcRenderer.invoke('load-follow-up-data', companyName),
   saveDebugHtml: (htmlContent) => ipcRenderer.invoke('save-debug-html', htmlContent),
 
+  // --- Objetivos SST ---
+  getObjetivosExcelPath: (companyName) => ipcRenderer.invoke('get-objetivos-excel-path', companyName),
+  loadObjetivosExcelData: (filePath) => ipcRenderer.invoke('load-objetivos-excel-data', filePath),
+  saveObjetivosExcelData: (filePath, data) => ipcRenderer.invoke('save-objetivos-excel-data', filePath, data),
+
   // --- Eventos IPC ---
   send: (channel, data) => ipcRenderer.send(channel, data),
   onIpcMessage: (channel, listener) => {
