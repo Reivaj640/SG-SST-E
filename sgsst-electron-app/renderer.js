@@ -1876,6 +1876,19 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 
+    } else if (submoduleName === "2.3.1 Evaluación inicial del SG-SST") {
+      if (window.EvaluacionInicialSgSst) {
+        const evaluacionComponent = new window.EvaluacionInicialSgSst(
+          submoduleContentDiv,
+          moduleName,
+          submoduleName
+        );
+        evaluacionComponent.render();
+      } else {
+        console.error('❌ EvaluacionInicialSgSst no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
     } else if (submoduleName === "2.4.1 Plan de Trabajo Anual") {
       if (window.PlanTrabajoComponent) {
         const planTrabajoComponent = new window.PlanTrabajoComponent(

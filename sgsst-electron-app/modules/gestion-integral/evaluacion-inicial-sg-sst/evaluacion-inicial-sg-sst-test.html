@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prueba - Evaluación Inicial SG-SST</title>
+    <link rel="stylesheet" href="../../../styles.css">
+    <link rel="stylesheet" href="evaluacion-inicial-sg-sst.css">
+    <link rel="stylesheet" href="../../../node_modules/bootstrap-icons/font/bootstrap-icons.css">
+</head>
+<body>
+    <div id="app">
+        <header id="app-header">
+            <div class="header-content">
+                <h1 id="app-title" class="header-title-left">
+                    <strong>K+AIR</strong> <small>Powered by GEST-IAR</small>
+                </h1>
+            </div>
+        </header>
+
+        <main id="main-content">
+            <div id="content-area" style="height: calc(100vh - 100px);">
+                <!-- El contenido se cargará aquí -->
+            </div>
+        </main>
+    </div>
+
+    <script src="../../../node_modules/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="evaluacion-inicial-sg-sst.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const container = document.getElementById('content-area');
+            const evaluacionComponent = new EvaluacionInicialSgSst(
+                container, 
+                'Gestión Integral', 
+                '2.3.1 Evaluación inicial del SG-SST'
+            );
+            evaluacionComponent.render();
+        });
+    </script>
+</body>
+</html>
