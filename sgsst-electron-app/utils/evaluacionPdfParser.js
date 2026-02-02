@@ -1,19 +1,340 @@
-// utils/evaluacionPdfParser.js - Parser para PDFs de evaluación inicial SG-SST
+/**
+ * Parser para extraer datos de PDFs de evaluación inicial del SG-SST
+ * Soporta dos formatos:
+ * 1. PDF del Ministerio (Resultados Calificación de Estándares Mínimos)
+ * 2. PDF de ARL (Informe Res 0312)
+ */
 
-const pdfParse = require('pdf-parse');
 const fs = require('fs');
+const path = require('path');
+const pdf = require('pdf-parse');
 
 class EvaluacionPdfParser {
     constructor() {
-        // Patrones para detectar estructura del PDF
-        this.patterns = {
-            itemCode: /(\d+\.\d+\.\d+)/,  // Ej: 1.1.1, 2.10.1
-            cycle: /(PLANEAR|HACER|VERIFICAR|ACTUAR)/i,
-            standard: /(?:Estándar|Estandar|Standard)[:\s]*(.+?)(?=\n|$)/i,
-            maxScore: /(?:Máximo|Maximo|Max)[:\s]*(\d+\.?\d*)/i,
-            scoreObtained: /(?:Obtenido|Obt|Puntaje)[:\s]*(\d+\.?\d*)/i,
-            status: /(?:Cumple|No Cumple|Parcial|No Aplica)/i,
-            year: /20(2[0-9]|3[0-9])/
+        this.pdfLib = pdf;
+    }
+
+    /**
+     * Valida el formato del PDF según el tipo de fuente
+     * @param {string} text - Texto extraído del PDF
+     * @param {string} sourceType - Tipo de fuente ('ministerio' o 'arl')
+     * @returns {Object} Resultado de la validación
+     */
+    validatePdfFormat(text, sourceType) {
+        if (sourceType === 'ministerio') {
+            // Validar formato del Ministerio
+            const hasHeader = text.includes('Número Radicado:') || 
+                             text.includes('Nombre de la Empresa :');
+            const hasTable = text.includes('ESTÁNDARES MÍNIMOS SGSST') ||
+                           text.includes('TABLA DE VALORES Y CALIFICACIÓN');
+            const hasItems = /\d+\.\d+\.\d+/.test(text); // Busca patrones como 1.1.1
+            
+            if (!hasHeader) {
+                return { isValid: false, reason: 'No se encontró el encabezado del Ministerio' };
+            }
+            if (!hasTable) {
+                return { isValid: false, reason: 'No se encontró la tabla de valores y calificación' };
+            }
+            if (!hasItems) {
+                return { isValid: false, reason: 'No se encontraron ítems de evaluación' };
+            }
+            
+            return { isValid: true };
+        } else if (sourceType === 'arl') {
+            // Validar formato de ARL
+            const hasHeader = text.includes('INFORME DE ESTANDARES MÍNIMOS') ||
+                             text.includes('Resolución 312');
+            const hasTable = text.includes('TABLA DE VALORES Y CALIFICACIÓN');
+            const hasItems = /\d+\.\d+\.\d+/.test(text);
+            
+            if (!hasHeader) {
+                return { isValid: false, reason: 'No se encontró el encabezado del informe ARL' };
+            }
+            if (!hasTable) {
+                return { isValid: false, reason: 'No se encontró la tabla de valores y calificación' };
+            }
+            if (!hasItems) {
+                return { isValid: false, reason: 'No se encontraron ítems de evaluación' };
+            }
+            
+            return { isValid: true };
+        }
+        
+        return { isValid: false, reason: 'Tipo de fuente no reconocido' };
+    }
+
+    /**
+     * Extrae el año del nombre del archivo o del contenido
+     * @param {string} filePath - Ruta del archivo
+     * @param {string} text - Texto del PDF
+     * @returns {string} Año extraído
+     */
+    extractYear(filePath, text) {
+        // Primero intentar del nombre del archivo
+        const fileName = path.basename(filePath);
+        const yearMatch = fileName.match(/20[1-2][0-9]/);
+        if (yearMatch) {
+            return yearMatch[0];
+        }
+        
+        // Luego intentar del contenido
+        const contentMatch = text.match(/(?:Periodo Correspondiente|Periodo)\s*:\s*(20[1-2][0-9])/);
+        if (contentMatch) {
+            return contentMatch[1];
+        }
+        
+        // Por defecto, usar el año actual
+        return new Date().getFullYear().toString();
+    }
+
+    /**
+     * Extrae el nombre del archivo sin extensión
+     * @param {string} filePath - Ruta del archivo
+     * @returns {string} Nombre del archivo
+     */
+    extractFileName(filePath) {
+        return path.basename(filePath, path.extname(filePath));
+    }
+
+    /**
+     * Parsea un PDF del Ministerio
+     * @param {string} text - Texto extraído del PDF
+     * @param {string} filePath - Ruta del archivo
+     * @returns {Object} Datos extraídos
+     */
+    parseMinisterioPdf(text, filePath) {
+        const findings = [];
+        const lines = text.split('\n');
+        
+        let currentItem = null;
+        let descriptionLines = [];
+        let inItem = false;
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            
+            // Ignorar líneas de página
+            if (line.match(/^-- \d+ of \d+ --$/)) {
+                continue;
+            }
+            
+            // Ignorar líneas de encabezado de tabla
+            if (line.includes('CICLO') && line.includes('ESTÁNDAR')) {
+                continue;
+            }
+            
+            // Detectar inicio de un ítem (línea que empieza con patrón como 1.1.1)
+            const itemMatch = line.match(/^(\d+\.\d+\.\d+)\s+(.+)$/);
+            
+            if (itemMatch) {
+                // Guardar el ítem anterior si existe
+                if (currentItem && inItem) {
+                    currentItem.desc = descriptionLines.join(' ').trim();
+                    findings.push(currentItem);
+                }
+                
+                // Crear nuevo ítem con nombres de propiedades compatibles con la interfaz
+                currentItem = {
+                    code: itemMatch[1],           // ID del ítem
+                    desc: '',                    // Descripción
+                    max: 0,                     // Valor máximo
+                    grade: 0,                   // Puntaje obtenido
+                    status: 'no_cumple',
+                    requiereRevisionManual: true,  // Requiere revisión manual
+                    errores: []                  // Lista de errores
+                };
+                descriptionLines = [itemMatch[2]];
+                inItem = true;
+            } else if (inItem && currentItem) {
+                // Buscar línea con valor y estado (ej: 0.50 	Cumple)
+                const valueMatch = line.match(/^(\d+[\.,]?\d*)\s+(.+?)\s*$/);
+                
+                if (valueMatch) {
+                    const value = parseFloat(valueMatch[1].replace(',', '.'));
+                    const statusText = valueMatch[2];
+                    
+                    currentItem.max = value;
+                    currentItem.status = this.parseStatus(statusText);
+                    currentItem.grade = value;
+                    currentItem.requiereRevisionManual = currentItem.status === 'no_cumple' || currentItem.status === 'parcial';
+                    
+                    // La siguiente línea podría tener el puntaje (ej: totalmente 0.50)
+                    if (i + 1 < lines.length) {
+                        const nextLine = lines[i + 1].trim();
+                        const scoreMatch = nextLine.match(/^.+?\s+(\d+[\.,]?\d*)$/);
+                        if (scoreMatch) {
+                            currentItem.grade = parseFloat(scoreMatch[1].replace(',', '.'));
+                        }
+                    }
+                    
+                    // Guardar el ítem
+                    currentItem.desc = descriptionLines.join(' ').trim();
+                    findings.push(currentItem);
+                    
+                    // Resetear para el siguiente ítem
+                    currentItem = null;
+                    descriptionLines = [];
+                    inItem = false;
+                } else if (line && !line.match(/^(Planear|Hacer|Verificar|Actuar)/)) {
+                    // Acumular líneas de descripción
+                    descriptionLines.push(line);
+                }
+            }
+        }
+        
+        // Guardar el último ítem si existe
+        if (currentItem && inItem) {
+            currentItem.desc = descriptionLines.join(' ').trim();
+            findings.push(currentItem);
+        }
+        
+        return {
+            findings: findings,
+            rawData: { text, lines }
+        };
+    }
+
+    /**
+     * Parsea un PDF de ARL
+     * @param {string} text - Texto extraído del PDF
+     * @param {string} filePath - Ruta del archivo
+     * @returns {Object} Datos extraídos
+     */
+    parseArlPdf(text, filePath) {
+        const findings = [];
+        const lines = text.split('\n');
+        
+        let currentItem = null;
+        let descriptionLines = [];
+        let inItem = false;
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            
+            // Ignorar líneas de página
+            if (line.match(/^-- \d+ of \d+ --$/)) {
+                continue;
+            }
+            
+            // Ignorar líneas de encabezado de tabla
+            if (line.includes('CICLO') && line.includes('ESTÁNDAR')) {
+                continue;
+            }
+            
+            // Detectar inicio de un ítem (línea que empieza con patrón como 1.1.1)
+            const itemMatch = line.match(/^(\d+\.\d+\.\d+)\s+(.+)$/);
+            
+            if (itemMatch) {
+                // Guardar el ítem anterior si existe
+                if (currentItem && inItem) {
+                    currentItem.desc = descriptionLines.join(' ').trim();
+                    findings.push(currentItem);
+                }
+                
+                // Crear nuevo ítem con nombres de propiedades compatibles con la interfaz
+                currentItem = {
+                    code: itemMatch[1],           // ID del ítem
+                    desc: '',                    // Descripción
+                    max: 0,                     // Valor máximo
+                    grade: 0,                   // Puntaje obtenido
+                    status: 'no_cumple',
+                    requiereRevisionManual: true,  // Requiere revisión manual
+                    errores: []                  // Lista de errores
+                };
+                descriptionLines = [itemMatch[2]];
+                inItem = true;
+            } else if (inItem && currentItem) {
+                // Buscar línea con valor y marca X (ej: 0,5 X)
+                const valueMatch = line.match(/^(\d+[\.,]?\d*)\s*(X)?$/);
+                
+                if (valueMatch) {
+                    const value = parseFloat(valueMatch[1].replace(',', '.'));
+                    const hasX = valueMatch[2] === 'X';
+                    
+                    currentItem.max = value;
+                    currentItem.status = hasX ? 'cumple' : 'no_cumple';
+                    currentItem.grade = hasX ? value : 0;
+                    currentItem.requiereRevisionManual = !hasX;
+                    
+                    // Guardar el ítem
+                    currentItem.desc = descriptionLines.join(' ').trim();
+                    findings.push(currentItem);
+                    
+                    // Resetear para el siguiente ítem
+                    currentItem = null;
+                    descriptionLines = [];
+                    inItem = false;
+                } else if (line && !line.match(/^(Planear|Hacer|Verificar|Actuar)/)) {
+                    // Acumular líneas de descripción
+                    descriptionLines.push(line);
+                }
+            }
+        }
+        
+        // Guardar el último ítem si existe
+        if (currentItem && inItem) {
+            currentItem.desc = descriptionLines.join(' ').trim();
+            findings.push(currentItem);
+        }
+        
+        return {
+            findings: findings,
+            rawData: { text, lines }
+        };
+    }
+
+    /**
+     * Parsea el estado de cumplimiento
+     * @param {string} statusText - Texto del estado
+     * @returns {string} Estado normalizado
+     */
+    parseStatus(statusText) {
+        if (!statusText) return 'no_cumple';
+        
+        const normalized = statusText.toLowerCase().trim();
+        
+        if (normalized.includes('cumple totalmente') || normalized === 'cumple') {
+            return 'cumple';
+        } else if (normalized.includes('parcial')) {
+            return 'parcial';
+        } else if (normalized.includes('no cumple') || normalized === 'no cumple') {
+            return 'no_cumple';
+        } else if (normalized === 'x') {
+            return 'cumple';
+        }
+        
+        return 'no_cumple';
+    }
+
+    /**
+     * Calcula métricas de los hallazgos
+     * @param {Array} findings - Lista de hallazgos
+     * @returns {Object} Métricas calculadas
+     */
+    calculateMetrics(findings) {
+        if (!findings || findings.length === 0) {
+            return {
+                cumplimiento: 0,
+                totalItems: 0,
+                cumplidos: 0,
+                noCumplidos: 0,
+                parcial: 0
+            };
+        }
+        
+        const totalItems = findings.length;
+        const cumplidos = findings.filter(f => f.status === 'cumple').length;
+        const noCumplidos = findings.filter(f => f.status === 'no_cumple').length;
+        const parcial = findings.filter(f => f.status === 'parcial').length;
+        
+        const cumplimiento = totalItems > 0 ? Math.round((cumplidos / totalItems) * 100) : 0;
+        
+        return {
+            cumplimiento,
+            totalItems,
+            cumplidos,
+            noCumplidos,
+            parcial
         };
     }
 
@@ -32,26 +353,54 @@ class EvaluacionPdfParser {
                 throw new Error(`Archivo no encontrado: ${pdfPath}`);
             }
 
-            // Leer el archivo PDF
+            // Leer el archivo PDF como Uint8Array
             const dataBuffer = fs.readFileSync(pdfPath);
-            const pdfData = await pdfParse(dataBuffer);
+            const data = new Uint8Array(dataBuffer);
             
-            console.log(`[EvaluacionPdfParser] PDF leído, ${pdfData.numpages} páginas`);
+            console.log(`[EvaluacionPdfParser] Tamaño del archivo: ${dataBuffer.length} bytes`);
             
-            // Extraer el texto completo
-            const fullText = pdfData.text;
+            // Crear el parser usando pdf-parse v2.4.5
+            console.log('[EvaluacionPdfParser] Creando parser PDF...');
+            const parser = new this.pdfLib.PDFParse(data);
             
+            // Obtener el texto del PDF
+            console.log('[EvaluacionPdfParser] Extrayendo texto del PDF...');
+            const result = await parser.getText();
+            
+            console.log(`[EvaluacionPdfParser] PDF leído, ${result.total} páginas`);
+            console.log(`[EvaluacionPdfParser] Longitud del texto: ${result.text.length} caracteres`);
+            
+            // Validar formato preliminar
+            const formatValidation = this.validatePdfFormat(result.text, sourceType);
+            if (!formatValidation.isValid) {
+                console.warn(`[EvaluacionPdfParser] Formato de PDF no reconocido: ${formatValidation.reason}`);
+                return {
+                    success: false,
+                    error: `Formato de PDF no reconocido: ${formatValidation.reason}`,
+                    year: new Date().getFullYear().toString(),
+                    source: sourceType,
+                    fileName: this.extractFileName(pdfPath),
+                    filePath: pdfPath,
+                    findings: [],
+                    metrics: { cumplimiento: 0, totalItems: 0, cumplidos: 0, noCumplidos: 0, parcial: 0 }
+                };
+            }
+
             // Extraer el año del nombre del archivo o del contenido
-            const year = this.extractYear(pdfPath, fullText);
-            
+            const year = this.extractYear(pdfPath, result.text);
+
             // Extraer datos según el tipo de fuente
             const extractedData = sourceType === 'ministerio' 
-                ? this.parseMinisterioPdf(fullText, pdfPath)
-                : this.parseArlPdf(fullText, pdfPath);
-            
+                ? this.parseMinisterioPdf(result.text, pdfPath)
+                : this.parseArlPdf(result.text, pdfPath);
+
+            console.log(`[EvaluacionPdfParser] Hallazgos extraídos: ${extractedData.findings.length}`);
+
             // Calcular métricas
             const metrics = this.calculateMetrics(extractedData.findings);
             
+            console.log(`[EvaluacionPdfParser] Métricas:`, metrics);
+
             return {
                 success: true,
                 year: year,
@@ -62,7 +411,7 @@ class EvaluacionPdfParser {
                 metrics: metrics,
                 rawData: extractedData.rawData
             };
-            
+
         } catch (error) {
             console.error('[EvaluacionPdfParser] Error procesando PDF:', error);
             return {
@@ -74,318 +423,6 @@ class EvaluacionPdfParser {
                 metrics: { cumplimiento: 0, totalItems: 0, cumplidos: 0, noCumplidos: 0, parcial: 0 }
             };
         }
-    }
-
-    /**
-     * Extrae el año del nombre del archivo o del contenido
-     */
-    extractYear(filePath, text) {
-        // Primero intentar del nombre del archivo
-        const fileName = this.extractFileName(filePath);
-        const yearMatch = fileName.match(/20(2[0-9]|3[0-9])/);
-        if (yearMatch) return yearMatch[0];
-        
-        // Si no, intentar del contenido
-        const textMatch = text.match(/20(2[0-9]|3[0-9])/);
-        if (textMatch) return textMatch[0];
-        
-        // Fallback al año actual
-        return new Date().getFullYear().toString();
-    }
-
-    /**
-     * Extrae el nombre del archivo de la ruta
-     */
-    extractFileName(filePath) {
-        return filePath.split(/[/\\]/).pop();
-    }
-
-    /**
-     * Parsea PDF del Ministerio de Trabajo
-     * Método mejorado: Usa contexto en lugar de look-ahead de líneas
-     */
-    parseMinisterioPdf(text, filePath) {
-        const findings = [];
-        
-        // Detectar ciclos PHVA en el texto completo
-        let currentCycle = '';
-        const cycleMatches = text.matchAll(/(?:Ciclo|CICLO)[:\s]*(PLANEAR|HACER|VERIFICAR|ACTUAR)/gi);
-        const cycles = Array.from(cycleMatches);
-        
-        // Patrón mejorado: Busca código + todo el contexto hasta el próximo código o final
-        // Usa [\s\S] para incluir saltos de línea (multiline tolerant)
-        const itemPattern = /(\d+\.\d+\.\d+)[\s\S]+?(?=\d+\.\d+\.\d+|$)/g;
-        
-        const itemMatches = text.matchAll(itemPattern);
-        
-        for (const match of itemMatches) {
-            const code = match[1];
-            const itemText = match[0].trim();
-            
-            // Determinar el ciclo actual basado en la posición del ítem
-            currentCycle = this.determineCycleForPosition(text, match.index, cycles);
-            
-            // Extraer descripción (todo después del código hasta el primer número o patrón de puntaje)
-            const descMatch = itemText.match(/\d+\.\d+\.\d+[\s\S]+?(?=\d+\.?\d*[\s\/]*\d+\.?\d*|Cumple|No Cumple|Parcial|$)/i);
-            const desc = descMatch ? descMatch[0].replace(/^\d+\.\d+\.\d+/, '').trim().substring(0, 200) : code;
-            
-            // Extraer puntajes del contexto del ítem
-            const scores = itemText.match(/(\d+\.?\d*)/g) || [];
-            let maxScore = 0;
-            let obtainedScore = 0;
-            let status = 'No Cumple';
-            let requiereRevisionManual = false;
-            
-            // Buscar patrón de puntaje (ej: 0.5 / 0.5 o 0.5 de 0.5)
-            const scorePattern = /(\d+\.?\d*)\s*(?:\/|de)\s*(\d+\.?\d*)/i;
-            const scoreMatch = itemText.match(scorePattern);
-            
-            if (scoreMatch) {
-                obtainedScore = parseFloat(scoreMatch[1]);
-                maxScore = parseFloat(scoreMatch[2]);
-            } else if (scores.length >= 2) {
-                // Fallback: usar los últimos dos números encontrados
-                maxScore = parseFloat(scores[scores.length - 1]);
-                obtainedScore = parseFloat(scores[scores.length - 2]);
-            }
-            
-            // Detectar estado del texto
-            const lowerText = itemText.toLowerCase();
-            if (lowerText.includes('cumple totalmente') || lowerText.includes('cumple') && !lowerText.includes('no cumple')) {
-                status = 'Cumple';
-                // Si cumple pero no hay puntaje, asumir puntaje máximo
-                if (maxScore > 0 && obtainedScore === 0) {
-                    obtainedScore = maxScore;
-                }
-            } else if (lowerText.includes('no cumple')) {
-                status = 'No Cumple';
-                obtainedScore = 0;
-            } else if (lowerText.includes('parcial')) {
-                status = 'Parcial';
-            }
-            
-            // Validación cruzada: Marcar para revisión manual si hay inconsistencias
-            if (status === 'No Cumple' && maxScore === 0) {
-                requiereRevisionManual = true;
-            } else if (status === 'Cumple' && obtainedScore === 0 && maxScore > 0) {
-                requiereRevisionManual = true;
-            } else if (obtainedScore > maxScore) {
-                requiereRevisionManual = true;
-            }
-            
-            findings.push({
-                code: code,
-                cycle: currentCycle,
-                standard: '', // Se puede extraer si es necesario
-                desc: desc,
-                max: maxScore,
-                grade: obtainedScore,
-                status: status,
-                requiereRevisionManual: requiereRevisionManual
-            });
-        }
-        
-        // Si no se encontraron hallazgos, intentar método genérico
-        if (findings.length === 0) {
-            console.log('[EvaluacionPdfParser] No se encontraron hallazgos con método principal, usando genérico');
-            return this.parseGenericPdf(text);
-        }
-        
-        console.log(`[EvaluacionPdfParser] Se encontraron ${findings.length} hallazgos`);
-        return { findings, rawData: text };
-    }
-
-    /**
-     * Determina el ciclo PHVA basado en la posición del ítem en el texto
-     */
-    determineCycleForPosition(text, position, cycles) {
-        for (let i = cycles.length - 1; i >= 0; i--) {
-            if (position > cycles[i].index) {
-                return cycles[i][1].toUpperCase();
-            }
-        }
-        return '';
-    }
-
-    /**
-     * Parsea PDF de ARL
-     * Método mejorado: Usa contexto en lugar de look-ahead de líneas
-     */
-    parseArlPdf(text, filePath) {
-        const findings = [];
-        
-        // Patrón mejorado para riesgos: Busca código de riesgo + todo el contexto hasta el próximo riesgo o final
-        // Usa [\s\S] para incluir saltos de línea (multiline tolerant)
-        const riskPattern = /(?:Riesgo|R-)([A-Z]+)[\s\S]+?(?=(?:Riesgo|R-)[A-Z]+|$)/gi;
-        
-        const riskMatches = text.matchAll(riskPattern);
-        
-        for (const match of riskMatches) {
-            const riskCode = match[1].toUpperCase();
-            const code = `R-${riskCode}`;
-            const riskText = match[0].trim();
-            
-            // Extraer descripción (todo después del código hasta el primer número o patrón de puntaje)
-            const descMatch = riskText.match(/(?:Riesgo|R-)[A-Z]+[\s\S]+?(?=\d+\.?\d*[\s\/]*\d+\.?\d*|Cumple|No Cumple|Parcial|$)/i);
-            const desc = descMatch ? descMatch[0].replace(/(?:Riesgo|R-)[A-Z]+/, '').trim().substring(0, 200) : `Riesgo ${riskCode}`;
-            
-            // Extraer puntajes del contexto del riesgo
-            const scores = riskText.match(/(\d+\.?\d*)/g) || [];
-            let maxScore = 10; // Valor por defecto para riesgos
-            let obtainedScore = 0;
-            let status = 'No Cumple';
-            let requiereRevisionManual = false;
-            
-            // Buscar patrón de puntaje (ej: 5 / 10 o 5 de 10)
-            const scorePattern = /(\d+\.?\d*)\s*(?:\/|de)\s*(\d+\.?\d*)/i;
-            const scoreMatch = riskText.match(scorePattern);
-            
-            if (scoreMatch) {
-                obtainedScore = parseFloat(scoreMatch[1]);
-                maxScore = parseFloat(scoreMatch[2]);
-            } else if (scores.length >= 1) {
-                // Fallback: usar el último número como puntaje obtenido
-                obtainedScore = parseFloat(scores[scores.length - 1]);
-            }
-            
-            // Detectar estado del texto
-            const lowerText = riskText.toLowerCase();
-            if (lowerText.includes('cumple totalmente') || lowerText.includes('cumple') && !lowerText.includes('no cumple')) {
-                status = 'Cumple';
-                // Si cumple pero no hay puntaje, asumir puntaje máximo
-                if (maxScore > 0 && obtainedScore === 0) {
-                    obtainedScore = maxScore;
-                }
-            } else if (lowerText.includes('no cumple')) {
-                status = 'No Cumple';
-                obtainedScore = 0;
-            } else if (lowerText.includes('parcial')) {
-                status = 'Parcial';
-            }
-            
-            // Validación cruzada: Marcar para revisión manual si hay inconsistencias
-            if (status === 'No Cumple' && maxScore === 0) {
-                requiereRevisionManual = true;
-            } else if (status === 'Cumple' && obtainedScore === 0 && maxScore > 0) {
-                requiereRevisionManual = true;
-            } else if (obtainedScore > maxScore) {
-                requiereRevisionManual = true;
-            }
-            
-            findings.push({
-                code: code,
-                cycle: '',
-                standard: '',
-                desc: desc,
-                max: maxScore,
-                grade: obtainedScore,
-                status: status,
-                requiereRevisionManual: requiereRevisionManual
-            });
-        }
-        
-        // Si no se encontraron hallazgos, intentar método genérico
-        if (findings.length === 0) {
-            console.log('[EvaluacionPdfParser] No se encontraron riesgos con método principal, usando genérico');
-            return this.parseGenericPdf(text);
-        }
-        
-        console.log(`[EvaluacionPdfParser] Se encontraron ${findings.length} riesgos`);
-        return { findings, rawData: text };
-    }
-
-    /**
-     * Método genérico para parsear PDFs cuando no se detecta patrón específico
-     */
-    parseGenericPdf(text) {
-        const findings = [];
-        
-        // Buscar patrones de código y descripción
-        const patterns = [
-            /(\d+\.\d+\.\d+)\s+([^\n]+?)(?=\n\d+\.\d+\.\d+|\n*$)/g,
-            /([A-Z]-\w+)\s+([^\n]+?)(?=\n[A-Z]-\w+|\n*$)/g
-        ];
-        
-        for (const pattern of patterns) {
-            const matches = text.matchAll(pattern);
-            
-            for (const match of matches) {
-                const code = match[1];
-                const desc = match[2].trim();
-                
-                // Buscar números en la descripción para inferir puntaje
-                const numbers = desc.match(/(\d+\.?\d*)/g) || [];
-                let maxScore = 1;
-                let obtainedScore = 0;
-                let status = 'No Cumple';
-                
-                if (numbers.length >= 1) {
-                    maxScore = parseFloat(numbers[numbers.length - 1]);
-                    if (numbers.length >= 2) {
-                        obtainedScore = parseFloat(numbers[numbers.length - 2]);
-                    }
-                }
-                
-                // Detectar estado del texto
-                const lowerDesc = desc.toLowerCase();
-                if (lowerDesc.includes('cumple')) {
-                    status = 'Cumple';
-                    if (obtainedScore === 0 && maxScore > 0) {
-                        obtainedScore = maxScore;
-                    }
-                } else if (lowerDesc.includes('no cumple')) {
-                    status = 'No Cumple';
-                    obtainedScore = 0;
-                } else if (lowerDesc.includes('parcial')) {
-                    status = 'Parcial';
-                }
-                
-                findings.push({
-                    code: code,
-                    cycle: '',
-                    standard: '',
-                    desc: desc.substring(0, 100), // Limitar longitud
-                    max: maxScore,
-                    grade: obtainedScore,
-                    status: status
-                });
-            }
-        }
-        
-        return { findings, rawData: text };
-    }
-
-    /**
-     * Calcula métricas a partir de los hallazgos
-     */
-    calculateMetrics(findings) {
-        if (!findings || findings.length === 0) {
-            return {
-                cumplimiento: 0,
-                totalItems: 0,
-                cumplidos: 0,
-                noCumplidos: 0,
-                parcial: 0
-            };
-        }
-        
-        const totalItems = findings.length;
-        const cumplidos = findings.filter(f => f.status === 'Cumple').length;
-        const noCumplidos = findings.filter(f => f.status === 'No Cumple').length;
-        const parcial = findings.filter(f => f.status === 'Parcial').length;
-        
-        const totalGrade = findings.reduce((sum, f) => sum + (f.grade || 0), 0);
-        const totalMax = findings.reduce((sum, f) => sum + (f.max || 0), 0);
-        
-        const cumplimiento = totalMax > 0 ? Math.round((totalGrade / totalMax) * 100) : 0;
-        
-        return {
-            cumplimiento,
-            totalItems,
-            cumplidos,
-            noCumplidos,
-            parcial
-        };
     }
 }
 

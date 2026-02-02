@@ -8,7 +8,7 @@ class EvaluacionInicialSgSst {
         this.moduleName = moduleName;
         this.submoduleTitle = submoduleTitle;
         this.backToModuleCallback = backToModuleCallback;
-        
+
         // Estado del componente
         this.currentFindings = [];
         this.currentData = [];
@@ -26,7 +26,7 @@ class EvaluacionInicialSgSst {
     async render() {
         // Registrar instancia global para manejo de eventos DOM
         window.currentEvaluacionInstance = this;
-        
+
         // Limpiar contenedor y establecer clase base del sistema K+AIR
         this.container.innerHTML = '';
         this.container.className = ''; // Limpiar clases previas
@@ -34,7 +34,7 @@ class EvaluacionInicialSgSst {
 
         const mainLayout = document.createElement('div');
         mainLayout.className = 'k-module-layout';
-        
+
         mainLayout.innerHTML = `
             <!-- 1. HEADER DEL MÓDULO (Patrón Estándar K+AIR) -->
             <header class="k-module-header">
@@ -80,7 +80,7 @@ class EvaluacionInicialSgSst {
 
             <!-- 3. CONTENIDO SCROLLABLE -->
             <div class="k-module-content">
-                
+
                 <!-- Panel de Control Interno -->
                 <div class="k-toolbar">
                     <div class="k-toolbar-group">
@@ -97,7 +97,7 @@ class EvaluacionInicialSgSst {
 
                 <!-- VISTA: DASHBOARD -->
                 <section id="view-dashboard" class="k-view active">
-                    
+
                     <!-- KPIs Principales -->
                     <div class="k-grid-metrics">
                         <div class="k-card k-card-metric">
@@ -248,7 +248,7 @@ class EvaluacionInicialSgSst {
                 </section>
 
             </div>
-            
+
             <!-- Notificaciones Toast -->
             <div id="k-toast" class="k-toast"></div>
         `;
@@ -263,16 +263,16 @@ class EvaluacionInicialSgSst {
     updateReferences() {
         this.hallazgosTableBody = document.getElementById('hallazgosTableBody');
         this.actionTableBody = document.getElementById('actionTableBody');
-        
+
         const backBtn = document.getElementById('btn-back-eval');
         if (backBtn && this.backToModuleCallback) {
             backBtn.addEventListener('click', this.backToModuleCallback);
         }
-        
+
         const btnPdf = document.getElementById('btn-view-pdf');
         if (btnPdf) {
-            btnPdf.addEventListener('click', () => { 
-                if (this.currentPdfPath) window.electronAPI.openPath(this.currentPdfPath); 
+            btnPdf.addEventListener('click', () => {
+                if (this.currentPdfPath) window.electronAPI.openPath(this.currentPdfPath);
             });
         }
     }
@@ -291,21 +291,21 @@ class EvaluacionInicialSgSst {
         views.forEach(view => {
             view.classList.remove('active');
             // Usar display none/block para asegurar limpieza visual
-            view.style.display = 'none'; 
+            view.style.display = 'none';
         });
 
         const activeView = this.container.querySelector(`#view-${tabId}`);
         if (activeView) {
             activeView.classList.add('active');
             activeView.style.display = 'block';
-            
+
             // Redibujar gráficos si se entra al dashboard para asegurar renderizado correcto
             if (tabId === 'dashboard' && this.currentFindings.length > 0) {
                 // Pequeño delay para que el canvas tenga dimensiones
                 setTimeout(() => this.updateDashboardWithRealData({ cumplimiento: parseInt(document.getElementById('kpi-score').textContent) }), 50);
             }
         }
-        
+
         this.activeTab = tabId;
     }
 
@@ -314,7 +314,7 @@ class EvaluacionInicialSgSst {
         try {
             const company = window.currentCompany || 'Tempoactiva';
             const pathResult = await window.electronAPI.findSubmodulePath(company, 'Gestión Integral', '2.3.1 Evaluación inicial del SG-SST');
-            
+
             if (pathResult.success && pathResult.path) {
                 this.submodulePath = pathResult.path;
                 await this.loadRealFiles();
@@ -329,33 +329,49 @@ class EvaluacionInicialSgSst {
 
     async loadRealFiles() {
         try {
+            console.log('[EvaluacionInicialSgSst] Cargando archivos desde:', this.submodulePath);
             const filesResult = await window.electronAPI.readDirectory(this.submodulePath);
+            console.log('[EvaluacionInicialSgSst] Resultado readDirectory:', filesResult);
+            
             if (!filesResult.success) throw new Error('Error de lectura');
 
             let allFiles = [...(filesResult.files || [])];
+            console.log('[EvaluacionInicialSgSst] Archivos encontrados en raíz:', allFiles.length);
 
             // Búsqueda recursiva simulada en carpetas clave
             const subfolders = ['Diagnostico Ministerio', 'Diagnostico ARL', 'SGSST'];
             for (const sub of subfolders) {
-                const subPath = `${this.submodulePath}\${sub}`;
+                const subPath = `${this.submodulePath}\\${sub}`;
+                console.log('[EvaluacionInicialSgSst] Buscando en subcarpeta:', subPath);
                 // Intentamos leer sin lanzar error si no existe la subcarpeta
                 try {
                     const subResult = await window.electronAPI.readDirectory(subPath);
+                    console.log('[EvaluacionInicialSgSst] Resultado subcarpeta', sub, ':', subResult);
                     if (subResult.success && subResult.files) {
                         allFiles = allFiles.concat(subResult.files);
+                        console.log('[EvaluacionInicialSgSst] Archivos agregados desde', sub, ':', subResult.files.length);
                     }
-                } catch (e) { /* Ignorar carpetas inexistentes */ }
+                } catch (e) { 
+                    console.log('[EvaluacionInicialSgSst] Subcarpeta no existe o error:', sub, e.message);
+                }
             }
 
+            console.log('[EvaluacionInicialSgSst] Total de archivos encontrados:', allFiles.length);
             this.renderHistoryFiles(allFiles);
 
-            // Prioridad de detección de informe
-            const reportPdf = allFiles.find(f => 
-                f.name.toLowerCase().endsWith('.pdf') && 
-                (f.name.includes('0312') || f.name.includes('evaluacion') || f.name.includes('informe'))
-            );
+            // Filtrar solo archivos PDF
+            const pdfFiles = allFiles.filter(f => f.name.toLowerCase().endsWith('.pdf'));
+            console.log('[EvaluacionInicialSgSst] Archivos PDF encontrados:', pdfFiles.length);
+            console.log('[EvaluacionInicialSgSst] Lista de PDFs:', pdfFiles.map(f => f.name));
 
-            if (reportPdf) {
+            // Si hay múltiples PDFs, mostrar selector
+            if (pdfFiles.length > 1) {
+                console.log('[EvaluacionInicialSgSst] Mostrando selector de PDFs');
+                this.showPdfSelector(pdfFiles);
+            } else if (pdfFiles.length === 1) {
+                // Si solo hay uno, procesarlo directamente
+                console.log('[EvaluacionInicialSgSst] Procesando único PDF encontrado');
+                const reportPdf = pdfFiles[0];
                 this.currentPdfPath = reportPdf.path;
                 const titleEl = document.getElementById('source-title');
                 const metaEl = document.getElementById('source-meta');
@@ -364,17 +380,115 @@ class EvaluacionInicialSgSst {
                 if (titleEl) titleEl.textContent = reportPdf.name;
                 if (metaEl) metaEl.textContent = `Archivo detectado en: ...${reportPdf.path.slice(-30)}`;
                 if (btnView) btnView.style.display = 'inline-flex';
-                
+
                 await this.processPdfData(reportPdf.path);
             } else {
+                console.warn('[EvaluacionInicialSgSst] No se encontraron archivos PDF');
                 document.getElementById('source-title').textContent = "No se encontró informe estándar";
                 document.getElementById('source-meta').textContent = "Por favor cargue un archivo PDF de evaluación (0312).";
             }
 
         } catch (e) {
-            console.warn(e);
+            console.error('[EvaluacionInicialSgSst] Error en loadRealFiles:', e);
             this.showToast('Error accediendo a los archivos.', 'warning');
         }
+    }
+
+    showPdfSelector(pdfFiles) {
+        // Crear un modal para seleccionar el PDF
+        const modal = document.createElement('div');
+        modal.className = 'k-modal';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        `;
+
+        let modalContent = `
+            <div class="k-modal-content" style="
+                background: white;
+                padding: 2rem;
+                border-radius: 8px;
+                width: 90%;
+                max-width: 600px;
+                max-height: 80vh;
+                overflow-y: auto;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            ">
+                <div class="k-modal-header" style="margin-bottom: 1.5rem;">
+                    <h3 style="margin: 0; color: var(--text-dark);">Seleccionar PDF de Evaluación</h3>
+                    <p style="margin: 0.5rem 0 0 0; color: var(--text-muted); font-size: 0.9rem;">
+                        Se encontraron ${pdfFiles.length} archivos PDF. Por favor seleccione el que desea procesar:
+                    </p>
+                </div>
+                <div class="k-modal-body">
+                    <div class="k-list-group">
+        `;
+
+        pdfFiles.forEach((pdf, index) => {
+            const encodedPath = encodeURIComponent(pdf.path);
+            const encodedName = encodeURIComponent(pdf.name);
+            modalContent += `
+                <div class="k-list-item" style="
+                    padding: 1rem;
+                    border: 1px solid var(--border);
+                    border-radius: 6px;
+                    margin-bottom: 0.5rem;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                " onclick="window.currentEvaluacionInstance.selectPdf(decodeURIComponent('${encodedPath}'), decodeURIComponent('${encodedName}'))">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <i class="bi bi-file-earmark-pdf-fill" style="color: var(--danger); font-size: 1.5rem;"></i>
+                        <div style="flex: 1;">
+                            <div style="font-weight: 500; color: var(--text-dark);">${pdf.name}</div>
+                            <div style="font-size: 0.8rem; color: var(--text-muted);">
+                                ${pdf.path.split('\\').slice(-2, -1)[0] || 'Raíz'} • ${Math.round(pdf.size / 1024)} KB
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        modalContent += `
+                    </div>
+                </div>
+                <div class="k-modal-footer" style="margin-top: 1.5rem; text-align: right;">
+                    <button class="k-btn k-btn-outline" onclick="this.closest('.k-modal').remove()" style="margin-right: 0.5rem;">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        `;
+
+        modal.innerHTML = modalContent;
+        document.body.appendChild(modal);
+    }
+
+    selectPdf(pdfPath, pdfName) {
+        // Cerrar el modal
+        const modal = document.querySelector('.k-modal');
+        if (modal) modal.remove();
+
+        // Actualizar la UI con el archivo seleccionado
+        this.currentPdfPath = pdfPath;
+        const titleEl = document.getElementById('source-title');
+        const metaEl = document.getElementById('source-meta');
+        const btnView = document.getElementById('btn-view-pdf');
+
+        if (titleEl) titleEl.textContent = pdfName;
+        if (metaEl) metaEl.textContent = `Archivo seleccionado: ...${pdfPath.slice(-30)}`;
+        if (btnView) btnView.style.display = 'inline-flex';
+
+        // Procesar el PDF seleccionado
+        this.processPdfData(pdfPath);
     }
 
     async processPdfData(pdfPath) {
@@ -382,22 +496,35 @@ class EvaluacionInicialSgSst {
         if (loading) loading.style.display = 'inline-flex';
 
         try {
+            console.log('[EvaluacionInicialSgSst] Iniciando procesamiento de PDF:', pdfPath);
             const sourceType = pdfPath.toLowerCase().includes('arl') ? 'arl' : 'ministerio';
-            
+            console.log('[EvaluacionInicialSgSst] Tipo de fuente detectado:', sourceType);
+
             if (window.electronAPI && window.electronAPI.processEvaluacionPdf) {
+                console.log('[EvaluacionInicialSgSst] Llamando a processEvaluacionPdf...');
                 const result = await window.electronAPI.processEvaluacionPdf(pdfPath, sourceType);
-                
+                console.log('[EvaluacionInicialSgSst] Resultado recibido:', result);
+
                 if (result.success) {
+                    console.log('[EvaluacionInicialSgSst] PDF procesado exitosamente');
+                    console.log('[EvaluacionInicialSgSst] Hallazgos encontrados:', result.findings?.length || 0);
+                    console.log('[EvaluacionInicialSgSst] Métricas:', result.metrics);
+                    
                     this.currentFindings = result.findings || [];
                     this.renderHallazgosTable();
                     this.updateDashboardWithRealData(result.metrics);
                     this.showToast('Datos procesados correctamente.', 'success');
                 } else {
-                    this.showToast('No se pudieron extraer datos estructurados.', 'warning');
+                    console.error('[EvaluacionInicialSgSst] Error procesando PDF:', result.error);
+                    this.showToast(`No se pudieron extraer datos: ${result.error || 'Error desconocido'}`, 'warning');
                 }
+            } else {
+                console.error('[EvaluacionInicialSgSst] electronAPI o processEvaluacionPdf no disponible');
+                this.showToast('Error: API no disponible', 'danger');
             }
         } catch (error) {
-            console.error(error);
+            console.error('[EvaluacionInicialSgSst] Excepción en processPdfData:', error);
+            this.showToast(`Error: ${error.message}`, 'danger');
         } finally {
             if (loading) loading.style.display = 'none';
         }
@@ -433,18 +560,18 @@ class EvaluacionInicialSgSst {
             
             if (isPdf) { icon = '<i class="bi bi-file-earmark-pdf-fill"></i>'; colorClass = 'text-danger'; }
             if (isXls) { icon = '<i class="bi bi-file-earmark-excel-fill"></i>'; colorClass = 'text-success'; }
-
-            const safePath = f.path.replace(/\\/g, '\\\\');
+            
+            const encodedPath = encodeURIComponent(f.path);
             
             html += `
                 <tr>
                     <td class="text-center" style="font-size:1.2rem; color:var(--text-muted);"><span class="${colorClass}">${icon}</span></td>
                     <td>
                         <div style="font-weight:500;">${f.name}</div>
-                        <div style="font-size:0.75rem; color:var(--text-muted);">${safePath.split('\\').slice(-2, -1)[0] || 'Raíz'}</div>
+                        <div style="font-size:0.75rem; color:var(--text-muted);">${f.path.split('\\').slice(-2, -1)[0] || 'Raíz'}</div>
                     </td>
                     <td class="text-right">
-                        <button class="k-btn k-btn-sm k-btn-outline" onclick="window.electronAPI.openPath('${safePath}')">
+                        <button class="k-btn k-btn-sm k-btn-outline" onclick="window.electronAPI.openPath(decodeURIComponent('${encodedPath}'))">
                             Abrir <i class="bi bi-box-arrow-up-right ms-1"></i>
                         </button>
                     </td>
@@ -458,7 +585,7 @@ class EvaluacionInicialSgSst {
     renderHallazgosTable() {
         const tbody = this.hallazgosTableBody;
         if (!tbody) return;
-        
+
         if (this.currentFindings.length === 0) {
             tbody.innerHTML = '<tr><td colspan="5" class="k-empty-table">No hay hallazgos para mostrar.</td></tr>';
             return;
@@ -467,10 +594,24 @@ class EvaluacionInicialSgSst {
         tbody.innerHTML = this.currentFindings.map(item => {
             const isCompliant = item.grade >= item.max;
             const badgeClass = isCompliant ? 'k-badge-success' : 'k-badge-danger';
-            
+            const needsReview = item.requiereRevisionManual;
+            const hasErrors = item.errores && item.errores.length > 0;
+            const rowClass = needsReview ? 'k-row-warning' : '';
+
+            // Crear tooltip con errores si existen
+            let errorTooltip = '';
+            if (hasErrors) {
+                const errorText = item.errores.join(', ');
+                errorTooltip = `title="${errorText}" data-bs-toggle="tooltip"`;
+            }
+
             return `
-            <tr>
-                <td style="font-weight:600; font-family:'Lexend';">${item.code}</td>
+            <tr class="${rowClass}">
+                <td style="font-weight:600; font-family:'Lexend';">
+                    ${item.code}
+                    ${needsReview ? '<i class="bi bi-exclamation-circle text-warning" title="Requiere revisión manual"></i>' : ''}
+                    ${hasErrors ? `<i class="bi bi-x-circle text-danger" ${errorTooltip}></i>` : ''}
+                </td>
                 <td>${item.desc}</td>
                 <td class="text-center">${item.max}</td>
                 <td class="text-center" style="font-weight:bold; color:${isCompliant ? 'var(--success)' : 'var(--danger)'}">${item.grade}</td>
@@ -483,22 +624,22 @@ class EvaluacionInicialSgSst {
 
     updateDashboardWithRealData(metrics) {
         if (!metrics) return;
-        
+
         // Actualizar Textos
         const score = metrics.cumplimiento || 0;
         const noCumplidos = metrics.noCumplidos || 0;
-        
+
         const scoreEl = document.getElementById('kpi-score');
         const gapsEl = document.getElementById('kpi-gaps');
         const chartLabel = document.getElementById('chart-score-label');
-        
+
         if (scoreEl) scoreEl.textContent = score + '%';
         if (chartLabel) chartLabel.textContent = score + '%';
         if (gapsEl) gapsEl.textContent = noCumplidos;
 
         // Actualizar Gráficos
         this.drawGauge(score);
-        
+
         // Simular PHVA si no hay datos detallados
         const phvaContainer = document.getElementById('phva-chart-container');
         if (phvaContainer) {
@@ -539,7 +680,7 @@ class EvaluacionInicialSgSst {
     drawGauge(value = 0) {
         const canvas = document.getElementById('gaugeChart');
         if (!canvas) return;
-        
+
         // Asegurar alta resolución
         const ctx = canvas.getContext('2d');
         const width = canvas.parentElement.offsetWidth;
@@ -552,7 +693,7 @@ class EvaluacionInicialSgSst {
         const r = Math.min(width, height) / 1.5;
 
         ctx.clearRect(0, 0, width, height);
-        
+
         // Arco fondo
         ctx.beginPath();
         ctx.arc(cx, cy, r, Math.PI, 2 * Math.PI);
@@ -564,7 +705,7 @@ class EvaluacionInicialSgSst {
         // Arco valor
         const percentage = value / 100;
         const endAngle = Math.PI + (percentage * Math.PI);
-        
+
         // Color dinámico
         let strokeColor = '#dc3545'; // Rojo
         if (value > 60) strokeColor = '#ffc107'; // Amarillo
@@ -581,7 +722,7 @@ class EvaluacionInicialSgSst {
 if (!document.getElementById('k-air-eval-styles')) {
     const style = document.createElement('style');
     style.id = 'k-air-eval-styles';
-    style.textContent = 
+    style.textContent =
         `
         /*VARIABLES DEL SISTEMA */
         :root {
@@ -603,15 +744,15 @@ if (!document.getElementById('k-air-eval-styles')) {
         /* LAYOUT PRINCIPAL */
         .k-module-container { height: 100%; width: 100%; background: var(--bg-body); font-family: 'Segoe UI', Roboto, sans-serif; overflow: hidden; }
         .k-module-layout { display: flex; flex-direction: column; height: 100%; }
-        
+
         /* HEADER */
         .k-module-header { background: var(--bg-card); border-bottom: 1px solid var(--border); flex-shrink: 0; box-shadow: var(--shadow-sm); z-index: 10; }
         .k-header-top { display: flex; align-items: center; justify-content: space-between; padding: 1rem 2rem; height: 70px; }
-        
+
         .k-title-group { display: flex; align-items: center; gap: 1rem; }
         .k-btn-back { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: white; border: 1px solid var(--border); border-radius: 8px; color: var(--text-dark); cursor: pointer; transition: 0.2s; }
         .k-btn-back:hover { border-color: var(--primary); color: var(--primary); background: #f0f7ff; }
-        
+
         .k-title-text { display: flex; flex-direction: column; }
         .k-main-title { margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--primary); font-family: 'Lexend', sans-serif; }
         .k-breadcrumb { font-size: 0.8rem; color: var(--text-muted); font-weight: 500; }
@@ -677,6 +818,7 @@ if (!document.getElementById('k-air-eval-styles')) {
         .k-table th { background: #f8f9fa; padding: 0.75rem 1rem; text-align: left; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; border-bottom: 2px solid var(--border); }
         .k-table td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; color: var(--text-dark); vertical-align: middle; }
         .k-table tr:hover { background-color: #f8f9fa; }
+        .k-table tr.k-row-warning { background-color: #fff3cd; border-left: 3px solid var(--warning); }
         .k-empty-table { text-align: center; padding: 2rem; color: var(--text-muted); font-style: italic; }
 
         /* BADGES & BUTTONS */
@@ -710,7 +852,7 @@ if (!document.getElementById('k-air-eval-styles')) {
         .k-toast.success { background-color: var(--success); }
         .k-toast.warning { background-color: var(--warning); color: #212529; }
         .k-toast.danger { background-color: var(--danger); }
-    	
+
     `;
     document.head.appendChild(style);
 }
