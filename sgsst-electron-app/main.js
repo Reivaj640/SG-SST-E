@@ -4025,3 +4025,37 @@ ipcMain.handle('load-normativa', async () => {
     };
   }
 });
+
+// Manejar el procesamiento de PDFs de evaluación inicial
+ipcMain.handle('process-evaluacion-pdf', async (event, pdfPath, sourceType) => {
+  try {
+    console.log(`[MAIN] Procesando PDF de evaluación: ${pdfPath}, fuente: ${sourceType}`);
+    
+    // Importar el parser de PDFs
+    const EvaluacionPdfParser = require('./utils/evaluacionPdfParser');
+    const parser = new EvaluacionPdfParser();
+    
+    // Procesar el PDF
+    const result = await parser.parsePdf(pdfPath, sourceType);
+    
+    if (result.success) {
+      console.log(`[MAIN] PDF procesado exitosamente: ${result.findings.length} hallazgos encontrados`);
+      console.log(`[MAIN] Métricas:`, result.metrics);
+    } else {
+      console.error(`[MAIN] Error procesando PDF: ${result.error}`);
+    }
+    
+    return result;
+
+  } catch (error) {
+    console.error('[MAIN] Error procesando PDF de evaluación:', error);
+    return { 
+      success: false, 
+      error: error.message,
+      year: new Date().getFullYear().toString(),
+      source: sourceType,
+      findings: [],
+      metrics: { cumplimiento: 0, totalItems: 0, cumplidos: 0, noCumplidos: 0, parcial: 0 }
+    };
+  }
+});

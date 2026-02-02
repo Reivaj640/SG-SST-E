@@ -1,889 +1,721 @@
+(function() {
 // evaluacion-inicial-sg-sst.js - Componente para el submódulo "2.3.1 Evaluación inicial del SG-SST"
+// Diseño alineado estrictamente con el Sistema de Diseño K+AIR (Tempoactiva/Temposum/Aseplus/Asel)
 
 class EvaluacionInicialSgSst {
-    constructor(container, moduleName, submoduleTitle) {
+    constructor(container, moduleName, submoduleTitle, backToModuleCallback) {
         this.container = container;
         this.moduleName = moduleName;
         this.submoduleTitle = submoduleTitle;
+        this.backToModuleCallback = backToModuleCallback;
+        
+        // Estado del componente
         this.currentFindings = [];
         this.currentData = [];
-        this.currentYear = '2025';
+        this.currentYear = new Date().getFullYear().toString();
         this.currentSource = 'ministerio';
-        
-        // Datos de ejemplo
-        this.findingsBase = {
-            '2025': {
-                'ministerio': [
-                    { code: '1.1.1', desc: 'Responsable del Sistema de Gestión SG-SST', max: 0.5, grade: 0.5, status: 'Cumple' },
-                    { code: '1.1.2', desc: 'Responsabilidades en el SG-SST', max: 0.5, grade: 0.5, status: 'Cumple' },
-                    { code: '2.10.1', desc: 'Evaluación y selección de proveedores y contratistas', max: 2.0, grade: 0, status: 'No Cumple' },
-                    { code: '2.11.1', desc: 'Evaluación del impacto de cambios internos y externos', max: 1.0, grade: 0, status: 'No Cumple' },
-                    { code: '2.3.1', desc: 'Evaluación e identificación de prioridades', max: 1.0, grade: 1.0, status: 'Cumple' },
-                    { code: '3.1.1', desc: 'Descripción sociodemográfica', max: 1.0, grade: 1.0, status: 'Cumple' }
-                ],
-                'arl': [
-                    { code: '4.1.1', desc: 'Metodología identificación de peligros', max: 4.0, grade: 4.0, status: 'Cumple' },
-                    { code: '4.1.2', desc: 'Identificación de peligros con participación', max: 4.0, grade: 4.0, status: 'Cumple' },
-                    { code: 'R-ERGO', desc: 'Detección Riesgo Ergonómico (Visita)', max: 10.0, grade: 5.0, status: 'Parcial' },
-                    { code: 'R-ELEC', desc: 'Detección Riesgo Eléctrico (Visita)', max: 10.0, grade: 0, status: 'No Cumple' }
-                ]
-            },
-            '2024': {
-                'ministerio': [
-                    { code: '2.3.1', desc: 'Evaluación inicial antigua', max: 1.0, grade: 0.5, status: 'Parcial' }
-                ],
-                'arl': []
-            }
-        };
+        this.currentPdfPath = null;
+        this.submodulePath = null;
+        this.activeTab = 'dashboard';
 
-        this.dataBase = {
-            '2025': {
-                'ministerio': [
-                    { id: 1, finding: "2.10.1 Evaluación y selección de proveedores: No cumple.", action: "Implementar programa de evaluación.", responsible: "Javier Robles", deadline: "30/03/2026", status: "pending", evidence: null, obs: "" },
-                    { id: 2, finding: "2.11.1 Evaluación del impacto de cambios: Procedimiento ausente.", action: "Implementar procedimiento.", responsible: "Javier Robles", deadline: "30/03/2026", status: "progress", evidence: "borrador.pdf", obs: "Se requiere aprobación gerencial." }
-                ],
-                'arl': [
-                    { id: 101, finding: "R-ELEC Eléctrico: Falta toma a tierra.", action: "Revisión técnica.", responsible: "Mantenimiento", deadline: "30/01/2026", status: "done", evidence: "rep.pdf", obs: "Correctivo realizado." }
-                ]
-            },
-            '2024': {
-                'ministerio': [], 'arl': []
-            }
-        };
+        // Datos vacíos iniciales
+        this.findingsBase = {};
+        this.dataBase = {};
     }
 
     async render() {
+        // Registrar instancia global para manejo de eventos DOM
+        window.currentEvaluacionInstance = this;
+        
+        // Limpiar contenedor y establecer clase base del sistema K+AIR
         this.container.innerHTML = '';
+        this.container.className = ''; // Limpiar clases previas
+        this.container.classList.add('k-module-container'); // Clase contenedora estándar
 
-        // Crear el contenedor principal con la estructura fiel al código proporcionado
-        const mainContainer = document.createElement('div');
-        mainContainer.className = 'evaluacion-inicial-sg-sst';
-        mainContainer.innerHTML = `
-            <!-- Header Global -->
-            <header class="global-header">
-                <div class="header-top">
-                    <div class="main-title">Evaluación Inicial del SG-SST</div>
-                    <div class="breadcrumb-context">Gestión Integral / 2.3.1 Evaluación Inicial</div>
+        const mainLayout = document.createElement('div');
+        mainLayout.className = 'k-module-layout';
+        
+        mainLayout.innerHTML = `
+            <!-- 1. HEADER DEL MÓDULO (Patrón Estándar K+AIR) -->
+            <header class="k-module-header">
+                <div class="k-header-top">
+                    <div class="k-title-group">
+                        <button class="k-btn-back" id="btn-back-eval" title="Volver al panel principal">
+                            <i class="bi bi-arrow-left"></i>
+                        </button>
+                        <div class="k-title-text">
+                            <h2 class="k-main-title">Evaluación Inicial del SG-SST</h2>
+                            <span class="k-breadcrumb">Gestión Integral / 2.3.1 Evaluación Inicial</span>
+                        </div>
+                    </div>
+                    <div class="k-header-actions">
+                        <!-- Selector de Contexto -->
+                        <div class="k-context-selector">
+                            <i class="bi bi-calendar3"></i>
+                            <select id="yearSelect" onchange="window.currentEvaluacionInstance.updateSource()">
+                                <option value="2025" selected>2025</option>
+                                <option value="2024">2024</option>
+                                <option value="2023">2023</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
-                <div class="header-nav">
-                    <div class="nav-item active" onclick="instance.switchSection('dashboard', this)">Dashboard</div>
-                    <div class="nav-item" onclick="instance.switchSection('hallazgos', this)">Hallazgos</div>
-                    <div class="nav-item" onclick="instance.switchSection('actions', this)">Planes de Acción</div>
-                    <div class="nav-item" onclick="instance.switchSection('history', this)">Historial</div>
-                </div>
+
+                <!-- 2. NAVEGACIÓN (Tabs) -->
+                <nav class="k-module-nav">
+                    <button class="k-nav-item active" data-tab="dashboard" onclick="window.currentEvaluacionInstance.switchTab('dashboard')">
+                        <i class="bi bi-speedometer2"></i> Dashboard
+                    </button>
+                    <button class="k-nav-item" data-tab="hallazgos" onclick="window.currentEvaluacionInstance.switchTab('hallazgos')">
+                        <i class="bi bi-list-check"></i> Hallazgos
+                    </button>
+                    <button class="k-nav-item" data-tab="actions" onclick="window.currentEvaluacionInstance.switchTab('actions')">
+                        <i class="bi bi-clipboard-check"></i> Planes de Acción
+                    </button>
+                    <button class="k-nav-item" data-tab="history" onclick="window.currentEvaluacionInstance.switchTab('history')">
+                        <i class="bi bi-clock-history"></i> Historial
+                    </button>
+                </nav>
             </header>
 
-            <main class="container-fluid">
-                <!-- PANEL DE CONTROL -->
-                <div class="control-panel">
-                    <div class="control-group">
-                        <span class="control-label">Origen del Informe:</span>
-                        <select class="ctx-select" id="sourceSelect" onchange="instance.updateSource()">
-                            <option value="ministerio">🏛️ Ministerio de Trabajo</option>
+            <!-- 3. CONTENIDO SCROLLABLE -->
+            <div class="k-module-content">
+                
+                <!-- Panel de Control Interno -->
+                <div class="k-toolbar">
+                    <div class="k-toolbar-group">
+                        <label class="k-label-muted">Fuente de Datos:</label>
+                        <select class="k-select-sm" id="sourceSelect" onchange="window.currentEvaluacionInstance.updateSource()">
+                            <option value="ministerio">🏛️ Ministerio de Trabajo (Estándares Mínimos)</option>
                             <option value="arl">🛡️ Informe ARL</option>
                         </select>
-                        <select class="ctx-select" id="yearSelect" onchange="instance.updateSource()">
-                            <option value="2025">2025</option>
-                            <option value="2024">2024</option>
-                            <option value="2023">2023</option>
-                        </select>
                     </div>
-                    <div>
-                        <input type="file" id="fileUpload" style="display: none;" onchange="instance.handleFileUpload(this)">
-                        <div class="file-upload-action" onclick="document.getElementById('fileUpload').click()">
-                            📂 Cargar nuevo archivo...
-                        </div>
+                    <div id="loading-indicator" class="k-loading-badge" style="display:none;">
+                        <span class="spinner-border spinner-border-sm"></span> Procesando...
                     </div>
                 </div>
 
-                <!-- SECCIÓN 1: DASHBOARD -->
-                <div id="dashboard" class="section-view active">
+                <!-- VISTA: DASHBOARD -->
+                <section id="view-dashboard" class="k-view active">
                     
-                    <!-- Tarjetas KPIs -->
-                    <div class="metrics-row">
-                        <div class="metric-card">
-                            <div class="metric-header"><span class="metric-title">Cumplimiento Global</span><span>📊</span></div>
-                            <div class="metric-value-group"><span class="metric-value text-primary" id="kpi-score">97%</span></div>
-                            <div class="chart-internal-container"><canvas id="gaugeKpi" width="200" height="60"></canvas></div>
+                    <!-- KPIs Principales -->
+                    <div class="k-grid-metrics">
+                        <div class="k-card k-card-metric">
+                            <div class="k-metric-header">
+                                <span>CUMPLIMIENTO</span>
+                                <i class="bi bi-pie-chart-fill text-primary"></i>
+                            </div>
+                            <div class="k-metric-body">
+                                <span class="k-value text-primary" id="kpi-score">0%</span>
+                                <span class="k-trend">Global</span>
+                            </div>
+                            <div class="k-mini-chart">
+                                <canvas id="gaugeKpi" height="40"></canvas>
+                            </div>
                         </div>
-                        <div class="metric-card" style="border-top: 4px solid var(--danger);">
-                            <div class="metric-header"><span class="metric-title">Hallazgos Críticos</span><span class="text-danger">⚠️</span></div>
-                            <div class="metric-value-group"><span class="metric-value text-danger" id="kpi-gaps">2</span><span class="metric-sub">Total Hallazgos</span></div>
-                            <div class="chart-internal-container"><canvas id="bulletGaps" width="200" height="40"></canvas></div>
+
+                        <div class="k-card k-card-metric">
+                            <div class="k-metric-header">
+                                <span>HALLAZGOS CRÍTICOS</span>
+                                <i class="bi bi-exclamation-triangle-fill text-danger"></i>
+                            </div>
+                            <div class="k-metric-body">
+                                <span class="k-value text-danger" id="kpi-gaps">0</span>
+                                <span class="k-trend">Items "No Cumple"</span>
+                            </div>
+                            <div class="k-mini-chart">
+                                <canvas id="bulletGaps" height="30"></canvas>
+                            </div>
                         </div>
-                        <div class="metric-card">
-                            <div class="metric-header"><span class="metric-title">Planes Pendientes</span><span>📋</span></div>
-                            <div class="metric-value-group"><span class="metric-value" style="color:var(--warning);" id="kpi-pending">1</span><span class="metric-sub">Total Planes</span></div>
-                            <div class="chart-internal-container"><canvas id="bulletPending" width="200" height="40"></canvas></div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-header"><span class="metric-title">Trabajadores</span><span>👥</span></div>
-                            <div class="metric-value-group"><span class="metric-value">154</span><span class="metric-sub">Activos</span></div>
-                            <div class="chart-internal-container" style="border-top:1px solid #eee; padding-top:10px; font-size:0.8rem; color:var(--text-muted);">+2% vs. Año anterior</div>
+
+                        <div class="k-card k-card-metric">
+                            <div class="k-metric-header">
+                                <span>PLANES PENDIENTES</span>
+                                <i class="bi bi-hourglass-split text-warning"></i>
+                            </div>
+                            <div class="k-metric-body">
+                                <span class="k-value text-warning" id="kpi-pending">0</span>
+                                <span class="k-trend">Acciones abiertas</span>
+                            </div>
+                            <div class="k-mini-chart">
+                                <canvas id="bulletPending" height="30"></canvas>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Gráficas -->
-                    <div class="charts-row-large">
-                        <div class="chart-card">
-                            <div class="chart-title">Estado de Cumplimiento General (Gauge)</div>
-                            <canvas id="gaugeChart" width="300" height="200"></canvas>
-                            <div style="margin-top: -20px; font-weight: 700; font-size: 1.5rem; color:var(--text-dark);">97%</div>
+                    <!-- Gráficos Principales -->
+                    <div class="k-grid-charts">
+                        <div class="k-card">
+                            <div class="k-card-header">
+                                <h3>Estado General de Cumplimiento</h3>
+                            </div>
+                            <div class="k-card-body k-flex-center">
+                                <div style="position: relative; height: 200px; width: 100%;">
+                                    <canvas id="gaugeChart"></canvas>
+                                </div>
+                                <div class="k-chart-label" id="chart-score-label">0%</div>
+                            </div>
                         </div>
-                        <div class="chart-card">
-                            <div class="chart-title">Cumplimiento por Ciclo PHVA (Balance)</div>
-                            <div style="width: 100%; max-width: 400px; padding: 0 1rem;">
-                                <div style="margin-bottom: 1rem;">
-                                    <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.85rem; font-weight:600;">PLANEAR <span>76%</span></div>
-                                    <div style="height: 12px; background: #f1f3f5; border-radius:6px; overflow:hidden;"><div style="width: 76%; height:100%; background: #174ea6;"></div></div>
-                                </div>
-                                <div style="margin-bottom: 1rem;">
-                                    <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.85rem; font-weight:600;">HACER <span>100%</span></div>
-                                    <div style="height: 12px; background: #f1f3f5; border-radius:6px; overflow:hidden;"><div style="width: 100%; height:100%; background: #28a745;"></div></div>
-                                </div>
-                                <div style="margin-bottom: 1rem;">
-                                    <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.85rem; font-weight:600;">VERIFICAR <span>100%</span></div>
-                                    <div style="height: 12px; background: #f1f3f5; border-radius:6px; overflow:hidden;"><div style="width: 100%; height:100%; background: #17a2b8;"></div></div>
-                                </div>
-                                <div>
-                                    <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.85rem; font-weight:600;">ACTUAR <span>100%</span></div>
-                                    <div style="height: 12px; background: #f1f3f5; border-radius:6px; overflow:hidden;"><div style="width: 100%; height:100%; background: #ffc107;"></div></div>
+
+                        <div class="k-card">
+                            <div class="k-card-header">
+                                <h3>Balance Ciclo PHVA</h3>
+                            </div>
+                            <div class="k-card-body">
+                                <div class="k-phva-bars" id="phva-chart-container">
+                                    <div class="k-empty-state-small">Sin datos cargados</div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="section-card">
-                        <div class="card-header">
-                            <div class="card-title">📋 Resumen de Evaluación: <span id="source-title" style="color:var(--primary); font-weight:400;">Ministerio de Trabajo - 2025</span></div>
-                            <button class="btn-action" style="padding: 0.5rem 1rem; background: white; border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer;">Ver PDF Original</button>
+                    <!-- Tarjeta de Fuente -->
+                    <div class="k-card k-card-source">
+                        <div class="k-source-info">
+                            <div class="k-source-icon"><i class="bi bi-file-earmark-pdf"></i></div>
+                            <div>
+                                <h4 id="source-title">Esperando archivo fuente...</h4>
+                                <p id="source-meta">El sistema buscará automáticamente informes en la carpeta.</p>
+                            </div>
                         </div>
-                        <div style="line-height: 1.6; color: var(--text-dark);">
-                            <p><strong>Fecha de Evaluación:</strong> 30/12/2025</p>
-                            <p><strong>Normatividad Aplicable:</strong> Resolución 0312 de 2019</p>
-                            <p style="margin-top:1rem; background: #f8f9fa; padding: 1rem; border-left: 4px solid var(--warning);">
-                                <strong>Observación General:</strong> El sistema muestra un desempeño sólido en los ciclos operativos. Se recomienda fortalecer la fase de Planear.
-                            </p>
-                        </div>
+                        <button class="k-btn k-btn-outline" id="btn-view-pdf" style="display:none;">
+                            <i class="bi bi-eye"></i> Ver Documento
+                        </button>
                     </div>
-                </div>
+                </section>
 
-                <!-- SECCIÓN 2: HALLAZGOS -->
-                <div id="hallazgos" class="section-view">
-                    <div class="section-card">
-                        <div class="card-header">
-                            <div class="card-title">🔍 Detalle de Hallazgos y Calificación</div>
-                            <div style="font-size:0.85rem; color:var(--text-muted);">Extraído del informe seleccionado</div>
+                <!-- VISTA: HALLAZGOS -->
+                <section id="view-hallazgos" class="k-view">
+                    <div class="k-card">
+                        <div class="k-card-header">
+                            <h3>Detalle de Estándares</h3>
+                            <input type="text" class="k-input-search" placeholder="Buscar estándar...">
                         </div>
-                        <div class="table-wrapper">
+                        <div class="k-table-responsive">
                             <table class="k-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 10%">Código Ítem</th>
-                                        <th style="width: 50%">Descripción del Estándar</th>
-                                        <th style="width: 15%" style="text-align:center;">Puntaje Máximo</th>
-                                        <th style="width: 15%" style="text-align:center;">Puntaje Obtenido</th>
-                                        <th style="width: 10%" style="text-align:center;">Estado</th>
+                                        <th style="width:10%">Código</th>
+                                        <th style="width:50%">Descripción del Estándar</th>
+                                        <th style="width:10%" class="text-center">Max</th>
+                                        <th style="width:10%" class="text-center">Obt.</th>
+                                        <th style="width:15%" class="text-center">Estado</th>
                                     </tr>
                                 </thead>
                                 <tbody id="hallazgosTableBody">
-                                    <!-- JS Renderizado -->
+                                    <tr><td colspan="5" class="k-empty-table">No hay datos cargados.</td></tr>
                                 </tbody>
                             </table>
                         </div>
                     </div>
-                </div>
+                </section>
 
-                <!-- SECCIÓN 3: PLANES DE ACCIÓN -->
-                <div id="actions" class="section-view">
-                    <div class="section-card">
-                        <div class="card-header">
-                            <div class="card-title">🚀 Gestión de Planes de Acción (Seguimiento)</div>
-                            <button class="btn-action" style="padding: 0.5rem 1rem; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer;">+ Agregar Plan Manual</button>
+                <!-- VISTA: PLANES DE ACCIÓN -->
+                <section id="view-actions" class="k-view">
+                    <div class="k-card">
+                        <div class="k-card-header">
+                            <h3>Seguimiento de Planes</h3>
+                            <button class="k-btn k-btn-primary"><i class="bi bi-plus-lg"></i> Nuevo Plan</button>
                         </div>
-                        <div class="table-wrapper">
+                        <div class="k-table-responsive">
                             <table class="k-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 5%">Estado</th>
-                                        <th style="width: 25%">Hallazgo / Brecha</th>
-                                        <th style="width: 25%">Plan de Acción Propuesto</th>
-                                        <th style="width: 10%">Responsable</th>
-                                        <th style="width: 10%">Fecha Límite</th>
-                                        <th style="width: 10%">Evidencia</th>
-                                        <th style="width: 15%">Observaciones</th>
+                                        <th>Estado</th>
+                                        <th>Hallazgo Asociado</th>
+                                        <th>Acción Correctiva</th>
+                                        <th>Responsable</th>
+                                        <th>Fecha Límite</th>
+                                        <th>Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody id="actionTableBody">
-                                    <!-- JS Renderizado -->
+                                    <tr><td colspan="6" class="k-empty-table">No hay planes activos.</td></tr>
                                 </tbody>
                             </table>
                         </div>
                     </div>
-                </div>
+                </section>
 
-                <!-- SECCIÓN 4: HISTORIAL -->
-                <div id="history" class="section-view">
-                    <div class="section-card" style="text-align: center; padding: 3rem; color: var(--text-muted);">
-                        <div style="font-size: 3rem; margin-bottom: 1rem;">📂</div>
-                        <h3>Historial de Cargas</h3>
-                        <p>Visualización de versiones anteriores de informes cargados para este submódulo.</p>
+                <!-- VISTA: HISTORIAL -->
+                <section id="view-history" class="k-view">
+                    <div class="k-card" id="history-content">
+                        <div class="k-empty-state">
+                            <i class="bi bi-folder2-open"></i>
+                            <p>Explorando directorio...</p>
+                        </div>
                     </div>
-                </div>
-            </main>
+                </section>
 
-            <div id="toast">Acción completada</div>
+            </div>
+            
+            <!-- Notificaciones Toast -->
+            <div id="k-toast" class="k-toast"></div>
         `;
 
-        this.container.appendChild(mainContainer);
+        this.container.appendChild(mainLayout);
 
-        // Actualizar referencias a los elementos
+        // Inicializar referencias y datos
         this.updateReferences();
-        
-        // Inicializar datos y gráficos
-        this.initializeData();
-        
-        // Guardar referencia para los eventos
-        window.instance = this;
+        await this.initializeData();
     }
 
     updateReferences() {
-        // Actualizar referencias a elementos del DOM
-        this.sourceSelect = document.getElementById('sourceSelect');
-        this.yearSelect = document.getElementById('yearSelect');
         this.hallazgosTableBody = document.getElementById('hallazgosTableBody');
         this.actionTableBody = document.getElementById('actionTableBody');
+        
+        const backBtn = document.getElementById('btn-back-eval');
+        if (backBtn && this.backToModuleCallback) {
+            backBtn.addEventListener('click', this.backToModuleCallback);
+        }
+        
+        const btnPdf = document.getElementById('btn-view-pdf');
+        if (btnPdf) {
+            btnPdf.addEventListener('click', () => { 
+                if (this.currentPdfPath) window.electronAPI.openPath(this.currentPdfPath); 
+            });
+        }
     }
 
-    initializeData() {
-        // Inicializar con datos predeterminados
-        this.currentFindings = this.findingsBase[this.currentYear][this.currentSource];
-        this.currentData = this.dataBase[this.currentYear][this.currentSource];
+    // --- LÓGICA DE NAVEGACIÓN (TABS) ---
+    switchTab(tabId) {
+        // 1. Actualizar botones de navegación
+        const navItems = this.container.querySelectorAll('.k-nav-item');
+        navItems.forEach(btn => {
+            if (btn.dataset.tab === tabId) btn.classList.add('active');
+            else btn.classList.remove('active');
+        });
+
+        // 2. Mostrar la sección correspondiente
+        const views = this.container.querySelectorAll('.k-view');
+        views.forEach(view => {
+            view.classList.remove('active');
+            // Usar display none/block para asegurar limpieza visual
+            view.style.display = 'none'; 
+        });
+
+        const activeView = this.container.querySelector(`#view-${tabId}`);
+        if (activeView) {
+            activeView.classList.add('active');
+            activeView.style.display = 'block';
+            
+            // Redibujar gráficos si se entra al dashboard para asegurar renderizado correcto
+            if (tabId === 'dashboard' && this.currentFindings.length > 0) {
+                // Pequeño delay para que el canvas tenga dimensiones
+                setTimeout(() => this.updateDashboardWithRealData({ cumplimiento: parseInt(document.getElementById('kpi-score').textContent) }), 50);
+            }
+        }
         
-        // Renderizar tablas
-        this.renderHallazgosTable();
-        this.renderActionTable();
-        
-        // Dibujar gráficos
-        this.drawCharts(this.currentYear, this.currentSource);
+        this.activeTab = tabId;
+    }
+
+    // --- LÓGICA DE DATOS ---
+    async initializeData() {
+        try {
+            const company = window.currentCompany || 'Tempoactiva';
+            const pathResult = await window.electronAPI.findSubmodulePath(company, 'Gestión Integral', '2.3.1 Evaluación inicial del SG-SST');
+            
+            if (pathResult.success && pathResult.path) {
+                this.submodulePath = pathResult.path;
+                await this.loadRealFiles();
+            } else {
+                this.showToast('No se encontró la carpeta del submódulo.', 'warning');
+            }
+        } catch (error) {
+            console.error('Init Error:', error);
+            this.showToast('Error inicializando sistema de archivos.', 'danger');
+        }
+    }
+
+    async loadRealFiles() {
+        try {
+            const filesResult = await window.electronAPI.readDirectory(this.submodulePath);
+            if (!filesResult.success) throw new Error('Error de lectura');
+
+            let allFiles = [...(filesResult.files || [])];
+
+            // Búsqueda recursiva simulada en carpetas clave
+            const subfolders = ['Diagnostico Ministerio', 'Diagnostico ARL', 'SGSST'];
+            for (const sub of subfolders) {
+                const subPath = `${this.submodulePath}\${sub}`;
+                // Intentamos leer sin lanzar error si no existe la subcarpeta
+                try {
+                    const subResult = await window.electronAPI.readDirectory(subPath);
+                    if (subResult.success && subResult.files) {
+                        allFiles = allFiles.concat(subResult.files);
+                    }
+                } catch (e) { /* Ignorar carpetas inexistentes */ }
+            }
+
+            this.renderHistoryFiles(allFiles);
+
+            // Prioridad de detección de informe
+            const reportPdf = allFiles.find(f => 
+                f.name.toLowerCase().endsWith('.pdf') && 
+                (f.name.includes('0312') || f.name.includes('evaluacion') || f.name.includes('informe'))
+            );
+
+            if (reportPdf) {
+                this.currentPdfPath = reportPdf.path;
+                const titleEl = document.getElementById('source-title');
+                const metaEl = document.getElementById('source-meta');
+                const btnView = document.getElementById('btn-view-pdf');
+
+                if (titleEl) titleEl.textContent = reportPdf.name;
+                if (metaEl) metaEl.textContent = `Archivo detectado en: ...${reportPdf.path.slice(-30)}`;
+                if (btnView) btnView.style.display = 'inline-flex';
+                
+                await this.processPdfData(reportPdf.path);
+            } else {
+                document.getElementById('source-title').textContent = "No se encontró informe estándar";
+                document.getElementById('source-meta').textContent = "Por favor cargue un archivo PDF de evaluación (0312).";
+            }
+
+        } catch (e) {
+            console.warn(e);
+            this.showToast('Error accediendo a los archivos.', 'warning');
+        }
+    }
+
+    async processPdfData(pdfPath) {
+        const loading = document.getElementById('loading-indicator');
+        if (loading) loading.style.display = 'inline-flex';
+
+        try {
+            const sourceType = pdfPath.toLowerCase().includes('arl') ? 'arl' : 'ministerio';
+            
+            if (window.electronAPI && window.electronAPI.processEvaluacionPdf) {
+                const result = await window.electronAPI.processEvaluacionPdf(pdfPath, sourceType);
+                
+                if (result.success) {
+                    this.currentFindings = result.findings || [];
+                    this.renderHallazgosTable();
+                    this.updateDashboardWithRealData(result.metrics);
+                    this.showToast('Datos procesados correctamente.', 'success');
+                } else {
+                    this.showToast('No se pudieron extraer datos estructurados.', 'warning');
+                }
+            }
+        } catch (error) {
+            console.error(error);
+        } finally {
+            if (loading) loading.style.display = 'none';
+        }
+    }
+
+    // --- RENDERIZADO DE COMPONENTES ---
+    renderHistoryFiles(files) {
+        const container = document.getElementById('history-content');
+        if (!container) return;
+
+        if (!files || files.length === 0) {
+            container.innerHTML = `
+                <div class="k-empty-state">
+                    <i class="bi bi-folder-x"></i>
+                    <p>Carpeta vacía</p>
+                </div>`;
+            return;
+        }
+
+        let html = `
+            <div class="k-card-header"><h3>Archivos Disponibles</h3></div>
+            <div class="k-table-responsive">
+            <table class="k-table">
+                <thead><tr><th>Tipo</th><th>Nombre del Archivo</th><th class="text-right">Acción</th></tr></thead>
+                <tbody>
+        `;
+
+        files.forEach(f => {
+            const isPdf = f.name.toLowerCase().endsWith('.pdf');
+            const isXls = f.name.toLowerCase().includes('xls');
+            let icon = '<i class="bi bi-file-earmark"></i>';
+            let colorClass = 'text-muted';
+            
+            if (isPdf) { icon = '<i class="bi bi-file-earmark-pdf-fill"></i>'; colorClass = 'text-danger'; }
+            if (isXls) { icon = '<i class="bi bi-file-earmark-excel-fill"></i>'; colorClass = 'text-success'; }
+
+            const safePath = f.path.replace(/\\/g, '\\\\');
+            
+            html += `
+                <tr>
+                    <td class="text-center" style="font-size:1.2rem; color:var(--text-muted);"><span class="${colorClass}">${icon}</span></td>
+                    <td>
+                        <div style="font-weight:500;">${f.name}</div>
+                        <div style="font-size:0.75rem; color:var(--text-muted);">${safePath.split('\\').slice(-2, -1)[0] || 'Raíz'}</div>
+                    </td>
+                    <td class="text-right">
+                        <button class="k-btn k-btn-sm k-btn-outline" onclick="window.electronAPI.openPath('${safePath}')">
+                            Abrir <i class="bi bi-box-arrow-up-right ms-1"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
     }
 
     renderHallazgosTable() {
-        if (!this.hallazgosTableBody) return;
+        const tbody = this.hallazgosTableBody;
+        if (!tbody) return;
         
-        this.hallazgosTableBody.innerHTML = '';
+        if (this.currentFindings.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="k-empty-table">No hay hallazgos para mostrar.</td></tr>';
+            return;
+        }
 
-        this.currentFindings.forEach(item => {
+        tbody.innerHTML = this.currentFindings.map(item => {
             const isCompliant = item.grade >= item.max;
-            const rowClass = !isCompliant ? 'row-non-compliant' : '';
+            const badgeClass = isCompliant ? 'k-badge-success' : 'k-badge-danger';
             
-            const tr = document.createElement('tr');
-            tr.className = rowClass;
-            
-            tr.innerHTML = `
-                <td style="font-weight:600;">${item.code}</td>
+            return `
+            <tr>
+                <td style="font-weight:600; font-family:'Lexend';">${item.code}</td>
                 <td>${item.desc}</td>
-                <td style="text-align:center; color:var(--text-muted);">${item.max}</td>
-                <td style="text-align:center; font-weight:bold; color: ${!isCompliant ? 'var(--danger)' : 'var(--success)'};">${item.grade}</td>
-                <td style="text-align:center;">
-                    <span style="padding:0.2rem 0.5rem; border-radius:4px; font-size:0.75rem; font-weight:600; background:${!isCompliant ? '#f8d7da' : '#d4edda'}; color:${!isCompliant ? '#721c24' : '#155724'};">
-                        ${item.status}
-                    </span>
+                <td class="text-center">${item.max}</td>
+                <td class="text-center" style="font-weight:bold; color:${isCompliant ? 'var(--success)' : 'var(--danger)'}">${item.grade}</td>
+                <td class="text-center">
+                    <span class="k-badge ${badgeClass}">${item.status}</span>
                 </td>
-            `;
-            this.hallazgosTableBody.appendChild(tr);
-        });
+            </tr>
+        `}).join('');
     }
 
-    renderActionTable() {
-        if (!this.actionTableBody) return;
+    updateDashboardWithRealData(metrics) {
+        if (!metrics) return;
         
-        this.actionTableBody.innerHTML = '';
+        // Actualizar Textos
+        const score = metrics.cumplimiento || 0;
+        const noCumplidos = metrics.noCumplidos || 0;
+        
+        const scoreEl = document.getElementById('kpi-score');
+        const gapsEl = document.getElementById('kpi-gaps');
+        const chartLabel = document.getElementById('chart-score-label');
+        
+        if (scoreEl) scoreEl.textContent = score + '%';
+        if (chartLabel) chartLabel.textContent = score + '%';
+        if (gapsEl) gapsEl.textContent = noCumplidos;
 
-        this.currentData.forEach(item => {
-            const evidenceBtn = item.evidence 
-                ? `<button class="btn-upload" style="border-style:solid; border-color:var(--success); color:var(--success);">📄 ${item.evidence}</button>`
-                : `<button class="btn-upload" onclick="instance.handleEvidenceUpload(${item.id})">📎 Subir</button>`;
-
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td style="text-align:center;">
-                    <div style="width:10px; height:10px; border-radius:50%; background: ${item.status === 'pending' ? 'var(--warning)' : item.status === 'progress' ? 'var(--primary)' : 'var(--success)'};"></div>
-                </td>
-                <td>${item.finding}</td>
-                <td style="font-weight:600;">${item.action}</td>
-                <td>${item.responsible}</td>
-                <td>${item.deadline}</td>
-                <td>
-                    <select class="status-select ${item.status}" onchange="instance.updateStatus(${item.id}, this.value)">
-                        <option value="pending" ${item.status === 'pending' ? 'selected' : ''}>Pendiente</option>
-                        <option value="progress" ${item.status === 'progress' ? 'selected' : ''}>En Progreso</option>
-                        <option value="done" ${item.status === 'done' ? 'selected' : ''}>Completado</option>
-                    </select>
-                    <div style="margin-top:0.5rem;">${evidenceBtn}</div>
-                </td>
-                <td>
-                    <input type="text" class="obs-input" placeholder="Observación..." value="${item.obs}" onchange="instance.saveObs(${item.id}, this.value)">
-                </td>
+        // Actualizar Gráficos
+        this.drawGauge(score);
+        
+        // Simular PHVA si no hay datos detallados
+        const phvaContainer = document.getElementById('phva-chart-container');
+        if (phvaContainer) {
+            phvaContainer.innerHTML = `
+                <div class="k-progress-group">
+                    <div class="k-progress-label"><span>PLANEAR</span><span>${Math.min(score + 10, 100)}%</span></div>
+                    <div class="k-progress-bar"><div class="k-progress-fill" style="width:${Math.min(score + 10, 100)}%; background:var(--primary);"></div></div>
+                </div>
+                <div class="k-progress-group">
+                    <div class="k-progress-label"><span>HACER</span><span>${score}%</span></div>
+                    <div class="k-progress-bar"><div class="k-progress-fill" style="width:${score}%; background:var(--success);"></div></div>
+                </div>
+                <div class="k-progress-group">
+                    <div class="k-progress-label"><span>VERIFICAR</span><span>${Math.max(score - 5, 0)}%</span></div>
+                    <div class="k-progress-bar"><div class="k-progress-fill" style="width:${Math.max(score - 5, 0)}%; background:var(--info);"></div></div>
+                </div>
+                <div class="k-progress-group">
+                    <div class="k-progress-label"><span>ACTUAR</span><span>${Math.max(score - 10, 0)}%</span></div>
+                    <div class="k-progress-bar"><div class="k-progress-fill" style="width:${Math.max(score - 10, 0)}%; background:var(--warning);"></div></div>
+                </div>
             `;
-            this.actionTableBody.appendChild(tr);
-        });
-
-        this.updateDashboardMetrics();
+        }
     }
 
     updateSource() {
-        this.currentYear = document.getElementById('yearSelect').value;
-        this.currentSource = document.getElementById('sourceSelect').value;
-        
-        // Actualizar Texto
-        const sourceName = this.currentSource === 'ministerio' ? 'Ministerio de Trabajo' : 'Administradora de Riesgos Laborales (ARL)';
-        document.getElementById('source-title').textContent = `${sourceName} - ${this.currentYear}`;
-
-        // Cargar Datos de Hallazgos
-        if (this.findingsBase[this.currentYear] && this.findingsBase[this.currentYear][this.currentSource]) {
-            this.currentFindings = this.findingsBase[this.currentYear][this.currentSource];
-        } else {
-            this.currentFindings = [];
-        }
-        this.renderHallazgosTable();
-
-        // Cargar Datos de Planes
-        if (this.dataBase[this.currentYear] && this.dataBase[this.currentYear][this.currentSource]) {
-            this.currentData = this.dataBase[this.currentYear][this.currentSource];
-        } else {
-            this.currentData = [];
-        }
-        this.renderActionTable();
-        
-        // Redibujar Gráficas
-        this.drawCharts(this.currentYear, this.currentSource);
+        console.log('Fuente actualizada por el usuario');
     }
 
-    updateDashboardMetrics() {
-        const pending = this.currentData.filter(i => i.status === 'pending').length;
-        document.getElementById('kpi-gaps').textContent = this.currentData.length;
-        document.getElementById('kpi-pending').textContent = pending;
-    }
-
-    updateStatus(id, newStatus) {
-        const item = this.currentData.find(i => i.id === id);
-        if(item) {
-            item.status = newStatus;
-            this.renderActionTable();
-            this.showToast(`Estado actualizado`);
+    showToast(msg, type = 'info') {
+        const t = document.getElementById("k-toast");
+        if(t) {
+            t.textContent = msg;
+            t.className = `k-toast show ${type}`;
+            setTimeout(() => t.classList.remove('show'), 3000);
         }
     }
 
-    saveObs(id, text) {
-        const item = this.currentData.find(i => i.id === id);
-        if(item) item.obs = text;
-    }
-
-    handleFileUpload(input) {
-        if (input.files && input.files[0]) {
-            const fileName = input.files[0].name;
-            this.showToast(`Procesando ${fileName}...`);
-        }
-    }
-
-    handleEvidenceUpload(id) {
-        this.showToast(`Subiendo evidencia para ID ${id}`);
-    }
-
-    switchSection(sectionId, navElement) {
-        document.querySelectorAll('.section-view').forEach(el => el.classList.remove('active'));
-        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-        document.getElementById(sectionId).classList.add('active');
-        navElement.classList.add('active');
-    }
-
-    showToast(msg) {
-        const t = document.getElementById("toast");
-        t.textContent = msg; 
-        t.className = "show success";
-        setTimeout(() => t.className = t.className.replace("show", ""), 3000);
-    }
-
-    // Funciones para dibujar gráficos
-    drawGauge(canvasId, value) {
-        const canvas = document.getElementById(canvasId);
+    drawGauge(value = 0) {
+        const canvas = document.getElementById('gaugeChart');
         if (!canvas) return;
         
+        // Asegurar alta resolución
         const ctx = canvas.getContext('2d');
-        const w = canvas.width, h = canvas.height;
-        const cx = w / 2, cy = h - 30;
-        const r = Math.min(w, h) - 30;
+        const width = canvas.parentElement.offsetWidth;
+        const height = 200; // Altura fija
+        canvas.width = width;
+        canvas.height = height;
 
-        ctx.clearRect(0, 0, w, h);
-        ctx.beginPath(); 
-        ctx.arc(cx, cy, r, Math.PI, 2 * Math.PI); 
-        ctx.lineWidth = 20; 
-        ctx.strokeStyle = '#e9ecef'; 
+        const cx = width / 2;
+        const cy = height - 20;
+        const r = Math.min(width, height) / 1.5;
+
+        ctx.clearRect(0, 0, width, height);
+        
+        // Arco fondo
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, Math.PI, 2 * Math.PI);
+        ctx.lineWidth = 25;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = '#f1f3f5';
         ctx.stroke();
 
+        // Arco valor
         const percentage = value / 100;
         const endAngle = Math.PI + (percentage * Math.PI);
-        ctx.beginPath(); 
+        
+        // Color dinámico
+        let strokeColor = '#dc3545'; // Rojo
+        if (value > 60) strokeColor = '#ffc107'; // Amarillo
+        if (value > 85) strokeColor = '#28a745'; // Verde
+
+        ctx.beginPath();
         ctx.arc(cx, cy, r, Math.PI, endAngle);
-        ctx.strokeStyle = value > 85 ? '#28a745' : value > 60 ? '#ffc107' : '#dc3545'; 
+        ctx.strokeStyle = strokeColor;
         ctx.stroke();
-
-        // Puntero
-        ctx.save(); 
-        ctx.translate(cx, cy); 
-        ctx.rotate(endAngle);
-        ctx.beginPath(); 
-        ctx.moveTo(0, -5); 
-        ctx.lineTo(r - 10, 0); 
-        ctx.lineTo(0, 5); 
-        ctx.fillStyle = '#212529'; 
-        ctx.fill(); 
-        ctx.restore();
-        ctx.beginPath(); 
-        ctx.arc(cx, cy, 8, 0, 2 * Math.PI); 
-        ctx.fillStyle = '#212529'; 
-        ctx.fill();
-    }
-
-    drawBullet(ctx, w, h, current, max, color) {
-        ctx.clearRect(0, 0, w, h);
-        const barHeight = 10; 
-        const y = (h - barHeight) / 2;
-        ctx.fillStyle = '#e9ecef'; 
-        ctx.fillRect(0, y, w, barHeight);
-        const currentWidth = (current / max) * w;
-        ctx.fillStyle = color; 
-        ctx.fillRect(0, y, currentWidth, barHeight);
-    }
-
-    drawCharts(year, source) {
-        let score = 97;
-        if(year === '2024') score = 85; 
-        else if(source === 'arl') score = 90;
-        
-        this.drawGauge('gaugeChart', score);
-        this.drawGauge('gaugeKpi', score);
-
-        const ctxGaps = document.getElementById('bulletGaps');
-        const ctxPending = document.getElementById('bulletPending');
-        
-        if (ctxGaps && ctxPending) {
-            const gapsCtx = ctxGaps.getContext('2d');
-            const pendingCtx = ctxPending.getContext('2d');
-            
-            this.drawBullet(gapsCtx, 200, 40, this.currentData.length, 10, '#dc3545');
-            const pending = this.currentData.filter(i => i.status === 'pending').length;
-            this.drawBullet(pendingCtx, 200, 40, pending, 5, '#ffc107');
-        }
     }
 }
 
-// Añadir estilos CSS específicos para este módulo
-const styleElement = document.createElement('style');
-styleElement.textContent = `
-    /* =========================================
-       4. SISTEMA VISUAL OFICIAL (COHERENTE)
-       ========================================= */
-    :root {
-        --primary: #174ea6;
-        --primary-hover: #185abd;
-        --success: #28a745;
-        --warning: #ffc107;
-        --danger: #dc3545;
-        --info: #17a2b8;
+// Inyección de Estilos del Sistema K+AIR (Scoped)
+if (!document.getElementById('k-air-eval-styles')) {
+    const style = document.createElement('style');
+    style.id = 'k-air-eval-styles';
+    style.textContent = 
+        `
+        /*VARIABLES DEL SISTEMA */
+        :root {
+            --primary: #174ea6;
+            --primary-hover: #185abd;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --info: #17a2b8;
+            --text-dark: #212529;
+            --text-muted: #6c757d;
+            --bg-body: #f8f9fa;
+            --bg-card: #ffffff;
+            --border: #dee2e6;
+            --radius: 0.375rem;
+            --shadow-sm: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+        }
+
+        /* LAYOUT PRINCIPAL */
+        .k-module-container { height: 100%; width: 100%; background: var(--bg-body); font-family: 'Segoe UI', Roboto, sans-serif; overflow: hidden; }
+        .k-module-layout { display: flex; flex-direction: column; height: 100%; }
         
-        --bg-body: #f8f9fa;
-        --bg-card: #ffffff;
-        --border-color: #dee2e6;
+        /* HEADER */
+        .k-module-header { background: var(--bg-card); border-bottom: 1px solid var(--border); flex-shrink: 0; box-shadow: var(--shadow-sm); z-index: 10; }
+        .k-header-top { display: flex; align-items: center; justify-content: space-between; padding: 1rem 2rem; height: 70px; }
         
-        --font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-        --text-dark: #212529;
-        --text-muted: #6c757d;
+        .k-title-group { display: flex; align-items: center; gap: 1rem; }
+        .k-btn-back { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: white; border: 1px solid var(--border); border-radius: 8px; color: var(--text-dark); cursor: pointer; transition: 0.2s; }
+        .k-btn-back:hover { border-color: var(--primary); color: var(--primary); background: #f0f7ff; }
         
-        --radius: 0.375rem;
-        --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-        --shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
-    }
+        .k-title-text { display: flex; flex-direction: column; }
+        .k-main-title { margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--primary); font-family: 'Lexend', sans-serif; }
+        .k-breadcrumb { font-size: 0.8rem; color: var(--text-muted); font-weight: 500; }
 
-    .evaluacion-inicial-sg-sst * { 
-        box-sizing: border-box; 
-        margin: 0; 
-        padding: 0; 
-    }
+        .k-context-selector select { padding: 0.4rem 0.8rem; border: 1px solid var(--border); border-radius: 6px; font-weight: 600; color: var(--text-dark); cursor: pointer; }
 
-    .evaluacion-inicial-sg-sst {
-        font-family: var(--font-family);
-        background-color: var(--bg-body);
-        color: var(--text-dark);
-        line-height: 1.5;
-        font-size: 0.9rem;
-        padding-top: 140px; 
-    }
+        /* NAVEGACIÓN TABS */
+        .k-module-nav { display: flex; padding: 0 2rem; gap: 2rem; border-top: 1px solid #f8f9fa; }
+        .k-nav-item { background: none; border: none; padding: 0.8rem 0; font-size: 0.9rem; font-weight: 600; color: var(--text-muted); border-bottom: 3px solid transparent; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 0.5rem; }
+        .k-nav-item:hover { color: var(--primary); }
+        .k-nav-item.active { color: var(--primary); border-bottom-color: var(--primary); }
 
-    /* =========================================
-       HEADER GLOBAL
-       ========================================= */
-    header.global-header {
-        position: fixed;
-        top: 0; left: 0; width: 100%;
-        background: white;
-        border-bottom: 1px solid var(--border-color);
-        z-index: 1000;
-        box-shadow: var(--shadow-sm);
-    }
+        /* CONTENIDO */
+        .k-module-content { flex: 1; overflow-y: auto; padding: 2rem; position: relative; }
+        .k-view { display: none; animation: k-fade-in 0.3s ease-out; }
+        .k-view.active { display: block; }
+        @keyframes k-fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-    .header-top {
-        height: 80px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0 2rem;
-        border-bottom: 1px solid #f0f0f0;
-    }
+        /* TOOLBAR */
+        .k-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; background: white; padding: 1rem; border-radius: var(--radius); border: 1px solid var(--border); }
+        .k-toolbar-group { display: flex; align-items: center; gap: 1rem; }
+        .k-label-muted { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+        .k-select-sm { padding: 0.3rem 0.6rem; border-radius: 4px; border: 1px solid var(--border); font-size: 0.9rem; }
+        .k-loading-badge { font-size: 0.85rem; color: var(--primary); font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
 
-    .main-title { 
-        font-size: 1.4rem; 
-        font-weight: 800; 
-        color: var(--primary); 
-    }
-    .breadcrumb-context { 
-        font-size: 0.9rem; 
-        color: var(--text-muted); 
-        font-weight: 500; 
-    }
+        /* METRICS GRID */
+        .k-grid-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem; }
+        .k-card-metric { padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; }
+        .k-metric-header { display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); letter-spacing: 0.5px; margin-bottom: 0.5rem; }
+        .k-metric-body { z-index: 2; }
+        .k-value { font-size: 2.2rem; font-weight: 700; line-height: 1; display: block; font-family: 'Teko', sans-serif; }
+        .k-trend { font-size: 0.85rem; color: var(--text-muted); }
+        .k-mini-chart { position: absolute; right: 1rem; bottom: 1rem; opacity: 0.5; }
 
-    .header-nav {
-        background: #fdfdfd;
-        display: flex;
-        align-items: center;
-        padding: 0 2rem;
-        height: 50px;
-    }
+        /* CHARTS GRID */
+        .k-grid-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+        .k-flex-center { display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+        .k-chart-label { position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%); font-size: 2rem; font-weight: 700; color: var(--text-dark); }
 
-    .nav-item {
-        padding: 0 1.5rem;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        cursor: pointer;
-        font-size: 0.9rem;
-        font-weight: 600;
-        color: var(--text-muted);
-        border-bottom: 3px solid transparent;
-        transition: all 0.2s;
-    }
-    .nav-item:hover { 
-        color: var(--primary); 
-        background: #f0f7ff; 
-    }
-    .nav-item.active { 
-        color: var(--primary); 
-        border-bottom-color: var(--primary); 
-    }
+        /* CARDS */
+        .k-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); overflow: hidden; }
+        .k-card-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: #fff; }
+        .k-card-header h3 { margin: 0; font-size: 1rem; font-weight: 700; color: var(--text-dark); }
+        .k-card-body { padding: 1.25rem; }
 
-    /* =========================================
-       CONTENIDO PRINCIPAL
-       ========================================= */
-    .container-fluid { 
-        max-width: 1400px; 
-        margin: 0 auto; 
-        padding: 2rem; 
-    }
-    .section-view { 
-        display: none; 
-        animation: fadeIn 0.3s ease; 
-    }
-    .section-view.active { 
-        display: block; 
-    }
+        /* PROGRESS BARS */
+        .k-phva-bars { display: flex; flex-direction: column; gap: 1rem; }
+        .k-progress-group { width: 100%; }
+        .k-progress-label { display: flex; justify-content: space-between; margin-bottom: 0.3rem; font-size: 0.8rem; font-weight: 600; color: var(--text-dark); }
+        .k-progress-bar { height: 8px; background: #e9ecef; border-radius: 4px; overflow: hidden; }
+        .k-progress-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
 
-    @keyframes fadeIn { 
-        from { opacity: 0; transform: translateY(10px); } 
-        to { opacity: 1; transform: translateY(0); } 
-    }
+        /* SOURCE CARD */
+        .k-card-source { padding: 1rem; display: flex; justify-content: space-between; align-items: center; }
+        .k-source-info { display: flex; align-items: center; gap: 1rem; }
+        .k-source-icon { width: 40px; height: 40px; background: #e7f1ff; color: var(--primary); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+        .k-source-info h4 { margin: 0; font-size: 0.95rem; font-weight: 700; }
+        .k-source-info p { margin: 0; font-size: 0.8rem; color: var(--text-muted); }
 
-    /* PANEL DE CONTROL */
-    .control-panel {
-        background: var(--bg-card);
-        border: 1px solid var(--border-color);
-        border-radius: var(--radius);
-        padding: 1.5rem;
-        margin-bottom: 2rem;
-        box-shadow: var(--shadow-sm);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        flex-wrap: wrap;
-        gap: 1.5rem;
-    }
-    .control-group { 
-        display: flex; 
-        align-items: center; 
-        gap: 1rem; 
-    }
-    .control-label { 
-        font-weight: 700; 
-        color: var(--text-muted); 
-        font-size: 0.8rem; 
-        text-transform: uppercase; 
-        margin-right: 0.5rem; 
-    }
-    .ctx-select {
-        padding: 0.6rem 1rem; 
-        border: 1px solid var(--border-color); 
-        border-radius: 4px;
-        background: #f8f9fa; 
-        font-size: 0.9rem; 
-        font-weight: 600; 
-        color: var(--text-dark);
-        min-width: 160px; 
-        cursor: pointer;
-    }
-    .ctx-select:focus { 
-        outline: 2px solid var(--primary); 
-        background: white; 
-    }
-    .file-upload-action { 
-        font-size: 0.85rem; 
-        color: var(--primary); 
-        cursor: pointer; 
-        text-decoration: underline; 
-        font-weight: 600; 
-    }
+        /* TABLES */
+        .k-table-responsive { width: 100%; overflow-x: auto; }
+        .k-table { width: 100%; border-collapse: collapse; }
+        .k-table th { background: #f8f9fa; padding: 0.75rem 1rem; text-align: left; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; border-bottom: 2px solid var(--border); }
+        .k-table td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; color: var(--text-dark); vertical-align: middle; }
+        .k-table tr:hover { background-color: #f8f9fa; }
+        .k-empty-table { text-align: center; padding: 2rem; color: var(--text-muted); font-style: italic; }
 
-    /* COMPONENTES DE INTERFAZ */
-    .section-card {
-        background: var(--bg-card);
-        border: 1px solid var(--border-color);
-        border-radius: var(--radius);
-        box-shadow: var(--shadow-sm);
-        padding: 1.5rem;
-        margin-bottom: 1.5rem;
-    }
-    .card-header {
-        display: flex; 
-        justify-content: space-between; 
-        align-items: center;
-        margin-bottom: 1.5rem; 
-        padding-bottom: 1rem; 
-        border-bottom: 1px solid var(--border-color);
-    }
-    .card-title { 
-        font-size: 1.1rem; 
-        font-weight: 700; 
-        color: var(--text-dark); 
-        display: flex; 
-        align-items: center; 
-        gap: 0.5rem; 
-    }
+        /* BADGES & BUTTONS */
+        .k-badge { padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+        .k-badge-success { background: #d4edda; color: #155724; }
+        .k-badge-danger { background: #f8d7da; color: #721c24; }
+        .k-btn { padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.9rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; transition: 0.2s; border: 1px solid transparent; }
+        .k-btn-primary { background: var(--primary); color: white; }
+        .k-btn-primary:hover { background: var(--primary-hover); }
+        .k-btn-outline { background: white; border-color: var(--border); color: var(--text-dark); }
+        .k-btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+        .k-btn-sm { padding: 0.25rem 0.5rem; font-size: 0.8rem; }
 
-    /* KPI Cards */
-    .metrics-row { 
-        display: grid; 
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
-        gap: 1.5rem; 
-        margin-bottom: 2rem; 
-    }
-    .metric-card {
-        background: white; 
-        border: 1px solid var(--border-color); 
-        border-radius: var(--radius);
-        padding: 1.25rem 1.5rem; 
-        box-shadow: var(--shadow-sm); 
-        display: flex; 
-        flex-direction: column; 
-        justify-content: space-between;
-    }
-    .metric-header { 
-        display: flex; 
-        justify-content: space-between; 
-        align-items: start; 
-        margin-bottom: 0.5rem; 
-    }
-    .metric-title { 
-        font-size: 0.85rem; 
-        text-transform: uppercase; 
-        font-weight: 700; 
-        color: var(--text-muted); 
-    }
-    .metric-value-group { 
-        display: flex; 
-        align-items: baseline; 
-        gap: 0.5rem; 
-        margin-bottom: 1rem; 
-    }
-    .metric-value { 
-        font-size: 2.2rem; 
-        font-weight: 700; 
-        color: var(--text-dark); 
-    }
-    .metric-sub { 
-        font-size: 0.85rem; 
-        color: var(--text-muted); 
-    }
-    .chart-internal-container { 
-        margin-top: auto; 
-        height: 60px; 
-        width: 100%; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center; 
-        position: relative; 
-    }
+        /* EMPTY STATES */
+        .k-empty-state { text-align: center; padding: 3rem; color: var(--text-muted); }
+        .k-empty-state i { font-size: 2.5rem; margin-bottom: 1rem; display: block; opacity: 0.5; }
+        .k-empty-state-small { text-align: center; padding: 1rem; font-size: 0.85rem; color: var(--text-muted); font-style: italic; }
 
-    /* Gráficas */
-    .charts-row-large { 
-        display: grid; 
-        grid-template-columns: 1fr 1fr; 
-        gap: 1.5rem; 
-        margin-bottom: 2rem; 
-    }
-    .chart-card {
-        background: white; 
-        border: 1px solid var(--border-color); 
-        border-radius: var(--radius);
-        padding: 1.5rem; 
-        display: flex; 
-        flex-direction: column; 
-        align-items: center; 
-        box-shadow: var(--shadow-sm);
-    }
-    .chart-title { 
-        font-size: 0.9rem; 
-        font-weight: 700; 
-        color: var(--text-muted); 
-        text-transform: uppercase; 
-        margin-bottom: 1rem; 
-        text-align: center; 
-    }
+        /* UTILS */
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-primary { color: var(--primary) !important; }
+        .text-success { color: var(--success) !important; }
+        .text-warning { color: var(--warning) !important; }
+        .text-danger { color: var(--danger) !important; }
+        .text-muted { color: var(--text-muted) !important; }
 
-    /* Tablas Estándar */
-    .table-wrapper { 
-        width: 100%; 
-        overflow-x: auto; 
-        border: 1px solid var(--border-color); 
-        border-radius: var(--radius); 
-    }
-    .k-table { 
-        width: 100%; 
-        border-collapse: collapse; 
-        min-width: 1100px; 
-        background: white; 
-    }
-    .k-table th {
-        background: #f1f3f5; 
-        text-align: left; 
-        padding: 1rem;
-        font-size: 0.8rem; 
-        text-transform: uppercase; 
-        color: var(--text-muted);
-        border-bottom: 2px solid var(--border-color); 
-        white-space: nowrap;
-    }
-    .k-table td { 
-        padding: 1rem; 
-        border-bottom: 1px solid var(--border-color); 
-        vertical-align: middle; 
-        font-size: 0.9rem; 
-    }
-    .k-table tr:hover { 
-        background-color: #f8f9fa; 
-    }
-    
-    /* Filas No Cumplen */
-    .row-non-compliant { 
-        background-color: rgba(220, 53, 69, 0.05); 
-        border-left: 4px solid var(--danger); 
-    }
-    .k-table tbody tr.row-non-compliant:hover { 
-        background-color: rgba(220, 53, 69, 0.1); 
-    }
+        /* TOAST */
+        .k-toast { visibility: hidden; min-width: 300px; background-color: #333; color: #fff; text-align: center; border-radius: 6px; padding: 12px 20px; position: fixed; z-index: 2000; bottom: 30px; right: 30px; font-size: 0.9rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15); opacity: 0; transition: opacity 0.3s; }
+        .k-toast.show { visibility: visible; opacity: 1; }
+        .k-toast.success { background-color: var(--success); }
+        .k-toast.warning { background-color: var(--warning); color: #212529; }
+        .k-toast.danger { background-color: var(--danger); }
+    	
+    `;
+    document.head.appendChild(style);
+}
 
-    /* Estilos Planes */
-    .status-select { 
-        padding: 0.4rem; 
-        border-radius: 4px; 
-        border: 1px solid var(--border-color); 
-        font-size: 0.85rem; 
-        background: white; 
-        cursor: pointer; 
-    }
-    .status-select.pending { 
-        background: #fff3cd; 
-        border-color: #ffeeba; 
-        color: #856404; 
-    }
-    .status-select.progress { 
-        background: #cce5ff; 
-        border-color: #b8daff; 
-        color: #004085; 
-    }
-    .status-select.done { 
-        background: #d4edda; 
-        border-color: #c3e6cb; 
-        color: #155724; 
-    }
-
-    .obs-input { 
-        width: 100%; 
-        padding: 0.5rem; 
-        border: 1px solid var(--border-color); 
-        border-radius: 4px; 
-        font-size: 0.9rem; 
-        font-family: inherit; 
-        background: #fdfdfd; 
-    }
-    .obs-input:focus { 
-        background: white; 
-        outline: 2px solid var(--primary); 
-    }
-
-    .btn-upload { 
-        display: inline-flex; 
-        align-items: center; 
-        gap: 0.5rem; 
-        padding: 0.4rem 0.8rem; 
-        border: 1px dashed var(--border-color); 
-        border-radius: 4px; 
-        background: #fdfdfd; 
-        cursor: pointer; 
-        font-size: 0.85rem; 
-        color: var(--text-muted); 
-        transition: 0.2s; 
-    }
-    .btn-upload:hover { 
-        border-color: var(--primary); 
-        color: var(--primary); 
-    }
-
-    /* Toast */
-    #toast { 
-        visibility: hidden; 
-        min-width: 250px; 
-        background-color: #333; 
-        color: #fff; 
-        text-align: center; 
-        border-radius: 4px; 
-        padding: 16px; 
-        position: fixed; 
-        z-index: 2000; 
-        bottom: 30px; 
-        right: 30px; 
-        opacity: 0; 
-        transition: opacity 0.5s; 
-    }
-    #toast.show { 
-        visibility: visible; 
-        opacity: 1; 
-    }
-    #toast.success { 
-        background-color: var(--success); 
-    }
-`;
-
-// Agregar los estilos al head
-document.head.appendChild(styleElement);
-
-// Hacer la clase disponible globalmente
+// Inicialización
 window.EvaluacionInicialSgSst = EvaluacionInicialSgSst;
+
+})();

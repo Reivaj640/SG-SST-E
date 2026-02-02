@@ -1881,7 +1881,8 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         const evaluacionComponent = new window.EvaluacionInicialSgSst(
           submoduleContentDiv,
           moduleName,
-          submoduleName
+          submoduleName,
+          safeBackToModuleCallback
         );
         evaluacionComponent.render();
       } else {
