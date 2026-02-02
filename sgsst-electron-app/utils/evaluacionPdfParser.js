@@ -103,12 +103,14 @@ class EvaluacionPdfParser {
      * @returns {Object} Datos extraídos
      */
     parseMinisterioPdf(text, filePath) {
+        console.log('[EvaluacionPdfParser] Iniciando parseMinisterioPdf');
         const findings = [];
         const lines = text.split('\n');
         
         let currentItem = null;
         let descriptionLines = [];
         let inItem = false;
+        let foundValue = false;
         
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
@@ -145,27 +147,23 @@ class EvaluacionPdfParser {
                 };
                 descriptionLines = [itemMatch[2]];
                 inItem = true;
-            } else if (inItem && currentItem) {
-                // Buscar línea con valor y estado (ej: 0.50 	Cumple)
-                const valueMatch = line.match(/^(\d+[\.,]?\d*)\s+(.+?)\s*$/);
+                foundValue = false;
+                console.log(`[EvaluacionPdfParser] Nuevo ítem detectado: ${currentItem.code}`);
+            } else if (inItem && currentItem && !foundValue) {
+                // Buscar línea con valor y estado (ej: "0.50 	Cumple" o "0.50	Cumple totalmente 0.50")
+                const valueMatch = line.match(/^(\d+[\.,]?\d*)\s+(.+)$/);
                 
                 if (valueMatch) {
                     const value = parseFloat(valueMatch[1].replace(',', '.'));
                     const statusText = valueMatch[2];
-                    
                     currentItem.max = value;
+                    console.log(`[EvaluacionPdfParser] Valor encontrado para ítem ${currentItem.code}: ${value}, statusText="${statusText}"`);
+                    
                     currentItem.status = this.parseStatus(statusText);
                     currentItem.grade = value;
                     currentItem.requiereRevisionManual = currentItem.status === 'no_cumple' || currentItem.status === 'parcial';
                     
-                    // La siguiente línea podría tener el puntaje (ej: totalmente 0.50)
-                    if (i + 1 < lines.length) {
-                        const nextLine = lines[i + 1].trim();
-                        const scoreMatch = nextLine.match(/^.+?\s+(\d+[\.,]?\d*)$/);
-                        if (scoreMatch) {
-                            currentItem.grade = parseFloat(scoreMatch[1].replace(',', '.'));
-                        }
-                    }
+                    console.log(`[EvaluacionPdfParser] Ítem ${currentItem.code}: valor=${value}, statusText="${statusText}", status=${currentItem.status}`);
                     
                     // Guardar el ítem
                     currentItem.desc = descriptionLines.join(' ').trim();
@@ -175,6 +173,7 @@ class EvaluacionPdfParser {
                     currentItem = null;
                     descriptionLines = [];
                     inItem = false;
+                    foundValue = false;
                 } else if (line && !line.match(/^(Planear|Hacer|Verificar|Actuar)/)) {
                     // Acumular líneas de descripción
                     descriptionLines.push(line);
@@ -188,10 +187,98 @@ class EvaluacionPdfParser {
             findings.push(currentItem);
         }
         
+        console.log(`[EvaluacionPdfParser] Total de hallazgos del Ministerio: ${findings.length}`);
         return {
             findings: findings,
             rawData: { text, lines }
         };
+    }
+
+    /**
+     * Extrae planes de acción de un informe de ARL
+     * @param {string} text - Texto extraído del PDF
+     * @returns {Array} Lista de planes de acción extraídos
+     */
+    extractActionPlansFromArl(text) {
+        const actionPlans = [];
+        const lines = text.split('\n');
+        
+        let inActionPlansSection = false;
+        let currentPlan = null;
+        let descriptionLines = [];
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            
+            // Detectar inicio de sección de planes de acción
+            if (line.includes('PLAN DE ACCIÓN') || line.includes('PLANES DE ACCIÓN') || 
+                line.includes('PLAN DE MEJORAMIENTO') || line.includes('PLANES DE MEJORAMIENTO')) {
+                inActionPlansSection = true;
+                continue;
+            }
+            
+            // Detectar fin de sección de planes de acción
+            if (inActionPlansSection && (line.includes('CONCLUSIONES') || line.includes('RECOMENDACIONES') || 
+                line.includes('OBSERVACIONES') || line.match(/^\d+\.\s+CONCLUSIONES/))) {
+                break;
+            }
+            
+            if (!inActionPlansSection) continue;
+            
+            // Detectar inicio de un plan de acción (patrón como 1., 2., 3. o con bullet points)
+            const planMatch = line.match(/^(\d+\.|-|\*)\s+(.+)$/);
+            
+            if (planMatch) {
+                // Guardar el plan anterior si existe
+                if (currentPlan && descriptionLines.length > 0) {
+                    currentPlan.accion = descriptionLines.join(' ').trim();
+                    actionPlans.push(currentPlan);
+                }
+                
+                // Crear nuevo plan
+                currentPlan = {
+                    hallazgoId: null,  // Se asignará después
+                    hallazgoDesc: '',
+                    accion: '',
+                    responsable: 'Por asignar',
+                    fechaLimite: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 días desde hoy
+                    estado: 'pendiente',
+                    seguimientos: [],
+                    responsables: []
+                };
+                descriptionLines = [planMatch[2]];
+            } else if (currentPlan) {
+                // Buscar información de responsable o fecha
+                const responsableMatch = line.match(/(?:Responsable|Asignado a|A cargo de)[:\s]+(.+)$/i);
+                const fechaMatch = line.match(/(?:Fecha límite|Fecha de cumplimiento|Plazo)[:\s]+(.+)$/i);
+                
+                if (responsableMatch) {
+                    currentPlan.responsable = responsableMatch[1].trim();
+                } else if (fechaMatch) {
+                    // Intentar parsear la fecha
+                    try {
+                        const fecha = new Date(fechaMatch[1].trim());
+                        if (!isNaN(fecha.getTime())) {
+                            currentPlan.fechaLimite = fecha.toISOString().split('T')[0];
+                        }
+                    } catch (e) {
+                        // Mantener fecha por defecto si no se puede parsear
+                    }
+                } else if (line && !line.match(/^(Responsable|Fecha|Plazo)/i)) {
+                    // Acumular líneas de descripción
+                    descriptionLines.push(line);
+                }
+            }
+        }
+        
+        // Guardar el último plan si existe
+        if (currentPlan && descriptionLines.length > 0) {
+            currentPlan.accion = descriptionLines.join(' ').trim();
+            actionPlans.push(currentPlan);
+        }
+        
+        console.log(`[EvaluacionPdfParser] Planes de acción extraídos de ARL: ${actionPlans.length}`);
+        return actionPlans;
     }
 
     /**
@@ -201,12 +288,14 @@ class EvaluacionPdfParser {
      * @returns {Object} Datos extraídos
      */
     parseArlPdf(text, filePath) {
+        console.log('[EvaluacionPdfParser] Iniciando parseArlPdf');
         const findings = [];
         const lines = text.split('\n');
         
         let currentItem = null;
         let descriptionLines = [];
         let inItem = false;
+        let foundValue = false;
         
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
@@ -243,18 +332,23 @@ class EvaluacionPdfParser {
                 };
                 descriptionLines = [itemMatch[2]];
                 inItem = true;
-            } else if (inItem && currentItem) {
-                // Buscar línea con valor y marca X (ej: 0,5 X)
+                foundValue = false;
+                console.log(`[EvaluacionPdfParser] Nuevo ítem detectado: ${currentItem.code}`);
+            } else if (inItem && currentItem && !foundValue) {
+                // Buscar línea con valor y estado (ej: "0,5 X" o "0.5 X")
                 const valueMatch = line.match(/^(\d+[\.,]?\d*)\s*(X)?$/);
                 
                 if (valueMatch) {
                     const value = parseFloat(valueMatch[1].replace(',', '.'));
                     const hasX = valueMatch[2] === 'X';
-                    
                     currentItem.max = value;
+                    console.log(`[EvaluacionPdfParser] Valor encontrado para ítem ${currentItem.code}: ${value}, hasX=${hasX}`);
+                    
                     currentItem.status = hasX ? 'cumple' : 'no_cumple';
                     currentItem.grade = hasX ? value : 0;
                     currentItem.requiereRevisionManual = !hasX;
+                    
+                    console.log(`[EvaluacionPdfParser] Ítem ${currentItem.code}: valor=${value}, hasX=${hasX}, status=${currentItem.status}`);
                     
                     // Guardar el ítem
                     currentItem.desc = descriptionLines.join(' ').trim();
@@ -264,6 +358,7 @@ class EvaluacionPdfParser {
                     currentItem = null;
                     descriptionLines = [];
                     inItem = false;
+                    foundValue = false;
                 } else if (line && !line.match(/^(Planear|Hacer|Verificar|Actuar)/)) {
                     // Acumular líneas de descripción
                     descriptionLines.push(line);
@@ -277,8 +372,14 @@ class EvaluacionPdfParser {
             findings.push(currentItem);
         }
         
+        console.log(`[EvaluacionPdfParser] Total de hallazgos de ARL: ${findings.length}`);
+        
+        // Extraer planes de acción del informe de ARL
+        const actionPlans = this.extractActionPlansFromArl(text);
+        
         return {
             findings: findings,
+            actionPlans: actionPlans,
             rawData: { text, lines }
         };
     }
@@ -395,6 +496,10 @@ class EvaluacionPdfParser {
                 : this.parseArlPdf(result.text, pdfPath);
 
             console.log(`[EvaluacionPdfParser] Hallazgos extraídos: ${extractedData.findings.length}`);
+            
+            // Extraer planes de acción si existen
+            const actionPlans = extractedData.actionPlans || [];
+            console.log(`[EvaluacionPdfParser] Planes de acción extraídos: ${actionPlans.length}`);
 
             // Calcular métricas
             const metrics = this.calculateMetrics(extractedData.findings);
@@ -408,6 +513,7 @@ class EvaluacionPdfParser {
                 fileName: this.extractFileName(pdfPath),
                 filePath: pdfPath,
                 findings: extractedData.findings,
+                actionPlans: actionPlans,
                 metrics: metrics,
                 rawData: extractedData.rawData
             };

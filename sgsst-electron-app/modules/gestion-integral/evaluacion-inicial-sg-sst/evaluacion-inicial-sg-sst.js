@@ -8,7 +8,7 @@ class EvaluacionInicialSgSst {
         this.moduleName = moduleName;
         this.submoduleTitle = submoduleTitle;
         this.backToModuleCallback = backToModuleCallback;
-
+ 
         // Estado del componente
         this.currentFindings = [];
         this.currentData = [];
@@ -17,10 +17,14 @@ class EvaluacionInicialSgSst {
         this.currentPdfPath = null;
         this.submodulePath = null;
         this.activeTab = 'dashboard';
-
+ 
         // Datos vacíos iniciales
         this.findingsBase = {};
         this.dataBase = {};
+        
+        // Datos de planes de acción
+        this.actionPlans = [];
+        this.actionPlanIdCounter = 1;
     }
 
     async render() {
@@ -89,6 +93,9 @@ class EvaluacionInicialSgSst {
                             <option value="ministerio">🏛️ Ministerio de Trabajo (Estándares Mínimos)</option>
                             <option value="arl">🛡️ Informe ARL</option>
                         </select>
+                        <button class="k-btn k-btn-sm k-btn-outline" id="btn-change-pdf" onclick="window.currentEvaluacionInstance.showPdfSelectorModal()" title="Cambiar archivo PDF">
+                            <i class="bi bi-file-earmark-pdf"></i> Cambiar Archivo
+                        </button>
                     </div>
                     <div id="loading-indicator" class="k-loading-badge" style="display:none;">
                         <span class="spinner-border spinner-border-sm"></span> Procesando...
@@ -215,18 +222,20 @@ class EvaluacionInicialSgSst {
                     <div class="k-card">
                         <div class="k-card-header">
                             <h3>Seguimiento de Planes</h3>
-                            <button class="k-btn k-btn-primary"><i class="bi bi-plus-lg"></i> Nuevo Plan</button>
+                            <button class="k-btn k-btn-primary" onclick="window.currentEvaluacionInstance.showActionPlanModal()">
+                                <i class="bi bi-plus-lg"></i> Nuevo Plan
+                            </button>
                         </div>
                         <div class="k-table-responsive">
                             <table class="k-table">
                                 <thead>
                                     <tr>
-                                        <th>Estado</th>
-                                        <th>Hallazgo Asociado</th>
-                                        <th>Acción Correctiva</th>
-                                        <th>Responsable</th>
-                                        <th>Fecha Límite</th>
-                                        <th>Acciones</th>
+                                        <th style="width: 10%;">Estado</th>
+                                        <th style="width: 25%;">Hallazgo Asociado</th>
+                                        <th style="width: 25%;">Acción Correctiva</th>
+                                        <th style="width: 15%;">Responsable</th>
+                                        <th style="width: 10%;">Fecha Límite</th>
+                                        <th style="width: 15%;">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody id="actionTableBody">
@@ -279,6 +288,8 @@ class EvaluacionInicialSgSst {
 
     // --- LÓGICA DE NAVEGACIÓN (TABS) ---
     switchTab(tabId) {
+        console.log('[EvaluacionInicialSgSst] switchTab() - Cambiando a pestaña:', tabId);
+        
         // 1. Actualizar botones de navegación
         const navItems = this.container.querySelectorAll('.k-nav-item');
         navItems.forEach(btn => {
@@ -296,17 +307,22 @@ class EvaluacionInicialSgSst {
 
         const activeView = this.container.querySelector(`#view-${tabId}`);
         if (activeView) {
+            console.log('[EvaluacionInicialSgSst] switchTab() - Vista encontrada:', activeView.id);
             activeView.classList.add('active');
             activeView.style.display = 'block';
+            console.log('[EvaluacionInicialSgSst] switchTab() - Vista activada con display:', activeView.style.display);
 
             // Redibujar gráficos si se entra al dashboard para asegurar renderizado correcto
             if (tabId === 'dashboard' && this.currentFindings.length > 0) {
                 // Pequeño delay para que el canvas tenga dimensiones
                 setTimeout(() => this.updateDashboardWithRealData({ cumplimiento: parseInt(document.getElementById('kpi-score').textContent) }), 50);
             }
+        } else {
+            console.error('[EvaluacionInicialSgSst] switchTab() - Vista no encontrada:', `#view-${tabId}`);
         }
 
         this.activeTab = tabId;
+        console.log('[EvaluacionInicialSgSst] switchTab() - Pestaña actual actualizada a:', this.activeTab);
     }
 
     // --- LÓGICA DE DATOS ---
@@ -395,7 +411,7 @@ class EvaluacionInicialSgSst {
     }
 
     showPdfSelector(pdfFiles) {
-        // Crear un modal para seleccionar el PDF
+        // Crear un modal mejorado para seleccionar el PDF
         const modal = document.createElement('div');
         modal.className = 'k-modal';
         modal.style.cssText = `
@@ -404,70 +420,221 @@ class EvaluacionInicialSgSst {
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.5);
+            background: rgba(0,0,0,0.6);
             display: flex;
             align-items: center;
             justify-content: center;
             z-index: 9999;
+            animation: fadeIn 0.3s ease-in-out;
         `;
-
+ 
+        // Agrupar PDFs por tipo
+        const ministerioPdfs = pdfFiles.filter(f => f.path.toLowerCase().includes('ministerio'));
+        const arlPdfs = pdfFiles.filter(f => f.path.toLowerCase().includes('arl'));
+        const otherPdfs = pdfFiles.filter(f => 
+            !f.path.toLowerCase().includes('ministerio') && 
+            !f.path.toLowerCase().includes('arl')
+        );
+ 
         let modalContent = `
             <div class="k-modal-content" style="
-                background: white;
-                padding: 2rem;
-                border-radius: 8px;
+                background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+                padding: 2.5rem;
+                border-radius: 16px;
                 width: 90%;
-                max-width: 600px;
-                max-height: 80vh;
+                max-width: 700px;
+                max-height: 85vh;
                 overflow-y: auto;
-                box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+                box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                animation: slideUp 0.4s ease-out;
             ">
-                <div class="k-modal-header" style="margin-bottom: 1.5rem;">
-                    <h3 style="margin: 0; color: var(--text-dark);">Seleccionar PDF de Evaluación</h3>
-                    <p style="margin: 0.5rem 0 0 0; color: var(--text-muted); font-size: 0.9rem;">
-                        Se encontraron ${pdfFiles.length} archivos PDF. Por favor seleccione el que desea procesar:
+                <div class="k-modal-header" style="margin-bottom: 2rem; text-align: center;">
+                    <div style="
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: 60px;
+                        height: 60px;
+                        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+                        border-radius: 50%;
+                        margin-bottom: 1rem;
+                        box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+                    ">
+                        <i class="bi bi-file-earmark-pdf-fill" style="color: white; font-size: 1.8rem;"></i>
+                    </div>
+                    <h3 style="margin: 0 0 0.5rem 0; color: var(--text-dark); font-size: 1.5rem; font-weight: 600;">
+                        Seleccionar PDF de Evaluación
+                    </h3>
+                    <p style="margin: 0; color: var(--text-muted); font-size: 0.95rem;">
+                        Se encontraron <strong style="color: var(--primary);">${pdfFiles.length}</strong> archivos PDF
                     </p>
                 </div>
                 <div class="k-modal-body">
-                    <div class="k-list-group">
         `;
-
-        pdfFiles.forEach((pdf, index) => {
-            const encodedPath = encodeURIComponent(pdf.path);
-            const encodedName = encodeURIComponent(pdf.name);
-            modalContent += `
-                <div class="k-list-item" style="
-                    padding: 1rem;
-                    border: 1px solid var(--border);
-                    border-radius: 6px;
-                    margin-bottom: 0.5rem;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                " onclick="window.currentEvaluacionInstance.selectPdf(decodeURIComponent('${encodedPath}'), decodeURIComponent('${encodedName}'))">
-                    <div style="display: flex; align-items: center; gap: 0.75rem;">
-                        <i class="bi bi-file-earmark-pdf-fill" style="color: var(--danger); font-size: 1.5rem;"></i>
-                        <div style="flex: 1;">
-                            <div style="font-weight: 500; color: var(--text-dark);">${pdf.name}</div>
-                            <div style="font-size: 0.8rem; color: var(--text-muted);">
-                                ${pdf.path.split('\\').slice(-2, -1)[0] || 'Raíz'} • ${Math.round(pdf.size / 1024)} KB
+ 
+        // Función para renderizar grupo de PDFs
+        const renderPdfGroup = (title, pdfs, icon, color, bgColor) => {
+            if (pdfs.length === 0) return '';
+            
+            let groupHtml = `
+                <div style="margin-bottom: 1.5rem;">
+                    <div style="
+                        display: flex;
+                        align-items: center;
+                        gap: 0.5rem;
+                        margin-bottom: 1rem;
+                        padding-bottom: 0.5rem;
+                        border-bottom: 2px solid ${bgColor};
+                    ">
+                        <i class="${icon}" style="color: ${color}; font-size: 1.2rem;"></i>
+                        <h4 style="margin: 0; color: var(--text-dark); font-size: 1.1rem; font-weight: 600;">
+                            ${title} <span style="color: var(--text-muted); font-weight: 400; font-size: 0.9rem;">(${pdfs.length})</span>
+                        </h4>
+                    </div>
+                    <div class="k-list-group" style="display: grid; gap: 0.75rem;">
+            `;
+ 
+            pdfs.forEach((pdf, index) => {
+                const encodedPath = encodeURIComponent(pdf.path);
+                const encodedName = encodeURIComponent(pdf.name);
+                const isMinisterio = pdf.path.toLowerCase().includes('ministerio');
+                const cardColor = isMinisterio ? 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)' : 'linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%)';
+                const iconColor = isMinisterio ? '#0d6efd' : '#ffc107';
+                const iconClass = isMinisterio ? 'bi-building' : 'bi-shield-check';
+                
+                groupHtml += `
+                    <div class="k-list-item" style="
+                        padding: 1.25rem;
+                        border: 2px solid ${bgColor};
+                        border-radius: 12px;
+                        cursor: pointer;
+                        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                        background: white;
+                        position: relative;
+                        overflow: hidden;
+                    " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 24px rgba(0,0,0,0.15)';" 
+                       onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';"
+                       onclick="window.currentEvaluacionInstance.selectPdf(decodeURIComponent('${encodedPath}'), decodeURIComponent('${encodedName}'))">
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <div style="
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                width: 50px;
+                                height: 50px;
+                                background: ${cardColor};
+                                border-radius: 10px;
+                                flex-shrink: 0;
+                            ">
+                                <i class="bi ${iconClass}" style="color: white; font-size: 1.4rem;"></i>
+                            </div>
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="
+                                    font-weight: 600; 
+                                    color: var(--text-dark); 
+                                    font-size: 1rem;
+                                    margin-bottom: 0.25rem;
+                                    white-space: nowrap;
+                                    overflow: hidden;
+                                    text-overflow: ellipsis;
+                                ">${pdf.name}</div>
+                                <div style="
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 0.5rem;
+                                    font-size: 0.85rem;
+                                    color: var(--text-muted);
+                                ">
+                                    <span style="
+                                        display: inline-flex;
+                                        align-items: center;
+                                        gap: 0.25rem;
+                                        padding: 0.25rem 0.5rem;
+                                        background: ${bgColor}20;
+                                        border-radius: 4px;
+                                    ">
+                                        <i class="bi bi-folder" style="font-size: 0.9rem;"></i>
+                                        ${pdf.path.split('\\').slice(-2, -1)[0] || 'Raíz'}
+                                    </span>
+                                    <span style="
+                                        display: inline-flex;
+                                        align-items: center;
+                                        gap: 0.25rem;
+                                        padding: 0.25rem 0.5rem;
+                                        background: var(--success)15;
+                                        border-radius: 4px;
+                                    ">
+                                        <i class="bi bi-file-earmark" style="font-size: 0.9rem;"></i>
+                                        ${Math.round(pdf.size / 1024)} KB
+                                    </span>
+                                </div>
                             </div>
                         </div>
+                        <div style="
+                            position: absolute;
+                            top: 0;
+                            right: 0;
+                            width: 4px;
+                            height: 100%;
+                            background: ${iconColor};
+                            border-radius: 0 12px 12px 0;
+                        "></div>
                     </div>
-                </div>
-            `;
-        });
-
+                `;
+            });
+ 
+            groupHtml += `</div></div>`;
+            return groupHtml;
+        };
+ 
+        // Renderizar grupos
+        modalContent += renderPdfGroup('🏛️ Ministerio de Trabajo', ministerioPdfs, 'bi-building', '#0d6efd', '#0d6efd');
+        modalContent += renderPdfGroup('🛡️ Informe ARL', arlPdfs, 'bi-shield-check', '#ffc107', '#ffc107');
+        if (otherPdfs.length > 0) {
+            modalContent += renderPdfGroup('📁 Otros Archivos', otherPdfs, 'bi-file-earmark', '#6c757d', '#6c757d');
+        }
+ 
         modalContent += `
-                    </div>
                 </div>
-                <div class="k-modal-footer" style="margin-top: 1.5rem; text-align: right;">
-                    <button class="k-btn k-btn-outline" onclick="this.closest('.k-modal').remove()" style="margin-right: 0.5rem;">
-                        Cancelar
+                <div class="k-modal-footer" style="
+                    margin-top: 2rem; 
+                    padding-top: 1.5rem; 
+                    border-top: 1px solid var(--border); 
+                    display: flex; 
+                    justify-content: flex-end; 
+                    gap: 0.75rem;
+                ">
+                    <button class="k-btn k-btn-outline" onclick="this.closest('.k-modal').remove()" style="
+                        padding: 0.75rem 1.5rem;
+                        font-size: 0.95rem;
+                        border-radius: 8px;
+                    ">
+                        <i class="bi bi-x-lg me-1"></i> Cancelar
                     </button>
                 </div>
             </div>
+            
+            <style>
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes slideUp {
+                    from { 
+                        opacity: 0; 
+                        transform: translateY(30px); 
+                    }
+                    to { 
+                        opacity: 1; 
+                        transform: translateY(0); 
+                    }
+                }
+                .k-list-item:hover {
+                    border-color: var(--primary) !important;
+                }
+            </style>
         `;
-
+ 
         modal.innerHTML = modalContent;
         document.body.appendChild(modal);
     }
@@ -509,10 +676,30 @@ class EvaluacionInicialSgSst {
                     console.log('[EvaluacionInicialSgSst] PDF procesado exitosamente');
                     console.log('[EvaluacionInicialSgSst] Hallazgos encontrados:', result.findings?.length || 0);
                     console.log('[EvaluacionInicialSgSst] Métricas:', result.metrics);
+                    console.log('[EvaluacionInicialSgSst] Pestaña actual:', this.activeTab);
+                    console.log('[EvaluacionInicialSgSst] Planes de acción extraídos:', result.actionPlans?.length || 0);
                     
                     this.currentFindings = result.findings || [];
                     this.renderHallazgosTable();
                     this.updateDashboardWithRealData(result.metrics);
+                    
+                    // Procesar planes de acción según el tipo de fuente
+                    if (result.source === 'arl' && result.actionPlans && result.actionPlans.length > 0) {
+                        // Para informes de ARL, usar los planes de acción extraídos
+                        console.log('[EvaluacionInicialSgSst] Procesando planes de acción de ARL');
+                        this.processArlActionPlans(result.actionPlans);
+                    } else if (result.source === 'ministerio') {
+                        // Para informes del Ministerio, generar planes automáticamente para hallazgos "no_cumple"
+                        console.log('[EvaluacionInicialSgSst] Generando planes de acción para hallazgos no_cumple');
+                        this.generateActionPlansForNoCumple();
+                    }
+                    
+                    this.renderActionPlansTable();
+                    
+                    // Cambiar a la pestaña de Planes de Acción para mostrar la tabla
+                    console.log('[EvaluacionInicialSgSst] Cambiando a pestaña de Planes de Acción');
+                    this.switchTab('actions');
+                    
                     this.showToast('Datos procesados correctamente.', 'success');
                 } else {
                     console.error('[EvaluacionInicialSgSst] Error procesando PDF:', result.error);
@@ -665,7 +852,1001 @@ class EvaluacionInicialSgSst {
     }
 
     updateSource() {
-        console.log('Fuente actualizada por el usuario');
+        console.log('[EvaluacionInicialSgSst] Fuente actualizada por el usuario');
+        
+        // Obtener el valor seleccionado
+        const sourceSelect = document.getElementById('sourceSelect');
+        const yearSelect = document.getElementById('yearSelect');
+        
+        if (!sourceSelect || !yearSelect) return;
+        
+        const newSource = sourceSelect.value;
+        const newYear = yearSelect.value;
+        
+        console.log('[EvaluacionInicialSgSst] Nueva fuente:', newSource);
+        console.log('[EvaluacionInicialSgSst] Nuevo año:', newYear);
+        
+        // Actualizar estado
+        this.currentSource = newSource;
+        this.currentYear = newYear;
+        
+        // Cargar archivos nuevamente sin recargar la página
+        this.loadRealFiles();
+    }
+    
+    showPdfSelectorModal() {
+        console.log('[EvaluacionInicialSgSst] Abriendo modal de selección de PDFs');
+        
+        // Cargar archivos nuevamente y mostrar el modal
+        this.loadRealFiles();
+    }
+    
+    // --- FUNCIONES PARA PLANES DE ACCIÓN ---
+    
+    showActionPlanModal(planId = null) {
+        console.log('[EvaluacionInicialSgSst] Abriendo modal de plan de acción:', planId);
+        
+        const isEdit = planId !== null;
+        const plan = isEdit ? this.actionPlans.find(p => p.id === planId) : null;
+        
+        const modal = document.createElement('div');
+        modal.className = 'k-modal';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            animation: fadeIn 0.3s ease-in-out;
+        `;
+        
+        const hallazgosOptions = this.currentFindings.map(f => 
+            `<option value="${f.code}">${f.code} - ${f.desc.substring(0, 50)}...</option>`
+        ).join('');
+        
+        let modalContent = `
+            <div class="k-modal-content" style="
+                background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+                padding: 2.5rem;
+                border-radius: 16px;
+                width: 90%;
+                max-width: 700px;
+                max-height: 85vh;
+                overflow-y: auto;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                animation: slideUp 0.4s ease-out;
+            ">
+                <div class="k-modal-header" style="margin-bottom: 2rem; text-align: center;">
+                    <div style="
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: 60px;
+                        height: 60px;
+                        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+                        border-radius: 50%;
+                        margin-bottom: 1rem;
+                        box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+                    ">
+                        <i class="bi bi-clipboard-check" style="color: white; font-size: 1.8rem;"></i>
+                    </div>
+                    <h3 style="margin: 0 0 0.5rem 0; color: var(--text-dark); font-size: 1.5rem; font-weight: 600;">
+                        ${isEdit ? 'Editar Plan de Acción' : 'Nuevo Plan de Acción'}
+                    </h3>
+                    <p style="margin: 0; color: var(--text-muted); font-size: 0.95rem;">
+                        ${isEdit ? 'Modifique los datos del plan de acción existente' : 'Complete el formulario para crear un nuevo plan de acción'}
+                    </p>
+                </div>
+                <div class="k-modal-body">
+                    <form id="actionPlanForm" style="display: grid; gap: 1.5rem;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                            <div>
+                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark);">
+                                    Hallazgo Asociado <span style="color: var(--danger);">*</span>
+                                </label>
+                                <select id="planHallazgo" class="k-input" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;" required>
+                                    <option value="">Seleccione un hallazgo...</option>
+                                    ${hallazgosOptions}
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark);">
+                                    Estado <span style="color: var(--danger);">*</span>
+                                </label>
+                                <select id="planEstado" class="k-input" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;" required>
+                                    <option value="pendiente">⏳ Pendiente</option>
+                                    <option value="en_progreso">🔄 En Progreso</option>
+                                    <option value="completado">✅ Completado</option>
+                                    <option value="cancelado">❌ Cancelado</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark);">
+                                Acción Correctiva <span style="color: var(--danger);">*</span>
+                            </label>
+                            <textarea id="planAccion" class="k-input" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; min-height: 100px; resize: vertical;" required placeholder="Describa la acción correctiva a implementar..."></textarea>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                            <div>
+                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark);">
+                                    Responsable <span style="color: var(--danger);">*</span>
+                                </label>
+                                <input type="text" id="planResponsable" class="k-input" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;" required placeholder="Nombre del responsable">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark);">
+                                    Fecha Límite <span style="color: var(--danger);">*</span>
+                                </label>
+                                <input type="date" id="planFechaLimite" class="k-input" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;" required>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="k-modal-footer" style="
+                    margin-top: 2rem; 
+                    padding-top: 1.5rem; 
+                    border-top: 1px solid var(--border); 
+                    display: flex; 
+                    justify-content: flex-end; 
+                    gap: 0.75rem;
+                ">
+                    <button class="k-btn k-btn-outline" onclick="this.closest('.k-modal').remove()" style="
+                        padding: 0.75rem 1.5rem;
+                        font-size: 0.95rem;
+                        border-radius: 8px;
+                    ">
+                        <i class="bi bi-x-lg me-1"></i> Cancelar
+                    </button>
+                    <button class="k-btn k-btn-primary" onclick="window.currentEvaluacionInstance.saveActionPlan(${planId})" style="
+                        padding: 0.75rem 1.5rem;
+                        font-size: 0.95rem;
+                        border-radius: 8px;
+                    ">
+                        <i class="bi bi-check-lg me-1"></i> ${isEdit ? 'Guardar Cambios' : 'Crear Plan'}
+                    </button>
+                </div>
+            </div>
+            
+            <style>
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes slideUp {
+                    from { 
+                        opacity: 0; 
+                        transform: translateY(30px); 
+                    }
+                    to { 
+                        opacity: 1; 
+                        transform: translateY(0); 
+                    }
+                }
+                .k-input {
+                    font-family: 'Segoe UI', Roboto, sans-serif;
+                    font-size: 0.95rem;
+                    color: var(--text-dark);
+                    transition: border-color 0.2s;
+                }
+                .k-input:focus {
+                    outline: none;
+                    border-color: var(--primary);
+                    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
+                }
+            </style>
+        `;
+        
+        modal.innerHTML = modalContent;
+        document.body.appendChild(modal);
+        
+        // Si es edición, llenar el formulario con los datos existentes
+        if (isEdit && plan) {
+            document.getElementById('planHallazgo').value = plan.hallazgoId;
+            document.getElementById('planEstado').value = plan.estado;
+            document.getElementById('planAccion').value = plan.accion;
+            document.getElementById('planResponsable').value = plan.responsable;
+            document.getElementById('planFechaLimite').value = plan.fechaLimite;
+        }
+    }
+    
+    saveActionPlan(planId = null) {
+        const form = document.getElementById('actionPlanForm');
+        if (!form) return;
+        
+        const hallazgoId = document.getElementById('planHallazgo').value;
+        const estado = document.getElementById('planEstado').value;
+        const accion = document.getElementById('planAccion').value;
+        const responsable = document.getElementById('planResponsable').value;
+        const fechaLimite = document.getElementById('planFechaLimite').value;
+        
+        if (!hallazgoId || !estado || !accion || !responsable || !fechaLimite) {
+            this.showToast('Por favor complete todos los campos requeridos', 'warning');
+            return;
+        }
+        
+        const hallazgo = this.currentFindings.find(f => f.code === hallazgoId);
+        if (!hallazgo) {
+            this.showToast('Hallazgo no encontrado', 'danger');
+            return;
+        }
+        
+        if (planId) {
+            // Editar plan existente
+            const planIndex = this.actionPlans.findIndex(p => p.id === planId);
+            if (planIndex !== -1) {
+                this.actionPlans[planIndex] = {
+                    ...this.actionPlans[planIndex],
+                    hallazgoId,
+                    estado,
+                    accion,
+                    responsable,
+                    fechaLimite,
+                    fechaModificacion: new Date().toISOString()
+                };
+                this.showToast('Plan de acción actualizado correctamente', 'success');
+            }
+        } else {
+            // Crear nuevo plan
+            const newPlan = {
+                id: this.actionPlanIdCounter++,
+                hallazgoId,
+                hallazgoCodigo: hallazgo.code,
+                hallazgoDescripcion: hallazgo.desc,
+                estado,
+                accion,
+                responsable,
+                fechaLimite,
+                fechaCreacion: new Date().toISOString(),
+                seguimientos: [],
+                responsables: [responsable]
+            };
+            this.actionPlans.push(newPlan);
+            this.showToast('Plan de acción creado correctamente', 'success');
+        }
+        
+        // Cerrar modal y actualizar tabla
+        const modal = document.querySelector('.k-modal');
+        if (modal) modal.remove();
+        
+        this.renderActionPlansTable();
+    }
+    
+    showActionPlanDetailModal(planId) {
+        console.log('[EvaluacionInicialSgSst] Mostrando detalle del plan:', planId);
+        
+        const plan = this.actionPlans.find(p => p.id === planId);
+        if (!plan) {
+            this.showToast('Plan no encontrado', 'danger');
+            return;
+        }
+        
+        const hallazgo = this.currentFindings.find(f => f.code === plan.hallazgoId);
+        
+        const modal = document.createElement('div');
+        modal.className = 'k-modal';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            animation: fadeIn 0.3s ease-in-out;
+        `;
+        
+        let modalContent = `
+            <div class="k-modal-content" style="
+                background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+                padding: 2.5rem;
+                border-radius: 16px;
+                width: 90%;
+                max-width: 800px;
+                max-height: 85vh;
+                overflow-y: auto;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                animation: slideUp 0.4s ease-out;
+            ">
+                <div class="k-modal-header" style="margin-bottom: 2rem; text-align: center;">
+                    <div style="
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: 60px;
+                        height: 60px;
+                        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+                        border-radius: 50%;
+                        margin-bottom: 1rem;
+                        box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+                    ">
+                        <i class="bi bi-clipboard-data" style="color: white; font-size: 1.8rem;"></i>
+                    </div>
+                    <h3 style="margin: 0 0 0.5rem 0; color: var(--text-dark); font-size: 1.5rem; font-weight: 600;">
+                        Detalle del Plan de Acción
+                    </h3>
+                </div>
+                <div class="k-modal-body">
+                    <div style="display: grid; gap: 1.5rem;">
+                        <div style="background: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border);">
+                            <h4 style="margin: 0 0 1rem 0; color: var(--primary); font-size: 1.1rem; font-weight: 600;">
+                                <i class="bi bi-list-check me-2"></i> Información del Plan
+                            </h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                                <div>
+                                    <span style="color: var(--text-muted); font-size: 0.9rem;">Estado:</span>
+                                    <span style="font-weight: 600; color: var(--text-dark); margin-left: 0.5rem;">
+                                        ${this.getEstadoBadge(plan.estado)}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span style="color: var(--text-muted); font-size: 0.9rem;">Fecha Límite:</span>
+                                    <span style="font-weight: 600; color: var(--text-dark); margin-left: 0.5rem;">
+                                        ${new Date(plan.fechaLimite).toLocaleDateString('es-CO')}
+                                    </span>
+                                </div>
+                            </div>
+                            <div style="margin-top: 1rem;">
+                                <span style="color: var(--text-muted); font-size: 0.9rem;">Responsable:</span>
+                                <div style="font-weight: 600; color: var(--text-dark); margin-top: 0.5rem;">
+                                    ${plan.responsable}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="background: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border);">
+                            <h4 style="margin: 0 0 1rem 0; color: var(--primary); font-size: 1.1rem; font-weight: 600;">
+                                <i class="bi bi-exclamation-triangle me-2"></i> Hallazgo Asociado
+                            </h4>
+                            <div style="margin-top: 1rem;">
+                                <div style="background: var(--warning)15; padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem;">
+                                    <span style="font-weight: 600; color: var(--text-dark);">${hallazgo.code}</span>
+                                    <span class="k-badge k-badge-warning" style="margin-left: 0.5rem;">${hallazgo.status}</span>
+                                </div>
+                                <div style="color: var(--text-dark); line-height: 1.6;">
+                                    ${hallazgo.desc}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="background: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border);">
+                            <h4 style="margin: 0 0 1rem 0; color: var(--primary); font-size: 1.1rem; font-weight: 600;">
+                                <i class="bi bi-clipboard-check me-2"></i> Acción Correctiva
+                            </h4>
+                            <div style="margin-top: 1rem; color: var(--text-dark); line-height: 1.6;">
+                                ${plan.accion}
+                            </div>
+                        </div>
+                        
+                        <div style="background: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border);">
+                            <h4 style="margin: 0 0 1rem 0; color: var(--primary); font-size: 1.1rem; font-weight: 600;">
+                                <i class="bi bi-people me-2"></i> Responsables
+                            </h4>
+                            <div style="margin-top: 1rem;">
+                                ${plan.responsables.map(r => `
+                                    <div style="
+                                        display: flex;
+                                        align-items: center;
+                                        gap: 0.75rem;
+                                        padding: 0.75rem;
+                                        background: var(--bg-body);
+                                        border-radius: 8px;
+                                        margin-bottom: 0.5rem;
+                                    ">
+                                        <i class="bi bi-person-circle" style="color: var(--primary); font-size: 1.2rem;"></i>
+                                        <span style="font-weight: 500;">${r}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        
+                        <div style="background: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border);">
+                            <h4 style="margin: 0 0 1rem 0; color: var(--primary); font-size: 1.1rem; font-weight: 600;">
+                                <i class="bi bi-clock-history me-2"></i> Seguimiento
+                            </h4>
+                            <div style="margin-top: 1rem;">
+                                ${plan.seguimientos.length > 0 ? plan.seguimientos.map(s => `
+                                    <div style="
+                                        padding: 1rem;
+                                        background: var(--bg-body);
+                                        border-radius: 8px;
+                                        margin-bottom: 0.75rem;
+                                        border-left: 3px solid var(--primary);
+                                    ">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                            <span style="font-weight: 600; color: var(--text-dark);">${s.descripcion}</span>
+                                            <span style="color: var(--text-muted); font-size: 0.85rem;">${new Date(s.fecha).toLocaleDateString('es-CO')}</span>
+                                        </div>
+                                        <div style="color: var(--text-muted); font-size: 0.9rem;">${s.responsable}</div>
+                                    </div>
+                                `).join('') : '<p style="color: var(--text-muted); font-style: italic;">No hay seguimientos registrados</p>'}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="k-modal-footer" style="
+                    margin-top: 2rem; 
+                    padding-top: 1.5rem; 
+                    border-top: 1px solid var(--border); 
+                    display: flex; 
+                    justify-content: space-between; 
+                    gap: 0.75rem;
+                ">
+                    <button class="k-btn k-btn-outline" onclick="window.currentEvaluacionInstance.showFollowUpModal(${plan.id})" style="
+                        padding: 0.75rem 1.5rem;
+                        font-size: 0.95rem;
+                        border-radius: 8px;
+                    ">
+                        <i class="bi bi-plus-lg me-1"></i> Agregar Seguimiento
+                    </button>
+                    <button class="k-btn k-btn-outline" onclick="window.currentEvaluacionInstance.showResponsibleModal(${plan.id})" style="
+                        padding: 0.75rem 1.5rem;
+                        font-size: 0.95rem;
+                        border-radius: 8px;
+                    ">
+                        <i class="bi bi-person-plus me-1"></i> Gestionar Responsables
+                    </button>
+                    <button class="k-btn k-btn-primary" onclick="this.closest('.k-modal').remove()" style="
+                        padding: 0.75rem 1.5rem;
+                        font-size: 0.95rem;
+                        border-radius: 8px;
+                    ">
+                        <i class="bi bi-x-lg me-1"></i> Cerrar
+                    </button>
+                </div>
+            </div>
+            
+            <style>
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes slideUp {
+                    from { 
+                        opacity: 0; 
+                        transform: translateY(30px); 
+                    }
+                    to { 
+                        opacity: 1; 
+                        transform: translateY(0); 
+                    }
+                }
+            </style>
+        `;
+        
+        modal.innerHTML = modalContent;
+        document.body.appendChild(modal);
+    }
+    
+    showFollowUpModal(planId) {
+        console.log('[EvaluacionInicialSgSst] Abriendo modal de seguimiento para plan:', planId);
+        
+        const plan = this.actionPlans.find(p => p.id === planId);
+        if (!plan) {
+            this.showToast('Plan no encontrado', 'danger');
+            return;
+        }
+        
+        const modal = document.createElement('div');
+        modal.className = 'k-modal';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            animation: fadeIn 0.3s ease-in-out;
+        `;
+        
+        let modalContent = `
+            <div class="k-modal-content" style="
+                background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+                padding: 2.5rem;
+                border-radius: 16px;
+                width: 90%;
+                max-width: 600px;
+                max-height: 85vh;
+                overflow-y: auto;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                animation: slideUp 0.4s ease-out;
+            ">
+                <div class="k-modal-header" style="margin-bottom: 2rem; text-align: center;">
+                    <div style="
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: 60px;
+                        height: 60px;
+                        background: linear-gradient(135deg, var(--success) 0%, #1e7e34 100%);
+                        border-radius: 50%;
+                        margin-bottom: 1rem;
+                        box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+                    ">
+                        <i class="bi bi-clock-history" style="color: white; font-size: 1.8rem;"></i>
+                    </div>
+                    <h3 style="margin: 0 0 0.5rem 0; color: var(--text-dark); font-size: 1.5rem; font-weight: 600;">
+                        Agregar Seguimiento
+                    </h3>
+                    <p style="margin: 0; color: var(--text-muted); font-size: 0.95rem;">
+                        Registre el progreso del plan de acción
+                    </p>
+                </div>
+                <div class="k-modal-body">
+                    <form id="followUpForm" style="display: grid; gap: 1.5rem;">
+                        <div>
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark);">
+                                Descripción <span style="color: var(--danger);">*</span>
+                            </label>
+                            <textarea id="followUpDescripcion" class="k-input" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; min-height: 100px; resize: vertical;" required placeholder="Describa el progreso o novedad..."></textarea>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                            <div>
+                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark);">
+                                    Fecha <span style="color: var(--danger);">*</span>
+                                </label>
+                                <input type="date" id="followUpFecha" class="k-input" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;" required>
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark);">
+                                    Responsable <span style="color: var(--danger);">*</span>
+                                </label>
+                                <input type="text" id="followUpResponsable" class="k-input" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;" required placeholder="Nombre del responsable">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="k-modal-footer" style="
+                    margin-top: 2rem; 
+                    padding-top: 1.5rem; 
+                    border-top: 1px solid var(--border); 
+                    display: flex; 
+                    justify-content: flex-end; 
+                    gap: 0.75rem;
+                ">
+                    <button class="k-btn k-btn-outline" onclick="this.closest('.k-modal').remove()" style="
+                        padding: 0.75rem 1.5rem;
+                        font-size: 0.95rem;
+                        border-radius: 8px;
+                    ">
+                        <i class="bi bi-x-lg me-1"></i> Cancelar
+                    </button>
+                    <button class="k-btn k-btn-primary" onclick="window.currentEvaluacionInstance.saveFollowUp(${plan.id})" style="
+                        padding: 0.75rem 1.5rem;
+                        font-size: 0.95rem;
+                        border-radius: 8px;
+                    ">
+                        <i class="bi bi-check-lg me-1"></i> Guardar Seguimiento
+                    </button>
+                </div>
+            </div>
+            
+            <style>
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes slideUp {
+                    from { 
+                        opacity: 0; 
+                        transform: translateY(30px); 
+                    }
+                    to { 
+                        opacity: 1; 
+                        transform: translateY(0); 
+                    }
+                }
+                .k-input {
+                    font-family: 'Segoe UI', Roboto, sans-serif;
+                    font-size: 0.95rem;
+                    color: var(--text-dark);
+                    transition: border-color 0.2s;
+                }
+                .k-input:focus {
+                    outline: none;
+                    border-color: var(--primary);
+                    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
+                }
+            </style>
+        `;
+        
+        modal.innerHTML = modalContent;
+        document.body.appendChild(modal);
+    }
+    
+    saveFollowUp(planId) {
+        const form = document.getElementById('followUpForm');
+        if (!form) return;
+        
+        const descripcion = document.getElementById('followUpDescripcion').value;
+        const fecha = document.getElementById('followUpFecha').value;
+        const responsable = document.getElementById('followUpResponsable').value;
+        
+        if (!descripcion || !fecha || !responsable) {
+            this.showToast('Por favor complete todos los campos requeridos', 'warning');
+            return;
+        }
+        
+        const planIndex = this.actionPlans.findIndex(p => p.id === planId);
+        if (planIndex === -1) {
+            this.showToast('Plan no encontrado', 'danger');
+            return;
+        }
+        
+        const newSeguimiento = {
+            id: Date.now(),
+            descripcion,
+            fecha,
+            responsable
+        };
+        
+        this.actionPlans[planIndex].seguimientos.push(newSeguimiento);
+        this.showToast('Seguimiento agregado correctamente', 'success');
+        
+        // Cerrar modal y actualizar vista de detalle
+        const modal = document.querySelector('.k-modal');
+        if (modal) modal.remove();
+        
+        // Mostrar el detalle actualizado
+        this.showActionPlanDetailModal(planId);
+    }
+    
+    showResponsibleModal(planId) {
+        console.log('[EvaluacionInicialSgSst] Abriendo modal de responsables para plan:', planId);
+        
+        const plan = this.actionPlans.find(p => p.id === planId);
+        if (!plan) {
+            this.showToast('Plan no encontrado', 'danger');
+            return;
+        }
+        
+        const modal = document.createElement('div');
+        modal.className = 'k-modal';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            animation: fadeIn 0.3s ease-in-out;
+        `;
+        
+        let modalContent = `
+            <div class="k-modal-content" style="
+                background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+                padding: 2.5rem;
+                border-radius: 16px;
+                width: 90%;
+                max-width: 600px;
+                max-height: 85vh;
+                overflow-y: auto;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                animation: slideUp 0.4s ease-out;
+            ">
+                <div class="k-modal-header" style="margin-bottom: 2rem; text-align: center;">
+                    <div style="
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: 60px;
+                        height: 60px;
+                        background: linear-gradient(135deg, var(--info) 0%, #138496 100%);
+                        border-radius: 50%;
+                        margin-bottom: 1rem;
+                        box-shadow: 0 4px 12px rgba(23, 162, 184, 0.3);
+                    ">
+                        <i class="bi bi-people" style="color: white; font-size: 1.8rem;"></i>
+                    </div>
+                    <h3 style="margin: 0 0 0.5rem 0; color: var(--text-dark); font-size: 1.5rem; font-weight: 600;">
+                        Gestionar Responsables
+                    </h3>
+                    <p style="margin: 0; color: var(--text-muted); font-size: 0.95rem;">
+                        Agregue o elimine responsables del plan de acción
+                    </p>
+                </div>
+                <div class="k-modal-body">
+                    <div style="margin-bottom: 1.5rem;">
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark);">
+                            Nuevo Responsable <span style="color: var(--danger);">*</span>
+                        </label>
+                        <input type="text" id="newResponsible" class="k-input" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;" required placeholder="Nombre del responsable">
+                    </div>
+                    <div style="background: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border);">
+                        <h4 style="margin: 0 0 1rem 0; color: var(--primary); font-size: 1.1rem; font-weight: 600;">
+                            <i class="bi bi-people me-2"></i> Responsables Actuales
+                        </h4>
+                        <div style="margin-top: 1rem;">
+                            ${plan.responsables.length > 0 ? plan.responsables.map((r, index) => `
+                                <div style="
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: space-between;
+                                    gap: 0.75rem;
+                                    padding: 1rem;
+                                    background: var(--bg-body);
+                                    border-radius: 8px;
+                                    margin-bottom: 0.5rem;
+                                ">
+                                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                        <i class="bi bi-person-circle" style="color: var(--primary); font-size: 1.2rem;"></i>
+                                        <span style="font-weight: 500;">${r}</span>
+                                    </div>
+                                    <button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.removeResponsible(${plan.id}, ${index})" style="padding: 0.25rem 0.5rem;">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            `).join('') : '<p style="color: var(--text-muted); font-style: italic;">No hay responsables asignados</p>'}
+                        </div>
+                    </div>
+                </div>
+                <div class="k-modal-footer" style="
+                    margin-top: 2rem; 
+                    padding-top: 1.5rem; 
+                    border-top: 1px solid var(--border); 
+                    display: flex; 
+                    justify-content: flex-end; 
+                    gap: 0.75rem;
+                ">
+                    <button class="k-btn k-btn-outline" onclick="this.closest('.k-modal').remove()" style="
+                        padding: 0.75rem 1.5rem;
+                        font-size: 0.95rem;
+                        border-radius: 8px;
+                    ">
+                        <i class="bi bi-x-lg me-1"></i> Cancelar
+                    </button>
+                    <button class="k-btn k-btn-primary" onclick="window.currentEvaluacionInstance.addResponsible(${plan.id})" style="
+                        padding: 0.75rem 1.5rem;
+                        font-size: 0.95rem;
+                        border-radius: 8px;
+                    ">
+                        <i class="bi bi-plus-lg me-1"></i> Agregar Responsable
+                    </button>
+                </div>
+            </div>
+            
+            <style>
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes slideUp {
+                    from { 
+                        opacity: 0; 
+                        transform: translateY(30px); 
+                    }
+                    to { 
+                        opacity: 1; 
+                        transform: translateY(0); 
+                    }
+                }
+                .k-input {
+                    font-family: 'Segoe UI', Roboto, sans-serif;
+                    font-size: 0.95rem;
+                    color: var(--text-dark);
+                    transition: border-color 0.2s;
+                }
+                .k-input:focus {
+                    outline: none;
+                    border-color: var(--primary);
+                    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
+                }
+            </style>
+        `;
+        
+        modal.innerHTML = modalContent;
+        document.body.appendChild(modal);
+    }
+    
+    addResponsible(planId) {
+        const newResponsible = document.getElementById('newResponsible').value;
+        if (!newResponsible || newResponsible.trim() === '') {
+            this.showToast('Por favor ingrese el nombre del responsable', 'warning');
+            return;
+        }
+        
+        const planIndex = this.actionPlans.findIndex(p => p.id === planId);
+        if (planIndex === -1) {
+            this.showToast('Plan no encontrado', 'danger');
+            return;
+        }
+        
+        this.actionPlans[planIndex].responsables.push(newResponsible.trim());
+        this.showToast('Responsable agregado correctamente', 'success');
+        
+        // Cerrar modal y actualizar vista
+        const modal = document.querySelector('.k-modal');
+        if (modal) modal.remove();
+        
+        this.showResponsibleModal(planId);
+    }
+    
+    removeResponsible(planId, responsibleIndex) {
+        const planIndex = this.actionPlans.findIndex(p => p.id === planId);
+        if (planIndex === -1) {
+            this.showToast('Plan no encontrado', 'danger');
+            return;
+        }
+        
+        this.actionPlans[planIndex].responsables.splice(responsibleIndex, 1);
+        this.showToast('Responsable eliminado correctamente', 'success');
+        
+        // Actualizar vista
+        const modal = document.querySelector('.k-modal');
+        if (modal) modal.remove();
+        
+        this.showResponsibleModal(planId);
+    }
+    
+    deleteActionPlan(planId) {
+        if (!confirm('¿Está seguro de que desea eliminar este plan de acción?')) {
+            return;
+        }
+        
+        const planIndex = this.actionPlans.findIndex(p => p.id === planId);
+        if (planIndex === -1) {
+            this.showToast('Plan no encontrado', 'danger');
+            return;
+        }
+        
+        this.actionPlans.splice(planIndex, 1);
+        this.showToast('Plan de acción eliminado correctamente', 'success');
+        
+        this.renderActionPlansTable();
+    }
+    
+    getEstadoBadge(estado) {
+        const badges = {
+            'pendiente': '<span class="k-badge k-badge-warning">⏳ Pendiente</span>',
+            'en_progreso': '<span class="k-badge k-badge-info">🔄 En Progreso</span>',
+            'completado': '<span class="k-badge k-badge-success">✅ Completado</span>',
+            'cancelado': '<span class="k-badge k-badge-danger">❌ Cancelado</span>'
+        };
+        return badges[estado] || badges['pendiente'];
+    }
+    
+    renderActionPlansTable() {
+        const tbody = this.actionTableBody;
+        console.log('[EvaluacionInicialSgSst] renderActionPlansTable() - actionTableBody:', tbody);
+        if (!tbody) {
+            console.error('[EvaluacionInicialSgSst] actionTableBody no encontrado');
+            return;
+        }
+        
+        if (this.actionPlans.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="k-empty-table">No hay planes activos.</td></tr>';
+            return;
+        }
+        
+        console.log('[EvaluacionInicialSgSst] Renderizando', this.actionPlans.length, 'planes de acción');
+        tbody.innerHTML = this.actionPlans.map(plan => {
+            const hallazgo = this.currentFindings.find(f => f.code === plan.hallazgoId);
+            const hallazgoText = hallazgo ? `${hallazgo.code} - ${hallazgo.desc.substring(0, 30)}...` : 'No encontrado';
+            
+            return `
+                <tr>
+                    <td>${this.getEstadoBadge(plan.estado)}</td>
+                    <td>
+                        <div style="font-weight: 500;">${hallazgoText}</div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">
+                            ${plan.accion.substring(0, 50)}${plan.accion.length > 50 ? '...' : ''}
+                        </div>
+                    </td>
+                    <td>${plan.responsable}</td>
+                    <td>${new Date(plan.fechaLimite).toLocaleDateString('es-CO')}</td>
+                    <td>
+                        <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                            <button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.showActionPlanDetailModal(${plan.id})" title="Ver detalle">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            <button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.showActionPlanModal(${plan.id})" title="Editar">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.deleteActionPlan(${plan.id})" title="Eliminar" style="color: var(--danger); border-color: var(--danger);">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+    
+    /**
+     * Procesa los planes de acción extraídos de un informe de ARL
+     * @param {Array} arlActionPlans - Planes de acción extraídos del informe ARL
+     */
+    processArlActionPlans(arlActionPlans) {
+        console.log('[EvaluacionInicialSgSst] Procesando', arlActionPlans.length, 'planes de acción de ARL');
+        
+        // Limpiar planes de acción existentes
+        this.actionPlans = [];
+        this.actionPlanIdCounter = 1;
+        
+        // Procesar cada plan de acción del ARL
+        arlActionPlans.forEach((arlPlan, index) => {
+            // Intentar encontrar un hallazgo relacionado
+            let relatedHallazgo = null;
+            
+            // Buscar por coincidencia en la descripción del hallazgo
+            for (const hallazgo of this.currentFindings) {
+                if (hallazgo.status === 'no_cumple' && 
+                    (hallazgo.desc.toLowerCase().includes(arlPlan.accion.toLowerCase().substring(0, 50)) ||
+                     arlPlan.accion.toLowerCase().includes(hallazgo.desc.toLowerCase().substring(0, 50)))) {
+                    relatedHallazgo = hallazgo;
+                    break;
+                }
+            }
+            
+            // Crear el plan de acción
+            const actionPlan = {
+                id: this.actionPlanIdCounter++,
+                hallazgoId: relatedHallazgo ? relatedHallazgo.code : null,
+                hallazgoDesc: relatedHallazgo ? relatedHallazgo.desc : '',
+                accion: arlPlan.accion,
+                responsable: arlPlan.responsable || 'Por asignar',
+                fechaLimite: arlPlan.fechaLimite,
+                estado: arlPlan.estado || 'pendiente',
+                seguimientos: arlPlan.seguimientos || [],
+                responsables: arlPlan.responsables || []
+            };
+            
+            this.actionPlans.push(actionPlan);
+            console.log('[EvaluacionInicialSgSst] Plan de acción creado:', actionPlan.id, '- Hallazgo:', actionPlan.hallazgoId);
+        });
+        
+        console.log('[EvaluacionInicialSgSst] Total de planes de acción creados:', this.actionPlans.length);
+    }
+    
+    /**
+     * Genera automáticamente planes de acción para hallazgos con estado "no_cumple"
+     */
+    generateActionPlansForNoCumple() {
+        console.log('[EvaluacionInicialSgSst] Generando planes de acción para hallazgos no_cumple');
+        
+        // Limpiar planes de acción existentes
+        this.actionPlans = [];
+        this.actionPlanIdCounter = 1;
+        
+        // Filtrar hallazgos con estado "no_cumple"
+        const noCumpleFindings = this.currentFindings.filter(f => f.status === 'no_cumple');
+        console.log('[EvaluacionInicialSgSst] Hallazgos no_cumple encontrados:', noCumpleFindings.length);
+        
+        // Generar un plan de acción para cada hallazgo "no_cumple"
+        noCumpleFindings.forEach((hallazgo, index) => {
+            const actionPlan = {
+                id: this.actionPlanIdCounter++,
+                hallazgoId: hallazgo.code,
+                hallazgoDesc: hallazgo.desc,
+                accion: `Implementar acciones correctivas para cumplir con el estándar ${hallazgo.code}`,
+                responsable: 'Por asignar',
+                fechaLimite: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 días desde hoy
+                estado: 'pendiente',
+                seguimientos: [],
+                responsables: []
+            };
+            
+            this.actionPlans.push(actionPlan);
+            console.log('[EvaluacionInicialSgSst] Plan de acción generado:', actionPlan.id, '- Hallazgo:', hallazgo.code);
+        });
+        
+        console.log('[EvaluacionInicialSgSst] Total de planes de acción generados:', this.actionPlans.length);
     }
 
     showToast(msg, type = 'info') {
