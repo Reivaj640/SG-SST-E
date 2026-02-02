@@ -335,14 +335,14 @@ class EvaluacionPdfParser {
                 foundValue = false;
                 console.log(`[EvaluacionPdfParser] Nuevo ítem detectado: ${currentItem.code}`);
             } else if (inItem && currentItem && !foundValue) {
-                // Buscar línea con valor y estado (ej: "0,5 X" o "0.5 X")
-                const valueMatch = line.match(/^(\d+[\.,]?\d*)\s*(X)?$/);
+                // Buscar línea con valor y estado (ej: "0,5 X", "0.5 X", o "COPASST 0,5 X")
+                const valueMatch = line.match(/(\d+[\.,]?\d*)\s*(X)?$/);
                 
                 if (valueMatch) {
                     const value = parseFloat(valueMatch[1].replace(',', '.'));
                     const hasX = valueMatch[2] === 'X';
                     currentItem.max = value;
-                    console.log(`[EvaluacionPdfParser] Valor encontrado para ítem ${currentItem.code}: ${value}, hasX=${hasX}`);
+                    console.log(`[EvaluacionPdfParser] Valor encontrado para ítem ${currentItem.code}: ${value}, hasX=${hasX}, línea="${line}"`);
                     
                     currentItem.status = hasX ? 'cumple' : 'no_cumple';
                     currentItem.grade = hasX ? value : 0;

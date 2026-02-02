@@ -52,17 +52,6 @@ class EvaluacionInicialSgSst {
                             <span class="k-breadcrumb">Gestión Integral / 2.3.1 Evaluación Inicial</span>
                         </div>
                     </div>
-                    <div class="k-header-actions">
-                        <!-- Selector de Contexto -->
-                        <div class="k-context-selector">
-                            <i class="bi bi-calendar3"></i>
-                            <select id="yearSelect" onchange="window.currentEvaluacionInstance.updateSource()">
-                                <option value="2025" selected>2025</option>
-                                <option value="2024">2024</option>
-                                <option value="2023">2023</option>
-                            </select>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- 2. NAVEGACIÓN (Tabs) -->
@@ -891,74 +880,33 @@ class EvaluacionInicialSgSst {
         
         const modal = document.createElement('div');
         modal.className = 'k-modal';
-        modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.6);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            animation: fadeIn 0.3s ease-in-out;
-        `;
         
         const hallazgosOptions = this.currentFindings.map(f => 
             `<option value="${f.code}">${f.code} - ${f.desc.substring(0, 50)}...</option>`
         ).join('');
         
         let modalContent = `
-            <div class="k-modal-content" style="
-                background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-                padding: 2.5rem;
-                border-radius: 16px;
-                width: 90%;
-                max-width: 700px;
-                max-height: 85vh;
-                overflow-y: auto;
-                box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-                animation: slideUp 0.4s ease-out;
-            ">
-                <div class="k-modal-header" style="margin-bottom: 2rem; text-align: center;">
-                    <div style="
-                        display: inline-flex;
-                        align-items: center;
-                        justify-content: center;
-                        width: 60px;
-                        height: 60px;
-                        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-                        border-radius: 50%;
-                        margin-bottom: 1rem;
-                        box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
-                    ">
-                        <i class="bi bi-clipboard-check" style="color: white; font-size: 1.8rem;"></i>
+            <div class="k-modal-content">
+                <div class="k-modal-header text-center">
+                    <div class="k-modal-icon">
+                        <i class="bi bi-clipboard-check"></i>
                     </div>
-                    <h3 style="margin: 0 0 0.5rem 0; color: var(--text-dark); font-size: 1.5rem; font-weight: 600;">
-                        ${isEdit ? 'Editar Plan de Acción' : 'Nuevo Plan de Acción'}
-                    </h3>
-                    <p style="margin: 0; color: var(--text-muted); font-size: 0.95rem;">
-                        ${isEdit ? 'Modifique los datos del plan de acción existente' : 'Complete el formulario para crear un nuevo plan de acción'}
-                    </p>
+                    <h3>${isEdit ? 'Editar Plan de Acción' : 'Nuevo Plan de Acción'}</h3>
+                    <p class="k-modal-subtitle">${isEdit ? 'Modifique los datos del plan de acción existente' : 'Complete el formulario para crear un nuevo plan de acción'}</p>
                 </div>
                 <div class="k-modal-body">
-                    <form id="actionPlanForm" style="display: grid; gap: 1.5rem;">
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-                            <div>
-                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark);">
-                                    Hallazgo Asociado <span style="color: var(--danger);">*</span>
-                                </label>
-                                <select id="planHallazgo" class="k-input" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;" required>
+                    <form id="actionPlanForm">
+                        <div class="k-form-row">
+                            <div class="k-form-group">
+                                <label class="k-form-label">Hallazgo Asociado <span class="text-danger">*</span></label>
+                                <select id="planHallazgo" class="k-form-control" required>
                                     <option value="">Seleccione un hallazgo...</option>
                                     ${hallazgosOptions}
                                 </select>
                             </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark);">
-                                    Estado <span style="color: var(--danger);">*</span>
-                                </label>
-                                <select id="planEstado" class="k-input" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;" required>
+                            <div class="k-form-group">
+                                <label class="k-form-label">Estado <span class="text-danger">*</span></label>
+                                <select id="planEstado" class="k-form-control" required>
                                     <option value="pendiente">⏳ Pendiente</option>
                                     <option value="en_progreso">🔄 En Progreso</option>
                                     <option value="completado">✅ Completado</option>
@@ -966,80 +914,31 @@ class EvaluacionInicialSgSst {
                                 </select>
                             </div>
                         </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark);">
-                                Acción Correctiva <span style="color: var(--danger);">*</span>
-                            </label>
-                            <textarea id="planAccion" class="k-input" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; min-height: 100px; resize: vertical;" required placeholder="Describa la acción correctiva a implementar..."></textarea>
+                        <div class="k-form-group">
+                            <label class="k-form-label">Acción Correctiva <span class="text-danger">*</span></label>
+                            <textarea id="planAccion" class="k-form-control" rows="4" required placeholder="Describa la acción correctiva a implementar..."></textarea>
                         </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-                            <div>
-                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark);">
-                                    Responsable <span style="color: var(--danger);">*</span>
-                                </label>
-                                <input type="text" id="planResponsable" class="k-input" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;" required placeholder="Nombre del responsable">
+                        <div class="k-form-row">
+                            <div class="k-form-group">
+                                <label class="k-form-label">Responsable <span class="text-danger">*</span></label>
+                                <input type="text" id="planResponsable" class="k-form-control" required placeholder="Nombre del responsable">
                             </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark);">
-                                    Fecha Límite <span style="color: var(--danger);">*</span>
-                                </label>
-                                <input type="date" id="planFechaLimite" class="k-input" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;" required>
+                            <div class="k-form-group">
+                                <label class="k-form-label">Fecha Límite <span class="text-danger">*</span></label>
+                                <input type="date" id="planFechaLimite" class="k-form-control" required>
                             </div>
                         </div>
                     </form>
                 </div>
-                <div class="k-modal-footer" style="
-                    margin-top: 2rem; 
-                    padding-top: 1.5rem; 
-                    border-top: 1px solid var(--border); 
-                    display: flex; 
-                    justify-content: flex-end; 
-                    gap: 0.75rem;
-                ">
-                    <button class="k-btn k-btn-outline" onclick="this.closest('.k-modal').remove()" style="
-                        padding: 0.75rem 1.5rem;
-                        font-size: 0.95rem;
-                        border-radius: 8px;
-                    ">
-                        <i class="bi bi-x-lg me-1"></i> Cancelar
+                <div class="k-modal-footer">
+                    <button class="k-btn k-btn-outline" onclick="this.closest('.k-modal').remove()">
+                        <i class="bi bi-x-lg"></i> Cancelar
                     </button>
-                    <button class="k-btn k-btn-primary" onclick="window.currentEvaluacionInstance.saveActionPlan(${planId})" style="
-                        padding: 0.75rem 1.5rem;
-                        font-size: 0.95rem;
-                        border-radius: 8px;
-                    ">
-                        <i class="bi bi-check-lg me-1"></i> ${isEdit ? 'Guardar Cambios' : 'Crear Plan'}
+                    <button class="k-btn k-btn-primary" onclick="window.currentEvaluacionInstance.saveActionPlan(${planId})">
+                        <i class="bi bi-check-lg"></i> ${isEdit ? 'Guardar Cambios' : 'Crear Plan'}
                     </button>
                 </div>
             </div>
-            
-            <style>
-                @keyframes fadeIn {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
-                @keyframes slideUp {
-                    from { 
-                        opacity: 0; 
-                        transform: translateY(30px); 
-                    }
-                    to { 
-                        opacity: 1; 
-                        transform: translateY(0); 
-                    }
-                }
-                .k-input {
-                    font-family: 'Segoe UI', Roboto, sans-serif;
-                    font-size: 0.95rem;
-                    color: var(--text-dark);
-                    transition: border-color 0.2s;
-                }
-                .k-input:focus {
-                    outline: none;
-                    border-color: var(--primary);
-                    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
-                }
-            </style>
         `;
         
         modal.innerHTML = modalContent;

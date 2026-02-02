@@ -464,10 +464,10 @@
 }
 
 .k-modal-content {
-    background: white;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
     border-radius: 16px;
     width: 90%;
-    max-width: 600px;
+    max-width: 700px;
     max-height: 85vh;
     overflow-y: auto;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
@@ -475,17 +475,47 @@
 }
 
 .k-modal-header {
-    padding: 1.5rem;
+    padding: 2.5rem;
     border-bottom: 1px solid var(--border);
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
 
+.k-modal-header.text-center {
+    text-align: center;
+    flex-direction: column;
+    gap: 1rem;
+}
+
 .k-modal-header h3 {
     margin: 0;
-    font-size: 1.25rem;
+    font-size: 1.5rem;
     font-weight: 600;
+    color: var(--text-dark);
+}
+
+.k-modal-subtitle {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+}
+
+.k-modal-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    border-radius: 50%;
+    margin-bottom: 1rem;
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+}
+
+.k-modal-icon i {
+    color: white;
+    font-size: 1.8rem;
 }
 
 .k-modal-close {
@@ -502,11 +532,12 @@
 }
 
 .k-modal-body {
-    padding: 1.5rem;
+    padding: 2.5rem;
 }
 
 .k-modal-footer {
-    padding: 1rem 1.5rem;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
     border-top: 1px solid var(--border);
     display: flex;
     justify-content: flex-end;
@@ -518,26 +549,34 @@
     margin-bottom: 1.25rem;
 }
 
+.k-form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
 .k-form-label {
     display: block;
     margin-bottom: 0.5rem;
-    font-weight: 500;
+    font-weight: 600;
     color: var(--text-dark);
 }
 
 .k-form-control {
     width: 100%;
-    padding: 0.625rem 0.875rem;
+    padding: 0.75rem;
     border: 1px solid var(--border);
     border-radius: 8px;
-    font-size: 0.9rem;
-    transition: border-color 0.3s ease;
+    font-size: 0.95rem;
+    font-family: 'Segoe UI', Roboto, sans-serif;
+    color: var(--text-dark);
+    transition: border-color 0.2s;
 }
 
 .k-form-control:focus {
     outline: none;
     border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.1);
+    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
 }
 
 .k-form-control-sm {
