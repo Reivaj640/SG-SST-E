@@ -796,6 +796,22 @@ let chartMonthlyProgress = null;
 let chartByResponsible = null;
 let chartMonthlyStatus = null;
 
+// Configuración global de Chart.js para aplicar el estilo K+AIR
+Chart.defaults.font.family = "'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif";
+Chart.defaults.color = '#6c757d'; // Texto secundario para etiquetas de ejes
+
+// Colores del sistema K+AIR
+const K_COLORS = {
+    primary: '#174ea6',
+    primaryTransparent: 'rgba(23, 78, 166, 0.1)',
+    success: '#28a745',
+    warning: '#ffc107',
+    danger: '#dc3545',
+    info: '#17a2b8',
+    gray: '#e9ecef', // Para grids
+    text: '#212529'
+};
+
 // Actualizar KPIs
 function updateKPIs() {
     const data = periodsData[currentPeriod];
@@ -884,35 +900,35 @@ function renderChartStatus() {
         data: {
             labels: ['Sin Iniciar', 'Planificadas', 'Ejecutadas'],
             datasets: [{
-                label: 'Número de Actividades',
+                label: 'Cantidad',
                 data: [notStartedCount, plannedCount, completedCount],
                 backgroundColor: [
-                    '#6c757d',  // gris para sin iniciar
-                    '#ffc107',  // amarillo para planificadas
-                    '#28a745'   // verde para ejecutadas
+                    '#e2e3e5', // Gris suave para neutros
+                    K_COLORS.warning,
+                    K_COLORS.success
                 ],
-                borderColor: [
-                    '#5a6268',
-                    '#e0a800',
-                    '#218838'
-                ],
-                borderWidth: 1
+                borderRadius: 4, // Bordes redondeados en barras
+                barPercentage: 0.6
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    display: false
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#333',
+                    padding: 10
                 }
             },
             scales: {
                 y: {
                     beginAtZero: true,
-                    ticks: {
-                        precision: 0
-                    }
+                    grid: { display: false },
+                    ticks: { precision: 0 }
+                },
+                x: {
+                    grid: { display: false }
                 }
             }
         }
@@ -952,40 +968,62 @@ function renderChartMonthlyProgress() {
         return totalPerMonth[idx] > 0 ? Math.round((completed / totalPerMonth[idx]) * 100) : 0;
     });
 
+    // Crear gradiente para el relleno
+    const gradientProgress = ctx.createLinearGradient(0, 0, 0, 300);
+    gradientProgress.addColorStop(0, K_COLORS.primaryTransparent);
+    gradientProgress.addColorStop(1, 'rgba(255,255,255,0)');
+
     chartMonthlyProgress = new Chart(ctx, {
         type: 'line',
         data: {
             labels: months,
             datasets: [{
-                label: 'Avance (%)',
+                label: 'Avance Mensual (%)',
                 data: progressPercentage,
-                fill: false,
-                borderColor: '#174ea6',
-                backgroundColor: 'rgba(23, 78, 166, 0.1)',
-                tension: 0.1,
-                pointBackgroundColor: '#174ea6',
-                pointBorderColor: '#fff',
-                pointHoverBackgroundColor: '#fff',
-                pointHoverBorderColor: '#174ea6'
+                borderColor: K_COLORS.primary,
+                backgroundColor: gradientProgress,
+                borderWidth: 2,
+                pointBackgroundColor: '#fff',
+                pointBorderColor: K_COLORS.primary,
+                pointBorderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                fill: true,
+                tension: 0.3 // Curvas suaves
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    display: false
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#fff',
+                    titleColor: K_COLORS.text,
+                    bodyColor: K_COLORS.text,
+                    borderColor: '#dee2e6',
+                    borderWidth: 1,
+                    padding: 10,
+                    displayColors: false,
+                    callbacks: {
+                        label: (context) => ` ${context.parsed.y}% Completado`
+                    }
                 }
             },
             scales: {
                 y: {
                     beginAtZero: true,
                     max: 100,
+                    grid: {
+                        color: K_COLORS.gray,
+                        borderDash: [5, 5] // Grid punteada sutil
+                    },
                     ticks: {
-                        callback: function(value) {
-                            return value + '%';
-                        }
+                        callback: (value) => value + '%'
                     }
+                },
+                x: {
+                    grid: { display: false } // Ocultar grid vertical para limpieza
                 }
             }
         }
@@ -1015,29 +1053,37 @@ function renderChartByResponsible() {
     const labels = Object.keys(responsibleCount);
     const values = Object.values(responsibleCount);
 
-    // Generar colores basados en el sistema de colores K+AIR
-    const backgroundColors = labels.map((_, index) => {
-        const colors = ['#174ea6', '#28a745', '#ffc107', '#dc3545', '#17a2b8', '#6f42c1', '#fd7e14', '#6c757d'];
-        return colors[index % colors.length];
+    // Generar paleta basada en el color primario y variaciones
+    const bgColors = labels.map((_, i) => {
+        const hues = [210, 150, 40, 340, 180]; // Azul, Verde, Naranja, Rojo, Cyan
+        const hue = hues[i % hues.length];
+        return `hsl(${hue}, 70%, 50%)`;
     });
 
     chartByResponsible = new Chart(ctx, {
-        type: 'pie',
+        type: 'doughnut',
         data: {
             labels: labels,
             datasets: [{
                 data: values,
-                backgroundColor: backgroundColors,
-                borderColor: 'white',
-                borderWidth: 2
+                backgroundColor: bgColors,
+                borderWidth: 2,
+                borderColor: '#ffffff',
+                hoverOffset: 4
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            cutout: '65%', // Más fino para estilo moderno
             plugins: {
                 legend: {
-                    position: 'bottom'
+                    position: 'bottom',
+                    labels: {
+                        usePointStyle: true,
+                        padding: 20,
+                        font: { size: 11 }
+                    }
                 }
             }
         }
@@ -1077,18 +1123,16 @@ function renderChartMonthlyStatus() {
             labels: months,
             datasets: [
                 {
-                    label: 'Planificadas',
-                    data: plannedPerMonth,
-                    backgroundColor: '#ffc107',
-                    borderColor: '#e0a800',
-                    borderWidth: 1
-                },
-                {
                     label: 'Ejecutadas',
                     data: completedPerMonth,
-                    backgroundColor: '#28a745',
-                    borderColor: '#218838',
-                    borderWidth: 1
+                    backgroundColor: K_COLORS.success,
+                    borderRadius: 2,
+                },
+                {
+                    label: 'Planificadas',
+                    data: plannedPerMonth,
+                    backgroundColor: K_COLORS.warning,
+                    borderRadius: 2,
                 }
             ]
         },
@@ -1097,18 +1141,23 @@ function renderChartMonthlyStatus() {
             maintainAspectRatio: false,
             plugins: {
                 legend: {
-                    position: 'top'
+                    position: 'top',
+                    align: 'end'
                 }
             },
             scales: {
                 x: {
-                    stacked: true
+                    stacked: true,
+                    grid: { display: false }
                 },
                 y: {
                     stacked: true,
-                    ticks: {
-                        precision: 0
-                    }
+                    beginAtZero: true,
+                    grid: {
+                        color: K_COLORS.gray,
+                        borderDash: [5, 5]
+                    },
+                    ticks: { precision: 0 }
                 }
             }
         }
