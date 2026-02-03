@@ -400,23 +400,10 @@ class EvaluacionInicialSgSst {
     }
 
     showPdfSelector(pdfFiles) {
-        // Crear un modal mejorado para seleccionar el PDF
+        // Crear un modal estilo Copasst para seleccionar el PDF
         const modal = document.createElement('div');
-        modal.className = 'k-modal';
-        modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.6);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            animation: fadeIn 0.3s ease-in-out;
-        `;
- 
+        modal.className = 'k-file-selector-modal';
+  
         // Agrupar PDFs por tipo
         const ministerioPdfs = pdfFiles.filter(f => f.path.toLowerCase().includes('ministerio'));
         const arlPdfs = pdfFiles.filter(f => f.path.toLowerCase().includes('arl'));
@@ -424,213 +411,196 @@ class EvaluacionInicialSgSst {
             !f.path.toLowerCase().includes('ministerio') && 
             !f.path.toLowerCase().includes('arl')
         );
- 
+  
         let modalContent = `
-            <div class="k-modal-content" style="
-                background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-                padding: 2.5rem;
-                border-radius: 16px;
-                width: 90%;
-                max-width: 700px;
-                max-height: 85vh;
-                overflow-y: auto;
-                box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-                animation: slideUp 0.4s ease-out;
-            ">
-                <div class="k-modal-header" style="margin-bottom: 2rem; text-align: center;">
-                    <div style="
-                        display: inline-flex;
-                        align-items: center;
-                        justify-content: center;
-                        width: 60px;
-                        height: 60px;
-                        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-                        border-radius: 50%;
-                        margin-bottom: 1rem;
-                        box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
-                    ">
-                        <i class="bi bi-file-earmark-pdf-fill" style="color: white; font-size: 1.8rem;"></i>
-                    </div>
-                    <h3 style="margin: 0 0 0.5rem 0; color: var(--text-dark); font-size: 1.5rem; font-weight: 600;">
+            <div class="k-file-selector-content">
+                <div class="k-file-selector-header">
+                    <div class="k-file-selector-title">
+                        <i class="bi bi-file-earmark-pdf-fill" style="color: var(--primary);"></i>
                         Seleccionar PDF de Evaluación
-                    </h3>
-                    <p style="margin: 0; color: var(--text-muted); font-size: 0.95rem;">
-                        Se encontraron <strong style="color: var(--primary);">${pdfFiles.length}</strong> archivos PDF
-                    </p>
-                </div>
-                <div class="k-modal-body">
-        `;
- 
-        // Función para renderizar grupo de PDFs
-        const renderPdfGroup = (title, pdfs, icon, color, bgColor) => {
-            if (pdfs.length === 0) return '';
-            
-            let groupHtml = `
-                <div style="margin-bottom: 1.5rem;">
-                    <div style="
-                        display: flex;
-                        align-items: center;
-                        gap: 0.5rem;
-                        margin-bottom: 1rem;
-                        padding-bottom: 0.5rem;
-                        border-bottom: 2px solid ${bgColor};
-                    ">
-                        <i class="${icon}" style="color: ${color}; font-size: 1.2rem;"></i>
-                        <h4 style="margin: 0; color: var(--text-dark); font-size: 1.1rem; font-weight: 600;">
-                            ${title} <span style="color: var(--text-muted); font-weight: 400; font-size: 0.9rem;">(${pdfs.length})</span>
-                        </h4>
                     </div>
-                    <div class="k-list-group" style="display: grid; gap: 0.75rem;">
-            `;
- 
-            pdfs.forEach((pdf, index) => {
-                const encodedPath = encodeURIComponent(pdf.path);
-                const encodedName = encodeURIComponent(pdf.name);
-                const isMinisterio = pdf.path.toLowerCase().includes('ministerio');
-                const cardColor = isMinisterio ? 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)' : 'linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%)';
-                const iconColor = isMinisterio ? '#0d6efd' : '#ffc107';
-                const iconClass = isMinisterio ? 'bi-building' : 'bi-shield-check';
-                
-                groupHtml += `
-                    <div class="k-list-item" style="
-                        padding: 1.25rem;
-                        border: 2px solid ${bgColor};
-                        border-radius: 12px;
-                        cursor: pointer;
-                        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                        background: white;
-                        position: relative;
-                        overflow: hidden;
-                    " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 24px rgba(0,0,0,0.15)';" 
-                       onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';"
-                       onclick="window.currentEvaluacionInstance.selectPdf(decodeURIComponent('${encodedPath}'), decodeURIComponent('${encodedName}'))">
-                        <div style="display: flex; align-items: center; gap: 1rem;">
-                            <div style="
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                                width: 50px;
-                                height: 50px;
-                                background: ${cardColor};
-                                border-radius: 10px;
-                                flex-shrink: 0;
-                            ">
-                                <i class="bi ${iconClass}" style="color: white; font-size: 1.4rem;"></i>
-                            </div>
-                            <div style="flex: 1; min-width: 0;">
-                                <div style="
-                                    font-weight: 600; 
-                                    color: var(--text-dark); 
-                                    font-size: 1rem;
-                                    margin-bottom: 0.25rem;
-                                    white-space: nowrap;
-                                    overflow: hidden;
-                                    text-overflow: ellipsis;
-                                ">${pdf.name}</div>
-                                <div style="
-                                    display: flex;
-                                    align-items: center;
-                                    gap: 0.5rem;
-                                    font-size: 0.85rem;
-                                    color: var(--text-muted);
-                                ">
-                                    <span style="
-                                        display: inline-flex;
-                                        align-items: center;
-                                        gap: 0.25rem;
-                                        padding: 0.25rem 0.5rem;
-                                        background: ${bgColor}20;
-                                        border-radius: 4px;
-                                    ">
-                                        <i class="bi bi-folder" style="font-size: 0.9rem;"></i>
-                                        ${pdf.path.split('\\').slice(-2, -1)[0] || 'Raíz'}
-                                    </span>
-                                    <span style="
-                                        display: inline-flex;
-                                        align-items: center;
-                                        gap: 0.25rem;
-                                        padding: 0.25rem 0.5rem;
-                                        background: var(--success)15;
-                                        border-radius: 4px;
-                                    ">
-                                        <i class="bi bi-file-earmark" style="font-size: 0.9rem;"></i>
-                                        ${Math.round(pdf.size / 1024)} KB
-                                    </span>
+                    <div>
+                        <button class="btn btn-ghost" onclick="this.closest('.k-file-selector-modal').remove()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="k-file-selector-body">
+                    <div class="k-file-selector-sidebar">
+                        <div class="k-file-breadcrumb" id="folderBreadcrumb">
+                            <span class="k-file-breadcrumb-current">Raíz</span>
+                        </div>
+                        <div class="k-file-section-header">
+                            Carpetas
+                        </div>
+                        <div class="k-file-section-content">
+                            <div class="k-file-item" onclick="window.currentEvaluacionInstance.navigateToFolder('ministerio')">
+                                <div class="k-file-item-icon folder">
+                                    <i class="fas fa-folder"></i>
+                                </div>
+                                <div class="k-file-item-info">
+                                    <div class="k-file-item-name">Ministerio de Trabajo</div>
+                                    <div class="k-file-item-meta">
+                                        <span class="k-file-badge">${ministerioPdfs.length}</span>
+                                    </div>
                                 </div>
                             </div>
+                            <div class="k-file-item" onclick="window.currentEvaluacionInstance.navigateToFolder('arl')">
+                                <div class="k-file-item-icon folder">
+                                    <i class="fas fa-shield-alt"></i>
+                                </div>
+                                <div class="k-file-item-info">
+                                    <div class="k-file-item-name">Informe ARL</div>
+                                    <div class="k-file-item-meta">
+                                        <span class="k-file-badge">${arlPdfs.length}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            ${otherPdfs.length > 0 ? `
+                            <div class="k-file-item" onclick="window.currentEvaluacionInstance.navigateToFolder('otros')">
+                                <div class="k-file-item-icon folder">
+                                    <i class="fas fa-folder"></i>
+                                </div>
+                                <div class="k-file-item-info">
+                                    <div class="k-file-item-name">Otros Archivos</div>
+                                    <div class="k-file-item-meta">
+                                        <span class="k-file-badge">${otherPdfs.length}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            ` : ''}
                         </div>
-                        <div style="
-                            position: absolute;
-                            top: 0;
-                            right: 0;
-                            width: 4px;
-                            height: 100%;
-                            background: ${iconColor};
-                            border-radius: 0 12px 12px 0;
-                        "></div>
                     </div>
-                `;
-            });
- 
-            groupHtml += `</div></div>`;
-            return groupHtml;
-        };
- 
-        // Renderizar grupos
-        modalContent += renderPdfGroup('🏛️ Ministerio de Trabajo', ministerioPdfs, 'bi-building', '#0d6efd', '#0d6efd');
-        modalContent += renderPdfGroup('🛡️ Informe ARL', arlPdfs, 'bi-shield-check', '#ffc107', '#ffc107');
-        if (otherPdfs.length > 0) {
-            modalContent += renderPdfGroup('📁 Otros Archivos', otherPdfs, 'bi-file-earmark', '#6c757d', '#6c757d');
-        }
- 
-        modalContent += `
+                    <div class="k-file-selector-main">
+                        <div class="k-file-go-back" id="goBackFolderBtn" onclick="window.currentEvaluacionInstance.goBackToRoot()" style="display: none;">
+                            <i class="fas fa-level-up-alt" style="margin-right: 8px; transform: rotate(90deg);"></i>
+                            Volver a carpetas
+                        </div>
+                        <div class="k-file-section-header">
+                            Documentos
+                        </div>
+                        <div class="k-file-section-content" id="pdfFileList">
+                            <div class="k-file-empty-state">
+                                <div class="k-file-empty-icon">
+                                    <i class="fas fa-folder-open"></i>
+                                </div>
+                                <div class="k-file-empty-title">Seleccione una carpeta</div>
+                                <div class="k-file-empty-desc">Haga clic en una carpeta del panel izquierdo para ver los archivos PDF disponibles.</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="k-modal-footer" style="
-                    margin-top: 2rem; 
-                    padding-top: 1.5rem; 
-                    border-top: 1px solid var(--border); 
-                    display: flex; 
-                    justify-content: flex-end; 
-                    gap: 0.75rem;
-                ">
-                    <button class="k-btn k-btn-outline" onclick="this.closest('.k-modal').remove()" style="
-                        padding: 0.75rem 1.5rem;
-                        font-size: 0.95rem;
-                        border-radius: 8px;
-                    ">
-                        <i class="bi bi-x-lg me-1"></i> Cancelar
+                <div class="k-file-selector-footer">
+                    <button class="btn btn-ghost" onclick="this.closest('.k-file-selector-modal').remove()">
+                        Cancelar
                     </button>
                 </div>
             </div>
-            
-            <style>
-                @keyframes fadeIn {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
-                @keyframes slideUp {
-                    from { 
-                        opacity: 0; 
-                        transform: translateY(30px); 
-                    }
-                    to { 
-                        opacity: 1; 
-                        transform: translateY(0); 
-                    }
-                }
-                .k-list-item:hover {
-                    border-color: var(--primary) !important;
-                }
-            </style>
         `;
- 
+  
         modal.innerHTML = modalContent;
         document.body.appendChild(modal);
+        
+        // Guardar referencia a los PDFs para usar en navigateToFolder
+        this.pdfFilesCache = {
+            ministerio: ministerioPdfs,
+            arl: arlPdfs,
+            otros: otherPdfs
+        };
+        
+        // Inicializar estado de navegación
+        this.currentFolder = null;
+    }
+    
+    navigateToFolder(type) {
+        const pdfs = this.pdfFilesCache[type] || [];
+        const fileList = document.getElementById('pdfFileList');
+        const breadcrumb = document.getElementById('folderBreadcrumb');
+        const goBackBtn = document.getElementById('goBackFolderBtn');
+        
+        // Actualizar estado de navegación
+        this.currentFolder = type;
+        
+        // Mostrar botón de volver
+        goBackBtn.style.display = 'flex';
+        
+        // Actualizar breadcrumb
+        const folderNames = {
+            ministerio: 'Ministerio de Trabajo',
+            arl: 'Informe ARL',
+            otros: 'Otros Archivos'
+        };
+        
+        breadcrumb.innerHTML = `
+            <span class="k-file-breadcrumb-item" onclick="window.currentEvaluacionInstance.goBackToRoot()">Raíz</span>
+            <span class="k-file-breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
+            <span class="k-file-breadcrumb-current">${folderNames[type] || type}</span>
+        `;
+        
+        if (pdfs.length === 0) {
+            fileList.innerHTML = `
+                <div class="k-file-empty-state">
+                    <div class="k-file-empty-icon">
+                        <i class="fas fa-file-pdf"></i>
+                    </div>
+                    <div class="k-file-empty-title">No hay archivos</div>
+                    <div class="k-file-empty-desc">No se encontraron archivos PDF en esta carpeta.</div>
+                </div>
+            `;
+            return;
+        }
+        
+        fileList.innerHTML = pdfs.map(pdf => {
+            const encodedPath = encodeURIComponent(pdf.path);
+            const encodedName = encodeURIComponent(pdf.name);
+            
+            return `
+                <div class="k-file-item" onclick="window.currentEvaluacionInstance.selectPdf(decodeURIComponent('${encodedPath}'), decodeURIComponent('${encodedName}'))">
+                    <div class="k-file-item-icon pdf">
+                        <i class="fas fa-file-pdf"></i>
+                    </div>
+                    <div class="k-file-item-info">
+                        <div class="k-file-item-name">${pdf.name}</div>
+                        <div class="k-file-item-meta">
+                            <span class="k-file-badge">${Math.round(pdf.size / 1024)} KB</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+    
+    goBackToRoot() {
+        const fileList = document.getElementById('pdfFileList');
+        const breadcrumb = document.getElementById('folderBreadcrumb');
+        const goBackBtn = document.getElementById('goBackFolderBtn');
+        
+        // Resetear estado de navegación
+        this.currentFolder = null;
+        
+        // Ocultar botón de volver
+        goBackBtn.style.display = 'none';
+        
+        // Resetear breadcrumb
+        breadcrumb.innerHTML = `
+            <span class="k-file-breadcrumb-current">Raíz</span>
+        `;
+        
+        // Mostrar estado inicial
+        fileList.innerHTML = `
+            <div class="k-file-empty-state">
+                <div class="k-file-empty-icon">
+                    <i class="fas fa-folder-open"></i>
+                </div>
+                <div class="k-file-empty-title">Seleccione una carpeta</div>
+                <div class="k-file-empty-desc">Haga clic en una carpeta del panel izquierdo para ver los archivos PDF disponibles.</div>
+            </div>
+        `;
     }
 
     selectPdf(pdfPath, pdfName) {
-        // Cerrar el modal
-        const modal = document.querySelector('.k-modal');
+        // Cerrar el modal de selección de archivos
+        const modal = document.querySelector('.k-file-selector-modal');
         if (modal) modal.remove();
 
         // Actualizar la UI con el archivo seleccionado
