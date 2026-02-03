@@ -578,9 +578,18 @@ function renderGantt() {
 function syncScrolling() {
     const headerScroll = document.getElementById('ganttHeaderScroll');
     const bodyScroll = document.getElementById('ganttBodyScroll');
+    const treeContainer = document.getElementById('treeContainer');
+    
     if (headerScroll && bodyScroll) {
+        // Sincronización horizontal entre header y body del Gantt
         headerScroll.addEventListener('scroll', () => { bodyScroll.scrollLeft = headerScroll.scrollLeft; });
         bodyScroll.addEventListener('scroll', () => { headerScroll.scrollLeft = bodyScroll.scrollLeft; });
+    }
+    
+    if (treeContainer && bodyScroll) {
+        // Sincronización vertical entre árbol de actividades y cronograma
+        treeContainer.addEventListener('scroll', () => { bodyScroll.scrollTop = treeContainer.scrollTop; });
+        bodyScroll.addEventListener('scroll', () => { treeContainer.scrollTop = bodyScroll.scrollTop; });
     }
 }
 

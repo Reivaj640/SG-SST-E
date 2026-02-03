@@ -77,46 +77,6 @@ class PlanTrabajoComponent {
         const viewerUrl = `./modules/gestion-integral/plan-trabajo/plan-view.html?company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
         iframe.src = viewerUrl;
 
-        // Crear un contenedor superior con botón de volver
-        const header = document.createElement('div');
-        header.className = 'submodule-header';
-        header.style.display = 'flex';
-        header.style.alignItems = 'center';
-        header.style.justifyContent = 'space-between';
-        header.style.padding = '10px 20px';
-        header.style.background = '#fff';
-        header.style.borderBottom = '1px solid #dee2e6';
-
-        const backButton = document.createElement('button');
-        backButton.innerHTML = '&#8592; Volver al Inicio';
-        backButton.style.display = 'flex';
-        backButton.style.alignItems = 'center';
-        backButton.style.gap = '8px';
-        backButton.style.padding = '8px 16px';
-        backButton.style.background = '#f8f9fa';
-        backButton.style.border = '1px solid #dee2e6';
-        backButton.style.borderRadius = '6px';
-        backButton.style.cursor = 'pointer';
-        backButton.style.fontFamily = "'Roboto', sans-serif";
-        backButton.style.fontSize = '14px';
-        backButton.style.color = '#212529';
-
-        // Volver al portal de inicio (no al módulo completo)
-        backButton.onclick = () => {
-            this.render(); // Recargar el portal
-        };
-
-        const title = document.createElement('h3');
-        title.textContent = this.submoduleName;
-        title.style.margin = '0';
-        title.style.fontFamily = "'Lexend', sans-serif";
-        title.style.fontSize = '1.1rem';
-        title.style.color = '#212529';
-
-        header.appendChild(backButton);
-        header.appendChild(title);
-
-        this.container.appendChild(header);
         this.container.appendChild(iframe);
     }
 
