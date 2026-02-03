@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K+AIR | Portal Plan de Trabajo</title>
+    <!-- Iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Fuentes -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+           SISTEMA VISUAL OFICIAL (K+AIR)
+           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+        :root {
+            --primary: #174ea6;
+            --primary-hover: #185abd;
+            --primary-light: #e8f0fe;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --info: #17a2b8;
+            --text-dark: #212529;
+            --text-muted: #6c757d;
+            --bg-body: #f0f2f5;
+            --bg-card: #ffffff;
+            --border: #dee2e6;
+            --radius: 0.5rem;
+            --shadow-lg: 0 10px 25px rgba(0,0,0,0.05);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
+        
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-dark);
+            font-size: 1rem;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* HEADER MINIMALISTA */
+        .top-bar {
+            height: 60px;
+            background: white;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 2rem;
+            flex-shrink: 0;
+        }
+        
+        .logo { font-family: 'Lexend', sans-serif; font-size: 1.5rem; font-weight: 600; color: var(--primary); }
+        .logo span { color: #333; margin-left: 2px; }
+        
+        .back-link {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            text-decoration: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: color 0.2s;
+        }
+        .back-link:hover { color: var(--primary); }
+
+        /* MAIN LAYOUT CENTRADO */
+        .portal-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+
+        .portal-card {
+            background: white;
+            width: 100%;
+            max-width: 1100px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-lg);
+            padding: 3rem;
+            text-align: center;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* HERO SECTION */
+        .hero-title {
+            font-family: 'Lexend', sans-serif;
+            font-size: 2.5rem;
+            color: var(--text-dark);
+            margin-bottom: 0.5rem;
+        }
+        
+        .hero-subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            margin-bottom: 2.5rem;
+            max-width: 650px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.6;
+        }
+        
+        /* STATUS PILL */
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 18px;
+            border-radius: 20px;
+            background: #d4edda;
+            color: #155724;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 2rem;
+        }
+
+        /* BOTÓN PRINCIPAL - ENTRADA AL CRONOGRAMA */
+        .main-action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            padding: 1rem 3rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(23, 78, 166, 0.3);
+        }
+        
+        .main-action-btn:hover {
+            background-color: var(--primary-hover);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(23, 78, 166, 0.4);
+        }
+        .main-action-btn i { font-size: 1.3rem; }
+
+        /* SECCIÓN DE ACCIONES RÁPIDAS */
+        .quick-actions {
+            margin-top: 3.5rem;
+            text-align: left;
+        }
+        
+        .quick-actions-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            color: var(--text-dark);
+            border-bottom: 2px solid #f1f3f5;
+            padding-bottom: 0.5rem;
+            display: inline-block;
+        }
+
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.25rem;
+        }
+
+        .action-card {
+            background: #f8f9fa;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            text-align: left;
+        }
+        
+        .action-card:hover {
+            border-color: var(--primary);
+            background: white;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            transform: translateY(-3px);
+        }
+
+        .action-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 8px;
+            background: white;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .action-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-bottom: 0.25rem;
+            color: var(--text-dark);
+        }
+        
+        .action-desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        /* COLORES ESPECIALES POR ACCIÓN */
+        .action-icon.success { color: var(--success); }
+        .action-icon.warning { color: var(--warning); }
+        .action-icon.danger { color: var(--danger); }
+        .action-icon.info { color: var(--info); }
+        .action-icon.muted { color: var(--text-muted); }
+
+        /* GRID PRINCIPAL DE ACCIONES */
+        .main-actions {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .main-action-card {
+            background: white;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            padding: 2rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+            text-align: left;
+        }
+        
+        .main-action-card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 5px 20px rgba(23, 78, 166, 0.1);
+            transform: translateY(-2px);
+        }
+        
+        .main-action-card.primary {
+            background: linear-gradient(135deg, var(--primary) 0%, #2d5dc7 100%);
+            border-color: var(--primary);
+            color: white;
+        }
+        
+        .main-action-card.primary:hover {
+            box-shadow: 0 8px 25px rgba(23, 78, 166, 0.35);
+        }
+        
+        .main-action-card.primary .action-title,
+        .main-action-card.primary .action-desc {
+            color: white;
+        }
+        
+        .main-action-card.primary .action-icon {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+
+        .main-action-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 10px;
+            background: #f1f3f5;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            flex-shrink: 0;
+        }
+
+        .main-action-content .action-title {
+            font-size: 1.05rem;
+            margin-bottom: 0.35rem;
+        }
+        
+        .main-action-content .action-desc {
+            font-size: 0.85rem;
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 768px) {
+            .main-actions {
+                grid-template-columns: 1fr;
+            }
+            .hero-title {
+                font-size: 1.8rem;
+            }
+            .portal-card {
+                padding: 2rem 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TOP BAR -->
+    <div class="top-bar">
+        <div class="logo">K+<span>AIR</span></div>
+        <a class="back-link" onclick="goBackToModule()">
+            <i class="fas fa-arrow-left"></i> Volver al Menú
+        </a>
+    </div>
+
+    <!-- PORTAL CONTENT -->
+    <div class="portal-container">
+        <div class="portal-card">
+            
+            <div class="status-pill">
+                <i class="fas fa-check-circle"></i> Año Activo: <span id="activeYear">2025</span>
+            </div>
+
+            <h1 class="hero-title">Plan de Trabajo Anual SST</h1>
+            <p class="hero-subtitle">
+                Bienvenido al módulo de planificación. Desde aquí puedes acceder al cronograma detallado, configurar el presupuesto o generar informes ejecutivos para la gestión de Seguridad y Salud en el Trabajo.
+            </p>
+
+            <!-- ACCIONES PRINCIPALES -->
+            <div class="main-actions">
+                
+                <!-- VER PLAN DE TRABAJO -->
+                <div class="main-action-card primary" onclick="enterCronograma()">
+                    <div class="main-action-icon">
+                        <i class="fas fa-calendar-check"></i>
+                    </div>
+                    <div class="main-action-content">
+                        <div class="action-title">Ver Plan de Trabajo</div>
+                        <div class="action-desc">Acceder al cronograma completo con vista de árbol, Gantt y editor mensual.</div>
+                    </div>
+                </div>
+
+                <!-- IMPORTAR DESDE EXCEL -->
+                <div class="main-action-card" onclick="importFromExcel()">
+                    <div class="main-action-icon" style="background: #e8f5e9; color: #28a745;">
+                        <i class="fas fa-file-excel"></i>
+                    </div>
+                    <div class="main-action-content">
+                        <div class="action-title">Importar desde Excel</div>
+                        <div class="action-desc">Cargar actividades desde un archivo Excel compatible con la plantilla oficial.</div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- GRID DE OPCIONES SECUNDARIAS -->
+            <div class="quick-actions">
+                <div class="quick-actions-title">Gestión y Configuración</div>
+                
+                <div class="actions-grid">
+                    
+                    <!-- EXPORTAR PLAN -->
+                    <div class="action-card" onclick="exportPlan()">
+                        <div class="action-icon success"><i class="fas fa-file-export"></i></div>
+                        <div class="action-title">Exportar Plan</div>
+                        <div class="action-desc">Generar archivo Excel o PDF del plan de trabajo vigente.</div>
+                    </div>
+
+                    <!-- PRESUPUESTO -->
+                    <div class="action-card" onclick="openPresupuesto()">
+                        <div class="action-icon warning"><i class="fas fa-coins"></i></div>
+                        <div class="action-title">Presupuesto Asignado</div>
+                        <div class="action-desc">Definir y ajustar el presupuesto financiero para el año.</div>
+                    </div>
+
+                    <!-- CLONAR PLAN -->
+                    <div class="action-card" onclick="clonePlan()">
+                        <div class="action-icon"><i class="fas fa-copy"></i></div>
+                        <div class="action-title">Clonar Plan</div>
+                        <div class="action-desc">Crear un nuevo año tomando como base el plan actual.</div>
+                    </div>
+
+                    <!-- CONFIGURACIÓN DE PERÍODO -->
+                    <div class="action-card" onclick="openConfigPeriodo()">
+                        <div class="action-icon muted"><i class="fas fa-calendar-alt"></i></div>
+                        <div class="action-title">Configuración de Período</div>
+                        <div class="action-desc">Ajustar días festivos, horarios laborales y ciclos.</div>
+                    </div>
+
+                    <!-- INFORME GERENCIAL -->
+                    <div class="action-card" onclick="generateInforme()">
+                        <div class="action-icon danger"><i class="fas fa-file-pdf"></i></div>
+                        <div class="action-title">Informe Gerencial</div>
+                        <div class="action-desc">Descargar resumen ejecutivo en PDF del estado actual.</div>
+                    </div>
+
+                    <!-- RESPONSABLES -->
+                    <div class="action-card" onclick="openResponsables()">
+                        <div class="action-icon info"><i class="fas fa-users-cog"></i></div>
+                        <div class="action-title">Responsables</div>
+                        <div class="action-desc">Asignar responsables por áreas sin entrar al detalle.</div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="plan-home.js"></script>
+</body>
+</html>
