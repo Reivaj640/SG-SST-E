@@ -125,7 +125,7 @@ async function detectAvailablePeriods() {
         if (submoduleResult.success) {
             currentSubmodulePath = submoduleResult.path;
             const excelFiles = await findExcelFilesInDirectory(currentSubmodulePath);
-            
+
             availableFilesMap = {};
             excelFiles.forEach(file => {
                 // Intentar extraer el año (4 dígitos que empiecen por 20)
@@ -244,10 +244,10 @@ async function loadSpecificYearFile(fileName) {
 async function processExcelData(excelBuffer) {
     try {
         if (excelBuffer && excelBuffer.length > 0) {
-            const result = await callParentAPI('process-excel-data', { 
-                buffer: excelBuffer, 
-                company: currentCompany, 
-                period: currentPeriod 
+            const result = await callParentAPI('process-excel-data', {
+                buffer: excelBuffer,
+                company: currentCompany,
+                period: currentPeriod
             });
 
             if (result.success) {
@@ -294,7 +294,7 @@ function isItemVisible(item, index, data) {
             if (!data[i].expanded) return false;
             // Continuar subiendo en la jerarquía (ej: de Nivel 3 a Nivel 2, de Nivel 2 a Nivel 1)
             currentLevel = data[i].level;
-            if (currentLevel <= 1) break; 
+            if (currentLevel <= 1) break;
         }
     }
     return true;
@@ -408,9 +408,9 @@ function showPeriodSelector() {
 
 async function clonePeriod() {
     console.log('[clonePeriod] Iniciando proceso de clonación independiente...');
-    
+
     const availableYears = Object.keys(availableFilesMap);
-    
+
     if (availableYears.length === 0) {
         alert("No se encontraron planes existentes para clonar. Por favor, asegúrese de tener al menos un archivo Excel en la carpeta.");
         return;
@@ -418,7 +418,7 @@ async function clonePeriod() {
 
     // 1. Seleccionar el año ORIGEN
     let sourceYear = currentPeriod;
-    
+
     if (availableYears.length > 1) {
         // Si hay múltiples años, usamos el actual seleccionado o el último disponible
         sourceYear = currentPeriod || availableYears[availableYears.length - 1];
@@ -438,12 +438,12 @@ async function clonePeriod() {
     }
 
     const confirmMessage = `¿Desea crear un nuevo Plan de Trabajo para el año ${newYear} basado en el plan del ${sourceYear}?`;
-    
+
     if (!confirm(confirmMessage)) return;
 
     const sourceFileName = availableFilesMap[sourceYear];
     console.log(`[clonePeriod] Clonando archivo: ${sourceFileName} (Origen: ${sourceYear}) -> Destino: ${newYear}`);
-    
+
     try {
         const sourcePathResult = await callParentAPI('get-file-path', {
             directory: currentSubmodulePath,
@@ -453,7 +453,7 @@ async function clonePeriod() {
         if (!sourcePathResult.success) throw new Error("No se pudo encontrar la ruta del archivo origen.");
 
         showLoading();
-        
+
         const cloneResult = await callParentAPI('duplicate-budget-file', {
             currentFilePath: sourcePathResult.path,
             newYear: newYear
@@ -461,10 +461,10 @@ async function clonePeriod() {
 
         if (cloneResult.success) {
             alert(`¡Éxito! El plan ha sido clonado para el año ${newYear}.\nSe ha creado el archivo: ${cloneResult.newFileName}`);
-            
+
             // Refrescar la lista de periodos inmediatamente
             await detectAvailablePeriods();
-            
+
             // Forzar que el modal se mantenga abierto para que el usuario vea el nuevo botón
             document.getElementById('periodSelector').style.display = 'flex';
         } else {
@@ -579,13 +579,13 @@ function syncScrolling() {
     const headerScroll = document.getElementById('ganttHeaderScroll');
     const bodyScroll = document.getElementById('ganttBodyScroll');
     const treeContainer = document.getElementById('treeContainer');
-    
+
     if (headerScroll && bodyScroll) {
         // Sincronización horizontal entre header y body del Gantt
         headerScroll.addEventListener('scroll', () => { bodyScroll.scrollLeft = headerScroll.scrollLeft; });
         bodyScroll.addEventListener('scroll', () => { headerScroll.scrollLeft = bodyScroll.scrollLeft; });
     }
-    
+
     if (treeContainer && bodyScroll) {
         // Sincronización vertical entre árbol de actividades y cronograma
         treeContainer.addEventListener('scroll', () => { bodyScroll.scrollTop = treeContainer.scrollTop; });
@@ -790,6 +790,12 @@ function switchMainView(view) {
     document.getElementById(`view-${view}`).classList.add('active');
 }
 
+// Variables para almacenar instancias de gráficos
+let chartStatus = null;
+let chartMonthlyProgress = null;
+let chartByResponsible = null;
+let chartMonthlyStatus = null;
+
 // Actualizar KPIs
 function updateKPIs() {
     const data = periodsData[currentPeriod];
@@ -824,6 +830,289 @@ function updateKPIs() {
     // Para calcular vencidas, necesitamos lógica adicional basada en fechas
     // Por ahora, simplemente mostramos 0
     document.getElementById('kpiOverdue').textContent = '0';
+
+    // Actualizar gráficos
+    updateCharts();
+}
+
+// Función para actualizar los gráficos
+function updateCharts() {
+    if (currentPeriod && periodsData[currentPeriod]) {
+        renderChartStatus();
+        renderChartMonthlyProgress();
+        renderChartByResponsible();
+        renderChartMonthlyStatus();
+    }
+}
+
+// Gráfico: Actividades por Estado
+function renderChartStatus() {
+    const ctx = document.getElementById('chartStatus').getContext('2d');
+
+    // Destruir instancia anterior si existe
+    if (chartStatus) {
+        chartStatus.destroy();
+    }
+
+    const data = periodsData[currentPeriod];
+    const activities = data.filter(item => item.type === 'activity');
+
+    // Contar actividades por estado
+    let plannedCount = 0;
+    let completedCount = 0;
+    let notStartedCount = 0; // Actividades sin estado definido
+
+    activities.forEach(activity => {
+        let hasStatus = false;
+        activity.months.forEach(month => {
+            if (month === 'P') {
+                plannedCount++;
+                hasStatus = true;
+            }
+            else if (month === 'C') {
+                completedCount++;
+                hasStatus = true;
+            }
+        });
+        if (!hasStatus) {
+            notStartedCount++; // Contar actividades sin meses programados
+        }
+    });
+
+    chartStatus = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Sin Iniciar', 'Planificadas', 'Ejecutadas'],
+            datasets: [{
+                label: 'Número de Actividades',
+                data: [notStartedCount, plannedCount, completedCount],
+                backgroundColor: [
+                    '#6c757d',  // gris para sin iniciar
+                    '#ffc107',  // amarillo para planificadas
+                    '#28a745'   // verde para ejecutadas
+                ],
+                borderColor: [
+                    '#5a6268',
+                    '#e0a800',
+                    '#218838'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        precision: 0
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Gráfico: Avance Mensual
+function renderChartMonthlyProgress() {
+    const ctx = document.getElementById('chartMonthlyProgress').getContext('2d');
+
+    // Destruir instancia anterior si existe
+    if (chartMonthlyProgress) {
+        chartMonthlyProgress.destroy();
+    }
+
+    const data = periodsData[currentPeriod];
+    const activities = data.filter(item => item.type === 'activity');
+
+    // Contar actividades completadas por mes
+    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const completedPerMonth = new Array(12).fill(0);
+    const totalPerMonth = new Array(12).fill(0);
+
+    activities.forEach(activity => {
+        activity.months.forEach((month, index) => {
+            if (month) {
+                totalPerMonth[index]++;
+                if (month === 'C') {
+                    completedPerMonth[index]++;
+                }
+            }
+        });
+    });
+
+    // Calcular porcentaje de avance por mes
+    const progressPercentage = completedPerMonth.map((completed, idx) => {
+        return totalPerMonth[idx] > 0 ? Math.round((completed / totalPerMonth[idx]) * 100) : 0;
+    });
+
+    chartMonthlyProgress = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: months,
+            datasets: [{
+                label: 'Avance (%)',
+                data: progressPercentage,
+                fill: false,
+                borderColor: '#174ea6',
+                backgroundColor: 'rgba(23, 78, 166, 0.1)',
+                tension: 0.1,
+                pointBackgroundColor: '#174ea6',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: '#174ea6'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        callback: function(value) {
+                            return value + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Gráfico: Distribución por Responsable
+function renderChartByResponsible() {
+    const ctx = document.getElementById('chartByResponsible').getContext('2d');
+
+    // Destruir instancia anterior si existe
+    if (chartByResponsible) {
+        chartByResponsible.destroy();
+    }
+
+    const data = periodsData[currentPeriod];
+    const activities = data.filter(item => item.type === 'activity');
+
+    // Agrupar actividades por responsable
+    const responsibleCount = {};
+
+    activities.forEach(activity => {
+        const responsible = activity.responsible || 'Sin Asignar';
+        responsibleCount[responsible] = (responsibleCount[responsible] || 0) + 1;
+    });
+
+    const labels = Object.keys(responsibleCount);
+    const values = Object.values(responsibleCount);
+
+    // Generar colores basados en el sistema de colores K+AIR
+    const backgroundColors = labels.map((_, index) => {
+        const colors = ['#174ea6', '#28a745', '#ffc107', '#dc3545', '#17a2b8', '#6f42c1', '#fd7e14', '#6c757d'];
+        return colors[index % colors.length];
+    });
+
+    chartByResponsible = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: values,
+                backgroundColor: backgroundColors,
+                borderColor: 'white',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+// Gráfico: Actividades por Mes y Estado
+function renderChartMonthlyStatus() {
+    const ctx = document.getElementById('chartMonthlyStatus').getContext('2d');
+
+    // Destruir instancia anterior si existe
+    if (chartMonthlyStatus) {
+        chartMonthlyStatus.destroy();
+    }
+
+    const data = periodsData[currentPeriod];
+    const activities = data.filter(item => item.type === 'activity');
+
+    // Contar actividades por mes y estado
+    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const plannedPerMonth = new Array(12).fill(0);
+    const completedPerMonth = new Array(12).fill(0);
+
+    activities.forEach(activity => {
+        activity.months.forEach((month, index) => {
+            if (month === 'P') {
+                plannedPerMonth[index]++;
+            } else if (month === 'C') {
+                completedPerMonth[index]++;
+            }
+        });
+    });
+
+    chartMonthlyStatus = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: months,
+            datasets: [
+                {
+                    label: 'Planificadas',
+                    data: plannedPerMonth,
+                    backgroundColor: '#ffc107',
+                    borderColor: '#e0a800',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Ejecutadas',
+                    data: completedPerMonth,
+                    backgroundColor: '#28a745',
+                    borderColor: '#218838',
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top'
+                }
+            },
+            scales: {
+                x: {
+                    stacked: true
+                },
+                y: {
+                    stacked: true,
+                    ticks: {
+                        precision: 0
+                    }
+                }
+            }
+        }
+    });
 }
 
 // Cargar datos iniciales
