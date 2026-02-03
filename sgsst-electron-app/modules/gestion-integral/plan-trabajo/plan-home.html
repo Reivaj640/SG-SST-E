@@ -8,8 +8,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Fuentes -->
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <style>
         /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -45,34 +43,7 @@
             overflow: hidden;
         }
 
-        /* HEADER MINIMALISTA */
-        .top-bar {
-            height: 60px;
-            background: white;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 2rem;
-            flex-shrink: 0;
-        }
-        
-        .logo { font-family: 'Lexend', sans-serif; font-size: 1.5rem; font-weight: 600; color: var(--primary); }
-        .logo span { color: #333; margin-left: 2px; }
-        
-        .back-link {
-            font-size: 0.9rem;
-            color: var(--text-muted);
-            text-decoration: none;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            transition: color 0.2s;
-        }
-        .back-link:hover { color: var(--primary); }
-
-        /* MAIN LAYOUT CENTRADO */
+        /* PORTAL CONTENEDOR PRINCIPAL */
         .portal-container {
             flex: 1;
             display: flex;
@@ -97,6 +68,48 @@
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* BARRA SUPERIOR INTERNA DEL PORTAL */
+        .portal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid #f1f3f5;
+        }
+
+        .portal-logo {
+            font-family: 'Lexend', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .back-btn-internal {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            text-decoration: none;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+            background: #f8f9fa;
+            border: 1px solid var(--border);
+        }
+
+        .back-btn-internal:hover {
+            color: var(--primary);
+            background: var(--primary-light);
+            border-color: var(--primary);
+        }
+
+        .back-btn-internal i {
+            font-size: 0.85rem;
         }
 
         /* HERO SECTION */
@@ -311,27 +324,34 @@
             .portal-card {
                 padding: 2rem 1.5rem;
             }
+            .portal-header {
+                flex-direction: column;
+                gap: 1rem;
+            }
         }
     </style>
 </head>
 <body>
 
-    <!-- TOP BAR -->
-    <div class="top-bar">
-        <div class="logo">K+<span>AIR</span></div>
-        <a class="back-link" onclick="goBackToModule()">
-            <i class="fas fa-arrow-left"></i> Volver al Menú
-        </a>
-    </div>
-
-    <!-- PORTAL CONTENT -->
+    <!-- PORTAL CONTENT (SIN TOP BAR EXTERNO) -->
     <div class="portal-container">
         <div class="portal-card">
             
+            <!-- BARRA SUPERIOR INTERNA -->
+            <div class="portal-header">
+                <div class="portal-logo">K+<span>AIR</span></div>
+                <a class="back-btn-internal" onclick="goBackToModule()">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Volver al Menú</span>
+                </a>
+            </div>
+
+            <!-- STATUS PILL -->
             <div class="status-pill">
                 <i class="fas fa-check-circle"></i> Año Activo: <span id="activeYear">2025</span>
             </div>
 
+            <!-- HERO -->
             <h1 class="hero-title">Plan de Trabajo Anual SST</h1>
             <p class="hero-subtitle">
                 Bienvenido al módulo de planificación. Desde aquí puedes acceder al cronograma detallado, configurar el presupuesto o generar informes ejecutivos para la gestión de Seguridad y Salud en el Trabajo.
