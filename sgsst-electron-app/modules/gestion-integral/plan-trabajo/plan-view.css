@@ -519,6 +519,61 @@ body {
     font-family: 'Lexend', sans-serif; 
 }
 
+/* --- GRÁFICOS DEL DASHBOARD --- */
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+.chart-card {
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+}
+
+.chart-card-wide {
+    grid-column: span 2;
+}
+
+.chart-header {
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.chart-header h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-dark);
+    font-family: 'Lexend', sans-serif;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.chart-header h3 i {
+    color: var(--primary);
+    font-size: 0.9rem;
+}
+
+.chart-body {
+    flex: 1;
+    min-height: 300px;
+    position: relative;
+}
+
+.chart-body canvas {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 300px;
+}
+
 .tabs-header { 
     background: var(--bg-card); 
     padding: 0 1rem; 
