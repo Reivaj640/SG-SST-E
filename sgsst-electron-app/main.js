@@ -9,7 +9,9 @@ const { exec, spawn, execFile } = require('child_process'); // Asegúrate de inc
 const { promisify } = require('util');
 const xlsx = require('xlsx');
 const os = require('os');
-const { autoUpdater } = require('electron-updater');
+// TEMPORAL: Comentado para pruebas de OnlyOffice Bridge
+// const { autoUpdater } = require('electron-updater');
+const autoUpdater = null; // Placeholder
 const log = require('electron-log');
 const ExcelJS = require('exceljs');
 
@@ -38,7 +40,7 @@ Reason: ${reason instanceof Error ? reason.stack : JSON.stringify(reason)}
 
 // --- Configuración del Auto-Updater ---
 log.transports.file.level = 'info';
-autoUpdater.logger = log;
+// autoUpdater.logger = log; // TEMPORAL: Comentado
 // ------------------------------------
 
 const execPromise = promisify(exec);
@@ -126,11 +128,12 @@ async function getPython() {
 }
 
 let mainWindow;
+let isWindowCreated = false; // Variable para rastrear si la ventana ya ha sido creada
 
 // --- Función de Logging Centralizada ---
 function sendLog(message, level = 'INFO') {
   console.log(`[${level}] ${message}`); // Log to main process console
-  if (mainWindow) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('log-message', message, level);
   }
 }
@@ -145,6 +148,16 @@ if (require('electron-squirrel-startup')) {
 
 // Función para crear la ventana principal
 const createWindow = () => {
+  // Verificar si la ventana ya ha sido creada o si mainWindow existe y no está destruida
+  if (isWindowCreated && mainWindow && !mainWindow.isDestroyed()) {
+    console.log('[MAIN] La ventana ya existe, trayéndola al frente...');
+    mainWindow.focus();
+    return;
+  }
+  
+  console.log('[MAIN] Creando ventana principal...');
+  isWindowCreated = true;
+  
   mainWindow = new BrowserWindow({
     width: 1024, // Ancho inicial 1200 para mejor visualización
     height: 900, // Alto inicial 900 para mejor visualización
@@ -155,7 +168,15 @@ const createWindow = () => {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
+      webviewTag: true, // Habilitar webviews para OnlyOffice
     },
+  });
+
+  // Manejar el evento de cierre para resetear el flag
+  mainWindow.on('closed', () => {
+    console.log('[MAIN] Ventana principal cerrada, reseteando isWindowCreated...');
+    mainWindow = null;
+    isWindowCreated = false;
   });
 
   // Cargar el archivo HTML principal
@@ -1624,11 +1645,11 @@ ipcMain.handle('get-objetivos-excel-path', async (event, companyName) => {
     async function findObjetivosFile(dir, recursive = false) {
       try {
         const entries = await fsp.readdir(dir, { withFileTypes: true });
-        
+
         // Prioridad 1: Búsqueda exacta del archivo esperado
-        const exactMatch = entries.find(e => 
-            !e.isDirectory() && 
-            e.name.toUpperCase().includes('GI-FO-044 OBJETIVOS Y METAS DEL SST') && 
+        const exactMatch = entries.find(e =>
+            !e.isDirectory() &&
+            e.name.toUpperCase().includes('GI-FO-044 OBJETIVOS Y METAS DEL SST') &&
             !e.name.startsWith('~$')
         );
         if (exactMatch) return path.join(dir, exactMatch.name);
@@ -1648,14 +1669,14 @@ ipcMain.handle('get-objetivos-excel-path', async (event, companyName) => {
           } else {
             // Ignorar archivos temporales
             if (name.startsWith('~$')) continue;
-            
+
             // Ignorar archivos de Psicosocial explícitamente
             if (name.includes('psicosocial')) continue;
 
             // Criterios de coincidencia
             // Debe ser excel y contener (objetivos Y metas) O (objetivos Y sst)
             if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
-                 if ((name.includes('objetivos') && name.includes('metas')) || 
+                 if ((name.includes('objetivos') && name.includes('metas')) ||
                      (name.includes('objetivos') && name.includes('sst'))) {
                      return fullPath;
                  }
@@ -1742,7 +1763,7 @@ ipcMain.handle('load-objetivos-excel-data', async (event, filePath) => {
     for (let i = startIndex; i < jsonData.length; i++) {
       const row = jsonData[i];
       // Verificar si existe el objetivo en la columna B (índice 1)
-      if (row && row[1]) { 
+      if (row && row[1]) {
         objectivesData.push({
           id: objectivesData.length + 1,
           objective: row[1] ? row[1].toString() : '',
@@ -1798,7 +1819,7 @@ ipcMain.handle('save-objetivos-excel-data', async (event, filePath, data) => {
 
     // Actualizar los objetivos
     // Iniciar escritura desde la fila 7 (índice 7 en ExcelJS que es 1-based)
-    const startIndex = 7; 
+    const startIndex = 7;
     const dataRows = data.objectivesData || [];
 
     // Limpiar filas anteriores (eliminar datos pero mantener encabezados y estructura)
@@ -1833,8 +1854,30 @@ ipcMain.handle('save-objetivos-excel-data', async (event, filePath, data) => {
   }
 });
 
-ipcMain.handle('get-word-preview', async (event, filePath) => {
-  sendLog(`[MAIN][get-word-preview] Solicitud recibida para filePath: ${filePath}`, 'INFO');
+ipcMain.handle('get-word-preview', async (event, rawFilePath) => {
+  sendLog(`[MAIN][get-word-preview] Solicitud recibida para filePath: ${rawFilePath}`, 'INFO');
+  
+  // La ruta puede venir codificada, decodificar si es necesario
+  let filePath = typeof rawFilePath === 'string' ? rawFilePath : (rawFilePath?.filePath || '');
+  let prev = '';
+  while (filePath !== prev) {
+      prev = filePath;
+      try {
+          filePath = decodeURIComponent(filePath);
+      } catch (e) {
+          break;
+      }
+  }
+  
+  // Si la ruta empieza con una letra de unidad (ej: G:), usarla directamente
+  const driveLetterMatch = filePath.match(/^([A-Za-z]):(.*)$/);
+  if (driveLetterMatch) {
+      filePath = driveLetterMatch[1] + ':' + driveLetterMatch[2];
+      filePath = filePath.replace(/\\/g, '\\').replace(/\//g, '\\');
+  }
+  
+  sendLog(`[MAIN][get-word-preview] Ruta normalizada: ${filePath}`, 'INFO');
+  
   let tempPdfPath = '';
   try {
     // Verificar que el archivo de entrada existe y es accesible
@@ -1893,6 +1936,346 @@ ipcMain.handle('get-word-preview', async (event, filePath) => {
         sendLog(`[MAIN][get-word-preview] Error al eliminar el archivo PDF temporal: ${cleanupError.message}`, 'WARN');
       }
     }
+  }
+});
+
+// =============================================================================
+// HANDLERS PARA EDICIÓN DE DOCUMENTOS (POLÍTICA)
+// =============================================================================
+
+// Manejador para obtener contenido editable de un documento
+ipcMain.handle('get-editable-content', async (event, payload) => {
+  //兼容 payload como objeto o como string directo
+  const rawFilePath = typeof payload === 'string' ? payload : (payload?.filePath || '');
+  
+  sendLog(`[MAIN][get-editable-content] Solicitud recibida para: ${rawFilePath}`, 'INFO');
+  
+  try {
+    // La ruta puede venir codificada, decodificar si es necesario
+    let filePath = rawFilePath;
+    let prev = '';
+    while (filePath !== prev) {
+        prev = filePath;
+        try {
+            filePath = decodeURIComponent(filePath);
+        } catch (e) {
+            break;
+        }
+    }
+    
+    // Si la ruta empieza con una letra de unidad (ej: G:), usarla directamente
+    // Esto es importante para unidades de Google Drive
+    const driveLetterMatch = filePath.match(/^([A-Za-z]):(.*)$/);
+    if (driveLetterMatch) {
+        filePath = driveLetterMatch[1] + ':' + driveLetterMatch[2];
+        // Normalizar separadores de ruta
+        filePath = filePath.replace(/\\/g, '\\').replace(/\//g, '\\');
+    }
+    
+    sendLog(`[MAIN][get-editable-content] Ruta normalizada: ${filePath}`, 'INFO');
+    
+    // Verificar que el archivo existe
+    await fsp.access(filePath, fs.constants.R_OK);
+    sendLog(`[MAIN][get-editable-content] Archivo accesible: ${filePath}`, 'DEBUG');
+    
+    const fileBuffer = await fsp.readFile(filePath);
+    const base64Data = fileBuffer.toString('base64');
+    const fileName = path.basename(filePath);
+    
+    // Devolver el contenido como base64 para que el renderer lo procese
+    return { 
+      success: true, 
+      content: base64Data,
+      fileName: fileName,
+      filePath: filePath
+    };
+  } catch (error) {
+    sendLog(`[MAIN][get-editable-content] Error: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// Manejador para guardar documento editado
+ipcMain.handle('save-edited-document', async (event, payload) => {
+  //兼容 payload como objeto o como propiedades directas
+  const rawFilePath = payload?.filePath || '';
+  const content = payload?.content || '';
+  
+  sendLog(`[MAIN][save-edited-document] Solicitud para guardar: ${rawFilePath}`, 'INFO');
+  
+  try {
+    // La ruta puede venir codificada, decodificar si es necesario
+    let filePath = rawFilePath;
+    let prev = '';
+    while (filePath !== prev) {
+        prev = filePath;
+        try {
+            filePath = decodeURIComponent(filePath);
+        } catch (e) {
+            break;
+        }
+    }
+    
+    // Si la ruta empieza con una letra de unidad (ej: G:), usarla directamente
+    const driveLetterMatch = filePath.match(/^([A-Za-z]):(.*)$/);
+    if (driveLetterMatch) {
+        filePath = driveLetterMatch[1] + ':' + driveLetterMatch[2];
+        filePath = filePath.replace(/\\/g, '\\').replace(/\//g, '\\');
+    }
+    
+    sendLog(`[MAIN][save-edited-document] Ruta normalizada: ${filePath}`, 'INFO');
+    
+    // Verificar que el directorio existe
+    const dir = path.dirname(filePath);
+    await fsp.mkdir(dir, { recursive: true });
+    
+    // Guardar el contenido
+    if (typeof content === 'string' && content.startsWith('<')) {
+      // Es HTML
+      const htmlPath = filePath.replace(/\.(docx?|doc)$/i, '_editado.html');
+      await fsp.writeFile(htmlPath, content, 'utf8');
+      return { 
+        success: true, 
+        message: 'Documento guardado como HTML',
+        savedPath: htmlPath
+      };
+    } else {
+      // Es base64
+      try {
+        const buffer = Buffer.from(content, 'base64');
+        await fsp.writeFile(filePath, buffer);
+      } catch (base64Error) {
+        await fsp.writeFile(filePath, content, 'utf8');
+      }
+      return { 
+        success: true, 
+        message: 'Documento guardado correctamente',
+        savedPath: filePath
+      };
+    }
+  } catch (error) {
+    sendLog(`[MAIN][save-edited-document] Error: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// Manejador para abrir editor OnlyOffice
+ipcMain.handle('open-onlyoffice-editor', async (event, payload) => {
+  const rawFilePath = payload?.filePath || '';
+  const fileName = payload?.fileName || '';
+  
+  sendLog(`[MAIN][open-onlyoffice-editor] Solicitud para abrir: ${rawFilePath}`, 'INFO');
+  
+  try {
+    // Decodificar la ruta si viene codificada
+    let filePath = rawFilePath;
+    let prev = '';
+    while (filePath !== prev) {
+        prev = filePath;
+        try {
+            filePath = decodeURIComponent(filePath);
+        } catch (e) {
+            break;
+        }
+    }
+    
+    // Manejar rutas de unidades de red (ej: G:)
+    const driveLetterMatch = filePath.match(/^([A-Za-z]):(.*)$/);
+    if (driveLetterMatch) {
+        filePath = driveLetterMatch[1] + ':' + driveLetterMatch[2].replace(/\\/g, '\\\\').replace(/\//g, '\\\\');
+    }
+    
+    sendLog(`[MAIN][open-onlyoffice-editor] Ruta normalizada: ${filePath}`, 'INFO');
+    
+    // Verificar que el archivo existe
+    const fs = require('fs');
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`El archivo no existe: ${filePath}`);
+    }
+    
+    // Construir configuración para el editor OnlyOffice
+    // NOTA: El frontend (politica-view.html) inicializa el editor internamente usando DocsAPI
+    // Este handler main.js ya no es necesario para el flujo principal, pero se mantiene por compatibilidad
+    
+    // Generar llave única para el documento
+    const documentKey = `doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Registrar la llave en el puente (si el servidor Bridge está corriendo)
+    try {
+        const http = require('http');
+        const postData = JSON.stringify({ key: documentKey, filePath: filePath });
+        
+        const req = http.request({
+            hostname: 'localhost',
+            port: 3011,
+            path: '/register-key',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(postData)
+            }
+        }, (res) => {
+            console.log(`[Bridge] Registro de llave respondió: ${res.statusCode}`);
+        });
+        
+        req.on('error', (e) => {
+        });
+        
+        req.write(postData);
+        req.end();
+    } catch (e) {
+    }
+    
+    // Generar configuración completa para DocsAPI de OnlyOffice
+    const getFileExtension = (filePath) => {
+        const parts = String(filePath).split('.');
+        return parts.length > 1 ? '.' + parts.pop().toLowerCase() : '';
+    };
+
+    const getDocumentType = (extension) => {
+        const ext = String(extension).toLowerCase().replace('.', '');
+        if (['doc', 'docx'].includes(ext)) return 'word';
+        if (['xls', 'xlsx'].includes(ext)) return 'cell';
+        if (['ppt', 'pptx'].includes(ext)) return 'slide';
+        return 'word';
+    };
+
+    // Usar la variable documentKey declarada al inicio
+    const currentDocumentKey = documentKey;
+    const callbackUrl = `http://localhost:3011/track?key=${currentDocumentKey}`;
+    
+    // Obtener configuración del Bridge (CON JWT)
+    try {
+        const http = require('http');
+        const postData = JSON.stringify({
+            filePath: filePath,
+            fileName: fileName,
+            documentKey: currentDocumentKey
+        });
+        
+        const configResult = await new Promise((resolve, reject) => {
+            const req = http.request({
+                hostname: 'localhost',
+                port: 3011,
+                path: '/get-editor-config',
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(postData)
+                }
+            }, (res) => {
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => {
+                    try {
+                        resolve(JSON.parse(data));
+                    } catch (e) {
+                        reject(new Error('Error parseando respuesta del Bridge'));
+                    }
+                });
+            });
+            
+            req.on('error', reject);
+            req.write(postData);
+            req.end();
+        });
+        
+        if (!configResult.success) {
+            throw new Error(configResult.error || 'Error generando configuración');
+        }
+        
+        // Retornar configuración con URL completa del editor
+        const bridgeConfig = configResult.config;
+        const documentUrl = bridgeConfig.document?.url || '';
+        const bridgeDocKey = bridgeConfig.document?.key || currentDocumentKey;
+        const bridgeCallbackUrl = bridgeConfig.editorConfig?.callbackUrl || callbackUrl;
+        const jwtToken = bridgeConfig.token || '';
+        
+        // Construir URL del editor con parámetros
+        // Usar el endpoint estándar de OnlyOffice Document Server
+        // Intentar primero con el endpoint estándar, si falla usar el endpoint alternativo
+        const editorBaseUrl = 'http://localhost:8080/office-apps/editor/index.html';
+        const documentType = bridgeConfig.documentType || 'word';
+        const urlParams = new URLSearchParams();
+        if (documentUrl) urlParams.set('fileURL', documentUrl);
+        if (bridgeDocKey) urlParams.set('key', bridgeDocKey);
+        if (jwtToken) urlParams.set('token', jwtToken);
+        if (bridgeCallbackUrl) urlParams.set('callbackUrl', bridgeCallbackUrl);
+        urlParams.set('type', documentType); // Tipo de documento: word, cell, slide
+        
+        const fullEditorUrl = `${editorBaseUrl}?${urlParams.toString()}`;
+        
+        // URL alternativa por si el endpoint estándar no funciona
+        const alternativeEditorUrl = `http://localhost:8080/editor?${urlParams.toString()}`;
+        
+        sendLog(`[MAIN][open-onlyoffice-editor] URL completa: ${fullEditorUrl.substring(0, 100)}...`, 'INFO');
+        
+        return {
+            success: true,
+            message: 'Editor OnlyOffice listo para abrirse en el iframe',
+            editorUrl: fullEditorUrl,
+            alternativeEditorUrl: alternativeEditorUrl,
+            filePath: filePath,
+            documentKey: bridgeDocKey,
+            config: bridgeConfig
+        };
+    } catch (bridgeError) {
+        // Fallback: generar configuración sin JWT (si el Bridge falla)
+        console.warn('[MAIN] Usando fallback sin JWT:', bridgeError.message);
+        
+        const fetchFileUrl = `http://localhost:3011/fetch-file?filePath=${encodeURIComponent(filePath)}`;
+        const extension = getFileExtension(filePath);
+
+        const editorConfig = {
+            document: {
+                fileType: extension.substring(1).toLowerCase(),
+                key: currentDocumentKey,
+                title: fileName,
+                url: fetchFileUrl,
+                permissions: {
+                    edit: true,
+                    download: true,
+                    print: true
+                }
+            },
+            documentType: getDocumentType(extension),
+            editorConfig: {
+                mode: 'edit',
+                lang: 'es-ES',
+                callbackUrl: callbackUrl,
+                user: {
+                    id: 'user-1',
+                    name: 'Usuario K+AIR'
+                },
+                customization: {
+                    autosave: true,
+                    forcesave: true,
+                    compactHeader: false,
+                    hideRightMenu: false,
+                    hideRulers: false
+                }
+            },
+            onlyofficeServerUrl: 'http://localhost:8080'
+        };
+        
+        // Construir URL completa del editor (fallback sin JWT)
+        const fallbackType = getDocumentType(extension);
+        const fallbackEditorUrl = `http://localhost:8080/office-apps/editor/index.html?fileURL=${encodeURIComponent(fetchFileUrl)}&key=${currentDocumentKey}&callbackUrl=${encodeURIComponent(callbackUrl)}&type=${fallbackType}`;
+        const alternativeFallbackUrl = `http://localhost:8080/editor?fileURL=${encodeURIComponent(fetchFileUrl)}&key=${currentDocumentKey}&callbackUrl=${encodeURIComponent(callbackUrl)}&type=${fallbackType}`;
+        
+        return {
+            success: true,
+            message: 'Editor OnlyOffice listo para abrirse en el iframe (sin JWT)',
+            editorUrl: fallbackEditorUrl,
+            alternativeEditorUrl: alternativeFallbackUrl,
+            filePath: filePath,
+            documentKey: currentDocumentKey,
+            config: editorConfig
+        };
+    }
+  } catch (error) {
+    sendLog(`[MAIN][open-onlyoffice-editor] Error: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
   }
 });
 
@@ -2378,16 +2761,24 @@ ipcMain.on('stop-watching-capacitaciones', () => {
 
 // Manejador para la creación de la ventana principal
 app.whenReady().then(() => {
-  createWindow();
+  // Solo crear ventana si no ha sido creada antes
+  if (!isWindowCreated) {
+    createWindow();
+  }
 
   // Iniciar la búsqueda de actualizaciones una vez que la app esté lista
-  autoUpdater.checkForUpdatesAndNotify();
+// autoUpdater.checkForUpdatesAndNotify(); // TEMPORAL: Comentado
 
   app.on('activate', () => {
     // En macOS, es común volver a crear una ventana en la aplicación cuando
     // se hace clic en el ícono del dock y no hay otras ventanas abiertas.
-    if (BrowserWindow.getAllWindows().length === 0) {
+    // Usamos isWindowCreated para evitar crear ventanas duplicadas
+    if ((BrowserWindow.getAllWindows().length === 0 || !mainWindow || mainWindow.isDestroyed()) && !isWindowCreated) {
       createWindow();
+    } else if (mainWindow && !mainWindow.isDestroyed()) {
+      // Si la ventana existe pero está oculta, mostrarla
+      mainWindow.show();
+      mainWindow.focus();
     }
   });
 });
@@ -2404,25 +2795,18 @@ app.on('window-all-closed', () => {
 // En este archivo puedes incluir el resto del código del proceso principal de tu aplicación.
 // También puedes ponerlos en archivos separados y requerirlos aquí.
 
-// --- Eventos del Auto-Updater ---
+// --- Eventos del Auto-Updater (TEMPORALMENTE COMENTADO) ---
+// log.info('Actualización disponible.');
+// if (mainWindow) {
+//   mainWindow.webContents.send('update_available');
+// }
 
-autoUpdater.on('update-available', () => {
-  log.info('Actualización disponible.');
-  if (mainWindow) {
-    mainWindow.webContents.send('update_available');
-  }
-});
+// log.info('Actualización descargada. Lista para ser instalada.');
+// if (mainWindow) {
+//   mainWindow.webContents.send('update_downloaded');
+// }
 
-autoUpdater.on('update-downloaded', () => {
-  log.info('Actualización descargada. Lista para ser instalada.');
-  if (mainWindow) {
-    mainWindow.webContents.send('update_downloaded');
-  }
-});
-
-autoUpdater.on('error', (err) => {
-  log.error('Error en el auto-updater: ' + err.toString());
-});
+// log.error('Error en el auto-updater: ' + err.toString());
 
 // =============================================================================
 // Handler: Leer datos de ausentismo desde Excel
@@ -3672,7 +4056,7 @@ ipcMain.handle('get-inducciones-data', async (event, companyName) => {
 
 ipcMain.on('restart_app', () => {
   log.info('El usuario ha aceptado la actualización. Reiniciando para instalar...');
-  autoUpdater.quitAndInstall();
+  // autoUpdater.quitAndInstall(); // TEMPORAL: Comentado
 });
 
 // --- FUNCIONES AUXILIARES INTERNAS PARA ESTADÍSTICAS ---
@@ -4030,27 +4414,27 @@ ipcMain.handle('load-normativa', async () => {
 ipcMain.handle('process-evaluacion-pdf', async (event, pdfPath, sourceType) => {
   try {
     console.log(`[MAIN] Procesando PDF de evaluación: ${pdfPath}, fuente: ${sourceType}`);
-    
+
     // Importar el parser de PDFs
     const EvaluacionPdfParser = require('./utils/evaluacionPdfParser');
     const parser = new EvaluacionPdfParser();
-    
+
     // Procesar el PDF
     const result = await parser.parsePdf(pdfPath, sourceType);
-    
+
     if (result.success) {
       console.log(`[MAIN] PDF procesado exitosamente: ${result.findings.length} hallazgos encontrados`);
       console.log(`[MAIN] Métricas:`, result.metrics);
     } else {
       console.error(`[MAIN] Error procesando PDF: ${result.error}`);
     }
-    
+
     return result;
 
   } catch (error) {
     console.error('[MAIN] Error procesando PDF de evaluación:', error);
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: error.message,
       year: new Date().getFullYear().toString(),
       source: sourceType,
@@ -4058,4 +4442,161 @@ ipcMain.handle('process-evaluacion-pdf', async (event, pdfPath, sourceType) => {
       metrics: { cumplimiento: 0, totalItems: 0, cumplidos: 0, noCumplidos: 0, parcial: 0 }
     };
   }
+});
+
+// --- HANDLERS ONLYOFFICE CON JWT ---
+
+// Handler para generar configuración del editor OnlyOffice con JWT
+ipcMain.handle('generate-onlyoffice-config', async (event, payload) => {
+    const { filePath, fileName, documentKey } = payload;
+    
+    console.log('LOG: generate-onlyoffice-config');
+    
+    try {
+        // Importar el módulo del Bridge para obtener configuración JWT
+        const bridgePath = path.join(__dirname, 'modules', 'gestion-integral', 'politica', 'onlyoffice-bridge.js');
+        
+        if (!fs.existsSync(bridgePath)) {
+            throw new Error('Archivo OnlyOffice Bridge no encontrado');
+        }
+        
+        // Preparar payload para el Bridge
+        const http = require('http');
+        const bridgePayload = JSON.stringify({
+            filePath: filePath,
+            fileName: fileName,
+            documentKey: documentKey
+        });
+        
+        return new Promise((resolve, reject) => {
+            const options = {
+                hostname: 'localhost',
+                port: 3011,
+                path: '/get-editor-config',
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(bridgePayload)
+                }
+            };
+            
+            console.log('[MAIN] Llamando al Bridge para configuración JWT...');
+            
+            const req = http.request(options, (res) => {
+                let data = '';
+                
+                res.on('data', (chunk) => {
+                    data += chunk;
+                });
+                
+                res.on('end', () => {
+                    console.log('[MAIN] Configuracion OnlyOffice generada');
+                    
+                    try {
+                        const response = JSON.parse(data);
+                        if (response.success) {
+                            resolve(response.config);
+                        } else {
+                            reject(new Error(response.error || 'Error generando configuración'));
+                        }
+                    } catch (e) {
+                        reject(new Error('Error parseando respuesta del Bridge: ' + e.message));
+                    }
+                });
+            });
+            
+            req.on('error', (e) => {
+                console.error('[MAIN] Error conectando al Bridge:', e.message);
+                // Fallback: generar configuración local sin JWT para pruebas
+                console.warn('[MAIN] Generando configuración local (sin JWT) como fallback');
+                
+                // Determinar tipo de documento
+                const ext = path.extname(filePath).toLowerCase();
+                let documentType = 'word';
+                if (['.xls', '.xlsx'].includes(ext)) documentType = 'cell';
+                if (['.ppt', '.pptx'].includes(ext)) documentType = 'slide';
+                
+                const localConfig = {
+                    document: {
+                        fileType: ext.replace('.', ''),
+                        key: documentKey,
+                        title: fileName,
+                        url: `file://${filePath}`,
+                        permissions: {
+                            edit: true,
+                            download: true,
+                            print: true,
+                            review: true,
+                            comment: true,
+                            fillForms: true
+                        }
+                    },
+                    documentType: documentType,
+                    editorConfig: {
+                        mode: 'edit',
+                        lang: 'es-ES',
+                        user: { id: 'user-1', name: 'Usuario K+AIR' },
+                    customization: { autosave: true, forcesave: true }
+                },
+                    onlyofficeServerUrl: 'http://localhost:8080'
+                };
+                
+                resolve(localConfig);
+            });
+            
+            req.write(bridgePayload);
+            req.end();
+        });
+        
+    } catch (error) {
+        console.error('[MAIN] Error generando configuración OnlyOffice:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// --- INTEGRACIÓN ONLYOFFICE BRIDGE SERVER ---
+let onlyofficeBridgeServer = null;
+
+// Función para iniciar el servidor OnlyOffice Bridge al iniciar la app
+function startOnlyOfficeBridge() {
+    try {
+        // Verificar si el módulo de OnlyOffice Bridge existe
+        const bridgePath = path.join(__dirname, 'modules', 'gestion-integral', 'politica', 'onlyoffice-bridge.js');
+
+        if (fs.existsSync(bridgePath)) {
+            // Importar el módulo del Bridge
+            const { startServer } = require(bridgePath);
+            
+            // Iniciar el servidor Bridge
+            startServer().then((server) => {
+                onlyofficeBridgeServer = server;
+                console.log('[MAIN] Servidor OnlyOffice Bridge iniciado correctamente');
+            }).catch((err) => {
+                console.error('[MAIN] Error iniciando servidor Bridge:', err);
+            });
+        } else {
+            console.warn('[MAIN] Archivo OnlyOffice Bridge no encontrado, omitiendo servidor');
+        }
+    } catch (error) {
+        console.error('[MAIN] Error iniciando servidor OnlyOffice Bridge:', error);
+    }
+}
+
+// Iniciar el servidor OnlyOffice al iniciar la aplicación
+app.whenReady().then(() => {
+    createWindow();
+
+    // Iniciar el servidor OnlyOffice Bridge
+    startOnlyOfficeBridge();
+
+    // Iniciar la búsqueda de actualizaciones una vez que la app esté lista
+// autoUpdater.checkForUpdatesAndNotify(); // TEMPORAL: Comentado
+
+    app.on('activate', () => {
+        // En macOS, es común volver a crear una ventana en la aplicación cuando
+        // se hace clic en el ícono del dock y no hay otras ventanas abiertas.
+        if (BrowserWindow.getAllWindows().length === 0) {
+            createWindow();
+        }
+    });
 });

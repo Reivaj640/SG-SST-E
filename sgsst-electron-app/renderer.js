@@ -300,6 +300,7 @@ let currentModule = null;
 let currentSubmodule = null; // ✅ NUEVA VARIABLE
 let logBuffer = []; // Búfer para almacenar los logs
 let currentCalendarInstance = null; // Para mantener una referencia a la instancia del calendario
+let currentActiveComponent = null; // Para mantener una referencia al componente activo y poder destruirlo adecuadamente
 
 // Variable para almacenar los submódulos filtrados por normativa
 let RESOURCES_SUBMODULES = ALL_SUBMODULES;
@@ -521,8 +522,32 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Allow messages from the window itself (for directly injected modules)
       const isFromSelf = event.source === window;
 
+      // DEBUG: Log para verificar el origen del mensaje
+      const allIframes = Array.from(iframes).map(iframe => ({
+          id: iframe.id,
+          src: iframe.src,
+          contentWindow: iframe.contentWindow === event.source
+      }));
+      if (type === 'open-onlyoffice-editor-request') {
+          console.log('[DEBUG] Iframes encontrados:', allIframes);
+          console.log('[DEBUG] event.source === window:', event.source === window);
+      }
+
       if (!sourceIframe && !isFromSelf) {
-          console.warn('RENDERER: Message received from an unknown source. Ignoring.');
+          console.warn('RENDERER: Message received from an unknown source. Ignoring.', { type, eventSource: event.source });
+          // Intentar enviar a window.parent como fallback
+          try {
+              if (window.parent && window.parent !== window) {
+                  console.log('[DEBUG] Intentando enviar respuesta a window.parent');
+                  window.parent.postMessage({
+                      type: responseType,
+                      payload: { success: false, error: 'Source not found' },
+                      requestId: requestId
+                  }, '*');
+              }
+          } catch (e) {
+              console.error('[DEBUG] Error enviando a window.parent:', e);
+          }
           return;
       }
 
@@ -537,6 +562,21 @@ document.addEventListener('DOMContentLoaded', async () => {
       let apiCallFunction;
       let apiCallArgs;
       let responseType = type.replace('-request', '-response');
+
+      // Función auxiliar para decodificar rutas que pueden estar codificadas múltiples veces
+      function decodePathMultipleTimes(str) {
+          let decoded = str;
+          let prev = '';
+          while (decoded !== prev) {
+              prev = decoded;
+              try {
+                  decoded = decodeURIComponent(decoded);
+              } catch (e) {
+                  break;
+              }
+          }
+          return decoded;
+      }
 
       try {
           switch (type) {
@@ -566,6 +606,27 @@ document.addEventListener('DOMContentLoaded', async () => {
               case 'download-document-request':
                   apiCallFunction = window.electronAPI.downloadDocument; // Assuming this API exists
                   apiCallArgs = [payload]; // payload is the filePath string
+                  break;
+              case 'get-editable-content-request':
+                  // Manejar solicitud de contenido editable para documentos
+                  // Usar la función decodePathMultipleTimes definida fuera del switch
+                  const decodedPayloadEd = {
+                      ...payload,
+                      filePath: payload.filePath ? decodePathMultipleTimes(payload.filePath) : payload.filePath
+                  };
+                  apiCallFunction = window.electronAPI.getEditableContent;
+                  apiCallArgs = [decodedPayloadEd];
+                  break;
+              case 'save-edited-document-request':
+                  // Manejar guardado de documento editado
+                  // Usar la función decodePathMultipleTimes definida fuera del switch
+                  const savePayloadEd = {
+                      ...payload,
+                      filePath: payload.filePath ? decodePathMultipleTimes(payload.filePath) : payload.filePath,
+                      content: payload.content
+                  };
+                  apiCallFunction = window.electronAPI.saveEditedDocument;
+                  apiCallArgs = [savePayloadEd];
                   break;
               case 'back-to-module-request':
                   // This is a UI navigation request, not an API call to main process
@@ -609,6 +670,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                   apiCallFunction = window.electronAPI.duplicateBudgetFile;
                   apiCallArgs = [payload];
                   break;
+              case 'electron-api-call-request':
+                  // Mensaje enviado desde un iframe para llamar a una API específica
+                  // El payload incluye el nombre de la función API y los argumentos
+                  const { apiFunctionName, apiArgs } = payload;
+                  apiCallFunction = window.electronAPI[apiFunctionName];
+                  apiCallArgs = [apiArgs];
+                  responseType = `${apiFunctionName}-response`;
+                  break;
               case 'save-report-request':
                   // Funcionalidad no implementada aún
                   console.warn('RENDERER: save-report-request received but not implemented');
@@ -627,6 +696,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                       requestId: requestId
                   }, '*');
                   return;
+              case 'open-onlyoffice-editor-request':
+                  // Abrir editor OnlyOffice
+                  apiCallFunction = window.electronAPI.openOnlyOfficeEditor;
+                  apiCallArgs = [payload];
+                  responseType = 'open-onlyoffice-editor-response';
+                  break;
+              case 'iframe-debug-log':
+                  // Logs de debug del iframe
+                  const { message, data } = payload || {};
+                  console.log(message, data || '');
+                  return;
               default:
                   // Verificar si es un mensaje de respuesta (ya procesado), para evitar bucles
                   if (type.endsWith('-response')) {
@@ -644,22 +724,79 @@ document.addEventListener('DOMContentLoaded', async () => {
           }
 
           console.log(`RENDERER: 🗣️ Calling main process for ${type} with args:`, apiCallArgs);
-          const result = await apiCallFunction(...apiCallArgs);
-          console.log('RENDERER: 📥 Result from main process:', result);
-
-          targetWindow.postMessage({
-              type: responseType,
-              payload: result,
-              requestId: requestId
-          }, '*');
+          
+          // Verificar si la función está disponible antes de llamarla
+          if (typeof apiCallFunction !== 'function') {
+              console.error(`RENDERER: La función ${type} no está disponible.`);
+              targetWindow.postMessage({
+                  type: responseType,
+                  payload: { success: false, error: `Función no disponible: ${type}` },
+                  requestId: requestId
+              }, '*');
+              return;
+          }
+          
+          try {
+              const result = await apiCallFunction(...apiCallArgs);
+              console.log('RENDERER: 📥 Result from main process:', result);
+              
+              // Verificar si el targetWindow aún está disponible antes de enviar respuesta
+              if (!targetWindow || targetWindow.closed) {
+                  console.warn(`RENDERER: Target window cerrado para ${type}, omitiendo respuesta`);
+                  return;
+              }
+              
+              console.log('[DEBUG] Enviando respuesta a iframe:', {
+                  type: responseType,
+                  requestId: requestId,
+                  hasConfig: !!result.config,
+                  targetWindowExists: !!targetWindow,
+                  targetWindowClosed: targetWindow?.closed
+              });
+              
+              targetWindow.postMessage({
+                  type: responseType,
+                  payload: result,
+                  requestId: requestId
+              }, '*');
+              
+              console.log('[DEBUG] Respuesta enviada a iframe');
+          } catch (error) {
+              // Manejo de errores específico para IPC
+              if (error.message && error.message.includes('Object has been destroyed')) {
+                  console.warn(`RENDERER: IPC destruido para ${type}, omitiendo respuesta`);
+                  return;
+              }
+              throw error; // Re-lanzar para el catch exterior
+          }
 
       } catch (error) {
+          // Manejo de errores específico para IPC
+          if (error.message && error.message.includes('Object has been destroyed')) {
+              console.warn(`RENDERER: IPC destruido para ${type}, omitiendo respuesta`);
+              return;
+          }
+          
+          // Manejo de errores para ventana destruida
+          if (error.message && error.message.includes('Cannot read properties of null')) {
+              console.warn(`RENDERER: Error de propiedad nula para ${type}, omitiendo respuesta`);
+              return;
+          }
+          
           console.error(`RENDERER: 😭 Error processing ${type}:`, error);
-          targetWindow.postMessage({
-              type: responseType,
-              payload: { success: false, error: error.message },
-              requestId: requestId
-          }, '*');
+          
+          // Solo intentar enviar error si el targetWindow está disponible
+          try {
+              if (targetWindow && !targetWindow.closed) {
+                  targetWindow.postMessage({
+                      type: responseType,
+                      payload: { success: false, error: error.message || 'Error desconocido' },
+                      requestId: requestId
+                  }, '*');
+              }
+          } catch (e) {
+              console.warn(`RENDERER: No se pudo enviar mensaje de error para ${type}`);
+          }
       }
   });
   // --- END: Iframe Communication Logic ---
@@ -1700,18 +1837,39 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         showModuleContent(moduleName);
     };
 
+    // Función auxiliar para crear componentes de forma segura
+    const createComponentSafely = (ComponentConstructor, ...args) => {
+      // Destruir componente anterior si existe
+      if (currentActiveComponent && typeof currentActiveComponent.destroy === 'function') {
+        try {
+          currentActiveComponent.destroy();
+        } catch (e) {
+          console.warn('Error al destruir componente anterior:', e);
+        }
+      }
+
+      if (ComponentConstructor) {
+        const component = new ComponentConstructor(...args);
+        // Guardar referencia al componente activo
+        currentActiveComponent = component;
+        component.render();
+        return component;
+      } else {
+        console.error(`❌ Constructor de componente no encontrado`);
+        return null;
+      }
+    };
+
     // ------------------ Submódulos con componentes especiales ------------------ //
     if (submoduleName === "1.1.1 Responsable del SG") {
-      if (window.ResponsableSgComponent) {
-        const responsableSgComponent = new window.ResponsableSgComponent(
-          submoduleContentDiv,
-          currentCompany,
-          moduleName,
-          submoduleName,
-          safeBackToModuleCallback // <-- USAR EL CALLBACK SEGURO
-        );
-        responsableSgComponent.render();
-      } else {
+      createComponentSafely(window.ResponsableSgComponent,
+        submoduleContentDiv,
+        currentCompany,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback // <-- USAR EL CALLBACK SEGURO
+      );
+      if (!window.ResponsableSgComponent) {
         console.error('❌ ResponsableSgComponent no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
@@ -1847,45 +2005,39 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
     } else if (submoduleName === "2.1.1 Politica del SG-SST") {
-      if (window.PoliticaComponent) {
-        const politicaComponent = new window.PoliticaComponent(
-          submoduleContentDiv,
-          currentCompany,
-          moduleName,
-          submoduleName,
-          safeBackToModuleCallback // <-- USAR EL CALLBACK SEGURO
-        );
-        politicaComponent.render();
-      } else {
+      createComponentSafely(window.PoliticaComponent,
+        submoduleContentDiv,
+        currentCompany,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback // <-- USAR EL CALLBACK SEGURO
+      );
+      if (!window.PoliticaComponent) {
         console.error('❌ PoliticaComponent no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 
     } else if (submoduleName === "2.2.1 Objetivos SST") {
-      if (window.ObjetivosSSTComponent) {
-        const objetivosSSTComponent = new window.ObjetivosSSTComponent(
-          submoduleContentDiv,
-          currentCompany,
-          moduleName,
-          submoduleName,
-          safeBackToModuleCallback // <-- USAR EL CALLBACK SEGURO
-        );
-        objetivosSSTComponent.render();
-      } else {
+      createComponentSafely(window.ObjetivosSSTComponent,
+        submoduleContentDiv,
+        currentCompany,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback // <-- USAR EL CALLBACK SEGURO
+      );
+      if (!window.ObjetivosSSTComponent) {
         console.error('❌ ObjetivosSSTComponent no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 
     } else if (submoduleName === "2.3.1 Evaluación inicial del SG-SST") {
-      if (window.EvaluacionInicialSgSst) {
-        const evaluacionComponent = new window.EvaluacionInicialSgSst(
-          submoduleContentDiv,
-          moduleName,
-          submoduleName,
-          safeBackToModuleCallback
-        );
-        evaluacionComponent.render();
-      } else {
+      createComponentSafely(window.EvaluacionInicialSgSst,
+        submoduleContentDiv,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback
+      );
+      if (!window.EvaluacionInicialSgSst) {
         console.error('❌ EvaluacionInicialSgSst no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }

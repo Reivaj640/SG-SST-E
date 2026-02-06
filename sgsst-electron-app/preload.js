@@ -61,13 +61,47 @@ contextBridge.exposeInMainWorld('electronAPI', {
   processExcelData: (payload) => ipcRenderer.invoke('process-excel-data', payload),
 
   // --- New Document Viewer ---
-  getDocumentFolders: (payload) => ipcRenderer.invoke('get-document-folders', payload),
+  getDocumentFolders: async (payload) => {
+    try {
+      // Verificar si el renderer aún está activo
+      if (!document || !document.visibilityState || document.visibilityState === 'hidden') {
+        log('WARN', 'Documento no visible, evitando llamada IPC');
+        return { success: false, error: 'Documento no visible' };
+      }
+      
+      log('DEBUG', `getDocumentFolders llamado con: ${JSON.stringify(payload)}`);
+      const result = await ipcRenderer.invoke('get-document-folders', payload);
+      log('DEBUG', 'getDocumentFolders resultado:', result);
+      return result;
+    } catch (error) {
+      // Verificar si el error es "Object has been destroyed"
+      if (error.message && error.message.includes('Object has been destroyed')) {
+        log('WARN', 'El objeto IPC ha sido destruido. La ventana puede estar cerrándose.');
+        return { success: false, error: 'La aplicación se está cerrando. Por favor, intente de nuevo.' };
+      }
+      
+      // Verificar si es un error de canal inválido
+      if (error.message && error.message.includes('channel')) {
+        log('WARN', `Canal no disponible: ${error.message}`);
+        return { success: false, error: 'El canal de comunicación no está disponible.' };
+      }
+      
+      log('ERROR', `Error en getDocumentFolders: ${error.message}`);
+      throw error;
+    }
+  },
   getFolderContents: (folderPath) => ipcRenderer.invoke('read-directory', folderPath),
   getDocumentsInFolder: (folderPath) => ipcRenderer.invoke('read-directory', folderPath), // REMAPPED
   getPDFPreview: (filePath) => ipcRenderer.invoke('get-pdf-preview', filePath),
   getWordPreview: (filePath) => ipcRenderer.invoke('get-word-preview', filePath),
   getExcelPreview: (filePath) => ipcRenderer.invoke('get-excel-preview', filePath),
   downloadDocument: (filePath) => ipcRenderer.invoke('download-document', filePath),
+  
+  // --- Edición de documentos ---
+  getEditableContent: (payload) => ipcRenderer.invoke('get-editable-content', payload),
+  saveEditedDocument: (payload) => ipcRenderer.invoke('save-edited-document', payload),
+  openOnlyOfficeEditor: (payload) => ipcRenderer.invoke('open-onlyoffice-editor', payload),
+  generateOnlyOfficeConfig: (payload) => ipcRenderer.invoke('generate-onlyoffice-config', payload),
 
   // --- Submódulos / rutas ---
   findSubmodulePath: (companyName, module, submodule) =>
