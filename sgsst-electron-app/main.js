@@ -2142,7 +2142,7 @@ ipcMain.handle('open-onlyoffice-editor', async (event, payload) => {
 
     // Usar la variable documentKey declarada al inicio
     const currentDocumentKey = documentKey;
-    const callbackUrl = `http://localhost:3011/track?key=${currentDocumentKey}`;
+    const callbackUrl = `http://host.docker.internal:3011/track?key=${currentDocumentKey}`;
     
     // Obtener configuración del Bridge (CON JWT)
     try {
@@ -2191,39 +2191,27 @@ ipcMain.handle('open-onlyoffice-editor', async (event, payload) => {
         const bridgeCallbackUrl = bridgeConfig.editorConfig?.callbackUrl || callbackUrl;
         const jwtToken = bridgeConfig.token || '';
         
-        // Construir URL del editor con parámetros
-        // Usar el endpoint estándar de OnlyOffice Document Server
-        // Intentar primero con el endpoint estándar, si falla usar el endpoint alternativo
-        const editorBaseUrl = 'http://localhost:8080/office-apps/editor/index.html';
-        const documentType = bridgeConfig.documentType || 'word';
-        const urlParams = new URLSearchParams();
-        if (documentUrl) urlParams.set('fileURL', documentUrl);
-        if (bridgeDocKey) urlParams.set('key', bridgeDocKey);
-        if (jwtToken) urlParams.set('token', jwtToken);
-        if (bridgeCallbackUrl) urlParams.set('callbackUrl', bridgeCallbackUrl);
-        urlParams.set('type', documentType); // Tipo de documento: word, cell, slide
+        console.log('[MAIN] 🔍 Config recibida del bridge:');
+        console.log('[MAIN] 🔍 document.url:', documentUrl);
+        console.log('[MAIN] 🔍 document.key:', bridgeDocKey);
+        console.log('[MAIN] 🔍 editorConfig.callbackUrl:', bridgeCallbackUrl);
+        console.log('[MAIN] 🔍 token:', jwtToken ? jwtToken.substring(0, 50) + '...' : 'NINGUNO');
         
-        const fullEditorUrl = `${editorBaseUrl}?${urlParams.toString()}`;
+        console.log('[MAIN] 📦 Retornando config JSON completa para inicializar DocsAPI');
         
-        // URL alternativa por si el endpoint estándar no funciona
-        const alternativeEditorUrl = `http://localhost:8080/editor?${urlParams.toString()}`;
-        
-        sendLog(`[MAIN][open-onlyoffice-editor] URL completa: ${fullEditorUrl.substring(0, 100)}...`, 'INFO');
-        
+        // Retornar config JSON completa para inicializar DocsAPI
+        // NO construir URL con ?fileURL= - eso es el método obsoleto de 2018
         return {
             success: true,
-            message: 'Editor OnlyOffice listo para abrirse en el iframe',
-            editorUrl: fullEditorUrl,
-            alternativeEditorUrl: alternativeEditorUrl,
-            filePath: filePath,
-            documentKey: bridgeDocKey,
+            message: 'Configuración OnlyOffice lista para inicializar DocsAPI',
+            editorUrl: 'about:blank', // El frontend cargará wrapper.html
             config: bridgeConfig
         };
     } catch (bridgeError) {
         // Fallback: generar configuración sin JWT (si el Bridge falla)
         console.warn('[MAIN] Usando fallback sin JWT:', bridgeError.message);
         
-        const fetchFileUrl = `http://localhost:3011/fetch-file?filePath=${encodeURIComponent(filePath)}`;
+        const fetchFileUrl = `http://host.docker.internal:3011/fetch-file?filePath=${encodeURIComponent(filePath)}`;
         const extension = getFileExtension(filePath);
 
         const editorConfig = {
@@ -2255,21 +2243,16 @@ ipcMain.handle('open-onlyoffice-editor', async (event, payload) => {
                     hideRulers: false
                 }
             },
-            onlyofficeServerUrl: 'http://localhost:8080'
+            onlyofficeServerUrl: 'http://localhost:8080',
+            token: ''
         };
         
-        // Construir URL completa del editor (fallback sin JWT)
-        const fallbackType = getDocumentType(extension);
-        const fallbackEditorUrl = `http://localhost:8080/office-apps/editor/index.html?fileURL=${encodeURIComponent(fetchFileUrl)}&key=${currentDocumentKey}&callbackUrl=${encodeURIComponent(callbackUrl)}&type=${fallbackType}`;
-        const alternativeFallbackUrl = `http://localhost:8080/editor?fileURL=${encodeURIComponent(fetchFileUrl)}&key=${currentDocumentKey}&callbackUrl=${encodeURIComponent(callbackUrl)}&type=${fallbackType}`;
+        console.log('[MAIN] 📦 Retornando config JSON fallback sin JWT');
         
         return {
             success: true,
-            message: 'Editor OnlyOffice listo para abrirse en el iframe (sin JWT)',
-            editorUrl: fallbackEditorUrl,
-            alternativeEditorUrl: alternativeFallbackUrl,
-            filePath: filePath,
-            documentKey: currentDocumentKey,
+            message: 'Configuración OnlyOffice lista (fallback sin JWT)',
+            editorUrl: 'about:blank',
             config: editorConfig
         };
     }
@@ -4560,25 +4543,32 @@ let onlyofficeBridgeServer = null;
 // Función para iniciar el servidor OnlyOffice Bridge al iniciar la app
 function startOnlyOfficeBridge() {
     try {
+        console.log('[MAIN] 🚀 Iniciando OnlyOffice Bridge...');
+        
         // Verificar si el módulo de OnlyOffice Bridge existe
         const bridgePath = path.join(__dirname, 'modules', 'gestion-integral', 'politica', 'onlyoffice-bridge.js');
+        console.log(`[MAIN] 🔍 Verificando existencia del archivo bridge: ${bridgePath}`);
 
         if (fs.existsSync(bridgePath)) {
+            console.log('[MAIN] ✅ Archivo bridge encontrado, importando módulo...');
+            
             // Importar el módulo del Bridge
             const { startServer } = require(bridgePath);
             
             // Iniciar el servidor Bridge
             startServer().then((server) => {
                 onlyofficeBridgeServer = server;
-                console.log('[MAIN] Servidor OnlyOffice Bridge iniciado correctamente');
+                console.log('[MAIN] ✅ Servidor OnlyOffice Bridge iniciado correctamente');
+                console.log('[MAIN] 📊 Estado del servidor:', server.listening ? 'ESCUCHANDO' : 'INACTIVO');
             }).catch((err) => {
-                console.error('[MAIN] Error iniciando servidor Bridge:', err);
+                console.error('[MAIN] ❌ Error iniciando servidor Bridge:', err);
             });
         } else {
-            console.warn('[MAIN] Archivo OnlyOffice Bridge no encontrado, omitiendo servidor');
+            console.warn('[MAIN] ⚠️ Archivo OnlyOffice Bridge no encontrado, omitiendo servidor');
         }
     } catch (error) {
-        console.error('[MAIN] Error iniciando servidor OnlyOffice Bridge:', error);
+        console.error('[MAIN] ❌ Excepción iniciando servidor OnlyOffice Bridge:', error.message);
+        console.error('[MAIN] Stack trace:', error.stack);
     }
 }
 

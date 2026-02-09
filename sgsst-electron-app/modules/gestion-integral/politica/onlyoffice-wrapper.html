@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>OnlyOffice Editor</title>
+  <script src="http://localhost:8080/web-apps/apps/api/documents/api.js"></script>
+  <style>
+    html, body, #editor {
+      margin: 0;
+      height: 100%;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div id="editor"></div>
+ 
+  <script>
+    console.log('[WRAPPER] OnlyOffice Wrapper inicializado');
+ 
+    window.addEventListener("message", (event) => {
+      if (!event.data) return;
+ 
+      if (event.data.type === "onlyoffice-config") {
+        const config = event.data.payload;
+ 
+        console.log('[WRAPPER] 📦 Config recibida:', config);
+        console.log('[WRAPPER] 🔑 Token en config:', config.token ? 'Presente' : 'AUSENTE');
+ 
+        try {
+          if (typeof DocsAPI === 'undefined') {
+            console.error('[WRAPPER] ❌ DocsAPI no disponible');
+            window.parent.postMessage({ 
+              type: "wrapper-error", 
+              error: "DocsAPI not loaded" 
+            }, "*");
+            return;
+          }
+ 
+          console.log('[WRAPPER] 🚀 Creando instancia de DocsAPI.DocEditor...');
+          
+          const editor = new DocsAPI.DocEditor("editor", config);
+          
+          console.log('[WRAPPER] ✅ Editor OnlyOffice inicializado');
+          
+          // Escuchar eventos de OnlyOffice para diagnóstico
+          editor.on('onDocumentReady', function() {
+            console.log('[WRAPPER] ✅ Documento cargado y listo');
+            window.parent.postMessage({ type: "onlyoffice-ready" }, "*");
+          });
+          
+          editor.on('onError', function(event) {
+            console.error('[WRAPPER] ❌ Error de OnlyOffice:', event);
+            window.parent.postMessage({
+              type: "onlyoffice-error",
+              error: event.data || event.message || 'Error desconocido'
+            }, "*");
+          });
+          
+          editor.on('onRequestSaveAs', function(event) {
+            console.log('[WRAPPER] 💾 Usuario solicitó guardar como');
+          });
+          
+          editor.on('onMakeRequest', function(event) {
+            console.log('[WRAPPER] 🔗 Request de OnlyOffice:', event);
+          });
+ 
+        } catch (error) {
+          console.error('[WRAPPER] ❌ Error inicializando editor:', error);
+          window.parent.postMessage({ 
+            type: "wrapper-error", 
+            error: error.message 
+          }, "*");
+        }
+      }
+    });
+ 
+    window.parent.postMessage({ type: "wrapper-ready" }, "*");
+    console.log('[WRAPPER] 📢 Wrapper listo para recibir config');
+  </script>
+</body>
+</html>

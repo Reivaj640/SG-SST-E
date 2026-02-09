@@ -307,90 +307,69 @@ function launchOnlyOfficeEditor(data) {
     const viewerContainer = document.getElementById('viewerContainer');
     if (!viewerContainer) return;
     
+    console.log('[IFRAME] 🚀 Inicializando OnlyOffice con DocsAPI wrapper');
+    console.log('[IFRAME] 📦 Config recibida:', data.config);
+    
     // Limpiar contenedor
     viewerContainer.innerHTML = '';
     
-    // Usar iframe en lugar de webview (los webviews no funcionan dentro de iframes en Electron)
-    const editorUrl = data.editorUrl;
-    const alternativeEditorUrl = data.alternativeEditorUrl;
+    // Cargar wrapper.html que inicializa DocsAPI
+    const wrapperUrl = 'onlyoffice-wrapper.html';
     
-    console.log('[IFRAME] Cargando OnlyOffice en iframe:', editorUrl.substring(0, 100) + '...');
+    console.log('[IFRAME] 📄 Cargando wrapper:', wrapperUrl);
     
-    // Crear iframe para OnlyOffice
+    // Crear iframe para el wrapper
     const iframe = document.createElement('iframe');
-    iframe.id = 'onlyoffice-iframe';
-    iframe.src = editorUrl;
+    iframe.id = 'onlyoffice-wrapper-iframe';
+    iframe.src = wrapperUrl;
     iframe.style.cssText = 'width: 100%; height: 100%; border: none; display: block;';
     iframe.setAttribute('allow', 'fullscreen; clipboard-read; clipboard-write');
     
-    // Eventos del iframe
+    // Esperar que el wrapper esté listo
     iframe.addEventListener('load', function() {
-        console.log('[IFRAME] OnlyOffice cargado en iframe');
-        showToast('Editor OnlyOffice cargado', 'success');
-    });
-    
-    iframe.addEventListener('error', function(event) {
-        console.error('[IFRAME] Error cargando OnlyOffice:', event.message);
+        console.log('[IFRAME] ✅ Wrapper cargado, enviando config...');
         
-        // Si hay una URL alternativa, intentar usarla
-        if (alternativeEditorUrl && iframe.src === editorUrl) {
-            console.log('[IFRAME] Intentando con URL alternativa...');
-            iframe.src = alternativeEditorUrl;
-        } else {
-            showToast('Error cargando editor: ' + event.message, 'error');
-        }
+        // Esperar un momento y enviar la config al wrapper
+        setTimeout(() => {
+            if (iframe.contentWindow) {
+                console.log('[IFRAME] 📤 Enviando config al wrapper via postMessage');
+                
+                iframe.contentWindow.postMessage({
+                    type: 'onlyoffice-config',
+                    payload: data.config
+                }, '*');
+                
+                showToast('Editor OnlyOffice inicializando...', 'info');
+            } else {
+                console.error('[IFRAME] ❌ No se pudo acceder al contentWindow del iframe');
+                showToast('Error: No se pudo inicializar el editor', 'error');
+            }
+        }, 500);
     });
     
-    // Detectar si el iframe no puede cargar el contenido (404 o error de conexión)
-    iframe.addEventListener('load', function() {
-        try {
-            // Intentar acceder al contenido del iframe para verificar si cargó correctamente
-            // Si hay un error de seguridad, significa que el contenido no cargó
-            const iframeContent = iframe.contentWindow || iframe.contentDocument;
-            if (!iframeContent) {
-                console.error('[IFRAME] No se pudo acceder al contenido del iframe');
-                
-                // Si hay una URL alternativa, intentar usarla
-                if (alternativeEditorUrl && iframe.src === editorUrl) {
-                    console.log('[IFRAME] Intentando con URL alternativa...');
-                    iframe.src = alternativeEditorUrl;
-                } else {
-                    showToast('Error: No se pudo cargar el editor OnlyOffice. Verifique que el servidor esté corriendo en http://localhost:8080', 'error');
-                }
-            }
-        } catch (e) {
-            // Error de seguridad es normal cuando el contenido cargó correctamente desde otro dominio
-            console.log('[IFRAME] Contenido cargado correctamente (error de seguridad esperado)');
+    // Escuchar mensajes del wrapper
+    window.addEventListener('message', function(event) {
+        if (event.data && event.data.type === 'wrapper-ready') {
+            console.log('[IFRAME] 📢 Wrapper listo, config enviada');
+        }
+        
+        if (event.data && event.data.type === 'wrapper-error') {
+            console.error('[IFRAME] ❌ Error del wrapper:', event.data.error);
+            showToast('Error en el editor: ' + event.data.error, 'error');
+        }
+        
+        if (event.data && event.data.type === 'onlyoffice-error') {
+            console.error('[IFRAME] ❌ Error de OnlyOffice:', event.data.error);
+            showToast('Error en OnlyOffice: ' + event.data.error, 'error');
+        }
+        
+        if (event.data && event.data.type === 'onlyoffice-ready') {
+            console.log('[IFRAME] ✅ Documento OnlyOffice cargado y listo');
+            showToast('Documento cargado correctamente', 'success');
         }
     });
     
     viewerContainer.appendChild(iframe);
-    
-    showToast('Cargando editor OnlyOffice...', 'info');
-    
-    // Mostrar mensaje de ayuda si OnlyOffice no está disponible
-    setTimeout(() => {
-        const iframeElement = document.getElementById('onlyoffice-iframe');
-        if (iframeElement) {
-            try {
-                // Intentar verificar si el iframe cargó correctamente
-                const iframeDoc = iframeElement.contentDocument || iframeElement.contentWindow.document;
-                if (!iframeDoc || iframeDoc.title === '404 Not Found' || iframeDoc.body.innerHTML.includes('404')) {
-                    console.error('[IFRAME] OnlyOffice no está disponible (404)');
-                    
-                    // Si hay una URL alternativa, intentar usarla
-                    if (alternativeEditorUrl && iframe.src === editorUrl) {
-                        console.log('[IFRAME] Intentando con URL alternativa...');
-                        iframe.src = alternativeEditorUrl;
-                    } else {
-                        showToast('Error: OnlyOffice no está disponible. Inicie el servidor OnlyOffice en http://localhost:8080', 'error');
-                    }
-                }
-            } catch (e) {
-                // Error de seguridad es normal cuando el contenido cargó correctamente
-            }
-        }
-    }, 5000);
 }
 
 // --- UTILIDADES ---

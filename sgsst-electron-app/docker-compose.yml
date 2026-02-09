@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  onlyoffice-documentserver:
+    container_name: onlyoffice-documentserver
+    image: onlyoffice/documentserver:latest
+    restart: always
+    ports:
+      - "8080:80"
+      - "443:443"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - JWT_ENABLED=true
+      - JWT_SECRET=P6dJQcyvA4LstDY2h16Jh6ay8SEJrMUY
+      - JWT_HEADER=Authorization
+      - JWT_IN_BODY=true
+      - DOCKER_DOCUMENTSERVER_PORT=80
+      - DB_TYPE=postgres
+      - DB_HOST=onlyoffice-postgresql
+      - DB_PORT=5432
+      - DB_NAME=onlyoffice
+      - DB_USER=onlyoffice
+      - DB_PWD=onlyoffice
+      - REDIS_SERVER_HOST=onlyoffice-redis
+      - REDIS_SERVER_PORT=6379
+    depends_on:
+      - onlyoffice-postgresql
+      - onlyoffice-redis
+    volumes:
+      - onlyoffice_data:/var/www/onlyoffice/Data
+      - onlyoffice_log:/var/log/onlyoffice
+      - onlyoffice_fonts:/usr/share/fonts/truetype/custom
+    networks:
+      - onlyoffice-network
+
+  onlyoffice-postgresql:
+    container_name: onlyoffice-postgresql
+    image: postgres:15
+    restart: always
+    environment:
+      - POSTGRES_DB=onlyoffice
+      - POSTGRES_USER=onlyoffice
+      - POSTGRES_PASSWORD=onlyoffice
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - onlyoffice-network
+
+  onlyoffice-redis:
+    container_name: onlyoffice-redis
+    image: redis:7-alpine
+    restart: always
+    networks:
+      - onlyoffice-network
+
+networks:
+  onlyoffice-network:
+    driver: bridge
+
+volumes:
+  onlyoffice_data:
+  onlyoffice_log:
+  onlyoffice_fonts:
+  postgres_data:
