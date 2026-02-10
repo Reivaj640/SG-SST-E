@@ -237,29 +237,15 @@ app.post('/get-editor-config', async (req, res) => {
     const { filePath, fileName, documentKey } = req.body;
     
     try {
-        console.log('[BRIDGE] 🔧 Generando JWT token...');
-        
-        const token = createJWT({ 
-            file: decodeURIComponent(filePath),
-            document: {
-                key: documentKey,
-                title: fileName,
-                type: 'desktop'
-            },
-            action: 'open'
-        });
-        
-        console.log('[BRIDGE] ✅ Token JWT generado:', token.substring(0, 50) + '...');
-        
         const ext = path.extname(filePath).toLowerCase();
         let documentType = 'word';
         if (['.xls', '.xlsx'].includes(ext)) documentType = 'cell';
         if (['.ppt', '.pptx'].includes(ext)) documentType = 'slide';
         
-        const documentUrl = `${BRIDGE_URL}/fetch-file?filePath=${encodeURIComponent(filePath)}&token=${encodeURIComponent(token)}`;
+        const documentUrl = `${BRIDGE_URL}/fetch-file?filePath=${encodeURIComponent(filePath)}`;
         const callbackUrl = `${BRIDGE_URL}/track`;
         
-        console.log('[BRIDGE] 🔗 Document URL generada:', documentUrl);
+        console.log('[BRIDGE] 🔗 Document URL:', documentUrl);
         console.log('[BRIDGE] 🔗 Callback URL:', callbackUrl);
         
         const editorConfig = {
@@ -293,12 +279,17 @@ app.post('/get-editor-config', async (req, res) => {
                     hideRightMenu: false,
                     hideRulers: false,
                     showSpellCheckInputMode: true
-}
+                }
             },
-            onlyofficeServerUrl: ONLYOFFICE_EDITOR_URL,
-            
+            onlyofficeServerUrl: ONLYOFFICE_EDITOR_URL
         };
         
+        console.log('[BRIDGE] 🔧 Generando JWT token con toda la configuración...');
+        
+        const token = createJWT(editorConfig);
+        
+        console.log('[BRIDGE] ✅ Token JWT generado:', token.substring(0, 50) + '...');
+
         editorConfig.token = token;
 
         documentKeys[documentKey] = decodeURIComponent(filePath);

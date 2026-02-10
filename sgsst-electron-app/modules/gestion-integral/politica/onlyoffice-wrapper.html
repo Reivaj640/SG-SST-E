@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>OnlyOffice Editor</title>
-  <script src="http://localhost:8080/web-apps/apps/api/documents/api.js"></script>
+  <script src="http://localhost:8080/web-apps/apps/api/documents/api.js" onerror="console.error('[WRAPPER] ❌ Error cargando script de DocsAPI'); window.docsApiLoadFailed = true;" onload="console.log('[WRAPPER] ✅ Script de DocsAPI cargado'); window.docsApiLoaded = true;"></script>
   <style>
     html, body, #editor {
       margin: 0;
@@ -17,53 +17,68 @@
  
   <script>
     console.log('[WRAPPER] OnlyOffice Wrapper inicializado');
- 
+    console.log('[WRAPPER] URL de DocsAPI:', 'http://localhost:8080/web-apps/apps/api/documents/api.js');
+
+    // Verificar que DocsAPI cargó
+    window.addEventListener('load', function() {
+        console.log('[WRAPPER] Window loaded');
+        if (typeof DocsAPI === 'undefined') {
+            console.error('[WRAPPER] ❌ DocsAPI NO cargó después de window.onload');
+        } else {
+            console.log('[WRAPPER] ✅ DocsAPI cargó después de window.onload');
+        }
+    });
+
     window.addEventListener("message", (event) => {
       if (!event.data) return;
- 
+
+      console.log('[WRAPPER] 📨 Mensaje recibido:', event.data.type);
+
       if (event.data.type === "onlyoffice-config") {
         const config = event.data.payload;
- 
+
         console.log('[WRAPPER] 📦 Config recibida:', config);
-        console.log('[WRAPPER] 🔑 Token en config:', config.token ? 'Presente' : 'AUSENTE');
+        console.log('[WRAPPER] 🔑 Token en config:', config.token ? 'Presente (' + config.token.substring(0, 30) + '...)' : 'AUSENTE');
+        console.log('[WRAPPER] 🔗 document.url:', config.document?.url);
+        console.log('[WRAPPER] 🔗 editorConfig.callbackUrl:', config.editorConfig?.callbackUrl);
  
         try {
+          console.log('[WRAPPER] 🔍 Verificando DocsAPI...');
+          console.log('[WRAPPER] 🔍 typeof DocsAPI:', typeof DocsAPI);
+          console.log('[WRAPPER] 🔍 DocsAPI existe:', typeof DocsAPI !== 'undefined');
+
           if (typeof DocsAPI === 'undefined') {
             console.error('[WRAPPER] ❌ DocsAPI no disponible');
+            console.error('[WRAPPER] ❌ Script cargó?:', window.docsApiLoaded);
+            console.error('[WRAPPER] ❌ Script falló?:', window.docsApiLoadFailed);
             window.parent.postMessage({ 
               type: "wrapper-error", 
               error: "DocsAPI not loaded" 
             }, "*");
             return;
           }
- 
+
           console.log('[WRAPPER] 🚀 Creando instancia de DocsAPI.DocEditor...');
+          console.log('[WRAPPER] 📋 Config para DocsAPI:', JSON.stringify(config, null, 2));
           
-          const editor = new DocsAPI.DocEditor("editor", config);
+          // Registrar eventos en el objeto config
+          config.events = {
+            onDocumentReady: function() {
+              console.log('[WRAPPER] ✅ Documento cargado y listo');
+              window.parent.postMessage({ type: "onlyoffice-ready" }, "*");
+            },
+            onError: function(event) {
+              console.error('[WRAPPER] ❌ Error de OnlyOffice:', event);
+              window.parent.postMessage({
+                type: "onlyoffice-error",
+                error: event.data || event.message || 'Error desconocido'
+              }, "*");
+            }
+          };
+ 
+          new DocsAPI.DocEditor("editor", config);
           
           console.log('[WRAPPER] ✅ Editor OnlyOffice inicializado');
-          
-          // Escuchar eventos de OnlyOffice para diagnóstico
-          editor.on('onDocumentReady', function() {
-            console.log('[WRAPPER] ✅ Documento cargado y listo');
-            window.parent.postMessage({ type: "onlyoffice-ready" }, "*");
-          });
-          
-          editor.on('onError', function(event) {
-            console.error('[WRAPPER] ❌ Error de OnlyOffice:', event);
-            window.parent.postMessage({
-              type: "onlyoffice-error",
-              error: event.data || event.message || 'Error desconocido'
-            }, "*");
-          });
-          
-          editor.on('onRequestSaveAs', function(event) {
-            console.log('[WRAPPER] 💾 Usuario solicitó guardar como');
-          });
-          
-          editor.on('onMakeRequest', function(event) {
-            console.log('[WRAPPER] 🔗 Request de OnlyOffice:', event);
-          });
  
         } catch (error) {
           console.error('[WRAPPER] ❌ Error inicializando editor:', error);

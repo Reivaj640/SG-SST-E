@@ -271,11 +271,36 @@ function enableEditMode() {
     }
 }
 
+async function checkOnlyOfficeServer() {
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+        const response = await fetch('http://localhost:8080', {
+            method: 'GET',
+            mode: 'no-cors',
+            signal: controller.signal
+        }).catch(() => null);
+
+        clearTimeout(timeoutId);
+
+        return response !== null;
+    } catch (e) {
+        return false;
+    }
+}
+
 // --- SOLO EDITOR ONLYOFFICE ---
 async function openOnlyOfficeEditor(filePath, fileName) {
     if (!filePath) return;
 
     showToast('Cargando editor OnlyOffice...', 'info');
+
+    const serverAvailable = await checkOnlyOfficeServer();
+    if (!serverAvailable) {
+        showToast('Error: El servidor OnlyOffice no está disponible. Por favor inícielo con el comando: docker run -i -t -d -p 8080:80 onlyoffice/documentserver', 'error');
+        return;
+    }
 
     try {
         // Obtener configuración del editor
@@ -292,13 +317,13 @@ async function openOnlyOfficeEditor(filePath, fileName) {
         }
     } catch (error) {
         console.error('[IFRAME] Error OnlyOffice:', error.message);
-        
-        // Mostrar mensaje de error más detallado
-        const errorMsg = error.message || 'Error desconocido';
-        if (errorMsg.includes('ECONNREFUSED') || errorMsg.includes('connect')) {
-            showToast('Error: OnlyOffice no está disponible. Verifique que el servidor esté corriendo en http://localhost:8080', 'error');
+
+        if (error.message.includes('ECONNREFUSED') || error.message.includes('connect')) {
+            showToast('Error: El servidor OnlyOffice no está disponible. Verifique que el servidor esté corriendo en http://localhost:8080', 'error');
+        } else if (error.message.includes('DocsAPI not loaded')) {
+            showToast('Error: No se pudo cargar la API de OnlyOffice. Verifique que el servidor esté corriendo en http://localhost:8080', 'error');
         } else {
-            showToast('Error al abrir editor: ' + errorMsg, 'error');
+            showToast('Error al abrir editor: ' + error.message, 'error');
         }
     }
 }
