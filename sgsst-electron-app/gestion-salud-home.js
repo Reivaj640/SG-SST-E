@@ -476,6 +476,10 @@ class GestionSaludHome {
         button.className = 'btn btn-primary btn-ingresar';
         button.textContent = 'Ingresar';
         button.addEventListener('click', () => {
+            console.log('[GESTION-SALUD-HOME] Click en submódulo:', name);
+            console.log('[GESTION-SALUD-HOME] this.container:', this.container);
+            console.log('[GESTION-SALUD-HOME] this.moduleName:', this.moduleName);
+            console.log('[GESTION-SALUD-HOME] typeof showSubmoduleContent:', typeof showSubmoduleContent);
             showSubmoduleContent(this.container, this.moduleName, name);
         });
 

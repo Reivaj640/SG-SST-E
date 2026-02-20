@@ -1,5 +1,9 @@
 // investigacion-accidentes.js - Componente para el submódulo "3.2.2 Investigación de Accidentes, indicentes y Enfermedades"
 
+console.log('================================================================================');
+console.log('[CARGA] investigacion-accidentes-logic.js - INICIO DE CARGA');
+console.log('================================================================================');
+
 class InvestigacionAccidentesComponent {
     constructor(container, currentCompany, moduleName, submoduleName, onBack) {
         this.container = container;
@@ -113,6 +117,15 @@ class InvestigacionAccidentesComponent {
         `;
         container.appendChild(notificationArea);
     }
+    
+    // Método para mostrar la nueva interfaz de investigación con IA
+    handleAIInvestigation() {
+        console.log('[INVESTIGACION-ACCIDENTES] handleAIInvestigation llamado - INICIO');
+        console.log('[INVESTIGACION-ACCIDENTES] Cambiando a vista de investigación con IA');
+        // Cambiar a la vista de investigación con IA usando iframe
+        this.currentView = 'root-cause-investigation';
+        this.render();
+    }
 
     renderRealizarInvestigacionView(container) {
         // Crear una instancia del nuevo componente de investigación de accidente
@@ -198,13 +211,221 @@ class InvestigacionAccidentesComponent {
     }
 
     handleViewInvestigation() {
-        this.showNewDocumentViewer();
+        // Redirigir a la interfaz moderna de visualización de investigaciones
+        this.showModernDocumentViewer();
+    }
+
+    showModernDocumentViewer() {
+        // Limpiar el contenedor actual
+        this.container.innerHTML = '';
+
+        // Crear un iframe para cargar la interfaz de visualización de investigaciones
+        const iframe = document.createElement('iframe');
+        iframe.src = './modules/gestion-salud/investigacion-accidentes/investigaciones-view.html';
+        iframe.style.width = '100%';
+        iframe.style.height = '100vh';
+        iframe.style.border = 'none';
+        iframe.style.background = 'white';
+
+        // Crear un encabezado con botón de volver
+        const header = document.createElement('div');
+        header.className = 'submodule-header';
+        header.style.display = 'flex';
+        header.style.alignItems = 'center';
+        header.style.padding = '10px';
+        header.style.backgroundColor = '#f8f9fa';
+        header.style.borderBottom = '1px solid #dee2e6';
+        header.style.marginBottom = '0';
+
+        const backButton = document.createElement('button');
+        backButton.className = 'btn btn-back';
+        backButton.innerHTML = '&#8592; Volver';
+        backButton.style.marginRight = '10px';
+        backButton.addEventListener('click', () => {
+            this.currentView = 'main';
+            this.render();
+        });
+
+        const title = document.createElement('h3');
+        title.textContent = 'Ver Investigaciones de Accidentes';
+        title.style.flexGrow = '1';
+        title.style.textAlign = 'center';
+        title.style.margin = '0';
+        title.style.fontSize = '1.2rem';
+
+        header.appendChild(backButton);
+        header.appendChild(title);
+
+        // Agregar elementos al contenedor
+        this.container.appendChild(header);
+        this.container.appendChild(iframe);
     }
 
     handlePerformInvestigation() {
-        // Cambiar a la vista de realizar investigación
-        this.currentView = 'realizar-investigacion';
-        this.render();
+        // Redirigir a la nueva interfaz moderna de investigación de accidentes
+        this.showModernInvestigationInterface();
+    }
+
+    showModernInvestigationInterface() {
+        // Limpiar el contenedor actual
+        this.container.innerHTML = '';
+
+        // Crear un iframe para cargar la nueva interfaz
+        const iframe = document.createElement('iframe');
+        // Pasar la empresa actual como parámetro de URL
+        iframe.src = `./modules/gestion-salud/investigacion-accidentes/investigacion-accidentes-view.html?company=${encodeURIComponent(this.currentCompany)}`;
+        iframe.style.width = '100%';
+        iframe.style.height = 'calc(100vh - 60px)'; // Ajustar para el encabezado
+        iframe.style.border = 'none';
+        iframe.style.background = 'white';
+
+        // Crear un encabezado con botón de volver
+        const header = document.createElement('div');
+        header.className = 'submodule-header';
+        header.style.display = 'flex';
+        header.style.alignItems = 'center';
+        header.style.padding = '10px';
+        header.style.backgroundColor = '#f8f9fa';
+        header.style.borderBottom = '1px solid #dee2e6';
+        header.style.marginBottom = '0';
+
+        const backButton = document.createElement('button');
+        backButton.className = 'btn btn-back';
+        backButton.innerHTML = '&#8592; Volver';
+        backButton.style.marginRight = '10px';
+        backButton.addEventListener('click', () => {
+            this.currentView = 'main';
+            this.render();
+        });
+
+        const title = document.createElement('h3');
+        title.textContent = 'Investigación de Accidentes - Nueva Interfaz';
+        title.style.flexGrow = '1';
+        title.style.textAlign = 'center';
+        title.style.margin = '0';
+        title.style.fontSize = '1.2rem';
+
+        header.appendChild(backButton);
+        header.appendChild(title);
+
+        // Agregar elementos al contenedor
+        this.container.appendChild(header);
+        this.container.appendChild(iframe);
+
+        // Establecer comunicación con el iframe
+        this.setupIframeCommunication(iframe);
+    }
+
+    setupIframeCommunication(iframe) {
+        // ⚠️ IMPORTANTE: El listener de mensajes ahora está centralizado en renderer.js
+        // Este método ya NO registra un listener duplicado para evitar doble procesamiento.
+        // Solo manejamos el mensaje 'goBack' que es específico de navegación.
+        
+        // Usar una referencia guardada para poder remover el listener si es necesario
+        if (this._iframeMessageHandler) {
+            window.removeEventListener('message', this._iframeMessageHandler);
+        }
+        
+        this._iframeMessageHandler = (event) => {
+            // Verificar que el origen sea el iframe
+            if (event.source !== iframe.contentWindow) {
+                return;
+            }
+
+            const { type } = event.data;
+
+            // Solo manejar navegación - el resto lo maneja renderer.js
+            if (type === 'goBack') {
+                this.currentView = 'main';
+                this.render();
+            }
+        };
+        
+        window.addEventListener('message', this._iframeMessageHandler);
+        
+        console.log('[INVESTIGACION-ACCIDENTES-LOGIC] Comunicación iframe configurada (listener único en renderer.js)');
+    }
+
+    async handleProcessAccidentPdf(payload, requestId, iframe) {
+        try {
+            if (window.electronAPI && typeof window.electronAPI.processAccidentPdf === 'function') {
+                const result = await window.electronAPI.processAccidentPdf(payload.pdfPath);
+                
+                // Enviar respuesta al iframe
+                iframe.contentWindow.postMessage({
+                    type: 'investigacion-accidentes-process-accident-pdf-request-response',
+                    requestId: requestId,
+                    success: true,
+                    payload: result
+                }, '*');
+            } else {
+                throw new Error('electronAPI.processAccidentPdf no está disponible');
+            }
+        } catch (error) {
+            console.error('[INVESTIGACION-ACCIDENTES-LOGIC] Error procesando PDF:', error);
+            
+            // Enviar error al iframe
+            iframe.contentWindow.postMessage({
+                type: 'investigacion-accidentes-process-accident-pdf-request-response',
+                requestId: requestId,
+                success: false,
+                error: error.message
+            }, '*');
+        }
+    }
+
+    async handleAnalyzeAccident(payload, requestId, iframe) {
+        try {
+            if (window.electronAPI && typeof window.electronAPI.analyzeAccident === 'function') {
+                const result = await window.electronAPI.analyzeAccident(payload.extractedData, payload.contextoAdicional);
+                
+                // Enviar respuesta al iframe
+                iframe.contentWindow.postMessage({
+                    type: 'investigacion-accidentes-analyze-accident-request-response',
+                    requestId: requestId,
+                    success: true,
+                    payload: result
+                }, '*');
+            } else {
+                throw new Error('electronAPI.analyzeAccident no está disponible');
+            }
+        } catch (error) {
+            console.error('[INVESTIGACION-ACCIDENTES-LOGIC] Error analizando accidente:', error);
+            
+            // Enviar error al iframe
+            iframe.contentWindow.postMessage({
+                type: 'investigacion-accidentes-analyze-accident-request-response',
+                requestId: requestId,
+                success: false,
+                error: error.message
+            }, '*');
+        }
+    }
+
+    async handleSaveTempPdf(payload, requestId, iframe) {
+        try {
+            // Enviar solicitud al proceso principal para guardar el archivo temporalmente
+            // Usamos el método expuesto en electronAPI directamente
+            const result = await window.electronAPI.saveTempPdfFile(payload.filename, payload.data);
+            
+            // Enviar respuesta al iframe
+            iframe.contentWindow.postMessage({
+                type: 'investigacion-accidentes-save-temp-pdf-file-request-response',
+                requestId: requestId,
+                success: true,
+                payload: result
+            }, '*');
+        } catch (error) {
+            console.error('[INVESTIGACION-ACCIDENTES-LOGIC] Error guardando archivo temporal:', error);
+            
+            // Enviar error al iframe
+            iframe.contentWindow.postMessage({
+                type: 'investigacion-accidentes-save-temp-pdf-file-request-response',
+                requestId: requestId,
+                success: false,
+                error: error.message
+            }, '*');
+        }
     }
 
     handleComingSoon() {
@@ -461,3 +682,8 @@ InvestigacionAccidentesComponent.prototype.showNewDocumentViewer = function() {
 
 // Hacer la clase disponible globalmente
 window.InvestigacionAccidentesComponent = InvestigacionAccidentesComponent;
+
+console.log('================================================================================');
+console.log('[CARGA] InvestigacionAccidentesComponent expuesto a window');
+console.log('[CARGA] typeof window.InvestigacionAccidentesComponent:', typeof window.InvestigacionAccidentesComponent);
+console.log('================================================================================');

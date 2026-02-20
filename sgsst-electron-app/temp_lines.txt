@@ -1,0 +1,309 @@
+1:# Esta Es la Versión 0.7 de la Aplicación de Inversión de Accidentes
+3:# CRÍTICO: Configurar CUDA ANTES de importar cualquier librería
+4:import os
+5:os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+6:os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+7:os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+8:# Configurar allocator de memoria para evitar fragmentación CUDA
+9:os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
+11:import re
+12:import json
+13:import logging
+14:import traceback
+15:import threading
+16:import unicodedata
+17:from pathlib import Path
+18:from datetime import datetime
+19:from tkinter import messagebox, filedialog, StringVar
+20:import ttkbootstrap as ttk
+21:from ttkbootstrap.constants import *
+22:from ttkbootstrap.scrolled import ScrolledFrame
+23:from docxtpl import DocxTemplate
+24:import jinja2
+25:from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+26:import torch
+27:import warnings
+28:import fitz
+29:import sys
+31:#-------------------------------------------------------------------------------------------------------------------
+32:# Configuración de advertencias
+33:warnings.filterwarnings("ignore")
+35:#-------------------------------------------------------------------------------------------------------------------
+36:class PdfProcessor:
+37:    """Clase para extraer datos de PDFs de accidentes."""
+38:    
+39:    def extract_pdf_data(self, pdf_path):
+40:        """
+41:        Extrae los datos de un PDF de accidente.
+42:        """
+43:        try:
+44:            text = ""
+45:            with fitz.open(pdf_path) as pdf:
+46:                for page in pdf.pages():
+47:                    text += page.get_text() or ""
+48:            
+49:            text = unicodedata.normalize('NFC', text)
+50:            data = self._extract_fields(text)
+51:            return data
+52:            
+53:        except Exception as e:
+54:            logging.error(f"Error extrayendo datos del PDF: {str(e)}")
+55:            raise
+57:    def _extract_fields(self, text):
+58:        """Extrae los campos específicos del PDF de accidente."""
+59:        data = {}
+60:        
+61:        # No. Identificación (buscar patrón CC seguido de números)
+62:        cc_match = re.search(r'CC[\s:]*([\d,\.]+)', text)
+63:        if cc_match:
+64:            data['No. Identificación'] = cc_match.group(1).replace(',', '').strip()
+65:        
+66:        # Nombre completo (buscar después de CC hasta siguiente campo)
+67:        if 'No. Identificación' in data:
+68:            cc_pos = text.find('CC')
+69:            if cc_pos != -1:
+70:                after_cc = text[cc_pos + 20:]
+71:                name_end_patterns = ['Fecha de Nacimiento', 'Sexo', 'Cargo', 'Empresa', 'Ocupación']
+72:                name_end = len(after_cc)
+73:                for pattern in name_end_patterns:
+74:                    pos = after_cc.find(pattern)
+75:                    if pos != -1 and pos < name_end:
+76:                        name_end = pos
+77:                
+78:                name = after_cc[:name_end].strip()
+79:                name = re.sub(r'^[\s\d,]+', '', name)
+80:                name = re.sub(r'[\s]+', ' ', name).strip()
+81:                if len(name) > 3:
+82:                    data['Nombre Completo'] = name
+83:        
+84:        # Fecha del Accidente
+85:        date_match = re.search(r'(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})', text)
+86:        if date_match:
+87:            data['Fecha del Accidente'] = date_match.group(1)
+88:        
+89:        # Hora del Accidente
+90:        time_match = re.search(r'(\d{1,2}:\d{2}\s*(?:AM|PM)?)', text)
+91:        if time_match:
+92:            data['Hora del Accidente'] = time_match.group(1)
+93:        
+94:        # Cargo
+95:        cargo_match = re.search(r'Cargo[:\s]*([A-Za-zÀ-ÿ\s]+?)(?=Ocupaci|Tiempo|Empresa|$)', text, re.IGNORECASE)
+96:        if cargo_match:
+97:            cargo = cargo_match.group(1).strip()
+98:            if cargo and len(cargo) > 2:
+99:                data['Cargo'] = cargo
+100:        
+101:        # Tipo de Lesión
+102:        lesion_match = re.search(r'Lesión[:\s]*([A-Za-zÀ-ÿ]+)', text, re.IGNORECASE)
+103:        if lesion_match:
+104:            data['Tipo de Lesión'] = lesion_match.group(1).strip()
+105:        
+106:        # Parte del Cuerpo
+107:        parte_match = re.search(r'Cuerpo(?: Aparentemente)? Afectada[:\s]*([A-Za-zÀ-ÿ\s]+?)(?=Agente|Mecanismo|Parte|$)', text, re.IGNORECASE)
+108:        if parte_match:
+109:            parte = parte_match.group(1).strip()
+110:            if parte and len(parte) < 50:
+111:                data['Parte del Cuerpo Afectada'] = parte
+112:        
+113:        # Agente del Accidente
+114:        agente_match = re.search(r'Accidente[:\s]*([A-Za-zÀ-ÿ\s]+?)(?=Mecanismo|Parte|Lugar|$)', text, re.IGNORECASE)
+115:        if agente_match:
+116:            agente = agente_match.group(1).strip()
+117:            if agente and len(agente) < 50:
+118:                data['Agente del Accidente'] = agente
+119:        
+120:        # Lugar del Accidente
+121:        lugar_match = re.search(r'Ocurrio el? accidente[:\s]*([A-Za-zÀ-ÿ\s]+?)(?=Sitio|Lesión|$)', text, re.IGNORECASE)
+122:        if lugar_match:
+123:            lugar = lugar_match.group(1).strip()
+124:            if lugar and len(lugar) < 50:
+125:                data['Lugar del Accidente'] = lugar
+126:        
+127:        # Sitio de Ocurrencia
+128:        sitio_match = re.search(r'Sitio de Ocurrencia[:\s]*([A-Za-zÀ-ÿ\s]+?)(?=Tipo|Lesión|$)', text, re.IGNORECASE)
+129:        if sitio_match:
+130:            sitio = sitio_match.group(1).strip()
+131:            if sitio and len(sitio) < 50:
+132:                data['Sitio de Ocurrencia'] = sitio
+133:        
+134:        # Descripción del Accidente (sección de observaciones)
+135:        desc_patterns = [
+136:            r'Observaciones[:\s]*([\s\S]*?)(?=Personas|Tel\.|Cargo:|Nombre:|Informa|$)',
+137:            r'el día\s+\d+.*?(?=Personas|Tel\.|Cargo:|Nombre:|$)',
+138:        ]
+139:        
+140:        for desc_pat in desc_patterns:
+141:            desc_match = re.search(desc_pat, text, re.IGNORECASE | re.DOTALL)
+142:            if desc_match:
+143:                desc = desc_match.group(1).strip()
+144:                desc = re.sub(r'[\s]+', ' ', desc)
+145:                if len(desc) > 2000:
+146:                    desc = desc[:2000] + '...'
+147:                data['Descripción del Accidente'] = desc
+148:                break
+149:        
+150:        # Campos obligatorios
+151:        required_fields = [
+152:            'No. Identificación', 'Nombre Completo', 'Fecha del Accidente',
+153:            'Cargo', 'Descripción del Accidente'
+154:        ]
+155:        
+156:        for field in required_fields:
+157:            if not data.get(field):
+158:                data[field] = "N/A"
+159:        
+160:        return data
+162:#-------------------------------------------------------------------------------------------------------------------
+163:class AccidentAnalyzer:
+164:    """Genera la metodología '5 Por Qué' usando un LLM (Ministral-3-3B-Reasoning)."""
+165:    
+166:    def __init__(self):
+167:        self.model_path = r"D:\1. Estudio\1.1 IA\1.1.2. LLM's\Inv. AT\mistral-3-3B-Reasonig-2512"
+168:        if not os.path.exists(self.model_path):
+169:            raise FileNotFoundError(f"No se encontró el modelo en la ruta: {self.model_path}")
+170:        try:
+171:            print("Cargando tokenizer de Mistral...", file=sys.stderr)
+172:            self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
+173:            self.tokenizer.pad_token = self.tokenizer.eos_token
+174:            print("Tokenizer cargado.", file=sys.stderr)
+175:            
+176:            # Verificar disponibilidad de CUDA
+177:            if torch.cuda.is_available():
+178:                device = torch.device("cuda")
+179:                print(f"GPU detectada: {torch.cuda.get_device_name(0)}", file=sys.stderr)
+180:                print(f"VRAM total: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB", file=sys.stderr)
+181:            else:
+182:                device = torch.device("cpu")
+183:                print("ADVERTENCIA: CUDA no disponible, usando CPU", file=sys.stderr)
+184:            
+185:            print(f"Usando dispositivo: {device}", file=sys.stderr)
+186:            
+187:            # Usar 8-bit quantization para mejor compatibilidad de memoria
+188:            use_gpu = torch.cuda.is_available()
+189:            
+190:            if use_gpu:
+191:                try:
+192:                    quantization_config = BitsAndBytesConfig(
+193:                        load_in_8bit=True
+194:                    )
+195:                    device_map = {"": 0}
+196:                    print("Usando 8-bit quantization en GPU", file=sys.stderr)
+197:                except Exception as e:
+198:                    print(f"8-bit falló, cayendo a CPU: {e}", file=sys.stderr)
+199:                    use_gpu = False
+200:            
+201:            if not use_gpu:
+202:                quantization_config = None
+203:                device_map = {"": "cpu"}
+204:                print("Usando CPU", file=sys.stderr)
+205:            
+206:            print("Cargando modelo...", file=sys.stderr)
+207:            self.model = AutoModelForCausalLM.from_pretrained(
+208:                self.model_path,
+209:                quantization_config=quantization_config,
+210:                device_map=device_map,
+211:                trust_remote_code=True,
+212:                low_cpu_mem_usage=True
+213:            )
+214:            print("Modelo cargado exitosamente.", file=sys.stderr)
+215:        except Exception as e:
+216:            raise RuntimeError(f"No se pudo cargar el modelo: {e}")
+218:    def analyze_5whys(self, descripcion_accidente: str, contexto_adicional: str = "") -> dict:
+219:        if not descripcion_accidente or descripcion_accidente.strip() == "N/A":
+220:            logging.warning("No se proporcionó descripción del accidente para el análisis. Saltando.")
+221:            return self._generate_fallback_analysis()
+223:        prompt_rules = ("""
+224:Tu rol es ser un analista experto en seguridad laboral. Tu única tarea es realizar un análisis '5 Porqués' para un accidente, siguiendo el formato 5M.
+225:REGLA ABSOLUTA: Debes responder exclusivamente en español y seguir el formato del ejemplo al pie de la letra.
+227:EJEMPLO DE RESPUESTA ESTRUCTURADA:
+228:1. ¿Por qué el trabajador se cayó de la escalera? [Causa Directa]
+229:    • Mano de Obra: El trabajador no mantuvo tres puntos de contacto.
+230:    • Método: El procedimiento de trabajo en alturas era ambiguo.
+231:    • Maquinaria: La escalera tenía un peldaño dañado.
+232:    • Medio Ambiente: El suelo estaba resbaladizo por un derrame.
+233:    • Material: N/A
+234:2. ¿Por qué el trabajador no mantuvo tres puntos de contacto?
+235:    • Mano de Obra: Intentaba cargar una caja mientras subía.
+236:    • Método: No se prohibió explícitamente subir con objetos en las manos.
+237:    • Maquinaria: N/A
+238:    • Medio Ambiente: N/A
+239:    • Material: La caja era pesada y voluminosa.
+240:3. ¿Por qué intentaba cargar una caja mientras subía?
+241:    • Mano de Obra: Quería terminar la tarea más rápido.
+242:    • Método: La planificación del trabajo no incluyó un sistema de izado.
+243:    • Maquinaria: No había montacargas disponible en esa área.
+244:    • Medio Ambiente: N/A
+245:    • Material: N/A
+246:4. ¿Por qué la planificación no incluyó un sistema de izado?
+247:    • Mano de Obra: El supervisor no evaluó correctamente los riesgos.
+248:    • Método: El formato de permiso de trabajo no tiene un campo para equipos de izado.
+249:    • Maquinaria: N/A
+250:    • Medio Ambiente: N/A
+251:    • Material: N/A
+252:5. ¿Por qué el supervisor no evaluó correctamente los riesgos?
+253:    • Mano de Obra: Falta de capacitación en identificación de peligros.
+254:    • Método: La empresa no tiene un programa de capacitación continua.
+255:    • Maquinaria: N/A
+256:    • Medio Ambiente: N/A
+257:    • Material: N/A
+259:Ahora, realiza el análisis para el siguiente accidente, imitando el formato del ejemplo y siguiendo las reglas.
+260:- Basa tu análisis en la información proporcionada.
+261:- Completa los 5 niveles del porqué.
+262:- Para cada nivel, analiza las 5M (Mano de Obra, Método, Maquinaria, Medio Ambiente, Material). Si una categoría no aplica, indica "N/A".
+263:- Sé conciso y accionable.""")
+264:        descripcion_str = f"**Descripción del accidente:**\n{descripcion_accidente}"
+265:        contexto_str = f"\n\n**Contexto Adicional:**\n{contexto_adicional}" if contexto_adicional and "Añade aquí" not in contexto_adicional else ""
+266:        final_user_prompt = f"{prompt_rules}\n\n{descripcion_str}{contexto_str}\n\n**Análisis de 5 Porqués:**"
+267:        messages = [{"role": "user", "content": final_user_prompt}]
+268:        
+269:        logging.info(f"Enviando el siguiente prompt al modelo:\n{final_user_prompt}")
+271:        try:
+272:            input_ids = self.tokenizer.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt").to(self.model.device)
+273:            outputs = self.model.generate(input_ids=input_ids, max_new_tokens=1024, temperature=0.7, do_sample=True, pad_token_id=self.tokenizer.eos_token_id)
+274:            analysis = self.tokenizer.decode(outputs[0][input_ids.shape[-1]:], skip_special_tokens=True)
+275:            
+276:            logging.info(f"Respuesta cruda del modelo:\n---\n{analysis}\n---")
+278:            parsed_analysis = self._parse_structured_analysis(analysis)
+279:            logging.info(f"Análisis parseado: {json.dumps(parsed_analysis, indent=2, ensure_ascii=False)}")
+280:            
+281:            return parsed_analysis
+282:        except Exception as e:
+283:            logging.error(f"Error en análisis '5 Por Qué': {e}\n{traceback.format_exc()}")
+284:            return self._generate_fallback_analysis()
+286:    def _parse_structured_analysis(self, text: str) -> dict:
+287:        logging.info(f"Iniciando parseo del siguiente texto:\n---\n{text}\n---")
+288:        causas = {}
+289:        level_pattern = r'(\d+)\.\s*¿Por qué(.*?)(?=\n\d+\. ¿Por qué|\Z)'
+290:        matches = re.finditer(level_pattern, text, re.DOTALL | re.IGNORECASE)
+291:        
+292:        found_matches = False
+293:        for match in matches:
+294:            found_matches = True
+295:            level = int(match.group(1))
+296:            if 1 <= level <= 5:
+297:                level_content = match.group(2).strip()
+298:                logging.info(f"Encontrado 'Por Qué {level}': Contenido='{level_content[:100]}...'")
+299:                causas[f"Por Qué {level}"] = self._parse_level_content(level_content)
+300:        
+301:        if not found_matches:
+302:            logging.warning("No se encontraron coincidencias para el patrón de 'Por Qué' en la respuesta del modelo.")
+304:        for i in range(1, 6):
+305:            if f"Por Qué {i}" not in causas:
+306:                causas[f"Por Qué {i}"] = {"causa": "Análisis no generado", "Mano de Obra": "N/A", "Método": "N/A", "Maquinaria": "N/A", "Medio Ambiente": "N/A", "Material": "N/A"}
+307:        
+308:        logging.info(f"Resultado final del parseo: {json.dumps(causas, indent=2, ensure_ascii=False)}")
+309:        return causas
+311:    def _parse_level_content(self, content: str) -> dict:
+312:        lines = content.split('\n')
+313:        causa_principal = lines[0].strip()
+314:        level_data = {"causa": causa_principal, "Mano de Obra": "N/A", "Método": "N/A", "Maquinaria": "N/A", "Medio Ambiente": "N/A", "Material": "N/A"}
+315:        category_pattern = r'•\s*(Mano de Obra|Método|Maquinaria|Medio Ambiente|Material):\s*(.*?)(?=\n\s*•|\Z)'
+316:        for match in re.finditer(category_pattern, content, re.DOTALL | re.IGNORECASE):
+317:            category_map = {"mano de obra": "Mano de Obra", "método": "Método", "maquinaria": "Maquinaria", "medio ambiente": "Medio Ambiente", "material": "Material"}
+318:            category = next((v for k, v in category_map.items() if k in match.group(1).lower()), None)
+319:            if category: level_data[category] = match.group(2).strip()
+320:        return level_data
+322:    def _generate_fallback_analysis(self) -> dict:
+323:        return {f"Por Qué {i}": {"causa": "Análisis no disponible", "Mano de Obra": "N/A", "Método": "N/A", "Maquinaria": "N/A", "Medio Ambiente": "N/A", "Material": "N/A"} for i in range(1, 6)}
+325:#-------------------------------------------------------------------------------------------------------------------
+326:logging.basicConfig(filename='accidentes_app.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s', encoding='utf-8')

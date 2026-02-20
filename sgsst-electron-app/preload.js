@@ -136,13 +136,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   duplicateBudgetFile: (params) => ipcRenderer.invoke('duplicate-budget-file', params),
 
   // --- Accidentes ---
-  selectAccidentPdf: () => ipcRenderer.invoke('select-accident-pdf'),
-  processAccidentPdf: (pdfPath) => ipcRenderer.invoke('process-accident-pdf', pdfPath),
+  selectAccidentPdf: () => ipcRenderer.invoke('investigacion-accidentes-select-accident-pdf'),
+  processAccidentPdf: (pdfPath) => ipcRenderer.invoke('investigacion-accidentes-process-accident-pdf', pdfPath),
   analyzeAccident: (extractedData, contextoAdicional) =>
-    ipcRenderer.invoke('analyze-accident', extractedData, contextoAdicional),
-  startModelLoading: () => ipcRenderer.invoke('start-model-loading'),
+    ipcRenderer.invoke('investigacion-accidentes-analyze-accident', extractedData, contextoAdicional),
+  startModelLoading: () => ipcRenderer.invoke('investigacion-accidentes-start-model-loading'),
   generateAccidentReport: (combinedData) =>
-    ipcRenderer.invoke('generate-accident-report', combinedData),
+    ipcRenderer.invoke('investigacion-accidentes-generate-accident-report', combinedData),
+  saveTempPdfFile: (filename, data) => ipcRenderer.invoke('investigacion-accidentes-save-temp-pdf-file', filename, data),
   readAusentismoData: (companyName) =>
     ipcRenderer.invoke('get-ausentismo-data', companyName),
 

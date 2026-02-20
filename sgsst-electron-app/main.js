@@ -36,7 +36,7 @@ Reason: ${reason instanceof Error ? reason.stack : JSON.stringify(reason)}
       `Razón: ${reason instanceof Error ? reason.message : reason}`
     );
   }
-});
+}); 
 
 // --- Configuración del Auto-Updater ---
 log.transports.file.level = 'info';
@@ -47,7 +47,8 @@ const execPromise = promisify(exec);
 const execFilePromise = promisify(execFile);
 
 // --- Detección robusta de Python ---
-let cachedPythonPath = null;
+// EXPONER A GLOBAL PARA QUE LOS HANDLERS PUEDAN USARLO
+global.cachedPythonPath = null;
 
 async function findPython() {
     console.log('[DEBUG] Starting Python path search');
@@ -117,14 +118,14 @@ async function findPython() {
 }
 
 async function getPython() {
-    console.log('[DEBUG] Current cachedPythonPath:', cachedPythonPath);
-    if (cachedPythonPath && fs.existsSync(cachedPythonPath)) {
-        console.log('[DEBUG] Using cached Python path:', cachedPythonPath);
-        return cachedPythonPath;
+    console.log('[DEBUG] Current global.cachedPythonPath:', global.cachedPythonPath);
+    if (global.cachedPythonPath && fs.existsSync(global.cachedPythonPath)) {
+        console.log('[DEBUG] Using cached Python path:', global.cachedPythonPath);
+        return global.cachedPythonPath;
     }
-    cachedPythonPath = await findPython();
-    console.log('[DEBUG] New Python path cached:', cachedPythonPath);
-    return cachedPythonPath;
+    global.cachedPythonPath = await findPython();
+    console.log('[DEBUG] New Python path cached:', global.cachedPythonPath);
+    return global.cachedPythonPath;
 }
 
 let mainWindow;
@@ -4572,12 +4573,105 @@ function startOnlyOfficeBridge() {
     }
 }
 
+// --- SERVIDOR LLM PARA ANÁLISIS DE ACCIDENTES ---
+let llmServerProcess = null;
+
+async function startLlmServer() {
+    const http = require('http');
+    const LLM_SERVER_HOST = '127.0.0.1';
+    const LLM_SERVER_PORT = 5555;
+    
+    // Función para verificar si el servidor ya está corriendo Y el modelo está cargado
+    const checkServerHealth = () => {
+        return new Promise((resolve) => {
+            const req = http.request({
+                hostname: LLM_SERVER_HOST,
+                port: LLM_SERVER_PORT,
+                path: '/health',
+                method: 'GET',
+                timeout: 5000
+            }, (res) => {
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => {
+                    try {
+                        const json = JSON.parse(data);
+                        // Solo retornar true si el modelo está cargado
+                        resolve(json.model_loaded === true);
+                    } catch {
+                        resolve(false);
+                    }
+                });
+            });
+            req.on('error', () => resolve(false));
+            req.on('timeout', () => { req.destroy(); resolve(false); });
+            req.end();
+        });
+    };
+
+    try {
+        // Verificar si ya está corriendo con modelo cargado
+        const isRunning = await checkServerHealth();
+        if (isRunning) {
+            console.log('[MAIN] ✅ Servidor LLM ya está corriendo con modelo cargado');
+            return;
+        }
+
+        console.log('[MAIN] 🚀 Iniciando servidor LLM...');
+        
+        // Obtener ruta de Python
+        const pythonPath = global.cachedPythonPath || 'python';
+        const serverScript = path.join(__dirname, 'Portear', 'src', 'llm_server.py');
+        
+        if (!fs.existsSync(serverScript)) {
+            console.warn('[MAIN] ⚠️ Script del servidor LLM no encontrado:', serverScript);
+            return;
+        }
+
+        // Iniciar servidor en background
+        llmServerProcess = spawn(pythonPath, [serverScript], {
+            cwd: path.dirname(serverScript),
+            detached: true,
+            stdio: 'ignore',
+            windowsHide: true
+        });
+        
+        llmServerProcess.unref();
+        
+        // Esperar a que el servidor esté listo Y el modelo esté cargado
+        console.log('[MAIN] ⏳ Esperando a que el servidor LLM y el modelo estén listos...');
+        console.log('[MAIN] ⏳ Esto puede tardar varios minutos (carga del modelo LLM)...');
+        
+        const maxAttempts = 600; // 20 minutos máximo (600 * 2 segundos)
+        for (let i = 0; i < maxAttempts; i++) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            const ready = await checkServerHealth();
+            if (ready) {
+                console.log('[MAIN] ✅ Servidor LLM iniciado correctamente con modelo cargado');
+                return;
+            }
+            if (i % 30 === 0) {
+                console.log(`[MAIN] ⏳ Cargando modelo LLM... (${Math.floor(i * 2 / 60)}min ${i * 2 % 60}s)`);
+            }
+        }
+        
+        console.warn('[MAIN] ⚠️ Timeout esperando al servidor LLM');
+        
+    } catch (error) {
+        console.error('[MAIN] ❌ Error iniciando servidor LLM:', error.message);
+    }
+}
+
 // Iniciar el servidor OnlyOffice al iniciar la aplicación
 app.whenReady().then(() => {
     createWindow();
 
     // Iniciar el servidor OnlyOffice Bridge
     startOnlyOfficeBridge();
+    
+    // NOTA: El servidor LLM ya no se inicia automáticamente.
+    // El análisis de accidentes usa spawn directo con Invest_APP_V_3.py
+    // que carga el modelo una sola vez usando el patrón Singleton.
 
     // Iniciar la búsqueda de actualizaciones una vez que la app esté lista
 // autoUpdater.checkForUpdatesAndNotify(); // TEMPORAL: Comentado

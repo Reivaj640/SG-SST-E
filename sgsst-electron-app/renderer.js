@@ -702,6 +702,37 @@ document.addEventListener('DOMContentLoaded', async () => {
                   apiCallArgs = [payload];
                   responseType = 'open-onlyoffice-editor-response';
                   break;
+              case 'investigacion-accidentes-save-temp-pdf-file-request':
+                  // Manejar solicitud para guardar archivo PDF temporalmente
+                  apiCallFunction = window.electronAPI.saveTempPdfFile;
+                  apiCallArgs = [payload.filename, payload.data];
+                  responseType = 'investigacion-accidentes-save-temp-pdf-file-request-response';
+                  break;
+              case 'investigacion-accidentes-process-accident-pdf-request':
+                  // Manejar solicitud para procesar PDF de accidente
+                  apiCallFunction = window.electronAPI.processAccidentPdf;
+                  apiCallArgs = [payload.pdfPath];
+                  responseType = 'investigacion-accidentes-process-accident-pdf-request-response';
+                  break;
+              case 'investigacion-accidentes-analyze-accident-request':
+                  // Manejar solicitud para analizar accidente
+                  apiCallFunction = window.electronAPI.analyzeAccident;
+                  apiCallArgs = [payload.extractedData, payload.contextoAdicional];
+                  responseType = 'investigacion-accidentes-analyze-accident-request-response';
+                  break;
+              case 'investigacion-accidentes-start-model-loading-request':
+                  // Manejar solicitud para iniciar carga del modelo
+                  apiCallFunction = window.electronAPI.startModelLoading;
+                  apiCallArgs = [];
+                  responseType = 'investigacion-accidentes-start-model-loading-request-response';
+                  break;
+              case 'investigacion-accidentes-generate-accident-report-request':
+                  // Manejar solicitud para generar reporte de accidente
+                  apiCallFunction = window.electronAPI.generateAccidentReport;
+                  // El payload ya contiene los datos combinados directamente
+                  apiCallArgs = [payload];
+                  responseType = 'investigacion-accidentes-generate-accident-report-request-response';
+                  break;
               case 'iframe-debug-log':
                   // Logs de debug del iframe
                   const { message, data } = payload || {};
@@ -756,6 +787,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               
               targetWindow.postMessage({
                   type: responseType,
+                  success: result.success,
                   payload: result,
                   requestId: requestId
               }, '*');

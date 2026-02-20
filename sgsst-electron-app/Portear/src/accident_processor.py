@@ -60,7 +60,27 @@ def analyze_accident(extracted_data, contexto_adicional=""):
         analyzer = AccidentAnalyzer()
 
         send_progress("analysis", 50, "Analizando causas con IA...")
-        descripcion = extracted_data.get("Descripcion del Accidente", "")
+        
+        # 🔧 CORRECCIÓN: Buscar la descripción de manera más robusta
+        # Primero buscar con la clave exacta, luego buscar cualquier clave que contenga "Descripcion"
+        descripcion = ""
+        for key in extracted_data.keys():
+            if "Descripcion" in key and "Accidente" in key:
+                descripcion = extracted_data[key]
+                logging.info(f"[DEBUG] Descripción encontrada en clave: {key}")
+                break
+        
+        if not descripcion:
+            # Buscar solo por "Descripcion"
+            for key in extracted_data.keys():
+                if "Descripcion" in key:
+                    descripcion = extracted_data[key]
+                    logging.info(f"[DEBUG] Descripción encontrada en clave alternativa: {key}")
+                    break
+        
+        if not descripcion:
+            logging.warning(f"[DEBUG] No se encontró descripción. Claves disponibles: {list(extracted_data.keys())}")
+        
         analysis = analyzer.analyze_5whys(descripcion, contexto_adicional)
 
         send_progress("finished", 100, "Análisis completado.")

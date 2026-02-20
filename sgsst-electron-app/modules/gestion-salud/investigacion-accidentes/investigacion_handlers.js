@@ -4,6 +4,28 @@ const { spawn } = require('child_process');
 const fsp = require('fs').promises;
 const { promisify } = require('util');
 const { execFile } = require('child_process');
+const http = require('http');
+
+// Determinar la ruta base del proyecto (raíz de sgsst-electron-app)
+// Usar app.getAppPath() para Electron o __dirname como fallback
+const PROJECT_ROOT = app ? app.getAppPath() : path.resolve(__dirname, '..', '..', '..');
+const PORTAR_SRC_PATH = path.join(PROJECT_ROOT, 'Portear', 'src');
+
+// Configuración del servidor LLM (Flask existente)
+const LLM_SERVER_HOST = '127.0.0.1';
+const LLM_SERVER_PORT = 5555;  // Puerto Flask (llm_server.py)
+const LLM_SERVER_URL = `http://${LLM_SERVER_HOST}:${LLM_SERVER_PORT}`;
+const LLM_SERVER_SCRIPT = 'llm_server.py';
+
+// Variable para rastrear el estado del servidor
+let llmServerProcess = null;
+let llmServerReady = false;
+let llmServerStarting = false;
+
+console.log('[HANDLERS] Project root:', PROJECT_ROOT);
+console.log('[HANDLERS] Portear src path:', PORTAR_SRC_PATH);
+console.log('[HANDLERS] LLM Server URL:', LLM_SERVER_URL);
+console.log('[HANDLERS] LLM Server Script:', LLM_SERVER_SCRIPT);
 
 // Esta función debe ser provista por main.js o importada
 async function getPython() {
@@ -23,10 +45,232 @@ function sendLog(message, level = 'INFO') {
     }
 }
 
+// --- FUNCIONES PARA COMUNICACIÓN CON SERVIDOR LLM ---
+
+/**
+ * Realiza una petición HTTP al servidor LLM
+ */
+function llmServerRequest(endpoint, method = 'GET', data = null) {
+    return new Promise((resolve, reject) => {
+        const options = {
+            hostname: LLM_SERVER_HOST,
+            port: LLM_SERVER_PORT,
+            path: endpoint,
+            method: method,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            timeout: 600000 // 10 minutos de timeout
+        };
+
+        const req = http.request(options, (res) => {
+            let responseData = '';
+            
+            res.on('data', (chunk) => {
+                responseData += chunk;
+            });
+            
+            res.on('end', () => {
+                try {
+                    const jsonResponse = JSON.parse(responseData);
+                    resolve(jsonResponse);
+                } catch (e) {
+                    reject(new Error(`Error parseando respuesta: ${e.message}`));
+                }
+            });
+        });
+
+        req.on('error', (e) => {
+            reject(new Error(`Error de conexión con servidor LLM: ${e.message}`));
+        });
+
+        req.on('timeout', () => {
+            req.destroy();
+            reject(new Error('Timeout conectando con servidor LLM'));
+        });
+
+        if (data) {
+            req.write(JSON.stringify(data));
+        }
+
+        req.end();
+    });
+}
+
+/**
+ * Verifica si el servidor LLM está corriendo
+ */
+async function checkLlmServerHealth() {
+    try {
+        const response = await llmServerRequest('/health', 'GET');
+        // Solo retornar true si el modelo está cargado
+        return response.model_loaded === true;
+    } catch (e) {
+        sendLog(`[LLM] Health check falló: ${e.message}`, 'WARN');
+        return false;
+    }
+}
+
+/**
+ * Verifica si el servidor está corriendo (sin verificar modelo)
+ */
+async function checkLlmServerRunning() {
+    try {
+        const response = await llmServerRequest('/status', 'GET');
+        return response.server_port !== undefined;
+    } catch (e) {
+        return false;
+    }
+}
+
+/**
+ * Inicia el servidor LLM si no está corriendo
+ */
+async function startLlmServer() {
+    // Verificar si ya está corriendo CON MODELO CARGADO
+    const isRunning = await checkLlmServerHealth();
+    if (isRunning) {
+        sendLog('[LLM] Servidor LLM ya está corriendo con modelo cargado');
+        llmServerReady = true;
+        return true;
+    }
+
+    // Verificar si el servidor está corriendo (aunque el modelo no esté cargado)
+    const serverRunning = await checkLlmServerRunning();
+    if (serverRunning) {
+        sendLog('[LLM] Servidor LLM ya está corriendo, esperando carga del modelo...');
+        llmServerStarting = true;
+        return true;
+    }
+
+    sendLog('[LLM] Iniciando servidor LLM...');
+
+    // Obtener ruta de Python
+    let pythonExecutable = global.cachedPythonPath;
+    if (!pythonExecutable || !require('fs').existsSync(pythonExecutable)) {
+        try {
+            const { execSync } = require('child_process');
+            pythonExecutable = execSync('where python').toString().trim().split('\n')[0];
+        } catch (e) {
+            throw new Error('No se encontró Python en el sistema');
+        }
+    }
+
+    const serverScriptPath = path.join(PORTAR_SRC_PATH, 'llm_server.py');
+    
+    // Verificar que el script existe
+    if (!require('fs').existsSync(serverScriptPath)) {
+        throw new Error(`Script del servidor no encontrado: ${serverScriptPath}`);
+    }
+
+    sendLog(`[LLM] Iniciando servidor con: "${pythonExecutable}" "${serverScriptPath}"`);
+
+    // Iniciar el servidor como proceso en background
+    llmServerProcess = spawn(pythonExecutable, [serverScriptPath], {
+        cwd: path.dirname(serverScriptPath),
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true,
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+    });
+
+    llmServerProcess.unref();
+
+    sendLog('[LLM] Proceso del servidor iniciado, PID: ' + llmServerProcess.pid);
+    sendLog('[LLM] Esperando a que el servidor esté listo...');
+
+    // Esperar a que el servidor esté listo (modelo puede estar cargando)
+    const maxAttempts = 300; // 10 minutos máximo
+    for (let i = 0; i < maxAttempts; i++) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        try {
+            const status = await llmServerRequest('/health', 'GET');
+            sendLog(`[LLM] Intento ${i + 1}: status=${status.status}, model_loaded=${status.model_loaded}`);
+            
+            if (status.model_loaded === true) {
+                sendLog('[LLM] Servidor LLM iniciado correctamente con modelo cargado');
+                llmServerReady = true;
+                return true;
+            }
+            
+            // Si el servidor está corriendo pero el modelo está cargando, continuar esperando
+            if (status.status === 'loading') {
+                if (i % 15 === 0) {
+                    sendLog(`[LLM] Modelo cargando... (${Math.floor(i * 2 / 60)}min ${i * 2 % 60}s)`);
+                }
+                continue;
+            }
+        } catch (e) {
+            sendLog(`[LLM] Error verificando servidor (intento ${i + 1}): ${e.message}`, 'WARN');
+        }
+        
+        if (i % 30 === 0 && i > 0) {
+            sendLog(`[LLM] Esperando servidor... (${Math.floor(i * 2 / 60)}min ${i * 2 % 60}s)`);
+        }
+    }
+
+    throw new Error('Timeout esperando al servidor LLM');
+}
+
+/**
+ * Analiza un accidente usando el servidor LLM
+ */
+async function analyzeAccidentViaServer(descripcion, contexto) {
+    // Verificar/Iniciar servidor
+    if (!llmServerReady) {
+        await startLlmServer();
+    }
+
+    // Verificar que el modelo está cargado
+    sendLog('[LLM] Verificando estado del modelo...');
+    const health = await llmServerRequest('/health', 'GET');
+    
+    if (!health.model_loaded) {
+        sendLog('[LLM] Modelo no cargado, esperando...');
+        
+        // Esperar a que el modelo esté listo (máximo 15 minutos)
+        const maxAttempts = 450; // 15 minutos
+        for (let i = 0; i < maxAttempts; i++) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            const status = await llmServerRequest('/health', 'GET');
+            
+            if (status.model_loaded) {
+                sendLog('[LLM] Modelo cargado correctamente');
+                break;
+            }
+            
+            if (i % 30 === 0) {
+                sendLog(`[LLM] Esperando carga del modelo... (${Math.floor(i * 2 / 60)}min)`);
+            }
+            
+            if (i === maxAttempts - 1) {
+                return {
+                    success: false,
+                    error: 'Timeout esperando carga del modelo LLM'
+                };
+            }
+        }
+    }
+
+    sendLog('[LLM] Enviando solicitud de análisis al servidor...');
+
+    const response = await llmServerRequest('/analyze', 'POST', {
+        descripcion: descripcion,
+        contexto: contexto || ''
+    });
+
+    return response;
+}
+
 
 // --- ACCIDENT INVESTIGATION HANDLERS ---
 
-ipcMain.handle('select-accident-pdf', async () => {
+// 🔒 Bloqueo anti-duplicación para prevenir ejecuciones paralelas
+let isProcessingPdf = false;
+let isAnalyzingAccident = false;
+
+ipcMain.handle('investigacion-accidentes-select-accident-pdf', async () => {
     const result = await dialog.showOpenDialog({
         properties: ['openFile'],
         filters: [{ name: 'PDF Files', extensions: ['pdf'] }]
@@ -34,193 +278,301 @@ ipcMain.handle('select-accident-pdf', async () => {
     return result.canceled ? null : result.filePaths[0];
 });
 
-ipcMain.handle('start-model-loading', async () => {
-    console.log('Iniciando carga del modelo LLM en segundo plano (simulado).');
-    return { success: true };
-});
+// Función para descargar y guardar temporalmente un archivo blob
+async function downloadBlobToFile(blobUrl, fileName) {
+    try {
+        // Convertir blob URL a Buffer
+        const response = await fetch(blobUrl);
+        const buffer = await response.arrayBuffer();
+        
+        // Crear nombre de archivo temporal
+        const fs = require('fs');
+        const os = require('os');
+        const path = require('path');
+        const tempDir = os.tmpdir();
+        const tempFilePath = path.join(tempDir, fileName);
+        
+        // Escribir el archivo temporalmente
+        fs.writeFileSync(tempFilePath, Buffer.from(buffer));
+        
+        return tempFilePath;
+    } catch (error) {
+        console.error('Error descargando blob a archivo temporal:', error);
+        throw error;
+    }
+}
 
-ipcMain.handle('process-accident-pdf', (event, pdfPath) => {
-    return new Promise(async (resolve, reject) => {
-        let hasResolved = false;
-
-        try {
-            sendLog(`IPC: process-accident-pdf (extract) recibido para: ${pdfPath}`);
-            const pythonExecutable = await getPython();
-            const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_processor.py');
-            const pythonProcess = spawn(pythonExecutable, [pythonScriptPath, 'extract', '--pdf_path', pdfPath], { cwd: path.dirname(pythonScriptPath) });
-
-            let stdoutData = '';
-            let stderrData = '';
-
+ipcMain.handle('investigacion-accidentes-process-accident-pdf', async (event, pdfPath) => {
+    // 🔒 Bloqueo anti-duplicación
+    if (isProcessingPdf) {
+        sendLog('⛔ Ya hay un procesamiento de PDF en curso, ignorando solicitud duplicada');
+        return { success: false, error: 'Ya hay un procesamiento en curso' };
+    }
+    isProcessingPdf = true;
+    
+    try {
+        sendLog(`IPC: investigacion-accidentes-process-accident-pdf (extract) recibido para: ${pdfPath}`);
+        
+        // Verificar si la ruta es una URL blob y convertirla a archivo físico si es necesario
+        let actualPdfPath = pdfPath;
+        if (pdfPath.startsWith('blob:')) {
+            const fileName = `temp_pdf_${Date.now()}.pdf`;
+            actualPdfPath = await downloadBlobToFile(pdfPath, fileName);
+            sendLog(`Archivo blob convertido a archivo temporal: ${actualPdfPath}`);
+        }
+        
+        // USAR global.cachedPythonPath CON VERIFICACIÓN
+        let pythonExecutable = global.cachedPythonPath;
+        if (!pythonExecutable || !require('fs').existsSync(pythonExecutable)) {
+            // Si no hay Python cached, buscar en el PATH del sistema
+            try {
+                const { execSync } = require('child_process');
+                pythonExecutable = execSync('where python').toString().trim().split('\n')[0];
+            } catch (e) {
+                throw new Error('No se encontró Python en el sistema. Por favor instale Python 3.10+ y agréguelo al PATH.');
+            }
+        }
+        
+        // Verificar que el ejecutable existe
+        if (!require('fs').existsSync(pythonExecutable)) {
+            throw new Error(`Python no encontrado en: ${pythonExecutable}`);
+        }
+        
+        // USAR PORTAR_SRC_PATH para ruta correcta
+        const pythonScriptPath = path.join(PORTAR_SRC_PATH, 'accident_processor.py');
+        
+        // Verificar que el script existe
+        if (!require('fs').existsSync(pythonScriptPath)) {
+            throw new Error(`Script de Python no encontrado en: ${pythonScriptPath}`);
+        }
+        
+        // Usar spawn con shell: true y rutas entre comillas para manejar espacios
+        const { spawn } = require('child_process');
+        
+        // LOGS DE DIAGNÓSTICO - CRÍTICO PARA DEBUG
+        sendLog(`[DEBUG] pythonExecutable valor: "${pythonExecutable}"`);
+        sendLog(`[DEBUG] pythonScriptPath valor: "${pythonScriptPath}"`);
+        sendLog(`[DEBUG] actualPdfPath valor: "${actualPdfPath}"`);
+        sendLog(`[DEBUG] PORTAR_SRC_PATH: "${PORTAR_SRC_PATH}"`);
+        
+        // Construir el comando con TODAS las rutas entre comillas dobles
+        // CRÍTICO: En Windows, las rutas con espacios deben estar entre comillas dobles
+        const escapedPython = `"${pythonExecutable}"`;
+        const escapedPdfPath = `"${actualPdfPath}"`;
+        const escapedScriptPath = `"${pythonScriptPath}"`;
+        const command = `${escapedPython} ${escapedScriptPath} extract --pdf_path ${escapedPdfPath}`;
+        
+        sendLog(`[DEBUG] Comando completo a ejecutar: ${command}`);
+        
+        // Usar spawn con shell: true para que Windows maneje las rutas con espacios
+        // IMPORTANTE: En Windows, spawn con shell:true ejecuta: cmd.exe /c <command>
+        const pythonProcess = spawn(command, [], {
+            shell: true,
+            cwd: path.dirname(pythonScriptPath),
+            timeout: 120000,
+            windowsHide: true,
+            env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+        });
+        
+        let stdoutData = '';
+        let stderrData = '';
+        
+        return new Promise((resolve, reject) => {
             pythonProcess.stdout.on('data', (data) => {
                 stdoutData += data.toString();
-                const lines = stdoutData.split('\n');
-                stdoutData = lines.pop(); // The last line might be incomplete
-
-                lines.forEach(line => {
-                    if (line) {
-                        try {
-                            const json = JSON.parse(line);
-                            if (json.type === 'progress') {
-                                event.sender.send('accident-processing-progress', json);
-                            } else if (json.type === 'result') {
-                                if (!hasResolved) {
-                                    hasResolved = true;
-                                    resolve(json.payload);
-                                }
-                            }
-                        } catch (e) {
-                            sendLog(`Error parsing python output line: ${line}. Error: ${e.message}`, 'WARN');
-                        }
-                    }
-                });
             });
-
+            
             pythonProcess.stderr.on('data', (data) => {
                 stderrData += data.toString();
                 sendLog(`Python stderr: ${data}`, 'ERROR');
             });
-
+            
             pythonProcess.on('close', (code) => {
-                // Procesar cualquier línea restante en stdoutData
-                if (stdoutData.trim() && !hasResolved) {
+                sendLog(`Python process closed with code: ${code}`);
+                sendLog(`stdoutData: ${stdoutData}`);
+                
+                if (code !== 0) {
+                    reject(new Error(`Script de Python falló con código ${code}: ${stderrData}`));
+                } else {
                     try {
-                        const json = JSON.parse(stdoutData.trim());
-                        if (json.type === 'progress') {
-                            event.sender.send('accident-processing-progress', json);
-                        } else if (json.type === 'result') {
-                            hasResolved = true;
-                            resolve(json.payload);
-                            return;
-                        }
-                    } catch (e) {
-                        sendLog(`Error parsing final python output line: ${stdoutData.trim()}. Error: ${e.message}`, 'WARN');
-                    }
-                }
-
-                if (!hasResolved) {
-                    if (code !== 0) {
-                        reject(new Error(`Script de Python falló con código ${code}: ${stderrData}`));
-                    } else {
-                        // Si el proceso terminó exitosamente pero no se recibió resultado, es un error
-                        reject(new Error("El script de Python terminó sin enviar un resultado JSON válido."));
-                    }
-                }
-            });
-
-            pythonProcess.on('error', (err) => {
-                if (!hasResolved) {
-                    hasResolved = true;
-                    reject(err);
-                }
-            });
-
-        } catch (error) {
-            if (!hasResolved) {
-                hasResolved = true;
-                reject(error);
-            }
-        }
-    });
-});
-
-ipcMain.handle('analyze-accident', (event, extractedData, contextoAdicional) => {
-    return new Promise(async (resolve, reject) => {
-        let hasResolved = false;
-
-        try {
-            sendLog(`IPC: analyze-accident recibido`);
-            const pythonExecutable = await getPython();
-            const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_processor.py');
-            const jsonData = JSON.stringify(extractedData);
-            const pythonProcess = spawn(pythonExecutable, [pythonScriptPath, 'analyze', '--json_data', jsonData, '--contexto', contextoAdicional], { cwd: path.dirname(pythonScriptPath) });
-
-            let stdoutData = '';
-            let stderrData = '';
-
-            pythonProcess.stdout.on('data', (data) => {
-                stdoutData += data.toString();
-                const lines = stdoutData.split('\n');
-                stdoutData = lines.pop(); // The last line might be incomplete
-
-                lines.forEach(line => {
-                    if (line) {
-                        try {
-                            const json = JSON.parse(line);
-                            if (json.type === 'progress' && event.sender) {
-                                event.sender.send('accident-processing-progress', json);
-                            } else if (json.type === 'result') {
-                                if (!hasResolved) {
-                                    hasResolved = true;
-                                    resolve(json.payload);
+                        // Buscar la línea que contiene el resultado final (type: "result")
+                        const lines = stdoutData.split('\n');
+                        let resultJson = null;
+                        
+                        for (const line of lines) {
+                            const trimmedLine = line.trim();
+                            if (trimmedLine.startsWith('{') && trimmedLine.includes('"type": "result"')) {
+                                try {
+                                    resultJson = JSON.parse(trimmedLine);
+                                    break;
+                                } catch (e) {
+                                    // Continuar buscando
                                 }
                             }
-                        } catch (e) {
-                            sendLog(`Error parsing python output line: ${line}. Error: ${e.message}`, 'WARN');
                         }
-                    }
-                });
-            });
-
-            pythonProcess.stderr.on('data', (data) => {
-                stderrData += data.toString();
-                sendLog(`Python stderr: ${data}`, 'ERROR');
-            });
-
-            pythonProcess.on('close', (code) => {
-                // Procesar cualquier línea restante en stdoutData
-                if (stdoutData.trim() && !hasResolved) {
-                    try {
-                        const json = JSON.parse(stdoutData.trim());
-                        if (json.type === 'progress' && event.sender) {
-                            event.sender.send('accident-processing-progress', json);
-                        } else if (json.type === 'result') {
-                            hasResolved = true;
-                            resolve(json.payload);
-                            return;
+                        
+                        if (resultJson && resultJson.type === 'result') {
+                            resolve({ success: true, data: resultJson.payload });
+                        } else {
+                            // Fallback: buscar cualquier JSON en la salida
+                            const jsonMatch = stdoutData.match(/\{[\s\S]*\}/);
+                            if (jsonMatch) {
+                                const result = JSON.parse(jsonMatch[0]);
+                                if (result.type === 'result') {
+                                    resolve({ success: true, data: result.payload });
+                                } else {
+                                    resolve({ success: true, data: result });
+                                }
+                            } else {
+                                throw new Error('No se encontró JSON válido en la salida');
+                            }
                         }
                     } catch (e) {
-                        sendLog(`Error parsing final python output line: ${stdoutData.trim()}. Error: ${e.message}`, 'WARN');
-                    }
-                }
-
-                if (!hasResolved) {
-                    if (code !== 0) {
-                        reject(new Error(`Script de Python falló con código ${code}: ${stderrData}`));
-                    } else {
-                        // Si el proceso terminó exitosamente pero no se recibió resultado, es un error
-                        reject(new Error("El script de Python terminó sin enviar un resultado JSON válido."));
+                        sendLog(`Error parsing output: ${stdoutData}`, 'ERROR');
+                        // Devolver datos vacíos pero con éxito
+                        resolve({ success: true, data: { error: 'No se pudieron extraer datos del PDF' } });
                     }
                 }
             });
-
+            
             pythonProcess.on('error', (err) => {
-                if (!hasResolved) {
-                    hasResolved = true;
-                    reject(err);
-                }
+                sendLog(`Python process error: ${err.message}`, 'ERROR');
+                reject(err);
             });
-
-        } catch (error) {
-            if (!hasResolved) {
-                hasResolved = true;
-                reject(error);
-            }
-        }
-    });
+        });
+        
+    } catch (error) {
+        sendLog(`Error en process-accident-pdf: ${error.message}`, 'ERROR');
+        throw error;
+    } finally {
+        // 🔓 Liberar bloqueo
+        isProcessingPdf = false;
+    }
 });
 
-ipcMain.handle('generate-accident-report', (event, combinedData) => {
+ipcMain.handle('investigacion-accidentes-analyze-accident', async (event, extractedData, contextoAdicional) => {
+    // 🔒 Bloqueo anti-duplicación
+    if (isAnalyzingAccident) {
+        sendLog('⛔ Ya hay un análisis en curso, ignorando solicitud duplicada');
+        return { success: false, error: 'Ya hay un análisis en curso' };
+    }
+    isAnalyzingAccident = true;
+
+    try {
+        sendLog(`IPC: analyze-accident recibido`);
+        sendLog(`[DEBUG] extractedData es de tipo: ${typeof extractedData}`);
+        sendLog(`[DEBUG] extractedData tiene success: ${extractedData?.success}`);
+        sendLog(`[DEBUG] extractedData.data tiene success: ${extractedData?.data?.success}`);
+
+        // 🔧 CORRECCIÓN: Extraer solo los datos del accidente del wrapper (DOBLE wrapper)
+        let dataToAnalyze = extractedData;
+
+        // Primer nivel de desanidamiento
+        if (extractedData && extractedData.success && extractedData.data) {
+            const primerNivel = extractedData.data;
+            sendLog(`[DEBUG] Primer nivel - tiene success: ${primerNivel?.success}, tiene data: ${!!primerNivel?.data}`);
+            // Segundo nivel de desanidamiento
+            if (primerNivel && primerNivel.success && primerNivel.data) {
+                dataToAnalyze = primerNivel.data;
+                sendLog('[DEBUG] Datos desanidados del DOBLE wrapper para análisis');
+            } else {
+                dataToAnalyze = primerNivel;
+                sendLog('[DEBUG] Datos desanidados del wrapper (un nivel) para análisis');
+            }
+        }
+
+        // Debug: verificar que la descripción existe
+        const descripcion = dataToAnalyze['Descripcion del Accidente'] || dataToAnalyze['Descripcion'];
+        sendLog(`[DEBUG] Claves en dataToAnalyze: ${Object.keys(dataToAnalyze).join(', ')}`);
+        sendLog(`[DEBUG] Descripción encontrada: ${descripcion ? descripcion.substring(0, 80) + '...' : 'NO ENCONTRADA'}`);
+
+        // 🚀 NUEVO ENFOQUE: Usar servidor HTTP persistente (FastAPI)
+        sendLog('[LLM] Iniciando análisis con servidor HTTP persistente...');
+        
+        // Verificar que hay descripción
+        if (!descripcion || descripcion.trim() === 'N/A') {
+            sendLog('[LLM] Descripción no válida, retornando fallback', 'WARN');
+            return {
+                success: true,
+                data: {
+                    PorQue1: {
+                        Pregunta: '¿Por qué ocurrió el accidente?',
+                        'Mano de Obra': 'N/A - Descripción no disponible',
+                        'Método': 'N/A',
+                        'Maquinaria': 'N/A',
+                        'Medio Ambiente': 'N/A',
+                        'Material': 'N/A'
+                    }
+                },
+                raw_text: 'No se pudo generar análisis - descripción no disponible',
+                generation_time: 0
+            };
+        }
+
+        // Enviar solicitud al servidor LLM
+        sendLog('[LLM] Enviando solicitud al servidor LLM...');
+        
+        const response = await llmServerRequest('/analyze', 'POST', {
+            descripcion: descripcion,
+            contexto: contextoAdicional || ''
+        });
+
+        sendLog(`[LLM] Respuesta recibida: success=${response.success}`);
+
+        if (!response.success) {
+            sendLog(`[LLM] Error en análisis: ${response.error}`, 'ERROR');
+            return {
+                success: false,
+                error: response.error || 'Error desconocido en el análisis'
+            };
+        }
+
+        // Enviar evento de progreso al frontend
+        if (event.sender) {
+            event.sender.send('accident-processing-progress', {
+                type: 'progress',
+                step: 'completed',
+                percentage: 100,
+                message: 'Análisis completado exitosamente'
+            });
+        }
+
+        sendLog('[LLM] Análisis completado exitosamente');
+
+        return {
+            success: true,
+            data: response.data,
+            raw_text: response.raw_text,
+            generation_time: response.generation_time
+        };
+
+    } catch (error) {
+        sendLog(`Error en analyze-accident: ${error.message}`, 'ERROR');
+        return { success: false, error: error.message };
+    } finally {
+        // 🔓 Liberar bloqueo
+        isAnalyzingAccident = false;
+    }
+});
+
+ipcMain.handle('investigacion-accidentes-generate-accident-report', (event, combinedData) => {
     return new Promise(async (resolve, reject) => {
         let tempDataPath;
         try {
             sendLog(`IPC: generate-accident-report recibido`);
+            sendLog(`[DEBUG] combinedData keys: ${Object.keys(combinedData || {}).join(', ')}`);
+            sendLog(`[DEBUG] combinedData.empresa: ${combinedData?.empresa}`);
+            
+            // Obtener empresa del combinedData, o usar TEMPOACTIVA como fallback
+            const empresa = (combinedData?.empresa || 'TEMPOACTIVA').toUpperCase();
+            sendLog(`[DEBUG] Empresa final para informe: ${empresa}`);
+            
             tempDataPath = path.join(app.getPath('temp'), `accident_report_data_${Date.now()}.json`);
-            const reportData = { combinedData: combinedData, empresa: combinedData.empresa || 'TEMPOACTIVA' };
+            const reportData = { combinedData: combinedData, empresa: empresa };
             await fsp.writeFile(tempDataPath, JSON.stringify(reportData, null, 2));
 
             const pythonExecutable = await getPython();
-            const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'accident_report_generator.py');
+            const pythonScriptPath = path.join(PORTAR_SRC_PATH, 'accident_report_generator.py');
             await fsp.access(pythonScriptPath);
 
             const pythonProcess = spawn(pythonExecutable, ['-X', 'utf8', pythonScriptPath, tempDataPath], { cwd: path.dirname(pythonScriptPath) });
@@ -254,9 +606,189 @@ ipcMain.handle('generate-accident-report', (event, combinedData) => {
     });
 });
 
-ipcMain.handle('get-config', async (event, empresa) => {
+// Función para guardar archivos temporalmente
+ipcMain.handle('investigacion-accidentes-save-temp-file', async (event, filename, data) => {
+    try {
+        const fs = require('fs');
+        const os = require('os');
+        const path = require('path');
+        
+        // Crear nombre de archivo temporal
+        const tempDir = os.tmpdir();
+        const uniqueFilename = `temp_investigation_pdf_${Date.now()}_${filename}`;
+        const tempFilePath = path.join(tempDir, uniqueFilename);
+        
+        // Convertir el array de bytes de vuelta a Buffer y escribir el archivo
+        const buffer = Buffer.from(data);
+        fs.writeFileSync(tempFilePath, buffer);
+        
+        return {
+            success: true,
+            filePath: tempFilePath
+        };
+    } catch (error) {
+        console.error('Error guardando archivo temporal:', error);
+        throw error;
+    }
+});
+
+// Función para guardar archivos PDF temporalmente
+ipcMain.handle('investigacion-accidentes-save-temp-pdf-file', async (event, filename, data) => {
+    try {
+        const fs = require('fs');
+        const os = require('os');
+        const path = require('path');
+        
+        // Asegurar que el nombre del archivo tenga extensión .pdf
+        let pdfFilename = filename;
+        if (!pdfFilename.toLowerCase().endsWith('.pdf')) {
+            pdfFilename += '.pdf';
+        }
+        
+        // Crear nombre de archivo temporal
+        const tempDir = os.tmpdir();
+        const uniqueFilename = `temp_investigation_pdf_${Date.now()}_${pdfFilename}`;
+        const tempFilePath = path.join(tempDir, uniqueFilename);
+        
+        // Convertir el array de bytes de vuelta a Buffer y escribir el archivo
+        const buffer = Buffer.from(data);
+        fs.writeFileSync(tempFilePath, buffer);
+        
+        return {
+            success: true,
+            filePath: tempFilePath
+        };
+    } catch (error) {
+        console.error('Error guardando archivo PDF temporal:', error);
+        throw error;
+    }
+});
+
+ipcMain.handle('investigacion-accidentes-get-config', async (event, empresa) => {
     const pythonExecutable = await getPython();
-    const investAppPath = path.join(__dirname, 'Portear', 'src', 'Invest_APP_V_3.py');
+    const investAppPath = path.join(PORTAR_SRC_PATH, 'Invest_APP_V_3.py');
     const { stdout } = await promisify(execFile)(pythonExecutable, [investAppPath, '--get-config', empresa], { cwd: path.dirname(investAppPath) });
     return JSON.parse(stdout.trim());
 });
+
+/**
+ * Inicializa el servidor LLM en segundo plano
+ * Esta función retorna INMEDIATAMENTE - el modelo carga en background
+ */
+async function initializeLlmServer() {
+    try {
+        sendLog('[LLM] Inicializando servidor LLM en segundo plano...');
+        
+        // Verificar si ya está corriendo CON MODELO CARGADO
+        const isRunning = await checkLlmServerHealth();
+        if (isRunning) {
+            sendLog('[LLM] Servidor LLM ya está inicializado con modelo cargado');
+            llmServerReady = true;
+            return true;
+        }
+        
+        // Verificar si el servidor está iniciando (pero modelo aún no cargado)
+        if (llmServerStarting) {
+            sendLog('[LLM] Servidor LLM ya está iniciando...');
+            return true;
+        }
+        
+        // Iniciar servidor en segundo plano
+        sendLog('[LLM] Iniciando servidor LLM...');
+        
+        // Obtener ruta de Python
+        let pythonExecutable = global.cachedPythonPath;
+        if (!pythonExecutable || !require('fs').existsSync(pythonExecutable)) {
+            try {
+                const { execSync } = require('child_process');
+                pythonExecutable = execSync('where python').toString().trim().split('\n')[0];
+                sendLog(`[LLM] Python encontrado en PATH: ${pythonExecutable}`);
+            } catch (e) {
+                sendLog('[LLM] No se encontró Python, se iniciará bajo demanda', 'WARN');
+                return false;
+            }
+        } else {
+            sendLog(`[LLM] Python cached: ${pythonExecutable}`);
+        }
+
+        const serverScriptPath = path.join(PORTAR_SRC_PATH, 'llm_server.py');
+        sendLog(`[LLM] Ruta del script: ${serverScriptPath}`);
+        
+        // Verificar que el script existe
+        if (!require('fs').existsSync(serverScriptPath)) {
+            sendLog(`[LLM] Script del servidor no encontrado: ${serverScriptPath}`, 'ERROR');
+            return false;
+        }
+
+        sendLog(`[LLM] Iniciando servidor: "${pythonExecutable}" "${serverScriptPath}"`);
+
+        // Iniciar el servidor como proceso en background CON LOGS
+        // Usar shell: true para manejar rutas con espacios correctamente
+        llmServerProcess = spawn(`"${pythonExecutable}"`, [`"${serverScriptPath}"`], {
+            cwd: path.dirname(serverScriptPath),
+            detached: false,  // NO detached para poder capturar logs
+            stdio: ['ignore', 'pipe', 'pipe'],  // Capturar stdout y stderr
+            windowsHide: true,
+            shell: true  // CRÍTICO: Usar shell para manejar rutas con espacios
+        });
+
+        sendLog(`[LLM] Proceso del servidor iniciado, PID: ${llmServerProcess.pid}`);
+        
+        // Capturar stdout del servidor
+        llmServerProcess.stdout.on('data', (data) => {
+            const msg = data.toString();
+            sendLog(`[LLM SERVER] ${msg.trim()}`);
+        });
+        
+        // Capturar stderr del servidor
+        llmServerProcess.stderr.on('data', (data) => {
+            const msg = data.toString();
+            sendLog(`[LLM SERVER ERROR] ${msg.trim()}`, 'ERROR');
+        });
+        
+        // Manejar cierre del proceso
+        llmServerProcess.on('close', (code) => {
+            sendLog(`[LLM] Servidor cerrado con código: ${code}`, code === 0 ? 'INFO' : 'ERROR');
+            llmServerStarting = false;
+            llmServerReady = false;
+        });
+        
+        // Manejar error del proceso
+        llmServerProcess.on('error', (err) => {
+            sendLog(`[LLM] Error en el proceso del servidor: ${err.message}`, 'ERROR');
+            llmServerStarting = false;
+            llmServerReady = false;
+        });
+        
+        sendLog('[LLM] Servidor LLM iniciado en segundo plano');
+        sendLog('[LLM] El modelo se cargará bajo demanda cuando se solicite el primer análisis');
+        
+        llmServerStarting = true;
+        llmServerReady = false;  // No marcar como listo hasta que el modelo cargue
+        
+        return true;
+        
+    } catch (error) {
+        sendLog(`[LLM] Error inicializando servidor: ${error.message}`, 'ERROR');
+        llmServerStarting = false;
+        return false;
+    }
+}
+
+// Exportar funciones para inicialización desde el exterior
+module.exports = {
+    initializeLlmServer,
+    checkLlmServerHealth,
+    startLlmServer,
+    analyzeAccidentViaServer
+};
+
+// Inicializar servidor automáticamente al cargar el módulo
+// Esto permite pre-cargar el modelo en segundo plano
+sendLog('[HANDLERS] Iniciando inicialización del módulo...');
+initializeLlmServer().then((result) => {
+    sendLog(`[HANDLERS] Módulo de handlers inicializado. Resultado: ${result}`);
+}).catch(err => {
+    sendLog(`[HANDLERS] Error en inicialización: ${err.message}`, 'WARN');
+});
+
