@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.40] - 2026-02-20
+
+### Added
+- **Sistema de Inteligencia Artificial para Investigación de Accidentes**
+  - Servidor LLM persistente (`llm_server.py`) con modelo Mistral 3 3B Reasoning
+  - Análisis automático de causa raíz mediante metodología 5 Porqués
+  - Extracción de datos desde PDFs de reportes de accidentes
+  - Generación automática de informes de investigación en formato DOCX
+  - Integración con plantillas personalizadas por empresa
+
+- **Nueva Interfaz del Módulo 3.2.2 Investigación de Accidentes**
+  - Portal de bienvenida con diseño K+AIR
+  - Tarjetas de acción principales y secundarias
+  - Estadísticas de investigaciones pendientes y completadas
+  - Navegación mejorada entre vistas
+
+- **Sistema Visual Oficial K+AIR**
+  - Paleta de colores estandarizada (Primario: #174ea6, Éxito: #28a745, etc.)
+  - Tipografía oficial (Lexend para títulos, Roboto para cuerpo)
+  - Componentes reutilizables con bordes 0.375rem
+  - Animaciones fadeIn consistentes
+
+### Fixed
+- Corrección de indexación de datos del análisis 5 Porqués en informes
+  - Agregadas múltiples variantes de búsqueda para claves (PorQue1, Por Qué 1, etc.)
+  - Corregido desanidamiento desde `analysis.data`
+- Corregido desfase de altura en portal de investigación de accidentes
+- Eliminados headers redundantes en vistas de módulos
+
+### Changed
+- Refactorización de `investigacion-accidentes-logic.js` para usar iframe con portal
+- Mejora en comunicación iframe-renderer con patrón `-request` / `-response`
+- Estandarización de comunicación entre módulos y renderer principal
+
 ## [0.1.39] - 2026-01-21
 
 ### Added

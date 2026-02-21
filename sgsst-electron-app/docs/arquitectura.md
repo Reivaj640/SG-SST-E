@@ -1,15 +1,15 @@
-# Arquitectura del Sistema SG-SST
+# Arquitectura del Sistema SG-SST (K+AIR)
 
 ## Visión General
 
-El sistema SG-SST (Sistema de Gestión de Seguridad y Salud en el Trabajo) es una aplicación Electron que implementa un sistema de gestión integral para la seguridad y salud en el trabajo.
+El sistema SG-SST (Sistema de Gestión de Seguridad y Salud en el Trabajo), denominado **K+AIR**, es una aplicación Electron que implementa un sistema de gestión integral para la seguridad y salud en el trabajo, con integración de inteligencia artificial para análisis de accidentes.
 
 ## Estructura de la Aplicación
 
 ### Capa de Presentación (Renderer)
 - Componentes HTML/CSS/JavaScript
 - Vistas específicas para cada módulo
-- Interfaz de usuario interactiva
+- Interfaz de usuario interactiva con Sistema Visual Oficial K+AIR
 
 ### Capa de Lógica (Main)
 - Procesos principales de Electron
@@ -19,7 +19,13 @@ El sistema SG-SST (Sistema de Gestión de Seguridad y Salud en el Trabajo) es un
 ### Capa de Datos
 - Almacenamiento local
 - Archivos JSON para normativas
-- Exportación a Excel
+- Exportación a Excel y DOCX
+
+### Capa de Inteligencia Artificial (Nueva)
+- Servidor LLM persistente (Flask en puerto 5555)
+- Modelo Mistral 3 3B Reasoning
+- Procesamiento de documentos con Python
+- Generación automática de informes
 
 ## Archivos Clave del Sistema
 
@@ -156,6 +162,8 @@ El sistema SG-SST (Sistema de Gestión de Seguridad y Salud en el Trabajo) es un
 - Componentes reutilizables
 - Configuración basada en normativas
 - Renderizado dinámico según escenarios
+- Comunicación iframe-renderer con patrón request/response
+- Sistema de diseño K+AIR unificado
 
 ## Estructura Modular
 
@@ -164,3 +172,71 @@ El sistema SG-SST (Sistema de Gestión de Seguridad y Salud en el Trabajo) es un
 - La información de todas las fases de reorganización está consolidada en el archivo `ESTADO_ACTUAL_REORGANIZACION.md`
 - Los módulos se integran con el sistema existente manteniendo compatibilidad
 - Cada módulo tiene su propio archivo `index.js` para exportar sus componentes
+
+## Directorio de Módulos Implementados
+
+```
+modules/
+├── recursos/
+│   ├── responsable-sg/        # 1.1.1
+│   ├── roles-responsabilidades/ # 1.1.2
+│   ├── afiliacion/            # 1.1.4
+│   ├── trabajo-alto-riesgo/   # 1.1.5
+│   ├── copasst/               # 1.1.6
+│   ├── capacitacion-copasst/  # 1.1.7
+│   ├── comite-convivencia/    # 1.1.8
+│   ├── capacitaciones/        # 1.2.1
+│   ├── inducciones/           # 1.2.2
+│   ├── curso-virtual/         # 1.2.3
+│   └── presupuesto/           # Recursos financieros
+├── gestion-integral/
+│   ├── politica/              # 2.1.1
+│   ├── objetivos-sst/         # 2.2.1
+│   ├── evaluacion-inicial-sg-sst/ # 2.3.1
+│   ├── plan-trabajo/          # 2.4.1 (con portal K+AIR)
+│   └── rendicion-cuentas/     # 2.6.1
+└── gestion-salud/
+    ├── sociodemografica/      # 3.1.1
+    ├── evaluaciones-medicas/  # 3.1.4
+    ├── restricciones-medicas/ # 3.1.6
+    ├── reportes-accidentes/   # 3.2.1
+    ├── investigacion-accidentes/ # 3.2.2 (con IA)
+    └── ausentismo/            # 3.3.6
+```
+
+## Sistema de Inteligencia Artificial
+
+### Directorio Portear/src/
+```
+Portear/src/
+├── llm_server.py              # Servidor Flask para modelo LLM
+├── accident_processor.py      # Extracción de datos de PDFs
+├── accident_report_generator.py # Generación de informes DOCX
+├── Invest_APP_V_3.py          # Interfaz standalone de investigación
+├── copasst_acta_generator.py  # Generador de actas COPASST
+├── comite_convivencia_acta_generator.py # Generador actas convivencia
+├── convert_docx_to_pdf.py     # Conversión DOCX a PDF
+├── convert_xlsx_to_pdf.py     # Conversión Excel a PDF
+├── actualizar_ausentismo.py   # Actualización de ausentismo
+└── map_directory.py           # Mapeo de directorios
+```
+
+### Configuración del Modelo LLM
+- **Ruta del modelo**: `D:\1. Estudio\1.1 IA\1.1.2. LLM's\Inv. AT\mistral-3-3B-Reasonig-2512`
+- **Puerto del servidor**: 5555
+- **Tipo**: Multimodal (texto + imagen)
+- **Cuantización**: bfloat16
+- **Contexto máximo**: 4096 tokens
+
+### Plantillas de Investigación por Empresa
+```python
+RUTAS = {
+    "TEMPOACTIVA": {
+        "investigaciones": ".../1. Tempoactiva Est SAS/.../Investigaciones/",
+        "plantilla": ".../GI-FO-020 INVESTIGACION.docx"
+    },
+    "TEMPOSUM": { ... },
+    "ASEPLUS": { ... },
+    "ASEL": { ... }
+}
+```

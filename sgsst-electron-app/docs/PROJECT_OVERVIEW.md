@@ -1,25 +1,33 @@
-# PROJECT OVERVIEW - SG-SST Electron App
+# PROJECT OVERVIEW - SG-SST Electron App (K+AIR)
 
 ## 🎯 Propósito del Sistema
 
-El Sistema de Gestión de Seguridad y Salud en el Trabajo (SG-SST) es una aplicación Electron que implementa un sistema de gestión integral para la seguridad y salud en el trabajo, con soporte para múltiples escenarios normativos basados en el tamaño de la empresa y nivel de riesgo.
+El Sistema de Gestión de Seguridad y Salud en el Trabajo (SG-SST), denominado **K+AIR**, es una aplicación Electron que implementa un sistema de gestión integral para la seguridad y salud en el trabajo, con soporte para múltiples escenarios normativos basados en el tamaño de la empresa y nivel de riesgo, e integración de inteligencia artificial para análisis de accidentes.
 
 ## 🏗️ Arquitectura del Sistema
 
 ### Capa de Presentación (Renderer)
 - Componentes HTML/CSS/JavaScript
 - Vistas específicas para cada módulo
-- Interfaz de usuario interactiva
+- Interfaz de usuario interactiva con Sistema Visual Oficial K+AIR
 
 ### Capa de Lógica (Main)
 - Procesos principales de Electron
 - Manejo de eventos inter-proceso (IPC)
 - Controladores de eventos
+- Integración con Python para procesamiento de documentos
 
 ### Capa de Datos
 - Almacenamiento local
 - Archivos JSON para normativas
-- Exportación a Excel
+- Exportación a Excel y DOCX
+
+### Capa de Inteligencia Artificial (Nueva)
+- Servidor LLM persistente (Flask)
+- Modelo Mistral 3 3B Reasoning (multimodal)
+- Análisis de causa raíz con metodología 5 Porqués
+- Extracción de datos desde PDFs
+- Generación automática de informes
 
 ## 🧩 Componentes Clave
 
@@ -43,6 +51,40 @@ El Sistema de Gestión de Seguridad y Salud en el Trabajo (SG-SST) es una aplica
 - **preload.js**: Punto de entrada seguro para la comunicación entre renderer y main
 - **renderer.js**: Proceso de renderizado que gestiona la interfaz de usuario y la navegación
 - **index.html**: Estructura principal de la interfaz de usuario
+
+### 5. Sistema de Inteligencia Artificial (Nuevo)
+- **llm_server.py**: Servidor Flask persistente para inferencia del modelo LLM
+- **accident_processor.py**: Extracción de datos desde PDFs de accidentes
+- **accident_report_generator.py**: Generación de informes DOCX con datos analizados
+- Modelo: Mistral 3 3B Reasoning (multimodal, capacidad de visión)
+- Metodología: Análisis 5 Porqués con categorías 5M (Mano de Obra, Método, Maquinaria, Medio Ambiente, Material)
+
+## 🎨 Sistema Visual Oficial K+AIR
+
+### Paleta de Colores
+| Color | Hex | Uso |
+|-------|-----|-----|
+| Primario | #174ea6 | Botones principales, headers |
+| Primario Hover | #185abd | Estados hover |
+| Primario Light | #e8f0fe | Fondos de acento |
+| Éxito | #28a745 | Estados positivos |
+| Advertencia | #ffc107 | Alertas |
+| Peligro | #dc3545 | Errores, eliminar |
+| Info | #17a2b8 | Información |
+
+### Fondos
+- App: #f8f9fa
+- Cards: #ffffff
+- Bordes: #dee2e6
+
+### Tipografía
+- Títulos: Lexend (600)
+- Cuerpo: Roboto (300, 400, 500, 700)
+
+### Componentes
+- Tarjetas con sombra sutil
+- Bordes redondeados: 0.375rem
+- Animaciones fadeIn consistentes
 
 ## 📋 Módulos Principales
 
@@ -160,12 +202,32 @@ El Sistema de Gestión de Seguridad y Salud en el Trabajo (SG-SST) es una aplica
 3. **Renderizado de Módulos** → Activación de componentes
 4. **Gestión de Documentos** → Almacenamiento y seguimiento
 5. **Generación de Reportes** → Exportación a Excel
+6. **Análisis con IA** → Investigación de accidentes con LLM (Nuevo)
+
+## 🔬 Módulos con Funcionalidad Avanzada
+
+### 3.2.2 Investigación de Accidentes (Con IA)
+- **Portal de bienvenida** con estadísticas y acciones rápidas
+- **Realizar Investigación**: 
+  - Carga de PDF de reporte de accidente
+  - Extracción automática de datos (nombre, fecha, cargo, descripción, etc.)
+  - Análisis de causa raíz con metodología 5 Porqués
+  - Generación automática de informe DOCX
+- **Ver Investigaciones**: Visualizador de documentos con preview integrado
+- **Comunicación iframe-renderer** con patrón request/response estandarizado
+
+### 2.4.1 Plan de Trabajo Anual
+- Portal de bienvenida con año activo
+- Vista de cronograma con diagrama de Gantt
+- Importación desde Excel
+- Clonación de planes entre años
+- Exportación a Excel/PDF
 
 ## 📚 Documentación Relacionada
 
 - [Arquitectura del Sistema](arquitectura.md) - Detalles técnicos de la estructura
 - [Archivos Clave del Sistema](archivos-clave.md) - Descripción detallada de main.js, preload.js, renderer.js e index.html
-- [Estado Actual de la Reorganización](../ESTADO_ACTUAL_REORGANIZACION.md) - Documento consolidado con la información de todas las fases de reorganización completadas
+- [Estado Actual de la Reorganización](ESTADO_ACTUAL_REORGANIZACION.md) - Documento consolidado con la información de todas las fases de reorganización completadas
 - [Motor Normativo](motor-normativo.md) - Funcionamiento del sistema normativo
 - [Escenarios Normativos](escenarios-normativos.md) - Tipos y categorías de escenarios
 - [Flujo de Creación de Empresa](flujo-creacion-empresa.md) - Proceso de registro
@@ -173,6 +235,43 @@ El Sistema de Gestión de Seguridad y Salud en el Trabajo (SG-SST) es una aplica
 - [Actualización de Interfaz: 1.1.1](ui-update-responsable-sg.md) - Detalles del nuevo Sistema de Diseño K+AIR
 - [Actualización de Interfaz: 1.1.2](ui-update-roles-responsabilidades.md) - Detalles de migración para Roles y Responsabilidades
 - [Mantenimiento de Documentación](mantenimiento-documentacion.md) - Guía para mantener la documentación actualizada
+- [Módulo Investigación de Accidentes](modulo-investigacion-accidentes.md) - Documentación del módulo 3.2.2 con IA
+- [Dependencias del Sistema](DEPENDENCIAS.md) - Guía completa de instalación en nuevo equipo
+- [Changelog](CHANGELOG.md) - Registro de cambios por versión
+- [Configuración OnlyOffice](ONLYOFFICE_SETUP.md) - Guía de configuración
+- [Mantenimiento del Proyecto](README-LIMPIEZA.md) - Reducción de tamaño y limpieza
+- [Portear/README.md](../Portear/README.md) - Scripts Python de procesamiento
+
+## 🤖 Sistema de Inteligencia Artificial
+
+### Arquitectura del Servidor LLM
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│   Electron App  │────▶│   Flask Server   │────▶│  Mistral 3 3B   │
+│   (renderer)    │     │  (llm_server.py) │     │    Reasoning    │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
+        │                        │
+        ▼                        ▼
+┌─────────────────┐     ┌──────────────────┐
+│   IPC Channel   │     │   HTTP :5555     │
+└─────────────────┘     └──────────────────┘
+```
+
+### Endpoints del Servidor LLM
+| Endpoint | Método | Descripción |
+|----------|--------|-------------|
+| `/health` | GET | Estado del servidor |
+| `/load` | POST | Cargar modelo en memoria |
+| `/analyze` | POST | Analizar accidente |
+| `/status` | GET | Estado detallado |
+
+### Flujo de Análisis de Accidente
+1. Usuario carga PDF de reporte de accidente
+2. `accident_processor.py` extrae datos del PDF
+3. Datos enviados al servidor LLM via HTTP
+4. Modelo genera análisis 5 Porqués con categorías 5M
+5. `accident_report_generator.py` genera informe DOCX
+6. Informe guardado en ruta de la empresa
 
 ## ⚠️ Reglas de Cambio
 

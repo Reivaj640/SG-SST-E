@@ -1,4 +1,4 @@
-# Sistema de Documentación Automática - SG-SST
+# Sistema de Documentación Automática - SG-SST (K+AIR)
 
 Este proyecto implementa un sistema de documentación automática basado en JSDoc para mantener actualizada la documentación del código fuente.
 
@@ -11,12 +11,14 @@ Este proyecto implementa un sistema de documentación automática basado en JSDo
 5. [Escenarios Normativos](#escenarios-normativos)
 6. [Flujo de Creación de Empresa](#flujo-de-creación-de-empresa)
 7. [Sistema de Renderizado](#sistema-de-renderizado)
-8. [Generación de Documentación](#generación-de-documentación)
-9. [Guía para Desarrolladores](#guía-para-desarrolladores)
+8. [Sistema de Inteligencia Artificial](#sistema-de-inteligencia-artificial)
+9. [Dependencias del Sistema](#dependencias-del-sistema)
+10. [Generación de Documentación](#generación-de-documentación)
+11. [Guía para Desarrolladores](#guía-para-desarrolladores)
 
 ## Introducción
 
-El sistema SG-SST (Sistema de Gestión de Seguridad y Salud en el Trabajo) es una aplicación Electron que implementa un sistema de gestión integral para la seguridad y salud en el trabajo, con soporte para múltiples escenarios normativos basados en el tamaño de la empresa y nivel de riesgo.
+El sistema SG-SST (Sistema de Gestión de Seguridad y Salud en el Trabajo), denominado **K+AIR**, es una aplicación Electron que implementa un sistema de gestión integral para la seguridad y salud en el trabajo, con soporte para múltiples escenarios normativos basados en el tamaño de la empresa y nivel de riesgo, e integración de inteligencia artificial para análisis de accidentes.
 
 ## Visión General del Proyecto
 
@@ -41,6 +43,56 @@ Para información sobre el flujo de creación de empresa, consulta [docs/flujo-c
 ## Sistema de Renderizado
 
 Para detalles sobre el sistema de renderizado, consulta [docs/renderer.md](docs/renderer.md).
+
+## Sistema de Inteligencia Artificial
+
+El sistema K+AIR integra un servidor LLM persistente para análisis de accidentes laborales.
+
+### Características
+- **Modelo**: Mistral 3 3B Reasoning (multimodal)
+- **Servidor**: Flask en puerto 5555
+- **Análisis**: Metodología 5 Porqués con categorías 5M
+- **Generación**: Informes DOCX automáticos
+
+### Documentación del Módulo de IA
+- [Módulo Investigación de Accidentes](docs/modulo-investigacion-accidentes.md) - Documentación completa del módulo 3.2.2
+
+### Scripts Python
+Los scripts de procesamiento se encuentran en `Portear/src/`:
+- `llm_server.py` - Servidor de inferencia
+- `accident_processor.py` - Extracción de datos
+- `accident_report_generator.py` - Generación de informes
+
+## Dependencias del Sistema
+
+Para instalar el sistema en un nuevo equipo, consulta la guía completa de dependencias:
+
+📖 **[Guía de Dependencias](docs/DEPENDENCIAS.md)**
+
+### Instalación Rápida
+
+```bash
+# 1. Instalar dependencias Node.js
+npm install
+
+# 2. Configurar entorno Python
+cd Portear
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+
+# 3. Ejecutar la aplicación
+cd ..
+npm start
+```
+
+### Requisitos Mínimos
+| Componente | Versión |
+|------------|---------|
+| Node.js | 18.x+ |
+| Python | 3.10-3.12 |
+| CUDA (opcional) | 12.x |
+| RAM | 16 GB |
 
 ## Generación de Documentación
 
@@ -89,7 +141,7 @@ function renderizarModulosEmpresa(empresa, reglasNormativas) {
 
 ### Actualizar documentación funcional
 
-Cuando realices cambios significativos en la funcionalidad, actualiza los archivos correspondientes en el directorio `docs/`:
+Cuando realices cambios significativos en la funcionalidad, actualice los archivos correspondientes en el directorio `docs/`:
 
 - `docs/PROJECT_OVERVIEW.md` - Decisiones arquitectónicas y reglas de cambio
 - `docs/arquitectura.md` - Cambios en la estructura del sistema
@@ -99,6 +151,11 @@ Cuando realices cambios significativos en la funcionalidad, actualiza los archiv
 - `docs/flujo-creacion-empresa.md` - Cambios en el proceso de creación de empresa
 - `docs/renderer.md` - Cambios en el sistema de renderizado
 - `docs/mantenimiento-documentacion.md` - Actualizaciones al proceso de documentación
+- `docs/modulo-investigacion-accidentes.md` - Cambios en el módulo de investigación
+- `docs/CHANGELOG.md` - Registro de cambios por versión
+- `docs/ESTADO_ACTUAL_REORGANIZACION.md` - Estado de reorganización modular
+- `docs/ONLYOFFICE_SETUP.md` - Configuración de OnlyOffice
+- `docs/README-LIMPIEZA.md` - Mantenimiento del proyecto
 
 ### Proceso de integración
 
@@ -107,7 +164,7 @@ Cada vez que se realice un cambio en el código:
 1. Actualiza los comentarios JSDoc en el código fuente
 2. Ejecuta `npm run docs:generate` para actualizar la documentación de API
 3. Actualiza los archivos de documentación funcional si es necesario
-4. Asegúrate de que el CHANGELOG.md refleje los cambios realizados
+4. Asegúrate de que `docs/CHANGELOG.md` refleje los cambios realizados
 
 ## Scripts Disponibles
 
