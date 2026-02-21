@@ -386,6 +386,28 @@ class RecursosHome {
 
             .canvas-container { position: relative; height: 250px; }
 
+            /* =========================================
+               TEMA OSCURO (MODO SYSTEM/DARK)
+               ========================================= */
+            [data-theme="dark"] .gestion-integral-home {
+                --k-primary: #4da6ff;
+                --k-primary-hover: #66b3ff;
+                --k-primary-light: rgba(77, 166, 255, 0.15);
+                --k-success: #5cb85c;
+                --k-success-light: rgba(92, 184, 92, 0.15);
+                --k-warning: #f0ad4e;
+                --k-warning-light: rgba(240, 173, 78, 0.15);
+                --k-danger: #d9534f;
+                --k-danger-light: rgba(217, 83, 79, 0.15);
+                --k-bg-app: #1a202c;
+                --k-bg-card: #2d3748;
+                --k-border: #4a5568;
+                --k-text-main: #e9ecef;
+                --k-text-muted: #adb5bd;
+                --k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.3);
+                --k-shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.4);
+            }
+
             @media (max-width: 992px) {
                 .charts-grid { grid-template-columns: 1fr; }
                 .chart-card.budget-chart { grid-column: auto; }

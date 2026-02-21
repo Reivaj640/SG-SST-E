@@ -447,19 +447,44 @@ let companyLogoElement;
 let companyLogoPlaceholder;
 
 // Función para aplicar el tema globalmente
-function applyGlobalTheme() {
-  const storedTheme = localStorage.getItem('theme') || 'light';
+async function applyGlobalTheme() {
+  let savedTheme = 'system';
+  
+  try {
+    if (window.electronAPI && window.electronAPI.getThemePreference) {
+      const result = await window.electronAPI.getThemePreference();
+      savedTheme = result.theme || 'system';
+    } else {
+      savedTheme = localStorage.getItem('kair-theme-preference') || 'system';
+    }
+  } catch (e) {
+    savedTheme = localStorage.getItem('kair-theme-preference') || 'system';
+  }
+  
+  let effectiveTheme = savedTheme;
+  
+  if (savedTheme === 'system') {
+    if (window.electronAPI && window.electronAPI.getSystemTheme) {
+      try {
+        const result = await window.electronAPI.getSystemTheme();
+        effectiveTheme = result.theme || 'light';
+      } catch (e) {
+        effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+    } else if (window.matchMedia) {
+      effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+  }
 
-  // Aplicar el tema al documento raíz
-  if (storedTheme === 'dark') {
-    document.documentElement.setAttribute('data-theme', 'dark');
-  } else if (storedTheme === 'light') {
-    document.documentElement.removeAttribute('data-theme');
-  } else if (storedTheme === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+  if (effectiveTheme === 'dark') {
     document.documentElement.setAttribute('data-theme', 'dark');
   } else {
     document.documentElement.removeAttribute('data-theme');
   }
+  
+  localStorage.setItem('kair-theme-preference', savedTheme);
+  
+  return effectiveTheme;
 }
 
 // --- Inicialización ---
@@ -479,7 +504,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Aplicar el tema global al cargar la aplicación
-  applyGlobalTheme();
+  await applyGlobalTheme();
+  
+  // Escuchar cambios de tema del sistema
+  if (window.electronAPI && window.electronAPI.onSystemThemeChanged) {
+    window.electronAPI.onSystemThemeChanged(async (systemTheme) => {
+      console.log('[Renderer] System theme changed:', systemTheme);
+      const savedTheme = localStorage.getItem('kair-theme-preference') || 'system';
+      if (savedTheme === 'system') {
+        if (systemTheme === 'dark') {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+          document.documentElement.removeAttribute('data-theme');
+        }
+      }
+    });
+  }
 
   // Obtener referencias a los elementos del DOM
   contentArea = document.getElementById('content-area');
@@ -628,19 +668,38 @@ document.addEventListener('DOMContentLoaded', async () => {
                   apiCallFunction = window.electronAPI.saveEditedDocument;
                   apiCallArgs = [savePayloadEd];
                   break;
+              case 'back-to-main-app':
+                  // Volver al home principal
+                  showHomePage();
+                  return;
               case 'back-to-module-request':
-                  // This is a UI navigation request, not an API call to main process
-                  // We handle it directly here and don't send a response back to iframe
+                  // Volver al módulo actual
                   console.log('RENDERER: Received back-to-module-request from iframe.');
-                  // Assuming showModuleContent is available in renderer.js scope
-                  // and currentModule is correctly set.
                   if (typeof currentModule !== 'undefined' && currentModule) {
-                      currentSubmodule = null; // Clear submodule state
+                      currentSubmodule = null;
                       showModuleContent(currentModule);
                   } else {
-                      showHomePage(); // Fallback to home if no current module
+                      showHomePage();
                   }
-                  return; // Exit after handling navigation
+                  return;
+              case 'theme-preference-changed':
+                  // El usuario cambió el tema desde el iframe de configuración
+                  console.log('RENDERER: Theme preference changed to:', payload);
+                  if (payload === 'dark') {
+                      document.documentElement.setAttribute('data-theme', 'dark');
+                  } else if (payload === 'light') {
+                      document.documentElement.removeAttribute('data-theme');
+                  } else if (payload === 'system') {
+                      // Aplicar tema del sistema
+                      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                      if (isDark) {
+                          document.documentElement.setAttribute('data-theme', 'dark');
+                      } else {
+                          document.documentElement.removeAttribute('data-theme');
+                      }
+                  }
+                  localStorage.setItem('kair-theme-preference', payload);
+                  return;
               case 'GET_AUSENTISMO_DATA':
                   // Handle request to get absenteeism data
                   apiCallFunction = window.electronAPI.readAusentismoData;
@@ -737,6 +796,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                   // Logs de debug del iframe
                   const { message, data } = payload || {};
                   console.log(message, data || '');
+                  return;
+              case 'get-theme-request':
+                  // Responder con el tema actual
+                  const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+                  targetWindow.postMessage({
+                      type: 'get-theme-response',
+                      theme: currentTheme
+                  }, '*');
+                  return;
+              case 'back-to-main-app':
+                  // Volver al home principal
+                  showHomePage();
                   return;
               default:
                   // Verificar si es un mensaje de respuesta (ya procesado), para evitar bucles
@@ -2516,11 +2587,34 @@ function createModuleCard(title, description, onClick) {
 
     contentArea.appendChild(iframe);
 
-    // Una vez que el iframe se carga, pasarle la API de Electron
+    // Una vez que el iframe se carga, pasarle la API de Electron y el tema
     iframe.onload = function() {
       if (iframe.contentWindow) {
         // Pasar la API de Electron al iframe
         iframe.contentWindow.electronAPI = window.electronAPI;
+
+        // Propagar el tema actual al iframe
+        const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+        const savedTheme = localStorage.getItem('kair-theme-preference') || 'system';
+        
+        try {
+          if (currentTheme === 'dark') {
+            iframe.contentDocument.documentElement.setAttribute('data-theme', 'dark');
+          } else {
+            iframe.contentDocument.documentElement.removeAttribute('data-theme');
+          }
+          
+          // Enviar mensaje postMessage con el tema para que el iframe lo procese
+          iframe.contentWindow.postMessage({
+            type: 'theme-changed',
+            theme: savedTheme,
+            effectiveTheme: currentTheme
+          }, '*');
+          
+          console.log('[Renderer] Tema propagado al iframe de configuración:', savedTheme, '(efectivo:', currentTheme + ')');
+        } catch (e) {
+          console.warn('[Renderer] Error al propagar tema al iframe:', e);
+        }
       }
     };
   }

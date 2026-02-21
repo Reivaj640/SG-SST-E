@@ -15,6 +15,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadConfig: () => ipcRenderer.invoke('load-config'),
   loadNormativa: () => ipcRenderer.invoke('load-normativa'),
 
+  // --- Sistema de Temas ---
+  getSystemTheme: () => ipcRenderer.invoke('get-system-theme'),
+  saveThemePreference: (themeMode) => ipcRenderer.invoke('save-theme-preference', themeMode),
+  getThemePreference: () => ipcRenderer.invoke('get-theme-preference'),
+  getEffectiveTheme: () => ipcRenderer.invoke('get-effective-theme'),
+  onSystemThemeChanged: (callback) => {
+    const listener = (event, theme) => callback(theme);
+    ipcRenderer.on('system-theme-changed', listener);
+    return () => ipcRenderer.removeListener('system-theme-changed', listener);
+  },
+
   // --- Manejo de archivos y directorios ---
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
 

@@ -793,3 +793,484 @@
   background-color: #0069d9 !important; /* Un azul un poco más oscuro para el hover */
   border-color: #0062cc !important;
 }
+
+/* =========================================
+   TEMA OSCURO (MODO SYSTEM/DARK)
+   ========================================= */
+[data-theme="dark"] {
+  /* Ajustes específicos para desarrollo-styles */
+  --widget-bg-color: #2d3748;
+  --text-light-color: #adb5bd;
+}
+
+[data-theme="dark"] .widget {
+  background-color: var(--widget-bg-color);
+  border-color: #4a5568;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .widget:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .widget h4 {
+  color: var(--heading-color);
+}
+
+[data-theme="dark"] .widget-value {
+  color: #4da6ff; /* Azul más claro para modo oscuro */
+}
+
+[data-theme="dark"] .widget-description {
+  color: var(--text-light-color);
+}
+
+[data-theme="dark"] .submodule-item {
+  background-color: #2d3748;
+  border-color: #4a5568;
+}
+
+[data-theme="dark"] .submodule-item:hover {
+  background-color: rgba(77, 166, 255, 0.15);
+  border-color: #4da6ff;
+}
+
+[data-theme="dark"] .submodule-name {
+  color: var(--heading-color);
+}
+
+[data-theme="dark"] .submodule-meta {
+  color: var(--text-light-color);
+}
+
+[data-theme="dark"] .chart-container {
+  background-color: #2d3748;
+  border-color: #4a5568;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .chart-container h3 {
+  color: var(--heading-color);
+}
+
+[data-theme="dark"] .chart-donut-hole {
+  color: #e9ecef;
+}
+
+[data-theme="dark"] .submodules-container h3 {
+  color: var(--heading-color);
+  border-bottom-color: #4a5568;
+}
+
+/* =========================================
+   TEMA OSCURO - CORRECCIONES ESPECÍFICAS PARA DEVELOPMENT-STYLES
+   ========================================= */
+
+/* 1. Submodule selector frame - Eliminar fondo blanco fijo */
+[data-theme="dark"] .submodule-selector-frame {
+  background-color: var(--widget-bg-color);
+  border-color: var(--border-color);
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .submodule-select {
+  background-color: var(--widget-bg-color);
+  border-color: var(--border-color);
+  color: var(--text-color);
+}
+
+/* 2. Submodule content canvas - Eliminar fondo blanco fijo */
+[data-theme="dark"] .submodule-content-canvas {
+  background-color: var(--widget-bg-color);
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .submodule-content h3 {
+  color: var(--heading-color);
+}
+
+/* 3. Development message - Ajustar tema */
+[data-theme="dark"] .development-message {
+  background-color: rgba(255, 193, 7, 0.15);
+  border-color: rgba(255, 193, 7, 0.3);
+}
+
+[data-theme="dark"] .development-message h3 {
+  color: #ffc107;
+}
+
+[data-theme="dark"] .development-message p {
+  color: var(--text-light-color);
+}
+
+/* 4. Control remisiones table - Eliminar fondo blanco fijo */
+[data-theme="dark"] .control-remisiones-table {
+  background-color: var(--widget-bg-color);
+  border-color: var(--border-color);
+}
+
+/* 5. Settings content - Ajustar tema */
+[data-theme="dark"] .settings-content {
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .settings-card {
+  background-color: var(--widget-bg-color);
+  border-color: var(--border-color);
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .settings-card:hover {
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.7);
+}
+
+[data-theme="dark"] .settings-card .card-title {
+  color: var(--heading-color);
+}
+
+[data-theme="dark"] .settings-card .card-description {
+  color: var(--text-light-color);
+}
+
+/* 6. Path linking content - Ajustar tema */
+[data-theme="dark"] .path-linking-content {
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .company-row label {
+  color: var(--heading-color);
+}
+
+[data-theme="dark"] .company-row input[type="text"] {
+  background-color: var(--widget-bg-color);
+  border-color: var(--border-color);
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .checkmark {
+  color: var(--success-color);
+}
+
+/* 7. Log area - Ajustar tema */
+[data-theme="dark"] .log-area {
+  background-color: var(--widget-bg-color);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .log-area h3 {
+  color: var(--heading-color);
+}
+
+[data-theme="dark"] .log-area textarea {
+  background-color: var(--widget-bg-color);
+  border-color: var(--border-color);
+  color: var(--text-color);
+}
+
+/* 8. LLM chat content - Eliminar fondo blanco fijo */
+[data-theme="dark"] .llm-chat-content {
+  background-color: var(--widget-bg-color);
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .chat-history {
+  background-color: rgba(45, 55, 72, 0.5);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .user-message {
+  background-color: var(--secondary-color);
+  color: var(--white-color);
+}
+
+[data-theme="dark"] .bot-message {
+  background-color: var(--light-color);
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .chat-input-area input {
+  background-color: var(--widget-bg-color);
+  border-color: var(--border-color);
+  color: var(--text-color);
+}
+
+/* 9. Excel preview - Ajustar tema */
+[data-theme="dark"] .excel-preview {
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .excel-header {
+  background-color: var(--widget-bg-color);
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .excel-header h4 {
+  color: var(--heading-color);
+}
+
+[data-theme="dark"] .excel-content {
+  background-color: var(--widget-bg-color);
+}
+
+[data-theme="dark"] .excel-tabs {
+  background-color: var(--widget-bg-color);
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .excel-tab {
+  color: var(--text-light-color);
+}
+
+[data-theme="dark"] .excel-tab:hover {
+  color: var(--text-color);
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .excel-tab.active {
+  color: var(--primary-color);
+  background-color: var(--widget-bg-color);
+  border-bottom-color: var(--primary-color);
+}
+
+[data-theme="dark"] .excel-table-container {
+  background-color: var(--widget-bg-color);
+}
+
+[data-theme="dark"] .excel-table {
+  background-color: var(--widget-bg-color);
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .excel-table th {
+  background-color: var(--light-color);
+  color: var(--heading-color);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .excel-table td {
+  background-color: var(--widget-bg-color);
+  color: var(--text-color);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .excel-table tbody tr:nth-child(even) {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+[data-theme="dark"] .excel-table tbody tr:hover {
+  background-color: rgba(77, 166, 255, 0.15);
+}
+
+[data-theme="dark"] .excel-table tfoot td {
+  background-color: var(--light-color);
+  color: var(--text-light-color);
+  border-top-color: var(--border-color);
+}
+
+/* 10. Excel scrollbar - Ajustar tema */
+[data-theme="dark"] .excel-table-container::-webkit-scrollbar-track {
+  background: var(--widget-bg-color);
+}
+
+[data-theme="dark"] .excel-table-container::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+}
+
+[data-theme="dark"] .excel-table-container::-webkit-scrollbar-thumb:hover {
+  background: var(--text-light-color);
+}
+
+/* 11. Submodule item - Ajustes adicionales */
+[data-theme="dark"] .submodule-item {
+  background-color: var(--widget-bg-color);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .submodule-item:hover {
+  background-color: var(--sidebar-hover-bg);
+  border-color: var(--primary-color);
+}
+
+[data-theme="dark"] .submodule-name {
+  color: var(--heading-color);
+}
+
+[data-theme="dark"] .submodule-meta {
+  color: var(--text-light-color);
+}
+
+/* 12. Submodule info - Ajustar tema */
+[data-theme="dark"] .submodule-info {
+  color: var(--text-color);
+}
+
+/* 13. Widget - Ajustes adicionales */
+[data-theme="dark"] .widget {
+  background-color: var(--widget-bg-color);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .widget h4 {
+  color: var(--heading-color);
+}
+
+[data-theme="dark"] .widget-value {
+  color: var(--primary-color);
+}
+
+[data-theme="dark"] .widget-description {
+  color: var(--text-light-color);
+}
+
+/* 14. Widget hover - Ajustar tema */
+[data-theme="dark"] .widget:hover {
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.4);
+}
+
+/* 15. Metric card - Ajustes adicionales */
+[data-theme="dark"] .metric-card {
+  background-color: var(--widget-bg-color);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .metric-card:hover {
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .metric-icon-placeholder {
+  background-color: rgba(77, 166, 255, 0.2);
+}
+
+[data-theme="dark"] .metric-value {
+  color: var(--primary-color);
+}
+
+[data-theme="dark"] .metric-label {
+  color: var(--text-light-color);
+}
+
+/* 16. Modules info - Ajustar tema */
+[data-theme="dark"] .modules-info {
+  background-color: rgba(45, 55, 72, 0.5);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .modules-info h3 {
+  color: var(--heading-color);
+}
+
+[data-theme="dark"] .modules-info li {
+  color: var(--text-light-color);
+}
+
+/* 17. Company home - Ajustes adicionales */
+[data-theme="dark"] .company-home-title {
+  color: var(--heading-color);
+}
+
+[data-theme="dark"] .company-home-text {
+  color: var(--text-light-color);
+}
+
+/* 18. Metrics section - Ajustar tema */
+[data-theme="dark"] .metrics-section {
+  color: var(--text-color);
+}
+
+/* 19. Metrics grid - Ajustar tema */
+[data-theme="dark"] .metrics-grid {
+  color: var(--text-color);
+}
+
+/* 20. Module card - Ajustes adicionales */
+[data-theme="dark"] .module-card {
+  background-color: var(--widget-bg-color);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .module-card:hover {
+  outline-color: var(--primary-color);
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .module-card .card-header {
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .module-card .card-icon-placeholder {
+  background-color: rgba(77, 166, 255, 0.2);
+}
+
+[data-theme="dark"] .module-card .card-title {
+  color: var(--heading-color);
+}
+
+[data-theme="dark"] .module-card .card-description {
+  color: var(--text-light-color);
+}
+
+/* 21. Module card button - Ajustar tema */
+[data-theme="dark"] .module-card .btn {
+  color: var(--white-color);
+}
+
+/* 22. Progress bar - Ajustar tema */
+[data-theme="dark"] #progress-container .bar {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] #progress-container .progress {
+  background: var(--primary-color);
+}
+
+/* 23. Btn ingresar - Ajustar tema */
+[data-theme="dark"] .btn-ingresar {
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+}
+
+[data-theme="dark"] .btn-ingresar:hover {
+  background-color: var(--primary-hover-color) !important;
+  border-color: var(--primary-hover-color) !important;
+}
+
+/* 24. Company select button - Ajustar tema */
+[data-theme="dark"] .company-select-button {
+  background-color: var(--widget-bg-color);
+  border-color: var(--border-color);
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .company-select-button:hover {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+  color: var(--white-color);
+}
+
+[data-theme="dark"] .company-select-button.selected {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+  color: var(--white-color);
+}
+
+/* 25. Main canvas company home - Ajustar tema */
+[data-theme="dark"] .main-canvas.company-home-canvas {
+  background-color: var(--widget-bg-color);
+}
+
+/* 26. Company home content - Ajustar tema */
+[data-theme="dark"] .company-home-content {
+  color: var(--text-color);
+}
+
+/* 27. Welcome placeholder - Ajustar tema */
+[data-theme="dark"] #welcome-placeholder {
+  color: var(--text-light-color);
+}
+
+/* 28. Company selection - Ajustar tema */
+[data-theme="dark"] #company-selection {
+  color: var(--text-color);
+}
+

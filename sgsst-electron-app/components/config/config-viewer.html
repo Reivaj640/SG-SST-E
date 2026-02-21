@@ -41,6 +41,29 @@
             --radius-lg: 0.5rem;
         }
 
+        /* Variables de tema oscuro */
+        [data-theme="dark"] {
+            --primary: #4da6ff;
+            --primary-hover: #66b3ff;
+            --success: #5cb85c;
+            --warning: #f0ad4e;
+            --danger: #d9534f;
+            --info: #5bc0de;
+            --dark: #212529;
+
+            --bg-general: #1a202c;
+            --bg-card: #2d3748;
+            --border-color: #4a5568;
+
+            --text-main: #e9ecef;
+            --text-muted: #adb5bd;
+            --text-light: #f8f9fa;
+
+            --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.4);
+            --shadow-lg: 0 1rem 3rem rgba(0, 0, 0, 0.5);
+        }
+
         * {
             box-sizing: border-box;
             margin: 0;
@@ -443,6 +466,68 @@
             color: var(--primary);
             box-shadow: 0 2px 5px rgba(0,0,0,0.05);
             font-weight: 600;
+        }
+
+        [data-theme="dark"] .theme-control-group {
+            background: var(--bg-card);
+            border-color: var(--border-color);
+        }
+
+        [data-theme="dark"] .theme-option {
+            color: var(--text-muted);
+        }
+
+        [data-theme="dark"] .theme-option.active {
+            background: #3d4a5a;
+            color: var(--primary);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        [data-theme="dark"] .theme-segmented {
+            background: #4a5568;
+        }
+
+        [data-theme="dark"] .company-stats {
+            background: #1a202c;
+        }
+
+        [data-theme="dark"] thead {
+            background-color: #1a202c;
+        }
+
+        [data-theme="dark"] tr:hover {
+            background-color: rgba(77, 166, 255, 0.1);
+        }
+
+        [data-theme="dark"] .form-control {
+            background-color: #1a202c;
+            border-color: #4a5568;
+            color: var(--text-main);
+        }
+
+        [data-theme="dark"] .form-control:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(77, 166, 255, 0.2);
+        }
+
+        [data-theme="dark"] .btn-outline {
+            background: var(--bg-card);
+            border-color: var(--border-color);
+            color: var(--text-main);
+        }
+
+        [data-theme="dark"] .btn-outline:hover {
+            background: #4a5568;
+        }
+
+        [data-theme="dark"] .ai-textarea {
+            background-color: #1a202c;
+            border-color: #4a5568;
+            color: var(--text-main);
+        }
+
+        [data-theme="dark"] .normativa-pill {
+            background-color: rgba(77, 166, 255, 0.2);
         }
 
         /* --- Acerca de --- */
@@ -1381,26 +1466,79 @@
     }
 
     /* ================= INTERFAZ UI ================= */
-    function setTheme(mode, el) {
-        // Remover clase activa de todas las opciones
+    async function setTheme(mode, el) {
         document.querySelectorAll('.theme-option').forEach(o => o.classList.remove('active'));
-        // Agregar clase activa al elemento clickeado
         el.classList.add('active');
-
-        showToast('Tema cambiado a: ' + mode, 'success');
-
-        // Guardar el tema en la configuración si hay API disponible
-        if (electronAPI && typeof electronAPI.saveConfig === 'function') {
-            electronAPI.loadConfig().then(config => {
-                if (!config.uiSettings) config.uiSettings = {};
-                config.uiSettings.theme = mode;
-                return electronAPI.saveConfig(config);
-            }).then(() => {
-                console.log('Tema guardado en configuración');
-            }).catch(error => {
-                console.error('Error al guardar el tema:', error);
-            });
+        
+        // Aplicar tema visualmente en este iframe
+        if (mode === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        } else if (mode === 'light') {
+            document.documentElement.removeAttribute('data-theme');
+        } else if (mode === 'system') {
+            // Para sistema, preguntar al padre o usar prefers-color-scheme
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+            }
         }
+        
+        // Guardar preferencia
+        if (electronAPI && typeof electronAPI.saveThemePreference === 'function') {
+            try {
+                await electronAPI.saveThemePreference(mode);
+                console.log('Tema guardado en configuración:', mode);
+                showToast(`Tema cambiado a: ${mode === 'system' ? 'Sistema' : mode}`, 'success');
+            } catch (error) {
+                console.error('Error al guardar el tema:', error);
+            }
+        }
+        
+        // Notificar al padre sobre el cambio
+        if (window.parent && window.parent !== window) {
+            window.parent.postMessage({
+                type: 'theme-preference-changed',
+                theme: mode
+            }, '*');
+        }
+    }
+    
+    async function initThemeUI() {
+        let currentTheme = 'system';
+        
+        // Intentar obtener tema desde electronAPI
+        if (electronAPI && typeof electronAPI.getThemePreference === 'function') {
+            try {
+                const result = await electronAPI.getThemePreference();
+                currentTheme = result.theme || 'system';
+                console.log('Tema cargado desde config:', currentTheme);
+            } catch (e) {
+                console.error('Error cargando tema:', e);
+            }
+        }
+        
+        // Actualizar UI del toggle
+        document.querySelectorAll('.theme-option').forEach(o => o.classList.remove('active'));
+        const activeOption = document.querySelector(`.theme-option[onclick*="'${currentTheme}'"]`);
+        if (activeOption) {
+            activeOption.classList.add('active');
+            console.log('Toggle actualizado para tema:', currentTheme);
+        }
+        
+        // Aplicar tema visualmente
+        let effectiveTheme = currentTheme;
+        if (currentTheme === 'system') {
+            effectiveTheme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+        }
+        
+        if (effectiveTheme === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+            document.documentElement.removeAttribute('data-theme');
+        }
+        
+        console.log('Tema efectivo aplicado:', effectiveTheme);
     }
 
     /* ================= FUNCIÓN PARA DETERMINAR ESCENARIO NORMATIVO ================= */
@@ -1862,8 +2000,67 @@
         }
     }
 
+    // Función para aplicar el tema efectivo basado en la preferencia
+    // MODO CLARO = ESTADO BASE (sin atributo data-theme)
+    function applyEffectiveTheme(themePreference) {
+        let effectiveTheme = themePreference;
+        
+        if (themePreference === 'system') {
+            effectiveTheme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+        }
+        
+        // IMPORTANTE: Solo aplicamos data-theme="dark" en modo oscuro
+        // En modo claro, NO hay atributo data-theme (estado natural)
+        if (effectiveTheme === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            console.log('[ConfigViewer] 🌙 Tema OSCURO aplicado');
+        } else {
+            document.documentElement.removeAttribute('data-theme');
+            console.log('[ConfigViewer] ☀️ Tema CLARO aplicado (estado base)');
+        }
+        
+        console.log('[ConfigViewer] Preferencia:', themePreference, '| Efectivo:', effectiveTheme);
+    }
+
     // Cargar datos cuando se inicialice la página
     document.addEventListener('DOMContentLoaded', async function() {
+        // Escuchar mensajes de tema desde el padre
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'theme-changed') {
+                const theme = event.data.theme;
+                console.log('[ConfigViewer] Mensaje theme-changed recibido:', theme);
+                applyEffectiveTheme(theme);
+                // Actualizar el toggle UI para que coincida
+                const currentPref = localStorage.getItem('kair-theme-preference') || 'system';
+                document.querySelectorAll('.theme-option').forEach(o => o.classList.remove('active'));
+                const activeOption = document.querySelector(`.theme-option[onclick*="'${currentPref}'"]`);
+                if (activeOption) {
+                    activeOption.classList.add('active');
+                }
+            } else if (event.data && event.data.type === 'get-theme-response') {
+                // Respuesta del padre con el tema actual
+                const theme = event.data.theme;
+                const preference = event.data.preference || 'system';
+                console.log('[ConfigViewer] Tema recibido del padre:', theme, 'Preferencia:', preference);
+                applyEffectiveTheme(preference);
+                // Actualizar el toggle UI
+                document.querySelectorAll('.theme-option').forEach(o => o.classList.remove('active'));
+                const activeOption = document.querySelector(`.theme-option[onclick*="'${preference}'"]`);
+                if (activeOption) {
+                    activeOption.classList.add('active');
+                }
+            }
+        });
+        
+        // Solicitar tema actual al padre inmediatamente
+        if (window.parent && window.parent !== window) {
+            console.log('[ConfigViewer] Solicitando tema actual al padre...');
+            window.parent.postMessage({ type: 'get-theme-request' }, '*');
+        }
+        
+        // Inicializar el tema UI como fallback
+        initThemeUI();
+        
         // Cargar la normativa antes de procesar las empresas
         try {
             console.log('🔍 Iniciando carga de normativa...');

@@ -1,6 +1,6 @@
 // main.js - Proceso principal de la aplicación Electron
 
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, nativeTheme } = require('electron');
 const path = require('path');
 const fsp = require('fs').promises;
 const fs = require('fs');           // Para operaciones síncronas
@@ -322,6 +322,86 @@ ipcMain.handle('get-app-version', async () => {
   } catch (error) {
     console.error('Error getting app version:', error);
     return '1.0.0'; // Valor por defecto en caso de error
+  }
+});
+
+// ===============================
+// 🎨 SISTEMA DE TEMAS (Claro/Oscuro/Sistema)
+// ===============================
+
+// Obtener el tema actual del sistema operativo
+ipcMain.handle('get-system-theme', async () => {
+  try {
+    const isDark = nativeTheme.shouldUseDarkColors;
+    return { success: true, theme: isDark ? 'dark' : 'light' };
+  } catch (error) {
+    console.error('Error getting system theme:', error);
+    return { success: false, error: error.message, theme: 'light' };
+  }
+});
+
+// Guardar preferencia de tema del usuario
+ipcMain.handle('save-theme-preference', async (event, themeMode) => {
+  try {
+    const config = await (async () => {
+      try {
+        const data = await fsp.readFile(configPath, 'utf8');
+        return JSON.parse(data);
+      } catch {
+        return {};
+      }
+    })();
+    
+    if (!config.uiSettings) config.uiSettings = {};
+    config.uiSettings.theme = themeMode;
+    
+    await fsp.writeFile(configPath, JSON.stringify(config, null, 2));
+    console.log(`[MAIN] Tema guardado: ${themeMode}`);
+    
+    return { success: true, theme: themeMode };
+  } catch (error) {
+    console.error('Error saving theme preference:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Obtener preferencia de tema guardada
+ipcMain.handle('get-theme-preference', async () => {
+  try {
+    const data = await fsp.readFile(configPath, 'utf8');
+    const config = JSON.parse(data);
+    const savedTheme = config.uiSettings?.theme || 'system';
+    return { success: true, theme: savedTheme };
+  } catch (error) {
+    return { success: true, theme: 'system' };
+  }
+});
+
+// Aplicar tema efectivo (resuelve 'system' a 'light' o 'dark')
+ipcMain.handle('get-effective-theme', async () => {
+  try {
+    const data = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(data);
+    const savedTheme = config.uiSettings?.theme || 'system';
+    
+    if (savedTheme === 'system') {
+      const systemTheme = nativeTheme.shouldUseDarkColors ? 'dark' : 'light';
+      return { success: true, theme: systemTheme, source: 'system' };
+    }
+    
+    return { success: true, theme: savedTheme, source: 'user' };
+  } catch (error) {
+    return { success: true, theme: 'light', source: 'default' };
+  }
+});
+
+// Notificar a todas las ventanas cuando cambia el tema del sistema
+nativeTheme.on('updated', () => {
+  const systemTheme = nativeTheme.shouldUseDarkColors ? 'dark' : 'light';
+  console.log(`[MAIN] Tema del sistema cambiado a: ${systemTheme}`);
+  
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('system-theme-changed', systemTheme);
   }
 });
 

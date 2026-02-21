@@ -115,6 +115,15 @@
   /* Sombras */
   --box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.5);
   --box-shadow-lg: 0 1rem 3rem rgba(0, 0, 0, 0.7);
+
+  /* Colores específicos para sidebar y header */
+  --sidebar-bg-color: #1a202c;
+  --sidebar-hover-bg: rgba(77, 166, 255, 0.15);
+  --sidebar-active-bg: rgba(77, 166, 255, 0.2);
+  --sidebar-border-color: #4a5568;
+  --header-bg-color: #2d3748;
+  --content-area-bg: #2d3748;
+  --home-page-bg: #1a202c;
 }
 
 /* Estilos generales */
@@ -1835,3 +1844,581 @@ select.form-control {
     font-weight: 400;
     font-size: 0.6em;
 }
+
+/* =========================================
+   TEMA OSCURO - REGLAS ESPECÍFICAS PARA MÓDULOS HOME
+   ========================================= */
+
+/* Widgets de los módulos home (Gestión Integral, Salud, Peligros, Amenazas, Verificación, Mejoramiento) */
+[data-theme="dark"] .widget {
+    background-color: var(--widget-bg-color) !important;
+    border-color: var(--border-color) !important;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="dark"] .widget h4 {
+    color: var(--heading-color) !important;
+}
+
+[data-theme="dark"] .widget-value {
+    color: var(--primary-color) !important;
+}
+
+[data-theme="dark"] .widget-description {
+    color: var(--text-light-color) !important;
+}
+
+/* Contenedores de widgets */
+[data-theme="dark"] .widgets-container {
+    /* Los widgets hijos ya tienen sus propias reglas */
+}
+
+/* Contenedores de gráficos */
+[data-theme="dark"] .chart-container {
+    background-color: var(--widget-bg-color) !important;
+    border-color: var(--border-color) !important;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="dark"] .chart-container h3 {
+    color: var(--heading-color) !important;
+}
+
+[data-theme="dark"] .chart-placeholder p {
+    color: var(--text-light-color) !important;
+}
+
+[data-theme="dark"] .chart-donut-hole {
+    color: var(--text-color) !important;
+}
+
+/* Contenedores de submódulos */
+[data-theme="dark"] .submodules-container {
+    background-color: var(--widget-bg-color) !important;
+    border-color: var(--border-color) !important;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="dark"] .submodules-container h3 {
+    color: var(--heading-color) !important;
+    border-bottom-color: var(--border-color) !important;
+}
+
+/* Items de submódulos */
+[data-theme="dark"] .submodule-item {
+    background-color: var(--widget-bg-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .submodule-item:hover {
+    background-color: rgba(77, 166, 255, 0.15) !important;
+    border-color: var(--primary-color) !important;
+}
+
+[data-theme="dark"] .submodule-name {
+    color: var(--heading-color) !important;
+}
+
+[data-theme="dark"] .submodule-meta {
+    color: var(--text-light-color) !important;
+}
+
+/* Botones en submódulos */
+[data-theme="dark"] .btn-ingresar {
+    background-color: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+}
+
+[data-theme="dark"] .btn-ingresar:hover {
+    background-color: var(--primary-hover-color) !important;
+    border-color: var(--primary-hover-color) !important;
+}
+
+/* Tarjetas de módulo */
+[data-theme="dark"] .module-card {
+    background-color: var(--widget-bg-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .module-card:hover {
+    outline-color: var(--primary-color) !important;
+}
+
+[data-theme="dark"] .module-card .card-title {
+    color: var(--heading-color) !important;
+}
+
+[data-theme="dark"] .module-card .card-description {
+    color: var(--text-light-color) !important;
+}
+
+[data-theme="dark"] .module-card .card-icon-placeholder {
+    background-color: rgba(77, 166, 255, 0.2) !important;
+}
+
+/* Listas de submódulos */
+[data-theme="dark"] .submodules-list {
+    /* Los items hijos ya tienen sus propias reglas */
+}
+
+/* Métricas y estadísticas */
+[data-theme="dark"] .metric-card {
+    background-color: var(--widget-bg-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .metric-value {
+    color: var(--primary-color) !important;
+}
+
+[data-theme="dark"] .metric-label {
+    color: var(--text-light-color) !important;
+}
+
+[data-theme="dark"] .metric-icon-placeholder {
+    background-color: rgba(77, 166, 255, 0.2) !important;
+}
+
+/* Información de módulos */
+[data-theme="dark"] .modules-info {
+    background-color: rgba(45, 55, 72, 0.5) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .modules-info h3 {
+    color: var(--heading-color) !important;
+}
+
+[data-theme="dark"] .modules-info li {
+    color: var(--text-light-color) !important;
+}
+
+/* Home de empresa */
+[data-theme="dark"] .company-home-content {
+    /* El fondo lo maneja el contenedor padre */
+}
+
+[data-theme="dark"] .company-home-title {
+    color: var(--heading-color) !important;
+}
+
+[data-theme="dark"] .company-home-text {
+    color: var(--text-light-color) !important;
+}
+
+/* Canvas principal */
+[data-theme="dark"] .main-canvas {
+    background-color: var(--bg-color) !important;
+}
+
+/* Paneles laterales */
+[data-theme="dark"] .sidebar-panel {
+    background-color: var(--widget-bg-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* Áreas principales */
+[data-theme="dark"] .main-area {
+    /* El fondo lo maneja el contenedor padre */
+}
+
+/* Contenedores de gestión */
+[data-theme="dark"] .gestion-integral-home,
+[data-theme="dark"] .gestion-salud-home,
+[data-theme="dark"] .gestion-peligros-home,
+[data-theme="dark"] .gestion-amenazas-home,
+[data-theme="dark"] .verificacion-home,
+[data-theme="dark"] .mejoramiento-home,
+[data-theme="dark"] .recursos-home {
+    /* Heredan variables CSS del padre */
+}
+
+/* =========================================
+   TEMA OSCURO - CORRECCIONES ESPECÍFICAS
+   (Línea blanca del content-area, sidebar, header, home-page)
+   ========================================= */
+
+/* 1. #content-area - Eliminar línea blanca y aplicar tema */
+[data-theme="dark"] #content-area {
+    background-color: var(--content-area-bg) !important;
+    border-color: var(--border-color) !important;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.5) !important;
+}
+
+/* 2. #app-header - Aplicar tema oscuro al header */
+[data-theme="dark"] #app-header {
+    background-color: var(--header-bg-color) !important;
+    border-bottom-color: var(--sidebar-border-color) !important;
+}
+
+[data-theme="dark"] .header-btn {
+    background-color: var(--light-color) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .header-btn:hover {
+    background-color: var(--primary-color) !important;
+    color: var(--white-color) !important;
+}
+
+[data-theme="dark"] .logo-placeholder {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: var(--text-light-color) !important;
+}
+
+/* 3. #sidebar - Mejorar contraste y aplicar tema consistente */
+[data-theme="dark"] #sidebar {
+    background-color: var(--sidebar-bg-color) !important;
+    border-right: 1px solid var(--sidebar-border-color) !important;
+}
+
+[data-theme="dark"] .sidebar-menu-button {
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] .sidebar-menu-button:hover {
+    background-color: var(--sidebar-hover-bg) !important;
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] .sidebar-menu-button.active {
+    background-color: var(--sidebar-active-bg) !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+}
+
+/* 4. .company-info - Aplicar tema al área de información de empresa */
+[data-theme="dark"] .company-info {
+    border-bottom-color: var(--sidebar-border-color) !important;
+}
+
+[data-theme="dark"] .company-logo-placeholder {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: var(--text-light-color) !important;
+}
+
+[data-theme="dark"] #company-name {
+    color: var(--text-color) !important;
+}
+
+/* 5. #home-page - Aplicar tema al fondo de Vanta.js */
+[data-theme="dark"] #home-page {
+    background-color: var(--home-page-bg) !important;
+}
+
+/* 6. #main-content - Asegurar consistencia del fondo */
+[data-theme="dark"] #main-content {
+    background-color: var(--bg-color) !important;
+}
+
+/* 7. .preview-placeholder - Eliminar fondo blanco fijo */
+[data-theme="dark"] .preview-placeholder {
+    background-color: rgba(45, 55, 72, 0.5) !important;
+    color: var(--text-light-color) !important;
+}
+
+/* 8. Elementos con fondo blanco fijo en formularios */
+[data-theme="dark"] .registrar-ausentismo-form {
+    background-color: var(--widget-bg-color) !important;
+}
+
+[data-theme="dark"] .registrar-ausentismo-form h3 {
+    color: var(--heading-color) !important;
+}
+
+[data-theme="dark"] .form-group label {
+    color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .form-group input,
+[data-theme="dark"] .form-group select,
+[data-theme="dark"] .form-group textarea {
+    background-color: var(--widget-bg-color) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-color) !important;
+}
+
+/* 9. Submódulo header - Eliminar fondo blanco fijo */
+[data-theme="dark"] .submodule-header {
+    background-color: var(--widget-bg-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .submodule-header h3 {
+    color: var(--heading-color) !important;
+}
+
+/* 10. Botón de volver - Ajustar para tema oscuro */
+[data-theme="dark"] .btn-back {
+    background-color: var(--light-color) !important;
+    color: var(--text-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .btn-back:hover {
+    background-color: var(--secondary-color) !important;
+    color: var(--white-color) !important;
+}
+
+/* 11. Document controls - Eliminar fondos blancos fijos */
+[data-theme="dark"] .document-controls {
+    background-color: var(--widget-bg-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* 12. Preview close btn - Ajustar tema */
+[data-theme="dark"] .preview-close-btn {
+    background-color: var(--light-color) !important;
+    color: var(--text-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .preview-close-btn:hover {
+    background-color: var(--secondary-color) !important;
+    color: var(--white-color) !important;
+}
+
+/* 13. Custom Alert - Asegurar tema consistente */
+[data-theme="dark"] #custom-alert-modal {
+    background-color: var(--widget-bg-color) !important;
+}
+
+[data-theme="dark"] #custom-alert-message {
+    color: var(--text-color) !important;
+}
+
+[data-theme="dark"] #custom-alert-close {
+    background-color: var(--light-color) !important;
+    color: var(--text-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] #custom-alert-close:hover {
+    background-color: var(--secondary-color) !important;
+    color: var(--white-color) !important;
+}
+
+/* 14. File drop zone - Ajustar tema */
+[data-theme="dark"] .file-drop-zone {
+    background-color: var(--widget-bg-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .file-drop-icon {
+    color: var(--text-light-color) !important;
+}
+
+[data-theme="dark"] .file-drop-text {
+    color: var(--text-light-color) !important;
+}
+
+/* 15. Selected file info - Ajustar tema */
+[data-theme="dark"] .selected-file-info {
+    background-color: var(--light-color) !important;
+}
+
+[data-theme="dark"] .selected-file-info h4 {
+    color: var(--heading-color) !important;
+}
+
+[data-theme="dark"] .selected-file-info p {
+    color: var(--text-color) !important;
+}
+
+/* 16. Progress container - Ajustar tema */
+[data-theme="dark"] .progress-container {
+    background-color: var(--widget-bg-color) !important;
+}
+
+[data-theme="dark"] .progress-text {
+    color: var(--heading-color) !important;
+}
+
+/* 17. Log area - Ajustar tema */
+[data-theme="dark"] .log-area h4 {
+    color: var(--heading-color) !important;
+}
+
+/* 18. Five whys card - Ajustar tema */
+[data-theme="dark"] .five-whys-card {
+    background-color: var(--widget-bg-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .cause-text {
+    color: var(--heading-color) !important;
+}
+
+/* 19. M-cell - Ajustar tema */
+[data-theme="dark"] .m-cell {
+    background-color: rgba(77, 166, 255, 0.1) !important;
+}
+
+/* 20. Summary item - Ajustar tema */
+[data-theme="dark"] .summary-item {
+    background-color: rgba(255, 255, 255, 0.02) !important;
+}
+
+[data-theme="dark"] .summary-item label {
+    color: var(--text-light-color) !important;
+}
+
+[data-theme="dark"] .summary-item span {
+    color: var(--text-color) !important;
+}
+
+/* 21. Module calendar container - Ajustar tema */
+[data-theme="dark"] .module-calendar-container {
+    background-color: var(--widget-bg-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* 22. Data table header - Ajustar tema */
+[data-theme="dark"] .data-table th {
+    background-color: var(--dark-color) !important;
+    color: var(--white-color) !important;
+}
+
+[data-theme="dark"] .data-table td {
+    background-color: var(--widget-bg-color) !important;
+    color: var(--text-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .data-table tbody tr:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.02) !important;
+}
+
+[data-theme="dark"] .data-table tbody tr:hover {
+    background-color: rgba(77, 166, 255, 0.15) !important;
+}
+
+/* 23. Search results list - Ajustar tema */
+[data-theme="dark"] .search-results-list li {
+    border-bottom-color: var(--border-color) !important;
+    color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .search-results-list li:hover {
+    background-color: var(--sidebar-hover-bg) !important;
+    color: var(--white-color) !important;
+}
+
+/* 24. Search results col - Ajustar tema */
+[data-theme="dark"] .search-results-col {
+    background-color: var(--widget-bg-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* 25. Preview col - Ajustar tema */
+[data-theme="dark"] .preview-col {
+    border-color: var(--border-color) !important;
+}
+
+/* 26. Company module selector - Ajustar tema */
+[data-theme="dark"] .company-module-selector {
+    background-color: var(--widget-bg-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .selector-label {
+    color: var(--heading-color) !important;
+}
+
+/* 27. Home page - Ajustes adicionales */
+[data-theme="dark"] .home-title {
+    color: var(--heading-color) !important;
+}
+
+[data-theme="dark"] .home-subtitle {
+    color: var(--text-light-color) !important;
+}
+
+/* 28. Company selection - Ajustar tema */
+[data-theme="dark"] .company-selection {
+    /* Los botones hijos ya tienen sus propias reglas */
+}
+
+/* 29. Card - Ajustes adicionales */
+[data-theme="dark"] .card {
+    background-color: var(--widget-bg-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .card-title {
+    color: var(--heading-color) !important;
+}
+
+[data-theme="dark"] .card-description {
+    color: var(--text-light-color) !important;
+}
+
+/* 30. Form control - Ajustes adicionales */
+[data-theme="dark"] .form-control {
+    background-color: var(--widget-bg-color) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .form-control:focus {
+    border-color: var(--primary-color) !important;
+}
+
+[data-theme="dark"] .form-control::placeholder {
+    color: var(--text-lighter-color) !important;
+}
+
+/* 31. Form label - Ajustar tema */
+[data-theme="dark"] .form-label {
+    color: var(--heading-color) !important;
+}
+
+/* 32. Investigacion form - Ajustar tema */
+[data-theme="dark"] .investigacion-form {
+    background-color: var(--widget-bg-color) !important;
+}
+
+/* 33. Context area textarea - Ajustar tema */
+[data-theme="dark"] .context-area textarea {
+    background-color: var(--widget-bg-color) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-color) !important;
+}
+
+/* 34. Extracted data area - Ajustar tema */
+[data-theme="dark"] .extracted-data-area {
+    background-color: var(--widget-bg-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* 35. Process controls - Ajustar tema */
+[data-theme="dark"] .process-controls {
+    color: var(--text-color) !important;
+}
+
+/* 36. Error messages - Ajustar tema */
+[data-theme="dark"] .error {
+    color: var(--danger-color) !important;
+}
+
+/* 37. Progress status - Ajustar tema */
+[data-theme="dark"] .progress-status {
+    color: var(--text-light-color) !important;
+}
+
+/* 38. M-category - Ajustar tema */
+[data-theme="dark"] .m-category {
+    color: var(--primary-color) !important;
+}
+
+/* 39. M-content - Ajustar tema */
+[data-theme="dark"] .m-content {
+    color: var(--text-color) !important;
+}
+
+/* 40. Cause number - Ajustar tema */
+[data-theme="dark"] .cause-number {
+    color: var(--primary-color) !important;
+}
+
