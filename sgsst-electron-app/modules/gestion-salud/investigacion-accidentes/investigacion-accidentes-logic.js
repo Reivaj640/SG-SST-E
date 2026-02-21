@@ -39,83 +39,53 @@ class InvestigacionAccidentesComponent {
     }
 
     renderMainView(container) {
-        // Encabezado
-        const header = document.createElement('div');
-        header.className = 'submodule-header';
+        // Cargar la nueva antesala estilo portal
+        this.showPortalHome(container);
+    }
 
-        const title = document.createElement('h2');
-        title.textContent = this.submoduleName;
-        header.appendChild(title);
+    showPortalHome(container) {
+        container.innerHTML = '';
 
-        if (this.onBack && typeof this.onBack === 'function') {
-            const backButton = document.createElement('button');
-            backButton.className = 'btn';
-            backButton.textContent = '← Volver';
-            backButton.addEventListener('click', this.onBack);
-            header.appendChild(backButton);
+        const iframe = document.createElement('iframe');
+        iframe.src = `./modules/gestion-salud/investigacion-accidentes/investigacion-home.html?company=${encodeURIComponent(this.currentCompany)}`;
+        iframe.style.width = '100%';
+        iframe.style.height = '100%';
+        iframe.style.border = 'none';
+        iframe.style.background = 'white';
+
+        container.appendChild(iframe);
+
+        this.setupPortalCommunication(iframe);
+    }
+
+    setupPortalCommunication(iframe) {
+        if (this._portalMessageHandler) {
+            window.removeEventListener('message', this._portalMessageHandler);
         }
 
-        container.appendChild(header);
+        this._portalMessageHandler = (event) => {
+            if (event.source !== iframe.contentWindow) {
+                return;
+            }
 
-        // Descripción
-        const description = document.createElement('p');
-        description.className = 'submodule-description';
-        description.textContent = 'Este submódulo permite gestionar la investigación de accidentes, incidentes y enfermedades laborales.';
-        container.appendChild(description);
+            const { type, action } = event.data;
 
-        // Crear tarjetas para las opciones del submódulo
-        const cardsContainer = document.createElement('div');
-        cardsContainer.className = 'module-cards';
+            if (type === 'back-to-module-request') {
+                if (this.onBack && typeof this.onBack === 'function') {
+                    this.onBack();
+                }
+            }
 
-        // Tarjeta 1: Ver investigación
-        const card1 = this.createModuleCard(
-            'Ver investigación',
-            'Consulta las investigaciones de accidentes, incidentes y enfermedades ya realizadas.',
-            () => this.handleViewInvestigation()
-        );
-        cardsContainer.appendChild(card1);
+            if (type === 'investigacion-home-action') {
+                if (action === 'realizar-investigacion') {
+                    this.handlePerformInvestigation();
+                } else if (action === 'ver-investigaciones') {
+                    this.handleViewInvestigation();
+                }
+            }
+        };
 
-        // Tarjeta 2: Realizar investigación
-        const card2 = this.createModuleCard(
-            'Realizar investigación',
-            'Inicia una nueva investigación de accidentes, incidentes o enfermedades.',
-            () => this.handlePerformInvestigation()
-        );
-        cardsContainer.appendChild(card2);
-
-        // Tarjeta 3: Próximo a implementar
-        const card3 = this.createModuleCard(
-            'Próximo a implementar',
-            'Nuevas funcionalidades estarán disponibles próximamente.',
-            () => this.handleComingSoon()
-        );
-        cardsContainer.appendChild(card3);
-
-        container.appendChild(cardsContainer);
-
-        // Área de notificaciones
-        const notificationArea = document.createElement('div');
-        notificationArea.className = 'notification-area';
-        notificationArea.innerHTML = `
-            <h3>Notificaciones recientes</h3>
-            <div class="notification-item">
-                <div class="notification-icon">ℹ️</div>
-                <div class="notification-content">
-                    <div class="notification-title">Nueva investigación pendiente</div>
-                    <div class="notification-message">Hay 2 investigaciones pendientes de accidentes menores.</div>
-                    <div class="notification-time">Hace 2 horas</div>
-                </div>
-            </div>
-            <div class="notification-item">
-                <div class="notification-icon">✅</div>
-                <div class="notification-content">
-                    <div class="notification-title">Investigación completada</div>
-                    <div class="notification-message">La investigación del incidente del 15/08/2025 ha sido completada.</div>
-                    <div class="notification-time">Hace 1 día</div>
-                </div>
-            </div>
-        `;
-        container.appendChild(notificationArea);
+        window.addEventListener('message', this._portalMessageHandler);
     }
     
     // Método para mostrar la nueva interfaz de investigación con IA
@@ -216,49 +186,18 @@ class InvestigacionAccidentesComponent {
     }
 
     showModernDocumentViewer() {
-        // Limpiar el contenedor actual
         this.container.innerHTML = '';
 
-        // Crear un iframe para cargar la interfaz de visualización de investigaciones
         const iframe = document.createElement('iframe');
         iframe.src = './modules/gestion-salud/investigacion-accidentes/investigaciones-view.html';
         iframe.style.width = '100%';
-        iframe.style.height = '100vh';
+        iframe.style.height = '100%';
         iframe.style.border = 'none';
         iframe.style.background = 'white';
 
-        // Crear un encabezado con botón de volver
-        const header = document.createElement('div');
-        header.className = 'submodule-header';
-        header.style.display = 'flex';
-        header.style.alignItems = 'center';
-        header.style.padding = '10px';
-        header.style.backgroundColor = '#f8f9fa';
-        header.style.borderBottom = '1px solid #dee2e6';
-        header.style.marginBottom = '0';
-
-        const backButton = document.createElement('button');
-        backButton.className = 'btn btn-back';
-        backButton.innerHTML = '&#8592; Volver';
-        backButton.style.marginRight = '10px';
-        backButton.addEventListener('click', () => {
-            this.currentView = 'main';
-            this.render();
-        });
-
-        const title = document.createElement('h3');
-        title.textContent = 'Ver Investigaciones de Accidentes';
-        title.style.flexGrow = '1';
-        title.style.textAlign = 'center';
-        title.style.margin = '0';
-        title.style.fontSize = '1.2rem';
-
-        header.appendChild(backButton);
-        header.appendChild(title);
-
-        // Agregar elementos al contenedor
-        this.container.appendChild(header);
         this.container.appendChild(iframe);
+
+        this.setupIframeCommunication(iframe);
     }
 
     handlePerformInvestigation() {
@@ -267,75 +206,33 @@ class InvestigacionAccidentesComponent {
     }
 
     showModernInvestigationInterface() {
-        // Limpiar el contenedor actual
         this.container.innerHTML = '';
 
-        // Crear un iframe para cargar la nueva interfaz
         const iframe = document.createElement('iframe');
-        // Pasar la empresa actual como parámetro de URL
         iframe.src = `./modules/gestion-salud/investigacion-accidentes/investigacion-accidentes-view.html?company=${encodeURIComponent(this.currentCompany)}`;
         iframe.style.width = '100%';
-        iframe.style.height = 'calc(100vh - 60px)'; // Ajustar para el encabezado
+        iframe.style.height = '100%';
         iframe.style.border = 'none';
         iframe.style.background = 'white';
 
-        // Crear un encabezado con botón de volver
-        const header = document.createElement('div');
-        header.className = 'submodule-header';
-        header.style.display = 'flex';
-        header.style.alignItems = 'center';
-        header.style.padding = '10px';
-        header.style.backgroundColor = '#f8f9fa';
-        header.style.borderBottom = '1px solid #dee2e6';
-        header.style.marginBottom = '0';
-
-        const backButton = document.createElement('button');
-        backButton.className = 'btn btn-back';
-        backButton.innerHTML = '&#8592; Volver';
-        backButton.style.marginRight = '10px';
-        backButton.addEventListener('click', () => {
-            this.currentView = 'main';
-            this.render();
-        });
-
-        const title = document.createElement('h3');
-        title.textContent = 'Investigación de Accidentes - Nueva Interfaz';
-        title.style.flexGrow = '1';
-        title.style.textAlign = 'center';
-        title.style.margin = '0';
-        title.style.fontSize = '1.2rem';
-
-        header.appendChild(backButton);
-        header.appendChild(title);
-
-        // Agregar elementos al contenedor
-        this.container.appendChild(header);
         this.container.appendChild(iframe);
 
-        // Establecer comunicación con el iframe
         this.setupIframeCommunication(iframe);
     }
 
     setupIframeCommunication(iframe) {
-        // ⚠️ IMPORTANTE: El listener de mensajes ahora está centralizado en renderer.js
-        // Este método ya NO registra un listener duplicado para evitar doble procesamiento.
-        // Solo manejamos el mensaje 'goBack' que es específico de navegación.
-        
-        // Usar una referencia guardada para poder remover el listener si es necesario
         if (this._iframeMessageHandler) {
             window.removeEventListener('message', this._iframeMessageHandler);
         }
         
         this._iframeMessageHandler = (event) => {
-            // Verificar que el origen sea el iframe
             if (event.source !== iframe.contentWindow) {
                 return;
             }
 
             const { type } = event.data;
 
-            // Solo manejar navegación - el resto lo maneja renderer.js
-            if (type === 'goBack') {
+            if (type === 'goBack' || type === 'back-to-module-request') {
                 this.currentView = 'main';
                 this.render();
             }
@@ -343,7 +240,7 @@ class InvestigacionAccidentesComponent {
         
         window.addEventListener('message', this._iframeMessageHandler);
         
-        console.log('[INVESTIGACION-ACCIDENTES-LOGIC] Comunicación iframe configurada (listener único en renderer.js)');
+        console.log('[INVESTIGACION-ACCIDENTES-LOGIC] Comunicación iframe configurada');
     }
 
     async handleProcessAccidentPdf(payload, requestId, iframe) {
