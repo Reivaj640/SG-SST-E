@@ -18,6 +18,16 @@ class MedicionAusentismoComponent {
     }
 
     render() {
+        // Ejecutar cleanup anterior si existe
+        if (this.portalMessageCleanup) {
+            this.portalMessageCleanup();
+            this.portalMessageCleanup = null;
+        }
+        if (this.iframeMessageCleanup) {
+            this.iframeMessageCleanup();
+            this.iframeMessageCleanup = null;
+        }
+
         this.container.innerHTML = '';
         // Añadir clase específica para identificar este módulo y permitir estilos específicos
         this.container.classList.add('medicion-ausentismo');
@@ -42,83 +52,74 @@ class MedicionAusentismoComponent {
     }
 
     renderMainView(container) {
-        // Encabezado
-        const header = document.createElement('div');
-        header.className = 'submodule-header';
+        // Limpiar padding para que el portal ocupe todo el espacio
+        container.style.padding = '0';
+        container.style.overflow = 'hidden';
 
-        const title = document.createElement('h2');
-        title.textContent = this.submoduleName;
-        header.appendChild(title);
-
-        if (this.onBack && typeof this.onBack === 'function') {
-            const backButton = document.createElement('button');
-            backButton.className = 'btn';
-            backButton.textContent = '← Volver';
-            backButton.addEventListener('click', this.onBack);
-            header.appendChild(backButton);
-        }
-
-        container.appendChild(header);
-
-        // Descripción
-        const description = document.createElement('p');
-        description.className = 'submodule-description';
-        description.textContent = 'Este submódulo permite gestionar la medición del ausentismo por causa médica.';
-        container.appendChild(description);
-
-        // Tarjetas de opciones
-        const cardsContainer = document.createElement('div');
-        cardsContainer.className = 'module-cards';
-
-        cardsContainer.appendChild(
-            this.createModuleCard(
-                'Ver ausentismo',
-                'Consulta las mediciones del ausentismo por causa médica ya realizadas.',
-                () => this.handleViewAusentismo()
-            )
-        );
-
-        cardsContainer.appendChild(
-            this.createModuleCard(
-                'Registrar Ausentismo',
-                'Registra nuevos casos de ausentismo por causa médica.',
-                () => this.handleRegistrarAusentismo()
-            )
-        );
-
-        cardsContainer.appendChild(
-            this.createModuleCard(
-                'Seguimiento de Incapacidades',
-                'Gestiona y sigue el estado de las incapacidades médicas de los empleados.',
-                () => this.handleSeguimientoIncapacidades()
-            )
-        );
-
-        container.appendChild(cardsContainer);
-
-        // Notificaciones
-        const notificationArea = document.createElement('div');
-        notificationArea.className = 'notification-area';
-        notificationArea.innerHTML = `
-            <h3>Notificaciones recientes</h3>
-            <div class="notification-item">
-                <div class="notification-icon">ℹ️</div>
-                <div class="notification-content">
-                    <div class="notification-title">Nueva medición pendiente</div>
-                    <div class="notification-message">Hay datos pendientes de actualización para el ausentismo del mes.</div>
-                    <div class="notification-time">Hace 1 día</div>
-                </div>
-            </div>
-            <div class="notification-item">
-                <div class="notification-icon">✅</div>
-                <div class="notification-content">
-                    <div class="notification-title">Medición completada</div>
-                    <div class="notification-message">La medición del ausentismo del mes pasado ha sido completada.</div>
-                    <div class="notification-time">Hace 3 días</div>
-                </div>
-            </div>
+        // Crear iframe para cargar el portal de bienvenida
+        const iframe = document.createElement('iframe');
+        iframe.src = 'medicion-ausentismo-home.html';
+        iframe.style.cssText = `
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
         `;
-        container.appendChild(notificationArea);
+
+        // Manejar mensajes desde el iframe
+        const handleIframeMessage = (event) => {
+            if (event.source !== iframe.contentWindow) return;
+
+            const data = event.data;
+            
+            if (data.type === 'back-to-module-request') {
+                // Volver al módulo principal
+                if (this.onBack && typeof this.onBack === 'function') {
+                    this.onBack();
+                }
+            } else if (data.type === 'ausentismo-home-action') {
+                // Manejar acciones del portal
+                switch (data.action) {
+                    case 'registrar-ausentismo':
+                        this.currentView = 'registrar-ausentismo';
+                        this.render();
+                        break;
+                    case 'ver-ausentismo':
+                        this.currentView = 'ver-ausentismo';
+                        this.render();
+                        break;
+                    case 'seguimiento-incapacidades':
+                        this.currentView = 'seguimiento-incapacidades';
+                        this.render();
+                        break;
+                }
+            }
+        };
+
+        // Agregar listener para mensajes desde el iframe
+        window.addEventListener('message', handleIframeMessage);
+
+        // Guardar cleanup para cuando se desmonte
+        if (this.portalMessageCleanup) {
+            this.portalMessageCleanup();
+        }
+        this.portalMessageCleanup = () => {
+            window.removeEventListener('message', handleIframeMessage);
+        };
+
+        // Pasar contexto de empresa al iframe cuando cargue
+        iframe.onload = () => {
+            try {
+                iframe.contentWindow.postMessage({
+                    type: 'SET_COMPANY_CONTEXT',
+                    company: this.currentCompany
+                }, '*');
+            } catch (error) {
+                console.error('Error al enviar contexto al iframe:', error);
+            }
+        };
+
+        container.appendChild(iframe);
     }
 
     createModuleCard(title, description, onClick) {
