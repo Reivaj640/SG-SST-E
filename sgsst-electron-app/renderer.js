@@ -477,8 +477,15 @@ async function applyGlobalTheme() {
   }
 
   if (effectiveTheme === 'dark') {
-    document.documentElement.setAttribute('data-theme', 'dark');
+    if (savedTheme === 'dark') {
+      // Tema Oscuro (Paleta Negro/Gris)
+      document.documentElement.setAttribute('data-theme', 'dark-legacy');
+    } else if (savedTheme === 'system') {
+      // Tema de Sistema (cuando el sistema es oscuro)
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
   } else {
+    // Tema Claro
     document.documentElement.removeAttribute('data-theme');
   }
   
@@ -506,7 +513,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Aplicar el tema global al cargar la aplicación
   await applyGlobalTheme();
   
-  // Escuchar cambios de tema del sistema
+// Escuchar cambios de tema del sistema
   if (window.electronAPI && window.electronAPI.onSystemThemeChanged) {
     window.electronAPI.onSystemThemeChanged(async (systemTheme) => {
       console.log('[Renderer] System theme changed:', systemTheme);
@@ -517,6 +524,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
           document.documentElement.removeAttribute('data-theme');
         }
+        console.log('[Renderer] Tema del sistema aplicado:', systemTheme);
+      } else if (savedTheme === 'dark') {
+        // Mantener tema Oscuro independientemente del sistema
+        if (systemTheme === 'dark') {
+          document.documentElement.setAttribute('data-theme', 'dark-legacy');
+        } else {
+          document.documentElement.removeAttribute('data-theme');
+        }
+        console.log('[Renderer] Tema Oscuro (dark-legacy) mantenido');
       }
     });
   }
@@ -684,12 +700,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                   return;
               case 'theme-preference-changed':
                   // El usuario cambió el tema desde el iframe de configuración
-                  console.log('RENDERER: Theme preference changed to:', payload);
-                  if (payload === 'dark') {
-                      document.documentElement.setAttribute('data-theme', 'dark');
-                  } else if (payload === 'light') {
+                  const themeMode = event.data.theme || payload;
+                  console.log('RENDERER: Theme preference changed to:', themeMode);
+
+                  // Aplicar tema inmediatamente
+                  if (themeMode === 'dark') {
+                      document.documentElement.setAttribute('data-theme', 'dark-legacy');
+                  } else if (themeMode === 'light') {
                       document.documentElement.removeAttribute('data-theme');
-                  } else if (payload === 'system') {
+                  } else if (themeMode === 'system') {
                       // Aplicar tema del sistema
                       const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
                       if (isDark) {
@@ -698,7 +717,51 @@ document.addEventListener('DOMContentLoaded', async () => {
                           document.documentElement.removeAttribute('data-theme');
                       }
                   }
-                  localStorage.setItem('kair-theme-preference', payload);
+
+                  // Guardar preferencia
+                  localStorage.setItem('kair-theme-preference', themeMode);
+
+                  // Forzar actualización en todos los iframes
+                  const iframes = document.querySelectorAll('iframe');
+                  iframes.forEach(iframe => {
+                      try {
+                          const effectiveTheme = themeMode === 'system' ?
+                              (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') :
+                              themeMode;
+
+                          if (iframe.contentDocument) {
+                              if (effectiveTheme === 'dark') {
+                                  if (themeMode === 'dark') {
+                                      iframe.contentDocument.documentElement.setAttribute('data-theme', 'dark-legacy');
+                                  } else if (themeMode === 'system') {
+                                      iframe.contentDocument.documentElement.setAttribute('data-theme', 'dark');
+                                  }
+                              } else {
+                                  iframe.contentDocument.documentElement.removeAttribute('data-theme');
+                              }
+                          }
+
+                          iframe.contentWindow?.postMessage({
+                              type: 'theme-changed',
+                              theme: themeMode,
+                              effectiveTheme: effectiveTheme
+                          }, '*');
+                      } catch (e) {
+                          console.warn('Error propagando tema a iframe:', e);
+                      }
+                  });
+
+                  console.log('Tema aplicado:', themeMode, '(efectivo:', (themeMode === 'system' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : themeMode) + ')');
+
+                  // Forzar actualización en módulos home activos
+                  if (typeof currentModule !== 'undefined' && currentModule) {
+                      console.log('Actualizando tema en módulo activo:', currentModule);
+                      // Recargar el módulo para aplicar el nuevo tema
+                      setTimeout(() => {
+                          showModuleContent(currentModule);
+                      }, 100);
+                  }
+
                   return;
               case 'GET_AUSENTISMO_DATA':
                   // Handle request to get absenteeism data
@@ -1395,6 +1458,7 @@ async function selectCompany(companyName, buttonElement) {
   const sidebar = document.getElementById('sidebar');
   if (sidebar) {
     sidebar.classList.remove('sidebar-hidden');
+    sidebar.classList.add('sidebar-collapsed'); // Asegurar que permanezca colapsado
   }
 
   // Cargar la normativa si aún no se ha hecho
@@ -1537,6 +1601,13 @@ function showCompanyHomePage() {
   // ✅ Pasar contentArea a hideCalendar
   hideCalendar(contentArea);
   console.log(`Showing home page for company: ${currentCompany}`);
+  
+  // Asegurar que el sidebar permanezca colapsado
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar) {
+    sidebar.classList.add('sidebar-collapsed');
+  }
+  
   contentArea.innerHTML = '';
 
   // Crear el contenedor principal del canvas
@@ -2596,14 +2667,18 @@ function createModuleCard(title, description, onClick) {
         // Propagar el tema actual al iframe
         const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
         const savedTheme = localStorage.getItem('kair-theme-preference') || 'system';
-        
+
         try {
           if (currentTheme === 'dark') {
-            iframe.contentDocument.documentElement.setAttribute('data-theme', 'dark');
+            if (savedTheme === 'dark') {
+              iframe.contentDocument.documentElement.setAttribute('data-theme', 'dark-legacy');
+            } else if (savedTheme === 'system') {
+              iframe.contentDocument.documentElement.setAttribute('data-theme', 'dark');
+            }
           } else {
             iframe.contentDocument.documentElement.removeAttribute('data-theme');
           }
-          
+
           // Enviar mensaje postMessage con el tema para que el iframe lo procese
           iframe.contentWindow.postMessage({
             type: 'theme-changed',

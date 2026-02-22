@@ -408,6 +408,28 @@ class RecursosHome {
                 --k-shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.4);
             }
 
+            /* =========================================
+               TEMA OSCURO (DARK-LEGACY - PALETA NEGRO/GRIS)
+               ========================================= */
+            [data-theme="dark-legacy"] .gestion-integral-home {
+                --k-primary: #9e9e9e;
+                --k-primary-hover: #bdbdbd;
+                --k-primary-light: rgba(158, 158, 158, 0.15);
+                --k-success: #4caf50;
+                --k-success-light: rgba(76, 175, 80, 0.15);
+                --k-warning: #ff9800;
+                --k-warning-light: rgba(255, 152, 0, 0.15);
+                --k-danger: #f44336;
+                --k-danger-light: rgba(244, 67, 54, 0.15);
+                --k-bg-app: #121212;
+                --k-bg-card: #1e1e1e;
+                --k-border: #404040;
+                --k-text-main: #e0e0e0;
+                --k-text-muted: #a0a0a0;
+                --k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.6);
+                --k-shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.8);
+            }
+
             @media (max-width: 992px) {
                 .charts-grid { grid-template-columns: 1fr; }
                 .chart-card.budget-chart { grid-column: auto; }

@@ -1,17 +1,17 @@
 /**
  * Theme Manager - Sistema centralizado de gestión de temas para K+AIR
- * Maneja los modos: Claro, Oscuro, Sistema
+ * Maneja los modos: Claro, Oscuro (Negro/Gris), Sistema
  */
 
 const ThemeManager = {
     THEME_KEY: 'kair-theme-preference',
     currentTheme: 'system',
     listeners: new Set(),
-    
+
     THEMES: {
         LIGHT: 'light',
-        DARK: 'dark',
-        SYSTEM: 'system'
+        DARK: 'dark',       // Tema Oscuro (Paleta Negro/Gris) - usa data-theme="dark-legacy"
+        SYSTEM: 'system'    // Tema Sistema - usa data-theme="dark" cuando es oscuro
     },
 
     async init() {
@@ -50,7 +50,7 @@ const ThemeManager = {
 
     async applyTheme(themeMode) {
         let effectiveTheme = themeMode;
-        
+
         if (themeMode === this.THEMES.SYSTEM) {
             if (window.electronAPI && window.electronAPI.getSystemTheme) {
                 const result = await window.electronAPI.getSystemTheme();
@@ -61,15 +61,23 @@ const ThemeManager = {
                 effectiveTheme = 'light';
             }
         }
-        
+
+        // Aplicar atributo según el tipo de tema
         if (effectiveTheme === 'dark') {
-            document.documentElement.setAttribute('data-theme', 'dark');
+            if (themeMode === this.THEMES.DARK) {
+                // Tema Oscuro (Paleta Negro/Gris)
+                document.documentElement.setAttribute('data-theme', 'dark-legacy');
+            } else if (themeMode === this.THEMES.SYSTEM) {
+                // Tema de Sistema (cuando el sistema es oscuro)
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
         } else {
+            // Tema Claro
             document.documentElement.removeAttribute('data-theme');
         }
-        
-        this._propagateToIframes(effectiveTheme);
-        console.log('[ThemeManager] Applied effective theme:', effectiveTheme);
+
+        this._propagateToIframes(effectiveTheme, themeMode);
+        console.log('[ThemeManager] Applied effective theme:', effectiveTheme, '(mode:', themeMode + ')');
     },
 
     getEffectiveTheme() {
@@ -124,21 +132,26 @@ const ThemeManager = {
         }
     },
 
-    _propagateToIframes(theme) {
+    _propagateToIframes(theme, mode) {
         const iframes = document.querySelectorAll('iframe');
         iframes.forEach(iframe => {
             try {
                 if (iframe.contentDocument) {
                     if (theme === 'dark') {
-                        iframe.contentDocument.documentElement.setAttribute('data-theme', 'dark');
+                        if (mode === 'dark') {
+                            iframe.contentDocument.documentElement.setAttribute('data-theme', 'dark-legacy');
+                        } else if (mode === 'system') {
+                            iframe.contentDocument.documentElement.setAttribute('data-theme', 'dark');
+                        }
                     } else {
                         iframe.contentDocument.documentElement.removeAttribute('data-theme');
                     }
                 }
-                
+
                 iframe.contentWindow?.postMessage({
                     type: 'theme-changed',
-                    theme: theme
+                    theme: theme,
+                    mode: mode
                 }, '*');
             } catch (e) {
                 // Iframe puede no estar accesible

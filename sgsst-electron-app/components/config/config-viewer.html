@@ -64,6 +64,29 @@
             --shadow-lg: 0 1rem 3rem rgba(0, 0, 0, 0.5);
         }
 
+        /* Variables de tema oscuro (DARK-LEGACY - Paleta Negro/Gris) */
+        [data-theme="dark-legacy"] {
+            --primary: #9e9e9e;
+            --primary-hover: #bdbdbd;
+            --success: #4caf50;
+            --warning: #ff9800;
+            --danger: #f44336;
+            --info: #2196f3;
+            --dark: #0a0a0a;
+
+            --bg-general: #121212;
+            --bg-card: #1e1e1e;
+            --border-color: #404040;
+
+            --text-main: #e0e0e0;
+            --text-muted: #a0a0a0;
+            --text-light: #e0e0e0;
+
+            --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.6);
+            --shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.8);
+            --shadow-lg: 0 1rem 3rem rgba(0, 0, 0, 0.9);
+        }
+
         * {
             box-sizing: border-box;
             margin: 0;
@@ -528,6 +551,71 @@
 
         [data-theme="dark"] .normativa-pill {
             background-color: rgba(77, 166, 255, 0.2);
+        }
+
+        /* =========================================
+           TEMA OSCURO (DARK-LEGACY - Paleta Negro/Gris)
+           ========================================= */
+        [data-theme="dark-legacy"] .theme-control-group {
+            background: var(--bg-card);
+            border-color: var(--border-color);
+        }
+
+        [data-theme="dark-legacy"] .theme-option {
+            color: var(--text-muted);
+        }
+
+        [data-theme="dark-legacy"] .theme-option.active {
+            background: #2a2a2a;
+            color: var(--primary);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+
+        [data-theme="dark-legacy"] .theme-segmented {
+            background: #2a2a2a;
+        }
+
+        [data-theme="dark-legacy"] .company-stats {
+            background: var(--bg-card);
+        }
+
+        [data-theme="dark-legacy"] thead {
+            background-color: var(--bg-card);
+        }
+
+        [data-theme="dark-legacy"] tr:hover {
+            background-color: rgba(158, 158, 158, 0.1);
+        }
+
+        [data-theme="dark-legacy"] .form-control {
+            background-color: var(--bg-card);
+            border-color: var(--border-color);
+            color: var(--text-main);
+        }
+
+        [data-theme="dark-legacy"] .form-control:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(158, 158, 158, 0.2);
+        }
+
+        [data-theme="dark-legacy"] .btn-outline {
+            background: var(--bg-card);
+            border-color: var(--border-color);
+            color: var(--text-main);
+        }
+
+        [data-theme="dark-legacy"] .btn-outline:hover {
+            background: #2a2a2a;
+        }
+
+        [data-theme="dark-legacy"] .ai-textarea {
+            background-color: var(--bg-card);
+            border-color: var(--border-color);
+            color: var(--text-main);
+        }
+
+        [data-theme="dark-legacy"] .normativa-pill {
+            background-color: rgba(158, 158, 158, 0.2);
         }
 
         /* --- Acerca de --- */
@@ -1469,21 +1557,23 @@
     async function setTheme(mode, el) {
         document.querySelectorAll('.theme-option').forEach(o => o.classList.remove('active'));
         el.classList.add('active');
-        
+
         // Aplicar tema visualmente en este iframe
         if (mode === 'dark') {
-            document.documentElement.setAttribute('data-theme', 'dark');
+            // Tema Oscuro (Paleta Negro/Gris)
+            document.documentElement.setAttribute('data-theme', 'dark-legacy');
         } else if (mode === 'light') {
+            // Tema Claro
             document.documentElement.removeAttribute('data-theme');
         } else if (mode === 'system') {
-            // Para sistema, preguntar al padre o usar prefers-color-scheme
+            // Tema de Sistema (usa la configuración del SO)
             if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
                 document.documentElement.setAttribute('data-theme', 'dark');
             } else {
                 document.documentElement.removeAttribute('data-theme');
             }
         }
-        
+
         // Guardar preferencia
         if (electronAPI && typeof electronAPI.saveThemePreference === 'function') {
             try {
@@ -1494,19 +1584,24 @@
                 console.error('Error al guardar el tema:', error);
             }
         }
-        
+
+        // Aplicar tema inmediatamente en este iframe (ya hecho arriba)
+        console.log('[ConfigViewer] Tema aplicado en iframe:', mode);
+
         // Notificar al padre sobre el cambio
         if (window.parent && window.parent !== window) {
-            window.parent.postMessage({
+            const message = {
                 type: 'theme-preference-changed',
                 theme: mode
-            }, '*');
+            };
+            console.log('[ConfigViewer] Enviando mensaje al padre:', message);
+            window.parent.postMessage(message, '*');
         }
     }
     
     async function initThemeUI() {
         let currentTheme = 'system';
-        
+
         // Intentar obtener tema desde electronAPI
         if (electronAPI && typeof electronAPI.getThemePreference === 'function') {
             try {
@@ -1517,7 +1612,7 @@
                 console.error('Error cargando tema:', e);
             }
         }
-        
+
         // Actualizar UI del toggle
         document.querySelectorAll('.theme-option').forEach(o => o.classList.remove('active'));
         const activeOption = document.querySelector(`.theme-option[onclick*="'${currentTheme}'"]`);
@@ -1525,20 +1620,25 @@
             activeOption.classList.add('active');
             console.log('Toggle actualizado para tema:', currentTheme);
         }
-        
+
         // Aplicar tema visualmente
         let effectiveTheme = currentTheme;
         if (currentTheme === 'system') {
             effectiveTheme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
         }
-        
-        if (effectiveTheme === 'dark') {
+
+        if (effectiveTheme === 'dark' && currentTheme === 'dark') {
+            // Tema Oscuro (Paleta Negro/Gris)
+            document.documentElement.setAttribute('data-theme', 'dark-legacy');
+        } else if (effectiveTheme === 'dark' && currentTheme === 'system') {
+            // Tema de Sistema (cuando el sistema es oscuro)
             document.documentElement.setAttribute('data-theme', 'dark');
         } else {
+            // Tema Claro
             document.documentElement.removeAttribute('data-theme');
         }
-        
-        console.log('Tema efectivo aplicado:', effectiveTheme);
+
+        console.log('Tema efectivo aplicado:', effectiveTheme, '(modo:', currentTheme + ')');
     }
 
     /* ================= FUNCIÓN PARA DETERMINAR ESCENARIO NORMATIVO ================= */
@@ -2004,21 +2104,28 @@
     // MODO CLARO = ESTADO BASE (sin atributo data-theme)
     function applyEffectiveTheme(themePreference) {
         let effectiveTheme = themePreference;
-        
+
         if (themePreference === 'system') {
             effectiveTheme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
         }
-        
-        // IMPORTANTE: Solo aplicamos data-theme="dark" en modo oscuro
-        // En modo claro, NO hay atributo data-theme (estado natural)
+
+        // Aplicar atributo según el tipo de tema
         if (effectiveTheme === 'dark') {
-            document.documentElement.setAttribute('data-theme', 'dark');
-            console.log('[ConfigViewer] 🌙 Tema OSCURO aplicado');
+            if (themePreference === 'dark') {
+                // Tema Oscuro (Paleta Negro/Gris)
+                document.documentElement.setAttribute('data-theme', 'dark-legacy');
+                console.log('[ConfigViewer] 🌙 Tema OSCURO (dark-legacy) aplicado');
+            } else if (themePreference === 'system') {
+                // Tema de Sistema (cuando el sistema es oscuro)
+                document.documentElement.setAttribute('data-theme', 'dark');
+                console.log('[ConfigViewer] 💻 Tema SISTEMA (oscuro) aplicado');
+            }
         } else {
+            // Tema Claro
             document.documentElement.removeAttribute('data-theme');
             console.log('[ConfigViewer] ☀️ Tema CLARO aplicado (estado base)');
         }
-        
+
         console.log('[ConfigViewer] Preferencia:', themePreference, '| Efectivo:', effectiveTheme);
     }
 
