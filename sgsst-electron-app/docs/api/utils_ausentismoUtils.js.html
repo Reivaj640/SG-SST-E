@@ -1,4 +1,32 @@
-/**
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: utils/ausentismoUtils.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: utils/ausentismoUtils.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
  * @fileoverview AusentismoUtils - Utilidades para procesamiento de ausentismos médicos
  * @module utils/ausentismoUtils
  * @description Proporciona funciones para cargar, guardar y gestionar datos de ausentismo médico
@@ -27,10 +55,10 @@ class AusentismoUtils {
    * @function loadAusentismoData
    * @memberof AusentismoUtils
    * @param {string} companyName - Nombre de la empresa (ej. 'TEMPOACTIVA', 'ASEPLUS')
-   * @returns {Promise<Object>} Resultado con datos de ausentismo
+   * @returns {Promise&lt;Object>} Resultado con datos de ausentismo
    * @property {boolean} success - Indica si la operación fue exitosa
    * @property {Array} headers - Encabezados de columnas del Excel
-   * @property {Array<Array>} rows - Filas de datos de ausentismo
+   * @property {Array&lt;Array>} rows - Filas de datos de ausentismo
    * @property {string} filePath - Ruta completa al archivo Excel
    * @property {string} [error] - Mensaje de error si success es false
    * @example
@@ -86,7 +114,7 @@ class AusentismoUtils {
    * @param {number} rowIndex - Índice de la fila a modificar (base 0)
    * @param {number} colIndex - Índice de la columna a modificar (base 0)
    * @param {string|number} newValue - Nuevo valor para la celda
-   * @returns {Promise<Object>} Resultado de la operación
+   * @returns {Promise&lt;Object>} Resultado de la operación
    * @property {boolean} success - Indica si el guardado fue exitoso
    * @property {string} [error] - Mensaje de error si success es false
    */
@@ -123,7 +151,7 @@ class AusentismoUtils {
    * @param {string} recordData.fechaFinal - Fecha final de la incapacidad
    * @param {string} recordData.diagnostico - Diagnóstico médico
    * @param {string} recordData.epsArl - EPS o ARL que cubre la incapacidad
-   * @returns {Promise<Object>} Resultado de la operación
+   * @returns {Promise&lt;Object>} Resultado de la operación
    * @property {boolean} success - Indica si el agregado fue exitoso
    * @property {string} [error] - Mensaje de error si success es false
    */
@@ -148,4 +176,26 @@ class AusentismoUtils {
   }
 }
 
-module.exports = AusentismoUtils;
+module.exports = AusentismoUtils;</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-scripts_theme-manager.html">scripts/theme-manager</a></li><li><a href="module-utils_ausentismoUtils.html">utils/ausentismoUtils</a></li><li><a href="module-utils_remisionUtils.html">utils/remisionUtils</a></li></ul><h3>Namespaces</h3><ul><li><a href="module-scripts_theme-manager.ThemeManager.html">ThemeManager</a></li></ul><h3>Classes</h3><ul><li><a href="RendicionCuentasComponent.html">RendicionCuentasComponent</a></li><li><a href="module-utils_ausentismoUtils-AusentismoUtils.html">AusentismoUtils</a></li><li><a href="module-utils_remisionUtils-RemisionUtils.html">RemisionUtils</a></li></ul><h3>Global</h3><ul><li><a href="global.html#analyzeAccidentViaServer">analyzeAccidentViaServer</a></li><li><a href="global.html#callParentAPI">callParentAPI</a></li><li><a href="global.html#checkLlmServerHealth">checkLlmServerHealth</a></li><li><a href="global.html#checkLlmServerRunning">checkLlmServerRunning</a></li><li><a href="global.html#collectInterfaceData">collectInterfaceData</a></li><li><a href="global.html#finalizeReport">finalizeReport</a></li><li><a href="global.html#fs">fs</a></li><li><a href="global.html#hideCalendar">hideCalendar</a></li><li><a href="global.html#initializeEvents">initializeEvents</a></li><li><a href="global.html#initializeLlmServer">initializeLlmServer</a></li><li><a href="global.html#llmServerRequest">llmServerRequest</a></li><li><a href="global.html#loadData">loadData</a></li><li><a href="global.html#loadExcelData">loadExcelData</a></li><li><a href="global.html#render">render</a></li><li><a href="global.html#saveExcelData">saveExcelData</a></li><li><a href="global.html#saveReport">saveReport</a></li><li><a href="global.html#showCalendarInModule">showCalendarInModule</a></li><li><a href="global.html#startLlmServer">startLlmServer</a></li><li><a href="global.html#switchSection">switchSection</a></li><li><a href="global.html#updateIndicatorsFields">updateIndicatorsFields</a></li><li><a href="global.html#updateInterfaceWithExcelData">updateInterfaceWithExcelData</a></li><li><a href="global.html#updateResultsTable">updateResultsTable</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Mon Feb 23 2026 16:38:39 GMT-0500 (hora estándar de Colombia)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

@@ -240,7 +240,93 @@ El Sistema de Gestión de Seguridad y Salud en el Trabajo (SG-SST), denominado *
 - [Changelog](CHANGELOG.md) - Registro de cambios por versión
 - [Configuración OnlyOffice](ONLYOFFICE_SETUP.md) - Guía de configuración
 - [Mantenimiento del Proyecto](README-LIMPIEZA.md) - Reducción de tamaño y limpieza
+- [Scripts Python](scripts-python.md) - Documentación de scripts en Portear/src
 - [Portear/README.md](../Portear/README.md) - Scripts Python de procesamiento
+
+## 📦 Estado de Módulos Reorganizados (v0.1.46)
+
+Al febrero de 2026, se ha completado la reorganización modular del sistema con **18 módulos migrados** a la nueva arquitectura `modules/`.
+
+### ✅ Módulos Completados (100%)
+
+#### Recursos (11 módulos)
+| Código | Módulo | Archivos | Estado |
+|--------|--------|----------|--------|
+| 1.1.1 | Responsable del SG | logic, viewer, view.html, view.css | ✅ |
+| 1.1.2 | Roles y Responsabilidades | logic, viewer, view.html, view.css | ✅ |
+| 1.1.3 | Presupuesto | logic, view.html, selector.html | ✅ |
+| 1.1.4 | Afiliación | logic, viewer, view.html, view.css | ✅ |
+| 1.1.5 | Trabajo de alto riesgo | logic, viewer, view.html, view.css | ✅ |
+| 1.1.6 | Copasst | logic, viewer, view.html, view.css | ✅ |
+| 1.1.7 | Capacitación al Copasst | logic, viewer, view.html, view.css | ✅ |
+| 1.1.8 | Comité de Convivencia | logic, viewer, view.html, view.css | ✅ |
+| 1.2.1 | Capacitaciones | logic, viewer, view.html, view.css | ✅ |
+| 1.2.2 | Inducciones | logic, viewer, view.html, view.css | ✅ |
+| 1.2.3 | Curso Virtual | logic, viewer, view.html, view.css | ✅ |
+
+#### Gestión Integral (5 módulos)
+| Código | Módulo | Archivos | Estado |
+|--------|--------|----------|--------|
+| 2.1.1 | Política | logic, viewer, view.html, view.css | ✅ |
+| 2.2.1 | Objetivos SST | logic, viewer, view.html, view.css | ✅ |
+| 2.3.1 | Evaluación Inicial SG-SST | logic, viewer, view.html, view.css | ✅ |
+| 2.4.1 | Plan de Trabajo Anual | logic, viewer, view.html, view.css | ✅ |
+| 2.6.1 | Rendición de cuentas | logic, viewer, view.html, view.css | ✅ |
+
+#### Gestión de la Salud (6 módulos)
+| Código | Módulo | Archivos | Estado |
+|--------|--------|----------|--------|
+| 3.1.1 | Sociodemográfica | component, viewer, view.html, view.css | ✅ |
+| 3.1.4 | Evaluaciones médicas | logic, viewer, view.html, view.css | ✅ |
+| 3.1.6 | Restricciones médicas | logic, viewer, view.html, view.css | ✅ |
+| 3.2.1 | Reportes de accidentes | logic, viewer, view.html, view.css | ✅ |
+| 3.2.2 | Investigación de Accidentes | logic, viewer, view.html, view.css, home, handlers | ✅ |
+| 3.3.6 | Ausentismo | logic, dashboard.html | ✅ |
+
+### 📁 Estructura de Directorios Actual
+
+```
+modules/
+├── recursos/
+│   ├── responsable-sg/
+│   ├── roles-responsabilidades/
+│   ├── afiliacion/
+│   ├── copasst/
+│   ├── capacitacion-copasst/
+│   ├── comite-convivencia/
+│   ├── curso-virtual/
+│   ├── presupuesto/
+│   ├── trabajo-alto-riesgo/
+│   ├── capacitaciones/
+│   └── inducciones/
+├── gestion-integral/
+│   ├── politica/
+│   ├── objetivos-sst/
+│   ├── evaluacion-inicial-sg-sst/
+│   ├── plan-trabajo/
+│   └── rendicion-cuentas/
+└── gestion-salud/
+│   ├── sociodemografica/
+│   ├── evaluaciones-medicas/
+│   ├── restricciones-medicas/
+│   ├── reportes-accidentes/
+│   ├── investigacion-accidentes/
+│   └── ausentismo/
+```
+
+### 🔄 Convención de Nombres
+
+- `*-logic.js` - Lógica del componente (anteriormente `*-component.js` o `*.js`)
+- `*-viewer.js` - Vista del componente (mantiene nombre)
+- `*-view.html` - HTML del componente (anteriormente `*-viewer.html`)
+- `*-view.css` - Estilos del componente (anteriormente `*-viewer.css`)
+- `index.js` - Exportación del módulo
+
+### 📝 Documentación Adicional
+
+- Ver [ESTADO_ACTUAL_REORGANIZACION.md](ESTADO_ACTUAL_REORGANIZACION.md) para detalles de las 18 fases completadas
+- Ver [scripts-python.md](scripts-python.md) para documentación de scripts Python
+
 
 ## 🤖 Sistema de Inteligencia Artificial
 

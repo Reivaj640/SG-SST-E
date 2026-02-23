@@ -86,7 +86,12 @@ function seguimientoIncapacidades() {
 }
 
 function verEstadisticas() {
-    alert('Función: Estadísticas de Ausentismo\n\nSe abrirá el módulo de estadísticas y gráficos del ausentismo por causa médica.');
+    if (window.parent && window.parent.postMessage) {
+        window.parent.postMessage({
+            type: 'ausentismo-home-action',
+            action: 'ver-estadisticas'
+        }, '*');
+    }
 }
 
 function exportarDatos() {

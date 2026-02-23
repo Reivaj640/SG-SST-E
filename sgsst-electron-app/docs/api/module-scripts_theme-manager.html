@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Home</title>
+    <title>JSDoc: Module: scripts/theme-manager</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,32 +17,160 @@
 
 <div id="main">
 
-    <h1 class="page-title">Home</h1>
-
-    
-
-
-
-    
-
-
-    <h3> </h3>
-
-
-
-
-
-
-
-
-
+    <h1 class="page-title">Module: scripts/theme-manager</h1>
 
     
 
 
 
 
+<section>
 
+<header>
+    
+        
+            
+        
+    
+</header>
+
+<article>
+    <div class="container-overview">
+    
+        
+            <div class="description"><p>Maneja los modos de tema: Claro, Oscuro (Negro/Gris), y Sistema.
+Proporciona sincronización de temas entre ventanas principales e iframes.</p>
+<p>Características:</p>
+<ul>
+<li>Tres modos: Claro (light), Oscuro (dark), Sistema (system)</li>
+<li>Sincronización automática con el tema del sistema operativo</li>
+<li>Propagación de temas a iframes embebidos</li>
+<li>Sistema de suscriptores para reactividad</li>
+<li>Persistencia en localStorage y configuración de Electron</li>
+</ul></div>
+        
+
+        
+            
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="scripts_theme-manager.js.html">scripts/theme-manager.js</a>, <a href="scripts_theme-manager.js.html#line1">line 1</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// El ThemeManager se inicializa automáticamente al cargar el DOM
+// Para cambiar el tema manualmente:
+await ThemeManager.setTheme('dark');
+
+// Para suscribirse a cambios de tema:
+ThemeManager.subscribe((preference, effective) => {
+  console.log(`Tema: ${preference}, Efectivo: ${effective}`);
+});</code></pre>
+
+
+
+        
+    
+    </div>
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+        <h3 class="subsection-title">Namespaces</h3>
+
+        <dl>
+            <dt><a href="module-scripts_theme-manager.ThemeManager.html">ThemeManager</a></dt>
+            <dd></dd>
+        </dl>
+    
+
+    
+
+    
+
+    
+
+    
+</article>
+
+</section>
 
 
 

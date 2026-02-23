@@ -872,6 +872,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                   // Volver al home principal
                   showHomePage();
                   return;
+              case 'ausentismo-home-action':
+                  // Acción desde home de ausentismo - ya se maneja internamente en el módulo
+                  console.log('[RENDERER] Ausentismo home action recibida, procesando...');
+                  // No se requiere acción adicional, el módulo ya maneja la navegación internamente
+                  return;
+              case 'ausentismo-home-action-ver-estadisticas':
+                  // Solicitud para ver estadísticas de ausentismo
+                  console.log('[RENDERER] Ver estadísticas de ausentismo solicitada');
+                  // El módulo se encarga de mostrar la vista de estadísticas
+                  return;
               default:
                   // Verificar si es un mensaje de respuesta (ya procesado), para evitar bucles
                   if (type.endsWith('-response')) {

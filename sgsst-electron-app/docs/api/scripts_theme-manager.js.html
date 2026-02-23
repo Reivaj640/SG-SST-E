@@ -1,4 +1,32 @@
-/**
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: scripts/theme-manager.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: scripts/theme-manager.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
  * @fileoverview Theme Manager - Sistema centralizado de gestión de temas para K+AIR
  * @module scripts/theme-manager
  * @description Maneja los modos de tema: Claro, Oscuro (Negro/Gris), y Sistema.
@@ -45,7 +73,7 @@ const ThemeManager = {
     /**
      * Conjunto de funciones callback para notificar cambios de tema
      * @private
-     * @type {Set<Function>}
+     * @type {Set&lt;Function>}
      */
     listeners: new Set(),
 
@@ -69,11 +97,11 @@ const ThemeManager = {
      * @function init
      * @memberof module:scripts/theme-manager.ThemeManager
      * @description Carga la preferencia guardada, aplica el tema y configura listeners
-     * @returns {Promise<void>}
+     * @returns {Promise&lt;void>}
      */
     async init() {
         try {
-            if (window.electronAPI && window.electronAPI.getThemePreference) {
+            if (window.electronAPI &amp;&amp; window.electronAPI.getThemePreference) {
                 const result = await window.electronAPI.getThemePreference();
                 this.currentTheme = result.theme || 'system';
             } else {
@@ -94,7 +122,7 @@ const ThemeManager = {
      * @function setTheme
      * @memberof module:scripts/theme-manager.ThemeManager
      * @param {string} themeMode - Modo de tema a establecer ('light', 'dark', o 'system')
-     * @returns {Promise<void>}
+     * @returns {Promise&lt;void>}
      * @description Guarda la preferencia en localStorage y Electron, luego aplica el tema
      * @example
      * await ThemeManager.setTheme('dark'); // Cambia a tema oscuro
@@ -109,7 +137,7 @@ const ThemeManager = {
         this.currentTheme = themeMode;
         localStorage.setItem(this.THEME_KEY, themeMode);
         
-        if (window.electronAPI && window.electronAPI.saveThemePreference) {
+        if (window.electronAPI &amp;&amp; window.electronAPI.saveThemePreference) {
             await window.electronAPI.saveThemePreference(themeMode);
         }
         
@@ -123,7 +151,7 @@ const ThemeManager = {
      * @function applyTheme
      * @memberof module:scripts/theme-manager.ThemeManager
      * @param {string} themeMode - Modo de tema a aplicar
-     * @returns {Promise<void>}
+     * @returns {Promise&lt;void>}
      * @description
      * - Para 'dark': aplica data-theme="dark-legacy"
      * - Para 'system' (oscuro): aplica data-theme="dark"
@@ -134,7 +162,7 @@ const ThemeManager = {
         let effectiveTheme = themeMode;
 
         if (themeMode === this.THEMES.SYSTEM) {
-            if (window.electronAPI && window.electronAPI.getSystemTheme) {
+            if (window.electronAPI &amp;&amp; window.electronAPI.getSystemTheme) {
                 const result = await window.electronAPI.getSystemTheme();
                 effectiveTheme = result.theme || 'light';
             } else if (window.matchMedia) {
@@ -218,7 +246,7 @@ const ThemeManager = {
     },
 
     _setupSystemThemeListener() {
-        if (window.electronAPI && window.electronAPI.onSystemThemeChanged) {
+        if (window.electronAPI &amp;&amp; window.electronAPI.onSystemThemeChanged) {
             window.electronAPI.onSystemThemeChanged((systemTheme) => {
                 console.log('[ThemeManager] System theme changed to:', systemTheme);
                 if (this.currentTheme === this.THEMES.SYSTEM) {
@@ -274,7 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 window.addEventListener('message', (event) => {
-    if (event.data && event.data.type === 'get-theme-request') {
+    if (event.data &amp;&amp; event.data.type === 'get-theme-request') {
         const sourceWindow = event.source;
         if (sourceWindow) {
             sourceWindow.postMessage({
@@ -286,6 +314,29 @@ window.addEventListener('message', (event) => {
     }
 });
 
-if (typeof module !== 'undefined' && module.exports) {
+if (typeof module !== 'undefined' &amp;&amp; module.exports) {
     module.exports = ThemeManager;
 }
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-scripts_theme-manager.html">scripts/theme-manager</a></li><li><a href="module-utils_ausentismoUtils.html">utils/ausentismoUtils</a></li><li><a href="module-utils_remisionUtils.html">utils/remisionUtils</a></li></ul><h3>Namespaces</h3><ul><li><a href="module-scripts_theme-manager.ThemeManager.html">ThemeManager</a></li></ul><h3>Classes</h3><ul><li><a href="RendicionCuentasComponent.html">RendicionCuentasComponent</a></li><li><a href="module-utils_ausentismoUtils-AusentismoUtils.html">AusentismoUtils</a></li><li><a href="module-utils_remisionUtils-RemisionUtils.html">RemisionUtils</a></li></ul><h3>Global</h3><ul><li><a href="global.html#analyzeAccidentViaServer">analyzeAccidentViaServer</a></li><li><a href="global.html#callParentAPI">callParentAPI</a></li><li><a href="global.html#checkLlmServerHealth">checkLlmServerHealth</a></li><li><a href="global.html#checkLlmServerRunning">checkLlmServerRunning</a></li><li><a href="global.html#collectInterfaceData">collectInterfaceData</a></li><li><a href="global.html#finalizeReport">finalizeReport</a></li><li><a href="global.html#fs">fs</a></li><li><a href="global.html#hideCalendar">hideCalendar</a></li><li><a href="global.html#initializeEvents">initializeEvents</a></li><li><a href="global.html#initializeLlmServer">initializeLlmServer</a></li><li><a href="global.html#llmServerRequest">llmServerRequest</a></li><li><a href="global.html#loadData">loadData</a></li><li><a href="global.html#loadExcelData">loadExcelData</a></li><li><a href="global.html#render">render</a></li><li><a href="global.html#saveExcelData">saveExcelData</a></li><li><a href="global.html#saveReport">saveReport</a></li><li><a href="global.html#showCalendarInModule">showCalendarInModule</a></li><li><a href="global.html#startLlmServer">startLlmServer</a></li><li><a href="global.html#switchSection">switchSection</a></li><li><a href="global.html#updateIndicatorsFields">updateIndicatorsFields</a></li><li><a href="global.html#updateInterfaceWithExcelData">updateInterfaceWithExcelData</a></li><li><a href="global.html#updateResultsTable">updateResultsTable</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Mon Feb 23 2026 16:38:39 GMT-0500 (hora estándar de Colombia)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

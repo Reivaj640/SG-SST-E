@@ -146,12 +146,8 @@ let normativaData = null;
 // Cargar la normativa desde el archivo JSON
 async function cargarNormativa() {
   try {
-    // Usar fetch para cargar el archivo JSON
-    const response = await fetch('normativa-0312.json');
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    normativaData = await response.json();
+    // Usar la API de Electron para cargar el archivo JSON
+    normativaData = await window.electronAPI.loadNormativa();
     console.log('Normativa cargada correctamente:', normativaData);
   } catch (error) {
     console.error('Error al cargar la normativa:', error);
@@ -332,6 +328,7 @@ let currentModule = null;
 let currentSubmodule = null; // ✅ NUEVA VARIABLE
 let logBuffer = []; // Búfer para almacenar los logs
 let currentCalendarInstance = null; // Para mantener una referencia a la instancia del calendario
+let currentActiveComponent = null; // Para mantener una referencia al componente activo y poder destruirlo adecuadamente
 
 // Variable para almacenar los submódulos filtrados por normativa
 let RESOURCES_SUBMODULES = ALL_SUBMODULES;
@@ -477,6 +474,54 @@ let companyNameElement;
 let companyLogoElement;
 let companyLogoPlaceholder;
 
+// Función para aplicar el tema globalmente
+async function applyGlobalTheme() {
+  let savedTheme = 'system';
+  
+  try {
+    if (window.electronAPI &amp;&amp; window.electronAPI.getThemePreference) {
+      const result = await window.electronAPI.getThemePreference();
+      savedTheme = result.theme || 'system';
+    } else {
+      savedTheme = localStorage.getItem('kair-theme-preference') || 'system';
+    }
+  } catch (e) {
+    savedTheme = localStorage.getItem('kair-theme-preference') || 'system';
+  }
+  
+  let effectiveTheme = savedTheme;
+  
+  if (savedTheme === 'system') {
+    if (window.electronAPI &amp;&amp; window.electronAPI.getSystemTheme) {
+      try {
+        const result = await window.electronAPI.getSystemTheme();
+        effectiveTheme = result.theme || 'light';
+      } catch (e) {
+        effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+    } else if (window.matchMedia) {
+      effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+  }
+
+  if (effectiveTheme === 'dark') {
+    if (savedTheme === 'dark') {
+      // Tema Oscuro (Paleta Negro/Gris)
+      document.documentElement.setAttribute('data-theme', 'dark-legacy');
+    } else if (savedTheme === 'system') {
+      // Tema de Sistema (cuando el sistema es oscuro)
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  } else {
+    // Tema Claro
+    document.documentElement.removeAttribute('data-theme');
+  }
+  
+  localStorage.setItem('kair-theme-preference', savedTheme);
+  
+  return effectiveTheme;
+}
+
 // --- Inicialización ---
 // Esperar a que el DOM esté completamente cargado
 document.addEventListener('DOMContentLoaded', async () => {
@@ -491,6 +536,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   } catch (error) {
     console.error('Error al obtener la versión de la app:', error);
+  }
+
+  // Aplicar el tema global al cargar la aplicación
+  await applyGlobalTheme();
+  
+// Escuchar cambios de tema del sistema
+  if (window.electronAPI &amp;&amp; window.electronAPI.onSystemThemeChanged) {
+    window.electronAPI.onSystemThemeChanged(async (systemTheme) => {
+      console.log('[Renderer] System theme changed:', systemTheme);
+      const savedTheme = localStorage.getItem('kair-theme-preference') || 'system';
+      if (savedTheme === 'system') {
+        if (systemTheme === 'dark') {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+          document.documentElement.removeAttribute('data-theme');
+        }
+        console.log('[Renderer] Tema del sistema aplicado:', systemTheme);
+      } else if (savedTheme === 'dark') {
+        // Mantener tema Oscuro independientemente del sistema
+        if (systemTheme === 'dark') {
+          document.documentElement.setAttribute('data-theme', 'dark-legacy');
+        } else {
+          document.documentElement.removeAttribute('data-theme');
+        }
+        console.log('[Renderer] Tema Oscuro (dark-legacy) mantenido');
+      }
+    });
   }
 
   // Obtener referencias a los elementos del DOM
@@ -531,14 +603,64 @@ document.addEventListener('DOMContentLoaded', async () => {
           }
       }
 
-      if (!sourceIframe) {
-          console.warn('RENDERER: Message received from an unknown source. Ignoring.');
+      // Allow messages from the window itself (for directly injected modules)
+      const isFromSelf = event.source === window;
+
+      // DEBUG: Log para verificar el origen del mensaje
+      const allIframes = Array.from(iframes).map(iframe => ({
+          id: iframe.id,
+          src: iframe.src,
+          contentWindow: iframe.contentWindow === event.source
+      }));
+      if (type === 'open-onlyoffice-editor-request') {
+          console.log('[DEBUG] Iframes encontrados:', allIframes);
+          console.log('[DEBUG] event.source === window:', event.source === window);
+      }
+
+      if (!sourceIframe &amp;&amp; !isFromSelf) {
+          console.warn('RENDERER: Message received from an unknown source. Ignoring.', { type, eventSource: event.source });
+          // Intentar enviar a window.parent como fallback
+          try {
+              if (window.parent &amp;&amp; window.parent !== window) {
+                  console.log('[DEBUG] Intentando enviar respuesta a window.parent');
+                  window.parent.postMessage({
+                      type: responseType,
+                      payload: { success: false, error: 'Source not found' },
+                      requestId: requestId
+                  }, '*');
+              }
+          } catch (e) {
+              console.error('[DEBUG] Error enviando a window.parent:', e);
+          }
+          return;
+      }
+
+      // Determine where to send the response back
+      const targetWindow = sourceIframe ? sourceIframe.contentWindow : (isFromSelf ? window : null);
+
+      if (!targetWindow) {
+          console.error('RENDERER: Could not determine target window for response.');
           return;
       }
 
       let apiCallFunction;
       let apiCallArgs;
       let responseType = type.replace('-request', '-response');
+
+      // Función auxiliar para decodificar rutas que pueden estar codificadas múltiples veces
+      function decodePathMultipleTimes(str) {
+          let decoded = str;
+          let prev = '';
+          while (decoded !== prev) {
+              prev = decoded;
+              try {
+                  decoded = decodeURIComponent(decoded);
+              } catch (e) {
+                  break;
+              }
+          }
+          return decoded;
+      }
 
       try {
           switch (type) {
@@ -569,99 +691,316 @@ document.addEventListener('DOMContentLoaded', async () => {
                   apiCallFunction = window.electronAPI.downloadDocument; // Assuming this API exists
                   apiCallArgs = [payload]; // payload is the filePath string
                   break;
+              case 'get-editable-content-request':
+                  // Manejar solicitud de contenido editable para documentos
+                  // Usar la función decodePathMultipleTimes definida fuera del switch
+                  const decodedPayloadEd = {
+                      ...payload,
+                      filePath: payload.filePath ? decodePathMultipleTimes(payload.filePath) : payload.filePath
+                  };
+                  apiCallFunction = window.electronAPI.getEditableContent;
+                  apiCallArgs = [decodedPayloadEd];
+                  break;
+              case 'save-edited-document-request':
+                  // Manejar guardado de documento editado
+                  // Usar la función decodePathMultipleTimes definida fuera del switch
+                  const savePayloadEd = {
+                      ...payload,
+                      filePath: payload.filePath ? decodePathMultipleTimes(payload.filePath) : payload.filePath,
+                      content: payload.content
+                  };
+                  apiCallFunction = window.electronAPI.saveEditedDocument;
+                  apiCallArgs = [savePayloadEd];
+                  break;
+              case 'back-to-main-app':
+                  // Volver al home principal
+                  showHomePage();
+                  return;
               case 'back-to-module-request':
-                  // This is a UI navigation request, not an API call to main process
-                  // We handle it directly here and don't send a response back to iframe
+                  // Volver al módulo actual
                   console.log('RENDERER: Received back-to-module-request from iframe.');
-                  // Assuming showModuleContent is available in renderer.js scope
-                  // and currentModule is correctly set.
-                  if (currentModule) {
-                      currentSubmodule = null; // Clear submodule state
+                  if (typeof currentModule !== 'undefined' &amp;&amp; currentModule) {
+                      currentSubmodule = null;
                       showModuleContent(currentModule);
                   } else {
-                      showHomePage(); // Fallback to home if no current module
+                      showHomePage();
                   }
-                  return; // Exit after handling navigation
+                  return;
+              case 'theme-preference-changed':
+                  // El usuario cambió el tema desde el iframe de configuración
+                  const themeMode = event.data.theme || payload;
+                  console.log('RENDERER: Theme preference changed to:', themeMode);
+
+                  // Aplicar tema inmediatamente
+                  if (themeMode === 'dark') {
+                      document.documentElement.setAttribute('data-theme', 'dark-legacy');
+                  } else if (themeMode === 'light') {
+                      document.documentElement.removeAttribute('data-theme');
+                  } else if (themeMode === 'system') {
+                      // Aplicar tema del sistema
+                      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                      if (isDark) {
+                          document.documentElement.setAttribute('data-theme', 'dark');
+                      } else {
+                          document.documentElement.removeAttribute('data-theme');
+                      }
+                  }
+
+                  // Guardar preferencia
+                  localStorage.setItem('kair-theme-preference', themeMode);
+
+                  // Forzar actualización en todos los iframes
+                  const iframes = document.querySelectorAll('iframe');
+                  iframes.forEach(iframe => {
+                      try {
+                          const effectiveTheme = themeMode === 'system' ?
+                              (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') :
+                              themeMode;
+
+                          if (iframe.contentDocument) {
+                              if (effectiveTheme === 'dark') {
+                                  if (themeMode === 'dark') {
+                                      iframe.contentDocument.documentElement.setAttribute('data-theme', 'dark-legacy');
+                                  } else if (themeMode === 'system') {
+                                      iframe.contentDocument.documentElement.setAttribute('data-theme', 'dark');
+                                  }
+                              } else {
+                                  iframe.contentDocument.documentElement.removeAttribute('data-theme');
+                              }
+                          }
+
+                          iframe.contentWindow?.postMessage({
+                              type: 'theme-changed',
+                              theme: themeMode,
+                              effectiveTheme: effectiveTheme
+                          }, '*');
+                      } catch (e) {
+                          console.warn('Error propagando tema a iframe:', e);
+                      }
+                  });
+
+                  console.log('Tema aplicado:', themeMode, '(efectivo:', (themeMode === 'system' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : themeMode) + ')');
+
+                  // Forzar actualización en módulos home activos
+                  if (typeof currentModule !== 'undefined' &amp;&amp; currentModule) {
+                      console.log('Actualizando tema en módulo activo:', currentModule);
+                      // Recargar el módulo para aplicar el nuevo tema
+                      setTimeout(() => {
+                          showModuleContent(currentModule);
+                      }, 100);
+                  }
+
+                  return;
               case 'GET_AUSENTISMO_DATA':
                   // Handle request to get absenteeism data
                   apiCallFunction = window.electronAPI.readAusentismoData;
                   apiCallArgs = [currentCompany]; // Use current company for the request
-                  responseType = 'AUSENTISMO_DATA_RESPONSE';
                   break;
-              case 'SAVE_FOLLOW_UP':
-                  // Handle request to save follow-up data
-                  apiCallFunction = window.electronAPI.saveFollowUp;
-                  apiCallArgs = [payload.followUpData, currentCompany]; // Use current company for the request
-                  responseType = 'FOLLOW_UP_SAVE_RESPONSE';
+              case 'find-submodule-path-request':
+                  apiCallFunction = window.electronAPI.findSubmodulePath;
+                  apiCallArgs = [payload.company, payload.module, payload.submodule];
                   break;
-              case 'EXPORT_INCAPACITY_DATA':
-                  // Handle request to export incapacity data
-                  apiCallFunction = window.electronAPI.exportIncapacityData;
-                  apiCallArgs = [currentCompany]; // Use current company for the request
-                  responseType = 'EXPORT_DATA_RESPONSE';
+              case 'read-excel-file-request':
+                  apiCallFunction = window.electronAPI.readExcelFile;
+                  apiCallArgs = [payload.filePath];
                   break;
-              case 'LOAD_FOLLOW_UP_DATA':
-                  // Handle request to load follow-up data
-                  apiCallFunction = window.electronAPI.loadFollowUpData;
-                  apiCallArgs = [payload.companyName];
-                  responseType = 'FOLLOW_UP_LOAD_RESPONSE';
+              case 'save-excel-data-request':
+                  apiCallFunction = window.electronAPI.saveExcelData;
+                  apiCallArgs = [payload];
                   break;
+              case 'get-file-path-request':
+                  apiCallFunction = window.electronAPI.getFilePath;
+                  apiCallArgs = [payload];
+                  break;
+              case 'process-excel-data-request':
+                  apiCallFunction = window.electronAPI.processExcelData;
+                  apiCallArgs = [payload];
+                  break;
+              case 'duplicate-budget-file-request':
+                  apiCallFunction = window.electronAPI.duplicateBudgetFile;
+                  apiCallArgs = [payload];
+                  break;
+              case 'electron-api-call-request':
+                  // Mensaje enviado desde un iframe para llamar a una API específica
+                  // El payload incluye el nombre de la función API y los argumentos
+                  const { apiFunctionName, apiArgs } = payload;
+                  apiCallFunction = window.electronAPI[apiFunctionName];
+                  apiCallArgs = [apiArgs];
+                  responseType = `${apiFunctionName}-response`;
+                  break;
+              case 'save-report-request':
+                  // Funcionalidad no implementada aún
+                  console.warn('RENDERER: save-report-request received but not implemented');
+                  targetWindow.postMessage({
+                      type: responseType,
+                      payload: { success: false, error: 'Funcionalidad de guardar informe no implementada' },
+                      requestId: requestId
+                  }, '*');
+                  return;
+              case 'generate-pdf-request':
+                  // Funcionalidad no implementada aún
+                  console.warn('RENDERER: generate-pdf-request received but not implemented');
+                  targetWindow.postMessage({
+                      type: responseType,
+                      payload: { success: false, error: 'Funcionalidad de generar PDF no implementada' },
+                      requestId: requestId
+                  }, '*');
+                  return;
+              case 'open-onlyoffice-editor-request':
+                  // Abrir editor OnlyOffice
+                  apiCallFunction = window.electronAPI.openOnlyOfficeEditor;
+                  apiCallArgs = [payload];
+                  responseType = 'open-onlyoffice-editor-response';
+                  break;
+              case 'investigacion-accidentes-save-temp-pdf-file-request':
+                  // Manejar solicitud para guardar archivo PDF temporalmente
+                  apiCallFunction = window.electronAPI.saveTempPdfFile;
+                  apiCallArgs = [payload.filename, payload.data];
+                  responseType = 'investigacion-accidentes-save-temp-pdf-file-request-response';
+                  break;
+              case 'investigacion-accidentes-process-accident-pdf-request':
+                  // Manejar solicitud para procesar PDF de accidente
+                  apiCallFunction = window.electronAPI.processAccidentPdf;
+                  apiCallArgs = [payload.pdfPath];
+                  responseType = 'investigacion-accidentes-process-accident-pdf-request-response';
+                  break;
+              case 'investigacion-accidentes-analyze-accident-request':
+                  // Manejar solicitud para analizar accidente
+                  apiCallFunction = window.electronAPI.analyzeAccident;
+                  apiCallArgs = [payload.extractedData, payload.contextoAdicional];
+                  responseType = 'investigacion-accidentes-analyze-accident-request-response';
+                  break;
+              case 'investigacion-accidentes-start-model-loading-request':
+                  // Manejar solicitud para iniciar carga del modelo
+                  apiCallFunction = window.electronAPI.startModelLoading;
+                  apiCallArgs = [];
+                  responseType = 'investigacion-accidentes-start-model-loading-request-response';
+                  break;
+              case 'investigacion-accidentes-generate-accident-report-request':
+                  // Manejar solicitud para generar reporte de accidente
+                  apiCallFunction = window.electronAPI.generateAccidentReport;
+                  // El payload ya contiene los datos combinados directamente
+                  apiCallArgs = [payload];
+                  responseType = 'investigacion-accidentes-generate-accident-report-request-response';
+                  break;
+              case 'iframe-debug-log':
+                  // Logs de debug del iframe
+                  const { message, data } = payload || {};
+                  console.log(message, data || '');
+                  return;
+              case 'get-theme-request':
+                  // Responder con el tema actual
+                  const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+                  targetWindow.postMessage({
+                      type: 'get-theme-response',
+                      theme: currentTheme
+                  }, '*');
+                  return;
               case 'back-to-main-app':
-                  // This is a UI navigation request to return to the main app
-                  // We handle it directly here and don't send a response back to iframe
-                  console.log('RENDERER: Received back-to-main-app request from iframe.');
-                  // Determine where to go based on current state
-                  try {
-                      // Check if there's a selected company in the configuration
-                      if (window.electronAPI &amp;&amp; typeof window.electronAPI.loadConfig === 'function') {
-                          const config = await window.electronAPI.loadConfig();
-                          const selectedCompany = config.selectedCompany || currentCompany || null;
-
-                          // If there's a selected company, go to the company home page
-                          if (selectedCompany) {
-                              currentCompany = selectedCompany; // Ensure currentCompany is set
-                              showCompanyHomePage();
-                          } else {
-                              // If no company is selected, go to the main home page
-                              showHomePage();
-                          }
-                      } else {
-                          // Fallback to home if electronAPI is not available
-                          showHomePage();
-                      }
-                  } catch (error) {
-                      console.error('Error determining where to navigate:', error);
-                      // Fallback to home page if there's an error
-                      showHomePage();
-                  }
-                  return; // Exit after handling navigation
+                  // Volver al home principal
+                  showHomePage();
+                  return;
+              case 'ausentismo-home-action':
+                  // Acción desde home de ausentismo - ya se maneja internamente en el módulo
+                  console.log('[RENDERER] Ausentismo home action recibida, procesando...');
+                  // No se requiere acción adicional, el módulo ya maneja la navegación internamente
+                  return;
+              case 'ausentismo-home-action-ver-estadisticas':
+                  // Solicitud para ver estadísticas de ausentismo
+                  console.log('[RENDERER] Ver estadísticas de ausentismo solicitada');
+                  // El módulo se encarga de mostrar la vista de estadísticas
+                  return;
               default:
-                  console.warn(`RENDERER: Unknown message type received from iframe: ${type}`);
-                  sourceIframe.contentWindow.postMessage({
+                  // Verificar si es un mensaje de respuesta (ya procesado), para evitar bucles
+                  if (type.endsWith('-response')) {
+                      console.log(`RENDERER: Ignoring response message type (likely already processed): ${type}`);
+                      return; // No responder a mensajes de respuesta para evitar bucles
+                  }
+
+                  console.warn(`RENDERER: Unknown message type received from source: ${type}`);
+                  targetWindow.postMessage({
                       type: responseType,
                       payload: { success: false, error: `Unknown request type: ${type}` },
-                      requestId: requestId // &lt;-- Pass back the original ID
-                  }, 'file://');
+                      requestId: requestId
+                  }, '*');
                   return;
           }
 
           console.log(`RENDERER: 🗣️ Calling main process for ${type} with args:`, apiCallArgs);
-          const result = await apiCallFunction(...apiCallArgs);
-          console.log('RENDERER: 📥 Result from main process:', result);
-
-          sourceIframe.contentWindow.postMessage({
-              type: responseType,
-              payload: result,
-              requestId: requestId // &lt;-- FIX: Use 'requestId' to match what the iframe is waiting for
-          }, 'file://');
+          
+          // Verificar si la función está disponible antes de llamarla
+          if (typeof apiCallFunction !== 'function') {
+              console.error(`RENDERER: La función ${type} no está disponible.`);
+              targetWindow.postMessage({
+                  type: responseType,
+                  payload: { success: false, error: `Función no disponible: ${type}` },
+                  requestId: requestId
+              }, '*');
+              return;
+          }
+          
+          try {
+              const result = await apiCallFunction(...apiCallArgs);
+              console.log('RENDERER: 📥 Result from main process:', result);
+              
+              // Verificar si el targetWindow aún está disponible antes de enviar respuesta
+              if (!targetWindow || targetWindow.closed) {
+                  console.warn(`RENDERER: Target window cerrado para ${type}, omitiendo respuesta`);
+                  return;
+              }
+              
+              console.log('[DEBUG] Enviando respuesta a iframe:', {
+                  type: responseType,
+                  requestId: requestId,
+                  hasConfig: !!result.config,
+                  targetWindowExists: !!targetWindow,
+                  targetWindowClosed: targetWindow?.closed
+              });
+              
+              targetWindow.postMessage({
+                  type: responseType,
+                  success: result.success,
+                  payload: result,
+                  requestId: requestId
+              }, '*');
+              
+              console.log('[DEBUG] Respuesta enviada a iframe');
+          } catch (error) {
+              // Manejo de errores específico para IPC
+              if (error.message &amp;&amp; error.message.includes('Object has been destroyed')) {
+                  console.warn(`RENDERER: IPC destruido para ${type}, omitiendo respuesta`);
+                  return;
+              }
+              throw error; // Re-lanzar para el catch exterior
+          }
 
       } catch (error) {
+          // Manejo de errores específico para IPC
+          if (error.message &amp;&amp; error.message.includes('Object has been destroyed')) {
+              console.warn(`RENDERER: IPC destruido para ${type}, omitiendo respuesta`);
+              return;
+          }
+          
+          // Manejo de errores para ventana destruida
+          if (error.message &amp;&amp; error.message.includes('Cannot read properties of null')) {
+              console.warn(`RENDERER: Error de propiedad nula para ${type}, omitiendo respuesta`);
+              return;
+          }
+          
           console.error(`RENDERER: 😭 Error processing ${type}:`, error);
-          sourceIframe.contentWindow.postMessage({
-              type: responseType,
-              payload: { success: false, error: error.message },
-              requestId: requestId // &lt;-- Pass back the original ID on error too
-          }, 'file://');
+          
+          // Solo intentar enviar error si el targetWindow está disponible
+          try {
+              if (targetWindow &amp;&amp; !targetWindow.closed) {
+                  targetWindow.postMessage({
+                      type: responseType,
+                      payload: { success: false, error: error.message || 'Error desconocido' },
+                      requestId: requestId
+                  }, '*');
+              }
+          } catch (e) {
+              console.warn(`RENDERER: No se pudo enviar mensaje de error para ${type}`);
+          }
       }
   });
   // --- END: Iframe Communication Logic ---
@@ -1157,6 +1496,7 @@ async function selectCompany(companyName, buttonElement) {
   const sidebar = document.getElementById('sidebar');
   if (sidebar) {
     sidebar.classList.remove('sidebar-hidden');
+    sidebar.classList.add('sidebar-collapsed'); // Asegurar que permanezca colapsado
   }
 
   // Cargar la normativa si aún no se ha hecho
@@ -1217,6 +1557,9 @@ async function selectCompany(companyName, buttonElement) {
   // Aquí se podría notificar al proceso principal para que inicie
   // el backend Python asociado a esta empresa.
   console.log(`Empresa seleccionada: ${companyName}`);
+
+  // Establecer la empresa también en el contexto global
+  window.currentCompany = companyName;
 
   // Destruir la animación de Vanta antes de cambiar de página
   if (window.vantaEffect &amp;&amp; typeof window.vantaEffect.destroy === 'function') {
@@ -1296,6 +1639,13 @@ function showCompanyHomePage() {
   // ✅ Pasar contentArea a hideCalendar
   hideCalendar(contentArea);
   console.log(`Showing home page for company: ${currentCompany}`);
+  
+  // Asegurar que el sidebar permanezca colapsado
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar) {
+    sidebar.classList.add('sidebar-collapsed');
+  }
+  
   contentArea.innerHTML = '';
 
   // Crear el contenedor principal del canvas
@@ -1699,18 +2049,39 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         showModuleContent(moduleName);
     };
 
+    // Función auxiliar para crear componentes de forma segura
+    const createComponentSafely = (ComponentConstructor, ...args) => {
+      // Destruir componente anterior si existe
+      if (currentActiveComponent &amp;&amp; typeof currentActiveComponent.destroy === 'function') {
+        try {
+          currentActiveComponent.destroy();
+        } catch (e) {
+          console.warn('Error al destruir componente anterior:', e);
+        }
+      }
+
+      if (ComponentConstructor) {
+        const component = new ComponentConstructor(...args);
+        // Guardar referencia al componente activo
+        currentActiveComponent = component;
+        component.render();
+        return component;
+      } else {
+        console.error(`❌ Constructor de componente no encontrado`);
+        return null;
+      }
+    };
+
     // ------------------ Submódulos con componentes especiales ------------------ //
     if (submoduleName === "1.1.1 Responsable del SG") {
-      if (window.ResponsableSgComponent) {
-        const responsableSgComponent = new window.ResponsableSgComponent(
-          submoduleContentDiv,
-          currentCompany,
-          moduleName,
-          submoduleName,
-          safeBackToModuleCallback // &lt;-- USAR EL CALLBACK SEGURO
-        );
-        responsableSgComponent.render();
-      } else {
+      createComponentSafely(window.ResponsableSgComponent,
+        submoduleContentDiv,
+        currentCompany,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback // &lt;-- USAR EL CALLBACK SEGURO
+      );
+      if (!window.ResponsableSgComponent) {
         console.error('❌ ResponsableSgComponent no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
@@ -1846,17 +2217,70 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
     } else if (submoduleName === "2.1.1 Politica del SG-SST") {
-      if (window.PoliticaComponent) {
-        const politicaComponent = new window.PoliticaComponent(
+      createComponentSafely(window.PoliticaComponent,
+        submoduleContentDiv,
+        currentCompany,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback // &lt;-- USAR EL CALLBACK SEGURO
+      );
+      if (!window.PoliticaComponent) {
+        console.error('❌ PoliticaComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
+    } else if (submoduleName === "2.2.1 Objetivos SST") {
+      createComponentSafely(window.ObjetivosSSTComponent,
+        submoduleContentDiv,
+        currentCompany,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback // &lt;-- USAR EL CALLBACK SEGURO
+      );
+      if (!window.ObjetivosSSTComponent) {
+        console.error('❌ ObjetivosSSTComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
+    } else if (submoduleName === "2.3.1 Evaluación inicial del SG-SST") {
+      createComponentSafely(window.EvaluacionInicialSgSst,
+        submoduleContentDiv,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback
+      );
+      if (!window.EvaluacionInicialSgSst) {
+        console.error('❌ EvaluacionInicialSgSst no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
+    } else if (submoduleName === "2.4.1 Plan de Trabajo Anual") {
+      if (window.PlanTrabajoComponent) {
+        const planTrabajoComponent = new window.PlanTrabajoComponent(
           submoduleContentDiv,
           currentCompany,
           moduleName,
           submoduleName,
           safeBackToModuleCallback // &lt;-- USAR EL CALLBACK SEGURO
         );
-        politicaComponent.render();
+        planTrabajoComponent.render();
       } else {
-        console.error('❌ PoliticaComponent no encontrado');
+        console.error('❌ PlanTrabajoComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
+    } else if (submoduleName === "2.6.1 Rendición de cuentas") {
+      if (window.RendicionCuentasComponent) {
+        const rendicionCuentasComponent = new window.RendicionCuentasComponent(
+          submoduleContentDiv,
+          currentCompany,
+          moduleName,
+          submoduleName,
+          safeBackToModuleCallback // &lt;-- USAR EL CALLBACK SEGURO
+        );
+        rendicionCuentasComponent.render();
+      } else {
+        console.error('❌ RendicionCuentasComponent no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 
@@ -2272,11 +2696,38 @@ function createModuleCard(title, description, onClick) {
 
     contentArea.appendChild(iframe);
 
-    // Una vez que el iframe se carga, pasarle la API de Electron
+    // Una vez que el iframe se carga, pasarle la API de Electron y el tema
     iframe.onload = function() {
       if (iframe.contentWindow) {
         // Pasar la API de Electron al iframe
         iframe.contentWindow.electronAPI = window.electronAPI;
+
+        // Propagar el tema actual al iframe
+        const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+        const savedTheme = localStorage.getItem('kair-theme-preference') || 'system';
+
+        try {
+          if (currentTheme === 'dark') {
+            if (savedTheme === 'dark') {
+              iframe.contentDocument.documentElement.setAttribute('data-theme', 'dark-legacy');
+            } else if (savedTheme === 'system') {
+              iframe.contentDocument.documentElement.setAttribute('data-theme', 'dark');
+            }
+          } else {
+            iframe.contentDocument.documentElement.removeAttribute('data-theme');
+          }
+
+          // Enviar mensaje postMessage con el tema para que el iframe lo procese
+          iframe.contentWindow.postMessage({
+            type: 'theme-changed',
+            theme: savedTheme,
+            effectiveTheme: currentTheme
+          }, '*');
+          
+          console.log('[Renderer] Tema propagado al iframe de configuración:', savedTheme, '(efectivo:', currentTheme + ')');
+        } catch (e) {
+          console.warn('[Renderer] Error al propagar tema al iframe:', e);
+        }
       }
     };
   }
@@ -2754,13 +3205,13 @@ function formatStructureForLog(node, indent = '') {
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#callParentAPI">callParentAPI</a></li><li><a href="global.html#hideCalendar">hideCalendar</a></li><li><a href="global.html#showCalendarInModule">showCalendarInModule</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-scripts_theme-manager.html">scripts/theme-manager</a></li><li><a href="module-utils_ausentismoUtils.html">utils/ausentismoUtils</a></li><li><a href="module-utils_remisionUtils.html">utils/remisionUtils</a></li></ul><h3>Namespaces</h3><ul><li><a href="module-scripts_theme-manager.ThemeManager.html">ThemeManager</a></li></ul><h3>Classes</h3><ul><li><a href="RendicionCuentasComponent.html">RendicionCuentasComponent</a></li><li><a href="module-utils_ausentismoUtils-AusentismoUtils.html">AusentismoUtils</a></li><li><a href="module-utils_remisionUtils-RemisionUtils.html">RemisionUtils</a></li></ul><h3>Global</h3><ul><li><a href="global.html#analyzeAccidentViaServer">analyzeAccidentViaServer</a></li><li><a href="global.html#callParentAPI">callParentAPI</a></li><li><a href="global.html#checkLlmServerHealth">checkLlmServerHealth</a></li><li><a href="global.html#checkLlmServerRunning">checkLlmServerRunning</a></li><li><a href="global.html#collectInterfaceData">collectInterfaceData</a></li><li><a href="global.html#finalizeReport">finalizeReport</a></li><li><a href="global.html#fs">fs</a></li><li><a href="global.html#hideCalendar">hideCalendar</a></li><li><a href="global.html#initializeEvents">initializeEvents</a></li><li><a href="global.html#initializeLlmServer">initializeLlmServer</a></li><li><a href="global.html#llmServerRequest">llmServerRequest</a></li><li><a href="global.html#loadData">loadData</a></li><li><a href="global.html#loadExcelData">loadExcelData</a></li><li><a href="global.html#render">render</a></li><li><a href="global.html#saveExcelData">saveExcelData</a></li><li><a href="global.html#saveReport">saveReport</a></li><li><a href="global.html#showCalendarInModule">showCalendarInModule</a></li><li><a href="global.html#startLlmServer">startLlmServer</a></li><li><a href="global.html#switchSection">switchSection</a></li><li><a href="global.html#updateIndicatorsFields">updateIndicatorsFields</a></li><li><a href="global.html#updateInterfaceWithExcelData">updateInterfaceWithExcelData</a></li><li><a href="global.html#updateResultsTable">updateResultsTable</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Fri Jan 09 2026 16:49:00 GMT-0500 (hora estándar de Colombia)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Mon Feb 23 2026 16:38:39 GMT-0500 (hora estándar de Colombia)
 </footer>
 
 <script> prettyPrint(); </script>

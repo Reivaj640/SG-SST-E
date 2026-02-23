@@ -5,6 +5,66 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.46] - 2026-02-23
+
+### Changed
+- **Actualización de Documentación del Proyecto**
+  - Escaneo completo del código fuente vs documentación existente
+  - Identificación de 18 módulos reorganizados (100% completados)
+  - Documentación de scripts Python de Portear/src
+  - Actualización de estado de módulos en PROJECT_OVERVIEW.md
+
+### Documentation
+- Actualización de CHANGELOG.md con versiones 0.1.41-0.1.46
+- Creación de docs/scripts-python.md para documentar utilidades Python
+- Actualización de estado de reorganización modular
+- Generación de documentación JSDoc API actualizada
+- Agregados JSDoc a archivos de utilidades (/utils)
+- Documentado theme-manager.js en docs principales
+- Corregido jsdoc.json con rutas actualizadas de módulos
+
+## [0.1.45] - 2026-02-22
+
+### Fixed
+- Correcciones menores en generación de informes de investigación
+- Mejoras en extracción de datos desde PDFs de accidentes
+
+## [0.1.44] - 2026-02-22
+
+### Added
+- Soporte para tema oscuro (paleta Negro/Gris) en Theme Manager
+- Sistema centralizado de gestión de temas (Claro/Oscuro/Sistema)
+
+### Changed
+- Mejora en comunicación iframe-renderer para módulos reorganizados
+
+## [0.1.43] - 2026-02-21
+
+### Fixed
+- Corrección en mapeo de rutas para empresas configuradas
+- Mejoras en sistema de logging centralizado
+
+## [0.1.42] - 2026-02-21
+
+### Added
+- Módulo de inducciones reorganizado (1.2.2)
+- Módulo de capacitaciones reorganizado (1.2.1)
+
+### Changed
+- Migración de archivos a estructura modular `modules/recursos/`
+- Actualización de referencias en index.html y renderer.js
+
+## [0.1.41] - 2026-02-21
+
+### Added
+- Módulo de rendición de cuentas reorganizado (2.6.1)
+- Módulo de objetivos SST reorganizado (2.2.1)
+- Módulo de evaluación inicial SG-SST reorganizado (2.3.1)
+
+### Changed
+- Continuación de reorganización modular de gestión-integral
+- Actualización de jsdoc.json con nuevas rutas de módulos
+
 ## [0.1.40] - 2026-02-20
 
 ### Added
