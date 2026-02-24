@@ -1,200 +1,593 @@
-# Sistema de Documentación Automática - SG-SST (K+AIR)
+# K+AIR - Sistema de Gestión SG-SST
 
-Este proyecto implementa un sistema de documentación automática basado en JSDoc para mantener actualizada la documentación del código fuente.
+**Versión:** 0.1.47  
+**Última actualización:** 24 de febrero de 2026  
+**Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
-## 📋 Tabla de Contenidos
+---
 
-1. [Introducción](#introducción)
-2. [Visión General del Proyecto](#visión-general-del-proyecto)
-3. [Arquitectura del Sistema](#arquitectura-del-sistema)
-4. [Motor Normativo](#motor-normativo)
-5. [Escenarios Normativos](#escenarios-normativos)
-6. [Flujo de Creación de Empresa](#flujo-de-creación-de-empresa)
-7. [Sistema de Renderizado](#sistema-de-renderizado)
-8. [Sistema de Inteligencia Artificial](#sistema-de-inteligencia-artificial)
-9. [Dependencias del Sistema](#dependencias-del-sistema)
-10. [Generación de Documentación](#generación-de-documentación)
-11. [Guía para Desarrolladores](#guía-para-desarrolladores)
+## 📋 Descripción General
 
-## Introducción
+**K+AIR** es una aplicación empresarial Electron que implementa un Sistema de Gestión de Seguridad y Salud en el Trabajo (SG-SST) completo, diseñado para cumplir con la normativa colombiana (Resolución 0312 de 2019).
 
-El sistema SG-SST (Sistema de Gestión de Seguridad y Salud en el Trabajo), denominado **K+AIR**, es una aplicación Electron que implementa un sistema de gestión integral para la seguridad y salud en el trabajo, con soporte para múltiples escenarios normativos basados en el tamaño de la empresa y nivel de riesgo, e integración de inteligencia artificial para análisis de accidentes.
+### Características Principales
 
-## Visión General del Proyecto
+- ✅ **Multi-empresa**: Gestión de múltiples empresas con una sola experiencia UX/UI
+- ✅ **Motor Normativo Inteligente**: Escenarios normativos basados en tamaño y riesgo
+- ✅ **7 Módulos Principales**: Recursos, Gestión Integral, Salud, Peligros, Amenazas, Verificación, Mejoramiento
+- ✅ **27 Submódulos**: Cada uno con su propia lógica y vistas especializadas
+- ✅ **IA Integrada**: Análisis de accidentes con LLM (Mistral 3 3B)
+- ✅ **Solo 13 archivos en raíz**: Proyecto limpio y organizado
 
-Para entender completamente el sistema, su arquitectura y decisiones de diseño, consulta [docs/PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md). Este archivo contiene la visión general del proyecto, decisiones arquitectónicas clave y reglas de cambio.
+---
 
-## Arquitectura del Sistema
+## 🏗️ Arquitectura del Sistema
 
-Para detalles sobre la arquitectura del sistema, consulta [docs/arquitectura.md](docs/arquitectura.md).
+```
+┌─────────────────────────────────────────────────────────┐
+│                    K+AIR Electron App                    │
+├─────────────────────────────────────────────────────────┤
+│  RENDERER (Frontend)                                    │
+│  ├── index.html (Estructura principal)                  │
+│  ├── renderer.js (Lógica de UI - 3170 líneas)           │
+│  ├── styles.css (Sistema Visual Oficial)                │
+│  └── modules/ (27 submódulos organizados)               │
+├─────────────────────────────────────────────────────────┤
+│  PRELOAD (Puente Seguro)                                │
+│  └── preload.js (60+ contratos IPC expuestos)           │
+├─────────────────────────────────────────────────────────┤
+│  MAIN (Backend Electron)                                │
+│  └── main.js (55+ handlers IPC - 4766 líneas)           │
+├─────────────────────────────────────────────────────────┤
+│  PYTHON (Portear/)                                      │
+│  ├── llm_server.py (Servidor Flask puerto 5555)         │
+│  ├── accident_processor.py (Procesamiento PDF)          │
+│  └── [15+ scripts especializados]                       │
+└─────────────────────────────────────────────────────────┘
+```
 
-## Motor Normativo
+---
 
-Para información sobre el motor normativo, consulta [docs/motor-normativo.md](docs/motor-normativo.md).
+## 📁 Estructura del Proyecto
 
-## Escenarios Normativos
+### Raíz del Proyecto (13 archivos)
 
-Para detalles sobre los escenarios normativos, consulta [docs/escenarios-normativos.md](docs/escenarios-normativos.md).
+| Archivo | Líneas | Propósito |
+|---------|--------|-----------|
+| `index.html` | 143 | Punto de entrada HTML |
+| `main.js` | 4766 | Proceso principal Electron |
+| `preload.js` | ~180 | Puente IPC seguro |
+| `renderer.js` | 3170 | Lógica de renderizado |
+| `styles.css` | ~2500 | Estilos globales |
+| `development-styles.css` | ~500 | Estilos desarrollo |
+| `package.json` | 85 | Configuración npm |
+| `package-lock.json` | - | Bloqueo dependencias |
+| `README.md` | - | Este archivo |
+| `docker-compose.yml` | - | Configuración Docker |
+| `icon-config.json` | - | Configuración iconos |
 
-## Flujo de Creación de Empresa
+### Módulos Principales (8 módulos)
 
-Para información sobre el flujo de creación de empresa, consulta [docs/flujo-creacion-empresa.md](docs/flujo-creacion-empresa.md).
+```
+modules/
+├── gestion-integral/          # Módulo 2: Política, Objetivos, Evaluación
+│   ├── gestion-integral-home.js
+│   ├── index.js
+│   ├── evaluacion-inicial-sg-sst/
+│   ├── objetivos-sst/
+│   ├── plan-trabajo/
+│   ├── politica/
+│   └── rendicion-cuentas/
+│
+├── recursos/                  # Módulo 1: Responsable, Roles, Capacitación
+│   ├── recursos-home.js
+│   ├── index.js
+│   ├── afiliacion/
+│   ├── capacitacion-copasst/
+│   ├── capacitaciones/
+│   ├── comite-convivencia/
+│   ├── copasst/
+│   ├── curso-virtual/
+│   ├── inducciones/
+│   ├── presupuesto/
+│   ├── responsable-sg/
+│   ├── roles-responsabilidades/
+│   └── trabajo-alto-riesgo/
+│
+├── gestion-salud/             # Módulo 3: Evaluaciones, Accidentes, Ausentismo
+│   ├── gestion-salud-home.js
+│   ├── index.js
+│   ├── ausentismo/            # 3.3.6 Medición del ausentismo
+│   ├── evaluaciones-medicas/  # 3.1.4 Evaluaciones médicas
+│   ├── investigacion-accidentes/ # 3.2.2 Investigación accidentes
+│   ├── reportes-accidentes/   # 3.2.1 Reporte accidentes
+│   ├── restricciones-medicas/ # 3.1.6 Restricciones médicas
+│   └── sociodemografica/      # 3.1.1 Diagnóstico sociodemográfico
+│
+├── gestion-peligros/          # Módulo 4: Identificación de peligros
+│   └── gestion-peligros-home.js
+│
+├── gestion-amenazas/          # Módulo 5: Plan de emergencias
+│   └── gestion-amenazas-home.js
+│
+├── verificacion/              # Módulo 6: Auditorías, Indicadores
+│   └── verificacion-home.js
+│
+├── mejoramiento/              # Módulo 7: Acciones correctivas
+│   └── mejoramiento-home.js
+│
+└── helpers/                   # Utilidades del sistema
+    └── viewLoader.js
+```
 
-## Sistema de Renderizado
+### Directorios Adicionales
 
-Para detalles sobre el sistema de renderizado, consulta [docs/renderer.md](docs/renderer.md).
+| Directorio | Propósito |
+|------------|-----------|
+| `assets/` | Iconos, imágenes y recursos gráficos |
+| `backup_archivos_originales/` | Respaldo histórico (67 archivos) |
+| `components/` | Componentes reutilizables (config, seguimiento) |
+| `docs/` | Documentación completa (137 archivos) |
+| `examples/` | Ejemplos de código y vistas de prueba |
+| `logs/` | Registros de la aplicación |
+| `Portear/` | Módulo Python con 15+ scripts especializados |
+| `scripts/` | Scripts de utilidad (generar docs, temas) |
+| `test/` | Archivos de prueba |
+| `utils/` | Utilidades y archivos de soporte |
 
-## Sistema de Inteligencia Artificial
+---
 
-El sistema K+AIR integra un servidor LLM persistente para análisis de accidentes laborales.
+## 🚀 Instalación y Configuración
 
-### Características
-- **Modelo**: Mistral 3 3B Reasoning (multimodal)
-- **Servidor**: Flask en puerto 5555
-- **Análisis**: Metodología 5 Porqués con categorías 5M
-- **Generación**: Informes DOCX automáticos
+### Requisitos del Sistema
 
-### Documentación del Módulo de IA
-- [Módulo Investigación de Accidentes](docs/modulo-investigacion-accidentes.md) - Documentación completa del módulo 3.2.2
+| Componente | Versión Mínima | Recomendada |
+|------------|----------------|-------------|
+| **Node.js** | 18.x | 20.x |
+| **Python** | 3.10 | 3.11-3.12 |
+| **RAM** | 8 GB | 16 GB |
+| **Almacenamiento** | 2 GB | 5 GB SSD |
+| **CUDA** (opcional) | 12.x | Para IA con GPU |
 
-### Scripts Python
-Los scripts de procesamiento se encuentran en `Portear/src/`:
-- `llm_server.py` - Servidor de inferencia
-- `accident_processor.py` - Extracción de datos
-- `accident_report_generator.py` - Generación de informes
-
-## Dependencias del Sistema
-
-Para instalar el sistema en un nuevo equipo, consulta la guía completa de dependencias:
-
-📖 **[Guía de Dependencias](docs/DEPENDENCIAS.md)**
-
-### Instalación Rápida
+### Instalación Paso a Paso
 
 ```bash
-# 1. Instalar dependencias Node.js
+# 1. Clonar repositorio
+git clone https://github.com/Reivaj640/SG-SST-E.git
+cd SG-SST-E
+
+# 2. Instalar dependencias Node.js
 npm install
 
-# 2. Configurar entorno Python
+# 3. Configurar entorno virtual Python
 cd Portear
 python -m venv .venv
+
+# 4. Activar entorno virtual
+# Windows:
 .venv\Scripts\activate
+# Linux/Mac:
+source .venv/bin/activate
+
+# 5. Instalar dependencias Python
 pip install -r requirements.txt
 
-# 3. Ejecutar la aplicación
+# 6. Volver al directorio raíz
 cd ..
+
+# 7. Ejecutar aplicación
 npm start
 ```
 
-### Requisitos Mínimos
-| Componente | Versión |
-|------------|---------|
-| Node.js | 18.x+ |
-| Python | 3.10-3.12 |
-| CUDA (opcional) | 12.x |
-| RAM | 16 GB |
-
-## Generación de Documentación
-
-### Documentación Automática (API)
-
-La documentación de la API se genera desde los comentarios JSDoc en el código fuente.
-
-#### Generar documentación
+### Comandos Disponibles
 
 ```bash
-# Generar documentación una vez
-npm run docs:generate
+# Ejecutar aplicación
+npm start
 
-# Generar documentación y vigilar cambios
-npm run docs:watch
+# Modo desarrollo con recarga automática
+npm run dev
+
+# Depuración
+npm run debug         # Debug completo
+npm run debug-main    # Solo proceso principal
+npm run debug-full    # Debug extendido
+
+# Construir para distribución
+npm run build         # Plataforma actual
+npm run build:win     # Windows
+npm run build:mac     # macOS
+npm run build:linux   # Linux
+
+# Generar documentación
+npm run docs:generate  # Generar documentación API
+npm run docs:watch     # Vigilar cambios y regenerar
 ```
 
-#### Archivos de documentación generada
+---
 
-- Documentación de API: `docs/api/`
+## 📊 Módulos y Funcionalidades
+
+### Módulo 1: Recursos (11 submódulos)
+
+| Código | Submódulo | Archivos Principales |
+|--------|-----------|---------------------|
+| 1.1.1 | Responsable del SG | `responsable-sg-logic.js`, `viewer.js`, `view.html` |
+| 1.1.2 | Roles y Responsabilidades | `roles-responsabilidades-logic.js`, `viewer.js` |
+| 1.1.3 | Asignación de Recursos | `presupuesto-logic.js`, `presupuesto-gestion.html` |
+| 1.1.4 | Afiliación al SSSI | `afiliacion-logic.js`, `viewer.js` |
+| 1.1.5 | Trabajo de Alto Riesgo | `trabajo-alto-riesgo-logic.js`, `viewer.js` |
+| 1.1.6 | Conformación de Copasst | `copasst-logic.js`, `viewer.js` |
+| 1.1.7 | Capacitación al Copasst | `capacitacion-copasst-logic.js`, `viewer.js` |
+| 1.1.8 | Comité de Convivencia | `comite-convivencia-logic.js`, `viewer.js` |
+| 1.2.1 | Programa de Capacitación | `capacitaciones-logic.js`, `viewer.js` |
+| 1.2.2 | Inducción y Reinducción | `inducciones-logic.js`, `viewer.js` |
+| 1.2.3 | Curso Virtual 50 Horas | `curso-virtual-logic.js`, `viewer.js` |
+
+### Módulo 2: Gestión Integral (6 submódulos)
+
+| Código | Submódulo | Archivos Principales |
+|--------|-----------|---------------------|
+| 2.1.1 | Política del SG-SST | `politica-logic.js`, `viewer.js`, `onlyoffice-bridge.js` |
+| 2.2.1 | Objetivos SST | `objetivos-sst-logic.js`, `viewer.js` |
+| 2.3.1 | Evaluación Inicial SG-SST | `evaluacion-inicial-sg-sst-logic.js`, `test.html` |
+| 2.4.1 | Plan de Trabajo Anual | `plan-trabajo-logic.js`, `plan-home.js` |
+| 2.5.1 | Archivo y Retención Documental | En `renderer.js` |
+| 2.6.1 | Rendición de Cuentas | `rendicion-logic.js`, `viewer.js` |
+
+### Módulo 3: Gestión de la Salud (6 submódulos)
+
+| Código | Submódulo | Archivos Principales |
+|--------|-----------|---------------------|
+| 3.1.1 | Diagnóstico Sociodemográfico | `sociodemografica-component.js`, `viewer.js` |
+| 3.1.4 | Evaluaciones Médicas | `evaluaciones-medicas-logic.js`, `component.js` |
+| 3.1.6 | Restricciones Médicas | `restricciones-medicas-logic.js`, `component.js` |
+| 3.2.1 | Reporte de Accidentes | `reportes-accidentes-logic.js`, `viewer.js` |
+| 3.2.2 | Investigación de Accidentes | `investigacion-accidentes-logic.js`, `handlers.js` 🤖 |
+| 3.3.6 | Medición del Ausentismo | `medicion-ausentismo.js`, `registrar-ausentismo.js` |
+
+### Módulos 4-7 (Resumen)
+
+| Módulo | Submódulos | Estado |
+|--------|-----------|--------|
+| 4. Gestión de Peligros y Riesgos | Home module | ✅ Activo |
+| 5. Gestión de Amenazas | Home module | ✅ Activo |
+| 6. Verificación | Home module | ✅ Activo |
+| 7. Mejoramiento | Home module | ✅ Activo |
+
+---
+
+## 🤖 Integración de Inteligencia Artificial
+
+### Módulo de Investigación de Accidentes (3.2.2)
+
+**Tecnología:**
+- **Modelo LLM**: Mistral 3 3B Reasoning (multimodal)
+- **Servidor**: Flask en puerto 5555
+- **Metodología**: 5 Porqués con categorías 5M
+
+**Flujo de Trabajo:**
+```
+1. Usuario sube PDF de accidente
+   ↓
+2. Python extrae datos (accident_processor.py)
+   ↓
+3. LLM analiza causas raíz (llm_server.py)
+   ↓
+4. Genera informe DOCX automático (accident_report_generator.py)
+   ↓
+5. Usuario descarga informe
+```
+
+**Archivos Clave:**
+- `modules/gestion-salud/investigacion-accidentes/investigacion_handlers.js`
+- `Portear/src/llm_server.py`
+- `Portear/src/accident_processor.py`
+- `Portear/src/accident_report_generator.py`
+
+**Documentación Completa:**
+- 📖 [docs/modulo-investigacion-accidentes.md](docs/modulo-investigacion-accidentes.md)
+
+---
+
+## 🔌 Sistema de Comunicación IPC
+
+### Contratos Principales (60+ handlers)
+
+#### App & Configuración
+| Método | Descripción |
+|--------|-------------|
+| `getAppVersion()` | Obtener versión de la aplicación |
+| `getRecursosStats(companyName)` | Estadísticas de recursos |
+| `saveConfig(config)` / `loadConfig()` | Guardar/Cargar configuración |
+| `loadNormativa()` | Cargar normativa 0312 |
+
+#### Sistema de Temas
+| Método | Descripción |
+|--------|-------------|
+| `getSystemTheme()` | Obtener tema del SO |
+| `saveThemePreference(themeMode)` | Guardar preferencia |
+| `getEffectiveTheme()` | Obtener tema efectivo |
+
+#### Archivos y Directorios
+| Método | Descripción |
+|--------|-------------|
+| `selectDirectory()` | Seleccionar directorio |
+| `mapDirectory(path)` | Mapear estructura con Python |
+| `readDirectory(path)` | Leer contenido |
+| `openPath(filePath)` | Abrir archivo/carpeta |
+
+#### Excel y Documentos
+| Método | Descripción |
+|--------|-------------|
+| `readExcelFile(filePath)` | Leer Excel |
+| `updateCapacitacionesExcel(data)` | Actualizar capacitaciones |
+| `convertExcelToPdf(filePath)` | Convertir Excel a PDF |
+| `getPresupuestoFiles(companyName)` | Obtener archivos de presupuesto |
+
+#### Ausentismo
+| Método | Descripción |
+|--------|-------------|
+| `getAusentismoData(companyName)` | Leer datos de ausentismo |
+| `buscarEmpleadoPorCedula(cedula, empresa)` | Buscar empleado |
+| `buscarCie10Descripcion(code)` | Buscar descripción CIE-10 |
+| `procesarAusentismo(formData)` | Procesar formulario |
+
+#### Investigación de Accidentes
+| Método | Descripción |
+|--------|-------------|
+| `selectAccidentPdf()` | Seleccionar PDF |
+| `processAccidentPdf(path)` | Procesar PDF |
+| `analyzeAccident(data)` | Analizar con LLM |
+| `generateAccidentReport(data)` | Generar informe |
+
+**Lista Completa:** 📖 [preload.js](preload.js) y 📖 [main.js](main.js)
+
+---
+
+## 🎨 Sistema Visual Oficial K+AIR
+
+### Colores Corporativos
+
+| Tipo | Color | Hex | Uso |
+|------|-------|-----|-----|
+| **Primario** | Azul K+AIR | `#174ea6` | Botones, enlaces, headers |
+| **Hover** | Azul claro | `#185abd` | Hover de elementos primarios |
+| **Éxito** | Verde | `#28a745` | Mensajes positivos, completados |
+| **Advertencia** | Amarillo | `#ffc107` | Alertas, pendientes |
+| **Peligro** | Rojo | `#dc3545` | Errores, urgencias |
+
+### Fondos
+
+| Elemento | Color | Hex |
+|----------|-------|-----|
+| App | Gris claro | `#f8f9fa` |
+| Cards | Blanco | `#ffffff` |
+| Bordes | Gris medio | `#dee2e6` |
+
+### Componentes
+
+- **Tarjetas**: Sombra sutil, bordes 0.375rem
+- **Tipografía**: Segoe UI / Roboto
+- **Jerarquía**: Títulos claros, contenido organizado
+
+**Documentación UI:** 📖 [docs/ui-update-responsable-sg.md](docs/ui-update-responsable-sg.md)
+
+---
+
+## 📚 Documentación
 
 ### Documentación Funcional
 
-La documentación funcional se encuentra en el directorio `docs/` y describe cómo funciona la aplicación desde el punto de vista del usuario y del sistema.
+| Archivo | Descripción |
+|---------|-------------|
+| [docs/PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md) | Visión general y decisiones arquitectónicas |
+| [docs/arquitectura.md](docs/arquitectura.md) | Detalles de arquitectura del sistema |
+| [docs/motor-normativo.md](docs/motor-normativo.md) | Funcionamiento del motor normativo |
+| [docs/escenarios-normativos.md](docs/escenarios-normativos.md) | Escenarios normativos aplicables |
+| [docs/flujo-creacion-empresa.md](docs/flujo-creacion-empresa.md) | Proceso de creación de empresa |
+| [docs/renderer.md](docs/renderer.md) | Sistema de renderizado |
+| [docs/modulo-investigacion-accidentes.md](docs/modulo-investigacion-accidentes.md) | Módulo de investigación con IA |
+| [docs/LIMPIEZA_REORGANIZACION_FEB_2026.md](docs/LIMPIEZA_REORGANIZACION_FEB_2026.md) | Última reorganización (Feb 2026) |
 
-## Guía para Desarrolladores
+### Documentación de API (JSDoc)
 
-### Agregar documentación a nuevas funciones
+La documentación de API se genera automáticamente desde los comentarios JSDoc:
 
-Cuando agregues nuevas funciones o modifiques existentes, asegúrate de incluir comentarios JSDoc apropiados:
+```bash
+# Generar documentación
+npm run docs:generate
 
-```javascript
-/**
- * Renderiza los módulos y submódulos activos de una empresa
- * según el escenario normativo asignado.
- *
- * @param {Object} empresa - Objeto que representa la empresa
- * @param {string} empresa.escenario_normativo - El escenario normativo asignado
- * @param {Object} reglasNormativas - Las reglas normativas aplicables
- * @returns {void}
- */
-function renderizarModulosEmpresa(empresa, reglasNormativas) {
-  // lógica de la función
+# Vigilar cambios y regenerar automáticamente
+npm run docs:watch
+```
+
+**Ubicación:** `docs/api/`
+
+### Estado del Proyecto
+
+| Archivo | Descripción |
+|---------|-------------|
+| [docs/ESTADO_ACTUAL_REORGANIZACION.md](docs/ESTADO_ACTUAL_REORGANIZACION.md) | 18 fases de reorganización completadas |
+| [docs/CHANGELOG.md](docs/CHANGELOG.md) | Historial de cambios por versión |
+| [docs/DEPENDENCIAS.md](docs/DEPENDENCIAS.md) | Guía completa de dependencias |
+
+---
+
+## 🧪 Pruebas y Depuración
+
+### Comandos de Depuración
+
+```bash
+# Depuración completa
+npm run debug
+
+# Solo proceso principal
+npm run debug-main
+
+# Depuración extendida
+npm run debug-full
+```
+
+### Archivos de Test
+
+| Archivo | Propósito |
+|---------|-----------|
+| `test/test-jsdoc.js` | Pruebas de generación JSDoc |
+| `test/test-module-cards.js` | Pruebas de tarjetas de módulo |
+| `test/test_remision_utils.py` | Pruebas de utilidades de remisión |
+
+### Logs
+
+Los registros de la aplicación se encuentran en:
+- `logs/dev_log.txt` - Log de desarrollo
+- `main.js` usa `electron-log` para logging centralizado
+
+---
+
+## 📦 Distribución
+
+### Configuración de Build
+
+El proyecto usa `electron-builder` para crear distribuciones:
+
+```json
+{
+  "appId": "com.jrfsoluciones.sgsst",
+  "productName": "K+AIR",
+  "win": {
+    "target": "nsis",
+    "icon": "assets/KIAR256.ico"
+  },
+  "mac": {
+    "target": "dmg",
+    "category": "public.app-category.business"
+  },
+  "linux": {
+    "target": "AppImage"
+  }
 }
 ```
 
-### Actualizar documentación funcional
+### Publicación
 
-Cuando realices cambios significativos en la funcionalidad, actualice los archivos correspondientes en el directorio `docs/`:
+La aplicación se publica en GitHub Releases:
+- **Repositorio:** https://github.com/Reivaj640/SG-SST-E
+- **Tipo de release:** Draft
+- **Auto-updates:** Habilitadas con `electron-updater`
 
-- `docs/PROJECT_OVERVIEW.md` - Decisiones arquitectónicas y reglas de cambio
-- `docs/arquitectura.md` - Cambios en la estructura del sistema
-- `docs/archivos-clave.md` - Detalles de los archivos fundamentales (main.js, preload.js, renderer.js, index.html)
-- `docs/motor-normativo.md` - Cambios en el motor normativo
-- `docs/escenarios-normativos.md` - Nuevos escenarios o modificaciones
-- `docs/flujo-creacion-empresa.md` - Cambios en el proceso de creación de empresa
-- `docs/renderer.md` - Cambios en el sistema de renderizado
-- `docs/mantenimiento-documentacion.md` - Actualizaciones al proceso de documentación
-- `docs/modulo-investigacion-accidentes.md` - Cambios en el módulo de investigación
-- `docs/CHANGELOG.md` - Registro de cambios por versión
-- `docs/ESTADO_ACTUAL_REORGANIZACION.md` - Estado de reorganización modular
-- `docs/ONLYOFFICE_SETUP.md` - Configuración de OnlyOffice
-- `docs/README-LIMPIEZA.md` - Mantenimiento del proyecto
+---
 
-### Proceso de integración
+## 🔧 Mantenimiento
 
-Cada vez que se realice un cambio en el código:
+### Actualización de Dependencias
 
-1. Actualiza los comentarios JSDoc en el código fuente
-2. Ejecuta `npm run docs:generate` para actualizar la documentación de API
-3. Actualiza los archivos de documentación funcional si es necesario
-4. Asegúrate de que `docs/CHANGELOG.md` refleje los cambios realizados
+```bash
+# Verificar dependencias desactualizadas
+npm outdated
 
-## Scripts Disponibles
+# Actualizar dependencias
+npm update
 
-- `npm run docs:generate` - Genera la documentación de API desde JSDoc
-- `npm run docs:watch` - Vigila cambios en los archivos JS y regenera la documentación automáticamente
-- `npm start` - Inicia la aplicación
-- `npm run dev` - Inicia la aplicación en modo desarrollo con recarga automática
-- `npm run build` - Construye la aplicación para distribución
+# Actualizar dependencias específicas
+npm install package-name@latest
+```
 
-## Contribuciones
+### Limpieza del Proyecto
 
-Cuando contribuyas al proyecto:
+El proyecto mantiene una raíz limpia:
+- ✅ **13 archivos en raíz** (solo esenciales)
+- ✅ **Módulos organizados** en `modules/`
+- ✅ **Backup histórico** en `backup_archivos_originales/`
 
-1. Sigue las convenciones de nombrado y estilo del código existente
-2. Documenta todas las funciones públicas con JSDoc
-3. Actualiza la documentación funcional cuando sea necesario
-4. Incluye tus cambios en el CHANGELOG.md
+### Scripts de Utilidad
 
-## Uso de IA en el Desarrollo
+```bash
+# Verificar tamaños de archivos
+scripts/verificar-tamanos.bat
 
-Antes de proponer cambios, revisa PROJECT_OVERVIEW.md y los archivos en /docs para respetar la arquitectura, el motor normativo y los escenarios existentes.
+# Generar documentación automáticamente
+npm run docs:watch
 
-Especial atención debe darse a los archivos clave del sistema:
-- **main.js**: Proceso principal con responsabilidades críticas
-- **preload.js**: Punto de entrada seguro para la comunicación entre procesos
-- **renderer.js**: Proceso de renderizado que gestiona la interfaz de usuario y la navegación
-- **index.html**: Estructura principal de la interfaz de usuario
+# Limpiar caché
+npm run clean  # (si está configurado)
+```
 
-Estos archivos son fundamentales para el funcionamiento del sistema y deben mantenerse con cuidado.
+---
 
-## Nota sobre la Documentación
+## 🤝 Contribuciones
 
-La documentación técnica se genera automáticamente desde los comentarios JSDoc y la documentación funcional se mantiene bajo disciplina de cambios.
+### Flujo de Trabajo
+
+1. **Crear rama** desde `main`
+2. **Implementar cambios** siguiendo convenciones existentes
+3. **Agregar documentación JSDoc** a nuevas funciones
+4. **Ejecutar pruebas** locales
+5. **Generar documentación**: `npm run docs:generate`
+6. **Actualizar CHANGELOG.md**
+7. **Crear Pull Request**
+
+### Convenciones de Código
+
+- **Nombrado**: `nombre-component.js`, `nombre-logic.js`, `nombre-viewer.js`
+- **Comentarios**: JSDoc para funciones públicas
+- **Estilos**: Seguir Sistema Visual Oficial K+AIR
+- **Módulos**: Organizar en `modules/[categoria]/[submodulo]/`
+
+### Documentación de Cambios
+
+Cuando realices cambios:
+
+1. **Actualiza comentarios JSDoc** en el código
+2. **Ejecuta** `npm run docs:generate`
+3. **Actualiza documentación funcional** en `docs/`
+4. **Registra cambios** en `CHANGELOG.md`
+
+---
+
+## 📞 Soporte y Contacto
+
+### Recursos de Ayuda
+
+- 📖 **Documentación Completa:** `/docs`
+- 🐛 **Reportar Bugs:** GitHub Issues
+- 💬 **Discusiones:** GitHub Discussions
+
+### Información del Autor
+
+**Javier Robles F.**
+- Prof. SG-SST
+- Esp. Gerencia de Proyectos
+- © 2025-2026 Todos los derechos reservados
+
+---
+
+## 📄 Licencia
+
+**Copyright © 2025 Javier Robles F.**
+
+Este software es propietario y confidencial. No se permite la reproducción, distribución o modificación sin autorización escrita del autor.
+
+---
+
+## 🎯 Hoja de Ruta (Próximos Pasos)
+
+### Corto Plazo
+- [ ] Completar módulos 4-7 (Peligros, Amenazas, Verificación, Mejoramiento)
+- [ ] Mejorar documentación de contratos IPC
+- [ ] Optimizar carga de módulos dinámicos
+
+### Mediano Plazo
+- [ ] Implementar sistema de módulos ES6
+- [ ] Migrar a webpack para bundling
+- [ ] Agregar tests unitarios
+
+### Largo Plazo
+- [ ] Versión web (sin Electron)
+- [ ] Base de datos SQL/NoSQL
+- [ ] Sincronización en la nube
+
+---
+
+**Última actualización:** 24 de febrero de 2026  
+**Versión del documento:** 2.0 (Post-reorganización completa)

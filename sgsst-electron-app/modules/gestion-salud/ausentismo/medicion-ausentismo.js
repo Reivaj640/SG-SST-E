@@ -61,7 +61,7 @@ class MedicionAusentismoComponent {
 
         // Crear iframe para cargar el portal de bienvenida
         const iframe = document.createElement('iframe');
-        iframe.src = 'medicion-ausentismo-home.html';
+        iframe.src = 'modules/gestion-salud/ausentismo/medicion-ausentismo-home.html';
         iframe.style.cssText = `
             width: 100%;
             height: 100%;
