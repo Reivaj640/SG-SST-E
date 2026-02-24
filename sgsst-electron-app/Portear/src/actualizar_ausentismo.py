@@ -546,6 +546,20 @@ def registrar_incapacidad(empresa, file_path, datos):
         log(f"Encabezados detectados: {headers}")
 
         # Mapear los datos del formulario a las columnas correctas
+        # Calcular días de incapacidad desde fecha_inicio hasta fecha_finalizacion
+        dias_incapacidad = 0
+        if datos.get("fecha_inicio") and datos.get("fecha_finalizacion"):
+            try:
+                from datetime import datetime
+                fecha_inicio = datetime.strptime(datos["fecha_inicio"], "%Y-%m-%d")
+                fecha_fin = datetime.strptime(datos["fecha_finalizacion"], "%Y-%m-%d")
+                # Calcular diferencia en días (inclusive)
+                dias_incapacidad = (fecha_fin - fecha_inicio).days + 1
+                log(f"Días de incapacidad calculados: {dias_incapacidad}")
+            except Exception as e:
+                log(f"Advertencia: No se pudo calcular días de incapacidad: {e}")
+                dias_incapacidad = 0
+
         nueva_fila = []
         for header in headers:
             if header == "No":
@@ -553,35 +567,27 @@ def registrar_incapacidad(empresa, file_path, datos):
                 num_filas_datos = sum(1 for r in range(8, ws.max_row + 1) if ws.cell(row=r, column=1).value)
                 nueva_fila.append(str(num_filas_datos + 1))
             elif header == "EMPRESA":
-                nueva_fila.append(datos.get("empresa", ""))
+                # Columna B (índice 1) - Empresa del empleado
+                nueva_fila.append(empresa)
             elif header == "NOMBRE ":
                 nueva_fila.append(datos.get("nombre", ""))
             elif header == "CEDULA ":
+                # Columna E (índice 4) - Cédula del empleado
                 nueva_fila.append(datos.get("cedula", ""))
-            elif header == "CARGO":
+            elif header == "Columna1":
+                # Columna adicional (puede usarse para cédula alternativa o dejar vacío)
+                nueva_fila.append("")
+            elif header == "CARGO ":
+                # Columna F (índice 5) - Cargo del empleado
                 nueva_fila.append(datos.get("cargo", ""))
             elif header == "EMPRESA USUARIA":
+                # Columna G (índice 6) - Empresa usuaria donde presta el servicio
                 nueva_fila.append(datos.get("empresa_usuaria", ""))
             elif header == "ÁREA O DPTO":
                 nueva_fila.append(datos.get("departamento", ""))
             elif header == "GENERO":
+                # Columna I (índice 8) - Género del empleado
                 nueva_fila.append(datos.get("genero", ""))
-            elif header == "CLASE DE INCAPACIDAD":
-                nueva_fila.append(datos.get("clase_incapacidad", ""))
-            elif header == "TIPO DE INCAPACIDAD":
-                nueva_fila.append(datos.get("tipo_incapacidad", ""))
-            elif header == "F. INICIO":
-                nueva_fila.append(datos.get("fecha_inicio", ""))
-            elif header == "F. FIN":
-                nueva_fila.append(datos.get("fecha_finalizacion", ""))
-            elif header == "CODIGO":
-                nueva_fila.append(datos.get("codigo", ""))
-            elif header == "DESCRIPCION":
-                nueva_fila.append(datos.get("descripcion", ""))
-            elif header == "ENTIDAD":
-                nueva_fila.append(datos.get("entidad", ""))
-            elif header == "AÑO":
-                nueva_fila.append(datos.get("fecha_inicio", "")[:4] if datos.get("fecha_inicio") else "")
             elif header == "MES":
                 if datos.get("fecha_inicio"):
                     try:
@@ -593,6 +599,25 @@ def registrar_incapacidad(empresa, file_path, datos):
                         nueva_fila.append("")
                 else:
                     nueva_fila.append("")
+            elif header == "N° DIAS DE INCAPACIDAD":
+                # Columna K (índice 10) - Días de incapacidad CALCULADOS
+                nueva_fila.append(str(dias_incapacidad) if dias_incapacidad > 0 else "")
+            elif header == "CLASE DE INCAPACIDAD":
+                nueva_fila.append(datos.get("clase_incapacidad", ""))
+            elif header == "TIPO DE INCAPACIDAD":
+                nueva_fila.append(datos.get("tipo_incapacidad", ""))
+            elif header == "ENTIDAD":
+                nueva_fila.append(datos.get("entidad", ""))
+            elif header == "AÑO":
+                nueva_fila.append(datos.get("fecha_inicio", "")[:4] if datos.get("fecha_inicio") else "")
+            elif header == "F. INICIO":
+                nueva_fila.append(datos.get("fecha_inicio", ""))
+            elif header == "F. FIN":
+                nueva_fila.append(datos.get("fecha_finalizacion", ""))
+            elif header == "CODIGO":
+                nueva_fila.append(datos.get("codigo", ""))
+            elif header == "DESCRIPCION":
+                nueva_fila.append(datos.get("descripcion", ""))
             else:
                 # Columnas calculadas o no mapeadas: dejar vacío
                 nueva_fila.append("")

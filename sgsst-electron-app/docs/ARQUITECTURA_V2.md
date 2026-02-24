@@ -1077,6 +1077,208 @@ if (empresaEmpleado && empresaSeleccionada !== empresaEmpleado) {
 }
 ```
 
+#### 9.3.4 Autocompletado Inteligente - Licencia de Luto
+
+**Ubicación:** `modules/gestion-salud/ausentismo/medicion-ausentismo.js`
+
+**Propósito:** Autocompletar automáticamente el código CIE-10 y descripción cuando se selecciona "Licencia de Luto".
+
+**Funcionalidad:**
+
+| Campo | Valor Autocompletado |
+|-------|---------------------|
+| **Código CIE-10** | `Z63.4` |
+| **Descripción** | `Luto` |
+
+**Implementación:**
+
+```javascript
+// Event listener en el select de tipo de incapacidad
+const tipoIncapacidadSelect = document.getElementById('tipo-incapacidad-select');
+if (tipoIncapacidadSelect) {
+    tipoIncapacidadSelect.addEventListener('change', async () => {
+        const tipoIncapacidad = tipoIncapacidadSelect.value;
+        const codigoInput = document.getElementById('codigo-input');
+        const descripcionInput = document.getElementById('descripcion-input');
+
+        // Si es LICENCIA DE LUTO, autocompletar código y descripción
+        if (tipoIncapacidad === 'LICENCIA DE LUTO') {
+            codigoInput.value = 'Z63.4';
+            descripcionInput.value = 'Luto';
+            this.showStatus(statusDiv, 'Código CIE-10 autocompletado para Licencia de Luto.', 'info');
+        }
+    });
+}
+```
+
+**Código CIE-10 Z63.4:**
+
+| Categoría | Descripción |
+|-----------|-------------|
+| **Categoría Principal** | Factores que influyen en el estado de salud |
+| **Subcategoría** | Otros problemas relacionados con el entorno social |
+| **Descripción Completa** | Ausencia por muerte de familiar (Luto) |
+
+**Flujo de Usuario:**
+
+```
+1. Usuario abre formulario de registro de incapacidad
+2. Usuario selecciona "LICENCIA DE LUTO" en el dropdown
+3. Automáticamente se completan:
+   - Campo "Código Diagnóstico (CIE-10)" → "Z63.4"
+   - Campo "Descripción Diagnóstico" → "Luto"
+4. Se muestra mensaje informativo
+5. Usuario continúa con el registro normalmente
+```
+
+**Resultado Visual:**
+
+```
+┌─────────────────────────────────────────────────┐
+│  ℹ️  Código CIE-10 autocompletado para         │
+│      Licencia de Luto.                          │
+└─────────────────────────────────────────────────┘
+```
+
+#### 9.3.5 Indexación Mejorada de Datos en Excel
+
+**Ubicación:** `Portear/src/actualizar_ausentismo.py` - Función `registrar_incapacidad()`
+
+**Propósito:** Indexar automáticamente todos los campos del formulario en las columnas correctas del archivo Excel de ausentismo.
+
+**Mapeo de Campos a Columnas Excel:**
+
+| Campo Formulario | Columna Excel | Índice | Descripción |
+|-----------------|---------------|--------|-------------|
+| **Empresa** | B | 1 | Nombre de la empresa seleccionada |
+| **Cédula** | E | 4 | Número de identificación del empleado |
+| **Cargo** | F | 5 | Cargo actual del empleado |
+| **Empresa Usuaria** | G | 6 | Empresa donde presta el servicio |
+| **Género** | I | 8 | Género del empleado (Masculino/Femenino/Otro) |
+| **N° Días Incapacidad** | K | 10 | **Días calculados automáticamente** (fecha_fin - fecha_inicio + 1) |
+| **Entidad** | N | 13 | Nombre de la EPS o ARL |
+
+**Cálculo Automático de Días:**
+
+```python
+# Calcular días de incapacidad desde fecha_inicio hasta fecha_finalizacion
+dias_incapacidad = 0
+if datos.get("fecha_inicio") and datos.get("fecha_finalizacion"):
+    try:
+        from datetime import datetime
+        fecha_inicio = datetime.strptime(datos["fecha_inicio"], "%Y-%m-%d")
+        fecha_fin = datetime.strptime(datos["fecha_finalizacion"], "%Y-%m-%d")
+        # Calcular diferencia en días (inclusive)
+        dias_incapacidad = (fecha_fin - fecha_inicio).days + 1
+        log(f"Días de incapacidad calculados: {dias_incapacidad}")
+    except Exception as e:
+        log(f"Advertencia: No se pudo calcular días de incapacidad: {e}")
+        dias_incapacidad = 0
+```
+
+**Ejemplo de Cálculo:**
+
+| Fecha Inicio | Fecha Fin | Días Calculados | Fórmula |
+|-------------|-----------|----------------|---------|
+| 2025-12-15 | 2025-12-18 | **4 días** | (18-15) + 1 = 4 |
+| 2025-01-01 | 2025-01-10 | **10 días** | (10-1) + 1 = 10 |
+| 2025-03-05 | 2025-03-05 | **1 día** | (5-5) + 1 = 1 |
+
+**Implementación en Python:**
+
+```python
+def registrar_incapacidad(empresa, file_path, datos):
+    # ... código inicial ...
+    
+    # Calcular días de incapacidad
+    dias_incapacidad = 0
+    if datos.get("fecha_inicio") and datos.get("fecha_finalizacion"):
+        from datetime import datetime
+        fecha_inicio = datetime.strptime(datos["fecha_inicio"], "%Y-%m-%d")
+        fecha_fin = datetime.strptime(datos["fecha_finalizacion"], "%Y-%m-%d")
+        dias_incapacidad = (fecha_fin - fecha_inicio).days + 1
+    
+    # Mapear los datos del formulario a las columnas correctas
+    nueva_fila = []
+    for header in headers:
+        if header == "EMPRESA":
+            # Columna B (índice 1) - Empresa del empleado
+            nueva_fila.append(empresa)
+        elif header == "CEDULA ":
+            # Columna E (índice 4) - Cédula del empleado
+            nueva_fila.append(datos.get("cedula", ""))
+        elif header == "CARGO ":
+            # Columna F (índice 5) - Cargo del empleado
+            nueva_fila.append(datos.get("cargo", ""))
+        elif header == "EMPRESA USUARIA":
+            # Columna G (índice 6) - Empresa usuaria
+            nueva_fila.append(datos.get("empresa_usuaria", ""))
+        elif header == "GENERO":
+            # Columna I (índice 8) - Género del empleado
+            nueva_fila.append(datos.get("genero", ""))
+        elif header == "N° DIAS DE INCAPACIDAD":
+            # Columna K (índice 10) - Días calculados
+            nueva_fila.append(str(dias_incapacidad) if dias_incapacidad > 0 else "")
+        elif header == "ENTIDAD":
+            # Columna N (índice 13) - Entidad (EPS/ARL)
+            nueva_fila.append(datos.get("entidad", ""))
+        # ... más campos ...
+```
+
+**Ejemplo de Registro Completo:**
+
+**Datos de Entrada:**
+```json
+{
+  "cedula": "32659263",
+  "nombre": "NANCY ESTHER LIDUEÑA SAENZ",
+  "cargo": "OFICIOS VARIOS",
+  "departamento": "ASEO",
+  "empresa_usuaria": "COMFAMILIAR ATLANTICO",
+  "genero": "Femenino",
+  "entidad": "EPS/SURA",
+  "clase_incapacidad": "EPS",
+  "tipo_incapacidad": "ENFERMEDAD GENERAL",
+  "fecha_inicio": "2025-12-15",
+  "fecha_finalizacion": "2025-12-18",
+  "codigo": "M179",
+  "descripcion": "Gonartrosis, no especificada"
+}
+```
+
+**Resultado en Excel (Fila Nueva):**
+```
+[597, "ASEPLUS", "NANCY ESTHER LIDUEÑA SAENZ", "32659263", "", 
+ "OFICIOS VARIOS", "COMFAMILIAR ATLANTICO", "ASEO", "Femenino", 
+ "DICIEMBRE", 4, "EPS", "ENFERMEDAD GENERAL", "EPS/SURA", 
+ "2025", "2025-12-15", "2025-12-18", "M179", 
+ "Gonartrosis, no especificada"]
+```
+
+**Columnas Indexadas:**
+
+| Índice | Columna | Header | Valor Indexado |
+|--------|---------|--------|----------------|
+| 0 | A | No | 597 (automático) |
+| 1 | B | EMPRESA | ASEPLUS |
+| 2 | C | NOMBRE | NANCY ESTHER LIDUEÑA SAENZ |
+| 3 | D | CEDULA | 32659263 |
+| 4 | E | Columna1 | (vacío) |
+| 5 | F | CARGO | OFICIOS VARIOS |
+| 6 | G | EMPRESA USUARIA | COMFAMILIAR ATLANTICO |
+| 7 | H | ÁREA O DPTO | ASEO |
+| 8 | I | GENERO | Femenino ✅ |
+| 9 | J | MES | DICIEMBRE |
+| 10 | K | N° DIAS DE INCAPACIDAD | 4 ✅ (calculado) |
+| 11 | L | CLASE DE INCAPACIDAD | EPS |
+| 12 | M | TIPO DE INCAPACIDAD | ENFERMEDAD GENERAL |
+| 13 | N | ENTIDAD | EPS/SURA ✅ |
+| 14 | O | AÑO | 2025 |
+| 15 | P | F. INICIO | 2025-12-15 |
+| 16 | Q | F. FIN | 2025-12-18 |
+| 17 | R | CODIGO | M179 |
+| 18 | S | DESCRIPCION | Gonartrosis, no especificada |
+
 ### 9.4 Temas (Claro/Oscuro/Sistema)
 
 El sistema soporta 3 modos de tema:

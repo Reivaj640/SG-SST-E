@@ -1281,6 +1281,23 @@ class MedicionAusentismoComponent {
                 });
             }
 
+            // 3. Autocompletar código y descripción CIE-10 para LICENCIA DE LUTO
+            const tipoIncapacidadSelect = document.getElementById('tipo-incapacidad-select');
+            if (tipoIncapacidadSelect) {
+                tipoIncapacidadSelect.addEventListener('change', async () => {
+                    const tipoIncapacidad = tipoIncapacidadSelect.value;
+                    const codigoInput = document.getElementById('codigo-input');
+                    const descripcionInput = document.getElementById('descripcion-input');
+
+                    // Si es LICENCIA DE LUTO, autocompletar código y descripción
+                    if (tipoIncapacidad === 'LICENCIA DE LUTO') {
+                        codigoInput.value = 'Z63.4';
+                        descripcionInput.value = 'Luto';
+                        this.showStatus(statusDiv, 'Código CIE-10 autocompletado para Licencia de Luto.', 'info');
+                    }
+                });
+            }
+
             // 3. Registrar incapacidad
             const registrarBtn = document.getElementById('registrar-btn');
             if (registrarBtn) {
@@ -1456,6 +1473,9 @@ class MedicionAusentismoComponent {
             nombre: document.getElementById('nombre-input').value.trim(),
             cargo: document.getElementById('cargo-input').value.trim(),
             departamento: document.getElementById('departamento-input').value.trim(),
+            empresa_usuaria: document.getElementById('empresa-usuaria-input').value.trim(),
+            genero: document.getElementById('genero-select').value,
+            entidad: document.getElementById('entidad-input').value.trim(),
             clase_incapacidad: document.getElementById('clase-incapacidad-select').value,
             tipo_incapacidad: document.getElementById('tipo-incapacidad-select').value,
             fecha_inicio: document.getElementById('fecha-inicio-input').value,
