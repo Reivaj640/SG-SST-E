@@ -960,6 +960,123 @@ h1, h2, h3, h4, h5, h6 {
 }
 ```
 
+### 9.3 Sistema de Notificaciones y Estados
+
+#### 9.3.1 Método `showStatus()` - Mensajes de Estado Modernos
+
+**Ubicación:** `modules/gestion-salud/ausentismo/medicion-ausentismo.js`
+
+**Propósito:** Mostrar mensajes de estado con diseño moderno, iconos SVG y animaciones.
+
+**Configuración por tipo:**
+
+| Tipo | Icono | Fondo | Borde | Texto | Icono BG |
+|------|-------|-------|-------|-------|----------|
+| **Success** | ✓ Check | `#F0FDF4` | `#86EFAC` | `#166534` | `#DCFCE7` |
+| **Error** | ⚠ Alerta | `#FEF2F2` | `#FCA5A5` | `#991B1B` | `#FEE2E2` |
+| **Warning** | ⚠ Triángulo | `#FFFBEB` | `#FCD34D` | `#92400E` | `#FEF3C7` |
+| **Info** | ℹ Info | `#EFF6FF` | `#93C5FD` | `#1E40AF` | `#DBEAFE` |
+
+**Características:**
+
+| Característica | Descripción |
+|----------------|-------------|
+| **Iconos** | SVG inline (sin dependencias externas) |
+| **Animación** | `slideDown` - 0.3s ease-out |
+| **Estructura** | Icono circular (36px) + texto con flex |
+| **Bordes** | 10px border-radius |
+| **Accesibilidad** | Buen contraste de colores |
+
+**Ejemplo de uso:**
+
+```javascript
+// Mensaje de éxito
+this.showStatus(statusDiv, 'Empleado encontrado. Puede continuar.', 'success');
+
+// Mensaje de advertencia
+this.showStatus(statusDiv, 'Búsqueda cancelada. Empleado no pertenece a esta empresa.', 'warning');
+
+// Mensaje de información
+this.showStatus(statusDiv, 'Buscando empleado...', 'info');
+
+// Mensaje de error
+this.showStatus(statusDiv, 'Error: Empleado no encontrado.', 'error');
+```
+
+**Resultado Visual:**
+
+```
+┌─────────────────────────────────────────────────┐
+│  [✓]  Empleado encontrado. Puede continuar.     │
+│  (icono) (texto con flex: 1)                    │
+└─────────────────────────────────────────────────┘
+```
+
+#### 9.3.2 Método `showNotification()` - Toast Notifications
+
+**Ubicación:** `modules/gestion-salud/ausentismo/medicion-ausentismo.js`
+
+**Propósito:** Mostrar notificaciones toast temporales en la esquina superior derecha.
+
+**Características:**
+
+| Característica | Descripción |
+|----------------|-------------|
+| **Posición** | Fixed top-right |
+| **Duración** | 3 segundos (auto-oculta) |
+| **Animación** | Slide desde derecha |
+| **Tipos** | success, error, warning, info |
+| **Borde izquierdo** | Color según tipo (4px) |
+
+**Ejemplo de uso:**
+
+```javascript
+// Notificación de éxito
+this.showNotification('¡Incapacidad registrada exitosamente!', 'success');
+
+// Notificación de proceso
+this.showNotification('Registrando incapacidad...', 'info');
+
+// Notificación de error
+this.showNotification('Error: No se pudo guardar.', 'error');
+```
+
+#### 9.3.3 Modal de Confirmación - `showEmpresaMismatchModal()`
+
+**Propósito:** Solicitar confirmación cuando el empleado pertenece a empresa diferente.
+
+**Características:**
+
+| Característica | Descripción |
+|----------------|-------------|
+| **Overlay** | Backdrop blur (4px) + opacity 60% |
+| **Animaciones** | fadeIn + slideUp |
+| **Icono** | SVG triángulo advertencia |
+| **Botones** | Cancelar + Confirmar |
+| **Z-index** | 10000 (sobre todo) |
+| **Focus** | Auto-focus en Confirmar |
+
+**Flujo de uso:**
+
+```javascript
+if (empresaEmpleado && empresaSeleccionada !== empresaEmpleado) {
+    this.showEmpresaMismatchModal(
+        result.datos.nombre,
+        result.datos.empresa,
+        this.currentCompany,
+        () => {
+            // Usuario confirmó - continuar
+            this.showStatus(statusDiv, 'Empleado encontrado.', 'success');
+        },
+        () => {
+            // Usuario canceló - limpiar
+            this.showStatus(statusDiv, 'Búsqueda cancelada.', 'warning');
+            // Limpiar formulario...
+        }
+    );
+}
+```
+
 ### 9.4 Temas (Claro/Oscuro/Sistema)
 
 El sistema soporta 3 modos de tema:

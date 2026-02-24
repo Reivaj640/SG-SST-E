@@ -1213,11 +1213,33 @@ class MedicionAusentismoComponent {
                             document.getElementById('empresa-usuaria-input').value = result.datos.empresa_usuaria || '';
                             document.getElementById('entidad-input').value = result.datos.entidad || '';
 
-                            if (result.datos.empresa && this.currentCompany.toUpperCase() !== result.datos.empresa.toUpperCase()) {
-                                this.currentCompany = result.datos.empresa;
-                                this.showStatus(statusDiv, `Empleado encontrado. Contexto actualizado: ${this.currentCompany}`, 'success');
+                            // ✅ VALIDACIÓN: Verificar si el empleado pertenece a la empresa seleccionada
+                            const empresaSeleccionada = this.currentCompany.toUpperCase();
+                            const empresaEmpleado = (result.datos.empresa || '').toUpperCase();
+                            
+                            if (empresaEmpleado && empresaSeleccionada !== empresaEmpleado) {
+                                // ⚠️ ALERTA: El empleado pertenece a otra empresa - Mostrar modal personalizado
+                                this.showEmpresaMismatchModal(
+                                    result.datos.nombre,
+                                    result.datos.empresa,
+                                    this.currentCompany,
+                                    () => {
+                                        // Usuario confirmó - continuar con el registro
+                                        this.showStatus(statusDiv, 'Empleado encontrado. Puede continuar con el registro.', 'success');
+                                    },
+                                    () => {
+                                        // Usuario canceló - limpiar formulario
+                                        this.showStatus(statusDiv, 'Búsqueda cancelada. Empleado no pertenece a esta empresa.', 'warning');
+                                        document.getElementById('nombre-input').value = '';
+                                        document.getElementById('cargo-input').value = '';
+                                        document.getElementById('departamento-input').value = '';
+                                        document.getElementById('empresa-usuaria-input').value = '';
+                                        document.getElementById('entidad-input').value = '';
+                                    }
+                                );
                             } else {
-                                this.showStatus(statusDiv, 'Empleado encontrado.', 'success');
+                                // ✅ Empleado de la misma empresa
+                                this.showStatus(statusDiv, 'Empleado encontrado. Puede continuar con el registro.', 'success');
                             }
                         } else {
                             this.showStatus(statusDiv, 'Empleado no encontrado. Diligencie manualmente.', 'warning');
@@ -1312,29 +1334,101 @@ class MedicionAusentismoComponent {
 
     // --- Funciones Auxiliares para el Formulario ---
 
+    /**
+     * Muestra mensaje de estado moderno con icono y animación
+     * @param {HTMLElement} statusDiv - Elemento contenedor del estado
+     * @param {string} message - Mensaje a mostrar
+     * @param {string} type - Tipo de estado: 'success', 'error', 'warning', 'info'
+     */
     showStatus(statusDiv, message, type) {
-        statusDiv.textContent = message;
         statusDiv.style.display = 'block';
-        statusDiv.className = 'status-message'; // Clase base
+        statusDiv.className = 'status-message';
+        
+        // Definir configuración por tipo
+        const config = {
+            success: {
+                icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+                bg: '#F0FDF4',
+                border: '#86EFAC',
+                text: '#166534',
+                iconBg: '#DCFCE7'
+            },
+            error: {
+                icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+                bg: '#FEF2F2',
+                border: '#FCA5A5',
+                text: '#991B1B',
+                iconBg: '#FEE2E2'
+            },
+            warning: {
+                icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+                bg: '#FFFBEB',
+                border: '#FCD34D',
+                text: '#92400E',
+                iconBg: '#FEF3C7'
+            },
+            info: {
+                icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+                bg: '#EFF6FF',
+                border: '#93C5FD',
+                text: '#1E40AF',
+                iconBg: '#DBEAFE'
+            }
+        };
 
-        switch (type) {
-            case 'success':
-                statusDiv.style.backgroundColor = '#d4edda';
-                statusDiv.style.color = '#155724';
-                break;
-            case 'error':
-                statusDiv.style.backgroundColor = '#f8d7da';
-                statusDiv.style.color = '#721c24';
-                break;
-            case 'warning':
-                statusDiv.style.backgroundColor = '#fff3cd';
-                statusDiv.style.color = '#856404';
-                break;
-            case 'info':
-            default:
-                statusDiv.style.backgroundColor = '#d1ecf1';
-                statusDiv.style.color = '#0c5460';
-                break;
+        const currentConfig = config[type] || config.info;
+
+        // Aplicar estilos modernos
+        statusDiv.style.cssText = `
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 18px;
+            background: ${currentConfig.bg};
+            border: 1px solid ${currentConfig.border};
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            color: ${currentConfig.text};
+            animation: slideDown 0.3s ease-out;
+            margin-bottom: 20px;
+        `;
+
+        // Contenido con icono
+        statusDiv.innerHTML = `
+            <div style="
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+                background: ${currentConfig.iconBg};
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+                color: ${currentConfig.text};
+            ">
+                ${currentConfig.icon}
+            </div>
+            <span style="flex: 1;">${message}</span>
+        `;
+
+        // Agregar animación si no existe
+        if (!document.getElementById('status-animations')) {
+            const style = document.createElement('style');
+            style.id = 'status-animations';
+            style.textContent = `
+                @keyframes slideDown {
+                    from {
+                        opacity: 0;
+                        transform: translateY(-10px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+            `;
+            document.head.appendChild(style);
         }
     }
 
@@ -1397,6 +1491,228 @@ class MedicionAusentismoComponent {
     document.getElementById('departamento-input').value = '';
     document.getElementById('empresa-usuaria-input').value = '';
     document.getElementById('entidad-input').value = '';
+    }
+
+    /**
+     * Muestra modal personalizado de advertencia por empresa diferente
+     * @param {string} nombreEmpleado - Nombre del empleado encontrado
+     * @param {string} empresaEmpleado - Empresa a la que pertenece el empleado
+     * @param {string} empresaSeleccionada - Empresa actualmente seleccionada en la UI
+     * @param {Function} onConfirm - Callback cuando el usuario confirma
+     * @param {Function} onCancel - Callback cuando el usuario cancela
+     */
+    showEmpresaMismatchModal(nombreEmpleado, empresaEmpleado, empresaSeleccionada, onConfirm, onCancel) {
+        // Crear overlay del modal
+        const overlay = document.createElement('div');
+        overlay.id = 'empresa-mismatch-overlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 10000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 0.2s ease-out;
+        `;
+
+        // Crear modal
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            max-width: 500px;
+            width: 90%;
+            overflow: hidden;
+            animation: slideUp 0.3s ease-out;
+        `;
+
+        // Header del modal
+        const header = document.createElement('div');
+        header.style.cssText = `
+            padding: 20px 24px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        `;
+
+        // Icono de advertencia
+        const iconContainer = document.createElement('div');
+        iconContainer.style.cssText = `
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #FEF3C7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        `;
+        iconContainer.innerHTML = `
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#92400E" stroke-width="2">
+                <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+        `;
+
+        // Título
+        const title = document.createElement('h3');
+        title.textContent = '⚠️ Empresa Diferente';
+        title.style.cssText = `
+            font-size: 16px;
+            font-weight: 600;
+            color: #1E293B;
+            margin: 0;
+        `;
+
+        header.appendChild(iconContainer);
+        header.appendChild(title);
+
+        // Cuerpo del modal
+        const body = document.createElement('div');
+        body.style.cssText = `
+            padding: 24px;
+        `;
+
+        // Mensaje
+        const message = document.createElement('div');
+        message.style.cssText = `
+            font-size: 14px;
+            color: #64748B;
+            line-height: 1.6;
+            margin-bottom: 16px;
+        `;
+        message.innerHTML = `
+            El empleado <strong style="color: #1E293B;">${nombreEmpleado}</strong> pertenece a la empresa 
+            <strong style="color: #174ea6;">${empresaEmpleado}</strong>, pero usted está registrado en 
+            <strong style="color: #174ea6;">${empresaSeleccionada}</strong>.
+        `;
+
+        // Nota informativa
+        const note = document.createElement('div');
+        note.style.cssText = `
+            background: #F8FAFC;
+            border-left: 3px solid #174ea6;
+            padding: 12px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #475569;
+        `;
+        note.innerHTML = `
+            <strong>Nota:</strong> Los datos se guardarán en el archivo de 
+            <strong>${empresaSeleccionada}</strong>. Asegúrese de que esta sea la empresa correcta 
+            antes de continuar.
+        `;
+
+        body.appendChild(message);
+        body.appendChild(note);
+
+        // Footer con botones
+        const footer = document.createElement('div');
+        footer.style.cssText = `
+            padding: 16px 24px;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            background: #F8FAFC;
+        `;
+
+        // Botón Cancelar
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancelar';
+        cancelBtn.style.cssText = `
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid #dee2e6;
+            background: white;
+            color: #64748B;
+            transition: all 0.2s;
+        `;
+        cancelBtn.onmouseover = function() {
+            this.style.backgroundColor = '#f1f5f9';
+            this.style.borderColor = '#cbd5e1';
+        };
+        cancelBtn.onmouseout = function() {
+            this.style.backgroundColor = 'white';
+            this.style.borderColor = '#dee2e6';
+        };
+        cancelBtn.onclick = () => {
+            overlay.remove();
+            if (onCancel) onCancel();
+        };
+
+        // Botón Confirmar
+        const confirmBtn = document.createElement('button');
+        confirmBtn.textContent = 'Continuar';
+        confirmBtn.style.cssText = `
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            background: #174ea6;
+            color: white;
+            transition: all 0.2s;
+        `;
+        confirmBtn.onmouseover = function() {
+            this.style.backgroundColor = '#185abd';
+            this.style.transform = 'translateY(-1px)';
+            this.style.boxShadow = '0 4px 6px -1px rgba(23, 78, 166, 0.3)';
+        };
+        confirmBtn.onmouseout = function() {
+            this.style.backgroundColor = '#174ea6';
+            this.style.transform = 'translateY(0)';
+            this.style.boxShadow = 'none';
+        };
+        confirmBtn.onclick = () => {
+            overlay.remove();
+            if (onConfirm) onConfirm();
+        };
+
+        footer.appendChild(cancelBtn);
+        footer.appendChild(confirmBtn);
+
+        // Ensamblar modal
+        modal.appendChild(header);
+        modal.appendChild(body);
+        modal.appendChild(footer);
+        overlay.appendChild(modal);
+
+        // Agregar al documento
+        document.body.appendChild(overlay);
+
+        // Agregar animaciones CSS dinámicamente
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+            @keyframes slideUp {
+                from { 
+                    opacity: 0;
+                    transform: translateY(20px);
+                }
+                to { 
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Enfocar botón de confirmar por defecto
+        setTimeout(() => confirmBtn.focus(), 100);
     }
 
     renderVerAusentismoView(container) {
