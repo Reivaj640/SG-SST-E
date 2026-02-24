@@ -13,19 +13,19 @@ Esta guía explica cómo configurar y ejecutar OnlyOffice Document Server para l
 
 Opción 1: Usar el script PowerShell (Recomendado)
 ```powershell
-.\start-onlyoffice.ps1
+.\scripts\onlyoffice\start-onlyoffice.ps1
 ```
 
 Opción 2: Usar el script Batch
 ```batch
-start-onlyoffice.bat
+scripts\onlyoffice\start-onlyoffice.bat
 ```
 
 ### En Linux/Mac
 
 ```bash
-chmod +x start-onlyoffice.sh
-./start-onlyoffice.sh
+chmod +x scripts/onlyoffice/start-onlyoffice.sh
+./scripts/onlyoffice/start-onlyoffice.sh
 ```
 
 ## Configuración Manual
