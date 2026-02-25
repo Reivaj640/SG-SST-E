@@ -366,15 +366,21 @@ class MedicionAusentismoComponent {
             display: flex; flex-wrap: wrap; align-items: flex-end; gap: 15px;
         `;
 
+        const currentYear = new Date().getFullYear();
+        const months = [
+            'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+            'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+        ];
+
         filtersContainer.innerHTML = `
-            <div style="flex: 1; min-width: 180px;">
+            <div style="flex: 2; min-width: 200px;">
                 <label style="display: block; font-size: 12px; font-weight: 500; color: #64748B; margin-bottom: 6px;">Buscar Paciente</label>
-                <input type="text" id="seguimientoSearchInput" class="form-control" placeholder="Nombre o Cédula..." 
+                <input type="text" id="seguimientoSearchInput" class="form-control" placeholder="Nombre o Cédula..."
                     style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px; background: #fff;">
             </div>
-            <div style="flex: 1; min-width: 180px;">
+            <div style="flex: 1; min-width: 150px;">
                 <label style="display: block; font-size: 12px; font-weight: 500; color: #64748B; margin-bottom: 6px;">Estado</label>
-                <select id="seguimientoEstadoFilter" class="form-control" 
+                <select id="seguimientoEstadoFilter" class="form-control"
                     style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px; background: #fff;">
                     <option value="">Todos</option>
                     <option value="En curso">En curso</option>
@@ -382,21 +388,37 @@ class MedicionAusentismoComponent {
                     <option value="Finalizado">Finalizado</option>
                 </select>
             </div>
-            <div style="flex: 1; min-width: 180px;">
+            <div style="flex: 1; min-width: 150px;">
                 <label style="display: block; font-size: 12px; font-weight: 500; color: #64748B; margin-bottom: 6px;">Tipo</label>
-                <select id="seguimientoTipoFilter" class="form-control" 
+                <select id="seguimientoTipoFilter" class="form-control"
                     style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px; background: #fff;">
                     <option value="">Todos</option>
                     <option value="EPS">EPS</option>
                     <option value="ARL">ARL</option>
                 </select>
             </div>
+            <div style="flex: 1; min-width: 150px;">
+                <label style="display: block; font-size: 12px; font-weight: 500; color: #64748B; margin-bottom: 6px;">Año</label>
+                <select id="seguimientoYearFilter" class="form-control"
+                    style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px; background: #fff;">
+                    <option value="">Todos</option>
+                    ${[currentYear, currentYear - 1, currentYear - 2].map(year => `<option value="${year}">${year}</option>`).join('')}
+                </select>
+            </div>
+            <div style="flex: 1; min-width: 150px;">
+                <label style="display: block; font-size: 12px; font-weight: 500; color: #64748B; margin-bottom: 6px;">Mes</label>
+                <select id="seguimientoMonthFilter" class="form-control"
+                    style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px; background: #fff;">
+                    <option value="">Todos</option>
+                    ${months.map((month, index) => `<option value="${index}">${month}</option>`).join('')}
+                </select>
+            </div>
             <div style="display: flex; gap: 10px; align-items: center;">
-                <button id="seguimientoFilterBtn" class="btn btn-primary" 
+                <button id="seguimientoFilterBtn" class="btn btn-primary"
                     style="padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; border: none; background-color: #174ea6; color: white;">
                     <i class="fas fa-filter"></i> Filtrar
                 </button>
-                <button id="seguimientoClearBtn" class="btn btn-outline" 
+                <button id="seguimientoClearBtn" class="btn btn-outline"
                     style="padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; border: 1px solid #e2e8f0; background: white; color: #1E293B;">
                     <i class="fas fa-times"></i> Limpiar
                 </button>
@@ -485,6 +507,8 @@ class MedicionAusentismoComponent {
                     document.getElementById('seguimientoSearchInput').value = '';
                     document.getElementById('seguimientoEstadoFilter').value = '';
                     document.getElementById('seguimientoTipoFilter').value = '';
+                    document.getElementById('seguimientoYearFilter').value = '';
+                    document.getElementById('seguimientoMonthFilter').value = '';
                     this.loadSeguimientoData();
                     this.showNotification('Filtros limpiados', 'info');
                 });
@@ -500,34 +524,166 @@ class MedicionAusentismoComponent {
                 // Procesar datos para seguimiento
                 const today = new Date();
                 const currentMonth = today.toLocaleString('default', { month: 'long' }).toUpperCase();
-                
-                this.seguimientoData = result.rows.map(row => {
+
+                console.log('[DEBUG loadSeguimientoData] Total de filas leídas:', result.rows.length);
+
+                // Convertir filas a objetos
+                const allRecords = result.rows.map(row => {
                     const rowObj = {};
                     result.headers.forEach((header, i) => {
                         rowObj[header ? header.trim() : `col_${i}`] = row[i];
                     });
                     return rowObj;
-                }).filter(row => {
-                    // Filtrar solo casos con fecha de fin futura o reciente (casos activos)
-                    const fechaFin = row['F. FIN'] ? new Date(row['F. FIN']) : null;
-                    if (!fechaFin) return false;
-                    
-                    // Incluir casos que aún no han terminado o terminaron este mes
-                    const diffTime = fechaFin - today;
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    return diffDays >= -30; // Casos de los últimos 30 días
                 });
+
+                console.log('[DEBUG loadSeguimientoData] Primer registro:', allRecords[0]);
+
+                // AGRUPAR incapacidades por empleado (cedula)
+                const empleadosMap = new Map();
+                
+                allRecords.forEach(record => {
+                    const cedula = record['CEDULA'] || record['cedula'];
+                    if (!cedula) return;
+                    
+                    // Limpiar y parsear días de incapacidad
+                    let diasIncapacidad = 0;
+                    const diasRaw = record['N° DIAS DE INCAPACIDAD'] || record['n°_dias_de_incapacidad'] || record['N° DIAS'] || '0';
+                    
+                    // Convertir string a número (manejar formatos como "1", "1,000", etc.)
+                    if (typeof diasRaw === 'string') {
+                        diasIncapacidad = parseInt(diasRaw.replace(/,/g, '').replace(/\./g, '').trim()) || 0;
+                    } else if (typeof diasRaw === 'number') {
+                        diasIncapacidad = Math.floor(diasRaw);
+                    }
+                    
+                    const fechaFin = record['F. FIN'] || record['f._fin'] || record['F. FIN'] || null;
+                    const fechaInicio = record['F. INICIO'] || record['f._inicio'] || record['F. INICIO'] || null;
+                    
+                    if (!empleadosMap.has(cedula)) {
+                        empleadosMap.set(cedula, {
+                            cedula: cedula,
+                            nombre: record['NOMBRE'] || record['nombre'] || '',
+                            cargo: record['CARGO'] || record['cargo'] || '',
+                            departamento: record['ÁREA O DPTO'] || record['area_o_dpto'] || '',
+                            empresaUsuaria: record['EMPRESA USUARIA'] || record['empresa_usuaria'] || '',
+                            genero: record['GENERO'] || record['genero'] || '',
+                            incapacidades: []
+                        });
+                    }
+                    
+                    empleadosMap.get(cedula).incapacidades.push({
+                        fechaInicio: fechaInicio ? new Date(fechaInicio) : null,
+                        fechaFin: fechaFin ? new Date(fechaFin) : null,
+                        diasIncapacidad: diasIncapacidad,
+                        record
+                    });
+                });
+
+                console.log('[DEBUG loadSeguimientoData] Total de empleados únicos:', empleadosMap.size);
+                console.log('[DEBUG loadSeguimientoData] Empleados agrupados:', Array.from(empleadosMap.entries()).map(([cedula, emp]) => ({
+                    cedula,
+                    nombre: emp.nombre,
+                    totalIncapacidades: emp.incapacidades.length,
+                    totalDias: emp.incapacidades.reduce((sum, inc) => sum + inc.diasIncapacidad, 0),
+                    incapacidades: emp.incapacidades.map(inc => ({
+                        dias: inc.diasIncapacidad,
+                        inicio: inc.fechaInicio,
+                        fin: inc.fechaFin
+                    }))
+                })).slice(0, 5)); // Mostrar solo primeros 5
+
+                // FILTRAR empleados que cumplen las condiciones
+                this.seguimientoData = Array.from(empleadosMap.values()).filter(empleado => {
+                    // Ordenar incapacidades por fecha de inicio
+                    empleado.incapacidades.sort((a, b) => {
+                        if (!a.fechaInicio) return 1;
+                        if (!b.fechaInicio) return -1;
+                        return a.fechaInicio - b.fechaInicio;
+                    });
+
+                    // Condición 1: Alguna incapacidad individual >= 10 días
+                    const tieneIncapacidadLarga = empleado.incapacidades.some(inc => {
+                        return inc.diasIncapacidad >= 10;
+                    });
+                    
+                    if (tieneIncapacidadLarga) {
+                        console.log('[DEBUG FILTRO] Empleado cumple Condición 1 (incapacidad >= 10 días):', empleado.nombre, 'Cédula:', empleado.cedula);
+                        return true;
+                    }
+
+                    // Condición 2: Suma de incapacidades >= 10 días Y gap entre incapacidades <= 3 días
+                    const totalDias = empleado.incapacidades.reduce((sum, inc) => sum + inc.diasIncapacidad, 0);
+                    
+                    if (totalDias >= 10) {
+                        // Verificar que el gap entre incapacidades consecutivas sea <= 3 días
+                        let gapValido = true;
+                        
+                        for (let i = 1; i < empleado.incapacidades.length; i++) {
+                            const incAnterior = empleado.incapacidades[i - 1];
+                            const incActual = empleado.incapacidades[i];
+                            
+                            if (!incAnterior.fechaFin || !incActual.fechaInicio) {
+                                gapValido = false;
+                                break;
+                            }
+                            
+                            // Calcular gap entre el fin de la anterior y el inicio de la actual
+                            const gapDias = Math.ceil((incActual.fechaInicio - incAnterior.fechaFin) / (1000 * 60 * 60 * 24));
+                            
+                            // Si el gap es mayor a 3 días, no cumple la condición
+                            if (gapDias > 3) {
+                                gapValido = false;
+                                break;
+                            }
+                        }
+                        
+                        if (gapValido && empleado.incapacidades.length > 1) {
+                            console.log('[DEBUG FILTRO] Empleado cumple Condición 2 (suma >= 10 y gaps <= 3):', empleado.nombre, 'Cédula:', empleado.cedula, 'Total días:', totalDias);
+                            return true;
+                        } else {
+                            console.log('[DEBUG FILTRO] Empleado NO cumple Condición 2 (gaps > 3):', empleado.nombre, 'Cédula:', empleado.cedula, 'Total días:', totalDias);
+                        }
+                    }
+
+                    return false;
+                });
+
+                console.log('[DEBUG loadSeguimientoData] Total de empleados que cumplen filtros:', this.seguimientoData.length);
+                console.log('[DEBUG loadSeguimientoData] Empleados filtrados:', this.seguimientoData.map(emp => ({
+                    nombre: emp.nombre,
+                    cedula: emp.cedula,
+                    totalIncapacidades: emp.incapacidades.length,
+                    totalDias: emp.incapacidades.reduce((sum, inc) => sum + inc.diasIncapacidad, 0)
+                })));
+
+                // Verificar si hay datos antes de renderizar
+                if (this.seguimientoData.length === 0) {
+                    console.warn('[DEBUG loadSeguimientoData] ⚠️ ADVERTENCIA: No hay empleados que cumplan las condiciones!');
+                    console.log('[DEBUG loadSeguimientoData] Revisar datos de ejemplo:', Array.from(empleadosMap.values()).slice(0, 3).map(emp => ({
+                        nombre: emp.nombre,
+                        incapacidades: emp.incapacidades.map(inc => ({
+                            dias: inc.diasIncapacidad,
+                            inicio: inc.fechaInicio,
+                            fin: inc.fechaFin
+                        }))
+                    })));
+                } else {
+                    console.log('[DEBUG loadSeguimientoData] ✅ Hay', this.seguimientoData.length, 'empleados para mostrar en la tabla');
+                }
 
                 // Calcular KPIs
                 this.calculateKPIs();
 
+                console.log('[DEBUG loadSeguimientoData] Renderizando tabla con', this.seguimientoData.length, 'empleados');
+
                 // Renderizar tabla
                 this.renderSeguimientoTable(this.seguimientoData);
             } else {
+                console.log('[DEBUG loadSeguimientoData] No hay datos o error en result');
                 this.renderSeguimientoTable([]);
             }
         } catch (error) {
-            console.error('Error loading seguimiento data:', error);
+            console.error('[DEBUG loadSeguimientoData] Error loading seguimiento data:', error);
             this.renderSeguimientoTable([]);
         }
     }
@@ -586,10 +742,36 @@ class MedicionAusentismoComponent {
     }
 
     renderSeguimientoTable(data) {
+        console.log('[DEBUG renderSeguimientoTable] Iniciando renderizado con', data.length, 'empleados');
+        
         const tbody = document.getElementById('seguimientoTableBody');
-        if (!tbody) return;
+        
+        console.log('[DEBUG renderSeguimientoTable] tbody encontrado:', tbody ? '✅ SÍ' : '❌ NO');
+        
+        if (!tbody) {
+            console.error('[DEBUG renderSeguimientoTable] ERROR: Elemento seguimientoTableBody no encontrado en el DOM!');
+            console.log('[DEBUG renderSeguimientoTable] Elementos en el DOM:', document.querySelectorAll('*').length);
+            console.log('[DEBUG renderSeguimientoTable] Buscando por ID alternativo...');
+            
+            // Intentar buscar con otros selectores
+            const alternativeTbody = document.querySelector('#seguimientoTableBody, tbody[id*="seguimiento"], tbody');
+            console.log('[DEBUG renderSeguimientoTable] tbody alternativo encontrado:', alternativeTbody ? '✅ SÍ' : '❌ NO');
+            
+            if (alternativeTbody) {
+                console.log('[DEBUG renderSeguimientoTable] Usando tbody alternativo');
+                this.renderSeguimientoTableWithBody(alternativeTbody, data);
+            }
+            return;
+        }
+
+        this.renderSeguimientoTableWithBody(tbody, data);
+    }
+
+    renderSeguimientoTableWithBody(tbody, data) {
+        console.log('[DEBUG renderSeguimientoTableWithBody] Renderizando', data.length, 'empleados en la tabla');
 
         if (!data || data.length === 0) {
+            console.log('[DEBUG renderSeguimientoTableWithBody] No hay datos para mostrar');
             tbody.innerHTML = `
                 <tr>
                     <td colspan="6" style="text-align: center; padding: 40px; color: #64748B;">
@@ -602,33 +784,46 @@ class MedicionAusentismoComponent {
         }
 
         const today = new Date();
+        console.log('[DEBUG renderSeguimientoTableWithBody] Fecha hoy:', today);
+        console.log('[DEBUG renderSeguimientoTableWithBody] Primer empleado:', data[0]);
 
-        tbody.innerHTML = data.map((row, index) => {
-            const nombre = row.NOMBRE || 'Sin nombre';
-            const cedula = row.CEDULA || '';
-            const tipo = row['CLASE DE INCAPACIDAD'] || 'EPS';
-            const fechaInicio = row['F. INICIO'] ? new Date(row['F. INICIO']) : null;
-            const fechaFin = row['F. FIN'] ? new Date(row['F. FIN']) : null;
+        tbody.innerHTML = data.map((empleado, index) => {
+            // Estructura de datos agrupados: {nombre, cedula, incapacidades: [...], cargo, departamento, etc.}
+            const nombre = empleado.nombre || 'Sin nombre';
+            const cedula = empleado.cedula || '';
             
+            // Obtener la incapacidad más reciente para mostrar en la tabla
+            const incapacidadReciente = empleado.incapacidades && empleado.incapacidades.length > 0
+                ? empleado.incapacidades[empleado.incapacidades.length - 1]
+                : null;
+            
+            // Obtener tipo de la incapacidad más reciente (o default EPS)
+            const tipo = incapacidadReciente?.record?.['CLASE DE INCAPACIDAD'] || 
+                        incapacidadReciente?.record?.['clase_de_incapacidad'] || 'EPS';
+            
+            // Usar fechas de la incapacidad más reciente
+            const fechaInicio = incapacidadReciente?.fechaInicio || null;
+            const fechaFin = incapacidadReciente?.fechaFin || null;
+
             // Calcular días totales y transcurridos
             let diasTotales = 0;
             let diasTranscurridos = 0;
             let avance = 0;
             let estado = 'En curso';
-            
+
             if (fechaInicio && fechaFin) {
                 const totalTime = fechaFin - fechaInicio;
                 diasTotales = Math.ceil(totalTime / (1000 * 60 * 60 * 24)) + 1;
-                
+
                 const currentTime = today - fechaInicio;
                 diasTranscurridos = Math.max(0, Math.ceil(currentTime / (1000 * 60 * 60 * 24)) + 1);
-                
+
                 avance = Math.min(100, Math.round((diasTranscurridos / diasTotales) * 100));
-                
+
                 // Determinar estado
                 const diffTime = fechaFin - today;
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                
+
                 if (diffDays < 0) {
                     estado = 'Finalizado';
                 } else if (diffDays <= 2) {
@@ -653,8 +848,8 @@ class MedicionAusentismoComponent {
             const initials = nombre.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 
             // Formatear fechas
-            const periodoStr = fechaInicio && fechaFin ? 
-                `${fechaInicio.toLocaleDateString('es-ES', {day: 'numeric', month: 'short'})} - ${fechaFin.toLocaleDateString('es-ES', {day: 'numeric', month: 'short'})}` : 
+            const periodoStr = fechaInicio && fechaFin ?
+                `${fechaInicio.toLocaleDateString('es-ES', {day: 'numeric', month: 'short'})} - ${fechaFin.toLocaleDateString('es-ES', {day: 'numeric', month: 'short'})}` :
                 'Sin fechas';
 
             return `
@@ -688,7 +883,7 @@ class MedicionAusentismoComponent {
                     </td>
                     <td style="padding: 15px;">
                         <div style="display: flex; gap: 5px;">
-                            <button style="width: 32px; height: 32px; border-radius: 6px; border: 1px solid #e2e8f0; background: white; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #64748B; transition: all 0.2s;" title="Ver Detalles" onclick="if(window.medicAusentismoComponent) window.medicAusentismoComponent.openDetailModal(${JSON.stringify(row).replace(/"/g, '&quot;')})">
+                            <button style="width: 32px; height: 32px; border-radius: 6px; border: 1px solid #e2e8f0; background: white; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #64748B; transition: all 0.2s;" title="Ver Detalles" onclick="if(window.medicAusentismoComponent) window.medicAusentismoComponent.openDetailModal(${JSON.stringify(empleado).replace(/"/g, '&quot;')})">
                                 <i class="fas fa-eye"></i>
                             </button>
                             <button style="width: 32px; height: 32px; border-radius: 6px; border: 1px solid #e2e8f0; background: white; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #64748B; transition: all 0.2s;" title="Agregar Nota" onclick="console.log('Agregar nota:', '${nombre.replace(/'/g, "\\'")}');">
@@ -708,6 +903,8 @@ class MedicionAusentismoComponent {
         const search = document.getElementById('seguimientoSearchInput').value.toLowerCase();
         const estado = document.getElementById('seguimientoEstadoFilter').value;
         const tipo = document.getElementById('seguimientoTipoFilter').value;
+        const year = document.getElementById('seguimientoYearFilter').value;
+        const month = document.getElementById('seguimientoMonthFilter').value;
 
         if (!this.seguimientoData) {
             this.showNotification('No hay datos cargados', 'warning');
@@ -715,21 +912,42 @@ class MedicionAusentismoComponent {
         }
 
         const today = new Date();
-        let filtered = this.seguimientoData.filter(row => {
-            const nombre = (row.NOMBRE || '').toLowerCase();
-            const cedula = (row.CEDULA || '').toLowerCase();
+        let filtered = this.seguimientoData.filter(empleado => {
+            const nombre = (empleado.nombre || '').toLowerCase();
+            const cedula = (empleado.cedula || '').toLowerCase();
             const matchesSearch = !search || nombre.includes(search) || cedula.includes(search);
 
-            const rowTipo = row['CLASE DE INCAPACIDAD'] || '';
+            // Obtener tipo de la incapacidad más reciente
+            const incapacidadReciente = empleado.incapacidades && empleado.incapacidades.length > 0
+                ? empleado.incapacidades[empleado.incapacidades.length - 1]
+                : null;
+            const rowTipo = incapacidadReciente?.record?.['CLASE DE INCAPACIDAD'] ||
+                           incapacidadReciente?.record?.['clase_de_incapacidad'] || '';
             const matchesTipo = !tipo || rowTipo.toUpperCase() === tipo.toUpperCase();
+
+            // Filtro por año (verificar si alguna incapacidad es del año seleccionado)
+            let matchesYear = true;
+            if (year) {
+                matchesYear = empleado.incapacidades.some(inc => {
+                    return inc.fechaInicio && inc.fechaInicio.getFullYear() === parseInt(year);
+                });
+            }
+
+            // Filtro por mes (verificar si alguna incapacidad inicia en el mes seleccionado)
+            let matchesMonth = true;
+            if (month !== '') {
+                matchesMonth = empleado.incapacidades.some(inc => {
+                    return inc.fechaInicio && inc.fechaInicio.getMonth() === parseInt(month);
+                });
+            }
 
             let matchesEstado = true;
             if (estado) {
-                const fechaFin = row['F. FIN'] ? new Date(row['F. FIN']) : null;
+                const fechaFin = incapacidadReciente?.fechaFin || null;
                 if (fechaFin) {
                     const diffTime = fechaFin - today;
                     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    
+
                     if (estado === 'En curso') {
                         matchesEstado = diffDays > 2;
                     } else if (estado === 'Próximo a vencer') {
@@ -740,7 +958,7 @@ class MedicionAusentismoComponent {
                 }
             }
 
-            return matchesSearch && matchesTipo && matchesEstado;
+            return matchesSearch && matchesTipo && matchesYear && matchesMonth && matchesEstado;
         });
 
         this.renderSeguimientoTable(filtered);
@@ -805,18 +1023,16 @@ class MedicionAusentismoComponent {
             backdrop-filter: blur(2px);
         `;
         detailModal.innerHTML = `
-            <div style="background: white; width: 90%; max-width: 600px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); overflow: hidden;">
-                <div style="padding: 15px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+            <div style="background: white; width: 90%; max-width: 700px; max-height: 85vh; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); overflow: hidden; display: flex; flex-direction: column;">
+                <div style="padding: 15px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
                     <div style="font-size: 16px; font-weight: 600;">Detalle de Seguimiento</div>
                     <button onclick="document.getElementById('detailModal').style.display='none'" style="background: none; border: none; font-size: 20px; color: #64748B; cursor: pointer;">&times;</button>
                 </div>
-                <div style="padding: 20px;">
-                    <div id="detailModalContent" style="margin-bottom: 20px;">
-                        <!-- Contenido dinámico -->
-                    </div>
+                <div id="detailModalContent" style="margin-bottom: 20px; overflow-y: auto; padding: 20px; max-height: calc(85vh - 140px);">
+                    <!-- Contenido dinámico -->
                 </div>
-                <div style="padding: 15px 20px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 10px;">
-                    <button onclick="document.getElementById('detailModal').style.display='none'" style="padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid #e2e8f0; background: white; color: #1E293B;">Cerrar</button>
+                <div style="padding: 15px 20px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 10px; flex-shrink: 0;">
+                    <button onclick="document.getElementById('detailModal').style.display='none'" style="padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid #e2e8f0; background: white; color: #1E293B;">Cerrar</button>
                 </div>
             </div>
         `;
@@ -830,55 +1046,352 @@ class MedicionAusentismoComponent {
         }
     }
 
-    openDetailModal(row) {
+    openDetailModal(empleado) {
         const modal = document.getElementById('detailModal');
         const content = document.getElementById('detailModalContent');
-        
-        if (modal && content && row) {
-            const nombre = row.NOMBRE || 'Sin nombre';
-            const cedula = row.CEDULA || '';
-            const tipo = row['CLASE DE INCAPACIDAD'] || 'EPS';
-            const fechaInicio = row['F. INICIO'] || 'N/A';
-            const fechaFin = row['F. FIN'] || 'N/A';
-            const diagnostico = row['DESCRIPCION'] || row['DESCRIPCIÓN'] || 'Sin descripción';
-            
-            content.innerHTML = `
-                <div style="display: flex; align-items: center; margin-bottom: 20px;">
-                    <div style="width: 50px; height: 50px; border-radius: 50%; background: #F1F5F9; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #64748B; font-size: 20px;">
-                        ${nombre.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-                    </div>
-                    <div style="margin-left: 15px;">
-                        <h3 style="font-size: 18px; margin: 0;">${nombre}</h3>
-                        <div style="font-size: 13px; color: #64748B;">CC: ${cedula} | ${tipo}</div>
-                    </div>
-                </div>
-                
-                <div style="background: #F8FAFC; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                        <div>
-                            <div style="font-size: 12px; color: #64748B;">Fecha Inicio</div>
-                            <div style="font-weight: 500;">${fechaInicio}</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 12px; color: #64748B;">Fecha Fin</div>
-                            <div style="font-weight: 500;">${fechaFin}</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <div style="font-size: 13px; font-weight: 500; margin-bottom: 5px;">Diagnóstico</div>
-                    <div style="font-size: 14px; color: #1E293B;">${diagnostico}</div>
-                </div>
-                
-                <div style="margin-top: 20px; padding: 15px; background: #F8FAFC; border-radius: 8px;">
-                    <label style="font-size: 13px; font-weight: 500; display: block; margin-bottom: 5px;">Agregar Nota de Seguimiento</label>
-                    <textarea style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px; resize: vertical;" rows="2" placeholder="Ej: Verificar estado con EPS..."></textarea>
-                </div>
-            `;
-            
+
+        if (!modal || !content || !empleado) return;
+
+        const nombre = empleado.nombre || 'Sin nombre';
+        const cedula = empleado.cedula || '';
+        const incapacidades = empleado.incapacidades || [];
+
+        if (incapacidades.length === 0) {
+            content.innerHTML = '<p style="text-align: center; color: #64748B; padding: 40px;">No hay incapacidades registradas</p>';
             modal.style.display = 'flex';
+            return;
         }
+
+        // Ordenar incapacidades por fecha de inicio
+        const incapacidadesOrdenadas = [...incapacidades].sort((a, b) => {
+            if (!a.fechaInicio) return 1;
+            if (!b.fechaInicio) return -1;
+            return a.fechaInicio - b.fechaInicio;
+        });
+
+        // Identificar incapacidades >= 10 días (las que activan el seguimiento por Condición 1)
+        const incapacidadesLargas = incapacidadesOrdenadas.filter(inc => inc.diasIncapacidad >= 10);
+        
+        // Determinar tipo de caso
+        const esCondicion1 = incapacidadesLargas.length > 0;
+        const esCondicion2 = !esCondicion1 && incapacidadesOrdenadas.length > 1;
+
+        // Calcular total de días
+        const totalDias = incapacidadesOrdenadas.reduce((sum, inc) => sum + inc.diasIncapacidad, 0);
+
+        // Construir HTML según el tipo de caso
+        if (esCondicion1) {
+            // CASO 1: Mostrar incapacidades >= 10 días
+            content.innerHTML = this.renderCondicion1Detalle(nombre, cedula, incapacidadesLargas, totalDias);
+        } else if (esCondicion2) {
+            // CASO 2: Mostrar secuencia de incapacidades que suman >= 10 días
+            content.innerHTML = this.renderCondicion2Detalle(nombre, cedula, incapacidadesOrdenadas, totalDias);
+        } else {
+            // CASO ESPECIAL: Solo una incapacidad < 10 días (no debería llegar aquí)
+            content.innerHTML = this.renderCondicion1Detalle(nombre, cedula, incapacidadesOrdenadas, totalDias);
+        }
+
+        modal.style.display = 'flex';
+    }
+
+    renderCondicion1Detalle(nombre, cedula, incapacidadesLargas, totalDias) {
+        const today = new Date();
+        
+        return `
+            <!-- Encabezado del empleado -->
+            <div style="display: flex; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #e2e8f0;">
+                <div style="width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, #174ea6, #2d5dc7); display: flex; align-items: center; justify-content: center; font-weight: 700; color: white; font-size: 22px; flex-shrink: 0;">
+                    ${nombre.split(' ').map(n => n[0]).filter(c => c).join('').substring(0, 2).toUpperCase()}
+                </div>
+                <div style="margin-left: 15px; flex: 1;">
+                    <h3 style="font-size: 18px; margin: 0; color: #1E293B; font-weight: 600;">${nombre}</h3>
+                    <div style="font-size: 14px; color: #64748B; margin-top: 4px;">CC: ${cedula}</div>
+                </div>
+                <div style="background: #FEF3C7; color: #92400E; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">
+                    ⚠️ Incapacidad >= 10 días
+                </div>
+            </div>
+
+            <!-- Lista de incapacidades >= 10 días -->
+            <div style="margin-bottom: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #1E293B; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-exclamation-triangle" style="color: #F59E0B;"></i>
+                    INCAPACIDAD(ES) QUE ACTIVA(N) SEGUIMIENTO
+                </h4>
+                ${incapacidadesLargas.map((inc, index) => {
+                    // Validar y formatear fechas
+                    let fechaInicio = 'N/A';
+                    let fechaFin = 'N/A';
+                    
+                    if (inc.fechaInicio) {
+                        try {
+                            const fechaIni = inc.fechaInicio instanceof Date ? inc.fechaInicio : new Date(inc.fechaInicio);
+                            if (!isNaN(fechaIni.getTime())) {
+                                fechaInicio = fechaIni.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+                            }
+                        } catch (e) {
+                            console.warn('Error al formatear fechaInicio:', e);
+                        }
+                    }
+                    
+                    if (inc.fechaFin) {
+                        try {
+                            const fechaFi = inc.fechaFin instanceof Date ? inc.fechaFin : new Date(inc.fechaFin);
+                            if (!isNaN(fechaFi.getTime())) {
+                                fechaFin = fechaFi.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+                            }
+                        } catch (e) {
+                            console.warn('Error al formatear fechaFin:', e);
+                        }
+                    }
+                    
+                    const codigo = inc.record?.['CODIGO'] || inc.record?.['CÓDIGO'] || inc.record?.['codigo'] || 'N/A';
+                    const diagnostico = inc.record?.['DESCRIPCION'] || inc.record?.['DESCRIPCIÓN'] || inc.record?.['descripcion'] || 'Sin descripción';
+                    const tipo = inc.record?.['CLASE DE INCAPACIDAD'] || inc.record?.['clase_de_incapacidad'] || 'EPS';
+                    
+                    // Calcular estado
+                    let estado = 'Finalizado';
+                    let estadoColor = '#64748B';
+                    
+                    if (inc.fechaFin) {
+                        try {
+                            const fechaFi = inc.fechaFin instanceof Date ? inc.fechaFin : new Date(inc.fechaFin);
+                            if (!isNaN(fechaFi.getTime())) {
+                                const diffTime = fechaFi - today;
+                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                
+                                if (diffDays < 0) {
+                                    estado = 'Finalizado';
+                                    estadoColor = '#64748B';
+                                } else if (diffDays <= 2) {
+                                    estado = 'Próximo a vencer';
+                                    estadoColor = '#F59E0B';
+                                } else {
+                                    estado = 'En curso';
+                                    estadoColor = '#10B981';
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('Error al calcular estado:', e);
+                        }
+                    }
+
+                    return `
+                        <div style="background: ${index === 0 ? '#FEF3C7' : '#F8FAFC'}; border: ${index === 0 ? '2px solid #F59E0B' : '1px solid #e2e8f0'}; border-radius: 8px; padding: 15px; margin-bottom: 12px; transition: all 0.2s;">
+                            ${index === 0 ? '<div style="font-size: 11px; font-weight: 700; color: #92400E; margin-bottom: 8px; text-transform: uppercase;">🔹 PRINCIPAL (Más reciente >= 10 días)</div>' : ''}
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                                <div>
+                                    <div style="font-size: 11px; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">Fecha Inicio</div>
+                                    <div style="font-weight: 600; color: #1E293B; font-size: 14px;">📅 ${fechaInicio}</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 11px; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">Fecha Fin</div>
+                                    <div style="font-weight: 600; color: #1E293B; font-size: 14px;">📅 ${fechaFin}</div>
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                                <div>
+                                    <div style="font-size: 11px; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">Días</div>
+                                    <div style="font-weight: 700; color: #174ea6; font-size: 16px;">📊 ${inc.diasIncapacidad} días</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 11px; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">Tipo</div>
+                                    <div style="font-weight: 600; color: #1E293B; font-size: 14px;">
+                                        <span style="padding: 2px 8px; border-radius: 12px; background: ${tipo === 'ARL' ? '#FEF3C7' : tipo === 'EMPRESA' ? '#DCFCE7' : '#DBEAFE'}; color: ${tipo === 'ARL' ? '#92400E' : tipo === 'EMPRESA' ? '#166534' : '#1E40AF'}; font-size: 12px;">
+                                            ${tipo}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 11px; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">Estado</div>
+                                    <div style="font-weight: 600; color: ${estadoColor}; font-size: 13px;">● ${estado}</div>
+                                </div>
+                            </div>
+                            <div style="background: white; border-radius: 6px; padding: 12px; border: 1px solid #e2e8f0;">
+                                <div style="font-size: 11px; color: #64748B; text-transform: uppercase; margin-bottom: 6px;">🏷️ Código Diagnóstico</div>
+                                <div style="font-weight: 700; color: #1E293B; font-size: 15px; margin-bottom: 8px;">${codigo}</div>
+                                <div style="font-size: 11px; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">📝 Descripción</div>
+                                <div style="color: #475569; font-size: 14px; line-height: 1.5;">${diagnostico}</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+
+            <!-- Resumen -->
+            <div style="background: #F1F5F9; border-radius: 8px; padding: 12px 15px; margin-bottom: 20px;">
+                <div style="font-size: 13px; color: #475569;">
+                    <strong>Total días en incapacidades >= 10:</strong> ${totalDias} días
+                </div>
+            </div>
+
+            <!-- Nota de seguimiento -->
+            ${this.renderNotaSeguimientoSection(cedula)}
+        `;
+    }
+
+    renderCondicion2Detalle(nombre, cedula, incapacidades, totalDias) {
+        const today = new Date();
+
+        return `
+            <!-- Encabezado del empleado -->
+            <div style="display: flex; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #e2e8f0;">
+                <div style="width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, #10B981, #059669); display: flex; align-items: center; justify-content: center; font-weight: 700; color: white; font-size: 22px; flex-shrink: 0;">
+                    ${nombre.split(' ').map(n => n[0]).filter(c => c).join('').substring(0, 2).toUpperCase()}
+                </div>
+                <div style="margin-left: 15px; flex: 1;">
+                    <h3 style="font-size: 18px; margin: 0; color: #1E293B; font-weight: 600;">${nombre}</h3>
+                    <div style="font-size: 14px; color: #64748B; margin-top: 4px;">CC: ${cedula}</div>
+                </div>
+                <div style="background: #DCFCE7; color: #166534; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">
+                    🔗 Suma >= 10 días
+                </div>
+            </div>
+
+            <!-- Secuencia de incapacidades -->
+            <div style="margin-bottom: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #1E293B; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-link" style="color: #10B981;"></i>
+                    SECUENCIA DE INCAPACIDADES (Gaps <= 3 días)
+                </h4>
+                ${incapacidades.map((inc, index) => {
+                    const fechaInicio = inc.fechaInicio ? inc.fechaInicio.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A';
+                    const fechaFin = inc.fechaFin ? inc.fechaFin.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A';
+                    const codigo = inc.record?.['CODIGO'] || inc.record?.['CÓDIGO'] || inc.record?.['codigo'] || 'N/A';
+                    const diagnostico = inc.record?.['DESCRIPCION'] || inc.record?.['DESCRIPCIÓN'] || inc.record?.['descripcion'] || 'Sin descripción';
+                    const tipo = inc.record?.['CLASE DE INCAPACIDAD'] || inc.record?.['clase_de_incapacidad'] || 'EPS';
+                    
+                    // Calcular gap con la incapacidad anterior
+                    let gapHTML = '';
+                    if (index > 0) {
+                        const incAnterior = incapacidades[index - 1];
+                        if (incAnterior.fechaFin && inc.fechaInicio) {
+                            const gapDias = Math.ceil((inc.fechaInicio - incAnterior.fechaFin) / (1000 * 60 * 60 * 24));
+                            const gapColor = gapDias <= 3 ? '#10B981' : '#F59E0B';
+                            gapHTML = `
+                                <div style="font-size: 11px; color: ${gapColor}; margin-top: 6px; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                                    <i class="fas fa-hourglass-half"></i>
+                                    Gap: ${gapDias} día${gapDias !== 1 ? 's' : ''} desde la anterior
+                                </div>
+                            `;
+                        }
+                    }
+
+                    return `
+                        <div style="background: #F8FAFC; border-left: 4px solid ${index === 0 ? '#10B981' : '#94A3B8'}; border-radius: 8px; padding: 15px; margin-bottom: 12px; position: relative;">
+                            <div style="position: absolute; top: 10px; right: 10px; background: ${index === 0 ? '#10B981' : '#94A3B8'}; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700;">
+                                ${index + 1}
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                                <div>
+                                    <div style="font-size: 11px; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">Fecha Inicio</div>
+                                    <div style="font-weight: 600; color: #1E293B; font-size: 14px;">📅 ${fechaInicio}</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 11px; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">Fecha Fin</div>
+                                    <div style="font-weight: 600; color: #1E293B; font-size: 14px;">📅 ${fechaFin}</div>
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                                <div>
+                                    <div style="font-size: 11px; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">Días</div>
+                                    <div style="font-weight: 700; color: #174ea6; font-size: 16px;">📊 ${inc.diasIncapacidad} días</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 11px; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">Tipo</div>
+                                    <div style="font-weight: 600; color: #1E293B; font-size: 14px;">
+                                        <span style="padding: 2px 8px; border-radius: 12px; background: ${tipo === 'ARL' ? '#FEF3C7' : tipo === 'EMPRESA' ? '#DCFCE7' : '#DBEAFE'}; color: ${tipo === 'ARL' ? '#92400E' : tipo === 'EMPRESA' ? '#166534' : '#1E40AF'}; font-size: 12px;">
+                                            ${tipo}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 11px; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">Código</div>
+                                    <div style="font-weight: 600; color: #1E293B; font-size: 13px;">🏷️ ${codigo}</div>
+                                </div>
+                            </div>
+                            <div style="background: white; border-radius: 6px; padding: 10px; border: 1px solid #e2e8f0; margin-bottom: 8px;">
+                                <div style="font-size: 11px; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">📝 Diagnóstico</div>
+                                <div style="color: #475569; font-size: 13px; line-height: 1.4;">${diagnostico}</div>
+                            </div>
+                            ${gapHTML}
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+
+            <!-- Resumen -->
+            <div style="background: linear-gradient(135deg, #10B981, #059669); border-radius: 8px; padding: 15px; margin-bottom: 20px; color: white;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="font-size: 12px; opacity: 0.9; margin-bottom: 4px;">TOTAL ACUMULADO</div>
+                        <div style="font-size: 24px; font-weight: 700;">${totalDias} días</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 12px; opacity: 0.9; margin-bottom: 4px;">INCAPACIDADES</div>
+                        <div style="font-size: 24px; font-weight: 700;">${incapacidades.length}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Nota de seguimiento -->
+            ${this.renderNotaSeguimientoSection(cedula)}
+        `;
+    }
+
+    renderNotaSeguimientoSection(cedula) {
+        // Nota: En una implementación real, las notas se guardarían en backend/archivo
+        // Aquí simulamos la funcionalidad
+        return `
+            <div style="border-top: 2px solid #e2e8f0; padding-top: 20px;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #1E293B; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-sticky-note" style="color: #174ea6;"></i>
+                    NOTA DE SEGUIMIENTO
+                </h4>
+                <textarea id="notaSeguimiento_${cedula.replace(/[^a-zA-Z0-9]/g, '_')}" 
+                    placeholder="Ej: Verificar estado con EPS, solicitar documentos pendientes, programar seguimiento..." 
+                    style="width: 100%; min-height: 100px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; resize: vertical; font-family: inherit; background: #F8FAFC;"
+                    onfocus="this.style.borderColor='#174ea6'; this.style.boxShadow='0 0 0 3px rgba(23, 78, 166, 0.1)'"
+                    onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'"></textarea>
+                <div style="display: flex; gap: 10px; margin-top: 12px;">
+                    <button onclick="window.medicAusentismoComponent.guardarNota('${cedula}')" 
+                        style="padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; background: linear-gradient(135deg, #174ea6, #2d5dc7); color: white; display: flex; align-items: center; gap: 8px; transition: all 0.2s;"
+                        onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 6px -1px rgba(23, 78, 166, 0.3)'"
+                        onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                        <i class="fas fa-save"></i> Guardar Nota
+                    </button>
+                    <button onclick="document.getElementById('detailModal').style.display='none'" 
+                        style="padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid #e2e8f0; background: white; color: #64748B; display: flex; align-items: center; gap: 8px; transition: all 0.2s;"
+                        onmouseover="this.style.backgroundColor='#f1f5f9'; this.style.borderColor='#cbd5e1'"
+                        onmouseout="this.style.backgroundColor='white'; this.style.borderColor='#e2e8f0'">
+                        <i class="fas fa-times"></i> Cerrar
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    guardarNota(cedula) {
+        const textarea = document.getElementById(`notaSeguimiento_${cedula.replace(/[^a-zA-Z0-9]/g, '_')}`);
+        if (!textarea) return;
+
+        const nota = textarea.value.trim();
+        if (!nota) {
+            this.showNotification('Por favor escribe una nota', 'warning');
+            return;
+        }
+
+        // En una implementación real, aquí se guardaría en backend/archivo
+        // Por ahora, simulamos el guardado
+        console.log(`[NOTA GUARDADA] Cédula: ${cedula}, Nota: ${nota}`);
+        
+        // Simular guardado exitoso
+        this.showNotification('Nota guardada exitosamente', 'success');
+        
+        // Cerrar modal después de guardar
+        setTimeout(() => {
+            document.getElementById('detailModal').style.display = 'none';
+        }, 1000);
     }
 
     async renderRegistrarAusentismoView(container) {
