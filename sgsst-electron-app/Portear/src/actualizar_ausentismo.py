@@ -420,6 +420,7 @@ def guardar_seguimiento(empresa, file_path, datos):
     Guarda un seguimiento de incapacidad en el archivo PRI.xlsx,
     en la hoja 'Casos en seguimiento', organizando los datos en las columnas correctas.
     Los encabezados están en filas 5-6, los datos comienzan en fila 7.
+    Busca si ya existe un registro con la misma cédula y pregunta si desea actualizar.
     """
     try:
         # USAR el archivo que se pasa como parámetro (PRI.xlsx)
@@ -446,21 +447,48 @@ def guardar_seguimiento(empresa, file_path, datos):
         log(f"✅ Usando hoja: {SHEET_NAME}")
         log(f"✅ Filas totales actuales: {ws.max_row}")
         
+        # Extraer cédula del empleado
+        empleado_id = str(datos.get("employeeId", "")).replace(',', '').replace('.', '').replace(' ', '').strip()
+        empleado_nombre = datos.get("employeeName", "")
+        
         # Los encabezados están en filas 5-6, los datos comienzan en fila 7
         primera_fila_datos = 7
         
-        # Buscar la primera fila vacía comenzando desde la fila 7
-        siguiente_fila = primera_fila_datos
-        while siguiente_fila <= ws.max_row:
-            # Verificar si la fila está vacía (revisar columna C - Nombre)
-            if ws[f"C{siguiente_fila}"].value is None or ws[f"C{siguiente_fila}"].value == "":
-                log(f"✅ Primera fila vacía encontrada: {siguiente_fila}")
-                break
-            siguiente_fila += 1
+        # BUSCAR si ya existe un registro con esta cédula en columna D
+        fila_existente = None
+        for fila_idx in range(primera_fila_datos, ws.max_row + 1):
+            celda_cedula = ws[f"D{fila_idx}"].value
+            if celda_cedula:
+                cedula_en_celda = str(celda_cedula).replace(',', '').replace('.', '').replace(' ', '').strip()
+                if cedula_en_celda == empleado_id:
+                    fila_existente = fila_idx
+                    log(f"⚠️ YA EXISTE un registro con cédula {empleado_id} en fila {fila_existente}")
+                    log(f"   Nombre en registro existente: {ws[f'C{fila_existente}'].value}")
+                    break
         
-        # Si todas las filas tienen datos, usar la siguiente fila después de max_row
-        if siguiente_fila > ws.max_row:
-            log(f"✅ Usando nueva fila: {siguiente_fila}")
+        # Determinar qué fila usar
+        if fila_existente:
+            # Preguntar si desea actualizar (en producción, esto debería ser un diálogo UI)
+            # Por ahora, actualizamos automáticamente pero dejamos log de advertencia
+            log(f"📝 ACTUALIZANDO registro existente en fila {fila_existente}")
+            log(f"   Para crear nuevo registro en lugar de actualizar, elimine la fila {fila_existente} manualmente")
+            siguiente_fila = int(fila_existente)  # Asegurar que sea entero
+        else:
+            # Buscar la primera fila vacía comenzando desde la fila 7
+            siguiente_fila = int(primera_fila_datos)  # Asegurar que sea entero
+            while siguiente_fila <= ws.max_row:
+                # Verificar si la fila está vacía (revisar columna C - Nombre)
+                if ws[f"C{siguiente_fila}"].value is None or ws[f"C{siguiente_fila}"].value == "":
+                    log(f"✅ Primera fila vacía encontrada: {siguiente_fila}")
+                    break
+                siguiente_fila = int(siguiente_fila) + 1  # Asegurar incremento como entero
+            
+            # Si todas las filas tienen datos, usar la siguiente fila después de max_row
+            if siguiente_fila > ws.max_row:
+                log(f"✅ Usando nueva fila: {siguiente_fila}")
+        
+        # Debug: Verificar tipo de dato
+        log(f"🔍 DEBUG: siguiente_fila = {siguiente_fila}, tipo = {type(siguiente_fila)}")
         
         # Calcular edad desde fecha de nacimiento
         def calcular_edad(fecha_nacimiento_str):
@@ -509,18 +537,41 @@ def guardar_seguimiento(empresa, file_path, datos):
             except:
                 return ""
         
-        # Extraer y procesar datos
-        empleado_id = str(datos.get("employeeId", "")).replace(',', '').replace('.', '').replace(' ', '').strip()
+        # Calcular días trabajados desde fecha de ingreso (6 días trabajo, 1 descanso)
+        def calcular_dias_trabajados(fecha_ingreso_str):
+            if not fecha_ingreso_str:
+                return ""
+            try:
+                from datetime import datetime, timedelta
+                fecha_ing = datetime.strptime(str(fecha_ingreso_str), "%Y-%m-%d")
+                hoy = datetime.now()
+                
+                # Calcular días totales desde ingreso
+                dias_totales = (hoy - fecha_ing).days
+                
+                # Calcular semanas completas y días restantes
+                semanas = dias_totales // 7
+                dias_restantes = dias_totales % 7
+                
+                # 6 días de trabajo por semana
+                dias_trabajados = (semanas * 6) + min(dias_restantes, 6)
+                
+                return str(dias_trabajados)
+            except:
+                return ""
+        
+        # Calcular valores derivados
         edad = calcular_edad(datos.get("fechaNacimiento", ""))
         antiguedad = calcular_antiguedad(datos.get("fechaIngreso", ""))
         estado_nutricional = calcular_estado_nutricional(datos.get("imc", ""))
+        dias_trabajados = calcular_dias_trabajados(datos.get("fechaIngreso", ""))
         
         # Construir la fila de datos ORGANIZADA POR COLUMNAS
-        # Estructura: A=1, B=2, C=3, D=4, E=5, F=6, G=7, H=8, I=9, J=10, K=11, L=12, M=13, N=14, O=15, P=16, Q=17, R=18, S=19, T=20, U=21, V=22, W=23, X=24, Y=25, Z=26, AA=27
-        # Índices en Python (base 0): C=2, D=3, E=4, F=5, G=6, H=7, J=8, M=12, N=13, O=14, P=15, Q=16, R=17, S=18, T=19, U=20, V=21, X=22, Y=23, Z=24, AA=25
+        # Estructura de columnas según PRI.xlsx:
+        # A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7, I=8, J=9, K=10, L=11, M=12, N=13, O=14, P=15, Q=16, R=17, S=18, T=19, U=20, V=21, W=22, X=23, Y=24, Z=25, AA=26
         
-        # Crear una lista con todas las columnas (hasta AA = índice 25)
-        fila_completa = [""] * 26  # 26 columnas de A a Z
+        # Crear una lista con todas las columnas (hasta AA = índice 26)
+        fila_completa = [""] * 27  # 27 columnas de A a AA
         
         # Asignar valores a las columnas específicas
         fila_completa[2] = datos.get("employeeName", "")  # C - Nombre (índice 2)
@@ -529,7 +580,8 @@ def guardar_seguimiento(empresa, file_path, datos):
         fila_completa[5] = datos.get("fechaNacimiento", "")  # F - Fecha Nacimiento (índice 5)
         fila_completa[6] = edad  # G - Edad (índice 6)
         fila_completa[7] = datos.get("fechaIngreso", "")  # H - Fecha Ingreso (índice 7)
-        fila_completa[8] = antiguedad  # J - Antigüedad (índice 8)
+        fila_completa[8] = dias_trabajados  # I - Días Trabajados (índice 8) ← NUEVO
+        fila_completa[9] = antiguedad  # J - Antigüedad (índice 9, se salta I=8)
         fila_completa[12] = datos.get("area", "")  # M - Sede/Área (índice 12)
         fila_completa[13] = datos.get("cargo", "")  # N - Cargo (índice 13)
         fila_completa[14] = datos.get("tipoCargo", "")  # O - Tipo de Cargo (índice 14)
@@ -540,26 +592,48 @@ def guardar_seguimiento(empresa, file_path, datos):
         fila_completa[19] = datos.get("talla", "")  # T - Talla (índice 19)
         fila_completa[20] = datos.get("imc", "")  # U - IMC (índice 20)
         fila_completa[21] = estado_nutricional  # V - Estado Nutricional (índice 21)
-        fila_completa[22] = datos.get("actividadesExtralaborales", "")  # X - Actividades Extralaborales (índice 22)
-        fila_completa[23] = datos.get("diasAcumulados", "")  # Y - Total Días Acumulados (índice 23)
-        fila_completa[24] = datos.get("fechaFin", "")  # Z - Fecha Finalización Incapacidad (índice 24)
-        fila_completa[25] = datos.get("codigoCie10", "")  # AA - Código CIE-10 (índice 25)
+        fila_completa[23] = datos.get("actividadesExtralaborales", "")  # X - Actividades Extralaborales (índice 23, se salta W=22)
+        fila_completa[24] = datos.get("diasAcumulados", "")  # Y - Total Días Acumulados (índice 24)
+        fila_completa[25] = datos.get("fechaFin", "")  # Z - Fecha Finalización Incapacidad (índice 25)
+        fila_completa[26] = datos.get("codigoCie10", "")  # AA - Código CIE-10 (índice 26)
         
         # Insertar la fila en la posición correcta
-        log(f"📝 Escribiendo datos en fila {siguiente_fila}:")
+        log(f"📝 {'ACTUALIZANDO' if fila_existente else 'CREANDO'} registro en fila {siguiente_fila}:")
         log(f"   Nombre: {fila_completa[2]}, Cédula: {fila_completa[3]}, Edad: {fila_completa[6]}")
         
+        # Insertar datos celda por celda
+        def indice_a_columna(idx):
+            """Convierte índice numérico a letra de columna Excel (0=A, 25=Z, 26=AA, 27=AB, etc.)"""
+            if idx < 26:
+                return chr(65 + idx)  # A-Z
+            else:
+                # Para columnas después de Z: AA, AB, AC, etc.
+                return chr(65 + (idx // 26 - 1)) + chr(65 + (idx % 26))
+        
         for col_idx, valor in enumerate(fila_completa):
-            col_letter = chr(65 + col_idx)  # Convertir índice a letra de columna (A=65)
-            ws[f"{col_letter}{siguiente_fila}"] = valor
+            col_letter = indice_a_columna(col_idx)
+            # Asegurar que siguiente_fila sea entero
+            fila_num = int(siguiente_fila)
+            coordenada = f"{col_letter}{fila_num}"
+            log(f"   Escribiendo {coordenada} = {valor if len(str(valor)) < 50 else str(valor)[:50] + '...'}")
+            try:
+                ws[coordenada] = valor
+            except Exception as e:
+                log(f"   ❌ Error escribiendo en {coordenada}: {str(e)}")
+                raise
         
         wb.save(seguimiento_file_path)
-        log(f"✅ Seguimiento guardado correctamente en la hoja '{SHEET_NAME}' fila {siguiente_fila}")
+        
+        if fila_existente:
+            log(f"✅ Registro ACTUALIZADO correctamente en la hoja '{SHEET_NAME}' fila {siguiente_fila}")
+        else:
+            log(f"✅ Registro CREADO correctamente en la hoja '{SHEET_NAME}' fila {siguiente_fila}")
 
         return {
             "success": True, 
             "message": "Seguimiento guardado.",
             "fila": siguiente_fila,
+            "actualizado": fila_existente is not None,
             **datos
         }
 

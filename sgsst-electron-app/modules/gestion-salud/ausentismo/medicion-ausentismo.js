@@ -2648,7 +2648,9 @@ class MedicionAusentismoComponent {
             genero: seguimientoData.trabajador.genero || '',
             fechaIngreso: seguimientoData.trabajador.fechaIngreso || '',
             area: seguimientoData.trabajador.area || '',
+            cargo: seguimientoData.trabajador.cargo || '',  // Asegurar que se envíe
             tipoContrato: seguimientoData.trabajador.tipoContrato || '',
+            eps: seguimientoData.trabajador.eps || '',  // Asegurar que se envíe
             afp: seguimientoData.trabajador.afp || '',
             diasAcumulados: seguimientoData.incapacidad.diasAcumulados || '',
             codigoCie10: seguimientoData.incapacidad.codigoCie10 || '',
@@ -2670,12 +2672,28 @@ class MedicionAusentismoComponent {
                 
                 if (result && result.success) {
                     console.log('[GUARDAR SEGUIMIENTO] ✅ Datos guardados exitosamente');
-                    this.showNotification('✅ Datos guardados correctamente en PRI.xlsx', 'success');
+                    
+                    // Mostrar notificación diferente según si actualizó o creó
+                    if (result.actualizado) {
+                        // Registro existente actualizado
+                        this.showNotification(
+                            `✅ Registro ACTUALIZADO correctamente para ${followUpData.employeeName}`, 
+                            'success'
+                        );
+                        console.log('[GUARDAR SEGUIMIENTO] 📝 Registro actualizado en fila:', result.fila);
+                    } else {
+                        // Registro nuevo creado
+                        this.showNotification(
+                            `➕ Registro CREADO correctamente para ${followUpData.employeeName}`, 
+                            'success'
+                        );
+                        console.log('[GUARDAR SEGUIMIENTO] ✅ Registro creado en fila:', result.fila);
+                    }
                     
                     // Cerrar el panel después de un breve delay
                     setTimeout(() => {
                         this.closeSeguimientoPanel();
-                    }, 1500);
+                    }, 2000);
                 } else {
                     const errorMsg = result?.error || 'Error desconocido';
                     console.error('[GUARDAR SEGUIMIENTO] ❌ Error:', errorMsg);
