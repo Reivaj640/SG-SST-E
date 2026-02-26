@@ -30,14 +30,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
 
   mapDirectory: (directoryPath) => {
-    log('DEBUG', `mapDirectory llamado con: ${directoryPath}`);
+    console.log(`[MAPEO][PRELOAD] mapDirectory llamado con: ${directoryPath}`);
+    console.log(`[MAPEO][PRELOAD] Enviando invoke 'map-directory'...`);
     return ipcRenderer.invoke('map-directory', directoryPath)
       .then(result => {
-        log('DEBUG', 'mapDirectory resultado:', result);
+        console.log(`[MAPEO][PRELOAD] mapDirectory resultado recibido:`, {
+          success: result.success,
+          hasStructure: !!result.structure,
+          hasLog: !!result.log
+        });
         return result;
       })
       .catch(error => {
-        log('ERROR', `Error en mapDirectory: ${error.message}`);
+        console.error(`[MAPEO][PRELOAD] Error en mapDirectory:`, error);
         throw error;
       });
   },
@@ -157,6 +162,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveTempPdfFile: (filename, data) => ipcRenderer.invoke('investigacion-accidentes-save-temp-pdf-file', filename, data),
   readAusentismoData: (companyName) =>
     ipcRenderer.invoke('get-ausentismo-data', companyName),
+  getPriSeguimientoData: (companyName) =>
+    ipcRenderer.invoke('get-pri-seguimiento-data', companyName),
 
   // --- Ausentismo ---
   buscarEmpleadoPorCedula: (cedula, empresa) =>

@@ -203,6 +203,64 @@
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
+        
+        /* Spinner de carga */
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .spinner-large {
+            width: 60px;
+            height: 60px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        /* Mensajes de estado */
+        .mapping-step {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            margin: 0.5rem 0;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+        
+        .mapping-step.pending {
+            background: #f8f9fa;
+            color: var(--text-muted);
+        }
+        
+        .mapping-step.active {
+            background: #e3f2fd;
+            color: var(--primary);
+            border-left: 3px solid var(--primary);
+        }
+        
+        .mapping-step.success {
+            background: #d4edda;
+            color: #155724;
+            border-left: 3px solid var(--success);
+        }
+        
+        .mapping-step.error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 3px solid var(--danger);
+        }
+        
+        .step-icon {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
 
         /* =========================================
            3. COMPONENTES UI ESPECÍFICOS
@@ -1094,7 +1152,7 @@
         </div>
         <div style="display: flex; gap: 1rem; margin-top: 2rem; justify-content: flex-end;">
             <button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
-            <button class="btn btn-primary" onclick="saveLink()">Guardar y Vincular</button>
+            <button class="btn btn-primary" onclick="saveLink()" id="btn-save-link">Guardar y Vincular</button>
         </div>
     </div>
 </div>
@@ -1126,6 +1184,34 @@
         <div style="display: flex; gap: 1rem; margin-top: 2rem; justify-content: flex-end;">
             <button class="btn btn-outline" onclick="closeUserModal()">Cancelar</button>
             <button class="btn btn-primary" onclick="saveUser()">Guardar Usuario</button>
+        </div>
+    </div>
+</div>
+
+<!-- OVERLAY DE CARGA PARA MAPEO -->
+<div id="mapping-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.7); z-index: 99999; align-items: center; justify-content: center;">
+    <div style="text-align: center; padding: 3rem; max-width: 500px; background: var(--bg-card); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); margin: 20px;">
+        <div style="margin-bottom: 2rem;">
+            <div class="spinner-large"></div>
+        </div>
+        <h3 style="font-family: var(--font-heading); margin-bottom: 1rem; color: var(--primary);">
+            Mapeando Estructura de Documentos
+        </h3>
+        <p id="mapping-message" style="color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.95rem;">
+            Analizando la estructura de carpetas...
+        </p>
+        <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px; margin-top: 1.5rem;">
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">
+                <i class="fas fa-info-circle"></i> 
+                <strong>Tiempo estimado:</strong> 10-60 segundos dependiendo del tamaño de la carpeta
+            </p>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0.5rem 0 0 0;">
+                <i class="fas fa-clock"></i> 
+                <span id="mapping-timer">Tiempo transcurrido: 0s</span>
+            </p>
+        </div>
+        <div id="mapping-details" style="margin-top: 1.5rem; text-align: left; max-height: 200px; overflow-y: auto; background: #1e293b; color: #10b981; padding: 1rem; border-radius: 8px; font-family: monospace; font-size: 0.8rem; display: none;">
+            <!-- Logs del proceso se mostrarán aquí -->
         </div>
     </div>
 </div>
@@ -1870,32 +1956,163 @@
         }
 
         if (electronAPI && typeof electronAPI.saveConfig === 'function') {
-            electronAPI.loadConfig().then(config => {
-                if (!config.companyPaths) config.companyPaths = {};
-
-                // Actualizar la empresa con todos los datos incluyendo los parámetros editables
-                config.companyPaths[companyName] = {
-                    ...config.companyPaths[companyName],
-                    root: path,
-                    stats: {
-                        employees: employees,
-                        risk: risk,
-                        isAgropecuaria: isAgropecuaria,
-                        // Mantener otros stats existentes si existen
-                        ...(config.companyPaths[companyName]?.stats || {})
+            // === MOSTRAR OVERLAY DE CARGA ===
+            const mappingOverlay = document.getElementById('mapping-overlay');
+            const mappingMessage = document.getElementById('mapping-message');
+            const mappingTimer = document.getElementById('mapping-timer');
+            const mappingDetails = document.getElementById('mapping-details');
+            const btnSaveLink = document.getElementById('btn-save-link');
+            
+            // Mostrar overlay
+            mappingOverlay.style.display = 'flex';
+            mappingOverlay.style.alignItems = 'center';
+            mappingOverlay.style.justifyContent = 'center';
+            btnSaveLink.disabled = true;
+            btnSaveLink.textContent = 'Mapeando...';
+            
+            // Iniciar timer
+            let seconds = 0;
+            const timerInterval = setInterval(() => {
+                seconds++;
+                mappingTimer.textContent = `Tiempo transcurrido: ${seconds}s`;
+            }, 1000);
+            
+            // Actualizar mensaje
+            mappingMessage.innerHTML = `
+                <div class="mapping-step active">
+                    <span class="step-icon"><i class="fas fa-spinner fa-spin"></i></span>
+                    <span>Iniciando mapeo para <strong>${companyName}</strong>...</span>
+                </div>
+            `;
+            mappingDetails.style.display = 'none';
+            mappingDetails.innerHTML = '';
+            
+            console.log(`[CONFIG][SAVE] Iniciando guardado para ${companyName}`);
+            console.log(`[CONFIG][SAVE] Ruta seleccionada: ${path}`);
+            
+            // Verificar si mapDirectory está disponible
+            if (!electronAPI.mapDirectory) {
+                console.error('[CONFIG][SAVE] ERROR: electronAPI.mapDirectory no está disponible');
+                clearInterval(timerInterval);
+                mappingOverlay.style.display = 'none';
+                btnSaveLink.disabled = false;
+                btnSaveLink.textContent = 'Guardar y Vincular';
+                showToast('Error: Función de mapeo no disponible', 'error');
+                return;
+            }
+            
+            console.log('[CONFIG][SAVE] Llamando a electronAPI.mapDirectory para mapear la estructura...');
+            
+            // Ejecutar mapeo
+            electronAPI.mapDirectory(path)
+                .then(result => {
+                    console.log(`[CONFIG][SAVE] Mapeo completado:`, {
+                        success: result.success,
+                        hasStructure: !!result.structure,
+                        hasStructureStructure: !!(result.structure?.structure)
+                    });
+                    
+                    // Actualizar UI con progreso
+                    mappingMessage.innerHTML = `
+                        <div class="mapping-step success">
+                            <span class="step-icon"><i class="fas fa-check-circle"></i></span>
+                            <span>Estructura analizada exitosamente</span>
+                        </div>
+                        <div class="mapping-step active">
+                            <span class="step-icon"><i class="fas fa-spinner fa-spin"></i></span>
+                            <span>Guardando configuración...</span>
+                        </div>
+                    `;
+                    
+                    // Mostrar detalles del mapeo
+                    if (result.structure) {
+                        mappingDetails.style.display = 'block';
+                        mappingDetails.innerHTML = `
+                            <div>✅ Root: ${result.structure.root || 'N/A'}</div>
+                            <div>📁 Total carpetas: ${result.structure.total_folders || 0}</div>
+                            <div>📄 Total archivos: ${result.structure.total_files || 0}</div>
+                        `;
                     }
-                };
+                    
+                    if (!result.success || !result.structure) {
+                        throw new Error('El mapeo no devolvió una estructura válida');
+                    }
+                    
+                    // === SEGUNDO: CARGAR CONFIGURACIÓN Y ACTUALIZAR ===
+                    console.log('[CONFIG][SAVE] Cargando configuración actual...');
+                    return electronAPI.loadConfig().then(config => {
+                        if (!config.companyPaths) config.companyPaths = {};
 
-                return electronAPI.saveConfig(config);
-            }).then(() => {
-                closeModal();
-                loadCompanies(); // Recargar la lista de empresas
-                showToast('Empresa actualizada correctamente', 'success');
-            }).catch(error => {
-                console.error('Error al guardar la empresa:', error);
-                showToast('Error al actualizar la empresa', 'error');
-            });
+                        console.log('[CONFIG][SAVE] Actualizando configuración con estructura mapeada...');
+                        
+                        // Actualizar la empresa con todos los datos incluyendo la estructura mapeada
+                        config.companyPaths[companyName] = {
+                            ...config.companyPaths[companyName],
+                            root: path,
+                            structure: result.structure,  // ← AGREGAR LA ESTRUCTURA MAPEADA
+                            stats: {
+                                employees: employees,
+                                risk: risk,
+                                isAgropecuaria: isAgropecuaria,
+                                // Mantener otros stats existentes si existen
+                                ...(config.companyPaths[companyName]?.stats || {})
+                            }
+                        };
+                        
+                        console.log('[CONFIG][SAVE] Configuración actualizada:', {
+                            root: config.companyPaths[companyName].root,
+                            hasStructure: !!config.companyPaths[companyName].structure,
+                            hasStructureStructure: !!(config.companyPaths[companyName].structure?.structure)
+                        });
+
+                        return electronAPI.saveConfig(config);
+                    });
+                })
+                .then(() => {
+                    console.log('[CONFIG][SAVE] Configuración guardada exitosamente');
+                    clearInterval(timerInterval);
+                    
+                    // Actualizar UI con éxito
+                    mappingMessage.innerHTML = `
+                        <div class="mapping-step success">
+                            <span class="step-icon"><i class="fas fa-check-circle"></i></span>
+                            <span><strong>¡Mapeo completado exitosamente!</strong></span>
+                        </div>
+                    `;
+                    
+                    // Cerrar overlay después de un breve delay
+                    setTimeout(() => {
+                        mappingOverlay.style.display = 'none';
+                        closeModal();
+                        loadCompanies(); // Recargar la lista de empresas
+                        showToast('Empresa actualizada correctamente con estructura mapeada', 'success');
+                        btnSaveLink.disabled = false;
+                        btnSaveLink.textContent = 'Guardar y Vincular';
+                    }, 1500);
+                })
+                .catch(error => {
+                    console.error('[CONFIG][SAVE] Error al guardar la empresa:', error);
+                    console.error('[CONFIG][SAVE] Stack:', error.stack);
+                    clearInterval(timerInterval);
+                    
+                    // Actualizar UI con error
+                    mappingMessage.innerHTML = `
+                        <div class="mapping-step error">
+                            <span class="step-icon"><i class="fas fa-exclamation-circle"></i></span>
+                            <span>Error: ${error.message}</span>
+                        </div>
+                    `;
+                    
+                    // Cerrar overlay después de un delay más largo para que el usuario vea el error
+                    setTimeout(() => {
+                        mappingOverlay.style.display = 'none';
+                        btnSaveLink.disabled = false;
+                        btnSaveLink.textContent = 'Guardar y Vincular';
+                        showToast(`Error al actualizar: ${error.message}`, 'error');
+                    }, 4000);
+                });
         } else {
+            // Simulación para pruebas sin Electron
             closeModal();
             loadCompanies(); // Recargar la lista de empresas
             showToast('Empresa actualizada correctamente (simulado)', 'success');

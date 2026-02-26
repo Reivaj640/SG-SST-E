@@ -2809,71 +2809,159 @@ function showPathLinkingPage() {
       try {
         loadButton.textContent = 'Mapeando...';
         loadButton.disabled = true;
+        
+        // === LOG DE DEPURACIÓN AGREGADO ===
+        console.log(`[MAPEO][DEBUG] Iniciando mapeo para empresa: ${companyName}`);
+        console.log(`[MAPEO][DEBUG] Ruta seleccionada: ${path}`);
+        console.log(`[MAPEO][DEBUG] window.electronAPI disponible: ${!!window.electronAPI}`);
+        console.log(`[MAPEO][DEBUG] window.electronAPI.mapDirectory disponible: ${!!window.electronAPI?.mapDirectory}`);
+        
         if (logTextarea) {
-          logTextarea.value = `Iniciando mapeo para ${companyName} en la ruta ${path}...
+          logTextarea.value = `[MAPEO] Iniciando mapeo para ${companyName} en la ruta ${path}...
+[DEBUG] Verificando APIs de Electron...
 `;
         }
 
         // Verificar que window.electronAPI exista
         if (!window.electronAPI || !window.electronAPI.mapDirectory) {
-          throw new Error('Electron API not available');
+          const errorMsg = 'Electron API not available';
+          console.error(`[MAPEO][ERROR] ${errorMsg}`);
+          throw new Error(errorMsg);
         }
 
+        if (logTextarea) {
+          logTextarea.value += `[DEBUG] Llamando a mapDirectory con ruta: ${path}
+`;
+        }
+        
+        console.log(`[MAPEO][DEBUG] Llamando a window.electronAPI.mapDirectory("${path}")`);
         const result = await window.electronAPI.mapDirectory(path);
 
         if (logTextarea) {
-          logTextarea.value += `Resultado del proceso Python:
+          logTextarea.value += `
+[DEBUG] Resultado recibido de mapDirectory:
+  - success: ${result.success}
+  - structure: ${result.structure ? 'PRESENT' : 'MISSING'}
+  - structure.structure: ${result.structure?.structure ? 'PRESENT' : 'MISSING'}
+  
+Resultado del proceso Python:
 ${result.log}
 
 `;
+        }
+        
+        console.log(`[MAPEO][DEBUG] Resultado de mapDirectory:`, {
+          success: result.success,
+          hasStructure: !!result.structure,
+          hasStructureStructure: !!(result.structure?.structure),
+          log: result.log
+        });
 
-          if (result.structure && result.structure.structure) {
-            logTextarea.value += '--- Estructura Mapeada ---';
+        if (result.structure && result.structure.structure) {
+          if (logTextarea) {
+            logTextarea.value += '--- Estructura Mapeada (resumen) ---\n';
+            logTextarea.value += `  Root: ${result.structure.root}
+`;
+            logTextarea.value += `  Total archivos: ${result.structure.total_files}
+`;
+            logTextarea.value += `  Total carpetas: ${result.structure.total_folders}
+`;
             logTextarea.value += formatStructureForLog(result.structure.structure);
-          } else {
-            logTextarea.value += 'No se pudo mostrar la estructura mapeada.';
           }
+          console.log(`[MAPEO][DEBUG] Estructura mapeada exitosamente para ${companyName}`);
+        } else {
+          if (logTextarea) {
+            logTextarea.value += '[ERROR] No se pudo mostrar la estructura mapeada.\n';
+            logTextarea.value += `  result.structure: ${JSON.stringify(result.structure, null, 2)}
+`;
+          }
+          console.error(`[MAPEO][ERROR] result.structure es:`, result.structure);
         }
 
         const checkmark = document.getElementById(`checkmark-${companyName}`);
         if (checkmark) {
           checkmark.style.display = 'inline';
+          console.log(`[MAPEO][DEBUG] Checkmark mostrado para ${companyName}`);
         }
 
         // Verificar que window.electronAPI exista
         if (!window.electronAPI || !window.electronAPI.loadConfig || !window.electronAPI.saveConfig) {
-          throw new Error('Electron API not available');
+          const errorMsg = 'Electron API not available for config';
+          console.error(`[MAPEO][ERROR] ${errorMsg}`);
+          throw new Error(errorMsg);
         }
 
+        if (logTextarea) {
+          logTextarea.value += `
+[DEBUG] Cargando configuración actual...
+`;
+        }
+        console.log(`[MAPEO][DEBUG] Llamando a window.electronAPI.loadConfig()`);
         const config = await window.electronAPI.loadConfig();
+        
+        console.log(`[MAPEO][DEBUG] Configuración cargada:`, {
+          hasCompanyPaths: !!config.companyPaths,
+          existingCompanies: config.companyPaths ? Object.keys(config.companyPaths) : []
+        });
+        
         if (!config.companyPaths) {
           config.companyPaths = {};
+          console.log(`[MAPEO][DEBUG] companyPaths no existía, creado nuevo objeto`);
         }
+        
+        // === LOG CRÍTICO: Qué se está guardando ===
+        console.log(`[MAPEO][DEBUG] Preparando para guardar configuración para ${companyName}:`, {
+          root: path,
+          structureKeys: result.structure ? Object.keys(result.structure) : 'MISSING',
+          structureHasStructure: !!(result.structure?.structure)
+        });
+        
         config.companyPaths[companyName] = {
           root: path,
           structure: result.structure
         };
-        await window.electronAPI.saveConfig(config);
+        
+        console.log(`[MAPEO][DEBUG] Configuración actualizada para ${companyName}:`, {
+          root: config.companyPaths[companyName].root,
+          structureKeys: config.companyPaths[companyName].structure ? Object.keys(config.companyPaths[companyName].structure) : 'MISSING',
+          structureHasStructure: !!(config.companyPaths[companyName].structure?.structure)
+        });
+        
+        if (logTextarea) {
+          logTextarea.value += `[DEBUG] Guardando configuración...
+`;
+        }
+        console.log(`[MAPEO][DEBUG] Llamando a window.electronAPI.saveConfig()`);
+        const saveResult = await window.electronAPI.saveConfig(config);
+        console.log(`[MAPEO][DEBUG] Resultado de saveConfig:`, saveResult);
 
         if (logTextarea) {
           logTextarea.value += `
 --- Proceso Finalizado ---
 Ruta para ${companyName} guardada exitosamente.
+[DEBUG] Configuración guardada con:
+  - root: ${path}
+  - structure.structure: ${result.structure?.structure ? 'PRESENT' : 'MISSING'}
 `;
         }
+        console.log(`[MAPEO][SUCCESS] Mapeo completado para ${companyName}`);
         alert(`Ruta para ${companyName} guardada exitosamente.`);
 
       } catch (error) {
-        console.error('Error mapping directory:', error);
+        console.error(`[MAPEO][ERROR] Error en mapeo para ${companyName}:`, error);
         if (logTextarea) {
             logTextarea.value += `
 --- ERROR ---
-Error al mapear el directorio: ${error.message}`;
+Error al mapear el directorio: ${error.message}
+[DEBUG] Stack trace:
+${error.stack}
+`;
         }
         alert(`Error al mapear el directorio: ${error.message}`);
       } finally {
         loadButton.textContent = 'Cargar Vínculo';
         loadButton.disabled = false;
+        console.log(`[MAPEO][DEBUG] Botón reseteado para ${companyName}`);
       }
     });
     companyRow.appendChild(loadButton);

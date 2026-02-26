@@ -1601,22 +1601,87 @@
             });
         }
 
-        // Ver detalles del caso
-        function viewCase(caseId) {
+        // Ver detalles del caso - AHORA CARGA DATOS DESDE PRI.xlsx
+        async function viewCase(caseId) {
             currentCaseId = caseId;
             const caseItem = allCasesData.find(c => c.id === caseId);
 
             if (caseItem) {
-                // Llenar formulario con datos del caso
+                console.log(`[SEGUIMIENTO][VIEW] === Abriendo caso: ${caseId} ===`);
+                console.log(`[SEGUIMIENTO][VIEW] Empleado: ${caseItem.employeeName}`);
+                console.log(`[SEGUIMIENTO][VIEW] Cédula: ${caseItem.employeeId}`);
+                
+                // Resetear formulario primero
+                document.getElementById('followUpForm').reset();
+                document.getElementById('followUpHistory').style.display = 'none';
+                
+                // === CARGAR DATOS DESDE PI-FO-076 (datos generales) ===
                 document.getElementById('employeeId').value = caseItem.employeeId || caseItem.id;
                 document.getElementById('employeeName').value = caseItem.employeeName;
                 document.getElementById('diagnosis').value = caseItem.diagnosis;
-
-                // Mostrar historial de seguimientos
+                
+                // === INTENTAR CARGAR DATOS DESDE PRI.xlsx ===
+                await loadPriDataForCase(caseItem);
+                
+                // Mostrar historial de seguimientos (desde archivo de seguimientos)
                 showFollowUpHistory(caseId);
 
                 // Abrir modal
                 document.getElementById('followUpModal').classList.add('active');
+            }
+        }
+        
+        // Cargar datos específicos desde PRI.xlsx para un caso
+        async function loadPriDataForCase(caseItem) {
+            try {
+                console.log('[SEGUIMIENTO][PRI] Intentando cargar datos desde PRI.xlsx...');
+                
+                // Verificar si tenemos acceso a la API
+                const apiToUse = window.electronAPI?.getPriSeguimientoData || 
+                                window.parent?.electronAPI?.getPriSeguimientoData;
+                
+                if (!apiToUse) {
+                    console.log('[SEGUIMIENTO][PRI] API no disponible, usando datos locales');
+                    return;
+                }
+                
+                console.log('[SEGUIMIENTO][PRI] Llamando a getPriSeguimientoData...');
+                const priResult = await apiToUse(currentCompany);
+                
+                if (!priResult.success || !priResult.rows) {
+                    console.log('[SEGUIMIENTO][PRI] No se pudieron cargar datos del PRI');
+                    return;
+                }
+                
+                console.log(`[SEGUIMIENTO][PRI] ✅ ${priResult.rows.length} registros cargados desde PRI.xlsx`);
+                
+                // Buscar el caso específico en el PRI por cédula o nombre
+                const priCase = priResult.rows.find(row => {
+                    // Asumiendo estructura: [Identificación, Nombre, Cargo, ...]
+                    const rowId = (row[0] || '').toString().replace(/,/g, '');
+                    const rowName = (row[1] || '').toString().toUpperCase();
+                    const searchId = caseItem.employeeId.toString().replace(/,/g, '');
+                    const searchName = caseItem.employeeName.toUpperCase();
+                    
+                    return rowId.includes(searchId) || rowName.includes(searchName);
+                });
+                
+                if (priCase) {
+                    console.log('[SEGUIMIENTO][PRI] ✅ Caso encontrado en PRI.xlsx');
+                    console.log('[SEGUIMIENTO][PRI] Datos:', priCase);
+                    
+                    // Cargar datos específicos del PRI en el formulario
+                    // Ajustar índices según la estructura real del PRI.xlsx
+                    if (priCase[2]) document.getElementById('cargo').value = priCase[2];  // Cargo
+                    if (priCase[6]) document.getElementById('area').value = priCase[6];   // Área
+                    if (priCase[12]) document.getElementById('eps').value = priCase[12];  // EPS
+                    if (priCase[13]) document.getElementById('arl').value = priCase[13];  // ARL
+                } else {
+                    console.log('[SEGUIMIENTO][PRI] ⚠️ Caso nuevo - No existe en PRI.xlsx');
+                }
+                
+            } catch (error) {
+                console.error('[SEGUIMIENTO][PRI] Error cargando datos:', error);
             }
         }
 
@@ -1676,7 +1741,7 @@
             document.getElementById('followUpModal').classList.remove('active');
         }
 
-        // Guardar seguimiento
+        // Guardar seguimiento - AHORA USA LA API DE ELECTRON DIRECTAMENTE
         async function saveFollowUp() {
             const form = document.getElementById('followUpForm');
 
@@ -1700,20 +1765,75 @@
             };
 
             try {
-                console.log('Guardando seguimiento:', followUpData);
+                console.log('[SEGUIMIENTO][GUARDAR] === Iniciando guardado ===');
+                console.log('[SEGUIMIENTO][GUARDAR] Datos:', followUpData);
+                console.log('[SEGUIMIENTO][GUARDAR] Empresa:', currentCompany);
 
-                // Enviar solicitud al contenedor principal para guardar el seguimiento
-                sendMessageToParent({
-                    type: 'SAVE_FOLLOW_UP',
-                    id: Date.now(), // ID único para emparejar la solicitud con la respuesta
-                    payload: {
-                        followUpData: followUpData,
-                        companyName: currentCompany
-                    }
-                });
+                // === VERIFICAR API DE ELECTRON ===
+                let apiToUse = null;
+                
+                if (window.electronAPI?.saveFollowUp) {
+                    apiToUse = window.electronAPI.saveFollowUp;
+                    console.log('[SEGUIMIENTO][GUARDAR] Usando window.electronAPI.saveFollowUp');
+                } else if (window.parent?.electronAPI?.saveFollowUp) {
+                    apiToUse = window.parent.electronAPI.saveFollowUp;
+                    console.log('[SEGUIMIENTO][GUARDAR] Usando window.parent.electronAPI.saveFollowUp');
+                }
+                
+                if (!apiToUse) {
+                    console.error('[SEGUIMIENTO][GUARDAR] ❌ API saveFollowUp no disponible');
+                    showNotification('Error: Función de guardado no disponible', 'error');
+                    return;
+                }
+
+                // === MOSTRAR INDICADOR DE CARGA ===
+                const saveButton = document.querySelector('#followUpModal .action-btn.primary');
+                const originalText = saveButton ? saveButton.innerHTML : '';
+                if (saveButton) {
+                    saveButton.disabled = true;
+                    saveButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+                }
+
+                console.log('[SEGUIMIENTO][GUARDAR] Llamando a saveFollowUp API...');
+                
+                // === LLAMAR A LA API ===
+                const result = await apiToUse(followUpData, currentCompany);
+                
+                console.log('[SEGUIMIENTO][GUARDAR] Resultado:', result);
+
+                // === RESTAURAR BOTÓN ===
+                if (saveButton) {
+                    saveButton.disabled = false;
+                    saveButton.innerHTML = originalText || '<i class="fas fa-save"></i> Guardar Seguimiento';
+                }
+
+                // === MANEJAR RESULTADO ===
+                if (result && result.success) {
+                    console.log('[SEGUIMIENTO][GUARDAR] ✅ Seguimiento guardado exitosamente');
+                    
+                    // Cerrar modal
+                    closeFollowUpModal();
+                    
+                    // Recargar datos de la tabla
+                    await loadData();
+                    
+                    // Mostrar notificación de éxito
+                    showNotification('Seguimiento guardado correctamente en PRI.xlsx', 'success');
+                } else {
+                    const errorMsg = result?.error || 'Error desconocido al guardar';
+                    console.error('[SEGUIMIENTO][GUARDAR] ❌ Error:', errorMsg);
+                    showNotification('Error al guardar: ' + errorMsg, 'error');
+                }
             } catch (error) {
-                console.error('Error guardando seguimiento:', error);
-                showNotification('Error al guardar seguimiento: ' + error.message, 'error');
+                console.error('[SEGUIMIENTO][GUARDAR] Error guardando seguimiento:', error);
+                showNotification('Error al guardar: ' + error.message, 'error');
+                
+                // Restaurar botón en caso de error
+                const saveButton = document.querySelector('#followUpModal .action-btn.primary');
+                if (saveButton) {
+                    saveButton.disabled = false;
+                    saveButton.innerHTML = '<i class="fas fa-save"></i> Guardar Seguimiento';
+                }
             }
         }
 

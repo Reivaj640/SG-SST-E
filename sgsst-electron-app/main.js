@@ -285,12 +285,33 @@ ipcMain.handle('save-file-dialog', async (event, options = {}) => {
 // Manejar guardado de configuración
 ipcMain.handle('save-config', async (event, config) => {
   try {
-    console.log('Saving config:', config);
+    console.log('========================================');
+    console.log('[CONFIG][MAIN] save-config llamado');
+    console.log(`[CONFIG][MAIN] Ruta de configuración: ${configPath}`);
+    
+    // Verificar estructura de companyPaths
+    if (config.companyPaths) {
+      console.log('[CONFIG][MAIN] companyPaths encontradas:');
+      for (const [companyName, companyData] of Object.entries(config.companyPaths)) {
+        console.log(`  - ${companyName}:`, {
+          hasRoot: !!companyData.root,
+          hasStructure: !!companyData.structure,
+          hasStructureStructure: !!(companyData.structure?.structure),
+          root: companyData.root
+        });
+      }
+    } else {
+      console.warn('[CONFIG][MAIN] companyPaths no encontrada en config');
+    }
+    
+    console.log('[CONFIG][MAIN] Escribiendo archivo de configuración...');
     await fsp.writeFile(configPath, JSON.stringify(config, null, 2));
-    console.log('Config saved successfully');
+    console.log('[CONFIG][MAIN] Config saved successfully');
+    console.log('========================================');
     return { success: true };
   } catch (error) {
-    console.error('Error saving config:', error);
+    console.error('[CONFIG][MAIN][ERROR] Error saving config:', error);
+    console.error('[CONFIG][MAIN][ERROR] Stack:', error.stack);
     return { success: false, error: error.message };
   }
 });
@@ -626,20 +647,65 @@ ipcMain.handle('get-control-remisiones-data', async (event, companyName) => {
 // Manejar mapeo de directorio
 ipcMain.handle('map-directory', async (event, directoryPath) => {
   try {
-    console.log('Mapping directory:', directoryPath);
+    console.log('========================================');
+    console.log('[MAPEO][MAIN] Handler map-directory llamado');
+    console.log(`[MAPEO][MAIN] Directorio a mapear: ${directoryPath}`);
+    console.log(`[MAPEO][MAIN] Verificando existencia del directorio...`);
+    
+    if (!fs.existsSync(directoryPath)) {
+      const errorMsg = `El directorio no existe: ${directoryPath}`;
+      console.error(`[MAPEO][MAIN][ERROR] ${errorMsg}`);
+      return { success: false, error: errorMsg, log: errorMsg };
+    }
+    console.log(`[MAPEO][MAIN] Directorio existe: ✅`);
+    
     const pythonPath = await getPython();
     const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'map_directory.py');
 
-    console.log(`Executing command: ${pythonPath} "${pythonScriptPath}" "${directoryPath}"`);
+    console.log(`[MAPEO][MAIN] Python path: ${pythonPath}`);
+    console.log(`[MAPEO][MAIN] Script path: ${pythonScriptPath}`);
+    console.log(`[MAPEO][MAIN] Ejecutando: ${pythonPath} "${pythonScriptPath}" "${directoryPath}"`);
 
-    const { stdout, stderr } = await execFilePromise(pythonPath, [pythonScriptPath, directoryPath], { cwd: path.dirname(pythonScriptPath) });
+    const { stdout, stderr } = await execFilePromise(pythonPath, [pythonScriptPath, directoryPath], { 
+      cwd: path.dirname(pythonScriptPath),
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+    });
 
-    const structure = JSON.parse(stdout);
-    console.log('Directory mapping completed successfully');
+    console.log(`[MAPEO][MAIN] stdout recibido (${stdout.length} bytes)`);
+    console.log(`[MAPEO][MAIN] stderr: ${stderr || '(vacío)'}`);
+    
+    // Parsear el JSON de salida
+    let structure;
+    try {
+      structure = JSON.parse(stdout);
+      console.log(`[MAPEO][MAIN] JSON parseado exitosamente`);
+      console.log(`[MAPEO][MAIN] Estructura keys: ${Object.keys(structure).join(', ')}`);
+      console.log(`[MAPEO][MAIN] structure.structure existe: ${!!structure.structure}`);
+      
+      if (structure.structure) {
+        console.log(`[MAPEO][MAIN] structure.structure keys: ${Object.keys(structure.structure).join(', ')}`);
+        console.log(`[MAPEO][MAIN] Total archivos: ${structure.total_files}`);
+        console.log(`[MAPEO][MAIN] Total carpetas: ${structure.total_folders}`);
+      }
+    } catch (parseError) {
+      console.error(`[MAPEO][MAIN][ERROR] Error parseando JSON:`, parseError);
+      console.error(`[MAPEO][MAIN][ERROR] stdout raw (primeros 500 chars):`, stdout.substring(0, 500));
+      throw new Error(`Error parseando JSON: ${parseError.message}`);
+    }
 
-    return { success: true, structure: structure, log: stderr || 'Mapeo completado sin errores.' };
+    console.log('[MAPEO][MAIN] Mapeo completado exitosamente');
+    console.log('========================================');
+
+    return { 
+      success: true, 
+      structure: structure, 
+      log: stderr || 'Mapeo completado sin errores.' 
+    };
   } catch (error) {
-    console.error('Error mapping directory:', error);
+    console.error('========================================');
+    console.error('[MAPEO][MAIN][ERROR] Error mapping directory:', error);
+    console.error('[MAPEO][MAIN][ERROR] Stack:', error.stack);
+    console.error('========================================');
     throw error;
   }
 });
@@ -2876,6 +2942,8 @@ app.on('window-all-closed', () => {
 // Handler: Leer datos de ausentismo desde Excel
 // =============================================================================
 ipcMain.handle('get-ausentismo-data', async (event, companyName) => {
+  console.log('========================================');
+  console.log(`[AUSENTISMO][MAIN] Handler get-ausentismo-data llamado para empresa: ${companyName}`);
   sendLog(`[DEBUG] Handler get-ausentismo-data llamado para empresa: ${companyName}`);
   sendLog(`[TEST] Este log debería aparecer si el handler se llama.`);
 
@@ -2886,6 +2954,9 @@ ipcMain.handle('get-ausentismo-data', async (event, companyName) => {
     const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
     const config = JSON.parse(configData);
 
+    console.log(`[AUSENTISMO][MAIN] Configuración cargada:`);
+    console.log(`[AUSENTISMO][MAIN] companyPaths disponibles:`, Object.keys(config.companyPaths || {}));
+
     // -------------------------------------------------------------------------
     // 2. Obtener la estructura real de la empresa
     // -------------------------------------------------------------------------
@@ -2894,14 +2965,29 @@ ipcMain.handle('get-ausentismo-data', async (event, companyName) => {
       key => key.toLowerCase() === normalizedCompanyName
     );
 
+    console.log(`[AUSENTISMO][MAIN] normalizedCompanyName: ${normalizedCompanyName}`);
+    console.log(`[AUSENTISMO][MAIN] companyKey encontrada: ${companyKey || '(NO ENCONTRADA)'}`);
+
     const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+
+    if (companyConfig) {
+      console.log(`[AUSENTISMO][MAIN] companyConfig para ${companyKey}:`, {
+        hasRoot: !!companyConfig.root,
+        root: companyConfig.root,
+        hasStructure: !!companyConfig.structure,
+        hasStructureStructure: !!(companyConfig.structure?.structure)
+      });
+    } else {
+      console.error(`[AUSENTISMO][MAIN] companyConfig es NULL para ${companyKey}`);
+    }
 
     if (!companyConfig || !companyConfig.structure?.structure) {
       const available = Object.keys(config.companyPaths || {});
-      throw new Error(
-        `Empresa "${companyName}" no tiene estructura mapeada. ` +
-        `Disponibles: [${available.join(', ')}]`
-      );
+      const errorMsg = `Empresa "${companyName}" no tiene estructura mapeada. Disponibles: [${available.join(', ')}]`;
+      console.error(`[AUSENTISMO][MAIN][ERROR] ${errorMsg}`);
+      console.error(`[AUSENTISMO][MAIN][ERROR] companyConfig:`, companyConfig);
+      console.log('========================================');
+      throw new Error(errorMsg);
     }
 
     const rootStructure = companyConfig.structure.structure;
@@ -2968,17 +3054,60 @@ ipcMain.handle('get-ausentismo-data', async (event, companyName) => {
     }
 
     // -------------------------------------------------------------------------
-    // 6. Obtener el primer archivo .xlsx
+    // 6. Obtener archivos de la carpeta de ausentismo
     // -------------------------------------------------------------------------
-    const excelFiles = (ausentismoDir.files || []).filter(
+    const allFiles = ausentismoDir.files || [];
+    
+    console.log(`[AUSENTISMO][MAIN] === ARCHIVOS EN LA CARPETA DE AUSENTISMO ===`);
+    console.log(`[AUSENTISMO][MAIN] Total de archivos encontrados: ${allFiles.length}`);
+    allFiles.forEach((f, idx) => {
+      console.log(`  [${idx}] ${f.name} (ext: ${f.extension || 'sin extensión'})`);
+    });
+    console.log(`[AUSENTISMO][MAIN] ============================================`);
+    
+    // Filtrar solo archivos .xlsx
+    const excelFiles = allFiles.filter(
       f => f.extension?.toLowerCase() === '.xlsx'
     );
-
+    
+    console.log(`[AUSENTISMO][MAIN] Archivos .xlsx encontrados: ${excelFiles.length}`);
+    excelFiles.forEach((f, idx) => {
+      console.log(`  [${idx}] ${f.name}`);
+    });
+    
+    // Buscar específicamente archivos que contengan "PRI" en el nombre
+    const priFiles = allFiles.filter(
+      f => f.name && f.name.toUpperCase().includes('PRI')
+    );
+    
+    console.log(`[AUSENTISMO][MAIN] Archivos que contienen "PRI" en el nombre: ${priFiles.length}`);
+    if (priFiles.length > 0) {
+      priFiles.forEach((f, idx) => {
+        console.log(`  [${idx}] ${f.name} (ext: ${f.extension || 'sin extensión'})`);
+      });
+    } else {
+      console.log(`[AUSENTISMO][MAIN] ⚠️ NO se encontró ningún archivo con "PRI" en el nombre`);
+    }
+    
     if (excelFiles.length === 0) {
       throw new Error('No hay archivos .xlsx en la carpeta de ausentismo.');
     }
 
-    const excelFile = excelFiles[0];
+    // === CORRECCIÓN: Seleccionar el archivo correcto según el propósito ===
+    // Para get-ausentismo-data (lista principal), usar el archivo PI-FO-076, NO el PRI.xlsx
+    // El PRI.xlsx se usa solo para seguimiento detallado de casos individuales
+    
+    // Buscar específicamente el archivo PI-FO-076 (ausentismo general)
+    const ausentismoGeneralFile = excelFiles.find(
+      f => f.name && (f.name.toUpperCase().includes('PI-FO-076') || f.name.toUpperCase().includes('PG-FO-076') || f.name.toUpperCase().includes('GI-FO-076'))
+    );
+    
+    // Si no encuentra PI-FO-076, usar el primer .xlsx que NO sea PRI.xlsx
+    const excelFile = ausentismoGeneralFile || excelFiles.find(f => !f.name.toUpperCase().includes('PRI')) || excelFiles[0];
+    
+    console.log(`[AUSENTISMO][MAIN] Archivo SELECCIONADO: ${excelFile.name}`);
+    console.log(`[AUSENTISMO][MAIN] ¿Es archivo de ausentismo general (PI/PG/GI-FO-076)?: ${ausentismoGeneralFile ? '✅ SÍ' : '❌ NO'}`);
+    console.log(`[AUSENTISMO][MAIN] Ruta completa: ${excelFile.path}`);
     sendLog(`[DEBUG] Archivo de ausentismo encontrado: ${excelFile.path}`);
 
     // -------------------------------------------------------------------------
@@ -3090,16 +3219,217 @@ ipcMain.handle('get-ausentismo-data', async (event, companyName) => {
     // -------------------------------------------------------------------------
     // 13. Retornar datos procesados
     // -------------------------------------------------------------------------
-    return {
+    const result = {
       success: true,
       headers: limitedHeaders,
       rows: limitedRows,
       filePath: excelFile.path,
       companyName
     };
+    
+    console.log('========================================');
+    console.log('[AUSENTISMO][MAIN] Datos de ausentismo listos para enviar:');
+    console.log(`  - Éxito: ${result.success}`);
+    console.log(`  - Encabezados: ${limitedHeaders.length} columnas`);
+    console.log(`  - Filas: ${limitedRows.length} registros`);
+    console.log(`  - Archivo: ${excelFile.path}`);
+    console.log('========================================');
+    
+    return result;
 
   } catch (error) {
     sendLog(`[ERROR] Error crítico en get-ausentismo-data: ${error.message}`, 'ERROR');
+    return {
+      success: false,
+      error: error.message,
+      companyName
+    };
+  }
+});
+
+// =============================================================================
+// Handler: Leer datos del PRI.xlsx (hoja "Casos en seguimiento")
+// =============================================================================
+ipcMain.handle('get-pri-seguimiento-data', async (event, companyName) => {
+  console.log('========================================');
+  console.log(`[PRI][MAIN] Handler get-pri-seguimiento-data llamado para empresa: ${companyName}`);
+  
+  try {
+    // -------------------------------------------------------------------------
+    // 1. Cargar configuración
+    // -------------------------------------------------------------------------
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+
+    // -------------------------------------------------------------------------
+    // 2. Obtener la estructura real de la empresa
+    // -------------------------------------------------------------------------
+    const normalizedCompanyName = companyName.toLowerCase();
+    const companyKey = Object.keys(config.companyPaths || {}).find(
+      key => key.toLowerCase() === normalizedCompanyName
+    );
+
+    const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+
+    if (!companyConfig || !companyConfig.structure?.structure) {
+      const available = Object.keys(config.companyPaths || {});
+      throw new Error(`Empresa "${companyName}" no tiene estructura mapeada. Disponibles: [${available.join(', ')}]`);
+    }
+
+    const rootStructure = companyConfig.structure.structure;
+
+    // -------------------------------------------------------------------------
+    // 3. Función auxiliar: Buscar carpeta de forma flexible
+    // -------------------------------------------------------------------------
+    function findDirFlexible(subdirs, target) {
+      if (!subdirs) return null;
+
+      const normalizedTarget = target
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      for (const [key, value] of Object.entries(subdirs)) {
+        const normalizedKey = key
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        if (normalizedKey === normalizedTarget) {
+          return value;
+        }
+      }
+
+      return null;
+    }
+
+    // -------------------------------------------------------------------------
+    // 4. Buscar carpeta "3. Gestión de la Salud"
+    // -------------------------------------------------------------------------
+    const gestionSalud = findDirFlexible(rootStructure.subdirectories, "3. Gestión de la Salud");
+
+    if (!gestionSalud) {
+      throw new Error(`No se encontró "3. Gestión de la Salud".`);
+    }
+
+    // -------------------------------------------------------------------------
+    // 5. Buscar el submódulo de ausentismo
+    // -------------------------------------------------------------------------
+    const ausentismoDir = findDirFlexible(gestionSalud.subdirectories, "3.3.6 Medición del ausentismo por causa médica");
+
+    if (!ausentismoDir) {
+      throw new Error(`No se encontró submódulo de ausentismo.`);
+    }
+
+    // -------------------------------------------------------------------------
+    // 6. Buscar específicamente el archivo PRI.xlsx
+    // -------------------------------------------------------------------------
+    const allFiles = ausentismoDir.files || [];
+    const priFile = allFiles.find(
+      f => f.name && f.name.toUpperCase() === 'PRI.XLSX' && f.extension?.toLowerCase() === '.xlsx'
+    );
+
+    if (!priFile) {
+      // Listar archivos disponibles para debug
+      console.log(`[PRI][MAIN] Archivos en la carpeta:`, allFiles.map(f => f.name));
+      throw new Error(`No se encontró el archivo PRI.xlsx en la carpeta de ausentismo.`);
+    }
+
+    console.log(`[PRI][MAIN] ✅ Archivo PRI.xlsx encontrado: ${priFile.path}`);
+
+    // -------------------------------------------------------------------------
+    // 7. Leer archivo PRI.xlsx
+    // -------------------------------------------------------------------------
+    const workbook = xlsx.readFile(priFile.path);
+    console.log('[PRI][MAIN] Nombres de hojas en PRI.xlsx:', workbook.SheetNames);
+
+    // Buscar la hoja "Casos en seguimiento"
+    const sheetName = workbook.SheetNames.find(name => 
+      name.toLowerCase().includes('casos en seguimiento') ||
+      name.toLowerCase().includes('casos') ||
+      name.toLowerCase().includes('seguimiento')
+    );
+
+    if (!sheetName) {
+      throw new Error(`No se encontró la hoja "Casos en seguimiento" en PRI.xlsx. Hojas disponibles: ${workbook.SheetNames.join(', ')}`);
+    }
+
+    console.log(`[PRI][MAIN] Hoja seleccionada: ${sheetName}`);
+    const worksheet = workbook.Sheets[sheetName];
+    console.log('[PRI][MAIN] !ref de la hoja:', worksheet['!ref']);
+
+    // -------------------------------------------------------------------------
+    // 8. Leer todos los datos de la hoja
+    // -------------------------------------------------------------------------
+    const allData = xlsx.utils.sheet_to_json(worksheet, {
+      header: 1,
+      raw: false,
+      defval: null
+    });
+
+    console.log(`[PRI][MAIN] Total de filas leídas: ${allData.length}`);
+
+    // -------------------------------------------------------------------------
+    // 9. Buscar encabezados (adaptar según la estructura del PRI)
+    // -------------------------------------------------------------------------
+    // El PRI tiene una estructura diferente - buscar la fila con encabezados
+    let headerRowIndex = -1;
+    for (let i = 0; i < Math.min(20, allData.length); i++) {
+      const row = allData[i];
+      if (row && row.some(cell => cell && cell.toString().toLowerCase().includes('identificación') || cell && cell.toString().toLowerCase().includes('nombre') || cell && cell.toString().toLowerCase().includes('cedula'))) {
+        headerRowIndex = i;
+        break;
+      }
+    }
+
+    if (headerRowIndex === -1) {
+      // Si no encuentra encabezados, usar la fila 1 como fallback
+      headerRowIndex = 0;
+    }
+
+    console.log(`[PRI][MAIN] Fila de encabezados encontrada en índice: ${headerRowIndex}`);
+    const headers = allData[headerRowIndex];
+    console.log(`[PRI][MAIN] Encabezados:`, headers);
+
+    // -------------------------------------------------------------------------
+    // 10. Extraer datos (filas después del encabezado)
+    // -------------------------------------------------------------------------
+    const rows = allData.slice(headerRowIndex + 1).filter(row => 
+      row && row.some(cell => cell !== null && cell !== undefined && cell !== '')
+    );
+
+    console.log(`[PRI][MAIN] Total de registros: ${rows.length}`);
+
+    // -------------------------------------------------------------------------
+    // 11. Retornar datos procesados
+    // -------------------------------------------------------------------------
+    const result = {
+      success: true,
+      headers: headers || [],
+      rows: rows,
+      filePath: priFile.path,
+      sheetName: sheetName,
+      companyName
+    };
+
+    console.log('========================================');
+    console.log('[PRI][MAIN] Datos del PRI listos para enviar:');
+    console.log(`  - Éxito: ${result.success}`);
+    console.log(`  - Encabezados: ${result.headers.length} columnas`);
+    console.log(`  - Filas: ${result.rows.length} registros`);
+    console.log(`  - Archivo: ${priFile.path}`);
+    console.log(`  - Hoja: ${sheetName}`);
+    console.log('========================================');
+
+    return result;
+
+  } catch (error) {
+    console.error('[PRI][MAIN][ERROR] Error crítico en get-pri-seguimiento-data:', error);
+    sendLog(`[ERROR] Error en get-pri-seguimiento-data: ${error.message}`, 'ERROR');
     return {
       success: false,
       error: error.message,
@@ -3302,6 +3632,67 @@ async function obtenerRutaAusentismo(companyName) {
   return excelFiles[0].path;
 }
 
+// Función específica para obtener la ruta del PRI.xlsx
+async function obtenerRutaPri(companyName) {
+  console.log(`[PRI][RUTA] Obteniendo ruta de PRI.xlsx para empresa: ${companyName}`);
+  
+  const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+  const config = JSON.parse(configData);
+
+  const normalizedCompanyName = companyName.toLowerCase();
+  const companyKey = Object.keys(config.companyPaths || {}).find(
+    key => key.toLowerCase() === normalizedCompanyName
+  );
+
+  const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+  if (!companyConfig || !companyConfig.structure?.structure) {
+    throw new Error(`Empresa "${companyName}" no tiene estructura mapeada.`);
+  }
+
+  const rootStructure = companyConfig.structure.structure;
+
+  function findDirFlexible(subdirs, target) {
+    if (!subdirs) return null;
+    const normalizedTarget = target
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    for (const [key, value] of Object.entries(subdirs)) {
+      const normalizedKey = key
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (normalizedKey === normalizedTarget) return value;
+    }
+    return null;
+  }
+
+  const gestionSalud = findDirFlexible(rootStructure.subdirectories, "3. Gestión de la Salud");
+  if (!gestionSalud) throw new Error("No se encontró '3. Gestión de la Salud'");
+
+  const ausentismoDir = findDirFlexible(gestionSalud.subdirectories, "3.3.6 Medición del ausentismo por causa médica");
+  if (!ausentismoDir) throw new Error("No se encontró submódulo de ausentismo");
+
+  // Buscar específicamente PRI.xlsx
+  const allFiles = ausentismoDir.files || [];
+  const priFile = allFiles.find(
+    f => f.name && f.name.toUpperCase() === 'PRI.XLSX' && f.extension?.toLowerCase() === '.xlsx'
+  );
+
+  if (!priFile) {
+    console.log(`[PRI][RUTA] Archivos en la carpeta:`, allFiles.map(f => f.name));
+    throw new Error(`No se encontró el archivo PRI.xlsx en la carpeta de ausentismo.`);
+  }
+
+  console.log(`[PRI][RUTA] ✅ PRI.xlsx encontrado: ${priFile.path}`);
+  return priFile.path;
+}
+
  // =============================================================================
 // Handler: Registrar nueva incapacidad en archivo de ausentismo
 // =============================================================================
@@ -3386,14 +3777,17 @@ ipcMain.handle('procesar-ausentismo', async (event, empresa, formData) => {
   }
 });
 
-// Manejador para guardar seguimiento de incapacidades
+// Manejador para guardar seguimiento de incapacidades - AHORA USA PRI.xlsx ESPECÍFICAMENTE
 ipcMain.handle('save-follow-up', async (event, followUpData, companyName) => {
+  console.log('========================================');
+  console.log(`[PRI][GUARDAR] Handler save-follow-up llamado para empresa: ${companyName}`);
   sendLog(`[MAIN] Guardando seguimiento de incapacidad para empresa: ${companyName}`, 'INFO');
 
   try {
-    // Obtener la ruta del archivo de ausentismo
-    const filePath = await obtenerRutaAusentismo(companyName);
-    sendLog(`[MAIN] Archivo de ausentismo encontrado: ${filePath}`, 'INFO');
+    // === OBTENER RUTA ESPECÍFICA DE PRI.xlsx ===
+    const filePath = await obtenerRutaPri(companyName);
+    console.log(`[PRI][GUARDAR] ✅ PRI.xlsx encontrado: ${filePath}`);
+    sendLog(`[MAIN] Archivo PRI.xlsx encontrado: ${filePath}`, 'INFO');
 
     const { spawn } = require('child_process');
     const scriptPath = path.join(__dirname, 'Portear', 'src', 'actualizar_ausentismo.py');
@@ -3402,12 +3796,17 @@ ipcMain.handle('save-follow-up', async (event, followUpData, companyName) => {
     // Convertir followUpData en string seguro para pasar a Python
     const followUpDataJson = JSON.stringify(followUpData);
 
+    console.log(`[PRI][GUARDAR] Llamando script Python: guardar_seguimiento`);
+    console.log(`[PRI][GUARDAR] Empresa: ${companyName}`);
+    console.log(`[PRI][GUARDAR] Archivo: ${filePath}`);
+    console.log(`[PRI][GUARDAR] Datos:`, followUpData);
+
     return new Promise((resolve, reject) => {
       const python = spawn(pythonPath, [
         scriptPath,
         'guardar_seguimiento',
         companyName,    // ARG 1
-        filePath,       // ARG 2
+        filePath,       // ARG 2 - Ruta específica de PRI.xlsx
         followUpDataJson // ARG 3
       ], {
         cwd: path.dirname(scriptPath),
@@ -3429,6 +3828,7 @@ ipcMain.handle('save-follow-up', async (event, followUpData, companyName) => {
             if (obj.type === 'log') {
               sendLog(`[Python Seguimiento] ${obj.message}`, 'INFO');
             } else if (obj.type === 'result') {
+              console.log(`[PRI][GUARDAR] Resultado de Python:`, obj.payload);
               resolve(obj.payload);
             }
           } catch (e) {
@@ -3439,6 +3839,7 @@ ipcMain.handle('save-follow-up', async (event, followUpData, companyName) => {
 
       python.stderr.on('data', (data) => {
         sendLog(`[Python Seguimiento - STDERR] ${data.toString()}`, 'ERROR');
+        console.error(`[PRI][GUARDAR] Error Python:`, data.toString());
       });
 
       python.on('close', (code) => {
@@ -3453,11 +3854,13 @@ ipcMain.handle('save-follow-up', async (event, followUpData, companyName) => {
 
       python.on('error', (err) => {
         sendLog(`Error al iniciar Python para guardar seguimiento: ${err.message}`, 'CRITICAL');
+        console.error(`[PRI][GUARDAR] Error al iniciar Python:`, err);
         reject(err);
       });
     });
 
   } catch (error) {
+    console.error('[PRI][GUARDAR][ERROR] Error crítico en save-follow-up:', error);
     sendLog(`[ERROR] Falló save-follow-up: ${error.message}`, 'ERROR');
     return { success: false, error: error.message };
   }

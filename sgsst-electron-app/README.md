@@ -1,7 +1,7 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.47  
-**Última actualización:** 24 de febrero de 2026  
+**Versión:** 0.1.49
+**Última actualización:** 26 de febrero de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
 ---
@@ -17,6 +17,7 @@
 - ✅ **7 Módulos Principales**: Recursos, Gestión Integral, Salud, Peligros, Amenazas, Verificación, Mejoramiento
 - ✅ **27 Submódulos**: Cada uno con su propia lógica y vistas especializadas
 - ✅ **IA Integrada**: Análisis de accidentes con LLM (Mistral 3 3B)
+- ✅ **Seguimiento PRIC**: Gestión completa de casos de incapacidad y rehabilitación
 - ✅ **Solo 13 archivos en raíz**: Proyecto limpio y organizado
 
 ---
@@ -290,6 +291,206 @@ npm run docs:watch     # Vigilar cambios y regenerar
 
 ---
 
+## 🏥 Módulo de Ausentismo y Seguimiento PRIC (3.3.6)
+
+### Descripción General
+
+El módulo de **Medición del Ausentismo** permite gestionar, registrar y hacer seguimiento a las incapacidades de los empleados, con detección automática de casos que requieren atención especial según criterios de la normativa SG-SST.
+
+### Funcionalidades Principales
+
+#### 1. Registro de Incapacidades
+- ✅ Búsqueda automática de empleados por cédula
+- ✅ Autocompletado de información laboral (cargo, área, empresa usuaria)
+- ✅ Búsqueda de códigos CIE-10 con descripción
+- ✅ Validación de pertenencia a la empresa
+- ✅ Soporte para múltiples tipos de incapacidad:
+  - Enfermedad General (EPS)
+  - Accidente de Trabajo (ARL)
+  - Enfermedad Laboral
+  - Licencias (Maternidad, Paternidad, Luto)
+  - Calamidad Doméstica
+
+#### 2. Detección Automática de Casos en Seguimiento
+
+El sistema identifica automáticamente empleados que cumplen **una de dos condiciones**:
+
+| Condición | Criterio | Ejemplo |
+|-----------|----------|---------|
+| **Condición 1** | Incapacidad individual ≥ 10 días | Incapacidad de 15 días por cirugía |
+| **Condición 2** | Suma de incapacidades ≥ 10 días con gaps ≤ 3 días | 3 incapacidades de 4, 3 y 5 días con 2 días entre ellas |
+
+**Algoritmo de Detección:**
+```javascript
+// Pseudocódigo del algoritmo
+1. Agrupar incapacidades por empleado (céedula)
+2. Para cada empleado:
+   a. Verificar si alguna incapacidad >= 10 días → Condición 1 CUMPLE
+   b. Si no, sumar todas las incapacidades
+   c. Verificar gaps entre incapacidades consecutivas
+   d. Si suma >= 10 Y gaps <= 3 → Condición 2 CUMPLE
+3. Mostrar en tabla de seguimiento solo empleados que cumplen condiciones
+```
+
+#### 3. Tabla de Seguimiento de Incapacidades
+
+**Columnas:**
+- Empleado (nombre + cédula)
+- Tipo (EPS/ARL)
+- Periodo (fechas inicio-fin)
+- Avance (barra de progreso con días transcurridos)
+- Estado (En curso / Próximo a vencer / Finalizado)
+- Acciones (Ver detalles, Agregar nota, Adjuntar archivo)
+
+**KPIs en Tiempo Real:**
+- 📊 Casos Activos
+- ⏳ Próximos a Vencer (< 2 días)
+- 📄 Docs Pendientes
+- ✅ Cerrados (Mes)
+
+**Filtros Disponibles:**
+- Buscar por nombre o cédula
+- Estado (En curso, Próximo a vencer, Finalizado)
+- Tipo (EPS, ARL)
+- Año de inicio de incapacidad
+- Mes de inicio de incapacidad
+
+#### 4. Modal de Detalles del Caso
+
+Al hacer clic en "Ver Detalles", se muestra:
+
+**Para Condición 1 (Incapacidad ≥ 10 días):**
+- Encabezado con datos del empleado
+- Lista de incapacidades ≥ 10 días ordenadas de más reciente a más antigua
+- Cada incapacidad muestra:
+  - Fechas de inicio y fin
+  - Días de duración
+  - Tipo (EPS/ARL/EMPRESA)
+  - Estado (En curso/Próximo a vencer/Finalizado)
+  - Código CIE-10
+  - Descripción del diagnóstico
+
+**Para Condición 2 (Suma ≥ 10 días con gaps ≤ 3):**
+- Encabezado con datos del empleado
+- Secuencia completa de incapacidades
+- Cálculo y visualización de gaps entre incapacidades
+- Total acumulado de días
+- Código CIE-10 y diagnóstico de cada incapacidad
+
+#### 5. Formulario Maestro de Seguimiento PRIC 🆕
+
+**Interfaz:** Panel slideover que emerge desde la derecha (95% ancho, máx 1100px)
+
+**Secciones del Formulario:**
+
+| Sección | Campos Principales |
+|---------|-------------------|
+| **1. Datos Generales** | Nombre, cédula, fecha nacimiento, género, cargo, área, fecha ingreso, antigüedad, tipo contrato, salario, EPS, AFP, ARL, caja compensación |
+| **2. Incapacidad Temporal** | Fechas inicio/fin, días acumulados, clase, código CIE-10, descripción diagnóstico, contingencia, prórrogas |
+| **3. Etapas PRIC** | 5 etapas: Captura, Plan de Tratamiento, Ejecución, Reincorporación, Cierre |
+| **4. Seguimiento Recomendaciones** | Tabla dinámica para listar recomendaciones de ARL/EPS con estado de cumplimiento |
+| **5. Calificación PCL** | Estado del proceso, fechas solicitud/dictamen, % PCL, origen, fecha estructuración |
+
+**Características de la Interfaz:**
+- ✅ Navegación horizontal por pestañas con animaciones fade-in
+- ✅ Carga automática de datos del empleado desde la tabla de seguimiento
+- ✅ Campos de solo lectura para datos que vienen del empleado
+- ✅ ARL prellenado con "COLMENA SEGUROS"
+- ✅ Tabla de recomendaciones con botones para agregar/eliminar filas
+- ✅ Botón "Guardar en Excel" que recopila todos los datos
+- ✅ Cierre al hacer clic en backdrop o botón cerrar
+
+**Flujo de Trabajo:**
+```
+1. Usuario hace clic en "Abrir Seguimiento" en modal de detalles
+   ↓
+2. Panel slideover se abre con datos del empleado precargados
+   ↓
+3. Usuario navega entre 5 pestañas y completa información
+   ↓
+4. Usuario puede agregar recomendaciones dinámicamente
+   ↓
+5. Usuario hace clic en "Guardar en Excel"
+   ↓
+6. Sistema recopila datos y muestra notificación de éxito
+   ↓
+7. Panel se cierra automáticamente
+```
+
+**Métodos del Componente:**
+```javascript
+// Principales métodos implementados
+- createSeguimientoPanel()       // Crea HTML y CSS del panel
+- closeSeguimientoPanel()        // Cierra el panel
+- showSeguimientoPanelSection()  // Navegación entre pestañas
+- cargarDatosEnPanelSeguimiento() // Carga datos del empleado
+- addRecomRow()                  // Agrega fila a tabla de recomendaciones
+- removeRecomRow()               // Elimina fila de recomendaciones
+- saveSeguimientoData()          // Recopila y guarda datos
+```
+
+### Archivos Principales del Módulo
+
+| Archivo | Líneas | Propósito |
+|---------|--------|-----------|
+| `modules/gestion-salud/ausentismo/medicion-ausentismo.js` | ~4465 | Componente principal con seguimiento PRIC |
+| `modules/gestion-salud/ausentismo/registrar-ausentismo.js` | ~1200 | Formulario de registro de incapacidades |
+| `modules/gestion-salud/ausentismo/medicion-ausentismo-home.html` | ~300 | Portal de bienvenida del módulo |
+
+### Estructura de Datos
+
+**Objeto Empleado:**
+```javascript
+{
+  cedula: "12345678",
+  nombre: "Juan Pérez",
+  cargo: "Operario de Producción",
+  departamento: "Planta",
+  empresaUsuaria: "Empresa SAS",
+  genero: "Masculino",
+  incapacidades: [
+    {
+      fechaInicio: Date,
+      fechaFin: Date,
+      diasIncapacidad: 15,
+      record: { /* datos crudos del Excel */ }
+    }
+  ]
+}
+```
+
+**Datos de Seguimiento PRIC:**
+```javascript
+{
+  trabajador: { /* datos generales */ },
+  incapacidad: { /* detalles de incapacidad */ },
+  pric: { /* 5 etapas PRIC */ },
+  calificacion: { /* datos de calificación PCL */ },
+  recomendaciones: [
+    {
+      recomendacion: "Reposo absoluto 15 días",
+      entidad: "ARL",
+      fechaLimite: "2026-03-15",
+      cumple: "SI",
+      observacion: "Cumplido según certificado"
+    }
+  ]
+}
+```
+
+### Criterios Normativos
+
+El módulo se basa en los lineamientos de la **Resolución 0312 de 2019** para el seguimiento de incapacidades:
+
+- **Seguimiento especial**: Incapacidades ≥ 10 días (origen común o laboral)
+- **Secuencia de incapacidades**: Múltiples incapacidades con gaps ≤ 3 días que suman ≥ 10 días
+- **Proceso PRIC**: Proceso de Rehabilitación y Reincorporación Laboral con 5 etapas estructuradas
+
+**Documentación Completa:**
+- 📖 [docs/modulo-ausentismo-pric.md](docs/modulo-ausentismo-pric.md) (pendiente)
+
+---
+
 ## 🔌 Sistema de Comunicación IPC
 
 ### Contratos Principales (60+ handlers)
@@ -325,13 +526,17 @@ npm run docs:watch     # Vigilar cambios y regenerar
 | `convertExcelToPdf(filePath)` | Convertir Excel a PDF |
 | `getPresupuestoFiles(companyName)` | Obtener archivos de presupuesto |
 
-#### Ausentismo
+#### Ausentismo y Seguimiento PRIC
 | Método | Descripción |
 |--------|-------------|
-| `getAusentismoData(companyName)` | Leer datos de ausentismo |
-| `buscarEmpleadoPorCedula(cedula, empresa)` | Buscar empleado |
-| `buscarCie10Descripcion(code)` | Buscar descripción CIE-10 |
-| `procesarAusentismo(formData)` | Procesar formulario |
+| `readAusentismoData(companyName)` | Leer datos de ausentismo desde Excel (PI-FO-076 / PG-FO-076 / GI-FO-076) |
+| `getPriSeguimientoData(companyName)` | Leer datos de seguimiento de casos desde PRI.xlsx (hoja "Casos en seguimiento") |
+| `buscarEmpleadoPorCedula(cedula, empresa)` | Buscar empleado por cédula |
+| `buscarCie10Descripcion(empresa, code)` | Buscar descripción CIE-10 |
+| `procesarAusentismo(companyName, formData)` | Registrar nueva incapacidad |
+| `saveFollowUp(followUpData, companyName)` | Guardar seguimiento de caso individual en PRI.xlsx |
+
+**📖 Ver documentación completa:** [docs/ARQUITECTURA_AUSENTISMO_DUAL.md](docs/ARQUITECTURA_AUSENTISMO_DUAL.md)
 
 #### Investigación de Accidentes
 | Método | Descripción |
@@ -383,6 +588,7 @@ npm run docs:watch     # Vigilar cambios y regenerar
 |---------|-------------|
 | [docs/PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md) | Visión general y decisiones arquitectónicas |
 | [docs/arquitectura.md](docs/arquitectura.md) | Detalles de arquitectura del sistema |
+| [docs/ARQUITECTURA_AUSENTISMO_DUAL.md](docs/ARQUITECTURA_AUSENTISMO_DUAL.md) | **🆕 Sistema dual de archivos (PI-FO-076 y PRI.xlsx)** |
 | [docs/motor-normativo.md](docs/motor-normativo.md) | Funcionamiento del motor normativo |
 | [docs/escenarios-normativos.md](docs/escenarios-normativos.md) | Escenarios normativos aplicables |
 | [docs/flujo-creacion-empresa.md](docs/flujo-creacion-empresa.md) | Proceso de creación de empresa |
@@ -576,11 +782,13 @@ Este software es propietario y confidencial. No se permite la reproducción, dis
 - [ ] Completar módulos 4-7 (Peligros, Amenazas, Verificación, Mejoramiento)
 - [ ] Mejorar documentación de contratos IPC
 - [ ] Optimizar carga de módulos dinámicos
+- [x] Implementar seguimiento PRIC con interfaz slideover 🆕
 
 ### Mediano Plazo
 - [ ] Implementar sistema de módulos ES6
 - [ ] Migrar a webpack para bundling
 - [ ] Agregar tests unitarios
+- [ ] Implementar guardado real de seguimiento PRIC en Excel
 
 ### Largo Plazo
 - [ ] Versión web (sin Electron)
@@ -589,5 +797,5 @@ Este software es propietario y confidencial. No se permite la reproducción, dis
 
 ---
 
-**Última actualización:** 24 de febrero de 2026  
-**Versión del documento:** 2.0 (Post-reorganización completa)
+**Última actualización:** 25 de febrero de 2026
+**Versión del documento:** 2.1 (Seguimiento PRIC implementado)

@@ -558,7 +558,47 @@ class MedicionAusentismoComponent {
                     
                     const fechaFin = record['F. FIN'] || record['f._fin'] || record['F. FIN'] || null;
                     const fechaInicio = record['F. INICIO'] || record['f._inicio'] || record['F. INICIO'] || null;
-                    
+
+                    // === FUNCIÓN AUXILIAR para parsear fechas correctamente ===
+                    // Maneja años de 2 dígitos (ej: "4/1/25" → 2025, no 1925)
+                    function parsearFecha(fechaStr) {
+                        if (!fechaStr) return null;
+                        
+                        // Si ya es un objeto Date, retornarlo
+                        if (fechaStr instanceof Date) return fechaStr;
+                        
+                        const str = fechaStr.toString().trim();
+                        
+                        // Intentar parsear directamente primero
+                        let date = new Date(str);
+                        
+                        // Si la fecha es inválida o el año es anterior a 2000, intentar formato DD/MM/YY o DD/MM/YYYY
+                        if (isNaN(date.getTime()) || date.getFullYear() < 2000) {
+                            // Intentar extraer componentes manualmente
+                            const match = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+                            if (match) {
+                                const dia = parseInt(match[1], 10);
+                                const mes = parseInt(match[2], 10) - 1; // Meses en JS son 0-11
+                                let anio = parseInt(match[3], 10);
+                                
+                                // Si el año tiene 2 dígitos, asumir 2000s
+                                if (anio < 100) {
+                                    anio = anio < 50 ? 2000 + anio : 1900 + anio;
+                                }
+                                
+                                date = new Date(anio, mes, dia);
+                            }
+                        }
+                        
+                        // Validar que la fecha sea correcta
+                        if (isNaN(date.getTime())) {
+                            console.warn(`[PARSEAR FECHA] No se pudo parsear: "${fechaStr}"`);
+                            return null;
+                        }
+                        
+                        return date;
+                    }
+
                     if (!empleadosMap.has(cedula)) {
                         empleadosMap.set(cedula, {
                             cedula: cedula,
@@ -570,10 +610,10 @@ class MedicionAusentismoComponent {
                             incapacidades: []
                         });
                     }
-                    
+
                     empleadosMap.get(cedula).incapacidades.push({
-                        fechaInicio: fechaInicio ? new Date(fechaInicio) : null,
-                        fechaFin: fechaFin ? new Date(fechaFin) : null,
+                        fechaInicio: parsearFecha(fechaInicio),
+                        fechaFin: parsearFecha(fechaFin),
                         diasIncapacidad: diasIncapacidad,
                         record
                     });
@@ -998,19 +1038,25 @@ class MedicionAusentismoComponent {
                            incapacidadReciente?.record?.['clase_de_incapacidad'] || '';
             const matchesTipo = !tipo || rowTipo.toUpperCase() === tipo.toUpperCase();
 
-            // Filtro por año (verificar si alguna incapacidad es del año seleccionado)
+            // Filtro por año (verificar si ALGUNA incapacidad >= 10 días es del año seleccionado)
             let matchesYear = true;
             if (year) {
+                const yearSeleccionado = parseInt(year);
                 matchesYear = empleado.incapacidades.some(inc => {
-                    return inc.fechaInicio && inc.fechaInicio.getFullYear() === parseInt(year);
+                    return inc.fechaInicio && 
+                           inc.fechaInicio.getFullYear() === yearSeleccionado &&
+                           inc.diasIncapacidad >= 10;  // ← CORRECCIÓN: Solo incapacidades >= 10 días
                 });
             }
 
-            // Filtro por mes (verificar si alguna incapacidad inicia en el mes seleccionado)
+            // Filtro por mes (verificar si ALGUNA incapacidad >= 10 días inicia en el mes seleccionado)
             let matchesMonth = true;
             if (month !== '') {
+                const monthSeleccionado = parseInt(month);
                 matchesMonth = empleado.incapacidades.some(inc => {
-                    return inc.fechaInicio && inc.fechaInicio.getMonth() === parseInt(month);
+                    return inc.fechaInicio && 
+                           inc.fechaInicio.getMonth() === monthSeleccionado &&
+                           inc.diasIncapacidad >= 10;  // ← CORRECCIÓN: Solo incapacidades >= 10 días
                 });
             }
 
@@ -1344,7 +1390,7 @@ class MedicionAusentismoComponent {
             </div>
 
             <!-- Nota de seguimiento -->
-            ${this.renderNotaSeguimientoSection(cedula)}
+            ${this.renderNotaSeguimientoSection(cedula, nombre, { nombre, cedula, incapacidades: incapacidadesLargas })}
         `;
     }
 
@@ -1453,14 +1499,19 @@ class MedicionAusentismoComponent {
             </div>
 
             <!-- Nota de seguimiento -->
-            ${this.renderNotaSeguimientoSection(cedula)}
+            ${this.renderNotaSeguimientoSection(cedula, nombre, { nombre, cedula, incapacidades })}
         `;
     }
 
-    renderNotaSeguimientoSection(cedula, nombreEmpleado) {
-        // Nota: En una implementación real, las notas se guardarían en backend/archivo
-        // Aquí simulamos la funcionalidad
+    renderNotaSeguimientoSection(cedula, nombreEmpleado, empleadoData = null) {
+        // Preparar datos para pasar al botón
         const nombreParam = nombreEmpleado ? nombreEmpleado.replace(/'/g, "\\'") : '';
+        const cedulaParam = cedula.replace(/'/g, "\\'");
+        
+        // Serializar datos del empleado si están disponibles
+        const empleadoDataStr = empleadoData 
+            ? JSON.stringify(empleadoData).replace(/"/g, '&quot;')
+            : 'null';
         
         return `
             <div style="border-top: 2px solid #e2e8f0; padding-top: 20px;">
@@ -1469,7 +1520,7 @@ class MedicionAusentismoComponent {
                     SEGUIMIENTO DEL CASO
                 </h4>
                 <div style="display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap;">
-                    <button onclick="window.medicAusentismoComponent.abrirSeguimiento('${cedula.replace(/'/g, "\\'")}', '${nombreParam}')" 
+                    <button onclick="window.medicAusentismoComponent.abrirSeguimiento('${cedulaParam}', '${nombreParam}', ${empleadoDataStr})"
                         style="padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; background: linear-gradient(135deg, #174ea6, #2d5dc7); color: white; display: flex; align-items: center; gap: 8px; transition: all 0.2s;"
                         onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 6px -1px rgba(23, 78, 166, 0.3)'"
                         onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
@@ -1503,19 +1554,892 @@ class MedicionAusentismoComponent {
         }, 1000);
     }
 
-    abrirSeguimiento(cedula, nombreEmpleado) {
+    abrirSeguimiento(cedula, nombreEmpleado, empleadoData = null) {
         // Cerrar el modal de detalles primero
         document.getElementById('detailModal').style.display = 'none';
-        
-        // Cambiar a la vista de seguimiento
-        this.currentView = 'seguimiento-incapacidades';
-        this.render();
-        
+
+        // Crear el panel slideover si no existe
+        if (!document.getElementById('seguimientoPanelBackdrop')) {
+            this.createSeguimientoPanel();
+        }
+
+        // Cargar datos del empleado en el formulario
+        if (empleadoData) {
+            this.cargarDatosEnPanelSeguimiento(empleadoData);
+        }
+
+        // Abrir el panel
+        document.getElementById('seguimientoPanelBackdrop').classList.add('active');
+
         // Mostrar notificación
-        this.showNotification(`Abriendo seguimiento para: ${nombreEmpleado}`, 'info');
-        
-        // TODO: En el futuro, aquí se abrirá la interfaz de seguimiento detallado
+        this.showNotification(`Gestión de caso: ${nombreEmpleado}`, 'info');
+
         console.log(`[ABRIR SEGUIMIENTO] Cédula: ${cedula}, Nombre: ${nombreEmpleado}`);
+    }
+
+    /**
+     * Crea el panel slideover de Seguimiento PRIC
+     */
+    createSeguimientoPanel() {
+        // Agregar estilos CSS del panel
+        const styleId = 'seguimiento-panel-styles';
+        if (!document.getElementById(styleId)) {
+            const style = document.createElement('style');
+            style.id = styleId;
+            style.textContent = `
+                :root {
+                    --sp-primary: #4F46E5;
+                    --sp-primary-light: #EEF2FF;
+                    --sp-secondary: #F1F5F9;
+                    --sp-accent: #10B981;
+                    --sp-danger: #EF4444;
+                    --sp-text-main: #1E293B;
+                    --sp-text-muted: #64748B;
+                    --sp-border: #E2E8F0;
+                    --sp-bg-panel: #FFFFFF;
+                }
+
+                /* Panel Slideover */
+                .seguimiento-backdrop {
+                    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                    background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 2000;
+                    opacity: 0; visibility: hidden; transition: all 0.3s ease;
+                }
+                .seguimiento-backdrop.active { opacity: 1; visibility: visible; }
+
+                .seguimiento-panel {
+                    position: fixed; top: 0; right: 0; width: 95%; max-width: 1100px; height: 100%;
+                    background: var(--sp-bg-panel); box-shadow: -5px 0 30px rgba(0,0,0,0.1);
+                    transform: translateX(100%); transition: transform 0.3s ease; z-index: 2001;
+                    display: flex; flex-direction: column;
+                }
+                .seguimiento-backdrop.active .seguimiento-panel { transform: translateX(0); }
+
+                /* Header */
+                .sp-panel-header {
+                    padding: 15px 30px; border-bottom: 1px solid var(--sp-border);
+                    display: flex; justify-content: space-between; align-items: center; background: #FAFAFA; flex-shrink: 0;
+                }
+                .sp-header-info h2 { font-size: 18px; font-weight: 600; color: var(--sp-text-main); }
+                .sp-header-info p { font-size: 12px; color: var(--sp-text-muted); margin-top: 2px; }
+                .sp-close-btn {
+                    width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--sp-border);
+                    background: white; cursor: pointer; display: flex; align-items: center; justify-content: center;
+                }
+                .sp-close-btn:hover { background: var(--sp-danger); color: white; border-color: var(--sp-danger); }
+
+                /* Navegación Horizontal */
+                .sp-horizontal-nav {
+                    display: flex; background: white; border-bottom: 1px solid var(--sp-border); padding: 0 20px;
+                    overflow-x: auto; flex-shrink: 0;
+                }
+                .sp-nav-item {
+                    padding: 15px 20px; color: var(--sp-text-muted); font-size: 13px; font-weight: 500;
+                    border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap;
+                    display: flex; align-items: center; gap: 8px; transition: all 0.2s;
+                }
+                .sp-nav-item:hover { color: var(--sp-text-main); background: var(--sp-secondary); }
+                .sp-nav-item.active {
+                    color: var(--sp-primary); border-bottom-color: var(--sp-primary); font-weight: 600;
+                }
+                .sp-nav-item i { font-size: 14px; }
+
+                /* Área de Contenido */
+                .sp-content-area {
+                    flex: 1; padding: 25px 30px; overflow-y: auto; background: #FDFEFE;
+                }
+                .sp-form-section { display: none; animation: spFadeIn 0.3s ease; }
+                .sp-form-section.active { display: block; }
+                @keyframes spFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+                .sp-section-title {
+                    font-size: 16px; font-weight: 600; color: var(--sp-text-main); margin-bottom: 20px;
+                    border-bottom: 1px solid var(--sp-border); padding-bottom: 10px;
+                    display: flex; align-items: center; gap: 10px;
+                }
+                .sp-section-title i { color: var(--sp-primary); }
+
+                /* Grid Forms */
+                .sp-form-grid {
+                    display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+                    gap: 18px 25px; margin-bottom: 25px;
+                }
+                .sp-form-group { display: flex; flex-direction: column; gap: 6px; }
+                .sp-form-group.full-width { grid-column: 1 / -1; }
+
+                .sp-form-label {
+                    font-size: 11.5px; font-weight: 600; color: var(--sp-text-muted); text-transform: uppercase; letter-spacing: 0.3px;
+                }
+
+                .sp-form-control {
+                    width: 100%; padding: 10px 12px; border: 1px solid var(--sp-border);
+                    border-radius: 6px; font-size: 13px; background: white; font-family: inherit;
+                    transition: all 0.2s;
+                }
+                .sp-form-control:focus {
+                    outline: none; border-color: var(--sp-primary);
+                    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
+                }
+                .sp-form-control:disabled {
+                    background: #F3F4F6; cursor: not-allowed; color: #9CA3AF;
+                }
+                .sp-form-control[readonly] {
+                    background: #F9FAFB; color: var(--sp-text-main);
+                }
+
+                /* Subsection */
+                .sp-subsection {
+                    background: white; border: 1px solid var(--sp-border); border-radius: 8px;
+                    padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+                }
+                .sp-subsection-title {
+                    font-size: 14px; font-weight: 600; color: var(--sp-text-main); margin-bottom: 15px;
+                    display: flex; align-items: center; gap: 8px;
+                }
+                .sp-subsection-title i { color: var(--sp-accent); font-size: 12px; }
+
+                /* Tabla de Recomendaciones */
+                .sp-data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+                .sp-data-table th {
+                    text-align: left; padding: 10px; background: var(--sp-secondary);
+                    border: 1px solid var(--sp-border); font-size: 11px; color: var(--sp-text-muted); font-weight: 600;
+                }
+                .sp-data-table td { padding: 8px; border: 1px solid var(--sp-border); }
+                .sp-data-table input, .sp-data-table select {
+                    border: none; background: transparent; width: 100%; font-size: 13px; font-family: inherit;
+                }
+                .sp-data-table input:focus, .sp-data-table select:focus {
+                    outline: 1px solid var(--sp-primary); background: var(--sp-primary-light);
+                }
+
+                /* Footer */
+                .sp-panel-footer {
+                    padding: 15px 30px; border-top: 1px solid var(--sp-border); background: white;
+                    display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
+                }
+                .sp-btn {
+                    padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 500;
+                    cursor: pointer; display: inline-flex; align-items: center; gap: 8px; border: none;
+                    transition: all 0.2s;
+                }
+                .sp-btn-primary { background: var(--sp-primary); color: white; }
+                .sp-btn-primary:hover { background: #4338CA; transform: translateY(-1px); box-shadow: 0 4px 6px rgba(79, 70, 229, 0.3); }
+                .sp-btn-outline { background: white; border: 1px solid var(--sp-border); color: var(--sp-text-main); }
+                .sp-btn-outline:hover { background: var(--sp-secondary); border-color: #CBD5E1; }
+                .sp-btn-success { background: var(--sp-accent); color: white; }
+                .sp-btn-success:hover { background: #059669; transform: translateY(-1px); box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3); }
+                .sp-btn-sm { padding: 4px 8px; font-size: 11px; }
+
+                /* Scrollbar personalizado */
+                .sp-content-area::-webkit-scrollbar { width: 8px; }
+                .sp-content-area::-webkit-scrollbar-track { background: #F1F5F9; border-radius: 4px; }
+                .sp-content-area::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+                .sp-content-area::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+                .sp-horizontal-nav::-webkit-scrollbar { height: 6px; }
+                .sp-horizontal-nav::-webkit-scrollbar-track { background: #F8FAFC; }
+                .sp-horizontal-nav::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 3px; }
+            `;
+            document.head.appendChild(style);
+        }
+
+        // Crear el HTML del panel
+        const backdrop = document.createElement('div');
+        backdrop.id = 'seguimientoPanelBackdrop';
+        backdrop.className = 'seguimiento-backdrop';
+        backdrop.innerHTML = `
+            <div class="seguimiento-panel">
+                <!-- Header -->
+                <div class="sp-panel-header">
+                    <div class="sp-header-info">
+                        <h2 id="spPanelTitle">Gestión de Caso en Seguimiento</h2>
+                        <p>Formato alineado a hoja "Casos en seguimiento"</p>
+                    </div>
+                    <button class="sp-close-btn" onclick="window.medicAusentismoComponent.closeSeguimientoPanel()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <!-- Navegación Horizontal -->
+                <nav class="sp-horizontal-nav">
+                    <div class="sp-nav-item active" onclick="window.medicAusentismoComponent.showSeguimientoPanelSection('datos', this)">
+                        <i class="fas fa-id-card"></i> Datos Generales
+                    </div>
+                    <div class="sp-nav-item" onclick="window.medicAusentismoComponent.showSeguimientoPanelSection('incapacidad', this)">
+                        <i class="fas fa-procedures"></i> Incapacidad Temporal
+                    </div>
+                    <div class="sp-nav-item" onclick="window.medicAusentismoComponent.showSeguimientoPanelSection('etapas', this)">
+                        <i class="fas fa-tasks"></i> Etapas PRIC
+                    </div>
+                    <div class="sp-nav-item" onclick="window.medicAusentismoComponent.showSeguimientoPanelSection('recomendaciones', this)">
+                        <i class="fas fa-clipboard-check"></i> Seg. Recomendaciones
+                    </div>
+                    <div class="sp-nav-item" onclick="window.medicAusentismoComponent.showSeguimientoPanelSection('calificacion', this)">
+                        <i class="fas fa-balance-scale"></i> Calificación PCL
+                    </div>
+                </nav>
+
+                <!-- Área de Contenido -->
+                <div class="sp-content-area">
+                    
+                    <!-- SECCIÓN 1: DATOS GENERALES -->
+                    <div id="sp-section-datos" class="sp-form-section active">
+                        <div class="sp-section-title"><i class="fas fa-user-tie"></i> 1. Información del Trabajador</div>
+                        
+                        <div class="sp-subsection">
+                            <div class="sp-subsection-title"><i class="fas fa-address-card"></i> Identificación</div>
+                            <div class="sp-form-grid">
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Nombre Completo</label>
+                                    <input type="text" id="sp-nombre" class="sp-form-control" placeholder="Nombres y Apellidos">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Cédula de Ciudadanía</label>
+                                    <input type="text" id="sp-cedula" class="sp-form-control" readonly>
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Fecha de Nacimiento</label>
+                                    <input type="date" id="sp-fecha-nacimiento" class="sp-form-control">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Género</label>
+                                    <select id="sp-genero" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="Masculino">Masculino</option>
+                                        <option value="Femenino">Femenino</option>
+                                        <option value="Otro">Otro</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="sp-subsection">
+                            <div class="sp-subsection-title"><i class="fas fa-briefcase"></i> Información Laboral</div>
+                            <div class="sp-form-grid">
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Cargo Actual</label>
+                                    <input type="text" id="sp-cargo" class="sp-form-control">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Área / Dependencia</label>
+                                    <input type="text" id="sp-area" class="sp-form-control">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Fecha de Ingreso</label>
+                                    <input type="date" id="sp-fecha-ingreso" class="sp-form-control">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Antigüedad (Años)</label>
+                                    <input type="number" id="sp-antiguedad" class="sp-form-control" placeholder="0">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Tipo de Contrato</label>
+                                    <select id="sp-tipo-contrato" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="Término Indefinido">Término Indefinido</option>
+                                        <option value="Término Fijo">Término Fijo</option>
+                                        <option value="Prestación de Servicios">Prestación de Servicios</option>
+                                    </select>
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Salario Básico</label>
+                                    <input type="number" id="sp-salario" class="sp-form-control" placeholder="0">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="sp-subsection">
+                            <div class="sp-subsection-title"><i class="fas fa-hospital-user"></i> Seguridad Social</div>
+                            <div class="sp-form-grid">
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">EPS</label>
+                                    <input type="text" id="sp-eps" class="sp-form-control">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">AFP (Pensión)</label>
+                                    <input type="text" id="sp-afp" class="sp-form-control">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">ARL</label>
+                                    <input type="text" id="sp-arl" class="sp-form-control" value="COLMENA SEGUROS" readonly>
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Caja de Compensación</label>
+                                    <input type="text" id="sp-caja-compensacion" class="sp-form-control">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SECCIÓN 2: INCAPACIDAD TEMPORAL -->
+                    <div id="sp-section-incapacidad" class="sp-form-section">
+                        <div class="sp-section-title"><i class="fas fa-calendar-times"></i> 2. Detalle de la Incapacidad Temporal</div>
+                        
+                        <div class="sp-form-grid">
+                            <div class="sp-form-group">
+                                <label class="sp-form-label">Fecha de Inicio</label>
+                                <input type="date" id="sp-fecha-inicio" class="sp-form-control">
+                            </div>
+                            <div class="sp-form-group">
+                                <label class="sp-form-label">Fecha de Fin</label>
+                                <input type="date" id="sp-fecha-fin" class="sp-form-control">
+                            </div>
+                            <div class="sp-form-group">
+                                <label class="sp-form-label">Total Días Acumulados</label>
+                                <input type="number" id="sp-dias-acumulados" class="sp-form-control" placeholder="Ej: 21">
+                            </div>
+                            <div class="sp-form-group">
+                                <label class="sp-form-label">Clase de Incapacidad</label>
+                                <select id="sp-clase-incapacidad" class="sp-form-control">
+                                    <option value="">Seleccione...</option>
+                                    <option value="Enfermedad Común">Enfermedad Común</option>
+                                    <option value="Accidente de Trabajo (AT)">Accidente de Trabajo (AT)</option>
+                                    <option value="Enfermedad Laboral (EL)">Enfermedad Laboral (EL)</option>
+                                    <option value="Licencia de Maternidad">Licencia de Maternidad</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="sp-subsection">
+                            <div class="sp-subsection-title"><i class="fas fa-diagnoses"></i> Diagnóstico</div>
+                            <div class="sp-form-grid">
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Código CIE-10</label>
+                                    <input type="text" id="sp-codigo-cie10" class="sp-form-control" placeholder="Ej: K910">
+                                </div>
+                                <div class="sp-form-group full-width">
+                                    <label class="sp-form-label">Descripción del Diagnóstico</label>
+                                    <input type="text" id="sp-descripcion-diagnostico" class="sp-form-control" placeholder="Ej: Vómitos postoperatorios">
+                                </div>
+                                <div class="sp-form-group full-width">
+                                    <label class="sp-form-label">Descripción de la Contingencia / Hecho Generador</label>
+                                    <textarea id="sp-contingencia" class="sp-form-control" rows="3" placeholder="Detallar cómo ocurrió el evento o causas de la enfermedad..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="sp-subsection">
+                            <div class="sp-subsection-title"><i class="fas fa-sync-alt"></i> Prórrogas</div>
+                            <div class="sp-form-grid">
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Número de Prórrogas</label>
+                                    <input type="number" id="sp-numero-prorrogas" class="sp-form-control" placeholder="0">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Fecha Última Prórroga</label>
+                                    <input type="date" id="sp-fecha-ultima-prorroga" class="sp-form-control">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SECCIÓN 3: ETAPAS PRIC -->
+                    <div id="sp-section-etapas" class="sp-form-section">
+                        <div class="sp-section-title"><i class="fas fa-tasks"></i> 3. Proceso de Rehabilitación y Reincorporación (PRIC)</div>
+                        
+                        <!-- Etapa 1 -->
+                        <div class="sp-subsection">
+                            <div class="sp-subsection-title">Etapa 1: Captura de Caso</div>
+                            <div class="sp-form-grid">
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Fecha de Detección</label>
+                                    <input type="date" id="sp-fecha-deteccion" class="sp-form-control">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Mecanismo de Detección</label>
+                                    <select id="sp-mecanismo-deteccion" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="Reporte ARL">Reporte ARL</option>
+                                        <option value="Reporte EPS">Reporte EPS</option>
+                                        <option value="Inasistencia">Inasistencia</option>
+                                    </select>
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Fecha Reporte a ARL</label>
+                                    <input type="date" id="sp-fecha-reporte-arl" class="sp-form-control">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Responsable Reporte</label>
+                                    <input type="text" id="sp-responsable-reporte" class="sp-form-control">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Etapa 2 -->
+                        <div class="sp-subsection">
+                            <div class="sp-subsection-title">Etapa 2: Plan de Tratamiento</div>
+                            <div class="sp-form-grid">
+                                <div class="sp-form-group full-width">
+                                    <label class="sp-form-label">Objetivos del Plan de Tratamiento</label>
+                                    <textarea id="sp-objetivos-tratamiento" class="sp-form-control" rows="2"></textarea>
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Fecha Inicio Plan</label>
+                                    <input type="date" id="sp-fecha-inicio-plan" class="sp-form-control">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Fecha Probable de Alta</label>
+                                    <input type="date" id="sp-fecha-probable-alta" class="sp-form-control">
+                                </div>
+                                <div class="sp-form-group full-width">
+                                    <label class="sp-form-label">Tratamientos Ordenados</label>
+                                    <input type="text" id="sp-tratamientos" class="sp-form-control" placeholder="Medicamentos, Terapias, Cirugías...">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Etapa 3 -->
+                        <div class="sp-subsection">
+                            <div class="sp-subsection-title">Etapa 3: Ejecución y Seguimiento</div>
+                            <div class="sp-form-grid">
+                                <div class="sp-form-group full-width">
+                                    <label class="sp-form-label">Evolución Clínica</label>
+                                    <textarea id="sp-evolucion-clinica" class="sp-form-control" rows="2" placeholder="Detalle de la evolución médica..."></textarea>
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Adherencia al Tratamiento</label>
+                                    <select id="sp-adherencia" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="Si">Sí</option>
+                                        <option value="No">No</option>
+                                        <option value="Parcial">Parcial</option>
+                                    </select>
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Fecha Último Seguimiento</label>
+                                    <input type="date" id="sp-fecha-ultimo-seguimiento" class="sp-form-control">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Etapa 4 -->
+                        <div class="sp-subsection">
+                            <div class="sp-subsection-title">Etapa 4: Reincorporación Laboral</div>
+                            <div class="sp-form-grid">
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Fecha de Reincorporación</label>
+                                    <input type="date" id="sp-fecha-reincorporacion" class="sp-form-control">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Tipo de Reintegro</label>
+                                    <select id="sp-tipo-reintegro" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="Mismo Cargo">Mismo Cargo</option>
+                                        <option value="Funciones Restrictivas">Funciones Restrictivas</option>
+                                        <option value="Otro Oficio">Otro Oficio</option>
+                                    </select>
+                                </div>
+                                <div class="sp-form-group full-width">
+                                    <label class="sp-form-label">Adaptaciones en el Puesto de Trabajo</label>
+                                    <input type="text" id="sp-adaptaciones" class="sp-form-control" placeholder="Ej: Silla ergonómica, Rotación de turnos...">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Etapa 5 -->
+                        <div class="sp-subsection">
+                            <div class="sp-subsection-title">Etapa 5: Cierre de Caso</div>
+                            <div class="sp-form-grid">
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Fecha de Cierre</label>
+                                    <input type="date" id="sp-fecha-cierre" class="sp-form-control">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Motivo de Cierre</label>
+                                    <select id="sp-motivo-cierre" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="Alta Médica">Alta Médica</option>
+                                        <option value="Calificación PCL">Calificación PCL</option>
+                                        <option value="Retiro Voluntario">Retiro Voluntario</option>
+                                    </select>
+                                </div>
+                                <div class="sp-form-group full-width">
+                                    <label class="sp-form-label">Observaciones Finales</label>
+                                    <textarea id="sp-observaciones-finales" class="sp-form-control" rows="2"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SECCIÓN 4: SEGUIMIENTO RECOMENDACIONES -->
+                    <div id="sp-section-recomendaciones" class="sp-form-section">
+                        <div class="sp-section-title"><i class="fas fa-clipboard-check"></i> 4. Seguimiento a Recomendaciones Médico Laborales</div>
+                        <p style="font-size: 13px; color: var(--sp-text-muted); margin-bottom: 15px;">Listado de recomendaciones emitidas por la ARL/EPS y su cumplimiento por parte de la empresa y el trabajador.</p>
+                        
+                        <table class="sp-data-table">
+                            <thead>
+                                <tr>
+                                    <th width="30%">Recomendación Emitida</th>
+                                    <th width="15%">Entidad que Emite</th>
+                                    <th width="12%">Fecha Límite</th>
+                                    <th width="12%">Cumple?</th>
+                                    <th width="23%">Observación / Evidencia</th>
+                                    <th width="8%">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sp-recomTableBody">
+                                <tr>
+                                    <td><input type="text" class="sp-form-control" placeholder="Ej: Reposo absoluto"></td>
+                                    <td>
+                                        <select class="sp-form-control">
+                                            <option>ARL</option>
+                                            <option>EPS</option>
+                                            <option>JRC</option>
+                                        </select>
+                                    </td>
+                                    <td><input type="date" class="sp-form-control"></td>
+                                    <td>
+                                        <select class="sp-form-control">
+                                            <option>SI</option>
+                                            <option>NO</option>
+                                            <option>EN PROCESO</option>
+                                        </select>
+                                    </td>
+                                    <td><input type="text" class="sp-form-control" placeholder="Detalle"></td>
+                                    <td style="text-align:center;">
+                                        <button class="sp-btn sp-btn-outline sp-btn-sm" onclick="window.medicAusentismoComponent.removeRecomRow(this)">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><input type="text" class="sp-form-control" placeholder="Ej: Prohibido levantar >5kg"></td>
+                                    <td>
+                                        <select class="sp-form-control">
+                                            <option>ARL</option>
+                                            <option>EPS</option>
+                                        </select>
+                                    </td>
+                                    <td><input type="date" class="sp-form-control"></td>
+                                    <td>
+                                        <select class="sp-form-control">
+                                            <option>SI</option>
+                                            <option>NO</option>
+                                        </select>
+                                    </td>
+                                    <td><input type="text" class="sp-form-control" placeholder="Detalle"></td>
+                                    <td style="text-align:center;">
+                                        <button class="sp-btn sp-btn-outline sp-btn-sm" onclick="window.medicAusentismoComponent.removeRecomRow(this)">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <button class="sp-btn sp-btn-outline sp-btn-sm" style="margin-top: 10px;" onclick="window.medicAusentismoComponent.addRecomRow()">
+                            <i class="fas fa-plus"></i> Agregar Fila
+                        </button>
+                    </div>
+
+                    <!-- SECCIÓN 5: CALIFICACIÓN PCL -->
+                    <div id="sp-section-calificacion" class="sp-form-section">
+                        <div class="sp-section-title"><i class="fas fa-balance-scale"></i> 5. Proceso de Calificación / PCL</div>
+                        
+                        <div class="sp-form-grid">
+                            <div class="sp-form-group">
+                                <label class="sp-form-label">Estado del Proceso</label>
+                                <select id="sp-estado-proceso" class="sp-form-control">
+                                    <option value="">Seleccione...</option>
+                                    <option value="No Requiere">No Requiere</option>
+                                    <option value="Solicitud Radicada">Solicitud Radicada</option>
+                                    <option value="En Estudio">En Estudio</option>
+                                    <option value="Calificado">Calificado</option>
+                                </select>
+                            </div>
+                            <div class="sp-form-group">
+                                <label class="sp-form-label">Fecha de Solicitud</label>
+                                <input type="date" id="sp-fecha-solicitud" class="sp-form-control">
+                            </div>
+                            <div class="sp-form-group">
+                                <label class="sp-form-label">Fecha Dictamen</label>
+                                <input type="date" id="sp-fecha-dictamen" class="sp-form-control">
+                            </div>
+                            <div class="sp-form-group">
+                                <label class="sp-form-label">% PCL (Pérdida Capacidad)</label>
+                                <input type="number" id="sp-porcentaje-pcl" class="sp-form-control" placeholder="0.00%" step="0.01">
+                            </div>
+                            <div class="sp-form-group">
+                                <label class="sp-form-label">Origen Calificado</label>
+                                <select id="sp-origen-calificacion" class="sp-form-control">
+                                    <option value="">Seleccione...</option>
+                                    <option value="Común">Común</option>
+                                    <option value="Laboral">Laboral</option>
+                                    <option value="Accidente Trabajo">Accidente de Trabajo</option>
+                                </select>
+                            </div>
+                            <div class="sp-form-group">
+                                <label class="sp-form-label">Fecha de Estructuración</label>
+                                <input type="date" id="sp-fecha-estructuracion" class="sp-form-control">
+                            </div>
+                            <div class="sp-form-group full-width">
+                                <label class="sp-form-label">Observaciones de la Calificación</label>
+                                <textarea id="sp-observaciones-calificacion" class="sp-form-control" rows="3"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Footer -->
+                <div class="sp-panel-footer">
+                    <button class="sp-btn sp-btn-outline" onclick="window.medicAusentismoComponent.closeSeguimientoPanel()">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                    <button class="sp-btn sp-btn-success" onclick="window.medicAusentismoComponent.saveSeguimientoData()">
+                        <i class="fas fa-save"></i> Guardar en Excel
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(backdrop);
+
+        // Cerrar al hacer clic en el backdrop
+        backdrop.addEventListener('click', (e) => {
+            if (e.target === backdrop) {
+                this.closeSeguimientoPanel();
+            }
+        });
+    }
+
+    /**
+     * Cierra el panel de seguimiento
+     */
+    closeSeguimientoPanel() {
+        const backdrop = document.getElementById('seguimientoPanelBackdrop');
+        if (backdrop) {
+            backdrop.classList.remove('active');
+        }
+    }
+
+    /**
+     * Muestra una sección específica del panel
+     */
+    showSeguimientoPanelSection(sectionId, navElement) {
+        // Ocultar todas las secciones
+        document.querySelectorAll('.sp-form-section').forEach(el => el.classList.remove('active'));
+        // Mostrar la sección seleccionada
+        document.getElementById(`sp-section-${sectionId}`).classList.add('active');
+
+        // Actualizar navegación
+        document.querySelectorAll('.sp-nav-item').forEach(el => el.classList.remove('active'));
+        navElement.classList.add('active');
+    }
+
+    /**
+     * Carga los datos del empleado en el panel
+     */
+    cargarDatosEnPanelSeguimiento(empleadoData) {
+        // empleadoData tiene estructura: {nombre, cedula, incapacidades: [...], cargo, departamento, genero, etc.}
+        
+        console.log('[SEGUIMIENTO][PANEL] Cargando datos del empleado:', empleadoData.nombre);
+        console.log('[SEGUIMIENTO][PANEL] Total incapacidades recibidas:', empleadoData.incapacidades?.length || 0);
+        
+        // === FILTRAR incapacidades por el año seleccionado en el filtro ===
+        const yearFilter = document.getElementById('seguimientoYearFilter')?.value;
+        let incapacidadesParaMostrar = empleadoData.incapacidades || [];
+        
+        if (yearFilter && yearFilter !== 'all') {
+            const yearSeleccionado = parseInt(yearFilter);
+            incapacidadesParaMostrar = incapacidadesParaMostrar.filter(inc => {
+                return inc.fechaInicio && inc.fechaInicio.getFullYear() === yearSeleccionado;
+            });
+            console.log(`[SEGUIMIENTO][PANEL] Filtrado por año ${yearSeleccionado}: ${incapacidadesParaMostrar.length} incapacidades`);
+        }
+        
+        // Si no hay incapacidades después del filtro, usar todas (fallback)
+        if (incapacidadesParaMostrar.length === 0) {
+            console.log('[SEGUIMIENTO][PANEL] No hay incapacidades del año filtrado, usando todas');
+            incapacidadesParaMostrar = empleadoData.incapacidades || [];
+        }
+
+        // Datos básicos
+        document.getElementById('sp-nombre').value = empleadoData.nombre || '';
+        document.getElementById('sp-cedula').value = empleadoData.cedula || '';
+        document.getElementById('sp-genero').value = empleadoData.genero || '';
+        document.getElementById('sp-cargo').value = empleadoData.cargo || '';
+        document.getElementById('sp-area').value = empleadoData.departamento || '';
+        document.getElementById('sp-eps').value = empleadoData.empresaUsuaria || '';
+
+        // Si hay incapacidades, cargar la más reciente (DEL AÑO FILTRADO)
+        if (incapacidadesParaMostrar.length > 0) {
+            const incapacidadReciente = incapacidadesParaMostrar[incapacidadesParaMostrar.length - 1];
+
+            console.log('[SEGUIMIENTO][PANEL] Incapacidad reciente:', {
+                fechaInicio: incapacidadReciente.fechaInicio,
+                fechaFin: incapacidadReciente.fechaFin,
+                dias: incapacidadReciente.diasIncapacidad
+            });
+
+            if (incapacidadReciente.fechaInicio) {
+                const fechaIni = incapacidadReciente.fechaInicio instanceof Date
+                    ? incapacidadReciente.fechaInicio
+                    : new Date(incapacidadReciente.fechaInicio);
+                if (!isNaN(fechaIni.getTime())) {
+                    document.getElementById('sp-fecha-inicio').value = fechaIni.toISOString().split('T')[0];
+                }
+            }
+
+            if (incapacidadReciente.fechaFin) {
+                const fechaFi = incapacidadReciente.fechaFin instanceof Date
+                    ? incapacidadReciente.fechaFin
+                    : new Date(incapacidadReciente.fechaFin);
+                if (!isNaN(fechaFi.getTime())) {
+                    document.getElementById('sp-fecha-fin').value = fechaFi.toISOString().split('T')[0];
+                }
+            }
+
+            document.getElementById('sp-dias-acumulados').value = incapacidadReciente.diasIncapacidad || 0;
+
+            // Clase de incapacidad
+            const clase = incapacidadReciente.record?.['CLASE DE INCAPACIDAD'] ||
+                         incapacidadReciente.record?.['clase_de_incapacidad'] || '';
+            document.getElementById('sp-clase-incapacidad').value = clase || 'Enfermedad Común';
+
+            // Código y descripción
+            document.getElementById('sp-codigo-cie10').value = incapacidadReciente.record?.['CODIGO'] ||
+                                                              incapacidadReciente.record?.['CÓDIGO'] || '';
+            document.getElementById('sp-descripcion-diagnostico').value = incapacidadReciente.record?.['DESCRIPCION'] ||
+                                                                          incapacidadReciente.record?.['DESCRIPCIÓN'] || '';
+        }
+
+        // Actualizar título del panel
+        document.getElementById('spPanelTitle').textContent = `Gestión de Caso: ${empleadoData.nombre}`;
+    }
+
+    /**
+     * Agrega una fila a la tabla de recomendaciones
+     */
+    addRecomRow() {
+        const tbody = document.getElementById('sp-recomTableBody');
+        const newRow = document.createElement('tr');
+        newRow.innerHTML = `
+            <td><input type="text" class="sp-form-control"></td>
+            <td>
+                <select class="sp-form-control">
+                    <option>ARL</option>
+                    <option>EPS</option>
+                </select>
+            </td>
+            <td><input type="date" class="sp-form-control"></td>
+            <td>
+                <select class="sp-form-control">
+                    <option>SI</option>
+                    <option>NO</option>
+                </select>
+            </td>
+            <td><input type="text" class="sp-form-control"></td>
+            <td style="text-align:center;">
+                <button class="sp-btn sp-btn-outline sp-btn-sm" onclick="window.medicAusentismoComponent.removeRecomRow(this)">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(newRow);
+    }
+
+    /**
+     * Elimina una fila de la tabla de recomendaciones
+     */
+    removeRecomRow(button) {
+        button.closest('tr').remove();
+    }
+
+    /**
+     * Guarda los datos del seguimiento
+     */
+    saveSeguimientoData() {
+        // Recopilar todos los datos del formulario
+        const seguimientoData = {
+            // Datos generales
+            trabajador: {
+                nombre: document.getElementById('sp-nombre').value,
+                cedula: document.getElementById('sp-cedula').value,
+                fechaNacimiento: document.getElementById('sp-fecha-nacimiento').value,
+                genero: document.getElementById('sp-genero').value,
+                cargo: document.getElementById('sp-cargo').value,
+                area: document.getElementById('sp-area').value,
+                fechaIngreso: document.getElementById('sp-fecha-ingreso').value,
+                antiguedad: document.getElementById('sp-antiguedad').value,
+                tipoContrato: document.getElementById('sp-tipo-contrato').value,
+                salario: document.getElementById('sp-salario').value,
+                eps: document.getElementById('sp-eps').value,
+                afp: document.getElementById('sp-afp').value,
+                arl: document.getElementById('sp-arl').value,
+                cajaCompensacion: document.getElementById('sp-caja-compensacion').value
+            },
+            // Incapacidad
+            incapacidad: {
+                fechaInicio: document.getElementById('sp-fecha-inicio').value,
+                fechaFin: document.getElementById('sp-fecha-fin').value,
+                diasAcumulados: document.getElementById('sp-dias-acumulados').value,
+                clase: document.getElementById('sp-clase-incapacidad').value,
+                codigoCie10: document.getElementById('sp-codigo-cie10').value,
+                descripcionDiagnostico: document.getElementById('sp-descripcion-diagnostico').value,
+                contingencia: document.getElementById('sp-contingencia').value,
+                numeroProrrogas: document.getElementById('sp-numero-prorrogas').value,
+                fechaUltimaProrroga: document.getElementById('sp-fecha-ultima-prorroga').value
+            },
+            // Etapas PRIC
+            pric: {
+                fechaDeteccion: document.getElementById('sp-fecha-deteccion').value,
+                mecanismoDeteccion: document.getElementById('sp-mecanismo-deteccion').value,
+                fechaReporteArl: document.getElementById('sp-fecha-reporte-arl').value,
+                responsableReporte: document.getElementById('sp-responsable-reporte').value,
+                objetivosTratamiento: document.getElementById('sp-objetivos-tratamiento').value,
+                fechaInicioPlan: document.getElementById('sp-fecha-inicio-plan').value,
+                fechaProbableAlta: document.getElementById('sp-fecha-probable-alta').value,
+                tratamientos: document.getElementById('sp-tratamientos').value,
+                evolucionClinica: document.getElementById('sp-evolucion-clinica').value,
+                adherencia: document.getElementById('sp-adherencia').value,
+                fechaUltimoSeguimiento: document.getElementById('sp-fecha-ultimo-seguimiento').value,
+                fechaReincorporacion: document.getElementById('sp-fecha-reincorporacion').value,
+                tipoReintegro: document.getElementById('sp-tipo-reintegro').value,
+                adaptaciones: document.getElementById('sp-adaptaciones').value,
+                fechaCierre: document.getElementById('sp-fecha-cierre').value,
+                motivoCierre: document.getElementById('sp-motivo-cierre').value,
+                observacionesFinales: document.getElementById('sp-observaciones-finales').value
+            },
+            // Calificación PCL
+            calificacion: {
+                estadoProceso: document.getElementById('sp-estado-proceso').value,
+                fechaSolicitud: document.getElementById('sp-fecha-solicitud').value,
+                fechaDictamen: document.getElementById('sp-fecha-dictamen').value,
+                porcentajePcl: document.getElementById('sp-porcentaje-pcl').value,
+                origenCalificacion: document.getElementById('sp-origen-calificacion').value,
+                fechaEstructuracion: document.getElementById('sp-fecha-estructuracion').value,
+                observacionesCalificacion: document.getElementById('sp-observaciones-calificacion').value
+            },
+            // Recomendaciones (tabla)
+            recomendaciones: []
+        };
+
+        // Recopilar recomendaciones de la tabla
+        document.querySelectorAll('#sp-recomTableBody tr').forEach(row => {
+            const inputs = row.querySelectorAll('input, select');
+            if (inputs.length >= 5) {
+                seguimientoData.recomendaciones.push({
+                    recomendacion: inputs[0].value,
+                    entidad: inputs[1].value,
+                    fechaLimite: inputs[2].value,
+                    cumple: inputs[3].value,
+                    observacion: inputs[4].value
+                });
+            }
+        });
+
+        console.log('[GUARDAR SEGUIMIENTO] Datos recopilados:', seguimientoData);
+
+        // Mostrar notificación de éxito
+        this.showNotification('✅ Datos guardados correctamente en la hoja "Casos en seguimiento"', 'success');
+
+        // Cerrar el panel
+        setTimeout(() => {
+            this.closeSeguimientoPanel();
+        }, 1500);
+
+        // TODO: Implementar lógica real de guardado en Excel
+        // window.electronAPI.guardarSeguimientoPCL(this.currentCompany, seguimientoData);
     }
 
     async renderRegistrarAusentismoView(container) {

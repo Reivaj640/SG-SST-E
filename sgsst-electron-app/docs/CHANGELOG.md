@@ -5,7 +5,181 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.46] - 2026-02-23
+## [0.1.49] - 2026-02-26
+
+### Added
+- **Sistema Dual de Archivos para Ausentismo** 🆕
+  - Separación clara entre archivo de registro general (PI-FO-076) y seguimiento de casos (PRI.xlsx)
+  - Documentación completa en `docs/ARQUITECTURA_AUSENTISMO_DUAL.md`
+
+- **Nuevo Handler IPC: `get-pri-seguimiento-data`** 
+  - Lee específicamente el archivo PRI.xlsx
+  - Selecciona automáticamente la hoja "Casos en seguimiento"
+  - Detección inteligente de encabezados
+  - Logs de depuración detallados
+  - Ubicación: `main.js` línea ~3251
+
+- **Nueva API en preload.js**
+  - `getPriSeguimientoData(companyName)` - Expone el handler `get-pri-seguimiento-data`
+  - Permite al frontend leer datos del PRI.xlsx para seguimiento detallado
+
+### Changed
+- **Handler `get-ausentismo-data` MODIFICADO** ⚠️
+  - Ahora usa **PI-FO-076 / PG-FO-076 / GI-FO-076** para la lista principal de ausentismo
+  - **NO usa PRI.xlsx** para consultas generales
+  - Lógica de selección mejorada:
+    1. Busca específicamente PI-FO-076, PG-FO-076 o GI-FO-076
+    2. Si no encuentra, usa el primer .xlsx que NO sea PRI.xlsx
+    3. Fallback: usa el primer archivo .xlsx disponible
+
+- **Mejoras en Logs de Depuración**
+  - Logs detallados que muestran TODOS los archivos en la carpeta de ausentismo
+  - Búsqueda específica de archivos con "PRI" en el nombre
+  - Confirmación visual de qué archivo se está seleccionando
+  - Logs separados para `get-ausentismo-data` y `get-pri-seguimiento-data`
+
+### Fixed
+- **Problema de selección de archivo PRI.xlsx**
+  - El sistema ahora encuentra correctamente el archivo PRI.xlsx cuando existe
+  - Se filtra el archivo temporal `~$PRI.xlsx` automáticamente
+  - Se selecciona la hoja correcta ("Casos en seguimiento") en lugar de "Introducción"
+
+### Documentation
+- **Nueva Documentación Creada:**
+  - `docs/ARQUITECTURA_AUSENTISMO_DUAL.md` - Arquitectura completa del sistema dual
+    - Flujo de datos por sección
+    - Handlers IPC implementados
+    - Logs de depuración de ejemplo
+    - Consideraciones importantes sobre sincronización
+
+- **README.md Actualizado:**
+  - Versión actualizada a 0.1.49
+  - Tabla de APIs de ausentismo actualizada con `getPriSeguimientoData` y `saveFollowUp`
+  - Enlace a nueva documentación de arquitectura dual
+
+### Technical Details
+- **Archivos Modificados:**
+  - `main.js` (+250 líneas)
+    - Modificado `get-ausentismo-data` para usar PI-FO-076
+    - Agregado `get-pri-seguimiento-data` para PRI.xlsx
+    - Agregada función `obtenerRutaPri()` para obtener ruta específica de PRI.xlsx
+    - Modificado `save-follow-up` para usar `obtenerRutaPri()` en lugar de `obtenerRutaAusentismo()`
+  - `preload.js` (+2 líneas)
+    - Expuesta nueva API `getPriSeguimientoData`
+  - `components/seguimiento/seguimiento-incapacidades.html` (+120 líneas)
+    - `viewCase()` → async, carga PRI.xlsx
+    - `loadPriDataForCase()` → nueva función
+    - `saveFollowUp()` → usa API de Electron directamente
+  - `README.md` (versión 0.1.49)
+  - `docs/CHANGELOG.md` (este archivo)
+  - `docs/ARQUITECTURA_AUSENTISMO_DUAL.md` (nuevo)
+  - `docs/ACTUALIZACION_FRONTEND_SEGUIMIENTO_v0.1.49.md` (nuevo)
+  - `docs/RESUMEN_CAMBIOS_v0.1.49.md` (nuevo)
+
+### Next Steps (Pendientes)
+- [x] Actualizar `seguimiento-incapacidades.html` para usar `getPriSeguimientoData` en "Abrir Seguimiento" ✅
+- [x] Modificar handler `save-follow-up` para usar PRI.xlsx específicamente ✅
+- [x] Conectar formulario de seguimiento con la función de guardado ✅
+
+### Frontend - Actualización Completada (Parte 2)
+- **`seguimiento-incapacidades.html` MODIFICADO** ⚠️
+  - Función `viewCase()` ahora es asíncrona y carga datos desde PRI.xlsx
+  - Nueva función `loadPriDataForCase()` para cargar datos específicos del PRI
+  - Función `saveFollowUp()` actualizada para usar API de Electron directamente
+  - Eliminada dependencia de `sendMessageToParent()` para guardado
+  - Agregados logs de depuración detallados
+
+- **Flujo de Carga de Datos:**
+  1. Abre caso → Carga datos básicos desde PI-FO-076
+  2. Llama `getPriSeguimientoData()` → Lee PRI.xlsx
+  3. Busca caso por cédula/nombre en PRI
+  4. Si encuentra → Carga cargo, área, EPS, ARL
+  5. Si no encuentra → Caso nuevo (solo datos básicos)
+
+- **Flujo de Guardado:**
+  1. Usuario llena formulario
+  2. Click "Guardar Seguimiento"
+  3. `saveFollowUp()` → `window.electronAPI.saveFollowUp()`
+  4. Handler `save-follow-up` busca PRI.xlsx específicamente
+  5. Python escribe en PRI.xlsx
+  6. Recarga tabla y muestra notificación de éxito
+
+- **Archivos Modificados:**
+  - `components/seguimiento/seguimiento-incapacidades.html` (+120 líneas)
+    - `viewCase()` → async, carga PRI.xlsx
+    - `loadPriDataForCase()` → nueva función
+    - `saveFollowUp()` → usa API de Electron directamente
+
+---
+
+## [0.1.48] - 2026-02-25
+
+### Added
+- **Módulo de Seguimiento PRIC (Proceso de Rehabilitación e Incorporación Laboral)** 🆕
+  - Panel slideover de seguimiento de incapacidades con diseño moderno
+  - 5 secciones especializadas: Datos Generales, Incapacidad Temporal, Etapas PRIC, Seguimiento Recomendaciones, Calificación PCL
+  - Navegación horizontal por pestañas con animaciones fade-in
+  - Carga automática de datos del empleado desde la tabla de seguimiento
+  - Tabla dinámica de recomendaciones con capacidad de agregar/eliminar filas
+  - Integración con hoja "Casos en seguimiento" de Excel (pendiente implementación real)
+
+- **Funcionalidades de Seguimiento de Incapacidades**
+  - Botón "Abrir Seguimiento" en modal de detalles de empleado
+  - Autocompletado de datos laborales (cargo, área, EPS, ARL)
+  - Campos de solo lectura para datos que vienen del empleado
+  - ARL prellenado con "COLMENA SEGUROS" por defecto
+  - Validación de fechas y campos obligatorios
+
+- **Interfaz de Usuario Mejorada**
+  - Panel slideover (95% ancho, máx 1100px) con backdrop y efecto blur
+  - Sistema de navegación horizontal con 5 pestañas
+  - Scrollbars personalizados con estilos K+AIR
+  - Botones con efectos hover y transiciones suaves
+  - Notificaciones toast de éxito/error
+
+### Changed
+- **Actualización de Documentación**
+  - README.md actualizado con sección completa de Módulo de Ausentismo y Seguimiento PRIC
+  - Agregados detalles de algoritmo de detección de casos en seguimiento
+  - Documentación de métodos del componente: `createSeguimientoPanel()`, `closeSeguimientoPanel()`, `showSeguimientoPanelSection()`, etc.
+  - Actualizada versión del documento a 2.1
+  - CHANGELOG.md actualizado con cambios de versión 0.1.48
+
+- **Mejoras en el Módulo de Ausentismo (3.3.6)**
+  - Refactorización de `renderNotaSeguimientoSection()` para pasar datos completos del empleado
+  - Mejora en serialización de datos para botones dinámicos
+  - Optimización de carga de datos en panel PRIC
+
+### Technical Details
+- **Archivos Modificados:**
+  - `modules/gestion-salud/ausentismo/medicion-ausentismo.js` (+850 líneas)
+    - Agregados métodos: `createSeguimientoPanel()`, `closeSeguimientoPanel()`, `showSeguimientoPanelSection()`, `cargarDatosEnPanelSeguimiento()`, `addRecomRow()`, `removeRecomRow()`, `saveSeguimientoData()`
+    - Actualizado método `abrirSeguimiento()` para abrir panel slideover
+    - Modificado `renderNotaSeguimientoSection()` para pasar datos del empleado
+  
+- **Estilos CSS:**
+  - ~200 líneas de CSS personalizado para panel slideover
+  - Variables CSS para consistencia de colores (--sp-primary, --sp-accent, etc.)
+  - Animaciones spFadeIn para transiciones entre pestañas
+  - Scrollbars personalizados para contenido y navegación
+
+### Fixed
+- Corrección en ordenamiento de fechas de incapacidades (strings ISO a Date objects)
+- Manejo de errores en carga de datos desde Excel
+- Validación de fechas inválidas en carga de incapacidades
+
+### Deprecated
+- Funcionalidad de "Guardar Nota" en modal de detalles (eliminada)
+- Botón "Cerrar" en sección de seguimiento (eliminado)
+
+### Pending
+- Implementación real de guardado en Excel (`guardarSeguimientoPCL()`)
+- Conexión con backend para persistencia de datos de seguimiento
+- Generación de informes PDF desde datos de seguimiento PRIC
+
+---
+
+## [0.1.47] - 2026-02-24
 
 ### Changed
 - **Actualización de Documentación del Proyecto**
