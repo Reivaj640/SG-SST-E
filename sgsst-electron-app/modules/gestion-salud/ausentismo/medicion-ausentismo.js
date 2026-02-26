@@ -402,7 +402,7 @@ class MedicionAusentismoComponent {
                 <select id="seguimientoYearFilter" class="form-control"
                     style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px; background: #fff;">
                     <option value="">Todos</option>
-                    ${[currentYear, currentYear - 1, currentYear - 2].map(year => `<option value="${year}">${year}</option>`).join('')}
+                    <!-- Los años se llenarán dinámicamente después de cargar los datos -->
                 </select>
             </div>
             <div style="flex: 1; min-width: 150px;">
@@ -580,6 +580,20 @@ class MedicionAusentismoComponent {
                 });
 
                 console.log('[DEBUG loadSeguimientoData] Total de empleados únicos:', empleadosMap.size);
+                
+                // LOG DETALLADO: Mostrar TODAS las incapacidades de cada empleado
+                console.log('========== DETALLE DE EMPLEADOS ==========');
+                empleadosMap.forEach((empleado, cedula) => {
+                    console.log(`\n[EMPLEADO] ${empleado.nombre} (CC: ${cedula})`);
+                    console.log(`  Total incapacidades: ${empleado.incapacidades.length}`);
+                    empleado.incapacidades.forEach((inc, idx) => {
+                        const fechaIniStr = inc.fechaInicio ? inc.fechaInicio.toLocaleDateString() : 'N/A';
+                        const fechaFinStr = inc.fechaFin ? inc.fechaFin.toLocaleDateString() : 'N/A';
+                        console.log(`    [${idx}] ${fechaIniStr} a ${fechaFinStr} = ${inc.diasIncapacidad} días`);
+                    });
+                });
+                console.log('==========================================');
+                
                 console.log('[DEBUG loadSeguimientoData] Empleados agrupados:', Array.from(empleadosMap.entries()).map(([cedula, emp]) => ({
                     cedula,
                     nombre: emp.nombre,
@@ -608,6 +622,13 @@ class MedicionAusentismoComponent {
                     
                     if (tieneIncapacidadLarga) {
                         console.log('[DEBUG FILTRO] Empleado cumple Condición 1 (incapacidad >= 10 días):', empleado.nombre, 'Cédula:', empleado.cedula);
+                        // Log de qué incapacidades cumplen >= 10 días
+                        empleado.incapacidades.forEach((inc, idx) => {
+                            if (inc.diasIncapacidad >= 10) {
+                                const fechaStr = inc.fechaInicio ? inc.fechaInicio.toLocaleDateString() : 'N/A';
+                                console.log(`  → Incapacidad [${idx}]: ${fechaStr} = ${inc.diasIncapacidad} días (CUMPLE >= 10)`);
+                            }
+                        });
                         return true;
                     }
 
@@ -653,7 +674,11 @@ class MedicionAusentismoComponent {
                     nombre: emp.nombre,
                     cedula: emp.cedula,
                     totalIncapacidades: emp.incapacidades.length,
-                    totalDias: emp.incapacidades.reduce((sum, inc) => sum + inc.diasIncapacidad, 0)
+                    totalDias: emp.incapacidades.reduce((sum, inc) => sum + inc.diasIncapacidad, 0),
+                    ultimaIncapacidad: emp.incapacidades.length > 0 ? {
+                        fechaInicio: emp.incapacidades[emp.incapacidades.length - 1].fechaInicio,
+                        dias: emp.incapacidades[emp.incapacidades.length - 1].diasIncapacidad
+                    } : null
                 })));
 
                 // Verificar si hay datos antes de renderizar
@@ -671,6 +696,9 @@ class MedicionAusentismoComponent {
                     console.log('[DEBUG loadSeguimientoData] ✅ Hay', this.seguimientoData.length, 'empleados para mostrar en la tabla');
                 }
 
+                // Llenar el filtro de años con todos los años únicos de los datos
+                this.llenarFiltroAnios(empleadosMap);
+
                 // Calcular KPIs
                 this.calculateKPIs();
 
@@ -686,6 +714,34 @@ class MedicionAusentismoComponent {
             console.error('[DEBUG loadSeguimientoData] Error loading seguimiento data:', error);
             this.renderSeguimientoTable([]);
         }
+    }
+
+    /**
+     * Llena el dropdown de años con todos los años únicos presentes en los datos
+     * @param {Map} empleadosMap - Mapa de empleados con sus incapacidades
+     */
+    llenarFiltroAnios(empleadosMap) {
+        const yearSelect = document.getElementById('seguimientoYearFilter');
+        if (!yearSelect) return;
+
+        // Extraer todos los años únicos de las incapacidades
+        const yearsSet = new Set();
+        empleadosMap.forEach(empleado => {
+            empleado.incapacidades.forEach(inc => {
+                if (inc.fechaInicio) {
+                    yearsSet.add(inc.fechaInicio.getFullYear());
+                }
+            });
+        });
+
+        // Convertir a array y ordenar descendente (año más reciente primero)
+        const yearsArray = Array.from(yearsSet).sort((a, b) => b - a);
+
+        console.log('[DEBUG llenarFiltroAnios] Años encontrados:', yearsArray);
+
+        // Llenar el select
+        yearSelect.innerHTML = '<option value="">Todos</option>' + 
+            yearsArray.map(year => `<option value="${year}">${year}</option>`).join('');
     }
 
     calculateKPIs() {
@@ -791,29 +847,46 @@ class MedicionAusentismoComponent {
             // Estructura de datos agrupados: {nombre, cedula, incapacidades: [...], cargo, departamento, etc.}
             const nombre = empleado.nombre || 'Sin nombre';
             const cedula = empleado.cedula || '';
-            
-            // Obtener la incapacidad más reciente para mostrar en la tabla
-            const incapacidadReciente = empleado.incapacidades && empleado.incapacidades.length > 0
-                ? empleado.incapacidades[empleado.incapacidades.length - 1]
-                : null;
-            
-            // Obtener tipo de la incapacidad más reciente (o default EPS)
-            const tipo = incapacidadReciente?.record?.['CLASE DE INCAPACIDAD'] || 
-                        incapacidadReciente?.record?.['clase_de_incapacidad'] || 'EPS';
-            
-            // Usar fechas de la incapacidad más reciente
-            const fechaInicio = incapacidadReciente?.fechaInicio || null;
-            const fechaFin = incapacidadReciente?.fechaFin || null;
 
-            // Calcular días totales y transcurridos
-            let diasTotales = 0;
+            // IDENTIFICAR la incapacidad PRINCIPAL que activa el seguimiento
+            // Las incapacidades ya están ordenadas por fecha de inicio (ascendente) en loadSeguimientoData
+            
+            // Primero, buscar incapacidades >= 10 días (Condición 1)
+            const incapacidadesLargas = empleado.incapacidades.filter(inc => inc.diasIncapacidad >= 10);
+            
+            let incapacidadPrincipal = null;
+            
+            if (incapacidadesLargas.length > 0) {
+                // Condición 1: Tomar la incapacidad >= 10 días MÁS RECIENTE
+                incapacidadPrincipal = incapacidadesLargas[incapacidadesLargas.length - 1];
+            } else if (empleado.incapacidades.length > 1) {
+                // Condición 2: Secuencia de incapacidades que suman >= 10 días con gaps <= 3 días
+                // Tomar la última incapacidad de la secuencia (la más reciente)
+                incapacidadPrincipal = empleado.incapacidades[empleado.incapacidades.length - 1];
+            } else {
+                // Caso fallback: tomar la única incapacidad disponible
+                incapacidadPrincipal = empleado.incapacidades.length > 0
+                    ? empleado.incapacidades[empleado.incapacidades.length - 1]
+                    : null;
+            }
+
+            // Obtener tipo de la incapacidad principal (o default EPS)
+            const tipo = incapacidadPrincipal?.record?.['CLASE DE INCAPACIDAD'] ||
+                        incapacidadPrincipal?.record?.['clase_de_incapacidad'] || 'EPS';
+
+            // Usar fechas de la incapacidad PRINCIPAL (la que activa el seguimiento)
+            const fechaInicio = incapacidadPrincipal?.fechaInicio || null;
+            const fechaFin = incapacidadPrincipal?.fechaFin || null;
+            const diasIncapacidad = incapacidadPrincipal?.diasIncapacidad || 0;
+
+            // Calcular días transcurridos desde el inicio de la incapacidad más reciente
             let diasTranscurridos = 0;
             let avance = 0;
             let estado = 'En curso';
 
             if (fechaInicio && fechaFin) {
                 const totalTime = fechaFin - fechaInicio;
-                diasTotales = Math.ceil(totalTime / (1000 * 60 * 60 * 24)) + 1;
+                const diasTotales = Math.ceil(totalTime / (1000 * 60 * 60 * 24)) + 1;
 
                 const currentTime = today - fechaInicio;
                 diasTranscurridos = Math.max(0, Math.ceil(currentTime / (1000 * 60 * 60 * 24)) + 1);
@@ -868,7 +941,7 @@ class MedicionAusentismoComponent {
                     </td>
                     <td style="padding: 15px;">
                         <div style="font-size: 13px; color: #1E293B;">${periodoStr}</div>
-                        <div style="font-size: 11px; color: #64748B;">${diasTotales} Días Total</div>
+                        <div style="font-size: 11px; color: #64748B;">${diasIncapacidad} Días</div>
                     </td>
                     <td style="padding: 15px;">
                         <div style="width: 100px;">
@@ -1096,6 +1169,51 @@ class MedicionAusentismoComponent {
 
     renderCondicion1Detalle(nombre, cedula, incapacidadesLargas, totalDias) {
         const today = new Date();
+
+        // DEBUG: Ver incapacidades antes de ordenar
+        console.log('[DEBUG renderCondicion1Detalle] incapacidadesLargas antes de ordenar:', incapacidadesLargas.map(inc => ({
+            fechaInicio: inc.fechaInicio,
+            fechaInicioType: typeof inc.fechaInicio,
+            fechaFin: inc.fechaFin,
+            dias: inc.diasIncapacidad
+        })));
+
+        // Ordenar incapacidades de MÁS RECIENTE a MÁS ANTIGUA para mostrar primero la actual
+        const incapacidadesOrdenadas = [...incapacidadesLargas].sort((a, b) => {
+            // Convertir strings ISO a objetos Date si es necesario
+            let dateA = a.fechaInicio;
+            let dateB = b.fechaInicio;
+
+            if (typeof dateA === 'string') {
+                dateA = new Date(dateA);
+            }
+            if (typeof dateB === 'string') {
+                dateB = new Date(dateB);
+            }
+
+            // Validar que las fechas sean objetos Date válidos
+            const validA = dateA instanceof Date && !isNaN(dateA.getTime());
+            const validB = dateB instanceof Date && !isNaN(dateB.getTime());
+
+            if (!validA) dateA = null;
+            if (!validB) dateB = null;
+
+            if (!dateB && !dateA) return 0;
+            if (!dateB) return -1;
+            if (!dateA) return 1;
+
+            const diff = dateB - dateA;
+            console.log(`[DEBUG sort] Comparando ${dateB.toLocaleDateString()} vs ${dateA.toLocaleDateString()} = ${diff}`);
+            return diff;
+        });
+
+        // DEBUG: Ver incapacidades después de ordenar
+        console.log('[DEBUG renderCondicion1Detalle] incapacidadesOrdenadas después de ordenar:', incapacidadesOrdenadas.map(inc => ({
+            fechaInicio: inc.fechaInicio,
+            fechaInicioType: typeof inc.fechaInicio,
+            fechaFin: inc.fechaFin,
+            dias: inc.diasIncapacidad
+        })));
         
         return `
             <!-- Encabezado del empleado -->
@@ -1112,13 +1230,13 @@ class MedicionAusentismoComponent {
                 </div>
             </div>
 
-            <!-- Lista de incapacidades >= 10 días -->
+            <!-- Lista de incapacidades >= 10 días (ordenadas de más reciente a más antigua) -->
             <div style="margin-bottom: 20px;">
                 <h4 style="font-size: 14px; font-weight: 600; color: #1E293B; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
                     <i class="fas fa-exclamation-triangle" style="color: #F59E0B;"></i>
                     INCAPACIDAD(ES) QUE ACTIVA(N) SEGUIMIENTO
                 </h4>
-                ${incapacidadesLargas.map((inc, index) => {
+                ${incapacidadesOrdenadas.map((inc, index) => {
                     // Validar y formatear fechas
                     let fechaInicio = 'N/A';
                     let fechaFin = 'N/A';
@@ -1339,32 +1457,23 @@ class MedicionAusentismoComponent {
         `;
     }
 
-    renderNotaSeguimientoSection(cedula) {
+    renderNotaSeguimientoSection(cedula, nombreEmpleado) {
         // Nota: En una implementación real, las notas se guardarían en backend/archivo
         // Aquí simulamos la funcionalidad
+        const nombreParam = nombreEmpleado ? nombreEmpleado.replace(/'/g, "\\'") : '';
+        
         return `
             <div style="border-top: 2px solid #e2e8f0; padding-top: 20px;">
                 <h4 style="font-size: 14px; font-weight: 600; color: #1E293B; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-                    <i class="fas fa-sticky-note" style="color: #174ea6;"></i>
-                    NOTA DE SEGUIMIENTO
+                    <i class="fas fa-folder-open" style="color: #174ea6;"></i>
+                    SEGUIMIENTO DEL CASO
                 </h4>
-                <textarea id="notaSeguimiento_${cedula.replace(/[^a-zA-Z0-9]/g, '_')}" 
-                    placeholder="Ej: Verificar estado con EPS, solicitar documentos pendientes, programar seguimiento..." 
-                    style="width: 100%; min-height: 100px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; resize: vertical; font-family: inherit; background: #F8FAFC;"
-                    onfocus="this.style.borderColor='#174ea6'; this.style.boxShadow='0 0 0 3px rgba(23, 78, 166, 0.1)'"
-                    onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'"></textarea>
-                <div style="display: flex; gap: 10px; margin-top: 12px;">
-                    <button onclick="window.medicAusentismoComponent.guardarNota('${cedula}')" 
+                <div style="display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap;">
+                    <button onclick="window.medicAusentismoComponent.abrirSeguimiento('${cedula.replace(/'/g, "\\'")}', '${nombreParam}')" 
                         style="padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; background: linear-gradient(135deg, #174ea6, #2d5dc7); color: white; display: flex; align-items: center; gap: 8px; transition: all 0.2s;"
                         onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 6px -1px rgba(23, 78, 166, 0.3)'"
                         onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
-                        <i class="fas fa-save"></i> Guardar Nota
-                    </button>
-                    <button onclick="document.getElementById('detailModal').style.display='none'" 
-                        style="padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid #e2e8f0; background: white; color: #64748B; display: flex; align-items: center; gap: 8px; transition: all 0.2s;"
-                        onmouseover="this.style.backgroundColor='#f1f5f9'; this.style.borderColor='#cbd5e1'"
-                        onmouseout="this.style.backgroundColor='white'; this.style.borderColor='#e2e8f0'">
-                        <i class="fas fa-times"></i> Cerrar
+                        <i class="fas fa-folder-open"></i> Abrir Seguimiento
                     </button>
                 </div>
             </div>
@@ -1384,14 +1493,29 @@ class MedicionAusentismoComponent {
         // En una implementación real, aquí se guardaría en backend/archivo
         // Por ahora, simulamos el guardado
         console.log(`[NOTA GUARDADA] Cédula: ${cedula}, Nota: ${nota}`);
-        
+
         // Simular guardado exitoso
         this.showNotification('Nota guardada exitosamente', 'success');
-        
+
         // Cerrar modal después de guardar
         setTimeout(() => {
             document.getElementById('detailModal').style.display = 'none';
         }, 1000);
+    }
+
+    abrirSeguimiento(cedula, nombreEmpleado) {
+        // Cerrar el modal de detalles primero
+        document.getElementById('detailModal').style.display = 'none';
+        
+        // Cambiar a la vista de seguimiento
+        this.currentView = 'seguimiento-incapacidades';
+        this.render();
+        
+        // Mostrar notificación
+        this.showNotification(`Abriendo seguimiento para: ${nombreEmpleado}`, 'info');
+        
+        // TODO: En el futuro, aquí se abrirá la interfaz de seguimiento detallado
+        console.log(`[ABRIR SEGUIMIENTO] Cédula: ${cedula}, Nombre: ${nombreEmpleado}`);
     }
 
     async renderRegistrarAusentismoView(container) {
