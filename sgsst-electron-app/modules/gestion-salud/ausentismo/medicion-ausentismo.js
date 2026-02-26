@@ -769,7 +769,10 @@ class MedicionAusentismoComponent {
         empleadosMap.forEach(empleado => {
             empleado.incapacidades.forEach(inc => {
                 if (inc.fechaInicio) {
-                    yearsSet.add(inc.fechaInicio.getFullYear());
+                    const anio = inc.fechaInicio instanceof Date 
+                        ? inc.fechaInicio.getFullYear() 
+                        : new Date(inc.fechaInicio).getFullYear();
+                    yearsSet.add(anio);
                 }
             });
         });
@@ -813,7 +816,9 @@ class MedicionAusentismoComponent {
 
             // Casos cerrados este mes
             const finMonth = fechaFin.toLocaleString('default', { month: 'long' }).toUpperCase();
-            const finYear = fechaFin.getFullYear();
+            const finYear = fechaFin instanceof Date 
+                ? fechaFin.getFullYear() 
+                : new Date(fechaFin).getFullYear();
             if (finMonth === currentMonth && finYear === today.getFullYear() && diffDays < 0) {
                 cerradosMes++;
             }
@@ -1043,9 +1048,11 @@ class MedicionAusentismoComponent {
             if (year) {
                 const yearSeleccionado = parseInt(year);
                 matchesYear = empleado.incapacidades.some(inc => {
-                    return inc.fechaInicio && 
-                           inc.fechaInicio.getFullYear() === yearSeleccionado &&
-                           inc.diasIncapacidad >= 10;  // ← CORRECCIÓN: Solo incapacidades >= 10 días
+                    if (!inc.fechaInicio || inc.diasIncapacidad < 10) return false;
+                    const anioInicio = inc.fechaInicio instanceof Date 
+                        ? inc.fechaInicio.getFullYear() 
+                        : new Date(inc.fechaInicio).getFullYear();
+                    return anioInicio === yearSeleccionado;
                 });
             }
 
@@ -1054,9 +1061,11 @@ class MedicionAusentismoComponent {
             if (month !== '') {
                 const monthSeleccionado = parseInt(month);
                 matchesMonth = empleado.incapacidades.some(inc => {
-                    return inc.fechaInicio && 
-                           inc.fechaInicio.getMonth() === monthSeleccionado &&
-                           inc.diasIncapacidad >= 10;  // ← CORRECCIÓN: Solo incapacidades >= 10 días
+                    if (!inc.fechaInicio || inc.diasIncapacidad < 10) return false;
+                    const dateInicio = inc.fechaInicio instanceof Date 
+                        ? inc.fechaInicio 
+                        : new Date(inc.fechaInicio);
+                    return dateInicio.getMonth() === monthSeleccionado;
                 });
             }
 
@@ -1799,7 +1808,11 @@ class MedicionAusentismoComponent {
                                 </div>
                                 <div class="sp-form-group">
                                     <label class="sp-form-label">Fecha de Nacimiento</label>
-                                    <input type="date" id="sp-fecha-nacimiento" class="sp-form-control">
+                                    <input type="date" id="sp-fecha-nacimiento" class="sp-form-control" onchange="window.medicAusentismoComponent.calcularEdad()">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Edad</label>
+                                    <input type="number" id="sp-edad" class="sp-form-control" placeholder="0" readonly style="background-color: #f0f0f0;">
                                 </div>
                                 <div class="sp-form-group">
                                     <label class="sp-form-label">Género</label>
@@ -1821,6 +1834,16 @@ class MedicionAusentismoComponent {
                                     <input type="text" id="sp-cargo" class="sp-form-control">
                                 </div>
                                 <div class="sp-form-group">
+                                    <label class="sp-form-label">Tipo de Cargo</label>
+                                    <select id="sp-tipo-cargo" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="Operativo">Operativo</option>
+                                        <option value="Administrativo">Administrativo</option>
+                                        <option value="Mando Medio">Mando Medio</option>
+                                        <option value="Directivo">Directivo</option>
+                                    </select>
+                                </div>
+                                <div class="sp-form-group">
                                     <label class="sp-form-label">Área / Dependencia</label>
                                     <input type="text" id="sp-area" class="sp-form-control">
                                 </div>
@@ -1831,6 +1854,18 @@ class MedicionAusentismoComponent {
                                 <div class="sp-form-group">
                                     <label class="sp-form-label">Antigüedad (Años)</label>
                                     <input type="number" id="sp-antiguedad" class="sp-form-control" placeholder="0">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Tipo de Evento</label>
+                                    <select id="sp-tipo-evento" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="Accidente de Trabajo">Accidente de Trabajo</option>
+                                        <option value="Enfermedad Laboral">Enfermedad Laboral</option>
+                                        <option value="Enfermedad General">Enfermedad General</option>
+                                        <option value="Licencia de Maternidad">Licencia de Maternidad</option>
+                                        <option value="Licencia de Paternidad">Licencia de Paternidad</option>
+                                        <option value="Otro">Otro</option>
+                                    </select>
                                 </div>
                                 <div class="sp-form-group">
                                     <label class="sp-form-label">Tipo de Contrato</label>
@@ -1866,6 +1901,32 @@ class MedicionAusentismoComponent {
                                 <div class="sp-form-group">
                                     <label class="sp-form-label">Caja de Compensación</label>
                                     <input type="text" id="sp-caja-compensacion" class="sp-form-control">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="sp-subsection">
+                            <div class="sp-subsection-title"><i class="fas fa-heartbeat"></i> Salud</div>
+                            <div class="sp-form-grid">
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Peso (Kg)</label>
+                                    <input type="number" id="sp-peso" class="sp-form-control" placeholder="0.0" step="0.1" onchange="window.medicAusentismoComponent.calcularIMC()">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Talla (cm)</label>
+                                    <input type="number" id="sp-talla" class="sp-form-control" placeholder="0" step="1" onchange="window.medicAusentismoComponent.calcularIMC()">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">IMC</label>
+                                    <input type="text" id="sp-imc" class="sp-form-control" placeholder="0.0" readonly style="background-color: #f0f0f0;">
+                                </div>
+                                <div class="sp-form-group full-width">
+                                    <label class="sp-form-label">Estado Nutricional</label>
+                                    <div id="sp-imc-estado" style="padding: 10px; border-radius: 6px; font-weight: 600; text-align: center; display: none;"></div>
+                                </div>
+                                <div class="sp-form-group full-width">
+                                    <label class="sp-form-label">Actividades Extralaborales / Deportes</label>
+                                    <textarea id="sp-actividades-extralaborales" class="sp-form-control" rows="2" placeholder="Ej: Fútbol los fines de semana, natación, gimnasio..."></textarea>
                                 </div>
                             </div>
                         </div>
@@ -2227,6 +2288,95 @@ class MedicionAusentismoComponent {
     }
 
     /**
+     * Calcula la edad automáticamente desde la fecha de nacimiento
+     */
+    calcularEdad() {
+        const fechaNacimientoInput = document.getElementById('sp-fecha-nacimiento');
+        const edadInput = document.getElementById('sp-edad');
+        
+        if (!fechaNacimientoInput?.value || !edadInput) return;
+        
+        const fechaNacimiento = new Date(fechaNacimientoInput.value);
+        const hoy = new Date();
+        
+        let edad = hoy.getFullYear() - fechaNacimiento.getFullYear();
+        const mesDiferencia = hoy.getMonth() - fechaNacimiento.getMonth();
+        
+        // Ajustar si aún no ha cumplido años este año
+        if (mesDiferencia < 0 || (mesDiferencia === 0 && hoy.getDate() < fechaNacimiento.getDate())) {
+            edad--;
+        }
+        
+        edadInput.value = edad >= 0 ? edad : 0;
+        console.log('[SEGUIMIENTO] Edad calculada:', edad, 'años');
+    }
+
+    /**
+     * Calcula el IMC automáticamente desde peso y talla (en cm)
+     */
+    calcularIMC() {
+        const pesoInput = document.getElementById('sp-peso');
+        const tallaInput = document.getElementById('sp-talla');
+        const imcInput = document.getElementById('sp-imc');
+        const estadoDiv = document.getElementById('sp-imc-estado');
+        
+        if (!pesoInput?.value || !tallaInput?.value || !imcInput) return;
+        
+        const peso = parseFloat(pesoInput.value);
+        const tallaCm = parseFloat(tallaInput.value);
+        
+        if (peso > 0 && tallaCm > 0) {
+            // Convertir cm a metros para el cálculo
+            const tallaMt = tallaCm / 100;
+            const imc = peso / (tallaMt * tallaMt);
+            imcInput.value = imc.toFixed(2);
+            
+            // Determinar categoría de IMC con colores
+            let categoria = '';
+            let color = '';
+            let mensaje = '';
+            
+            if (imc < 18.5) {
+                categoria = 'Bajo peso';
+                color = '#FFA500'; // Naranja
+                mensaje = '⚠️ Bajo peso - Consultar nutricionista';
+            } else if (imc < 25) {
+                categoria = 'Normal';
+                color = '#28a745'; // Verde
+                mensaje = '✅ Peso saludable - ¡Excelente!';
+            } else if (imc < 30) {
+                categoria = 'Sobrepeso';
+                color = '#FFA500'; // Naranja
+                mensaje = '⚠️ Sobrepeso - Considerar dieta y ejercicio';
+            } else if (imc < 35) {
+                categoria = 'Obesidad Tipo I';
+                color = '#dc3545'; // Rojo
+                mensaje = '🔴 Obesidad Tipo I - Consultar médico';
+            } else if (imc < 40) {
+                categoria = 'Obesidad Tipo II';
+                color = '#dc3545'; // Rojo
+                mensaje = '🔴 Obesidad Tipo II - Atención médica requerida';
+            } else {
+                categoria = 'Obesidad Tipo III';
+                color = '#721c24'; // Rojo oscuro
+                mensaje = '🚨 Obesidad Tipo III - Atención médica urgente';
+            }
+            
+            // Mostrar estado con estilo
+            estadoDiv.style.display = 'block';
+            estadoDiv.style.backgroundColor = color + '20'; // 20% opacity
+            estadoDiv.style.color = color;
+            estadoDiv.style.border = `2px solid ${color}`;
+            estadoDiv.textContent = `${categoria} (IMC: ${imc.toFixed(2)}) - ${mensaje}`;
+            
+            console.log('[SEGUIMIENTO] IMC calculado:', imc.toFixed(2), '-', categoria);
+        } else {
+            imcInput.value = '';
+            estadoDiv.style.display = 'none';
+        }
+    }
+
+    /**
      * Carga los datos del empleado en el panel
      */
     cargarDatosEnPanelSeguimiento(empleadoData) {
@@ -2234,19 +2384,31 @@ class MedicionAusentismoComponent {
         
         console.log('[SEGUIMIENTO][PANEL] Cargando datos del empleado:', empleadoData.nombre);
         console.log('[SEGUIMIENTO][PANEL] Total incapacidades recibidas:', empleadoData.incapacidades?.length || 0);
-        
+
+        // === FUNCIÓN AUXILIAR para obtener año de fecha ===
+        function obtenerAnio(fecha) {
+            if (!fecha) return null;
+            if (fecha instanceof Date) return fecha.getFullYear();
+            if (typeof fecha === 'string') {
+                const date = new Date(fecha);
+                return isNaN(date.getTime()) ? null : date.getFullYear();
+            }
+            return null;
+        }
+
         // === FILTRAR incapacidades por el año seleccionado en el filtro ===
         const yearFilter = document.getElementById('seguimientoYearFilter')?.value;
         let incapacidadesParaMostrar = empleadoData.incapacidades || [];
-        
+
         if (yearFilter && yearFilter !== 'all') {
             const yearSeleccionado = parseInt(yearFilter);
             incapacidadesParaMostrar = incapacidadesParaMostrar.filter(inc => {
-                return inc.fechaInicio && inc.fechaInicio.getFullYear() === yearSeleccionado;
+                const anioInicio = obtenerAnio(inc.fechaInicio);
+                return anioInicio === yearSeleccionado;
             });
             console.log(`[SEGUIMIENTO][PANEL] Filtrado por año ${yearSeleccionado}: ${incapacidadesParaMostrar.length} incapacidades`);
         }
-        
+
         // Si no hay incapacidades después del filtro, usar todas (fallback)
         if (incapacidadesParaMostrar.length === 0) {
             console.log('[SEGUIMIENTO][PANEL] No hay incapacidades del año filtrado, usando todas');
@@ -2260,6 +2422,9 @@ class MedicionAusentismoComponent {
         document.getElementById('sp-cargo').value = empleadoData.cargo || '';
         document.getElementById('sp-area').value = empleadoData.departamento || '';
         document.getElementById('sp-eps').value = empleadoData.empresaUsuaria || '';
+        
+        // Calcular edad automáticamente
+        this.calcularEdad();
 
         // Si hay incapacidades, cargar la más reciente (DEL AÑO FILTRADO)
         if (incapacidadesParaMostrar.length > 0) {
@@ -2366,7 +2531,15 @@ class MedicionAusentismoComponent {
                 eps: document.getElementById('sp-eps').value,
                 afp: document.getElementById('sp-afp').value,
                 arl: document.getElementById('sp-arl').value,
-                cajaCompensacion: document.getElementById('sp-caja-compensacion').value
+                cajaCompensacion: document.getElementById('sp-caja-compensacion').value,
+                // Nuevos campos de Salud
+                peso: document.getElementById('sp-peso').value,
+                talla: document.getElementById('sp-talla').value,
+                imc: document.getElementById('sp-imc').value,
+                actividadesExtralaborales: document.getElementById('sp-actividades-extralaborales').value,
+                // Nuevos campos laborales
+                tipoEvento: document.getElementById('sp-tipo-evento').value,
+                tipoCargo: document.getElementById('sp-tipo-cargo').value
             },
             // Incapacidad
             incapacidad: {
@@ -2430,16 +2603,95 @@ class MedicionAusentismoComponent {
 
         console.log('[GUARDAR SEGUIMIENTO] Datos recopilados:', seguimientoData);
 
-        // Mostrar notificación de éxito
-        this.showNotification('✅ Datos guardados correctamente en la hoja "Casos en seguimiento"', 'success');
-
-        // Cerrar el panel
-        setTimeout(() => {
-            this.closeSeguimientoPanel();
-        }, 1500);
-
-        // TODO: Implementar lógica real de guardado en Excel
-        // window.electronAPI.guardarSeguimientoPCL(this.currentCompany, seguimientoData);
+        // === IMPLEMENTAR GUARDADO REAL EN EXCEL ===
+        console.log('[GUARDAR SEGUIMIENTO] Iniciando guardado en PRI.xlsx...');
+        
+        // Verificar si hay API disponible
+        const apiToUse = window.electronAPI?.saveFollowUp || 
+                        window.parent?.electronAPI?.saveFollowUp;
+        
+        if (!apiToUse) {
+            console.error('[GUARDAR SEGUIMIENTO] API saveFollowUp no disponible');
+            this.showNotification('❌ Error: Función de guardado no disponible', 'error');
+            return;
+        }
+        
+        // Mostrar indicador de carga
+        const saveButton = document.querySelector('.sp-btn-success');
+        if (saveButton) {
+            saveButton.disabled = true;
+            saveButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+        }
+        
+        // Preparar datos para guardar
+        const followUpData = {
+            employeeId: seguimientoData.trabajador.cedula,
+            employeeName: seguimientoData.trabajador.nombre,
+            diagnosis: seguimientoData.incapacidad.descripcionDiagnostico,
+            followUpDate: new Date().toISOString().split('T')[0],
+            followUpType: 'presencial',
+            evolution: seguimientoData.incapacidad.contingencia,
+            recommendations: seguimientoData.recomendaciones.map(r => r.descripcion).join('; '),
+            nextFollowUp: seguimientoData.pric.fechaProbableAlta || '',
+            caseStatus: 'En seguimiento',
+            timestamp: new Date().toISOString(),
+            // Datos adicionales de Salud
+            peso: seguimientoData.trabajador.peso || '',
+            talla: seguimientoData.trabajador.talla || '',
+            imc: seguimientoData.trabajador.imc || '',
+            actividadesExtralaborales: seguimientoData.trabajador.actividadesExtralaborales || '',
+            // Datos laborales adicionales
+            tipoEvento: seguimientoData.trabajador.tipoEvento || '',
+            tipoCargo: seguimientoData.trabajador.tipoCargo || '',
+            // Datos necesarios para las columnas del PRI.xlsx
+            fechaNacimiento: seguimientoData.trabajador.fechaNacimiento || '',
+            genero: seguimientoData.trabajador.genero || '',
+            fechaIngreso: seguimientoData.trabajador.fechaIngreso || '',
+            area: seguimientoData.trabajador.area || '',
+            tipoContrato: seguimientoData.trabajador.tipoContrato || '',
+            afp: seguimientoData.trabajador.afp || '',
+            diasAcumulados: seguimientoData.incapacidad.diasAcumulados || '',
+            codigoCie10: seguimientoData.incapacidad.codigoCie10 || '',
+            fechaFin: seguimientoData.incapacidad.fechaFin || ''
+        };
+        
+        console.log('[GUARDAR SEGUIMIENTO] Enviando datos:', followUpData);
+        console.log('[GUARDAR SEGUIMIENTO] Empresa:', this.currentCompany);
+        
+        // Llamar a la API
+        apiToUse(followUpData, this.currentCompany)
+            .then(result => {
+                console.log('[GUARDAR SEGUIMIENTO] Resultado:', result);
+                
+                if (saveButton) {
+                    saveButton.disabled = false;
+                    saveButton.innerHTML = '<i class="fas fa-save"></i> Guardar Seguimiento';
+                }
+                
+                if (result && result.success) {
+                    console.log('[GUARDAR SEGUIMIENTO] ✅ Datos guardados exitosamente');
+                    this.showNotification('✅ Datos guardados correctamente en PRI.xlsx', 'success');
+                    
+                    // Cerrar el panel después de un breve delay
+                    setTimeout(() => {
+                        this.closeSeguimientoPanel();
+                    }, 1500);
+                } else {
+                    const errorMsg = result?.error || 'Error desconocido';
+                    console.error('[GUARDAR SEGUIMIENTO] ❌ Error:', errorMsg);
+                    this.showNotification('❌ Error al guardar: ' + errorMsg, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('[GUARDAR SEGUIMIENTO] ❌ Error en la llamada:', error);
+                
+                if (saveButton) {
+                    saveButton.disabled = false;
+                    saveButton.innerHTML = '<i class="fas fa-save"></i> Guardar Seguimiento';
+                }
+                
+                this.showNotification('❌ Error al guardar: ' + error.message, 'error');
+            });
     }
 
     async renderRegistrarAusentismoView(container) {

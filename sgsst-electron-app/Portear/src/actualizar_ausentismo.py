@@ -417,69 +417,150 @@ def buscar_empleado_main(cedula, empresa):
 
 def guardar_seguimiento(empresa, file_path, datos):
     """
-    Guarda un seguimiento de incapacidad en un archivo específico de seguimientos,
-    siempre en una hoja llamada 'Seguimientos'.
+    Guarda un seguimiento de incapacidad en el archivo PRI.xlsx,
+    en la hoja 'Casos en seguimiento', organizando los datos en las columnas correctas.
+    Los encabezados están en filas 5-6, los datos comienzan en fila 7.
     """
     try:
-        # Usar el archivo específico para seguimientos
-        seguimiento_file_path = r"G:\Mi unidad\2. Trabajo\1. SG-SST\2. Temporales Comfa\Seguimiento Casos Medicos.xlsx"
-        log(f"Guardando seguimiento en archivo específico: {seguimiento_file_path}")
+        # USAR el archivo que se pasa como parámetro (PRI.xlsx)
+        seguimiento_file_path = file_path
+        log(f"Guardando seguimiento en archivo: {seguimiento_file_path}")
         log(f"Datos de seguimiento recibidos: {datos}")
 
-        SHEET_NAME = "Seguimientos"
+        SHEET_NAME = "Casos en seguimiento"
 
-        # Verificar si el archivo de seguimiento existe, si no, crearlo
+        # Verificar si el archivo existe
         if not os.path.exists(seguimiento_file_path):
-            from openpyxl import Workbook
-            wb = Workbook()
-            ws = wb.active
-            ws.title = SHEET_NAME
-            headers = ["Empresa", "ID Empleado", "Nombre Empleado", "Diagnóstico", "Fecha Seguimiento",
-                       "Tipo Seguimiento", "Evolución", "Recomendaciones", "Próximo Seguimiento",
-                       "Estado Caso", "Fecha Registro"]
-            ws.append(headers)
-            wb.save(seguimiento_file_path)
-            log(f"✅ Archivo de seguimiento creado con hoja '{SHEET_NAME}'.")
+            log(f"❌ El archivo PRI.xlsx no existe: {seguimiento_file_path}")
+            return {"success": False, "error": "El archivo PRI.xlsx no existe"}
         
         # Cargar el libro de trabajo
         wb = load_workbook(seguimiento_file_path)
-
-        # Asegurar que la hoja "Seguimientos" exista, si no, crearla con encabezados
-        if SHEET_NAME not in wb.sheetnames:
-            ws = wb.create_sheet(SHEET_NAME)
-            headers = ["Empresa", "ID Empleado", "Nombre Empleado", "Diagnóstico", "Fecha Seguimiento",
-                       "Tipo Seguimiento", "Evolución", "Recomendaciones", "Próximo Seguimiento",
-                       "Estado Caso", "Fecha Registro"]
-            ws.append(headers)
-        else:
-            ws = wb[SHEET_NAME]
-
-        # Extraer y normalizar información del seguimiento
-        empleado_id_raw = datos.get("employeeId", "")
-        empleado_id = str(empleado_id_raw).replace(',', '').replace('.', '').replace(' ', '').strip() if empleado_id_raw else ""
-
-        # Construir la fila de datos
-        nueva_fila = [
-            empresa,
-            empleado_id,
-            datos.get("employeeName", ""),
-            datos.get("diagnosis", ""),
-            datos.get("followUpDate", ""),
-            datos.get("followUpType", ""),
-            datos.get("evolution", ""),
-            datos.get("recommendations", ""),
-            datos.get("nextFollowUp", ""),
-            datos.get("caseStatus", ""),
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        ]
         
-        ws.append(nueva_fila)
+        # Verificar si la hoja existe
+        if SHEET_NAME not in wb.sheetnames:
+            log(f"❌ La hoja '{SHEET_NAME}' no existe en PRI.xlsx")
+            return {"success": False, "error": f"La hoja '{SHEET_NAME}' no existe en PRI.xlsx"}
+        
+        ws = wb[SHEET_NAME]
+        log(f"✅ Usando hoja: {SHEET_NAME}")
+        log(f"✅ Filas totales actuales: {ws.max_row}")
+        
+        # Los encabezados están en filas 5-6, los datos comienzan en fila 7
+        primera_fila_datos = 7
+        
+        # Buscar la primera fila vacía comenzando desde la fila 7
+        siguiente_fila = primera_fila_datos
+        while siguiente_fila <= ws.max_row:
+            # Verificar si la fila está vacía (revisar columna C - Nombre)
+            if ws[f"C{siguiente_fila}"].value is None or ws[f"C{siguiente_fila}"].value == "":
+                log(f"✅ Primera fila vacía encontrada: {siguiente_fila}")
+                break
+            siguiente_fila += 1
+        
+        # Si todas las filas tienen datos, usar la siguiente fila después de max_row
+        if siguiente_fila > ws.max_row:
+            log(f"✅ Usando nueva fila: {siguiente_fila}")
+        
+        # Calcular edad desde fecha de nacimiento
+        def calcular_edad(fecha_nacimiento_str):
+            if not fecha_nacimiento_str:
+                return ""
+            try:
+                from datetime import datetime
+                fecha_nac = datetime.strptime(str(fecha_nacimiento_str), "%Y-%m-%d")
+                hoy = datetime.now()
+                edad = hoy.year - fecha_nac.year - ((hoy.month, hoy.day) < (fecha_nac.month, fecha_nac.day))
+                return str(edad)
+            except:
+                return ""
+        
+        # Calcular antigüedad desde fecha de ingreso
+        def calcular_antiguedad(fecha_ingreso_str):
+            if not fecha_ingreso_str:
+                return ""
+            try:
+                from datetime import datetime
+                fecha_ing = datetime.strptime(str(fecha_ingreso_str), "%Y-%m-%d")
+                hoy = datetime.now()
+                anios = hoy.year - fecha_ing.year - ((hoy.month, hoy.day) < (fecha_ing.month, fecha_ing.day))
+                return str(anios)
+            except:
+                return ""
+        
+        # Calcular estado nutricional desde IMC
+        def calcular_estado_nutricional(imc_str):
+            if not imc_str:
+                return ""
+            try:
+                imc = float(imc_str)
+                if imc < 18.5:
+                    return "Bajo peso"
+                elif imc < 25:
+                    return "Normal"
+                elif imc < 30:
+                    return "Sobrepeso"
+                elif imc < 35:
+                    return "Obesidad Tipo I"
+                elif imc < 40:
+                    return "Obesidad Tipo II"
+                else:
+                    return "Obesidad Tipo III"
+            except:
+                return ""
+        
+        # Extraer y procesar datos
+        empleado_id = str(datos.get("employeeId", "")).replace(',', '').replace('.', '').replace(' ', '').strip()
+        edad = calcular_edad(datos.get("fechaNacimiento", ""))
+        antiguedad = calcular_antiguedad(datos.get("fechaIngreso", ""))
+        estado_nutricional = calcular_estado_nutricional(datos.get("imc", ""))
+        
+        # Construir la fila de datos ORGANIZADA POR COLUMNAS
+        # Estructura: A=1, B=2, C=3, D=4, E=5, F=6, G=7, H=8, I=9, J=10, K=11, L=12, M=13, N=14, O=15, P=16, Q=17, R=18, S=19, T=20, U=21, V=22, W=23, X=24, Y=25, Z=26, AA=27
+        # Índices en Python (base 0): C=2, D=3, E=4, F=5, G=6, H=7, J=8, M=12, N=13, O=14, P=15, Q=16, R=17, S=18, T=19, U=20, V=21, X=22, Y=23, Z=24, AA=25
+        
+        # Crear una lista con todas las columnas (hasta AA = índice 25)
+        fila_completa = [""] * 26  # 26 columnas de A a Z
+        
+        # Asignar valores a las columnas específicas
+        fila_completa[2] = datos.get("employeeName", "")  # C - Nombre (índice 2)
+        fila_completa[3] = empleado_id  # D - Cédula (índice 3)
+        fila_completa[4] = datos.get("genero", "")  # E - Género (índice 4)
+        fila_completa[5] = datos.get("fechaNacimiento", "")  # F - Fecha Nacimiento (índice 5)
+        fila_completa[6] = edad  # G - Edad (índice 6)
+        fila_completa[7] = datos.get("fechaIngreso", "")  # H - Fecha Ingreso (índice 7)
+        fila_completa[8] = antiguedad  # J - Antigüedad (índice 8)
+        fila_completa[12] = datos.get("area", "")  # M - Sede/Área (índice 12)
+        fila_completa[13] = datos.get("cargo", "")  # N - Cargo (índice 13)
+        fila_completa[14] = datos.get("tipoCargo", "")  # O - Tipo de Cargo (índice 14)
+        fila_completa[15] = datos.get("tipoContrato", "")  # P - Tipo de Vinculación (índice 15)
+        fila_completa[16] = datos.get("eps", "")  # Q - EPS (índice 16)
+        fila_completa[17] = datos.get("afp", "")  # R - AFP (índice 17)
+        fila_completa[18] = datos.get("peso", "")  # S - Peso (índice 18)
+        fila_completa[19] = datos.get("talla", "")  # T - Talla (índice 19)
+        fila_completa[20] = datos.get("imc", "")  # U - IMC (índice 20)
+        fila_completa[21] = estado_nutricional  # V - Estado Nutricional (índice 21)
+        fila_completa[22] = datos.get("actividadesExtralaborales", "")  # X - Actividades Extralaborales (índice 22)
+        fila_completa[23] = datos.get("diasAcumulados", "")  # Y - Total Días Acumulados (índice 23)
+        fila_completa[24] = datos.get("fechaFin", "")  # Z - Fecha Finalización Incapacidad (índice 24)
+        fila_completa[25] = datos.get("codigoCie10", "")  # AA - Código CIE-10 (índice 25)
+        
+        # Insertar la fila en la posición correcta
+        log(f"📝 Escribiendo datos en fila {siguiente_fila}:")
+        log(f"   Nombre: {fila_completa[2]}, Cédula: {fila_completa[3]}, Edad: {fila_completa[6]}")
+        
+        for col_idx, valor in enumerate(fila_completa):
+            col_letter = chr(65 + col_idx)  # Convertir índice a letra de columna (A=65)
+            ws[f"{col_letter}{siguiente_fila}"] = valor
+        
         wb.save(seguimiento_file_path)
-        log(f"✅ Seguimiento guardado correctamente en la hoja '{SHEET_NAME}' en la fila {ws.max_row}")
+        log(f"✅ Seguimiento guardado correctamente en la hoja '{SHEET_NAME}' fila {siguiente_fila}")
 
         return {
-            "success": True, "message": "Seguimiento guardado.",
-            **datos # Devolver los datos originales para consistencia del frontend
+            "success": True, 
+            "message": "Seguimiento guardado.",
+            "fila": siguiente_fila,
+            **datos
         }
 
     except Exception as e:
