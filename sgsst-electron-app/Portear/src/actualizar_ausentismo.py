@@ -478,7 +478,8 @@ def guardar_seguimiento(empresa, file_path, datos):
     Guarda un seguimiento de incapacidad en el archivo PRI.xlsx,
     en la hoja 'Casos en seguimiento', organizando los datos en las columnas correctas.
     Los encabezados están en filas 5-6, los datos comienzan en fila 7.
-    Busca si ya existe un registro con la misma cédula y pregunta si desea actualizar.
+    Busca si ya existe un registro con la misma cédula Y las mismas fechas para actualizar.
+    Si las fechas son diferentes, crea un nuevo registro.
     """
     try:
         # USAR el archivo que se pasa como parámetro (PRI.xlsx)
@@ -492,59 +493,92 @@ def guardar_seguimiento(empresa, file_path, datos):
         if not os.path.exists(seguimiento_file_path):
             log(f"❌ El archivo PRI.xlsx no existe: {seguimiento_file_path}")
             return {"success": False, "error": "El archivo PRI.xlsx no existe"}
-        
+
         # Cargar el libro de trabajo
         wb = load_workbook(seguimiento_file_path)
-        
+
         # Verificar si la hoja existe
         if SHEET_NAME not in wb.sheetnames:
             log(f"❌ La hoja '{SHEET_NAME}' no existe en PRI.xlsx")
             return {"success": False, "error": f"La hoja '{SHEET_NAME}' no existe en PRI.xlsx"}
-        
+
         ws = wb[SHEET_NAME]
         log(f"✅ Usando hoja: {SHEET_NAME}")
         log(f"✅ Filas totales actuales: {ws.max_row}")
-        
+
         # Extraer cédula del empleado
         empleado_id = str(datos.get("employeeId", "")).replace(',', '').replace('.', '').replace(' ', '').strip()
         empleado_nombre = datos.get("employeeName", "")
         
+        # Extraer fecha_fin (identificador único de incapacidad)
+        fecha_fin_datos = str(datos.get("fechaFin", "")).strip()
+        dias_acumulados_datos = str(datos.get("diasAcumulados", "")).strip()
+
+        log(f"🔍 Buscando registro con cédula: {empleado_id}, fecha_fin: {fecha_fin_datos}")
+
         # Los encabezados están en filas 5-6, los datos comienzan en fila 7
         primera_fila_datos = 7
-        
-        # BUSCAR si ya existe un registro con esta cédula en columna D
+
+        # BUSCAR si ya existe un registro con esta cédula Y las mismas fechas
         fila_existente = None
         for fila_idx in range(primera_fila_datos, ws.max_row + 1):
             celda_cedula = ws[f"D{fila_idx}"].value
+            celda_fecha_fin = ws[f"Z{fila_idx}"].value  # Columna Z = Fecha Fin
+            
             if celda_cedula:
                 cedula_en_celda = str(celda_cedula).replace(',', '').replace('.', '').replace(' ', '').strip()
+                
+                # Verificar cédula
                 if cedula_en_celda == empleado_id:
-                    fila_existente = fila_idx
-                    log(f"⚠️ YA EXISTE un registro con cédula {empleado_id} en fila {fila_existente}")
-                    log(f"   Nombre en registro existente: {ws[f'C{fila_existente}'].value}")
-                    break
-        
+                    # Verificar fecha_fin (si existe en ambos)
+                    if fecha_fin_datos and celda_fecha_fin:
+                        celda_fecha_fin_str = str(celda_fecha_fin).strip()
+                        # Comparar fechas (normalizar formato)
+                        misma_fecha = False
+                        try:
+                            # Intentar comparar como fechas
+                            from datetime import datetime
+                            fecha_datos = datetime.strptime(fecha_fin_datos, "%Y-%m-%d")
+                            fecha_celda = datetime.strptime(celda_fecha_fin_str, "%Y-%m-%d")
+                            misma_fecha = (fecha_datos == fecha_celda)
+                        except:
+                            # Si falla, comparar como strings
+                            misma_fecha = (fecha_fin_datos == celda_fecha_fin_str)
+                        
+                        if misma_fecha:
+                            fila_existente = fila_idx
+                            log(f"⚠️ YA EXISTE registro con cédula {empleado_id} Y fecha_fin {fecha_fin_datos} en fila {fila_existente}")
+                            log(f"   Nombre: {ws[f'C{fila_existente}'].value}")
+                            log(f"   Diagnóstico: {ws[f'AA{fila_existente}'].value}")
+                            break
+                    else:
+                        # Si no hay fecha_fin, solo usar cédula (comportamiento legacy)
+                        fila_existente = fila_idx
+                        log(f"⚠️ YA EXISTE registro con cédula {empleado_id} (sin fecha) en fila {fila_existente}")
+                        break
+
         # Determinar qué fila usar
         if fila_existente:
-            # Preguntar si desea actualizar (en producción, esto debería ser un diálogo UI)
-            # Por ahora, actualizamos automáticamente pero dejamos log de advertencia
+            # ACTUALIZAR registro existente (mismas fechas)
             log(f"📝 ACTUALIZANDO registro existente en fila {fila_existente}")
-            log(f"   Para crear nuevo registro en lugar de actualizar, elimine la fila {fila_existente} manualmente")
-            siguiente_fila = int(fila_existente)  # Asegurar que sea entero
+            siguiente_fila = int(fila_existente)
         else:
+            # CREAR NUEVO registro (cédula existe pero fechas diferentes, o es nuevo empleado)
+            log(f"➕ CREANDO NUEVO registro para cédula {empleado_id} (fechas diferentes o nuevo)")
+            
             # Buscar la primera fila vacía comenzando desde la fila 7
-            siguiente_fila = int(primera_fila_datos)  # Asegurar que sea entero
+            siguiente_fila = int(primera_fila_datos)
             while siguiente_fila <= ws.max_row:
                 # Verificar si la fila está vacía (revisar columna C - Nombre)
                 if ws[f"C{siguiente_fila}"].value is None or ws[f"C{siguiente_fila}"].value == "":
                     log(f"✅ Primera fila vacía encontrada: {siguiente_fila}")
                     break
-                siguiente_fila = int(siguiente_fila) + 1  # Asegurar incremento como entero
-            
+                siguiente_fila = int(siguiente_fila) + 1
+
             # Si todas las filas tienen datos, usar la siguiente fila después de max_row
             if siguiente_fila > ws.max_row:
                 log(f"✅ Usando nueva fila: {siguiente_fila}")
-        
+
         # Debug: Verificar tipo de dato
         log(f"🔍 DEBUG: siguiente_fila = {siguiente_fila}, tipo = {type(siguiente_fila)}")
         

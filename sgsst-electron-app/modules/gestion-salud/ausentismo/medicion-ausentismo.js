@@ -1445,6 +1445,7 @@ class MedicionAusentismoComponent {
 
         console.log('[SEGUIMIENTO] Cédula:', cedula);
         console.log('[SEGUIMIENTO] Nombre:', nombre);
+        console.log('[SEGUIMIENTO] Incapacidad seleccionada:', this.incapacidadSeleccionada);
 
         // === 1. CERRAR MODAL DE DETALLES ===
         const modalDetalles = document.getElementById('detailModal');
@@ -1466,7 +1467,11 @@ class MedicionAusentismoComponent {
         window.electronAPI.buscarRegistrosCedula(cedula, this.currentCompany)
             .then(resultado => {
                 console.log('[SEGUIMIENTO] Resultado búsqueda:', resultado);
-                
+                console.log('[SEGUIMIENTO] success:', resultado.success);
+                console.log('[SEGUIMIENTO] registros:', resultado.registros);
+                console.log('[SEGUIMIENTO] total:', resultado.total);
+                console.log('[SEGUIMIENTO] registros.length:', resultado.registros ? resultado.registros.length : 'N/A');
+
                 if (resultado.success && resultado.registros && resultado.registros.length > 0) {
                     // Hay registros - mostrar modal antiguo adaptado
                     console.log('[SEGUIMIENTO] Mostrando modal de registros existentes');
@@ -1514,14 +1519,20 @@ class MedicionAusentismoComponent {
             </div>
 
             <!-- Timeline Section Title -->
-            <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #64748B; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
-                <i class="fas fa-history"></i> Incapacidades que activan seguimiento (${incapacidadesOrdenadas.length})
+            <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #64748B; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-history"></i> Incapacidades que activan seguimiento (${incapacidadesOrdenadas.length})
+                </div>
+                <div style="font-size: 11px; font-weight: 400; text-transform: none; color: #94A3B8;">
+                    <i class="fas fa-info-circle"></i> Selecciona para seguimiento
+                </div>
             </div>
 
             <!-- Timeline Items -->
             ${incapacidadesOrdenadas.map((inc, index) => {
                 const isPrincipal = index === 0;
-                
+                const incId = `inc-${index}-${Date.now()}`;
+
                 // Formatear fechas
                 let fechaInicio = 'N/A';
                 let fechaFin = 'N/A';
@@ -1571,19 +1582,34 @@ class MedicionAusentismoComponent {
                         <div style="position: absolute; left: 5px; top: 24px; bottom: -10px; width: 2px; background: #E2E8F0;"></div>
                         ${index === incapacidadesOrdenadas.length - 1 ? '<div style="position: absolute; left: 0; top: 4px; width: 12px; height: 12px; border-radius: 50%; background: white; border: 2px solid ' + dotColor + ';"></div>' : ''}
                         <div style="position: absolute; left: 0; top: 4px; width: 12px; height: 12px; border-radius: 50%; background: ${dotBg}; border: 2px solid ${dotColor};"></div>
-                        
-                        <div style="background: white; border: 1px solid #E2E8F0; border-radius: 10px; padding: 16px;">
+
+                        <div style="background: white; border: 1px solid #E2E8F0; border-radius: 10px; padding: 16px; transition: all 0.2s;" 
+                            onmouseover="this.style.borderColor='#4F46E5'; this.style.boxShadow='0 2px 8px rgba(79, 70, 229, 0.1)'"
+                            onmouseout="this.style.borderColor='#E2E8F0'; this.style.boxShadow='none'">
                             <!-- Timeline Header -->
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #F1F5F9;">
-                                <div style="font-size: 13px; font-weight: 600; color: #1E293B; display: flex; align-items: center; gap: 6px;">
-                                    <i class="fas fa-calendar-alt" style="color: #94A3B8; font-size: 12px;"></i>
-                                    ${fechaInicio} - ${fechaFin}
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #F1F5F9;">
+                                <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+                                    <input type="checkbox" 
+                                        id="${incId}" 
+                                        class="incapacidad-checkbox"
+                                        data-inc-index="${index}"
+                                        data-inc-fecha-inicio="${inc.fechaInicio}"
+                                        data-inc-fecha-fin="${inc.fechaFin}"
+                                        data-inc-dias="${inc.diasIncapacidad}"
+                                        data-inc-diagnostico="${diagnostico.replace(/"/g, '&quot;')}"
+                                        data-inc-codigo="${codigo}"
+                                        style="width: 18px; height: 18px; accent-color: #4F46E5; cursor: pointer;"
+                                        onchange="window.medicAusentismoComponent.onIncapacidadSeleccionada(this)">
+                                    <div style="font-size: 13px; font-weight: 600; color: #1E293B; display: flex; align-items: center; gap: 6px;">
+                                        <i class="fas fa-calendar-alt" style="color: #94A3B8; font-size: 12px;"></i>
+                                        ${fechaInicio} - ${fechaFin}
+                                    </div>
                                 </div>
                                 ${isPrincipal ? '<span style="padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; text-transform: uppercase; background: #DBEAFE; color: #2563EB;">Principal</span>' : '<span style="padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; text-transform: uppercase; background: ' + estadoBg + '; color: ' + estadoColor + ';">' + estado + '</span>'}
                             </div>
-                            
+
                             <!-- Timeline Body -->
-                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-left: 30px;">
                                 <div>
                                     <label style="display: block; font-size: 10px; color: #94A3B8; margin-bottom: 2px; text-transform: uppercase;">Días Totales</label>
                                     <strong style="font-size: 14px; color: #334155; font-weight: 600;">${inc.diasIncapacidad} días</strong>
@@ -1600,13 +1626,12 @@ class MedicionAusentismoComponent {
                                     <label style="display: block; font-size: 10px; color: #94A3B8; margin-bottom: 2px; text-transform: uppercase;">Estado</label>
                                     <strong style="font-size: 14px; color: ${estadoColor}; font-weight: 600;">${estado}</strong>
                                 </div>
-                                ${isPrincipal ? `
+                                <!-- Diagnóstico para TODAS las incapacidades -->
                                 <div style="grid-column: span 3; margin-top: 8px; padding-top: 12px; border-top: 1px solid #F1F5F9;">
                                     <label style="display: block; font-size: 10px; color: #94A3B8; margin-bottom: 4px; text-transform: uppercase;">Diagnóstico</label>
                                     <strong style="font-size: 14px; color: #1E293B; font-weight: 600;">${codigo}</strong>
                                     <div style="font-size: 13px; color: #64748B; margin-top: 4px; line-height: 1.5;">${diagnostico}</div>
                                 </div>
-                                ` : ''}
                             </div>
                         </div>
                     </div>
@@ -1646,17 +1671,23 @@ class MedicionAusentismoComponent {
 
             <!-- Secuencia de incapacidades -->
             <div style="margin-bottom: 20px;">
-                <h4 style="font-size: 14px; font-weight: 600; color: #1E293B; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-                    <i class="fas fa-link" style="color: #10B981;"></i>
-                    SECUENCIA DE INCAPACIDADES (Gaps <= 3 días)
+                <h4 style="font-size: 14px; font-weight: 600; color: #1E293B; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-link" style="color: #10B981;"></i>
+                        SECUENCIA DE INCAPACIDADES (Gaps <= 3 días)
+                    </div>
+                    <div style="font-size: 11px; font-weight: 400; color: #94A3B8; text-transform: none;">
+                        <i class="fas fa-info-circle"></i> Selecciona para seguimiento
+                    </div>
                 </h4>
                 ${incapacidades.map((inc, index) => {
+                    const incId = `inc2-${index}-${Date.now()}`;
                     const fechaInicio = inc.fechaInicio ? inc.fechaInicio.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A';
                     const fechaFin = inc.fechaFin ? inc.fechaFin.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A';
                     const codigo = inc.record?.['CODIGO'] || inc.record?.['CÓDIGO'] || inc.record?.['codigo'] || 'N/A';
                     const diagnostico = inc.record?.['DESCRIPCION'] || inc.record?.['DESCRIPCIÓN'] || inc.record?.['descripcion'] || 'Sin descripción';
                     const tipo = inc.record?.['CLASE DE INCAPACIDAD'] || inc.record?.['clase_de_incapacidad'] || 'EPS';
-                    
+
                     // Calcular gap con la incapacidad anterior
                     let gapHTML = '';
                     if (index > 0) {
@@ -1674,9 +1705,24 @@ class MedicionAusentismoComponent {
                     }
 
                     return `
-                        <div style="background: #F8FAFC; border-left: 4px solid ${index === 0 ? '#10B981' : '#94A3B8'}; border-radius: 8px; padding: 15px; margin-bottom: 12px; position: relative;">
-                            <div style="position: absolute; top: 10px; right: 10px; background: ${index === 0 ? '#10B981' : '#94A3B8'}; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700;">
-                                ${index + 1}
+                        <div style="background: #F8FAFC; border-left: 4px solid ${index === 0 ? '#10B981' : '#94A3B8'}; border-radius: 8px; padding: 15px; margin-bottom: 12px; position: relative; transition: all 0.2s;"
+                            onmouseover="this.style.boxShadow='0 2px 8px rgba(16, 185, 129, 0.1)'"
+                            onmouseout="this.style.boxShadow='none'">
+                            <div style="position: absolute; top: 15px; right: 15px; display: flex; align-items: center; gap: 10px;">
+                                <input type="checkbox" 
+                                    id="${incId}" 
+                                    class="incapacidad-checkbox"
+                                    data-inc-index="${index}"
+                                    data-inc-fecha-inicio="${inc.fechaInicio}"
+                                    data-inc-fecha-fin="${inc.fechaFin}"
+                                    data-inc-dias="${inc.diasIncapacidad}"
+                                    data-inc-diagnostico="${diagnostico.replace(/"/g, '&quot;')}"
+                                    data-inc-codigo="${codigo}"
+                                    style="width: 18px; height: 18px; accent-color: #10B981; cursor: pointer;"
+                                    onchange="window.medicAusentismoComponent.onIncapacidadSeleccionada(this)">
+                                <div style="background: ${index === 0 ? '#10B981' : '#94A3B8'}; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700;">
+                                    ${index + 1}
+                                </div>
                             </div>
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                                 <div>
@@ -2493,6 +2539,40 @@ class MedicionAusentismoComponent {
         const backdrop = document.getElementById('seguimientoPanelBackdrop');
         if (backdrop) {
             backdrop.classList.remove('active');
+        }
+    }
+
+    /**
+     * Maneja la selección de una incapacidad en el modal de detalles
+     */
+    onIncapacidadSeleccionada(checkbox) {
+        const incapacidadesSeleccionadas = document.querySelectorAll('.incapacidad-checkbox:checked');
+        
+        console.log('[INCAPACIDAD SELECCIONADA] Total seleccionadas:', incapacidadesSeleccionadas.length);
+        
+        // Opcional: Limitar a una sola selección
+        if (incapacidadesSeleccionadas.length > 1) {
+            // Desmarcar las anteriores excepto la actual
+            incapacidadesSeleccionadas.forEach((cb, idx) => {
+                if (cb !== checkbox) {
+                    cb.checked = false;
+                }
+            });
+        }
+        
+        // Guardar referencia de la incapacidad seleccionada
+        if (checkbox.checked) {
+            this.incapacidadSeleccionada = {
+                index: checkbox.dataset.incIndex,
+                fechaInicio: checkbox.dataset.incFechaInicio,
+                fechaFin: checkbox.dataset.incFechaFin,
+                dias: checkbox.dataset.incDias,
+                diagnostico: checkbox.dataset.incDiagnostico,
+                codigo: checkbox.dataset.incCodigo
+            };
+            console.log('[INCAPACIDAD SELECCIONADA]', this.incapacidadSeleccionada);
+        } else {
+            this.incapacidadSeleccionada = null;
         }
     }
 
