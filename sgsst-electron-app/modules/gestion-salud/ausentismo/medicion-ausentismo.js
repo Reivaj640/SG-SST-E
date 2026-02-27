@@ -1430,20 +1430,60 @@ class MedicionAusentismoComponent {
     }
 
     openSeguimientoPanelFromModal() {
-        // Cerrar modal de detalles
-        const modal = document.getElementById('detailModal');
-        const modalContainer = modal.querySelector('.modal-container');
-        modal.style.opacity = '0';
-        modal.style.visibility = 'hidden';
-        modalContainer.style.transform = 'translateY(20px)';
-        setTimeout(() => {
-            modal.style.display = 'none';
-        }, 300);
-
-        // Abrir panel de seguimiento si hay empleado seleccionado
-        if (this.currentDetalleEmpleado) {
-            this.openSeguimientoPanel(this.currentDetalleEmpleado);
+        console.log('[OPEN SEGUIMIENTO] === INICIO ===');
+        
+        // Verificar si hay empleado seleccionado
+        if (!this.currentDetalleEmpleado) {
+            console.error('[SEGUIMIENTO] No hay empleado seleccionado');
+            this.showNotification('❌ Error: No hay empleado seleccionado', 'error');
+            return;
         }
+
+        // Obtener cédula y nombre del empleado
+        const cedula = this.currentDetalleEmpleado.cedula || '';
+        const nombre = this.currentDetalleEmpleado.nombre || '';
+
+        console.log('[SEGUIMIENTO] Cédula:', cedula);
+        console.log('[SEGUIMIENTO] Nombre:', nombre);
+
+        // === 1. CERRAR MODAL DE DETALLES ===
+        const modalDetalles = document.getElementById('detailModal');
+        const modalContainer = modalDetalles.querySelector('.modal-container');
+        
+        if (modalDetalles) {
+            modalDetalles.style.opacity = '0';
+            modalDetalles.style.visibility = 'hidden';
+            if (modalContainer) {
+                modalContainer.style.transform = 'translateY(20px)';
+            }
+            setTimeout(() => {
+                modalDetalles.style.display = 'none';
+            }, 300);
+        }
+
+        // === 2. BUSCAR REGISTROS Y MOSTRAR MODAL ANTIGUO ===
+        console.log('[SEGUIMIENTO] Buscando registros existentes...');
+        window.electronAPI.buscarRegistrosCedula(cedula, this.currentCompany)
+            .then(resultado => {
+                console.log('[SEGUIMIENTO] Resultado búsqueda:', resultado);
+                
+                if (resultado.success && resultado.registros && resultado.registros.length > 0) {
+                    // Hay registros - mostrar modal antiguo adaptado
+                    console.log('[SEGUIMIENTO] Mostrando modal de registros existentes');
+                    this.mostrarModalSeleccionRegistros(resultado.registros, {
+                        trabajador: { nombre: nombre, cedula: cedula }
+                    });
+                } else {
+                    // No hay registros - abrir panel directamente para crear nuevo
+                    console.log('[SEGUIMIENTO] No hay registros, abriendo panel para caso nuevo');
+                    this.abrirPanelSeguimientoConEmpleado(this.currentDetalleEmpleado);
+                }
+            })
+            .catch(error => {
+                console.error('[SEGUIMIENTO] Error buscando registros:', error);
+                // En caso de error, abrir panel directamente
+                this.abrirPanelSeguimientoConEmpleado(this.currentDetalleEmpleado);
+            });
     }
 
     renderCondicion1Detalle(nombre, cedula, incapacidadesLargas, totalDias) {
@@ -1699,12 +1739,12 @@ class MedicionAusentismoComponent {
         // Preparar datos para pasar al botón
         const nombreParam = nombreEmpleado ? nombreEmpleado.replace(/'/g, "\\'") : '';
         const cedulaParam = cedula.replace(/'/g, "\\'");
-        
+
         // Serializar datos del empleado si están disponibles
-        const empleadoDataStr = empleadoData 
+        const empleadoDataStr = empleadoData
             ? JSON.stringify(empleadoData).replace(/"/g, '&quot;')
             : 'null';
-        
+
         return `
             <div style="border-top: 2px solid #e2e8f0; padding-top: 20px;">
                 <h4 style="font-size: 14px; font-weight: 600; color: #1E293B; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
@@ -1712,7 +1752,7 @@ class MedicionAusentismoComponent {
                     SEGUIMIENTO DEL CASO
                 </h4>
                 <div style="display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap;">
-                    <button onclick="window.medicAusentismoComponent.abrirSeguimiento('${cedulaParam}', '${nombreParam}', ${empleadoDataStr})"
+                    <button onclick="window.medicAusentismoComponent.abrirSeguimientoDesdeTarjeta('${cedulaParam}', '${nombreParam}', ${empleadoDataStr})"
                         style="padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; background: linear-gradient(135deg, #174ea6, #2d5dc7); color: white; display: flex; align-items: center; gap: 8px; transition: all 0.2s;"
                         onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 6px -1px rgba(23, 78, 166, 0.3)'"
                         onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
@@ -1721,6 +1761,29 @@ class MedicionAusentismoComponent {
                 </div>
             </div>
         `;
+    }
+
+    /**
+     * Abre seguimiento desde una tarjeta/nota (fuera del modal de detalles)
+     * Busca el empleado en currentDetalleEmpleado o lo crea temporalmente
+     */
+    abrirSeguimientoDesdeTarjeta(cedula, nombre, empleadoData) {
+        console.log('[ABRIR DESDE TARJETA] Cédula:', cedula, 'Nombre:', nombre);
+        
+        // Si ya hay un empleado en currentDetalleEmpleado con la misma cédula, usarlo
+        if (this.currentDetalleEmpleado && this.currentDetalleEmpleado.cedula === cedula) {
+            console.log('[ABRIR DESDE TARJETA] Usando currentDetalleEmpleado existente');
+            this.openSeguimientoPanelFromModal();
+        } else {
+            // Crear un objeto temporal de empleado
+            this.currentDetalleEmpleado = {
+                cedula: cedula,
+                nombre: nombre,
+                incapacidades: empleadoData?.incapacidades || []
+            };
+            console.log('[ABRIR DESDE TARJETA] Creando currentDetalleEmpleado temporal');
+            this.openSeguimientoPanelFromModal();
+        }
     }
 
     guardarNota(cedula) {
@@ -1744,29 +1807,6 @@ class MedicionAusentismoComponent {
         setTimeout(() => {
             document.getElementById('detailModal').style.display = 'none';
         }, 1000);
-    }
-
-    abrirSeguimiento(cedula, nombreEmpleado, empleadoData = null) {
-        // Cerrar el modal de detalles primero
-        document.getElementById('detailModal').style.display = 'none';
-
-        // Crear el panel slideover si no existe
-        if (!document.getElementById('seguimientoPanelBackdrop')) {
-            this.createSeguimientoPanel();
-        }
-
-        // Cargar datos del empleado en el formulario
-        if (empleadoData) {
-            this.cargarDatosEnPanelSeguimiento(empleadoData);
-        }
-
-        // Abrir el panel
-        document.getElementById('seguimientoPanelBackdrop').classList.add('active');
-
-        // Mostrar notificación
-        this.showNotification(`Gestión de caso: ${nombreEmpleado}`, 'info');
-
-        console.log(`[ABRIR SEGUIMIENTO] Cédula: ${cedula}, Nombre: ${nombreEmpleado}`);
     }
 
     /**
@@ -2457,6 +2497,329 @@ class MedicionAusentismoComponent {
     }
 
     /**
+     * Abre el modal para cargar casos existentes filtrados por cédula
+     * Se usa después de hacer clic en "Abrir Seguimiento" desde el modal de detalles
+     */
+    async openCargarCasosModalPorCedula(cedula, nombre) {
+        console.log('[CARGAR CASOS POR CEDULA] Abriendo modal para cédula:', cedula);
+
+        // Crear modal si no existe
+        if (!document.getElementById('modalCargarCasos')) {
+            this.crearModalCargarCasos();
+        }
+
+        // Cargar casos desde PRI.xlsx
+        const modal = document.getElementById('modalCargarCasos');
+        const listaCasos = document.getElementById('listaCasosContenido');
+        const modalHeader = modal.querySelector('h3');
+        const modalSubheader = modal.querySelector('p');
+        
+        // Actualizar título del modal
+        if (modalHeader) modalHeader.textContent = 'Seleccionar Caso para Cargar';
+        if (modalSubheader) modalSubheader.textContent = `Casos registrados para: ${nombre} (CC: ${cedula})`;
+        
+        // Mostrar estado de carga
+        listaCasos.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #64748B;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 32px; margin-bottom: 16px;"></i>
+                <p>Buscando casos registrados...</p>
+            </div>
+        `;
+
+        // Mostrar modal
+        modal.style.display = 'flex';
+        setTimeout(() => {
+            modal.style.opacity = '1';
+            modal.style.visibility = 'visible';
+        }, 10);
+
+        // Buscar casos por cédula desde el backend
+        try {
+            const resultado = await window.electronAPI.buscarRegistrosCedula(cedula, this.currentCompany);
+            console.log('[CARGAR CASOS] Resultado:', resultado);
+
+            if (resultado.success && resultado.registros && resultado.registros.length > 0) {
+                // Renderizar lista de casos encontrados
+                listaCasos.innerHTML = `
+                    <div style="margin-bottom: 16px; padding: 12px; background: #EEF2FF; border-radius: 8px; border-left: 4px solid #4F46E5;">
+                        <div style="font-weight: 600; color: #1E40AF; font-size: 13px;">
+                            <i class="fas fa-info-circle"></i> ${resultado.registros.length} caso(s) encontrado(s)
+                        </div>
+                        <div style="font-size: 12px; color: #64748B; margin-top: 4px;">
+                            Selecciona un caso para cargar sus datos o crea uno nuevo
+                        </div>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        ${resultado.registros.map((caso, idx) => `
+                            <div style="display: flex; align-items: center; padding: 12px; border: 1px solid #E2E8F0; border-radius: 8px; cursor: pointer; transition: all 0.2s; background: white;"
+                                onmouseover="this.style.borderColor='#4F46E5'; this.style.background='#EEF2FF'"
+                                onmouseout="this.style.borderColor='#E2E8F0'; this.style.background='white'"
+                                onclick="window.medicAusentismoComponent.cargarCasoSeleccionado(${JSON.stringify(caso).replace(/"/g, '&quot;')}, ${idx === 0 ? 'true' : 'false'})">
+                                <div style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #10B981, #059669); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0;">
+                                    <i class="fas fa-file-medical" style="font-size: 16px;"></i>
+                                </div>
+                                <div style="flex: 1; margin-left: 12px;">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <div style="font-weight: 600; font-size: 14px; color: #1E293B;">
+                                            ${caso.fecha_fin || 'Sin fecha fin'} | 
+                                            <span style="color: #4F46E5;">${caso.dias || '0'} días</span>
+                                        </div>
+                                        ${idx === 0 ? '<span style="padding: 2px 8px; background: #FEF3C7; color: #D97706; font-size: 10px; font-weight: 600; border-radius: 12px; text-transform: uppercase;">Más reciente</span>' : ''}
+                                    </div>
+                                    <div style="font-size: 12px; color: #64748B; margin-top: 4px;">
+                                        ${caso.diagnostico || 'Sin diagnóstico'}
+                                    </div>
+                                </div>
+                                <i class="fas fa-chevron-right" style="color: #94A3B8; font-size: 12px;"></i>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #E2E8F0; text-align: center;">
+                        <button onclick="window.medicAusentismoComponent.cargarCasoSeleccionado(null, false)"
+                            style="padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid #E2E8F0; background: white; color: #64748B; transition: all 0.2s;"
+                            onmouseover="this.style.borderColor='#94A3B8'; this.style.background='#F1F5F9'"
+                            onmouseout="this.style.borderColor='#E2E8F0'; this.style.background='white'">
+                            <i class="fas fa-plus"></i> Crear caso nuevo
+                        </button>
+                    </div>
+                `;
+                console.log(`[CARGAR CASOS] ${resultado.registros.length} casos encontrados`);
+            } else if (resultado.success && (!resultado.registros || resultado.registros.length === 0)) {
+                // No hay casos registrados - mostrar opción de crear nuevo
+                listaCasos.innerHTML = `
+                    <div style="text-align: center; padding: 40px;">
+                        <div style="width: 80px; height: 80px; border-radius: 50%; background: #EEF2FF; color: #4F46E5; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
+                            <i class="fas fa-inbox" style="font-size: 32px;"></i>
+                        </div>
+                        <h4 style="font-size: 16px; font-weight: 600; color: #1E293B; margin-bottom: 8px;">No hay casos registrados</h4>
+                        <p style="font-size: 13px; color: #64748B; margin-bottom: 20px;">
+                            No se encontraron casos previos para esta cédula
+                        </p>
+                        <button onclick="window.medicAusentismoComponent.cargarCasoSeleccionado(null, false)"
+                            style="padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; background: linear-gradient(135deg, #4F46E5, #7C3AED); color: white; transition: all 0.2s; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);"
+                            onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 6px 8px -1px rgba(79, 70, 229, 0.3)'"
+                            onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 6px -1px rgba(79, 70, 229, 0.2)'">
+                            <i class="fas fa-plus"></i> Crear caso nuevo
+                        </button>
+                    </div>
+                `;
+            } else {
+                throw new Error(resultado.error || 'Error al buscar casos');
+            }
+        } catch (error) {
+            console.error('[CARGAR CASOS] Error:', error);
+            listaCasos.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: #EF4444;">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px;"></i>
+                    <p>Error al buscar casos: ${error.message}</p>
+                    <button onclick="window.medicAusentismoComponent.cargarCasoSeleccionado(null, false)"
+                        style="margin-top: 16px; padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid #E2E8F0; background: white; color: #64748B;">
+                        Continuar sin cargar
+                    </button>
+                </div>
+            `;
+        }
+    }
+
+    /**
+     * Crea el modal para cargar casos existentes
+     */
+    crearModalCargarCasos() {
+        const modal = document.createElement('div');
+        modal.id = 'modalCargarCasos';
+        modal.className = 'modal-backdrop';
+        modal.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(5px);
+            z-index: 10001; display: none;
+            align-items: center; justify-content: center;
+            opacity: 0; visibility: hidden; transition: all 0.3s ease;
+        `;
+
+        modal.innerHTML = `
+            <div style="background: white; border-radius: 16px; max-width: 800px; width: 90%; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);">
+                <!-- Header -->
+                <div style="padding: 24px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); color: white; border-radius: 16px 16px 0 0;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 18px; font-weight: 600;">Cargar Caso Existente</h3>
+                        <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.9;">Selecciona un caso registrado para cargar sus datos</p>
+                    </div>
+                    <button onclick="document.getElementById('modalCargarCasos').style.display='none'"
+                        style="width: 32px; height: 32px; border-radius: 8px; border: none; background: rgba(255,255,255,0.2); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;"
+                        onmouseover="this.style.background='rgba(255,255,255,0.3)'"
+                        onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <!-- Body - Lista de casos -->
+                <div id="listaCasosContenido" style="padding: 24px; overflow-y: auto; max-height: calc(80vh - 140px); background: #F8FAFC;">
+                    <!-- Se llena dinámicamente -->
+                </div>
+
+                <!-- Footer -->
+                <div style="padding: 16px 24px; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; background: white; border-radius: 0 0 16px 16px;">
+                    <button onclick="document.getElementById('modalCargarCasos').style.display='none'"
+                        style="padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid #E2E8F0; background: white; color: #475569; transition: all 0.2s;"
+                        onmouseover="this.style.borderColor='#CBD5E1'; this.style.background='#F1F5F9'"
+                        onmouseout="this.style.borderColor='#E2E8F0'; this.style.background='white'">
+                        <i class="fas fa-times"></i> Cerrar
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Cerrar al hacer clic en el backdrop
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+    }
+
+    /**
+     * Carga un caso seleccionado desde el modal de búsqueda por cédula
+     * @param {Object} caso - Datos del caso (null si es caso nuevo)
+     * @param {boolean} esRegistroExistente - true si carga de registro existente, false si es nuevo
+     */
+    cargarCasoSeleccionado(caso, esRegistroExistente) {
+        console.log('[CARGAR CASO SELECCIONADO] Caso:', caso, 'Es registro existente:', esRegistroExistente);
+
+        // Cerrar modal
+        const modal = document.getElementById('modalCargarCasos');
+        if (modal) {
+            modal.style.opacity = '0';
+            modal.style.visibility = 'hidden';
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 300);
+        }
+
+        // Si es caso nuevo (null), abrir panel vacío con datos básicos del empleado actual
+        if (!caso) {
+            console.log('[CARGAR CASO SELECCIONADO] Creando caso nuevo');
+            if (this.currentDetalleEmpleado) {
+                // Abrir panel directamente
+                this.abrirPanelSeguimientoConEmpleado(this.currentDetalleEmpleado);
+                this.showNotification('📝 Creando caso nuevo', 'info');
+            }
+            return;
+        }
+
+        // Cargar caso existente
+        console.log('[CARGAR CASO SELECCIONADO] Cargando caso existente de fila:', caso.fila);
+
+        // Abrir panel con el empleado actual
+        if (this.currentDetalleEmpleado) {
+            this.abrirPanelSeguimientoConEmpleado(this.currentDetalleEmpleado);
+        }
+
+        // Esperar a que el panel esté visible y cargar datos
+        setTimeout(() => {
+            // Cambiar a sección de datos generales
+            this.showSeguimientoPanelSection('datos', document.querySelector('.sp-nav-item'));
+
+            // === Cargar TODOS los datos del caso ===
+            
+            // Datos básicos del trabajador
+            document.getElementById('sp-nombre').value = caso.nombre || '';
+            document.getElementById('sp-cedula').value = caso.cedula || '';
+            document.getElementById('sp-genero').value = caso.genero || '';
+            document.getElementById('sp-tipo-evento').value = caso.tipo_evento || '';
+            
+            // Fechas personales
+            if (caso.fecha_nacimiento) {
+                try {
+                    const fecha = new Date(caso.fecha_nacimiento);
+                    if (!isNaN(fecha.getTime())) {
+                        document.getElementById('sp-fecha-nacimiento').value = fecha.toISOString().split('T')[0];
+                        this.calcularEdad();
+                    }
+                } catch (e) { console.warn('Error cargando fecha_nacimiento:', e); }
+            }
+            
+            if (caso.fecha_ingreso) {
+                try {
+                    const fecha = new Date(caso.fecha_ingreso);
+                    if (!isNaN(fecha.getTime())) {
+                        document.getElementById('sp-fecha-ingreso').value = fecha.toISOString().split('T')[0];
+                    }
+                } catch (e) { console.warn('Error cargando fecha_ingreso:', e); }
+            }
+            
+            // Información laboral
+            document.getElementById('sp-cargo').value = caso.cargo || '';
+            document.getElementById('sp-area').value = caso.sede_area || '';
+            document.getElementById('sp-tipo-cargo').value = caso.tipo_cargo || '';
+            document.getElementById('sp-tipo-contrato').value = caso.tipo_vinculacion || '';
+            document.getElementById('sp-eps').value = caso.eps || '';
+            document.getElementById('sp-afp').value = caso.afp || '';
+            
+            // Datos de salud
+            document.getElementById('sp-peso').value = caso.peso || '';
+            document.getElementById('sp-talla').value = caso.talla || '';
+            document.getElementById('sp-imc').value = caso.imc || '';
+            document.getElementById('sp-actividades-extralaborales').value = caso.actividades_extralaborales || '';
+            
+            // Calcular IMC si hay peso y talla
+            if (caso.peso && caso.talla) {
+                this.calcularIMC();
+            }
+            
+            // === Datos de incapacidad ===
+            if (caso.fecha_fin) {
+                try {
+                    const fecha = new Date(caso.fecha_fin);
+                    if (!isNaN(fecha.getTime())) {
+                        document.getElementById('sp-fecha-fin').value = fecha.toISOString().split('T')[0];
+                    }
+                } catch (e) { console.warn('Error cargando fecha_fin:', e); }
+            }
+            
+            document.getElementById('sp-dias-acumulados').value = caso.dias_acumulados || '';
+            document.getElementById('sp-codigo-cie10').value = caso.codigo_cie10 || '';
+            document.getElementById('sp-descripcion-diagnostico').value = caso.diagnostico || '';
+            
+            // Mostrar notificación
+            this.showNotification(`✅ Caso cargado: ${caso.nombre} (Fila ${caso.fila})`, 'success');
+            console.log('[CARGAR CASO SELECCIONADO] Datos cargados exitosamente');
+            
+            // Navegar a la sección de incapacidad para mostrar datos cargados
+            setTimeout(() => {
+                const navIncapacidad = document.querySelector('.sp-nav-item:nth-child(2)');
+                if (navIncapacidad) {
+                    this.showSeguimientoPanelSection('incapacidad', navIncapacidad);
+                }
+            }, 500);
+        }, 300);
+    }
+
+    /**
+     * Abre el panel de seguimiento con los datos de un empleado
+     */
+    abrirPanelSeguimientoConEmpleado(empleadoData) {
+        console.log('[ABRIR PANEL] Abriendo panel para empleado:', empleadoData.nombre);
+        
+        // Crear el panel slideover si no existe
+        if (!document.getElementById('seguimientoPanelBackdrop')) {
+            this.createSeguimientoPanel();
+        }
+
+        // Cargar datos del empleado en el formulario
+        if (empleadoData) {
+            this.cargarDatosEnPanelSeguimiento(empleadoData);
+        }
+
+        // Abrir el panel
+        document.getElementById('seguimientoPanelBackdrop').classList.add('active');
+
+        // Mostrar notificación
+        this.showNotification(`Gestión de caso: ${empleadoData.nombre}`, 'info');
+    }
+
+    /**
      * Muestra una sección específica del panel
      */
     showSeguimientoPanelSection(sectionId, navElement) {
@@ -2786,28 +3149,33 @@ class MedicionAusentismoComponent {
 
         console.log('[GUARDAR SEGUIMIENTO] Datos recopilados:', seguimientoData);
 
-        // === VERIFICAR SI YA EXISTE REGISTRO CON ESA CÉDULA ===
+        // === GUARDAR DIRECTAMENTE (sin mostrar modal) ===
+        // El usuario ya seleccionó qué hacer al abrir el panel (actualizar o crear nuevo)
+        // Ahora solo guardamos los datos directamente
         const cedula = seguimientoData.trabajador.cedula;
-        console.log('[GUARDAR SEGUIMIENTO] Buscando registros existentes para cédula:', cedula);
+        console.log('[GUARDAR SEGUIMIENTO] Guardando datos para cédula:', cedula);
         
-        // Buscar registros existentes antes de guardar
+        // Determinar si es actualización buscando la fila
         window.electronAPI.buscarRegistrosCedula(cedula, this.currentCompany)
             .then(resultadoBusqueda => {
-                console.log('[GUARDAR SEGUIMIENTO] Resultado búsqueda:', resultadoBusqueda);
+                let filaObjetivo = null;
+                let esActualizacion = false;
                 
-                if (resultadoBusqueda.success && resultadoBusqueda.total > 0) {
-                    // Hay registros existentes - mostrar modal de selección
-                    console.log('[GUARDAR SEGUIMIENTO] ⚠️ Se encontraron', resultadoBusqueda.total, 'registro(s)');
-                    this.mostrarModalSeleccionRegistros(resultadoBusqueda.registros, seguimientoData);
+                if (resultadoBusqueda.success && resultadoBusqueda.registros && resultadoBusqueda.registros.length > 0) {
+                    // Usar el registro más reciente
+                    filaObjetivo = resultadoBusqueda.registros[0].fila;
+                    esActualizacion = true;
+                    console.log('[GUARDAR SEGUIMIENTO] Actualizando registro en fila:', filaObjetivo);
                 } else {
-                    // No hay registros existentes - guardar directamente
-                    console.log('[GUARDAR SEGUIMIENTO] ✅ No hay registros existentes, guardando nuevo...');
-                    this.ejecutarGuardadoReal(seguimientoData, false, null);
+                    console.log('[GUARDAR SEGUIMIENTO] Creando nuevo registro');
                 }
+                
+                // Ejecutar guardado
+                this.ejecutarGuardadoReal(seguimientoData, esActualizacion, filaObjetivo);
             })
             .catch(error => {
                 console.error('[GUARDAR SEGUIMIENTO] Error buscando registros:', error);
-                // En caso de error, proceder con guardado normal
+                // En caso de error, guardar como nuevo
                 this.ejecutarGuardadoReal(seguimientoData, false, null);
             });
     }
@@ -2818,32 +3186,29 @@ class MedicionAusentismoComponent {
     mostrarModalSeleccionRegistros(registros, seguimientoData) {
         const empleadoNombre = seguimientoData.trabajador.nombre;
         const empleadoCedula = seguimientoData.trabajador.cedula;
-        
-        // Escapar datos para HTML (evitar errores con comillas)
-        const seguimientoDataEscaped = JSON.stringify(seguimientoData).replace(/'/g, "&apos;").replace(/"/g, "&quot;");
-        
+
         // Generar iniciales para el avatar
         const initials = empleadoNombre.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-        
+
         // Crear modal dinámicamente con diseño moderno
         const modalHTML = `
             <div id="modalSeleccionRegistro" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(5px); z-index: 10000; display: flex; align-items: center; justify-content: center; font-family: 'Inter', sans-serif; color: #1E293B; animation: fadeIn 0.2s ease-out;">
                 <div style="background: white; padding: 0; border-radius: 16px; max-width: 650px; width: 90%; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); overflow: hidden; display: flex; flex-direction: column; animation: slideUp 0.3s ease-out; max-height: 90vh;">
-                    
-                    <!-- Header Moderno con Advertencia -->
+
+                    <!-- Header Moderno -->
                     <div style="padding: 24px; background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); color: white; display: flex; align-items: center; gap: 16px;">
                         <div style="background: rgba(255,255,255,0.2); width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                            <i class="fas fa-exclamation-triangle" style="font-size: 20px;"></i>
+                            <i class="fas fa-folder-open" style="font-size: 20px;"></i>
                         </div>
                         <div>
                             <h3 style="margin: 0; font-size: 18px; font-weight: 600;">Registros Existentes Detectados</h3>
-                            <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.9;">Se encontraron coincidencias para este documento.</p>
+                            <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.9;">Selecciona un registro para cargar sus datos</p>
                         </div>
                     </div>
 
                     <!-- Body -->
                     <div style="padding: 24px; overflow-y: auto; flex: 1;">
-                        
+
                         <!-- Tarjeta de Identificación del Empleado -->
                         <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 16px; margin-bottom: 24px; display: flex; align-items: center; gap: 16px;">
                             <div style="background: #E0E7FF; color: #4F46E5; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; text-transform: uppercase;">
@@ -2857,125 +3222,131 @@ class MedicionAusentismoComponent {
 
                         <!-- Lista de Registros Existentes -->
                         <div style="margin-bottom: 24px;">
-                            <label style="display: block; font-size: 11px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">1. Seleccione un registro existente:</label>
-                            <div style="max-height: 200px; overflow-y: auto; border: 1px solid #E2E8F0; border-radius: 10px; padding: 4px; background: #FFFFFF;">
+                            <label style="display: block; font-size: 11px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">Selecciona un registro para cargar:</label>
+                            <div style="display: flex; flex-direction: column; gap: 8px;">
                                 ${registros.map((reg, idx) => `
-                                    <label style="display: flex; align-items: center; padding: 12px; border-radius: 8px; cursor: pointer; transition: all 0.2s; margin: 2px 0;" 
-                                        onmouseover="this.style.background='#F1F5F9'" 
-                                        onmouseout="this.style.background='transparent'">
-                                        <input type="radio" name="registroSeleccionado" value="${reg.fila}" style="width: 18px; height: 18px; margin-right: 12px; accent-color: #4F46E5; cursor: pointer;">
-                                        <div style="flex: 1; border-left: 3px solid #E2E8F0; padding-left: 12px;">
-                                            <div style="font-weight: 600; font-size: 14px; color: #1E293B; display: flex; align-items: center; gap: 8px;">
-                                                <i class="fas fa-calendar-alt" style="color: #94A3B8; font-size: 12px;"></i>
-                                                ${reg.fecha_fin || 'Sin fecha fin'}
+                                    <div style="display: flex; align-items: center; padding: 12px; border: 1px solid #E2E8F0; border-radius: 8px; cursor: pointer; transition: all 0.2s; background: white;"
+                                        onmouseover="this.style.borderColor='#F59E0B'; this.style.background='#FFFBEB'"
+                                        onmouseout="this.style.borderColor='#E2E8F0'; this.style.background='white'"
+                                        onclick="window.medicAusentismoComponent.cargarRegistroYAbrirPanel(${JSON.stringify(reg).replace(/"/g, '&quot;')})">
+                                        <div style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #F59E0B, #D97706); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0;">
+                                            <i class="fas fa-file-medical" style="font-size: 16px;"></i>
+                                        </div>
+                                        <div style="flex: 1; margin-left: 12px;">
+                                            <div style="display: flex; align-items: center; gap: 8px;">
+                                                <div style="font-weight: 600; font-size: 14px; color: #1E293B;">
+                                                    ${reg.fecha_fin || 'Sin fecha fin'} | 
+                                                    <span style="color: #F59E0B;">${reg.dias || '0'} días</span>
+                                                </div>
+                                                ${idx === 0 ? '<span style="padding: 2px 8px; background: #FEF3C7; color: #D97706; font-size: 10px; font-weight: 600; border-radius: 12px; text-transform: uppercase;">Más reciente</span>' : ''}
                                             </div>
                                             <div style="font-size: 12px; color: #64748B; margin-top: 4px;">
-                                                Días: <strong style="color: #4F46E5;">${reg.dias || 'N/A'}</strong> | 
-                                                <span style="color: #64748B;">${reg.diagnostico || 'Sin diagnóstico'}</span>
+                                                ${reg.diagnostico || 'Sin diagnóstico'}
                                             </div>
                                         </div>
-                                    </label>
+                                        <i class="fas fa-chevron-right" style="color: #94A3B8; font-size: 12px;"></i>
+                                    </div>
                                 `).join('')}
                             </div>
                         </div>
 
-                        <!-- Selección de Acción -->
-                        <div style="background: #FFFFFF; border-radius: 10px; border: 1px solid #E2E8F0; padding: 20px;">
-                            <label style="display: block; font-size: 11px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;">2. ¿Qué acción desea realizar?</label>
-                            
-                            <div style="display: flex; flex-direction: column; gap: 12px;">
-                                <!-- Opción Actualizar -->
-                                <label style="display: flex; align-items: center; gap: 12px; cursor: pointer; padding: 14px; border-radius: 10px; border: 1px solid #E2E8F0; transition: all 0.2s; background: #FFF;" 
-                                    onmouseover="this.style.borderColor='#4F46E5'; this.style.background='#EEF2FF'" 
-                                    onmouseout="this.style.borderColor='#E2E8F0'; this.style.background='#FFF'">
-                                    <input type="radio" name="accionGuardar" value="actualizar" checked style="width: 18px; height: 18px; accent-color: #4F46E5;">
-                                    <div style="flex: 1;">
-                                        <div style="font-weight: 600; font-size: 14px; color: #1E293B;">Sobrescribir Registro</div>
-                                        <div style="font-size: 12px; color: #64748B; margin-top: 2px;">Actualiza los datos del registro seleccionado arriba.</div>
-                                    </div>
-                                    <i class="fas fa-pencil-alt" style="color: #4F46E5; opacity: 0.6;"></i>
-                                </label>
-                                
-                                <!-- Opción Crear Nuevo -->
-                                <label style="display: flex; align-items: center; gap: 12px; cursor: pointer; padding: 14px; border-radius: 10px; border: 1px solid #E2E8F0; transition: all 0.2s; background: #FFF;" 
-                                    onmouseover="this.style.borderColor='#10B981'; this.style.background='#ECFDF5'" 
-                                    onmouseout="this.style.borderColor='#E2E8F0'; this.style.background='#FFF'">
-                                    <input type="radio" name="accionGuardar" value="crear" style="width: 18px; height: 18px; accent-color: #10B981;">
-                                    <div style="flex: 1;">
-                                        <div style="font-weight: 600; font-size: 14px; color: #1E293B;">Crear Nuevo Registro</div>
-                                        <div style="font-size: 12px; color: #64748B; margin-top: 2px;">Agrega una fila nueva al archivo de seguimiento.</div>
-                                    </div>
-                                    <i class="fas fa-plus-circle" style="color: #10B981; opacity: 0.6;"></i>
-                                </label>
-                            </div>
+                        <!-- Opción Crear Nuevo -->
+                        <div style="text-align: center; padding-top: 16px; border-top: 1px solid #E2E8F0;">
+                            <button onclick="window.medicAusentismoComponent.crearNuevoRegistroYAbrirPanel()"
+                                style="padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; background: linear-gradient(135deg, #10B981, #059669); color: white; transition: all 0.2s; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2);"
+                                onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 6px 8px -1px rgba(16, 185, 129, 0.3)'"
+                                onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 6px -1px rgba(16, 185, 129, 0.2)'">
+                                <i class="fas fa-plus"></i> Crear nuevo registro
+                            </button>
                         </div>
 
                     </div>
 
                     <!-- Footer -->
-                    <div style="padding: 16px 24px; background: #F8FAFC; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; gap: 12px; flex-shrink: 0;">
-                        <button onclick="document.getElementById('modalSeleccionRegistro').remove()" style="padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid #E2E8F0; background: white; color: #64748B; transition: all 0.2s; display: flex; align-items: center; gap: 8px;">
+                    <div style="padding: 16px 24px; background: #F8FAFC; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; flex-shrink: 0;">
+                        <button onclick="document.getElementById('modalSeleccionRegistro').remove()" style="padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid #E2E8F0; background: white; color: #64748B; transition: all 0.2s;">
                             <i class="fas fa-times"></i> Cancelar
                         </button>
-                        <button onclick="window.medicAusentismoComponent.confirmarGuardadoConSeleccion()" data-seguimiento-data='${seguimientoDataEscaped}' style="padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; background: linear-gradient(135deg, #4F46E5, #4338CA); color: white; transition: all 0.2s; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2); display: flex; align-items: center; gap: 8px;">
-                            <i class="fas fa-check-circle"></i> Confirmar Acción
-                        </button>
                     </div>
-
                 </div>
             </div>
-            
-            <style>
-                @keyframes fadeIn {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
-                @keyframes slideUp {
-                    from { transform: translateY(20px); opacity: 0; }
-                    to { transform: translateY(0); opacity: 1; }
-                }
-            </style>
         `;
-        
-        // Insertar modal en el DOM
+
         document.body.insertAdjacentHTML('beforeend', modalHTML);
     }
 
     /**
-     * Confirma el guardado después de que el usuario selecciona qué hacer
+     * Carga un registro seleccionado y abre el panel de gestión
      */
-    async confirmarGuardadoConSeleccion() {
-        // Obtener datos del botón
-        const botonConfirmar = document.querySelector('button[onclick*="confirmarGuardadoConSeleccion"]');
-        const seguimientoDataStr = botonConfirmar.getAttribute('data-seguimiento-data');
-        
-        // Parsear datos
-        const seguimientoData = JSON.parse(seguimientoDataStr.replace(/&apos;/g, "'").replace(/&quot;/g, '"'));
-        
-        // Obtener selección del usuario
-        const registroSeleccionado = document.querySelector('input[name="registroSeleccionado"]:checked');
-        const accionSeleccionada = document.querySelector('input[name="accionGuardar"]:checked').value;
-        
-        if (accionSeleccionada === 'actualizar' && !registroSeleccionado) {
-            alert('⚠️ Por favor seleccione un registro para actualizar');
-            return;
-        }
+    cargarRegistroYAbrirPanel(registro) {
+        console.log('[CARGAR REGISTRO] Cargando registro fila:', registro.fila);
         
         // Cerrar modal
-        document.getElementById('modalSeleccionRegistro').remove();
+        const modal = document.getElementById('modalSeleccionRegistro');
+        if (modal) {
+            modal.remove();
+        }
+
+        // Abrir panel
+        if (this.currentDetalleEmpleado) {
+            this.abrirPanelSeguimientoConEmpleado(this.currentDetalleEmpleado);
+        }
+
+        // Esperar a que el panel esté visible y cargar datos
+        setTimeout(() => {
+            // Cambiar a sección de datos generales
+            this.showSeguimientoPanelSection('datos', document.querySelector('.sp-nav-item'));
+
+            // === Cargar TODOS los datos del registro ===
+            
+            // Datos básicos
+            document.getElementById('sp-nombre').value = this.currentDetalleEmpleado?.nombre || '';
+            document.getElementById('sp-cedula').value = this.currentDetalleEmpleado?.cedula || '';
+            
+            // Datos de incapacidad
+            if (registro.fecha_fin) {
+                try {
+                    const fecha = new Date(registro.fecha_fin);
+                    if (!isNaN(fecha.getTime())) {
+                        document.getElementById('sp-fecha-fin').value = fecha.toISOString().split('T')[0];
+                    }
+                } catch (e) { console.warn('Error fecha_fin:', e); }
+            }
+            
+            document.getElementById('sp-dias-acumulados').value = registro.dias || '';
+            document.getElementById('sp-descripcion-diagnostico').value = registro.diagnostico || '';
+            
+            // Navegar a incapacidad para mostrar datos
+            setTimeout(() => {
+                const navIncapacidad = document.querySelector('.sp-nav-item:nth-child(2)');
+                if (navIncapacidad) {
+                    this.showSeguimientoPanelSection('incapacidad', navIncapacidad);
+                }
+            }, 500);
+
+            // Mostrar notificación
+            this.showNotification(`✅ Registro cargado: ${this.currentDetalleEmpleado?.nombre || ''}`, 'success');
+            console.log('[CARGAR REGISTRO] Datos cargados:', registro);
+        }, 300);
+    }
+
+    /**
+     * Crea un nuevo registro y abre el panel vacío
+     */
+    crearNuevoRegistroYAbrirPanel() {
+        console.log('[CREAR NUEVO] Abriendo panel para nuevo registro');
         
-        // Determinar fila objetivo
-        const filaObjetivo = accionSeleccionada === 'actualizar' ? parseInt(registroSeleccionado.value) : null;
-        const esActualizacion = accionSeleccionada === 'actualizar';
-        
-        console.log('[GUARDAR SEGUIMIENTO] Usuario seleccionó:', {
-            accion: accionSeleccionada,
-            fila: filaObjetivo,
-            esActualizacion: esActualizacion
-        });
-        
-        // Proceder con guardado
-        this.ejecutarGuardadoReal(seguimientoData, esActualizacion, filaObjetivo);
+        // Cerrar modal
+        const modal = document.getElementById('modalSeleccionRegistro');
+        if (modal) {
+            modal.remove();
+        }
+
+        // Abrir panel
+        if (this.currentDetalleEmpleado) {
+            this.abrirPanelSeguimientoConEmpleado(this.currentDetalleEmpleado);
+            this.showNotification('📝 Creando nuevo registro', 'info');
+        }
     }
 
     /**

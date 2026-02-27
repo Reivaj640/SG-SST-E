@@ -627,11 +627,13 @@ def guardar_seguimiento(empresa, file_path, datos):
         # Construir la fila de datos ORGANIZADA POR COLUMNAS
         # Estructura de columnas según PRI.xlsx:
         # A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7, I=8, J=9, K=10, L=11, M=12, N=13, O=14, P=15, Q=16, R=17, S=18, T=19, U=20, V=21, W=22, X=23, Y=24, Z=25, AA=26
-        
+
         # Crear una lista con todas las columnas (hasta AA = índice 26)
         fila_completa = [""] * 27  # 27 columnas de A a AA
-        
+
         # Asignar valores a las columnas específicas
+        fila_completa[0] = ""  # A - Índice/Consecutivo (vacío)
+        fila_completa[1] = datos.get("tipoEvento", "")  # B - TIPO DE EVENTO (índice 1)
         fila_completa[2] = datos.get("employeeName", "")  # C - Nombre (índice 2)
         fila_completa[3] = empleado_id  # D - Cédula (índice 3)
         fila_completa[4] = datos.get("genero", "")  # E - Género (índice 4)
