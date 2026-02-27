@@ -538,6 +538,9 @@ class MedicionAusentismoComponent {
 
                 console.log('[DEBUG loadSeguimientoData] Primer registro:', allRecords[0]);
 
+                // Calcular KPIs con TODOS los registros (antes de filtrar)
+                this.calculateKPIsFromRawData(allRecords);
+
                 // AGRUPAR incapacidades por empleado (cedula)
                 const empleadosMap = new Map();
                 
@@ -795,36 +798,52 @@ class MedicionAusentismoComponent {
         let docsPendientes = 0;
         let cerradosMes = 0;
 
-        this.seguimientoData.forEach(row => {
-            const fechaFin = row['F. FIN'] ? new Date(row['F. FIN']) : null;
-            const fechaInicio = row['F. INICIO'] ? new Date(row['F. INICIO']) : null;
+        console.log('[KPIs] Calculando con', this.seguimientoData ? this.seguimientoData.length : 0, 'registros');
+
+        if (!this.seguimientoData || this.seguimientoData.length === 0) {
+            console.warn('[KPIs] No hay datos para calcular KPIs');
+            // Actualizar UI con 0
+            const kpiElements = document.querySelectorAll('.kpi-value');
+            if (kpiElements[0]) kpiElements[0].textContent = '0';
+            if (kpiElements[1]) kpiElements[1].textContent = '0';
+            if (kpiElements[2]) kpiElements[2].textContent = '0';
+            if (kpiElements[3]) kpiElements[3].textContent = '0';
+            return;
+        }
+
+        this.seguimientoData.forEach(empleado => {
+            // Cada empleado tiene un array de incapacidades
+            const incapacidades = empleado.incapacidades || [];
             
-            if (!fechaFin || !fechaInicio) return;
+            incapacidades.forEach(inc => {
+                const fechaFin = inc.fechaFin ? new Date(inc.fechaFin) : null;
+                const fechaInicio = inc.fechaInicio ? new Date(inc.fechaInicio) : null;
 
-            const diffTime = fechaFin - today;
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                if (!fechaFin || !fechaInicio) return;
 
-            // Casos activos (fecha fin futura)
-            if (diffDays >= 0) {
-                casosActivos++;
-                
-                // Próximos a vencer (menos de 2 días)
-                if (diffDays <= 2) {
-                    proximosVencer++;
+                const diffTime = fechaFin - today;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                // Casos activos (fecha fin futura o dentro de los últimos 30 días)
+                if (diffDays >= -30) {
+                    casosActivos++;
+
+                    // Próximos a vencer (menos de 2 días)
+                    if (diffDays >= 0 && diffDays <= 2) {
+                        proximosVencer++;
+                    }
                 }
-            }
 
-            // Casos cerrados este mes
-            const finMonth = fechaFin.toLocaleString('default', { month: 'long' }).toUpperCase();
-            const finYear = fechaFin instanceof Date 
-                ? fechaFin.getFullYear() 
-                : new Date(fechaFin).getFullYear();
-            if (finMonth === currentMonth && finYear === today.getFullYear() && diffDays < 0) {
-                cerradosMes++;
-            }
+                // Casos cerrados este mes (fecha fin en el mes actual y ya venció)
+                const finMonth = fechaFin.toLocaleString('default', { month: 'long' }).toUpperCase();
+                const finYear = fechaFin.getFullYear();
+                if (finMonth === currentMonth && finYear === today.getFullYear() && diffDays < 0) {
+                    cerradosMes++;
+                }
+            });
 
-            // Docs pendientes (simulado - en implementación real verificaría archivos adjuntos)
-            if (!row['DESCRIPCION'] || row['DESCRIPCION'].trim() === '') {
+            // Docs pendientes (simulado - verificar si hay diagnóstico)
+            if (!empleado.incapacidades || empleado.incapacidades.every(inc => !inc.diagnostico)) {
                 docsPendientes++;
             }
         });
@@ -833,6 +852,77 @@ class MedicionAusentismoComponent {
         this.kpiProximosVencer = proximosVencer;
         this.kpiDocsPendientes = docsPendientes;
         this.kpiCerradosMes = cerradosMes;
+
+        console.log('[KPIs] Resultados:', { casosActivos, proximosVencer, docsPendientes, cerradosMes });
+
+        // Actualizar UI de KPIs
+        const kpiElements = document.querySelectorAll('.kpi-value');
+        if (kpiElements[0]) kpiElements[0].textContent = casosActivos;
+        if (kpiElements[1]) kpiElements[1].textContent = proximosVencer;
+        if (kpiElements[2]) kpiElements[2].textContent = docsPendientes;
+        if (kpiElements[3]) kpiElements[3].textContent = cerradosMes;
+    }
+
+    /**
+     * Calcula KPIs desde datos crudos (antes de filtrar)
+     * @param {Array} allRecords - Todos los registros del Excel
+     */
+    calculateKPIsFromRawData(allRecords) {
+        const today = new Date();
+        const currentMonth = today.toLocaleString('default', { month: 'long' }).toUpperCase();
+        let casosActivos = 0;
+        let proximosVencer = 0;
+        let docsPendientes = 0;
+        let cerradosMes = 0;
+
+        console.log('[KPIs Raw] Calculando con', allRecords.length, 'registros crudos');
+
+        allRecords.forEach(row => {
+            // Leer fechas directamente del row
+            const fechaFinStr = row['F. FIN'] || row['f._fin'] || row['F. FIN'] || null;
+            const fechaInicioStr = row['F. INICIO'] || row['f._inicio'] || row['F. INICIO'] || null;
+
+            if (!fechaFinStr || !fechaInicioStr) return;
+
+            // Parsear fechas
+            const fechaFin = new Date(fechaFinStr);
+            const fechaInicio = new Date(fechaInicioStr);
+
+            if (isNaN(fechaFin.getTime()) || isNaN(fechaInicio.getTime())) return;
+
+            const diffTime = fechaFin - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            // Casos activos (fecha fin futura o dentro de los últimos 30 días)
+            if (diffDays >= -30) {
+                casosActivos++;
+
+                // Próximos a vencer (menos de 2 días)
+                if (diffDays >= 0 && diffDays <= 2) {
+                    proximosVencer++;
+                }
+            }
+
+            // Casos cerrados este mes (fecha fin en el mes actual y ya venció)
+            const finMonth = fechaFin.toLocaleString('default', { month: 'long' }).toUpperCase();
+            const finYear = fechaFin.getFullYear();
+            if (finMonth === currentMonth && finYear === today.getFullYear() && diffDays < 0) {
+                cerradosMes++;
+            }
+
+            // Docs pendientes (simulado - verificar si hay descripción)
+            const descripcion = row['DESCRIPCION'] || row['descripcion'] || row['DESCRIPCIÓN'] || '';
+            if (!descripcion || descripcion.trim() === '') {
+                docsPendientes++;
+            }
+        });
+
+        this.kpiCasosActivos = casosActivos;
+        this.kpiProximosVencer = proximosVencer;
+        this.kpiDocsPendientes = docsPendientes;
+        this.kpiCerradosMes = cerradosMes;
+
+        console.log('[KPIs Raw] Resultados:', { casosActivos, proximosVencer, docsPendientes, cerradosMes });
 
         // Actualizar UI de KPIs
         const kpiElements = document.querySelectorAll('.kpi-value');
@@ -1049,8 +1139,8 @@ class MedicionAusentismoComponent {
                 const yearSeleccionado = parseInt(year);
                 matchesYear = empleado.incapacidades.some(inc => {
                     if (!inc.fechaInicio || inc.diasIncapacidad < 10) return false;
-                    const anioInicio = inc.fechaInicio instanceof Date 
-                        ? inc.fechaInicio.getFullYear() 
+                    const anioInicio = inc.fechaInicio instanceof Date
+                        ? inc.fechaInicio.getFullYear()
                         : new Date(inc.fechaInicio).getFullYear();
                     return anioInicio === yearSeleccionado;
                 });
@@ -1062,8 +1152,8 @@ class MedicionAusentismoComponent {
                 const monthSeleccionado = parseInt(month);
                 matchesMonth = empleado.incapacidades.some(inc => {
                     if (!inc.fechaInicio || inc.diasIncapacidad < 10) return false;
-                    const dateInicio = inc.fechaInicio instanceof Date 
-                        ? inc.fechaInicio 
+                    const dateInicio = inc.fechaInicio instanceof Date
+                        ? inc.fechaInicio
                         : new Date(inc.fechaInicio);
                     return dateInicio.getMonth() === monthSeleccionado;
                 });
@@ -1089,8 +1179,73 @@ class MedicionAusentismoComponent {
             return matchesSearch && matchesTipo && matchesYear && matchesMonth && matchesEstado;
         });
 
+        // Renderizar tabla con datos filtrados
         this.renderSeguimientoTable(filtered);
+        
+        // Recalcular KPIs con los datos filtrados
+        this.calculateKPIsFromFilteredData(filtered);
+        
         this.showNotification(`${filtered.length} registros encontrados`, 'success');
+    }
+
+    /**
+     * Calcula KPIs desde datos filtrados (cuando se aplican filtros)
+     * @param {Array} filteredData - Datos filtrados por año/mes/búsqueda
+     */
+    calculateKPIsFromFilteredData(filteredData) {
+        const today = new Date();
+        const currentMonth = today.toLocaleString('default', { month: 'long' }).toUpperCase();
+        let casosActivos = 0;
+        let proximosVencer = 0;
+        let docsPendientes = 0;
+        let cerradosMes = 0;
+
+        console.log('[KPIs Filtered] Calculando con', filteredData.length, 'registros filtrados');
+
+        filteredData.forEach(empleado => {
+            const incapacidades = empleado.incapacidades || [];
+            
+            incapacidades.forEach(inc => {
+                const fechaFin = inc.fechaFin ? new Date(inc.fechaFin) : null;
+                const fechaInicio = inc.fechaInicio ? new Date(inc.fechaInicio) : null;
+
+                if (!fechaFin || !fechaInicio) return;
+
+                const diffTime = fechaFin - today;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                // Casos activos (fecha fin futura o dentro de los últimos 30 días)
+                if (diffDays >= -30) {
+                    casosActivos++;
+
+                    // Próximos a vencer (menos de 2 días)
+                    if (diffDays >= 0 && diffDays <= 2) {
+                        proximosVencer++;
+                    }
+                }
+
+                // Casos cerrados este mes (fecha fin en el mes actual y ya venció)
+                const finMonth = fechaFin.toLocaleString('default', { month: 'long' }).toUpperCase();
+                const finYear = fechaFin.getFullYear();
+                if (finMonth === currentMonth && finYear === today.getFullYear() && diffDays < 0) {
+                    cerradosMes++;
+                }
+            });
+
+            // Docs pendientes (simulado - verificar si hay diagnóstico)
+            if (!empleado.incapacidades || empleado.incapacidades.every(inc => !inc.diagnostico)) {
+                docsPendientes++;
+            }
+        });
+
+        console.log('[KPIs Filtered] Resultados:', { casosActivos, proximosVencer, docsPendientes, cerradosMes });
+
+        // Actualizar UI de KPIs
+        const kpiElements = document.querySelectorAll('.kpi-value');
+        if (kpiElements[0]) kpiElements[0].textContent = casosActivos;
+        if (kpiElements[1]) kpiElements[1].textContent = proximosVencer;
+        if (kpiElements[2]) kpiElements[2].textContent = docsPendientes;
+        if (kpiElements[3]) kpiElements[3].textContent = cerradosMes;
     }
 
     createSeguimientoModals(container) {
@@ -4632,7 +4787,9 @@ class MedicionAusentismoComponent {
 
     async loadEstadisticasData(notificationDiv) {
         try {
+            console.log('[ESTADISTICAS] Cargando datos para empresa:', this.currentCompany);
             const result = await window.electronAPI.readAusentismoData(this.currentCompany);
+            console.log('[ESTADISTICAS] Resultado:', result);
 
             if (result.success && result.rows) {
                 const data = result.rows.map(row => {
@@ -4643,16 +4800,20 @@ class MedicionAusentismoComponent {
                     return rowObj;
                 });
 
+                console.log('[ESTADISTICAS] Datos procesados:', data.length, 'filas');
+                console.log('[ESTADISTICAS] Primera fila:', data[0]);
+                
                 // Guardar datos para filtros
                 this.currentAusentismoDataStats = data;
 
                 this.updateStatsMetrics(data);
                 this.renderCharts(data);
             } else {
+                console.warn('[ESTADISTICAS] No hay datos:', result);
                 this.showNotification('No hay datos para mostrar', 'warning', notificationDiv.id);
             }
         } catch (error) {
-            console.error('Error loading estadisticas data:', error);
+            console.error('[ESTADISTICAS] Error loading data:', error);
             this.showNotification(`Error: ${error.message}`, 'error', notificationDiv.id);
         }
     }
@@ -4660,15 +4821,29 @@ class MedicionAusentismoComponent {
     updateStatsMetrics(data) {
         // Calcular métricas
         const totalIncapacidades = data.length;
-        const totalDias = data.reduce((sum, row) => sum + (parseInt(row['N° DIAS DE INCAPACIDAD']) || 0), 0);
+        const totalDias = data.reduce((sum, row) => {
+            // Probar diferentes variaciones del nombre de columna
+            const dias = parseInt(row['N° DIAS DE INCAPACIDAD']) || 
+                        parseInt(row['Nº DIAS DE INCAPACIDAD']) || 
+                        parseInt(row['N° DIAS']) || 
+                        parseInt(row['DIAS']) || 0;
+            return sum + dias;
+        }, 0);
         const totalEPS = data.filter(row => (row['CLASE DE INCAPACIDAD'] || '').toUpperCase() === 'EPS').length;
         const totalARL = data.filter(row => (row['CLASE DE INCAPACIDAD'] || '').toUpperCase() === 'ARL').length;
 
+        console.log('[ESTADISTICAS] Métricas calculadas:', { totalIncapacidades, totalDias, totalEPS, totalARL });
+
         // Actualizar tarjetas
-        document.getElementById('metricTotalIncapacidades').textContent = totalIncapacidades.toLocaleString();
-        document.getElementById('metricTotalDias').textContent = totalDias.toLocaleString();
-        document.getElementById('metricTotalEPS').textContent = totalEPS.toLocaleString();
-        document.getElementById('metricTotalARL').textContent = totalARL.toLocaleString();
+        const metricIncap = document.getElementById('metricTotalIncapacidades');
+        const metricDias = document.getElementById('metricTotalDias');
+        const metricEPS = document.getElementById('metricTotalEPS');
+        const metricARL = document.getElementById('metricTotalARL');
+        
+        if (metricIncap) metricIncap.textContent = totalIncapacidades.toLocaleString();
+        if (metricDias) metricDias.textContent = totalDias.toLocaleString();
+        if (metricEPS) metricEPS.textContent = totalEPS.toLocaleString();
+        if (metricARL) metricARL.textContent = totalARL.toLocaleString();
     }
 
     renderCharts(data) {

@@ -1,6 +1,6 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.49
+**Versión:** 0.1.50
 **Última actualización:** 26 de febrero de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
@@ -18,6 +18,10 @@
 - ✅ **27 Submódulos**: Cada uno con su propia lógica y vistas especializadas
 - ✅ **IA Integrada**: Análisis de accidentes con LLM (Mistral 3 3B)
 - ✅ **Seguimiento PRIC**: Gestión completa de casos de incapacidad y rehabilitación
+- ✅ **Sistema Dual de Archivos**: PI-FO-076 (lista general) + PRI.xlsx (seguimiento)
+- ✅ **Alertas Inteligentes**: Detección de registros duplicados con modal interactivo
+- ✅ **Cálculos Automáticos**: Edad, IMC, Estado Nutricional, Días Trabajados
+- ✅ **KPIs en Tiempo Real**: Actualización dinámica con filtros de año/mes
 - ✅ **Solo 13 archivos en raíz**: Proyecto limpio y organizado
 
 ---

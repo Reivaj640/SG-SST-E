@@ -5,6 +5,91 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.50] - 2026-02-26
+
+### Added
+- **Sistema de Alertas para Registros Existentes** 🆕
+  - Modal moderno al guardar seguimiento con registros duplicados
+  - Opciones: "Actualizar registro seleccionado" o "Crear nuevo registro"
+  - Diseño con gradiente naranja, avatar con iniciales, timeline de registros
+  - Función `buscar_registros_por_cedula()` en Python
+  - Handler IPC `buscar-registros-cedula` en main.js
+
+- **Cálculos Automáticos en Formulario** 🆕
+  - Edad: Calculada desde fecha de nacimiento
+  - IMC: Calculado desde peso/talla² (talla en cm)
+  - Estado Nutricional: 6 categorías con indicadores visuales
+  - Días Trabajados: Calculado desde fecha de ingreso (6 días trabajo, 1 descanso)
+  - Antigüedad: Años desde fecha de ingreso
+
+- **Nuevos Campos en Formulario de Seguimiento**
+  - Salud: Peso (Kg), Talla (cm), IMC, Estado Nutricional, Actividades Extralaborales
+  - Laborales: Edad, Tipo de Cargo, Tipo de Evento
+
+- **Estadísticas en Tiempo Real** 📊
+  - KPIs se actualizan al aplicar filtros (Año/Mes)
+  - Funciones: `calculateKPIsFromRawData()`, `calculateKPIsFromFilteredData()`
+  - Handler `read-ausentismo-data` para cargar todos los datos
+  - Tarjetas: Casos Activos, Próximos a Vencer, Docs Pendientes, Cerrados (Mes)
+
+- **Modal de Detalles Modernizado** 👁️
+  - Header con ícono en gradiente
+  - Employee card con avatar
+  - Timeline vertical de incapacidades
+  - Badges de estado con colores
+  - Animaciones fade in / slide up
+
+### Changed
+- **Organización de Columnas en PRI.xlsx** ⚠️
+  - Datos se guardan en columnas específicas (C-AA)
+  - Función `indice_a_columna()` para columnas después de Z
+  - Cálculo automático de edad, antigüedad, estado nutricional
+
+- **Filtros Actualizan KPIs** 🔄
+  - `applySeguimientoFilters()` ahora recalcula estadísticas
+  - Event listeners en selectores de Año/Mes
+  - Filtros se aplican solo con click en botón "Filtrar"
+
+- **Mejoras en Logging** 📝
+  - Logs `[KPIs Raw]`, `[KPIs Filtered]` para depuración
+  - Logs `[GUARDAR SEGUIMIENTO]` con detalle de acciones
+  - Logs `[ESTADISTICAS]` para carga de datos
+
+### Fixed
+- **Error de Columnas Excel** 🐛
+  - Problema: `[7 is not a valid coordinate or range`
+  - Causa: Columna AA mal calculada (chr(91) = '[')
+  - Solución: Función `indice_a_columna()` con lógica para AA, AB, AC...
+
+- **KPIs en Cero** 🐛
+  - Problema: Todas las tarjetas mostraban "0"
+  - Causa: Handler `read-ausentismo-data` no existía
+  - Solución: Handler implementado en main.js
+
+- **Filtros Auto-Aplicados** 🐛
+  - Problema: Filtros se aplicaban al cambiar selección (sin click)
+  - Solución: Removidos event listeners automáticos
+
+### Technical
+- **Python Script (actualizar_ausentismo.py)**
+  - Función `guardar_seguimiento()` con columnas específicas
+  - Función `buscar_registros_por_cedula()` para alertas
+  - Funciones auxiliares: `calcular_edad()`, `calcular_antiguedad()`, `calcular_estado_nutricional()`, `calcular_dias_trabajados()`
+
+- **Frontend (medicion-ausentismo.js)**
+  - Función `mostrarModalSeleccionRegistros()` con diseño moderno
+  - Función `confirmarGuardadoConSeleccion()` para interacción
+  - Función `calculateKPIsFromFilteredData()` para filtros
+
+- **Backend (main.js)**
+  - Handler `buscar-registros-cedula` para búsqueda de duplicados
+  - Handler `read-ausentismo-data` para estadísticas
+
+### Documentation
+- **Nueva Documentación Creada:**
+  - `docs/RESUMEN_CAMBIOS_v0.1.50.md` - Resumen completo de cambios
+  - Actualización de `docs/CHANGELOG.md` con versión 0.1.50
+
 ## [0.1.49] - 2026-02-26
 
 ### Added

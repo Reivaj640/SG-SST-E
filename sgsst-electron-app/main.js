@@ -3234,7 +3234,7 @@ ipcMain.handle('get-ausentismo-data', async (event, companyName) => {
     console.log(`  - Filas: ${limitedRows.length} registros`);
     console.log(`  - Archivo: ${excelFile.path}`);
     console.log('========================================');
-    
+
     return result;
 
   } catch (error) {
@@ -3243,6 +3243,97 @@ ipcMain.handle('get-ausentismo-data', async (event, companyName) => {
       success: false,
       error: error.message,
       companyName
+    };
+  }
+});
+
+// =============================================================================
+// Handler: read-ausentismo-data (Para estadísticas - retorna todos los datos sin filtrar)
+// =============================================================================
+ipcMain.handle('read-ausentismo-data', async (event, companyName) => {
+  console.log('========================================');
+  console.log(`[ESTADISTICAS][MAIN] Handler read-ausentismo-data llamado para empresa: ${companyName}`);
+  sendLog(`[ESTADISTICAS] Cargando datos para estadísticas: ${companyName}`, 'INFO');
+
+  try {
+    // 1. Cargar configuración
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+
+    // 2. Obtener estructura de la empresa
+    const normalizedCompanyName = companyName.toLowerCase();
+    const companyKey = Object.keys(config.companyPaths || {}).find(
+      key => key.toLowerCase() === normalizedCompanyName
+    );
+
+    const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+
+    if (!companyConfig || !companyConfig.root) {
+      throw new Error(`Empresa "${companyName}" no tiene ruta mapeada`);
+    }
+
+    // 3. Buscar archivo de ausentismo (PI-FO-076)
+    const ausentismoDir = path.join(
+      companyConfig.root,
+      '3. Gestión de la Salud',
+      '3.3.6 Medición del ausentismo por causa médica'
+    );
+
+    const files = await fsp.readdir(ausentismoDir);
+    const ausentismoFile = files.find(f => 
+      f.includes('PI-FO-076') || f.includes('AUSENTISMO')
+    );
+
+    if (!ausentismoFile) {
+      throw new Error('No se encontró el archivo de ausentismo (PI-FO-076)');
+    }
+
+    const filePath = path.join(ausentismoDir, ausentismoFile);
+    console.log(`[ESTADISTICAS] Archivo encontrado: ${filePath}`);
+
+    // 4. Leer Excel con XLSX
+    const XLSX = require('xlsx');
+    const workbook = XLSX.readFile(filePath);
+    
+    // 5. Obtener hoja del año actual (o la primera que tenga datos)
+    const sheetName = workbook.SheetNames.find(name => 
+      name.includes(companyKey ? companyKey.toUpperCase() : '2024')
+    ) || workbook.SheetNames[0];
+
+    const sheet = workbook.Sheets[sheetName];
+    const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+    // 6. Encontrar encabezados (primera fila con "NOMBRE" o "CEDULA")
+    let headerRowIndex = 0;
+    for (let i = 0; i < Math.min(rawData.length, 20); i++) {
+      const row = rawData[i];
+      if (row.some(cell => cell && (String(cell).includes('NOMBRE') || String(cell).includes('CEDULA')))) {
+        headerRowIndex = i;
+        break;
+      }
+    }
+
+    const headers = rawData[headerRowIndex].map(h => h ? String(h).trim() : '');
+    const dataRows = rawData.slice(headerRowIndex + 1);
+
+    console.log(`[ESTADISTICAS] Headers: ${headers.length} columnas`);
+    console.log(`[ESTADISTICAS] Data rows: ${dataRows.length} filas`);
+
+    // 7. Retornar datos
+    return {
+      success: true,
+      headers,
+      rows: dataRows,
+      file: filePath,
+      sheet: sheetName
+    };
+
+  } catch (error) {
+    console.error('[ESTADISTICAS] Error:', error);
+    sendLog(`[ERROR] Error en read-ausentismo-data: ${error.message}`, 'ERROR');
+    return {
+      success: false,
+      error: error.message
     };
   }
 });

@@ -1,7 +1,7 @@
 # 📊 Arquitectura Dual de Archivos - Módulo de Ausentismo
 
-**Versión:** 0.1.49  
-**Fecha de actualización:** 26 de febrero de 2026  
+**Versión:** 0.1.50
+**Fecha de actualización:** 26 de febrero de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
 ---
@@ -15,7 +15,14 @@ El módulo de **Medición del Ausentismo** utiliza un **sistema dual de archivos
 | Archivo | Propósito | Tipo de Datos |
 |---------|-----------|---------------|
 | **PI-FO-076 / PG-FO-076 / GI-FO-076** | Registro y consulta general | Lista maestra de todas las incapacidades |
-| **PRI.xlsx** | Seguimiento detallado de casos | Casos en seguimiento activo y recomendaciones |
+| **PRI.xlsx** | Seguimiento detallado de casos | Casos en seguimiento activo, recomendaciones y datos de salud |
+
+### 🆕 Novedades Versión 0.1.50
+
+- **Alertas de Registros Existentes**: Modal interactivo al detectar duplicados
+- **Cálculos Automáticos**: Edad, IMC, Estado Nutricional, Días Trabajados
+- **KPIs en Tiempo Real**: Actualización dinámica con filtros
+- **Columnas Específicas**: Organización estructurada en PRI.xlsx (C-AA)
 
 ---
 
