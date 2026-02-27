@@ -2630,7 +2630,7 @@ class MedicionAusentismoComponent {
     }
 
     /**
-     * Muestra modal para seleccionar qué registro actualizar o si crear uno nuevo
+     * Muestra modal moderno para seleccionar qué registro actualizar o si crear uno nuevo
      */
     mostrarModalSeleccionRegistros(registros, seguimientoData) {
         const empleadoNombre = seguimientoData.trabajador.nombre;
@@ -2639,63 +2639,123 @@ class MedicionAusentismoComponent {
         // Escapar datos para HTML (evitar errores con comillas)
         const seguimientoDataEscaped = JSON.stringify(seguimientoData).replace(/'/g, "&apos;").replace(/"/g, "&quot;");
         
-        // Crear modal dinámicamente
+        // Generar iniciales para el avatar
+        const initials = empleadoNombre.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        
+        // Crear modal dinámicamente con diseño moderno
         const modalHTML = `
-            <div id="modalSeleccionRegistro" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;">
-                <div style="background: white; padding: 30px; border-radius: 12px; max-width: 600px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.3);">
-                    <h3 style="color: #dc3545; margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
-                        <i class="fas fa-exclamation-triangle"></i> ⚠️ YA EXISTE(N) REGISTRO(S)
-                    </h3>
-                    <p style="margin-bottom: 20px; color: #666;">
-                        <strong>${empleadoNombre}</strong><br>
-                        Cédula: ${empleadoCedula}
-                    </p>
+            <div id="modalSeleccionRegistro" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(5px); z-index: 10000; display: flex; align-items: center; justify-content: center; font-family: 'Inter', sans-serif; color: #1E293B; animation: fadeIn 0.2s ease-out;">
+                <div style="background: white; padding: 0; border-radius: 16px; max-width: 650px; width: 90%; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); overflow: hidden; display: flex; flex-direction: column; animation: slideUp 0.3s ease-out; max-height: 90vh;">
                     
-                    <div style="margin-bottom: 20px;">
-                        <strong style="display: block; margin-bottom: 10px; color: #333;">Registros existentes:</strong>
-                        <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px;">
-                            ${registros.map((reg, idx) => `
-                                <label style="display: block; padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; hover: background: #f5f5f5;">
-                                    <input type="radio" name="registroSeleccionado" value="${reg.fila}" style="margin-right: 10px;">
-                                    <strong>Fila ${reg.fila}:</strong> 
-                                    ${reg.fecha_fin || 'N/A'} | 
-                                    Días: ${reg.dias || 'N/A'} |
-                                    ${reg.diagnostico || 'Sin diagnóstico'}
+                    <!-- Header Moderno con Advertencia -->
+                    <div style="padding: 24px; background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); color: white; display: flex; align-items: center; gap: 16px;">
+                        <div style="background: rgba(255,255,255,0.2); width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <i class="fas fa-exclamation-triangle" style="font-size: 20px;"></i>
+                        </div>
+                        <div>
+                            <h3 style="margin: 0; font-size: 18px; font-weight: 600;">Registros Existentes Detectados</h3>
+                            <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.9;">Se encontraron coincidencias para este documento.</p>
+                        </div>
+                    </div>
+
+                    <!-- Body -->
+                    <div style="padding: 24px; overflow-y: auto; flex: 1;">
+                        
+                        <!-- Tarjeta de Identificación del Empleado -->
+                        <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 16px; margin-bottom: 24px; display: flex; align-items: center; gap: 16px;">
+                            <div style="background: #E0E7FF; color: #4F46E5; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; text-transform: uppercase;">
+                                ${initials}
+                            </div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; font-size: 15px; color: #1E293B;">${empleadoNombre}</div>
+                                <div style="font-size: 13px; color: #64748B; margin-top: 2px;">CC: ${empleadoCedula}</div>
+                            </div>
+                        </div>
+
+                        <!-- Lista de Registros Existentes -->
+                        <div style="margin-bottom: 24px;">
+                            <label style="display: block; font-size: 11px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">1. Seleccione un registro existente:</label>
+                            <div style="max-height: 200px; overflow-y: auto; border: 1px solid #E2E8F0; border-radius: 10px; padding: 4px; background: #FFFFFF;">
+                                ${registros.map((reg, idx) => `
+                                    <label style="display: flex; align-items: center; padding: 12px; border-radius: 8px; cursor: pointer; transition: all 0.2s; margin: 2px 0;" 
+                                        onmouseover="this.style.background='#F1F5F9'" 
+                                        onmouseout="this.style.background='transparent'">
+                                        <input type="radio" name="registroSeleccionado" value="${reg.fila}" style="width: 18px; height: 18px; margin-right: 12px; accent-color: #4F46E5; cursor: pointer;">
+                                        <div style="flex: 1; border-left: 3px solid #E2E8F0; padding-left: 12px;">
+                                            <div style="font-weight: 600; font-size: 14px; color: #1E293B; display: flex; align-items: center; gap: 8px;">
+                                                <i class="fas fa-calendar-alt" style="color: #94A3B8; font-size: 12px;"></i>
+                                                ${reg.fecha_fin || 'Sin fecha fin'}
+                                            </div>
+                                            <div style="font-size: 12px; color: #64748B; margin-top: 4px;">
+                                                Días: <strong style="color: #4F46E5;">${reg.dias || 'N/A'}</strong> | 
+                                                <span style="color: #64748B;">${reg.diagnostico || 'Sin diagnóstico'}</span>
+                                            </div>
+                                        </div>
+                                    </label>
+                                `).join('')}
+                            </div>
+                        </div>
+
+                        <!-- Selección de Acción -->
+                        <div style="background: #FFFFFF; border-radius: 10px; border: 1px solid #E2E8F0; padding: 20px;">
+                            <label style="display: block; font-size: 11px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;">2. ¿Qué acción desea realizar?</label>
+                            
+                            <div style="display: flex; flex-direction: column; gap: 12px;">
+                                <!-- Opción Actualizar -->
+                                <label style="display: flex; align-items: center; gap: 12px; cursor: pointer; padding: 14px; border-radius: 10px; border: 1px solid #E2E8F0; transition: all 0.2s; background: #FFF;" 
+                                    onmouseover="this.style.borderColor='#4F46E5'; this.style.background='#EEF2FF'" 
+                                    onmouseout="this.style.borderColor='#E2E8F0'; this.style.background='#FFF'">
+                                    <input type="radio" name="accionGuardar" value="actualizar" checked style="width: 18px; height: 18px; accent-color: #4F46E5;">
+                                    <div style="flex: 1;">
+                                        <div style="font-weight: 600; font-size: 14px; color: #1E293B;">Sobrescribir Registro</div>
+                                        <div style="font-size: 12px; color: #64748B; margin-top: 2px;">Actualiza los datos del registro seleccionado arriba.</div>
+                                    </div>
+                                    <i class="fas fa-pencil-alt" style="color: #4F46E5; opacity: 0.6;"></i>
                                 </label>
-                            `).join('')}
+                                
+                                <!-- Opción Crear Nuevo -->
+                                <label style="display: flex; align-items: center; gap: 12px; cursor: pointer; padding: 14px; border-radius: 10px; border: 1px solid #E2E8F0; transition: all 0.2s; background: #FFF;" 
+                                    onmouseover="this.style.borderColor='#10B981'; this.style.background='#ECFDF5'" 
+                                    onmouseout="this.style.borderColor='#E2E8F0'; this.style.background='#FFF'">
+                                    <input type="radio" name="accionGuardar" value="crear" style="width: 18px; height: 18px; accent-color: #10B981;">
+                                    <div style="flex: 1;">
+                                        <div style="font-weight: 600; font-size: 14px; color: #1E293B;">Crear Nuevo Registro</div>
+                                        <div style="font-size: 12px; color: #64748B; margin-top: 2px;">Agrega una fila nueva al archivo de seguimiento.</div>
+                                    </div>
+                                    <i class="fas fa-plus-circle" style="color: #10B981; opacity: 0.6;"></i>
+                                </label>
+                            </div>
                         </div>
+
                     </div>
-                    
-                    <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
-                        <strong>¿Qué desea hacer?</strong>
-                        <div style="margin-top: 10px;">
-                            <label style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px; cursor: pointer;">
-                                <input type="radio" name="accionGuardar" value="actualizar" checked style="width: 18px; height: 18px;">
-                                <span>📝 Actualizar registro seleccionado</span>
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                                <input type="radio" name="accionGuardar" value="crear" style="width: 18px; height: 18px;">
-                                <span>➕ Crear nuevo registro (fila nueva)</span>
-                            </label>
-                        </div>
-                    </div>
-                    
-                    <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
-                        <button onclick="document.getElementById('modalSeleccionRegistro').remove()" style="padding: 10px 20px; border: 1px solid #ddd; background: white; border-radius: 6px; cursor: pointer;">
-                            ❌ Cancelar
+
+                    <!-- Footer -->
+                    <div style="padding: 16px 24px; background: #F8FAFC; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; gap: 12px; flex-shrink: 0;">
+                        <button onclick="document.getElementById('modalSeleccionRegistro').remove()" style="padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid #E2E8F0; background: white; color: #64748B; transition: all 0.2s; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-times"></i> Cancelar
                         </button>
-                        <button onclick="window.medicAusentismoComponent.confirmarGuardadoConSeleccion()" data-seguimiento-data='${seguimientoDataEscaped}' style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer;">
-                            ✅ Confirmar
+                        <button onclick="window.medicAusentismoComponent.confirmarGuardadoConSeleccion()" data-seguimiento-data='${seguimientoDataEscaped}' style="padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; background: linear-gradient(135deg, #4F46E5, #4338CA); color: white; transition: all 0.2s; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2); display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-check-circle"></i> Confirmar Acción
                         </button>
                     </div>
+
                 </div>
             </div>
+            
+            <style>
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes slideUp {
+                    from { transform: translateY(20px); opacity: 0; }
+                    to { transform: translateY(0); opacity: 1; }
+                }
+            </style>
         `;
         
         // Insertar modal en el DOM
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = modalHTML;
-        document.body.appendChild(tempDiv.firstElementChild);
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
     }
 
     /**
