@@ -1140,7 +1140,7 @@ class MedicionAusentismoComponent {
         `;
         container.appendChild(exportModal);
 
-        // Modal de Detalle
+        // Modal de Detalle Modernizado
         const detailModal = document.createElement('div');
         detailModal.id = 'detailModal';
         detailModal.className = 'modal-backdrop';
@@ -1148,19 +1148,44 @@ class MedicionAusentismoComponent {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(15, 23, 42, 0.6); z-index: 1000;
             display: none; justify-content: center; align-items: center;
-            backdrop-filter: blur(2px);
+            backdrop-filter: blur(4px);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
         `;
         detailModal.innerHTML = `
-            <div style="background: white; width: 90%; max-width: 700px; max-height: 85vh; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); overflow: hidden; display: flex; flex-direction: column;">
-                <div style="padding: 15px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
-                    <div style="font-size: 16px; font-weight: 600;">Detalle de Seguimiento</div>
-                    <button onclick="document.getElementById('detailModal').style.display='none'" style="background: none; border: none; font-size: 20px; color: #64748B; cursor: pointer;">&times;</button>
+            <div style="background: white; width: 90%; max-width: 700px; max-height: 90vh; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); overflow: hidden; display: flex; flex-direction: column; transform: translateY(20px); transition: transform 0.3s ease;" class="modal-container">
+                <!-- Header Moderno -->
+                <div style="background: #FFFFFF; padding: 0; border-bottom: 1px solid #E2E8F0; flex-shrink: 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 20px 24px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #EEF2FF, #E0E7FF); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #4F46E5; font-size: 18px;">
+                                <i class="fas fa-eye"></i>
+                            </div>
+                            <div>
+                                <h2 style="font-size: 18px; font-weight: 700; color: #1E293B; margin: 0;">Detalle de Seguimiento</h2>
+                                <span style="font-size: 13px; color: #64748B; font-weight: 400;">Historial del paciente</span>
+                            </div>
+                        </div>
+                        <button onclick="document.getElementById('detailModal').style.display='none'; document.getElementById('detailModal').style.opacity='0'; document.getElementById('detailModal').style.visibility='hidden'" style="width: 32px; height: 32px; border-radius: 8px; border: 1px solid #E2E8F0; background: white; cursor: pointer; color: #94A3B8; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" class="close-btn">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
                 </div>
-                <div id="detailModalContent" style="margin-bottom: 20px; overflow-y: auto; padding: 20px; max-height: calc(85vh - 140px);">
+                
+                <!-- Body -->
+                <div id="detailModalContent" style="margin-bottom: 0; overflow-y: auto; padding: 24px; max-height: calc(90vh - 140px); background: #F8FAFC; flex: 1;">
                     <!-- Contenido dinámico -->
                 </div>
-                <div style="padding: 15px 20px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 10px; flex-shrink: 0;">
-                    <button onclick="document.getElementById('detailModal').style.display='none'" style="padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid #e2e8f0; background: white; color: #1E293B;">Cerrar</button>
+                
+                <!-- Footer -->
+                <div style="padding: 16px 24px; background: white; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; gap: 10px; flex-shrink: 0;">
+                    <button onclick="document.getElementById('detailModal').style.display='none'; document.getElementById('detailModal').style.opacity='0'; document.getElementById('detailModal').style.visibility='hidden'" style="padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid #E2E8F0; background: white; color: #475569; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px;" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cerrar
+                    </button>
+                    <button onclick="window.medicAusentismoComponent.openSeguimientoPanelFromModal()" style="padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; background: linear-gradient(135deg, #4F46E5, #4338CA); color: white; transition: all 0.2s; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2); display: inline-flex; align-items: center; gap: 8px;" class="btn btn-primary">
+                        <i class="fas fa-folder-open"></i> Abrir Seguimiento
+                    </button>
                 </div>
             </div>
         `;
@@ -1177,16 +1202,25 @@ class MedicionAusentismoComponent {
     openDetailModal(empleado) {
         const modal = document.getElementById('detailModal');
         const content = document.getElementById('detailModalContent');
+        const modalContainer = modal.querySelector('.modal-container');
 
         if (!modal || !content || !empleado) return;
+
+        // Guardar empleado actual para usar en "Abrir Seguimiento"
+        this.currentDetalleEmpleado = empleado;
 
         const nombre = empleado.nombre || 'Sin nombre';
         const cedula = empleado.cedula || '';
         const incapacidades = empleado.incapacidades || [];
 
         if (incapacidades.length === 0) {
-            content.innerHTML = '<p style="text-align: center; color: #64748B; padding: 40px;">No hay incapacidades registradas</p>';
+            content.innerHTML = '<div style="text-align: center; color: #64748B; padding: 40px;"><i class="fas fa-inbox" style="font-size: 48px; color: #CBD5E1; margin-bottom: 16px;"></i><p>No hay incapacidades registradas</p></div>';
             modal.style.display = 'flex';
+            setTimeout(() => {
+                modal.style.opacity = '1';
+                modal.style.visibility = 'visible';
+                modalContainer.style.transform = 'translateY(0)';
+            }, 10);
             return;
         }
 
@@ -1199,7 +1233,7 @@ class MedicionAusentismoComponent {
 
         // Identificar incapacidades >= 10 días (las que activan el seguimiento por Condición 1)
         const incapacidadesLargas = incapacidadesOrdenadas.filter(inc => inc.diasIncapacidad >= 10);
-        
+
         // Determinar tipo de caso
         const esCondicion1 = incapacidadesLargas.length > 0;
         const esCondicion2 = !esCondicion1 && incapacidadesOrdenadas.length > 1;
@@ -1219,187 +1253,169 @@ class MedicionAusentismoComponent {
             content.innerHTML = this.renderCondicion1Detalle(nombre, cedula, incapacidadesOrdenadas, totalDias);
         }
 
+        // Mostrar modal con animación
         modal.style.display = 'flex';
+        setTimeout(() => {
+            modal.style.opacity = '1';
+            modal.style.visibility = 'visible';
+            modalContainer.style.transform = 'translateY(0)';
+        }, 10);
+    }
+
+    openSeguimientoPanelFromModal() {
+        // Cerrar modal de detalles
+        const modal = document.getElementById('detailModal');
+        const modalContainer = modal.querySelector('.modal-container');
+        modal.style.opacity = '0';
+        modal.style.visibility = 'hidden';
+        modalContainer.style.transform = 'translateY(20px)';
+        setTimeout(() => {
+            modal.style.display = 'none';
+        }, 300);
+
+        // Abrir panel de seguimiento si hay empleado seleccionado
+        if (this.currentDetalleEmpleado) {
+            this.openSeguimientoPanel(this.currentDetalleEmpleado);
+        }
     }
 
     renderCondicion1Detalle(nombre, cedula, incapacidadesLargas, totalDias) {
         const today = new Date();
+        const initials = nombre.split(' ').map(n => n[0]).filter(c => c).join('').substring(0, 2).toUpperCase();
 
-        // DEBUG: Ver incapacidades antes de ordenar
-        console.log('[DEBUG renderCondicion1Detalle] incapacidadesLargas antes de ordenar:', incapacidadesLargas.map(inc => ({
-            fechaInicio: inc.fechaInicio,
-            fechaInicioType: typeof inc.fechaInicio,
-            fechaFin: inc.fechaFin,
-            dias: inc.diasIncapacidad
-        })));
-
-        // Ordenar incapacidades de MÁS RECIENTE a MÁS ANTIGUA para mostrar primero la actual
+        // Ordenar incapacidades de MÁS RECIENTE a MÁS ANTIGUA
         const incapacidadesOrdenadas = [...incapacidadesLargas].sort((a, b) => {
-            // Convertir strings ISO a objetos Date si es necesario
-            let dateA = a.fechaInicio;
-            let dateB = b.fechaInicio;
-
-            if (typeof dateA === 'string') {
-                dateA = new Date(dateA);
-            }
-            if (typeof dateB === 'string') {
-                dateB = new Date(dateB);
-            }
-
-            // Validar que las fechas sean objetos Date válidos
-            const validA = dateA instanceof Date && !isNaN(dateA.getTime());
-            const validB = dateB instanceof Date && !isNaN(dateB.getTime());
-
-            if (!validA) dateA = null;
-            if (!validB) dateB = null;
-
-            if (!dateB && !dateA) return 0;
-            if (!dateB) return -1;
-            if (!dateA) return 1;
-
-            const diff = dateB - dateA;
-            console.log(`[DEBUG sort] Comparando ${dateB.toLocaleDateString()} vs ${dateA.toLocaleDateString()} = ${diff}`);
-            return diff;
+            let dateA = a.fechaInicio instanceof Date ? a.fechaInicio : new Date(a.fechaInicio);
+            let dateB = b.fechaInicio instanceof Date ? b.fechaInicio : new Date(b.fechaInicio);
+            if (!isNaN(dateB) && !isNaN(dateA)) return dateB - dateA;
+            return 0;
         });
 
-        // DEBUG: Ver incapacidades después de ordenar
-        console.log('[DEBUG renderCondicion1Detalle] incapacidadesOrdenadas después de ordenar:', incapacidadesOrdenadas.map(inc => ({
-            fechaInicio: inc.fechaInicio,
-            fechaInicioType: typeof inc.fechaInicio,
-            fechaFin: inc.fechaFin,
-            dias: inc.diasIncapacidad
-        })));
-        
         return `
-            <!-- Encabezado del empleado -->
-            <div style="display: flex; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #e2e8f0;">
-                <div style="width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, #174ea6, #2d5dc7); display: flex; align-items: center; justify-content: center; font-weight: 700; color: white; font-size: 22px; flex-shrink: 0;">
-                    ${nombre.split(' ').map(n => n[0]).filter(c => c).join('').substring(0, 2).toUpperCase()}
+            <!-- Employee Card -->
+            <div style="background: white; border: 1px solid #E2E8F0; border-radius: 12px; padding: 16px; margin-bottom: 24px; display: flex; align-items: center; gap: 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                <div style="width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #4F46E5, #7C3AED); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; flex-shrink: 0;">
+                    ${initials}
                 </div>
-                <div style="margin-left: 15px; flex: 1;">
-                    <h3 style="font-size: 18px; margin: 0; color: #1E293B; font-weight: 600;">${nombre}</h3>
-                    <div style="font-size: 14px; color: #64748B; margin-top: 4px;">CC: ${cedula}</div>
+                <div style="flex: 1;">
+                    <h3 style="margin: 0 0 4px 0; font-size: 15px; font-weight: 600; color: #1E293B;">${nombre}</h3>
+                    <p style="margin: 0; font-size: 13px; color: #64748B;">CC: ${cedula}</p>
                 </div>
-                <div style="background: #FEF3C7; color: #92400E; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">
-                    ⚠️ Incapacidad >= 10 días
-                </div>
+                <span style="padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; background: #FEF3C7; color: #D97706;">
+                    <i class="fas fa-exclamation-triangle"></i> Seguimiento Activo
+                </span>
             </div>
 
-            <!-- Lista de incapacidades >= 10 días (ordenadas de más reciente a más antigua) -->
-            <div style="margin-bottom: 20px;">
-                <h4 style="font-size: 14px; font-weight: 600; color: #1E293B; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-                    <i class="fas fa-exclamation-triangle" style="color: #F59E0B;"></i>
-                    INCAPACIDAD(ES) QUE ACTIVA(N) SEGUIMIENTO
-                </h4>
-                ${incapacidadesOrdenadas.map((inc, index) => {
-                    // Validar y formatear fechas
-                    let fechaInicio = 'N/A';
-                    let fechaFin = 'N/A';
-                    
-                    if (inc.fechaInicio) {
-                        try {
-                            const fechaIni = inc.fechaInicio instanceof Date ? inc.fechaInicio : new Date(inc.fechaInicio);
-                            if (!isNaN(fechaIni.getTime())) {
-                                fechaInicio = fechaIni.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
-                            }
-                        } catch (e) {
-                            console.warn('Error al formatear fechaInicio:', e);
-                        }
-                    }
-                    
-                    if (inc.fechaFin) {
-                        try {
-                            const fechaFi = inc.fechaFin instanceof Date ? inc.fechaFin : new Date(inc.fechaFin);
-                            if (!isNaN(fechaFi.getTime())) {
-                                fechaFin = fechaFi.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
-                            }
-                        } catch (e) {
-                            console.warn('Error al formatear fechaFin:', e);
-                        }
-                    }
-                    
-                    const codigo = inc.record?.['CODIGO'] || inc.record?.['CÓDIGO'] || inc.record?.['codigo'] || 'N/A';
-                    const diagnostico = inc.record?.['DESCRIPCION'] || inc.record?.['DESCRIPCIÓN'] || inc.record?.['descripcion'] || 'Sin descripción';
-                    const tipo = inc.record?.['CLASE DE INCAPACIDAD'] || inc.record?.['clase_de_incapacidad'] || 'EPS';
-                    
-                    // Calcular estado
-                    let estado = 'Finalizado';
-                    let estadoColor = '#64748B';
-                    
-                    if (inc.fechaFin) {
-                        try {
-                            const fechaFi = inc.fechaFin instanceof Date ? inc.fechaFin : new Date(inc.fechaFin);
-                            if (!isNaN(fechaFi.getTime())) {
-                                const diffTime = fechaFi - today;
-                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                                
-                                if (diffDays < 0) {
-                                    estado = 'Finalizado';
-                                    estadoColor = '#64748B';
-                                } else if (diffDays <= 2) {
-                                    estado = 'Próximo a vencer';
-                                    estadoColor = '#F59E0B';
-                                } else {
-                                    estado = 'En curso';
-                                    estadoColor = '#10B981';
-                                }
-                            }
-                        } catch (e) {
-                            console.warn('Error al calcular estado:', e);
-                        }
-                    }
+            <!-- Timeline Section Title -->
+            <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #64748B; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-history"></i> Incapacidades que activan seguimiento (${incapacidadesOrdenadas.length})
+            </div>
 
-                    return `
-                        <div style="background: ${index === 0 ? '#FEF3C7' : '#F8FAFC'}; border: ${index === 0 ? '2px solid #F59E0B' : '1px solid #e2e8f0'}; border-radius: 8px; padding: 15px; margin-bottom: 12px; transition: all 0.2s;">
-                            ${index === 0 ? '<div style="font-size: 11px; font-weight: 700; color: #92400E; margin-bottom: 8px; text-transform: uppercase;">🔹 PRINCIPAL (Más reciente >= 10 días)</div>' : ''}
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-                                <div>
-                                    <div style="font-size: 11px; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">Fecha Inicio</div>
-                                    <div style="font-weight: 600; color: #1E293B; font-size: 14px;">📅 ${fechaInicio}</div>
+            <!-- Timeline Items -->
+            ${incapacidadesOrdenadas.map((inc, index) => {
+                const isPrincipal = index === 0;
+                
+                // Formatear fechas
+                let fechaInicio = 'N/A';
+                let fechaFin = 'N/A';
+                if (inc.fechaInicio) {
+                    try {
+                        const fechaIni = inc.fechaInicio instanceof Date ? inc.fechaInicio : new Date(inc.fechaInicio);
+                        if (!isNaN(fechaIni.getTime())) {
+                            fechaInicio = fechaIni.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+                        }
+                    } catch (e) { console.warn('Error fechaInicio:', e); }
+                }
+                if (inc.fechaFin) {
+                    try {
+                        const fechaFi = inc.fechaFin instanceof Date ? inc.fechaFin : new Date(inc.fechaFin);
+                        if (!isNaN(fechaFi.getTime())) {
+                            fechaFin = fechaFi.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+                        }
+                    } catch (e) { console.warn('Error fechaFin:', e); }
+                }
+
+                const codigo = inc.record?.['CODIGO'] || 'N/A';
+                const diagnostico = inc.record?.['DESCRIPCION'] || 'Sin descripción';
+                const tipo = inc.record?.['CLASE DE INCAPACIDAD'] || 'EPS';
+
+                // Calcular estado
+                let estado = 'Finalizado';
+                let estadoColor = '#64748B';
+                let estadoBg = '#F1F5F9';
+                if (inc.fechaFin) {
+                    try {
+                        const fechaFi = inc.fechaFin instanceof Date ? inc.fechaFin : new Date(inc.fechaFin);
+                        if (!isNaN(fechaFi.getTime())) {
+                            const diffDays = Math.ceil((fechaFi - today) / (1000 * 60 * 60 * 24));
+                            if (diffDays < 0) { estado = 'Finalizado'; estadoColor = '#64748B'; estadoBg = '#F1F5F9'; }
+                            else if (diffDays <= 2) { estado = 'Próximo a vencer'; estadoColor = '#D97706'; estadoBg = '#FEF3C7'; }
+                            else { estado = 'En curso'; estadoColor = '#059669'; estadoBg = '#D1FAE5'; }
+                        }
+                    } catch (e) { console.warn('Error estado:', e); }
+                }
+
+                const dotColor = isPrincipal ? '#F59E0B' : '#CBD5E1';
+                const dotBg = isPrincipal ? '#FEF3C7' : 'white';
+
+                return `
+                    <!-- Timeline Item -->
+                    <div style="position: relative; padding-left: 28px; margin-bottom: 20px;">
+                        <div style="position: absolute; left: 5px; top: 24px; bottom: -10px; width: 2px; background: #E2E8F0;"></div>
+                        ${index === incapacidadesOrdenadas.length - 1 ? '<div style="position: absolute; left: 0; top: 4px; width: 12px; height: 12px; border-radius: 50%; background: white; border: 2px solid ' + dotColor + ';"></div>' : ''}
+                        <div style="position: absolute; left: 0; top: 4px; width: 12px; height: 12px; border-radius: 50%; background: ${dotBg}; border: 2px solid ${dotColor};"></div>
+                        
+                        <div style="background: white; border: 1px solid #E2E8F0; border-radius: 10px; padding: 16px;">
+                            <!-- Timeline Header -->
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #F1F5F9;">
+                                <div style="font-size: 13px; font-weight: 600; color: #1E293B; display: flex; align-items: center; gap: 6px;">
+                                    <i class="fas fa-calendar-alt" style="color: #94A3B8; font-size: 12px;"></i>
+                                    ${fechaInicio} - ${fechaFin}
                                 </div>
-                                <div>
-                                    <div style="font-size: 11px; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">Fecha Fin</div>
-                                    <div style="font-weight: 600; color: #1E293B; font-size: 14px;">📅 ${fechaFin}</div>
-                                </div>
+                                ${isPrincipal ? '<span style="padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; text-transform: uppercase; background: #DBEAFE; color: #2563EB;">Principal</span>' : '<span style="padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; text-transform: uppercase; background: ' + estadoBg + '; color: ' + estadoColor + ';">' + estado + '</span>'}
                             </div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                            
+                            <!-- Timeline Body -->
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
                                 <div>
-                                    <div style="font-size: 11px; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">Días</div>
-                                    <div style="font-weight: 700; color: #174ea6; font-size: 16px;">📊 ${inc.diasIncapacidad} días</div>
+                                    <label style="display: block; font-size: 10px; color: #94A3B8; margin-bottom: 2px; text-transform: uppercase;">Días Totales</label>
+                                    <strong style="font-size: 14px; color: #334155; font-weight: 600;">${inc.diasIncapacidad} días</strong>
                                 </div>
                                 <div>
-                                    <div style="font-size: 11px; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">Tipo</div>
-                                    <div style="font-weight: 600; color: #1E293B; font-size: 14px;">
-                                        <span style="padding: 2px 8px; border-radius: 12px; background: ${tipo === 'ARL' ? '#FEF3C7' : tipo === 'EMPRESA' ? '#DCFCE7' : '#DBEAFE'}; color: ${tipo === 'ARL' ? '#92400E' : tipo === 'EMPRESA' ? '#166534' : '#1E40AF'}; font-size: 12px;">
+                                    <label style="display: block; font-size: 10px; color: #94A3B8; margin-bottom: 2px; text-transform: uppercase;">Tipo</label>
+                                    <strong style="font-size: 14px; color: #334155; font-weight: 600;">
+                                        <span style="padding: 2px 8px; border-radius: 12px; background: ${tipo === 'ARL' ? '#FEF3C7' : tipo === 'EMPRESA' ? '#DCFCE7' : '#DBEAFE'}; color: ${tipo === 'ARL' ? '#92400E' : tipo === 'EMPRESA' ? '#166534' : '#1E40AF'}; font-size: 11px;">
                                             ${tipo}
                                         </span>
-                                    </div>
+                                    </strong>
                                 </div>
                                 <div>
-                                    <div style="font-size: 11px; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">Estado</div>
-                                    <div style="font-weight: 600; color: ${estadoColor}; font-size: 13px;">● ${estado}</div>
+                                    <label style="display: block; font-size: 10px; color: #94A3B8; margin-bottom: 2px; text-transform: uppercase;">Estado</label>
+                                    <strong style="font-size: 14px; color: ${estadoColor}; font-weight: 600;">${estado}</strong>
                                 </div>
-                            </div>
-                            <div style="background: white; border-radius: 6px; padding: 12px; border: 1px solid #e2e8f0;">
-                                <div style="font-size: 11px; color: #64748B; text-transform: uppercase; margin-bottom: 6px;">🏷️ Código Diagnóstico</div>
-                                <div style="font-weight: 700; color: #1E293B; font-size: 15px; margin-bottom: 8px;">${codigo}</div>
-                                <div style="font-size: 11px; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">📝 Descripción</div>
-                                <div style="color: #475569; font-size: 14px; line-height: 1.5;">${diagnostico}</div>
+                                ${isPrincipal ? `
+                                <div style="grid-column: span 3; margin-top: 8px; padding-top: 12px; border-top: 1px solid #F1F5F9;">
+                                    <label style="display: block; font-size: 10px; color: #94A3B8; margin-bottom: 4px; text-transform: uppercase;">Diagnóstico</label>
+                                    <strong style="font-size: 14px; color: #1E293B; font-weight: 600;">${codigo}</strong>
+                                    <div style="font-size: 13px; color: #64748B; margin-top: 4px; line-height: 1.5;">${diagnostico}</div>
+                                </div>
+                                ` : ''}
                             </div>
                         </div>
-                    `;
-                }).join('')}
-            </div>
+                    </div>
+                `;
+            }).join('')}
 
-            <!-- Resumen -->
-            <div style="background: #F1F5F9; border-radius: 8px; padding: 12px 15px; margin-bottom: 20px;">
-                <div style="font-size: 13px; color: #475569;">
-                    <strong>Total días en incapacidades >= 10:</strong> ${totalDias} días
+            <!-- Total Días -->
+            <div style="background: white; border: 1px solid #E2E8F0; border-radius: 10px; padding: 16px; margin-top: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 13px; color: #64748B;">Total días en incapacidades >= 10:</span>
+                    <strong style="font-size: 18px; color: #4F46E5; font-weight: 700;">${totalDias} días</strong>
                 </div>
             </div>
 
             <!-- Nota de seguimiento -->
-            ${this.renderNotaSeguimientoSection(cedula, nombre, { nombre, cedula, incapacidades: incapacidadesLargas })}
+            ${this.renderNotaSeguimientoSection(cedula, nombre, { nombre, cedula, incapacidades: incapacidadesOrdenadas })}
         `;
     }
 
