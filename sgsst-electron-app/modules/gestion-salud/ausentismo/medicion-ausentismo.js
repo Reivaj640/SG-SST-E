@@ -1645,9 +1645,6 @@ class MedicionAusentismoComponent {
                     <strong style="font-size: 18px; color: #4F46E5; font-weight: 700;">${totalDias} días</strong>
                 </div>
             </div>
-
-            <!-- Nota de seguimiento -->
-            ${this.renderNotaSeguimientoSection(cedula, nombre, { nombre, cedula, incapacidades: incapacidadesOrdenadas })}
         `;
     }
 
@@ -1775,61 +1772,7 @@ class MedicionAusentismoComponent {
                     </div>
                 </div>
             </div>
-
-            <!-- Nota de seguimiento -->
-            ${this.renderNotaSeguimientoSection(cedula, nombre, { nombre, cedula, incapacidades })}
         `;
-    }
-
-    renderNotaSeguimientoSection(cedula, nombreEmpleado, empleadoData = null) {
-        // Preparar datos para pasar al botón
-        const nombreParam = nombreEmpleado ? nombreEmpleado.replace(/'/g, "\\'") : '';
-        const cedulaParam = cedula.replace(/'/g, "\\'");
-
-        // Serializar datos del empleado si están disponibles
-        const empleadoDataStr = empleadoData
-            ? JSON.stringify(empleadoData).replace(/"/g, '&quot;')
-            : 'null';
-
-        return `
-            <div style="border-top: 2px solid #e2e8f0; padding-top: 20px;">
-                <h4 style="font-size: 14px; font-weight: 600; color: #1E293B; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-                    <i class="fas fa-folder-open" style="color: #174ea6;"></i>
-                    SEGUIMIENTO DEL CASO
-                </h4>
-                <div style="display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap;">
-                    <button onclick="window.medicAusentismoComponent.abrirSeguimientoDesdeTarjeta('${cedulaParam}', '${nombreParam}', ${empleadoDataStr})"
-                        style="padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; background: linear-gradient(135deg, #174ea6, #2d5dc7); color: white; display: flex; align-items: center; gap: 8px; transition: all 0.2s;"
-                        onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 6px -1px rgba(23, 78, 166, 0.3)'"
-                        onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
-                        <i class="fas fa-folder-open"></i> Abrir Seguimiento
-                    </button>
-                </div>
-            </div>
-        `;
-    }
-
-    /**
-     * Abre seguimiento desde una tarjeta/nota (fuera del modal de detalles)
-     * Busca el empleado en currentDetalleEmpleado o lo crea temporalmente
-     */
-    abrirSeguimientoDesdeTarjeta(cedula, nombre, empleadoData) {
-        console.log('[ABRIR DESDE TARJETA] Cédula:', cedula, 'Nombre:', nombre);
-        
-        // Si ya hay un empleado en currentDetalleEmpleado con la misma cédula, usarlo
-        if (this.currentDetalleEmpleado && this.currentDetalleEmpleado.cedula === cedula) {
-            console.log('[ABRIR DESDE TARJETA] Usando currentDetalleEmpleado existente');
-            this.openSeguimientoPanelFromModal();
-        } else {
-            // Crear un objeto temporal de empleado
-            this.currentDetalleEmpleado = {
-                cedula: cedula,
-                nombre: nombre,
-                incapacidades: empleadoData?.incapacidades || []
-            };
-            console.log('[ABRIR DESDE TARJETA] Creando currentDetalleEmpleado temporal');
-            this.openSeguimientoPanelFromModal();
-        }
     }
 
     guardarNota(cedula) {
@@ -2197,6 +2140,15 @@ class MedicionAusentismoComponent {
                                     <label class="sp-form-label">Actividades Extralaborales / Deportes</label>
                                     <textarea id="sp-actividades-extralaborales" class="sp-form-control" rows="2" placeholder="Ej: Fútbol los fines de semana, natación, gimnasio..."></textarea>
                                 </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Dominancia</label>
+                                    <select id="sp-dominancia" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="Diestro">Diestro</option>
+                                        <option value="Zurdo">Zurdo</option>
+                                        <option value="Ambidiestro">Ambidiestro</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2222,10 +2174,8 @@ class MedicionAusentismoComponent {
                                 <label class="sp-form-label">Clase de Incapacidad</label>
                                 <select id="sp-clase-incapacidad" class="sp-form-control">
                                     <option value="">Seleccione...</option>
-                                    <option value="Enfermedad Común">Enfermedad Común</option>
-                                    <option value="Accidente de Trabajo (AT)">Accidente de Trabajo (AT)</option>
-                                    <option value="Enfermedad Laboral (EL)">Enfermedad Laboral (EL)</option>
-                                    <option value="Licencia de Maternidad">Licencia de Maternidad</option>
+                                    <option value="LABORAL">LABORAL</option>
+                                    <option value="COMÚN">COMÚN</option>
                                 </select>
                             </div>
                         </div>
@@ -2274,6 +2224,37 @@ class MedicionAusentismoComponent {
                                 <div class="sp-form-group">
                                     <label class="sp-form-label">Fecha Última Prórroga</label>
                                     <input type="date" id="sp-fecha-ultima-prorroga" class="sp-form-control">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Diagnósticos Múltiples -->
+                        <div class="sp-subsection">
+                            <div class="sp-subsection-title"><i class="fas fa-stethoscope"></i> Diagnósticos Adicionales</div>
+                            <div class="sp-form-grid">
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">CIE-10 Incapacidad Temporal DX 2</label>
+                                    <input type="text" id="sp-cie10-dx2" class="sp-form-control" placeholder="Ej: M545">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Origen Incapacidad DX 2</label>
+                                    <select id="sp-origen-dx2" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="LABORAL">LABORAL</option>
+                                        <option value="COMÚN">COMÚN</option>
+                                    </select>
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">CIE-10 Incapacidad Temporal DX 3</label>
+                                    <input type="text" id="sp-cie10-dx3" class="sp-form-control" placeholder="Ej: G439">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Origen Incapacidad DX 3</label>
+                                    <select id="sp-origen-dx3" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="LABORAL">LABORAL</option>
+                                        <option value="COMÚN">COMÚN</option>
+                                    </select>
                                 </div>
                             </div>
                         </div>
@@ -3323,7 +3304,8 @@ class MedicionAusentismoComponent {
                 actividadesExtralaborales: document.getElementById('sp-actividades-extralaborales').value,
                 // Nuevos campos laborales
                 tipoEvento: document.getElementById('sp-tipo-evento').value,
-                tipoCargo: document.getElementById('sp-tipo-cargo').value
+                tipoCargo: document.getElementById('sp-tipo-cargo').value,
+                dominancia: document.getElementById('sp-dominancia').value  // 🆕 Dominancia
             },
             // Incapacidad
             incapacidad: {
@@ -3335,6 +3317,11 @@ class MedicionAusentismoComponent {
                 descripcionDiagnostico: document.getElementById('sp-descripcion-diagnostico').value,
                 numeroProrrogas: document.getElementById('sp-numero-prorrogas').value,
                 fechaUltimaProrroga: document.getElementById('sp-fecha-ultima-prorroga').value,
+                // 🆕 Diagnósticos adicionales
+                cie10Dx2: document.getElementById('sp-cie10-dx2').value,
+                origenDx2: document.getElementById('sp-origen-dx2').value,
+                cie10Dx3: document.getElementById('sp-cie10-dx3').value,
+                origenDx3: document.getElementById('sp-origen-dx3').value,
                 // Seguimientos múltiples
                 seguimientos: this.obtenerSeguimientos()
             },
@@ -3628,6 +3615,7 @@ class MedicionAusentismoComponent {
             talla: seguimientoData.trabajador.talla || '',
             imc: seguimientoData.trabajador.imc || '',
             actividadesExtralaborales: seguimientoData.trabajador.actividadesExtralaborales || '',
+            dominancia: seguimientoData.trabajador.dominancia || '',  // 🆕 Dominancia
             // Datos laborales adicionales
             tipoEvento: seguimientoData.trabajador.tipoEvento || '',
             tipoCargo: seguimientoData.trabajador.tipoCargo || '',
@@ -3642,7 +3630,13 @@ class MedicionAusentismoComponent {
             afp: seguimientoData.trabajador.afp || '',
             diasAcumulados: seguimientoData.incapacidad.diasAcumulados || '',
             codigoCie10: seguimientoData.incapacidad.codigoCie10 || '',
+            clase: seguimientoData.incapacidad.clase || '',  // 🆕 Clase (LABORAL/COMÚN)
             fechaFin: seguimientoData.incapacidad.fechaFin || '',
+            // 🆕 Diagnósticos adicionales
+            cie10Dx2: seguimientoData.incapacidad.cie10Dx2 || '',
+            origenDx2: seguimientoData.incapacidad.origenDx2 || '',
+            cie10Dx3: seguimientoData.incapacidad.cie10Dx3 || '',
+            origenDx3: seguimientoData.incapacidad.origenDx3 || '',
             // Enviar seguimientos al backend
             seguimientos: seguimientoData.incapacidad.seguimientos || []
         };

@@ -1,7 +1,7 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.50
-**Última actualización:** 26 de febrero de 2026
+**Versión:** 0.1.51
+**Última actualización:** 27 de febrero de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
 ---
@@ -20,7 +20,8 @@
 - ✅ **Seguimiento PRIC**: Gestión completa de casos de incapacidad y rehabilitación
 - ✅ **Sistema Dual de Archivos**: PI-FO-076 (lista general) + PRI.xlsx (seguimiento)
 - ✅ **Alertas Inteligentes**: Detección de registros duplicados con modal interactivo
-- ✅ **Cálculos Automáticos**: Edad, IMC, Estado Nutricional, Días Trabajados
+- ✅ **Cálculos Automáticos**: Edad, IMC, Estado Nutricional, Días Trabajados, Antigüedad, Días Acumulados de Incapacidad
+- ✅ **Seguimientos Múltiples**: Hasta 5 seguimientos por caso con fecha y descripción
 - ✅ **KPIs en Tiempo Real**: Actualización dinámica con filtros de año/mes
 - ✅ **Solo 13 archivos en raíz**: Proyecto limpio y organizado
 
@@ -359,79 +360,108 @@ El sistema identifica automáticamente empleados que cumplen **una de dos condic
 - Año de inicio de incapacidad
 - Mes de inicio de incapacidad
 
-#### 4. Modal de Detalles del Caso
+#### 4. Modal de Detalles del Caso con Incapacidades Seleccionables 🆕
 
-Al hacer clic en "Ver Detalles", se muestra:
+Al hacer clic en "Ver Detalles", se muestra un modal con:
+
+**Características Nuevas:**
+- ✅ **Checkboxes en todas las incapacidades** - Usuario puede seleccionar incapacidades específicas para seguimiento
+- ✅ **Código CIE-10 y diagnóstico en TODAS las incapacidades** - No solo en la principal
+- ✅ **Diseño visual mejorado** - Hover effects, transiciones suaves
+- ✅ **Filtro de año aplicado** - Solo muestra incapacidades del año seleccionado
 
 **Para Condición 1 (Incapacidad ≥ 10 días):**
 - Encabezado con datos del empleado
-- Lista de incapacidades ≥ 10 días ordenadas de más reciente a más antigua
+- Lista de incapacidades ≥ 10 días con checkboxes
 - Cada incapacidad muestra:
+  - Checkbox de selección
   - Fechas de inicio y fin
   - Días de duración
   - Tipo (EPS/ARL/EMPRESA)
   - Estado (En curso/Próximo a vencer/Finalizado)
-  - Código CIE-10
-  - Descripción del diagnóstico
+  - Código CIE-10 y descripción del diagnóstico
 
 **Para Condición 2 (Suma ≥ 10 días con gaps ≤ 3):**
 - Encabezado con datos del empleado
-- Secuencia completa de incapacidades
+- Secuencia completa de incapacidades con checkboxes
 - Cálculo y visualización de gaps entre incapacidades
 - Total acumulado de días
 - Código CIE-10 y diagnóstico de cada incapacidad
 
-#### 5. Formulario Maestro de Seguimiento PRIC 🆕
+#### 5. Flujo de Selección de Casos 🆕
 
-**Interfaz:** Panel slideover que emerge desde la derecha (95% ancho, máx 1100px)
+**Nuevo Comportamiento al hacer "Abrir Seguimiento":**
 
-**Secciones del Formulario:**
-
-| Sección | Campos Principales |
-|---------|-------------------|
-| **1. Datos Generales** | Nombre, cédula, fecha nacimiento, género, cargo, área, fecha ingreso, antigüedad, tipo contrato, salario, EPS, AFP, ARL, caja compensación |
-| **2. Incapacidad Temporal** | Fechas inicio/fin, días acumulados, clase, código CIE-10, descripción diagnóstico, contingencia, prórrogas |
-| **3. Etapas PRIC** | 5 etapas: Captura, Plan de Tratamiento, Ejecución, Reincorporación, Cierre |
-| **4. Seguimiento Recomendaciones** | Tabla dinámica para listar recomendaciones de ARL/EPS con estado de cumplimiento |
-| **5. Calificación PCL** | Estado del proceso, fechas solicitud/dictamen, % PCL, origen, fecha estructuración |
-
-**Características de la Interfaz:**
-- ✅ Navegación horizontal por pestañas con animaciones fade-in
-- ✅ Carga automática de datos del empleado desde la tabla de seguimiento
-- ✅ Campos de solo lectura para datos que vienen del empleado
-- ✅ ARL prellenado con "COLMENA SEGUROS"
-- ✅ Tabla de recomendaciones con botones para agregar/eliminar filas
-- ✅ Botón "Guardar en Excel" que recopila todos los datos
-- ✅ Cierre al hacer clic en backdrop o botón cerrar
-
-**Flujo de Trabajo:**
 ```
-1. Usuario hace clic en "Abrir Seguimiento" en modal de detalles
+1. Click en "Abrir Seguimiento" desde modal de detalles
    ↓
-2. Panel slideover se abre con datos del empleado precargados
+2. Sistema busca registros existentes en PRI.xlsx por cédula
    ↓
-3. Usuario navega entre 5 pestañas y completa información
+3. Si hay registros → Modal "Registros Existentes Detectados"
+   - Muestra lista de casos encontrados
+   - Usuario selecciona caso existente → Panel abre con datos cargados
+   - Usuario selecciona "Crear nuevo registro" → Panel abre vacío
    ↓
-4. Usuario puede agregar recomendaciones dinámicamente
+4. Si no hay registros → Panel abre directamente para crear nuevo
    ↓
-5. Usuario hace clic en "Guardar en Excel"
-   ↓
-6. Sistema recopila datos y muestra notificación de éxito
-   ↓
-7. Panel se cierra automáticamente
+5. Panel de gestión muestra TODAS las secciones con datos cargados
 ```
 
-**Métodos del Componente:**
-```javascript
-// Principales métodos implementados
-- createSeguimientoPanel()       // Crea HTML y CSS del panel
-- closeSeguimientoPanel()        // Cierra el panel
-- showSeguimientoPanelSection()  // Navegación entre pestañas
-- cargarDatosEnPanelSeguimiento() // Carga datos del empleado
-- addRecomRow()                  // Agrega fila a tabla de recomendaciones
-- removeRecomRow()               // Elimina fila de recomendaciones
-- saveSeguimientoData()          // Recopila y guarda datos
+**Modal "Registros Existentes Detectados":**
+- Muestra casos encontrados con: fecha, días, diagnóstico
+- Indica cuál es el más reciente
+- Botón "Crear nuevo registro" para caso nuevo
+- Botón "Cancelar" para cerrar sin acción
+
+#### 6. Formulario Maestro de Seguimiento PRIC Mejorado 🆕
+
+**Mejoras Implementadas:**
+
+| Mejora | Descripción |
+|--------|-------------|
+| **Cálculo automático de antigüedad** | Al ingresar fecha de ingreso, calcula años automáticamente |
+| **Cálculo automático de días acumulados** | Al ingresar fechas de inicio/fin de incapacidad, calcula días totales |
+| **Carga automática de CIE-10 y diagnóstico** | Desde la incapacidad seleccionada en el modal de detalles |
+| **Sección de Seguimientos Múltiples** | Hasta 5 seguimientos con fecha y descripción, agregables dinámicamente |
+
+**Nueva Sección: Seguimientos Múltiples**
+
 ```
+┌─────────────────────────────────────────────────────────────┐
+│ 📋 Seguimientos                          [+ Agregar]        │
+├─────────────────────────────────────────────────────────────┤
+│ [Fecha] [Descripción del seguimiento..............] [🗑️]   │
+│ [Fecha] [Descripción del seguimiento..............] [🗑️]   │
+│ [Fecha] [Descripción del seguimiento..............] [🗑️]   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Funciones de Seguimientos:**
+- Click "+ Agregar Seguimiento" → Agrega nueva fila con fecha y descripción
+- Click "🗑️" → Elimina ese seguimiento específico
+- Al guardar → Todos los seguimientos se indexan en PRI.xlsx
+
+**Columnas de Indexación en PRI.xlsx:**
+
+| Seguimiento | Fecha (Columna) | Índice | Descripción (Columna) | Índice |
+|-------------|-----------------|--------|----------------------|--------|
+| 1 | AB | 27 | AC | 28 |
+| 2 | AD | 29 | AE | 30 |
+| 3 | AF | 31 | AG | 32 |
+| 4 | AH | 33 | AI | 34 |
+| 5 | AJ | 35 | AK | 36 |
+
+**Lógica de Actualización vs Creación:**
+
+El sistema ahora usa **criterio inteligente** para determinar si actualiza o crea:
+
+| Condición | Acción |
+|-----------|--------|
+| MISMA cédula + MISMAS fechas (fecha_fin) | ✅ ACTUALIZA registro existente |
+| MISMA cédula + DIFERENTES fechas | ✅ CREA NUEVO registro |
+| Cédula diferente | ✅ CREA NUEVO registro |
+
+Esto permite que un mismo empleado tenga **múltiples registros** en PRI.xlsx, uno por cada incapacidad diferente.
 
 ### Archivos Principales del Módulo
 
@@ -452,6 +482,8 @@ Al hacer clic en "Ver Detalles", se muestra:
   departamento: "Planta",
   empresaUsuaria: "Empresa SAS",
   genero: "Masculino",
+  fechaNacimiento: "1985-05-15",  // 🆕
+  fechaIngreso: "2020-01-10",      // 🆕
   incapacidades: [
     {
       fechaInicio: Date,
@@ -463,11 +495,49 @@ Al hacer clic en "Ver Detalles", se muestra:
 }
 ```
 
-**Datos de Seguimiento PRIC:**
+**Datos de Seguimiento PRIC (Actualizado 🆕):**
 ```javascript
 {
-  trabajador: { /* datos generales */ },
-  incapacidad: { /* detalles de incapacidad */ },
+  trabajador: {
+    nombre: "Juan Pérez",
+    cedula: "12345678",
+    fechaNacimiento: "1985-05-15",
+    genero: "Masculino",
+    cargo: "Operario",
+    area: "Planta",
+    fechaIngreso: "2020-01-10",
+    antiguedad: 5,  // Calculado automáticamente
+    tipoContrato: "Término Indefinido",
+    salario: 1500000,
+    eps: "Sanitas",
+    afp: "Porvenir",
+    tipoEvento: "Enfermedad General",
+    tipoCargo: "Operativo"
+  },
+  incapacidad: {
+    fechaInicio: "2025-02-01",
+    fechaFin: "2025-02-28",
+    diasAcumulados: 28,  // Calculado automáticamente
+    clase: "EPS",
+    codigoCie10: "S801",
+    descripcionDiagnostico: "Contusión de pierna",
+    numeroProrrogas: 0,
+    // 🆕 Seguimientos múltiples (hasta 5)
+    seguimientos: [
+      {
+        fecha: "2025-02-27",
+        descripcion: "Revisión médica inicial"
+      },
+      {
+        fecha: "2025-03-05",
+        descripcion: "Seguimiento por terapia física"
+      },
+      {
+        fecha: "2025-03-12",
+        descripcion: "Evaluación de reincorporación"
+      }
+    ]
+  },
   pric: { /* 5 etapas PRIC */ },
   calificacion: { /* datos de calificación PCL */ },
   recomendaciones: [
@@ -538,7 +608,9 @@ El módulo se basa en los lineamientos de la **Resolución 0312 de 2019** para e
 | `buscarEmpleadoPorCedula(cedula, empresa)` | Buscar empleado por cédula |
 | `buscarCie10Descripcion(empresa, code)` | Buscar descripción CIE-10 |
 | `procesarAusentismo(companyName, formData)` | Registrar nueva incapacidad |
-| `saveFollowUp(followUpData, companyName)` | Guardar seguimiento de caso individual en PRI.xlsx |
+| `saveFollowUp(followUpData, companyName)` | Guardar seguimiento de caso individual en PRI.xlsx (incluye hasta 5 seguimientos) |
+| `buscarRegistrosCedula(cedula, companyName)` | 🆕 Buscar registros existentes por cédula en PRI.xlsx |
+| `leerCasosPRI(companyName)` | 🆕 Leer todos los casos desde PRI.xlsx para selección |
 
 **📖 Ver documentación completa:** [docs/ARQUITECTURA_AUSENTISMO_DUAL.md](docs/ARQUITECTURA_AUSENTISMO_DUAL.md)
 
@@ -787,12 +859,16 @@ Este software es propietario y confidencial. No se permite la reproducción, dis
 - [ ] Mejorar documentación de contratos IPC
 - [ ] Optimizar carga de módulos dinámicos
 - [x] Implementar seguimiento PRIC con interfaz slideover 🆕
+- [x] Implementar selección de incapacidades con checkboxes 🆕
+- [x] Implementar flujo de selección de casos al abrir seguimiento 🆕
+- [x] Implementar cálculos automáticos (antigüedad, días acumulados) 🆕
+- [x] Implementar seguimientos múltiples (hasta 5) con indexación en PRI.xlsx 🆕
+- [x] Implementar lógica inteligente actualización vs creación 🆕
 
 ### Mediano Plazo
 - [ ] Implementar sistema de módulos ES6
 - [ ] Migrar a webpack para bundling
 - [ ] Agregar tests unitarios
-- [ ] Implementar guardado real de seguimiento PRIC en Excel
 
 ### Largo Plazo
 - [ ] Versión web (sin Electron)
@@ -801,5 +877,41 @@ Este software es propietario y confidencial. No se permite la reproducción, dis
 
 ---
 
-**Última actualización:** 25 de febrero de 2026
-**Versión del documento:** 2.1 (Seguimiento PRIC implementado)
+## 📝 Cambios Recientes (v0.1.51 - 27 Feb 2026)
+
+### Mejoras en Módulo de Ausentismo PRIC
+
+1. **Incapacidades Seleccionables** - Checkboxes en modal de detalles
+2. **Flujo de Selección de Casos** - Modal después de "Abrir Seguimiento"
+3. **Cálculos Automáticos** - Antigüedad y días acumulados
+4. **Seguimientos Múltiples** - Hasta 5 seguimientos por caso
+5. **Lógica Inteligente** - Actualiza o crea según fechas
+6. **Carga Automática** - Datos desde incapacidad seleccionada
+
+### Archivos Modificados
+
+- `modules/gestion-salud/ausentismo/medicion-ausentismo.js` - +12 funciones nuevas
+- `Portear/src/actualizar_ausentismo.py` - Seguimientos múltiples en columnas AB-AK
+- `main.js` - Handler `leer-casos-pri`
+- `preload.js` - API `leerCasosPRI()`
+
+### Columnas PRI.xlsx (Nuevas 🆕)
+
+| Columna | Índice | Campo |
+|---------|--------|-------|
+| AB | 27 | Seguimiento 1 - Fecha 🆕 |
+| AC | 28 | Seguimiento 1 - Descripción 🆕 |
+| AD | 29 | Seguimiento 2 - Fecha 🆕 |
+| AE | 30 | Seguimiento 2 - Descripción 🆕 |
+| AF | 31 | Seguimiento 3 - Fecha 🆕 |
+| AG | 32 | Seguimiento 3 - Descripción 🆕 |
+| AH | 33 | Seguimiento 4 - Fecha 🆕 |
+| AI | 34 | Seguimiento 4 - Descripción 🆕 |
+| AJ | 35 | Seguimiento 5 - Fecha 🆕 |
+| AK | 36 | Seguimiento 5 - Descripción 🆕 |
+
+---
+
+**Última actualización:** 27 de febrero de 2026  
+**Versión del documento:** 2.2 (Seguimientos múltiples implementados)  
+**Versión de la aplicación:** 0.1.51

@@ -660,10 +660,10 @@ def guardar_seguimiento(empresa, file_path, datos):
         
         # Construir la fila de datos ORGANIZADA POR COLUMNAS
         # Estructura de columnas según PRI.xlsx:
-        # A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7, I=8, J=9, K=10, L=11, M=12, N=13, O=14, P=15, Q=16, R=17, S=18, T=19, U=20, V=21, W=22, X=23, Y=24, Z=25, AA=26, AB=27, AC=28, AD=29, AE=30, AF=31, AG=32, AH=33, AI=34, AJ=35, AK=36
+        # A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7, I=8, J=9, K=10, L=11, M=12, N=13, O=14, P=15, Q=16, R=17, S=18, T=19, U=20, V=21, W=22, X=23, Y=24, Z=25, AA=26, AB=27, AC=28, AD=29, AE=30, AF=31, AG=32, AH=33, AI=34, AJ=35, AK=36, AL=37, AM=38, AN=39, AO=40, AP=41
 
-        # Crear una lista con todas las columnas (hasta AK = índice 36)
-        fila_completa = [""] * 37  # 37 columnas de A a AK
+        # Crear una lista con todas las columnas (hasta AP = índice 41)
+        fila_completa = [""] * 42  # 42 columnas de A a AP
 
         # Asignar valores a las columnas específicas
         fila_completa[0] = ""  # A - Índice/Consecutivo (vacío)
@@ -674,8 +674,8 @@ def guardar_seguimiento(empresa, file_path, datos):
         fila_completa[5] = datos.get("fechaNacimiento", "")  # F - Fecha Nacimiento (índice 5)
         fila_completa[6] = edad  # G - Edad (índice 6)
         fila_completa[7] = datos.get("fechaIngreso", "")  # H - Fecha Ingreso (índice 7)
-        fila_completa[8] = dias_trabajados  # I - Días Trabajados (índice 8) ← NUEVO
-        fila_completa[9] = antiguedad  # J - Antigüedad (índice 9, se salta I=8)
+        fila_completa[8] = dias_trabajados  # I - Días Trabajados (índice 8)
+        fila_completa[9] = antiguedad  # J - Antigüedad (índice 9)
         fila_completa[12] = datos.get("area", "")  # M - Sede/Área (índice 12)
         fila_completa[13] = datos.get("cargo", "")  # N - Cargo (índice 13)
         fila_completa[14] = datos.get("tipoCargo", "")  # O - Tipo de Cargo (índice 14)
@@ -686,7 +686,8 @@ def guardar_seguimiento(empresa, file_path, datos):
         fila_completa[19] = datos.get("talla", "")  # T - Talla (índice 19)
         fila_completa[20] = datos.get("imc", "")  # U - IMC (índice 20)
         fila_completa[21] = estado_nutricional  # V - Estado Nutricional (índice 21)
-        fila_completa[23] = datos.get("actividadesExtralaborales", "")  # X - Actividades Extralaborales (índice 23, se salta W=22)
+        fila_completa[22] = datos.get("dominancia", "")  # W - Dominancia (índice 22) 🆕
+        fila_completa[23] = datos.get("actividadesExtralaborales", "")  # X - Actividades Extralaborales (índice 23)
         fila_completa[24] = datos.get("diasAcumulados", "")  # Y - Total Días Acumulados (índice 24)
         fila_completa[25] = datos.get("fechaFin", "")  # Z - Fecha Finalización Incapacidad (índice 25)
         fila_completa[26] = datos.get("codigoCie10", "")  # AA - Código CIE-10 (índice 26)
@@ -705,6 +706,13 @@ def guardar_seguimiento(empresa, file_path, datos):
                 fila_completa[idx_fecha] = seg.get("fecha", "")
                 fila_completa[idx_desc] = seg.get("descripcion", "")
                 log(f"   Seguimiento {i+1}: fecha={seg.get('fecha', '')}, desc={seg.get('descripcion', '')[:50]}")
+        
+        # 🆕 Nuevos campos diagnósticos adicionales
+        fila_completa[37] = datos.get("clase", "")  # AL - Clase de Incapacidad (LABORAL/COMÚN) (índice 37)
+        fila_completa[38] = datos.get("cie10Dx2", "")  # AM - CIE-10 Incapacidad Temporal DX 2 (índice 38)
+        fila_completa[39] = datos.get("origenDx2", "")  # AN - Origen Incapacidad DX 2 (índice 39)
+        fila_completa[40] = datos.get("cie10Dx3", "")  # AO - CIE-10 Incapacidad Temporal DX 3 (índice 40)
+        fila_completa[41] = datos.get("origenDx3", "")  # AP - Origen Incapacidad DX 3 (índice 41)
         
         # Insertar la fila en la posición correcta
         log(f"📝 {'ACTUALIZANDO' if fila_existente else 'CREANDO'} registro en fila {siguiente_fila}:")
