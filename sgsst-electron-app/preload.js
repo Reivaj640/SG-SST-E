@@ -172,6 +172,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('buscar-cie10-descripcion', { companyName, cie10Code }),
   procesarAusentismo: (empresa, formData) =>
     ipcRenderer.invoke('procesar-ausentismo', empresa, formData),
+  buscarRegistrosCedula: (cedula, companyName) =>
+    ipcRenderer.invoke('buscar-registros-cedula', cedula, companyName),
 
   // --- Inducciones ---
   getInduccionesData: (companyName) => ipcRenderer.invoke('get-inducciones-data', companyName),

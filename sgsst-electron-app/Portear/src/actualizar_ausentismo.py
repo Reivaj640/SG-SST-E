@@ -415,6 +415,64 @@ def buscar_empleado_main(cedula, empresa):
             "error": str(e)
         }
 
+def buscar_registros_por_cedula(empresa, file_path, cedula):
+    """
+    Busca todos los registros existentes con la misma cédula en PRI.xlsx
+    Retorna lista de registros encontrados con su información básica
+    """
+    try:
+        log(f"🔍 Buscando registros con cédula {cedula} en {file_path}")
+        
+        if not os.path.exists(file_path):
+            return {"success": False, "error": "El archivo PRI.xlsx no existe"}
+        
+        wb = load_workbook(file_path)
+        SHEET_NAME = "Casos en seguimiento"
+        
+        if SHEET_NAME not in wb.sheetnames:
+            return {"success": False, "error": f"La hoja '{SHEET_NAME}' no existe"}
+        
+        ws = wb[SHEET_NAME]
+        
+        # Normalizar cédula buscada
+        cedula_busqueda = str(cedula).replace(',', '').replace('.', '').replace(' ', '').strip()
+        
+        registros_encontrados = []
+        
+        # Buscar desde fila 7 (datos comienzan ahí)
+        for fila_idx in range(7, ws.max_row + 1):
+            celda_cedula = ws[f"D{fila_idx}"].value
+            if celda_cedula:
+                celda_cedula_str = str(celda_cedula).replace(',', '').replace('.', '').replace(' ', '').strip()
+                if celda_cedula_str == cedula_busqueda:
+                    # Registro encontrado - extraer datos básicos
+                    registro = {
+                        "fila": fila_idx,
+                        "nombre": ws[f"C{fila_idx}"].value or "",
+                        "fecha_inicio": ws[f"Z{fila_idx}"].value or "",  # Columna Z = Fecha Fin (ajustar si es diferente)
+                        "fecha_fin": ws[f"Z{fila_idx}"].value or "",
+                        "diagnostico": ws[f"AA{fila_idx}"].value or "",  # Columna AA = CIE-10 (ajustar)
+                        "dias": ws[f"Y{fila_idx}"].value or ""  # Columna Y = Días Acumulados
+                    }
+                    registros_encontrados.append(registro)
+                    log(f"   ✅ Registro encontrado en fila {fila_idx}: {registro['nombre']}")
+        
+        log(f"🔍 Total registros encontrados: {len(registros_encontrados)}")
+        
+        return {
+            "success": True,
+            "cedula": cedula,
+            "registros": registros_encontrados,
+            "total": len(registros_encontrados)
+        }
+        
+    except Exception as e:
+        log(f"❌ Error buscando registros: {str(e)}")
+        import traceback
+        log(traceback.format_exc())
+        return {"success": False, "error": str(e)}
+
+
 def guardar_seguimiento(empresa, file_path, datos):
     """
     Guarda un seguimiento de incapacidad en el archivo PRI.xlsx,
@@ -982,6 +1040,22 @@ if __name__ == "__main__":
             import traceback
             log(traceback.format_exc())
             print(json.dumps({"type": "result", "payload": {"success": False, "error": f"Error al leer archivo de seguimientos: {str(e)}"}}))
+    
+    elif comando == "buscar_registros_por_cedula":
+        if len(sys.argv) != 5:
+            print(json.dumps({"type": "result", "payload": {"success": False, "error": "Uso: python actualizar_ausentismo.py buscar_registros_por_cedula <empresa> <ruta_archivo> <cedula>"}}))
+            sys.exit(1)
+
+        empresa = sys.argv[2]
+        file_path = sys.argv[3]
+        cedula = sys.argv[4]
+
+        try:
+            resultado = buscar_registros_por_cedula(empresa, file_path, cedula)
+            print(json.dumps({"type": "result", "payload": resultado}, ensure_ascii=False))
+        except Exception as e:
+            print(json.dumps({"type": "result", "payload": {"success": False, "error": str(e)}}))
+    
     else:
-        print(json.dumps({"type": "result", "payload": {"success": False, "error": f"Comando desconocido: {comando}. Comandos válidos: 'actualizar', 'buscar_empleado', 'buscar_cie10', 'registrar_incapacidad', 'guardar_seguimiento', 'cargar_seguimientos'"}}))
+        print(json.dumps({"type": "result", "payload": {"success": False, "error": f"Comando desconocido: {comando}. Comandos válidos: 'actualizar', 'buscar_empleado', 'buscar_cie10', 'registrar_incapacidad', 'guardar_seguimiento', 'cargar_seguimientos', 'buscar_registros_por_cedula'"}}))
         sys.exit(1)

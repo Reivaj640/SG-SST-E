@@ -2603,19 +2603,154 @@ class MedicionAusentismoComponent {
 
         console.log('[GUARDAR SEGUIMIENTO] Datos recopilados:', seguimientoData);
 
-        // === IMPLEMENTAR GUARDADO REAL EN EXCEL ===
+        // === VERIFICAR SI YA EXISTE REGISTRO CON ESA CÉDULA ===
+        const cedula = seguimientoData.trabajador.cedula;
+        console.log('[GUARDAR SEGUIMIENTO] Buscando registros existentes para cédula:', cedula);
+        
+        // Buscar registros existentes antes de guardar
+        window.electronAPI.buscarRegistrosCedula(cedula, this.currentCompany)
+            .then(resultadoBusqueda => {
+                console.log('[GUARDAR SEGUIMIENTO] Resultado búsqueda:', resultadoBusqueda);
+                
+                if (resultadoBusqueda.success && resultadoBusqueda.total > 0) {
+                    // Hay registros existentes - mostrar modal de selección
+                    console.log('[GUARDAR SEGUIMIENTO] ⚠️ Se encontraron', resultadoBusqueda.total, 'registro(s)');
+                    this.mostrarModalSeleccionRegistros(resultadoBusqueda.registros, seguimientoData);
+                } else {
+                    // No hay registros existentes - guardar directamente
+                    console.log('[GUARDAR SEGUIMIENTO] ✅ No hay registros existentes, guardando nuevo...');
+                    this.ejecutarGuardadoReal(seguimientoData, false, null);
+                }
+            })
+            .catch(error => {
+                console.error('[GUARDAR SEGUIMIENTO] Error buscando registros:', error);
+                // En caso de error, proceder con guardado normal
+                this.ejecutarGuardadoReal(seguimientoData, false, null);
+            });
+    }
+
+    /**
+     * Muestra modal para seleccionar qué registro actualizar o si crear uno nuevo
+     */
+    mostrarModalSeleccionRegistros(registros, seguimientoData) {
+        const empleadoNombre = seguimientoData.trabajador.nombre;
+        const empleadoCedula = seguimientoData.trabajador.cedula;
+        
+        // Escapar datos para HTML (evitar errores con comillas)
+        const seguimientoDataEscaped = JSON.stringify(seguimientoData).replace(/'/g, "&apos;").replace(/"/g, "&quot;");
+        
+        // Crear modal dinámicamente
+        const modalHTML = `
+            <div id="modalSeleccionRegistro" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;">
+                <div style="background: white; padding: 30px; border-radius: 12px; max-width: 600px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.3);">
+                    <h3 style="color: #dc3545; margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-exclamation-triangle"></i> ⚠️ YA EXISTE(N) REGISTRO(S)
+                    </h3>
+                    <p style="margin-bottom: 20px; color: #666;">
+                        <strong>${empleadoNombre}</strong><br>
+                        Cédula: ${empleadoCedula}
+                    </p>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <strong style="display: block; margin-bottom: 10px; color: #333;">Registros existentes:</strong>
+                        <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px;">
+                            ${registros.map((reg, idx) => `
+                                <label style="display: block; padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; hover: background: #f5f5f5;">
+                                    <input type="radio" name="registroSeleccionado" value="${reg.fila}" style="margin-right: 10px;">
+                                    <strong>Fila ${reg.fila}:</strong> 
+                                    ${reg.fecha_fin || 'N/A'} | 
+                                    Días: ${reg.dias || 'N/A'} |
+                                    ${reg.diagnostico || 'Sin diagnóstico'}
+                                </label>
+                            `).join('')}
+                        </div>
+                    </div>
+                    
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+                        <strong>¿Qué desea hacer?</strong>
+                        <div style="margin-top: 10px;">
+                            <label style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px; cursor: pointer;">
+                                <input type="radio" name="accionGuardar" value="actualizar" checked style="width: 18px; height: 18px;">
+                                <span>📝 Actualizar registro seleccionado</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                <input type="radio" name="accionGuardar" value="crear" style="width: 18px; height: 18px;">
+                                <span>➕ Crear nuevo registro (fila nueva)</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                        <button onclick="document.getElementById('modalSeleccionRegistro').remove()" style="padding: 10px 20px; border: 1px solid #ddd; background: white; border-radius: 6px; cursor: pointer;">
+                            ❌ Cancelar
+                        </button>
+                        <button onclick="window.medicAusentismoComponent.confirmarGuardadoConSeleccion()" data-seguimiento-data='${seguimientoDataEscaped}' style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                            ✅ Confirmar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Insertar modal en el DOM
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = modalHTML;
+        document.body.appendChild(tempDiv.firstElementChild);
+    }
+
+    /**
+     * Confirma el guardado después de que el usuario selecciona qué hacer
+     */
+    async confirmarGuardadoConSeleccion() {
+        // Obtener datos del botón
+        const botonConfirmar = document.querySelector('button[onclick*="confirmarGuardadoConSeleccion"]');
+        const seguimientoDataStr = botonConfirmar.getAttribute('data-seguimiento-data');
+        
+        // Parsear datos
+        const seguimientoData = JSON.parse(seguimientoDataStr.replace(/&apos;/g, "'").replace(/&quot;/g, '"'));
+        
+        // Obtener selección del usuario
+        const registroSeleccionado = document.querySelector('input[name="registroSeleccionado"]:checked');
+        const accionSeleccionada = document.querySelector('input[name="accionGuardar"]:checked').value;
+        
+        if (accionSeleccionada === 'actualizar' && !registroSeleccionado) {
+            alert('⚠️ Por favor seleccione un registro para actualizar');
+            return;
+        }
+        
+        // Cerrar modal
+        document.getElementById('modalSeleccionRegistro').remove();
+        
+        // Determinar fila objetivo
+        const filaObjetivo = accionSeleccionada === 'actualizar' ? parseInt(registroSeleccionado.value) : null;
+        const esActualizacion = accionSeleccionada === 'actualizar';
+        
+        console.log('[GUARDAR SEGUIMIENTO] Usuario seleccionó:', {
+            accion: accionSeleccionada,
+            fila: filaObjetivo,
+            esActualizacion: esActualizacion
+        });
+        
+        // Proceder con guardado
+        this.ejecutarGuardadoReal(seguimientoData, esActualizacion, filaObjetivo);
+    }
+
+    /**
+     * Ejecuta el guardado real de los datos
+     */
+    ejecutarGuardadoReal(seguimientoData, esActualizacion, filaObjetivo) {
         console.log('[GUARDAR SEGUIMIENTO] Iniciando guardado en PRI.xlsx...');
-        
+
         // Verificar si hay API disponible
-        const apiToUse = window.electronAPI?.saveFollowUp || 
+        const apiToUse = window.electronAPI?.saveFollowUp ||
                         window.parent?.electronAPI?.saveFollowUp;
-        
+
         if (!apiToUse) {
             console.error('[GUARDAR SEGUIMIENTO] API saveFollowUp no disponible');
             this.showNotification('❌ Error: Función de guardado no disponible', 'error');
             return;
         }
-        
+
         // Mostrar indicador de carga
         const saveButton = document.querySelector('.sp-btn-success');
         if (saveButton) {
@@ -2672,22 +2807,30 @@ class MedicionAusentismoComponent {
                 
                 if (result && result.success) {
                     console.log('[GUARDAR SEGUIMIENTO] ✅ Datos guardados exitosamente');
+                    console.log('[GUARDAR SEGUIMIENTO] ¿Es actualización?', esActualizacion, 'Fila:', filaObjetivo);
                     
                     // Mostrar notificación diferente según si actualizó o creó
-                    if (result.actualizado) {
+                    if (esActualizacion && filaObjetivo) {
                         // Registro existente actualizado
                         this.showNotification(
-                            `✅ Registro ACTUALIZADO correctamente para ${followUpData.employeeName}`, 
+                            `📝 Registro ACTUALIZADO en fila ${filaObjetivo} para ${followUpData.employeeName}`, 
                             'success'
                         );
-                        console.log('[GUARDAR SEGUIMIENTO] 📝 Registro actualizado en fila:', result.fila);
+                        console.log('[GUARDAR SEGUIMIENTO] 📝 Registro actualizado en fila:', filaObjetivo);
+                    } else if (result.actualizado) {
+                        // Registro existente actualizado (viene del backend)
+                        this.showNotification(
+                            `📝 Registro ACTUALIZADO en fila ${result.fila} para ${followUpData.employeeName}`, 
+                            'success'
+                        );
+                        console.log('[GUARDAR SEGUIMIENTO] 📝 Registro actualizado (backend) en fila:', result.fila);
                     } else {
                         // Registro nuevo creado
                         this.showNotification(
-                            `➕ Registro CREADO correctamente para ${followUpData.employeeName}`, 
+                            `➕ Registro CREADO para ${followUpData.employeeName}`, 
                             'success'
                         );
-                        console.log('[GUARDAR SEGUIMIENTO] ✅ Registro creado en fila:', result.fila);
+                        console.log('[GUARDAR SEGUIMIENTO] ✅ Registro creado');
                     }
                     
                     // Cerrar el panel después de un breve delay

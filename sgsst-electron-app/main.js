@@ -3866,6 +3866,81 @@ ipcMain.handle('save-follow-up', async (event, followUpData, companyName) => {
   }
 });
 
+// Manejador para buscar registros existentes por cédula
+ipcMain.handle('buscar-registros-cedula', async (event, cedula, companyName) => {
+  console.log('========================================');
+  console.log(`[PRI][BUSCAR] Buscando registros para cédula: ${cedula}, empresa: ${companyName}`);
+  
+  try {
+    const filePath = await obtenerRutaPri(companyName);
+    console.log(`[PRI][BUSCAR] ✅ PRI.xlsx encontrado: ${filePath}`);
+    
+    const { spawn } = require('child_process');
+    const scriptPath = path.join(__dirname, 'Portear', 'src', 'actualizar_ausentismo.py');
+    const pythonPath = await getPython();
+
+    return new Promise((resolve, reject) => {
+      const python = spawn(pythonPath, [
+        scriptPath,
+        'buscar_registros_por_cedula',
+        companyName,
+        filePath,
+        cedula
+      ], {
+        cwd: path.dirname(scriptPath),
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+      });
+
+      let buffer = '';
+
+      python.stdout.on('data', (data) => {
+        buffer += data.toString();
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        lines.forEach(line => {
+          line = line.trim();
+          if (!line) return;
+
+          try {
+            const obj = JSON.parse(line);
+            if (obj.type === 'log') {
+              sendLog(`[Python Buscar] ${obj.message}`, 'INFO');
+            } else if (obj.type === 'result') {
+              console.log(`[PRI][BUSCAR] Resultado:`, obj.payload);
+              resolve(obj.payload);
+            }
+          } catch (e) {
+            sendLog(`[Python Buscar - RAW] ${line}`, 'DEBUG');
+          }
+        });
+      });
+
+      python.stderr.on('data', (data) => {
+        sendLog(`[Python Buscar - STDERR] ${data.toString()}`, 'ERROR');
+      });
+
+      python.on('close', (code) => {
+        if (buffer?.trim()) {
+          try {
+            const last = JSON.parse(buffer.trim());
+            if (last.type === 'result') return resolve(last.payload);
+          } catch { /* ignore */ }
+        }
+        resolve({ success: false, error: 'Proceso cerrado sin resultado.' });
+      });
+
+      python.on('error', (err) => {
+        sendLog(`Error al iniciar Python para buscar: ${err.message}`, 'CRITICAL');
+        reject(err);
+      });
+    });
+
+  } catch (error) {
+    console.error('[PRI][BUSCAR][ERROR] Error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // Manejador para exportar datos de incapacidades
 ipcMain.handle('export-incapacity-data', async (event, companyName) => {
   sendLog(`[MAIN] Exportando datos de incapacidades para empresa: ${companyName}`, 'INFO');
