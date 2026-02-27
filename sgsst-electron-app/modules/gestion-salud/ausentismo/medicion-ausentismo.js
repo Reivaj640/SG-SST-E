@@ -1366,10 +1366,22 @@ class MedicionAusentismoComponent {
 
         const nombre = empleado.nombre || 'Sin nombre';
         const cedula = empleado.cedula || '';
-        const incapacidades = empleado.incapacidades || [];
+        let incapacidades = empleado.incapacidades || [];
+
+        // === APLICAR FILTRO DE AÑO (igual que en la tabla) ===
+        const yearFilter = document.getElementById('seguimientoYearFilter')?.value;
+        if (yearFilter && yearFilter !== 'all') {
+            const yearSeleccionado = parseInt(yearFilter);
+            incapacidades = incapacidades.filter(inc => {
+                if (!inc.fechaInicio) return false;
+                const fechaIni = inc.fechaInicio instanceof Date ? inc.fechaInicio : new Date(inc.fechaInicio);
+                return !isNaN(fechaIni.getTime()) && fechaIni.getFullYear() === yearSeleccionado;
+            });
+            console.log(`[MODAL DETALLES] Filtrado por año ${yearSeleccionado}: ${incapacidades.length} incapacidades`);
+        }
 
         if (incapacidades.length === 0) {
-            content.innerHTML = '<div style="text-align: center; color: #64748B; padding: 40px;"><i class="fas fa-inbox" style="font-size: 48px; color: #CBD5E1; margin-bottom: 16px;"></i><p>No hay incapacidades registradas</p></div>';
+            content.innerHTML = '<div style="text-align: center; color: #64748B; padding: 40px;"><i class="fas fa-inbox" style="font-size: 48px; color: #CBD5E1; margin-bottom: 16px;"></i><p>No hay incapacidades del año seleccionado</p></div>';
             modal.style.display = 'flex';
             setTimeout(() => {
                 modal.style.opacity = '1';
