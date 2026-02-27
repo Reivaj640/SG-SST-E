@@ -2118,7 +2118,7 @@ class MedicionAusentismoComponent {
                                 </div>
                                 <div class="sp-form-group">
                                     <label class="sp-form-label">Fecha de Ingreso</label>
-                                    <input type="date" id="sp-fecha-ingreso" class="sp-form-control">
+                                    <input type="date" id="sp-fecha-ingreso" class="sp-form-control" onchange="window.medicAusentismoComponent.calcularAntiguedad()">
                                 </div>
                                 <div class="sp-form-group">
                                     <label class="sp-form-label">Antigüedad (Años)</label>
@@ -2208,15 +2208,15 @@ class MedicionAusentismoComponent {
                         <div class="sp-form-grid">
                             <div class="sp-form-group">
                                 <label class="sp-form-label">Fecha de Inicio</label>
-                                <input type="date" id="sp-fecha-inicio" class="sp-form-control">
+                                <input type="date" id="sp-fecha-inicio" class="sp-form-control" onchange="window.medicAusentismoComponent.calcularDiasAcumulados()">
                             </div>
                             <div class="sp-form-group">
                                 <label class="sp-form-label">Fecha de Fin</label>
-                                <input type="date" id="sp-fecha-fin" class="sp-form-control">
+                                <input type="date" id="sp-fecha-fin" class="sp-form-control" onchange="window.medicAusentismoComponent.calcularDiasAcumulados()">
                             </div>
                             <div class="sp-form-group">
                                 <label class="sp-form-label">Total Días Acumulados</label>
-                                <input type="number" id="sp-dias-acumulados" class="sp-form-control" placeholder="Ej: 21">
+                                <input type="number" id="sp-dias-acumulados" class="sp-form-control" placeholder="Ej: 21" readonly style="background-color: #f0f0f0;">
                             </div>
                             <div class="sp-form-group">
                                 <label class="sp-form-label">Clase de Incapacidad</label>
@@ -2241,9 +2241,25 @@ class MedicionAusentismoComponent {
                                     <label class="sp-form-label">Descripción del Diagnóstico</label>
                                     <input type="text" id="sp-descripcion-diagnostico" class="sp-form-control" placeholder="Ej: Vómitos postoperatorios">
                                 </div>
-                                <div class="sp-form-group full-width">
-                                    <label class="sp-form-label">Descripción de la Contingencia / Hecho Generador</label>
-                                    <textarea id="sp-contingencia" class="sp-form-control" rows="3" placeholder="Detallar cómo ocurrió el evento o causas de la enfermedad..."></textarea>
+                                
+                                <!-- Sección de Seguimientos -->
+                                <div class="sp-form-group full-width" style="grid-column: 1 / -1;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                        <label class="sp-form-label" style="margin: 0;">
+                                            <i class="fas fa-clipboard-list" style="color: #4F46E5;"></i> Seguimientos
+                                        </label>
+                                        <button type="button" onclick="window.medicAusentismoComponent.agregarSeguimiento()" 
+                                            style="padding: 6px 12px; border-radius: 6px; border: 1px solid #4F46E5; background: white; color: #4F46E5; cursor: pointer; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; transition: all 0.2s;"
+                                            onmouseover="this.style.background='#EEF2FF'; this.style.borderColor='#4338CA'"
+                                            onmouseout="this.style.background='white'; this.style.borderColor='#4F46E5'">
+                                            <i class="fas fa-plus"></i> Agregar Seguimiento
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- Contenedor de seguimientos -->
+                                    <div id="sp-seguimientos-container" style="display: flex; flex-direction: column; gap: 12px;">
+                                        <!-- El primer seguimiento se agrega por defecto -->
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -2881,7 +2897,7 @@ class MedicionAusentismoComponent {
      */
     abrirPanelSeguimientoConEmpleado(empleadoData) {
         console.log('[ABRIR PANEL] Abriendo panel para empleado:', empleadoData.nombre);
-        
+
         // Crear el panel slideover si no existe
         if (!document.getElementById('seguimientoPanelBackdrop')) {
             this.createSeguimientoPanel();
@@ -2891,6 +2907,9 @@ class MedicionAusentismoComponent {
         if (empleadoData) {
             this.cargarDatosEnPanelSeguimiento(empleadoData);
         }
+
+        // Inicializar seguimientos
+        this.inicializarSeguimientos();
 
         // Abrir el panel
         document.getElementById('seguimientoPanelBackdrop').classList.add('active');
@@ -2919,22 +2938,67 @@ class MedicionAusentismoComponent {
     calcularEdad() {
         const fechaNacimientoInput = document.getElementById('sp-fecha-nacimiento');
         const edadInput = document.getElementById('sp-edad');
-        
+
         if (!fechaNacimientoInput?.value || !edadInput) return;
-        
+
         const fechaNacimiento = new Date(fechaNacimientoInput.value);
         const hoy = new Date();
-        
+
         let edad = hoy.getFullYear() - fechaNacimiento.getFullYear();
         const mesDiferencia = hoy.getMonth() - fechaNacimiento.getMonth();
-        
+
         // Ajustar si aún no ha cumplido años este año
         if (mesDiferencia < 0 || (mesDiferencia === 0 && hoy.getDate() < fechaNacimiento.getDate())) {
             edad--;
         }
-        
+
         edadInput.value = edad >= 0 ? edad : 0;
         console.log('[SEGUIMIENTO] Edad calculada:', edad, 'años');
+    }
+
+    /**
+     * Calcula la antigüedad automáticamente desde la fecha de ingreso
+     */
+    calcularAntiguedad() {
+        const fechaIngresoInput = document.getElementById('sp-fecha-ingreso');
+        const antiguedadInput = document.getElementById('sp-antiguedad');
+
+        if (!fechaIngresoInput?.value || !antiguedadInput) return;
+
+        const fechaIngreso = new Date(fechaIngresoInput.value);
+        const hoy = new Date();
+
+        let anios = hoy.getFullYear() - fechaIngreso.getFullYear();
+        const mesDiferencia = hoy.getMonth() - fechaIngreso.getMonth();
+
+        // Ajustar si aún no ha cumplido año completo
+        if (mesDiferencia < 0 || (mesDiferencia === 0 && hoy.getDate() < fechaIngreso.getDate())) {
+            anios--;
+        }
+
+        antiguedadInput.value = anios >= 0 ? anios : 0;
+        console.log('[SEGUIMIENTO] Antigüedad calculada:', anios, 'años');
+    }
+
+    /**
+     * Calcula los días acumulados automáticamente desde fecha de inicio y fin de incapacidad
+     */
+    calcularDiasAcumulados() {
+        const fechaInicioInput = document.getElementById('sp-fecha-inicio');
+        const fechaFinInput = document.getElementById('sp-fecha-fin');
+        const diasInput = document.getElementById('sp-dias-acumulados');
+
+        if (!fechaInicioInput?.value || !fechaFinInput?.value || !diasInput) return;
+
+        const fechaInicio = new Date(fechaInicioInput.value);
+        const fechaFin = new Date(fechaFinInput.value);
+
+        // Calcular diferencia en días (inclusive)
+        const diffTime = Math.abs(fechaFin - fechaInicio);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+        diasInput.value = diffDays > 0 ? diffDays : 0;
+        console.log('[SEGUIMIENTO] Días acumulados calculados:', diffDays);
     }
 
     /**
@@ -3049,8 +3113,19 @@ class MedicionAusentismoComponent {
         document.getElementById('sp-area').value = empleadoData.departamento || '';
         document.getElementById('sp-eps').value = empleadoData.empresaUsuaria || '';
         
-        // Calcular edad automáticamente
+        // Cargar fecha de nacimiento si está disponible (desde archivo de empleados)
+        if (empleadoData.fechaNacimiento) {
+            document.getElementById('sp-fecha-nacimiento').value = empleadoData.fechaNacimiento;
+        }
+        
+        // Cargar fecha de ingreso si está disponible (desde archivo de empleados)
+        if (empleadoData.fechaIngreso) {
+            document.getElementById('sp-fecha-ingreso').value = empleadoData.fechaIngreso;
+        }
+
+        // Calcular edad y antigüedad automáticamente
         this.calcularEdad();
+        this.calcularAntiguedad();
 
         // Si hay incapacidades, cargar la más reciente (DEL AÑO FILTRADO)
         if (incapacidadesParaMostrar.length > 0) {
@@ -3087,11 +3162,15 @@ class MedicionAusentismoComponent {
                          incapacidadReciente.record?.['clase_de_incapacidad'] || '';
             document.getElementById('sp-clase-incapacidad').value = clase || 'Enfermedad Común';
 
-            // Código y descripción
-            document.getElementById('sp-codigo-cie10').value = incapacidadReciente.record?.['CODIGO'] ||
-                                                              incapacidadReciente.record?.['CÓDIGO'] || '';
-            document.getElementById('sp-descripcion-diagnostico').value = incapacidadReciente.record?.['DESCRIPCION'] ||
-                                                                          incapacidadReciente.record?.['DESCRIPCIÓN'] || '';
+            // Código y descripción (CIE-10)
+            const codigo = incapacidadReciente.record?.['CODIGO'] ||
+                          incapacidadReciente.record?.['CÓDIGO'] || '';
+            const diagnostico = incapacidadReciente.record?.['DESCRIPCION'] ||
+                               incapacidadReciente.record?.['DESCRIPCIÓN'] || '';
+            document.getElementById('sp-codigo-cie10').value = codigo;
+            document.getElementById('sp-descripcion-diagnostico').value = diagnostico;
+            
+            console.log('[SEGUIMIENTO][PANEL] CIE-10 cargado:', codigo, 'Diagnóstico:', diagnostico);
         }
 
         // Actualizar título del panel
@@ -3137,6 +3216,85 @@ class MedicionAusentismoComponent {
     }
 
     /**
+     * Agrega un nuevo seguimiento al contenedor
+     */
+    agregarSeguimiento(fecha = '', descripcion = '') {
+        const container = document.getElementById('sp-seguimientos-container');
+        if (!container) return;
+
+        const seguimientoId = `seg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const seguimientoDiv = document.createElement('div');
+        seguimientoDiv.id = seguimientoId;
+        seguimientoDiv.className = 'seguimiento-item';
+        seguimientoDiv.style.cssText = `
+            display: flex; gap: 10px; align-items: flex-start; padding: 12px; 
+            background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px;
+        `;
+        seguimientoDiv.innerHTML = `
+            <div style="flex: 1; display: grid; grid-template-columns: 150px 1fr; gap: 12px;">
+                <div>
+                    <label class="sp-form-label">Fecha</label>
+                    <input type="date" class="sp-form-control seguimiento-fecha" value="${fecha}" style="width: 100%;">
+                </div>
+                <div>
+                    <label class="sp-form-label">Descripción</label>
+                    <textarea class="sp-form-control seguimiento-descripcion" rows="2" placeholder="Describa el seguimiento..." style="width: 100%;">${descripcion}</textarea>
+                </div>
+            </div>
+            <button type="button" onclick="window.medicAusentismoComponent.eliminarSeguimiento('${seguimientoId}')" 
+                style="padding: 8px; border-radius: 6px; border: 1px solid #EF4444; background: white; color: #EF4444; cursor: pointer; font-size: 13px; transition: all 0.2s; flex-shrink: 0;"
+                onmouseover="this.style.background='#FEF2F2'; this.style.borderColor='#DC2626'"
+                onmouseout="this.style.background='white'; this.style.borderColor='#EF4444'">
+                <i class="fas fa-trash"></i>
+            </button>
+        `;
+        container.appendChild(seguimientoDiv);
+        console.log('[SEGUIMIENTO] Agregado:', seguimientoId);
+    }
+
+    /**
+     * Elimina un seguimiento del contenedor
+     */
+    eliminarSeguimiento(seguimientoId) {
+        const elemento = document.getElementById(seguimientoId);
+        if (elemento) {
+            elemento.remove();
+            console.log('[SEGUIMIENTO] Eliminado:', seguimientoId);
+        }
+    }
+
+    /**
+     * Inicializa el contenedor de seguimientos con un elemento vacío
+     */
+    inicializarSeguimientos() {
+        const container = document.getElementById('sp-seguimientos-container');
+        if (container) {
+            container.innerHTML = '';
+            this.agregarSeguimiento();
+        }
+    }
+
+    /**
+     * Obtiene todos los seguimientos del contenedor
+     */
+    obtenerSeguimientos() {
+        const seguimientos = [];
+        const container = document.getElementById('sp-seguimientos-container');
+        if (container) {
+            const items = container.querySelectorAll('.seguimiento-item');
+            items.forEach(item => {
+                const fecha = item.querySelector('.seguimiento-fecha')?.value || '';
+                const descripcion = item.querySelector('.seguimiento-descripcion')?.value || '';
+                if (fecha || descripcion) {
+                    seguimientos.push({ fecha, descripcion });
+                }
+            });
+        }
+        console.log('[SEGUIMIENTOS] Obtenidos:', seguimientos.length);
+        return seguimientos;
+    }
+
+    /**
      * Guarda los datos del seguimiento
      */
     saveSeguimientoData() {
@@ -3175,9 +3333,10 @@ class MedicionAusentismoComponent {
                 clase: document.getElementById('sp-clase-incapacidad').value,
                 codigoCie10: document.getElementById('sp-codigo-cie10').value,
                 descripcionDiagnostico: document.getElementById('sp-descripcion-diagnostico').value,
-                contingencia: document.getElementById('sp-contingencia').value,
                 numeroProrrogas: document.getElementById('sp-numero-prorrogas').value,
-                fechaUltimaProrroga: document.getElementById('sp-fecha-ultima-prorroga').value
+                fechaUltimaProrroga: document.getElementById('sp-fecha-ultima-prorroga').value,
+                // Seguimientos múltiples
+                seguimientos: this.obtenerSeguimientos()
             },
             // Etapas PRIC
             pric: {
@@ -3483,10 +3642,13 @@ class MedicionAusentismoComponent {
             afp: seguimientoData.trabajador.afp || '',
             diasAcumulados: seguimientoData.incapacidad.diasAcumulados || '',
             codigoCie10: seguimientoData.incapacidad.codigoCie10 || '',
-            fechaFin: seguimientoData.incapacidad.fechaFin || ''
+            fechaFin: seguimientoData.incapacidad.fechaFin || '',
+            // Enviar seguimientos al backend
+            seguimientos: seguimientoData.incapacidad.seguimientos || []
         };
-        
+
         console.log('[GUARDAR SEGUIMIENTO] Enviando datos:', followUpData);
+        console.log('[GUARDAR SEGUIMIENTO] Seguimientos:', seguimientoData.incapacidad.seguimientos);
         console.log('[GUARDAR SEGUIMIENTO] Empresa:', this.currentCompany);
         
         // Llamar a la API

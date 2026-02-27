@@ -660,10 +660,10 @@ def guardar_seguimiento(empresa, file_path, datos):
         
         # Construir la fila de datos ORGANIZADA POR COLUMNAS
         # Estructura de columnas según PRI.xlsx:
-        # A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7, I=8, J=9, K=10, L=11, M=12, N=13, O=14, P=15, Q=16, R=17, S=18, T=19, U=20, V=21, W=22, X=23, Y=24, Z=25, AA=26
+        # A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7, I=8, J=9, K=10, L=11, M=12, N=13, O=14, P=15, Q=16, R=17, S=18, T=19, U=20, V=21, W=22, X=23, Y=24, Z=25, AA=26, AB=27, AC=28, AD=29, AE=30, AF=31, AG=32, AH=33, AI=34, AJ=35, AK=36
 
-        # Crear una lista con todas las columnas (hasta AA = índice 26)
-        fila_completa = [""] * 27  # 27 columnas de A a AA
+        # Crear una lista con todas las columnas (hasta AK = índice 36)
+        fila_completa = [""] * 37  # 37 columnas de A a AK
 
         # Asignar valores a las columnas específicas
         fila_completa[0] = ""  # A - Índice/Consecutivo (vacío)
@@ -690,6 +690,21 @@ def guardar_seguimiento(empresa, file_path, datos):
         fila_completa[24] = datos.get("diasAcumulados", "")  # Y - Total Días Acumulados (índice 24)
         fila_completa[25] = datos.get("fechaFin", "")  # Z - Fecha Finalización Incapacidad (índice 25)
         fila_completa[26] = datos.get("codigoCie10", "")  # AA - Código CIE-10 (índice 26)
+        
+        # Seguimientos (hasta 5 seguimientos con fecha y descripción)
+        # Seguimiento 1: AB (27) = fecha, AC (28) = descripcion
+        # Seguimiento 2: AD (29) = fecha, AE (30) = descripcion
+        # Seguimiento 3: AF (31) = fecha, AG (32) = descripcion
+        # Seguimiento 4: AH (33) = fecha, AI (34) = descripcion
+        # Seguimiento 5: AJ (35) = fecha, AK (36) = descripcion
+        seguimientos = datos.get("seguimientos", [])
+        if seguimientos and isinstance(seguimientos, list):
+            for i, seg in enumerate(seguimientos[:5]):  # Máximo 5 seguimientos
+                idx_fecha = 27 + (i * 2)  # 27, 29, 31, 33, 35
+                idx_desc = 28 + (i * 2)   # 28, 30, 32, 34, 36
+                fila_completa[idx_fecha] = seg.get("fecha", "")
+                fila_completa[idx_desc] = seg.get("descripcion", "")
+                log(f"   Seguimiento {i+1}: fecha={seg.get('fecha', '')}, desc={seg.get('descripcion', '')[:50]}")
         
         # Insertar la fila en la posición correcta
         log(f"📝 {'ACTUALIZANDO' if fila_existente else 'CREANDO'} registro en fila {siguiente_fila}:")
