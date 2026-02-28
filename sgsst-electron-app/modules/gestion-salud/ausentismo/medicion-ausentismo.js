@@ -2173,14 +2173,6 @@ class MedicionAusentismoComponent {
                                 <label class="sp-form-label">Total Días Acumulados</label>
                                 <input type="number" id="sp-dias-acumulados" class="sp-form-control" placeholder="Ej: 21" readonly style="background-color: #f0f0f0;">
                             </div>
-                            <div class="sp-form-group">
-                                <label class="sp-form-label">Clase de Incapacidad</label>
-                                <select id="sp-clase-incapacidad" class="sp-form-control">
-                                    <option value="">Seleccione...</option>
-                                    <option value="LABORAL">LABORAL</option>
-                                    <option value="COMÚN">COMÚN</option>
-                                </select>
-                            </div>
                         </div>
 
                         <div class="sp-subsection">
@@ -3373,7 +3365,6 @@ class MedicionAusentismoComponent {
         document.getElementById('sp-fecha-inicio').value = '';
         document.getElementById('sp-fecha-fin').value = '';
         document.getElementById('sp-dias-acumulados').value = '';
-        document.getElementById('sp-clase-incapacidad').value = '';
         document.getElementById('sp-codigo-cie10').value = '';
         document.getElementById('sp-descripcion-diagnostico').value = '';
         document.getElementById('sp-numero-prorrogas').value = '';
@@ -3569,7 +3560,7 @@ class MedicionAusentismoComponent {
                 fechaInicio: document.getElementById('sp-fecha-inicio').value,
                 fechaFin: document.getElementById('sp-fecha-fin').value,
                 diasAcumulados: document.getElementById('sp-dias-acumulados').value,
-                clase: document.getElementById('sp-clase-incapacidad').value,
+                clase: '',  // Campo eliminado del UI
                 codigoCie10: document.getElementById('sp-codigo-cie10').value,
                 descripcionDiagnostico: document.getElementById('sp-descripcion-diagnostico').value,
                 numeroProrrogas: document.getElementById('sp-numero-prorrogas').value,
@@ -3843,7 +3834,7 @@ class MedicionAusentismoComponent {
             document.getElementById('sp-area').value = registro.area || '';
             document.getElementById('sp-eps').value = registro.eps || '';
             document.getElementById('sp-afp').value = registro.afp || '';
-            
+
             // Fechas
             if (registro.fecha_nacimiento) {
                 try {
@@ -3854,7 +3845,7 @@ class MedicionAusentismoComponent {
                     }
                 } catch (e) { console.warn('Error fecha_nacimiento:', e); }
             }
-            
+
             if (registro.fecha_ingreso) {
                 try {
                     const fecha = new Date(registro.fecha_ingreso);
@@ -3864,18 +3855,19 @@ class MedicionAusentismoComponent {
                     }
                 } catch (e) { console.warn('Error fecha_ingreso:', e); }
             }
-            
+
             // Información laboral
             document.getElementById('sp-tipo-evento').value = registro.tipo_evento || '';
             document.getElementById('sp-tipo-cargo').value = registro.tipo_cargo || '';
             document.getElementById('sp-tipo-contrato').value = registro.tipo_contrato || '';
             document.getElementById('sp-salario').value = registro.salario || '';
-            
+
             // Salud
             document.getElementById('sp-peso').value = registro.peso || '';
             document.getElementById('sp-talla').value = registro.talla || '';
             document.getElementById('sp-imc').value = registro.imc || '';
             document.getElementById('sp-dominancia').value = registro.dominancia || '';
+            document.getElementById('sp-actividades-extralaborales').value = registro.actividades_extralaborales || '';
 
             // Datos de incapacidad
             if (registro.fecha_inicio) {
@@ -3887,7 +3879,7 @@ class MedicionAusentismoComponent {
                     }
                 } catch (e) { console.warn('Error fecha_inicio:', e); }
             }
-            
+
             if (registro.fecha_fin) {
                 try {
                     const fecha = new Date(registro.fecha_fin);
@@ -3899,9 +3891,19 @@ class MedicionAusentismoComponent {
             }
 
             document.getElementById('sp-dias-acumulados').value = registro.dias || '';
-            document.getElementById('sp-clase-incapacidad').value = registro.clase || '';
+            // Campo 'clase-incapacidad' eliminado del UI - ya no se carga
             document.getElementById('sp-codigo-cie10').value = registro.cie10 || '';
             document.getElementById('sp-descripcion-diagnostico').value = registro.diagnostico || '';
+            
+            // 🆕 Cargar DX2, DX3 y orígenes
+            document.getElementById('sp-cie10-dx2').value = registro.cie10_dx2 || '';
+            document.getElementById('sp-origen-dx2').value = registro.origen_dx2 || '';
+            document.getElementById('sp-cie10-dx3').value = registro.cie10_dx3 || '';
+            document.getElementById('sp-origen-dx3').value = registro.origen_dx3 || '';
+            
+            // 🆕 Cargar número de prórrogas y fecha última prórroga
+            document.getElementById('sp-numero-prorrogas').value = registro.numero_prorrogas || '';
+            document.getElementById('sp-fecha-ultima-prorroga').value = registro.fecha_ultima_prorroga || '';
 
             // 🆕 Cargar seguimientos múltiples
             if (registro.seguimientos && registro.seguimientos.length > 0) {
@@ -3917,15 +3919,133 @@ class MedicionAusentismoComponent {
                 }
             }
 
-            // 🆕 Cargar Etapa 4: Reincorporación Laboral
+            // 🆕 Cargar Etapa 4: Reincorporación Laboral - de incapacidad
             document.getElementById('sp-fecha-reincorporacion-inc').value = registro.fecha_reincorporacion || '';
             document.getElementById('sp-tipo-reintegro-inc').value = registro.tipo_reintegro || '';
             document.getElementById('sp-adaptaciones-inc').value = registro.adaptaciones || '';
 
-            // 🆕 Cargar Etapa 5: Cierre de Caso
+            // 🆕 Cargar Etapa 5: Cierre de Caso - de incapacidad
             document.getElementById('sp-fecha-cierre-inc').value = registro.fecha_cierre || '';
             document.getElementById('sp-motivo-cierre-inc').value = registro.motivo_cierre || '';
             document.getElementById('sp-observaciones-finales-inc').value = registro.observaciones_finales || '';
+
+            // ============================================
+            // 🆕 Cargar TODOS los campos de PRIC
+            // ============================================
+            if (registro.pric) {
+                const pric = registro.pric;
+                
+                // Condiciones de Salud
+                document.getElementById('sp-fecha-examen-medico').value = pric.fechaExamenMedico || '';
+                document.getElementById('sp-resultado-examen-medico').value = pric.resultadoExamenMedico || '';
+                document.getElementById('sp-fecha-examen-periodico').value = pric.fechaExamenPeriodico || '';
+                document.getElementById('sp-resultado-examen-post-incapacidad').value = pric.resultadoExamenPostIncapacidad || '';
+                document.getElementById('sp-trabajador-remoto').value = pric.trabajadorRemoto || '';
+                document.getElementById('sp-fecha-inicio-remoto').value = pric.fechaInicioRemoto || '';
+                
+                // Etapa 1: Captura de Caso
+                document.getElementById('sp-caso-ingresado-pric').value = pric.casoIngresadoPRIC || '';
+                document.getElementById('sp-mecanismo-deteccion').value = pric.mecanismoDeteccion || '';
+                document.getElementById('sp-fecha-ingreso-pric').value = pric.fechaIngresoPRIC || '';
+                
+                // Etapa 2: Plan de Tratamiento
+                document.getElementById('sp-trabajador-plan-tratamiento').value = pric.trabajadorPlanTratamiento || '';
+                document.getElementById('sp-objetivos-tratamiento').value = pric.metaRehabilitacion || '';
+                document.getElementById('sp-fecha-inicio-plan').value = pric.fechaEmisionPlan || '';
+                document.getElementById('sp-fecha-probable-alta').value = pric.fechaProbableReintegro || '';
+                
+                // Etapa 3: Ejecución y Seguimiento
+                document.getElementById('sp-fecha-proxima-cita').value = pric.fechaProximaCita || '';
+                document.getElementById('sp-evolucion-clinica').value = pric.observacionesSeguimiento || '';
+                document.getElementById('sp-fecha-ultimo-seguimiento').value = pric.fechaAPTReincorporacion || '';
+                document.getElementById('sp-adherencia').value = pric.modalidadReincorporacion || '';
+                document.getElementById('sp-fecha-reintegro').value = pric.fechaReintegro || '';
+                document.getElementById('sp-periodicidad-seguimiento').value = pric.periodicidadSeguimiento || '';
+                document.getElementById('sp-recomendaciones-laborales').value = pric.recomendacionesLaborales || '';
+                document.getElementById('sp-fecha-vencimiento-recomendaciones').value = pric.fechaVencimientoRecomendaciones || '';
+                document.getElementById('sp-descripcion-recomendaciones').value = pric.descripcionRecomendaciones || '';
+                document.getElementById('sp-fecha-proximo-seguimiento-recomendaciones').value = pric.fechaProximoSeguimientoRecomendaciones || '';
+                document.getElementById('sp-tiene-desercion').value = pric.tieneDesercion || '';
+                document.getElementById('sp-logro-mejoria-medica').value = pric.logroMejoriaMedica || '';
+                
+                // Seguimientos adicionales
+                document.getElementById('sp-fecha-seguimiento-1').value = pric.fechaSeguimiento1 || '';
+                document.getElementById('sp-descripcion-seguimiento-1').value = pric.descripcionSeguimiento1 || '';
+                document.getElementById('sp-fecha-seguimiento-2').value = pric.fechaSeguimiento2 || '';
+                document.getElementById('sp-descripcion-seguimiento-2').value = pric.descripcionSeguimiento2 || '';
+                
+                // Etapa 4: Reincorporación Laboral - de pric
+                document.getElementById('sp-fecha-reincorporacion').value = pric.fechaReincorporacion || '';
+                document.getElementById('sp-tipo-reintegro').value = pric.tipoReintegro || '';
+                document.getElementById('sp-adaptaciones').value = pric.adaptaciones || '';
+                
+                // Etapa 5: Cierre de Caso - de pric
+                document.getElementById('sp-fecha-cierre').value = pric.fechaCierre || '';
+                document.getElementById('sp-motivo-cierre').value = pric.motivoCierre || '';
+                document.getElementById('sp-fecha-calificacion-pcl').value = pric.fechaCalificacionPCL || '';
+                document.getElementById('sp-porcentaje-pcl-calificacion').value = pric.porcentajePCLCalificacion || '';
+                
+                // Historial de Diagnóstico
+                document.getElementById('sp-cie10-dx1-calificada').value = pric.cie10CalificadaDX1 || '';
+                document.getElementById('sp-origen-dx1').value = pric.origenDX1 || '';
+                document.getElementById('sp-cie10-dx2-calificada').value = pric.cie10CalificadaDX2 || '';
+                document.getElementById('sp-origen-dx2-calificada').value = pric.origenDX2 || '';
+                document.getElementById('sp-cie10-dx3-calificada').value = pric.cie10CalificadaDX3 || '';
+                document.getElementById('sp-origen-dx3-calificada').value = pric.origenDX3 || '';
+                document.getElementById('sp-cie10-dx4-calificada').value = pric.cie10CalificadaDX4 || '';
+                document.getElementById('sp-origen-dx4-calificada').value = pric.origenDX4 || '';
+                document.getElementById('sp-origen-caso').value = pric.origenCaso || '';
+                document.getElementById('sp-ingreso-sve').value = pric.ingresoSVE || '';
+                document.getElementById('sp-anio-ultima-calificacion-pcl').value = pric.anioUltimaCalificacionPCL || '';
+                document.getElementById('sp-anio-seguimiento-empresa').value = pric.anioSeguimientoEmpresa || '';
+                
+                console.log('[CARGAR REGISTRO] Campos PRIC cargados exitosamente');
+            }
+
+            // ============================================
+            // 🆕 Cargar Recomendaciones (tabla)
+            // ============================================
+            if (registro.recomendaciones && registro.recomendaciones.length > 0) {
+                const tbody = document.getElementById('sp-recomTableBody');
+                if (tbody) {
+                    // Limpiar tabla primero (dejar al menos una fila vacía)
+                    tbody.innerHTML = '';
+                    
+                    // Cargar cada recomendación
+                    registro.recomendaciones.forEach((rec, index) => {
+                        const newRow = document.createElement('tr');
+                        newRow.innerHTML = `
+                            <td style="text-align: center; vertical-align: middle;"><span class="recom-item-number">${rec.item || index + 1}</span></td>
+                            <td><input type="text" class="sp-form-control" value="${rec.recomendacion || ''}" placeholder="Ej: Reposo absoluto"></td>
+                            <td>
+                                <select class="sp-form-control">
+                                    <option value="ARL" ${rec.entidad === 'ARL' ? 'selected' : ''}>ARL</option>
+                                    <option value="EPS" ${rec.entidad === 'EPS' ? 'selected' : ''}>EPS</option>
+                                    <option value="JRC" ${rec.entidad === 'JRC' ? 'selected' : ''}>JRC</option>
+                                </select>
+                            </td>
+                            <td><input type="date" class="sp-form-control" value="${rec.fechaLimite || ''}"></td>
+                            <td>
+                                <select class="sp-form-control">
+                                    <option value="SI" ${rec.cumple === 'SI' ? 'selected' : ''}>SI</option>
+                                    <option value="NO" ${rec.cumple === 'NO' ? 'selected' : ''}>NO</option>
+                                    <option value="EN PROCESO" ${rec.cumple === 'EN PROCESO' ? 'selected' : ''}>EN PROCESO</option>
+                                </select>
+                            </td>
+                            <td><input type="text" class="sp-form-control" value="${rec.observacion || ''}" placeholder="Detalle"></td>
+                            <td style="text-align:center;">
+                                <button class="sp-btn sp-btn-outline sp-btn-sm" onclick="window.medicAusentismoComponent.removeRecomRow(this)">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        `;
+                        tbody.appendChild(newRow);
+                    });
+                    
+                    this.updateRecomItemNumbers();
+                    console.log(`[CARGAR REGISTRO] ${registro.recomendaciones.length} recomendaciones cargadas`);
+                }
+            }
 
             // Navegar a incapacidad para mostrar datos
             setTimeout(() => {
