@@ -1405,8 +1405,15 @@ class MedicionAusentismoComponent {
         const esCondicion1 = incapacidadesLargas.length > 0;
         const esCondicion2 = !esCondicion1 && incapacidadesOrdenadas.length > 1;
 
-        // Calcular total de días
-        const totalDias = incapacidadesOrdenadas.reduce((sum, inc) => sum + inc.diasIncapacidad, 0);
+        // Calcular total de días (SOLO de las incapacidades que se van a mostrar)
+        let totalDias;
+        if (esCondicion1) {
+            // Para Condición 1, sumar solo las incapacidades >= 10 días
+            totalDias = incapacidadesLargas.reduce((sum, inc) => sum + inc.diasIncapacidad, 0);
+        } else {
+            // Para Condición 2, sumar todas las incapacidades
+            totalDias = incapacidadesOrdenadas.reduce((sum, inc) => sum + inc.diasIncapacidad, 0);
+        }
 
         // Construir HTML según el tipo de caso
         if (esCondicion1) {
@@ -3052,110 +3059,49 @@ class MedicionAusentismoComponent {
      */
     cargarDatosEnPanelSeguimiento(empleadoData) {
         // empleadoData tiene estructura: {nombre, cedula, incapacidades: [...], cargo, departamento, genero, etc.}
-        
+
         console.log('[SEGUIMIENTO][PANEL] Cargando datos del empleado:', empleadoData.nombre);
         console.log('[SEGUIMIENTO][PANEL] Total incapacidades recibidas:', empleadoData.incapacidades?.length || 0);
 
-        // === FUNCIÓN AUXILIAR para obtener año de fecha ===
-        function obtenerAnio(fecha) {
-            if (!fecha) return null;
-            if (fecha instanceof Date) return fecha.getFullYear();
-            if (typeof fecha === 'string') {
-                const date = new Date(fecha);
-                return isNaN(date.getTime()) ? null : date.getFullYear();
-            }
-            return null;
-        }
-
-        // === FILTRAR incapacidades por el año seleccionado en el filtro ===
-        const yearFilter = document.getElementById('seguimientoYearFilter')?.value;
-        let incapacidadesParaMostrar = empleadoData.incapacidades || [];
-
-        if (yearFilter && yearFilter !== 'all') {
-            const yearSeleccionado = parseInt(yearFilter);
-            incapacidadesParaMostrar = incapacidadesParaMostrar.filter(inc => {
-                const anioInicio = obtenerAnio(inc.fechaInicio);
-                return anioInicio === yearSeleccionado;
-            });
-            console.log(`[SEGUIMIENTO][PANEL] Filtrado por año ${yearSeleccionado}: ${incapacidadesParaMostrar.length} incapacidades`);
-        }
-
-        // Si no hay incapacidades después del filtro, usar todas (fallback)
-        if (incapacidadesParaMostrar.length === 0) {
-            console.log('[SEGUIMIENTO][PANEL] No hay incapacidades del año filtrado, usando todas');
-            incapacidadesParaMostrar = empleadoData.incapacidades || [];
-        }
-
-        // Datos básicos
+        // Datos básicos del trabajador (SOLO nombre y cédula, lo demás vacío para caso nuevo)
         document.getElementById('sp-nombre').value = empleadoData.nombre || '';
         document.getElementById('sp-cedula').value = empleadoData.cedula || '';
-        document.getElementById('sp-genero').value = empleadoData.genero || '';
-        document.getElementById('sp-cargo').value = empleadoData.cargo || '';
-        document.getElementById('sp-area').value = empleadoData.departamento || '';
-        document.getElementById('sp-eps').value = empleadoData.empresaUsuaria || '';
         
-        // Cargar fecha de nacimiento si está disponible (desde archivo de empleados)
-        if (empleadoData.fechaNacimiento) {
-            document.getElementById('sp-fecha-nacimiento').value = empleadoData.fechaNacimiento;
-        }
-        
-        // Cargar fecha de ingreso si está disponible (desde archivo de empleados)
-        if (empleadoData.fechaIngreso) {
-            document.getElementById('sp-fecha-ingreso').value = empleadoData.fechaIngreso;
-        }
+        // Los demás campos se dejan VACÍOS para que el usuario los diligencie manualmente
+        document.getElementById('sp-genero').value = '';
+        document.getElementById('sp-cargo').value = '';
+        document.getElementById('sp-area').value = '';
+        document.getElementById('sp-eps').value = '';
+        document.getElementById('sp-fecha-nacimiento').value = '';
+        document.getElementById('sp-fecha-ingreso').value = '';
+        document.getElementById('sp-edad').value = '';
+        document.getElementById('sp-antiguedad').value = '';
+        document.getElementById('sp-tipo-evento').value = '';
+        document.getElementById('sp-tipo-contrato').value = '';
+        document.getElementById('sp-salario').value = '';
+        document.getElementById('sp-afp').value = '';
+        document.getElementById('sp-caja-compensacion').value = '';
+        document.getElementById('sp-peso').value = '';
+        document.getElementById('sp-talla').value = '';
+        document.getElementById('sp-imc').value = '';
+        document.getElementById('sp-dominancia').value = '';
+        document.getElementById('sp-actividades-extralaborales').value = '';
 
-        // Calcular edad y antigüedad automáticamente
-        this.calcularEdad();
-        this.calcularAntiguedad();
+        // Campos de incapacidad vacíos
+        document.getElementById('sp-fecha-inicio').value = '';
+        document.getElementById('sp-fecha-fin').value = '';
+        document.getElementById('sp-dias-acumulados').value = '';
+        document.getElementById('sp-clase-incapacidad').value = '';
+        document.getElementById('sp-codigo-cie10').value = '';
+        document.getElementById('sp-descripcion-diagnostico').value = '';
+        document.getElementById('sp-numero-prorrogas').value = '';
+        document.getElementById('sp-fecha-ultima-prorroga').value = '';
+        document.getElementById('sp-cie10-dx2').value = '';
+        document.getElementById('sp-origen-dx2').value = '';
+        document.getElementById('sp-cie10-dx3').value = '';
+        document.getElementById('sp-origen-dx3').value = '';
 
-        // Si hay incapacidades, cargar la más reciente (DEL AÑO FILTRADO)
-        if (incapacidadesParaMostrar.length > 0) {
-            const incapacidadReciente = incapacidadesParaMostrar[incapacidadesParaMostrar.length - 1];
-
-            console.log('[SEGUIMIENTO][PANEL] Incapacidad reciente:', {
-                fechaInicio: incapacidadReciente.fechaInicio,
-                fechaFin: incapacidadReciente.fechaFin,
-                dias: incapacidadReciente.diasIncapacidad
-            });
-
-            if (incapacidadReciente.fechaInicio) {
-                const fechaIni = incapacidadReciente.fechaInicio instanceof Date
-                    ? incapacidadReciente.fechaInicio
-                    : new Date(incapacidadReciente.fechaInicio);
-                if (!isNaN(fechaIni.getTime())) {
-                    document.getElementById('sp-fecha-inicio').value = fechaIni.toISOString().split('T')[0];
-                }
-            }
-
-            if (incapacidadReciente.fechaFin) {
-                const fechaFi = incapacidadReciente.fechaFin instanceof Date
-                    ? incapacidadReciente.fechaFin
-                    : new Date(incapacidadReciente.fechaFin);
-                if (!isNaN(fechaFi.getTime())) {
-                    document.getElementById('sp-fecha-fin').value = fechaFi.toISOString().split('T')[0];
-                }
-            }
-
-            document.getElementById('sp-dias-acumulados').value = incapacidadReciente.diasIncapacidad || 0;
-
-            // Clase de incapacidad
-            const clase = incapacidadReciente.record?.['CLASE DE INCAPACIDAD'] ||
-                         incapacidadReciente.record?.['clase_de_incapacidad'] || '';
-            document.getElementById('sp-clase-incapacidad').value = clase || 'Enfermedad Común';
-
-            // Código y descripción (CIE-10)
-            const codigo = incapacidadReciente.record?.['CODIGO'] ||
-                          incapacidadReciente.record?.['CÓDIGO'] || '';
-            const diagnostico = incapacidadReciente.record?.['DESCRIPCION'] ||
-                               incapacidadReciente.record?.['DESCRIPCIÓN'] || '';
-            document.getElementById('sp-codigo-cie10').value = codigo;
-            document.getElementById('sp-descripcion-diagnostico').value = diagnostico;
-            
-            console.log('[SEGUIMIENTO][PANEL] CIE-10 cargado:', codigo, 'Diagnóstico:', diagnostico);
-        }
-
-        // Actualizar título del panel
-        document.getElementById('spPanelTitle').textContent = `Gestión de Caso: ${empleadoData.nombre}`;
+        console.log('[SEGUIMIENTO][PANEL] Panel vacío para nuevo caso - solo nombre y cédula precargados');
     }
 
     /**
@@ -3422,7 +3368,7 @@ class MedicionAusentismoComponent {
                 <div style="background: white; padding: 0; border-radius: 16px; max-width: 650px; width: 90%; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); overflow: hidden; display: flex; flex-direction: column; animation: slideUp 0.3s ease-out; max-height: 90vh;">
 
                     <!-- Header Moderno -->
-                    <div style="padding: 24px; background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); color: white; display: flex; align-items: center; gap: 16px;">
+                    <div style="padding: 24px; background: linear-gradient(135deg, #64748B 0%, #475569 100%); color: white; display: flex; align-items: center; gap: 16px;">
                         <div style="background: rgba(255,255,255,0.2); width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                             <i class="fas fa-folder-open" style="font-size: 20px;"></i>
                         </div>
@@ -3461,13 +3407,13 @@ class MedicionAusentismoComponent {
                                         <div style="flex: 1; margin-left: 12px;">
                                             <div style="display: flex; align-items: center; gap: 8px;">
                                                 <div style="font-weight: 600; font-size: 14px; color: #1E293B;">
-                                                    ${reg.fecha_fin || 'Sin fecha fin'} | 
+                                                    ${reg.fecha_fin || 'Sin fecha fin'} |
                                                     <span style="color: #F59E0B;">${reg.dias || '0'} días</span>
                                                 </div>
                                                 ${idx === 0 ? '<span style="padding: 2px 8px; background: #FEF3C7; color: #D97706; font-size: 10px; font-weight: 600; border-radius: 12px; text-transform: uppercase;">Más reciente</span>' : ''}
                                             </div>
                                             <div style="font-size: 12px; color: #64748B; margin-top: 4px;">
-                                                ${reg.diagnostico || 'Sin diagnóstico'}
+                                                <strong style="color: #4F46E5;">${reg.cie10 || ''}</strong> - ${reg.diagnostico || 'Sin diagnóstico'}
                                             </div>
                                         </div>
                                         <i class="fas fa-chevron-right" style="color: #94A3B8; font-size: 12px;"></i>

@@ -446,17 +446,26 @@ def buscar_registros_por_cedula(empresa, file_path, cedula):
                 celda_cedula_str = str(celda_cedula).replace(',', '').replace('.', '').replace(' ', '').strip()
                 if celda_cedula_str == cedula_busqueda:
                     # Registro encontrado - extraer datos básicos
+                    # Columna Z (25) = Fecha Fin
+                    # Columna Y (24) = Días Acumulados
+                    # Columna AA (26) = Código CIE-10
+                    # Columna AB (27) = Descripción Diagnóstico 🆕
+                    celda_fecha_fin = ws[f"Z{fila_idx}"].value
+                    celda_dias = ws[f"Y{fila_idx}"].value
+                    celda_cie10 = ws[f"AA{fila_idx}"].value
+                    celda_diagnostico_desc = ws[f"AB{fila_idx}"].value  # 🆕 Descripción del diagnóstico
+                    
                     registro = {
                         "fila": fila_idx,
                         "nombre": ws[f"C{fila_idx}"].value or "",
-                        "fecha_inicio": ws[f"Z{fila_idx}"].value or "",  # Columna Z = Fecha Fin (ajustar si es diferente)
-                        "fecha_fin": ws[f"Z{fila_idx}"].value or "",
-                        "diagnostico": ws[f"AA{fila_idx}"].value or "",  # Columna AA = CIE-10 (ajustar)
-                        "dias": ws[f"Y{fila_idx}"].value or ""  # Columna Y = Días Acumulados
+                        "fecha_fin": str(celda_fecha_fin) if celda_fecha_fin else "",
+                        "dias": str(celda_dias) if celda_dias else "",
+                        "cie10": str(celda_cie10) if celda_cie10 else "",
+                        "diagnostico": str(celda_diagnostico_desc) if celda_diagnostico_desc else (str(celda_cie10) if celda_cie10 else "")
                     }
                     registros_encontrados.append(registro)
-                    log(f"   ✅ Registro encontrado en fila {fila_idx}: {registro['nombre']}")
-        
+                    log(f"   ✅ Registro encontrado en fila {fila_idx}: {registro['nombre']}, cie10: {registro['cie10']}, desc: {registro['diagnostico'][:50] if registro['diagnostico'] else 'N/A'}")
+
         log(f"🔍 Total registros encontrados: {len(registros_encontrados)}")
         
         return {
@@ -659,11 +668,11 @@ def guardar_seguimiento(empresa, file_path, datos):
         dias_trabajados = calcular_dias_trabajados(datos.get("fechaIngreso", ""))
         
         # Construir la fila de datos ORGANIZADA POR COLUMNAS
-        # Estructura de columnas según PRI.xlsx:
-        # A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7, I=8, J=9, K=10, L=11, M=12, N=13, O=14, P=15, Q=16, R=17, S=18, T=19, U=20, V=21, W=22, X=23, Y=24, Z=25, AA=26, AB=27, AC=28, AD=29, AE=30, AF=31, AG=32, AH=33, AI=34, AJ=35, AK=36, AL=37, AM=38, AN=39, AO=40, AP=41
+        # Estructura de columnas según PRI.xlsx (ACTUALIZADA con columna Diagnóstico en AB):
+        # A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7, I=8, J=9, K=10, L=11, M=12, N=13, O=14, P=15, Q=16, R=17, S=18, T=19, U=20, V=21, W=22, X=23, Y=24, Z=25, AA=26, AB=27 (Diagnóstico), AC=28, AD=29, AE=30, AF=31, AG=32, AH=33, AI=34, AJ=35, AK=36, AL=37, AM=38, AN=39, AO=40, AP=41, AQ=42
 
-        # Crear una lista con todas las columnas (hasta AP = índice 41)
-        fila_completa = [""] * 42  # 42 columnas de A a AP
+        # Crear una lista con todas las columnas (hasta AQ = índice 42)
+        fila_completa = [""] * 43  # 43 columnas de A a AQ
 
         # Asignar valores a las columnas específicas
         fila_completa[0] = ""  # A - Índice/Consecutivo (vacío)
@@ -686,33 +695,34 @@ def guardar_seguimiento(empresa, file_path, datos):
         fila_completa[19] = datos.get("talla", "")  # T - Talla (índice 19)
         fila_completa[20] = datos.get("imc", "")  # U - IMC (índice 20)
         fila_completa[21] = estado_nutricional  # V - Estado Nutricional (índice 21)
-        fila_completa[22] = datos.get("dominancia", "")  # W - Dominancia (índice 22) 🆕
+        fila_completa[22] = datos.get("dominancia", "")  # W - Dominancia (índice 22)
         fila_completa[23] = datos.get("actividadesExtralaborales", "")  # X - Actividades Extralaborales (índice 23)
         fila_completa[24] = datos.get("diasAcumulados", "")  # Y - Total Días Acumulados (índice 24)
         fila_completa[25] = datos.get("fechaFin", "")  # Z - Fecha Finalización Incapacidad (índice 25)
         fila_completa[26] = datos.get("codigoCie10", "")  # AA - Código CIE-10 (índice 26)
-        
+        fila_completa[27] = datos.get("descripcionDiagnostico", "")  # AB - Descripción Diagnóstico (índice 27) 🆕
+
         # Seguimientos (hasta 5 seguimientos con fecha y descripción)
-        # Seguimiento 1: AB (27) = fecha, AC (28) = descripcion
-        # Seguimiento 2: AD (29) = fecha, AE (30) = descripcion
-        # Seguimiento 3: AF (31) = fecha, AG (32) = descripcion
-        # Seguimiento 4: AH (33) = fecha, AI (34) = descripcion
-        # Seguimiento 5: AJ (35) = fecha, AK (36) = descripcion
+        # Seguimiento 1: AC (28) = fecha, AD (29) = descripcion
+        # Seguimiento 2: AE (30) = fecha, AF (31) = descripcion
+        # Seguimiento 3: AG (32) = fecha, AH (33) = descripcion
+        # Seguimiento 4: AI (34) = fecha, AJ (35) = descripcion
+        # Seguimiento 5: AK (36) = fecha, AL (37) = descripcion
         seguimientos = datos.get("seguimientos", [])
         if seguimientos and isinstance(seguimientos, list):
             for i, seg in enumerate(seguimientos[:5]):  # Máximo 5 seguimientos
-                idx_fecha = 27 + (i * 2)  # 27, 29, 31, 33, 35
-                idx_desc = 28 + (i * 2)   # 28, 30, 32, 34, 36
+                idx_fecha = 28 + (i * 2)  # 28, 30, 32, 34, 36
+                idx_desc = 29 + (i * 2)   # 29, 31, 33, 35, 37
                 fila_completa[idx_fecha] = seg.get("fecha", "")
                 fila_completa[idx_desc] = seg.get("descripcion", "")
                 log(f"   Seguimiento {i+1}: fecha={seg.get('fecha', '')}, desc={seg.get('descripcion', '')[:50]}")
-        
-        # 🆕 Nuevos campos diagnósticos adicionales
-        fila_completa[37] = datos.get("clase", "")  # AL - Clase de Incapacidad (LABORAL/COMÚN) (índice 37)
-        fila_completa[38] = datos.get("cie10Dx2", "")  # AM - CIE-10 Incapacidad Temporal DX 2 (índice 38)
-        fila_completa[39] = datos.get("origenDx2", "")  # AN - Origen Incapacidad DX 2 (índice 39)
-        fila_completa[40] = datos.get("cie10Dx3", "")  # AO - CIE-10 Incapacidad Temporal DX 3 (índice 40)
-        fila_completa[41] = datos.get("origenDx3", "")  # AP - Origen Incapacidad DX 3 (índice 41)
+
+        # 🆕 Nuevos campos diagnósticos adicionales (corridos una posición por columna AB)
+        fila_completa[38] = datos.get("clase", "")  # AM - Clase de Incapacidad (LABORAL/COMÚN) (índice 38)
+        fila_completa[39] = datos.get("cie10Dx2", "")  # AN - CIE-10 Incapacidad Temporal DX 2 (índice 39)
+        fila_completa[40] = datos.get("origenDx2", "")  # AO - Origen Incapacidad DX 2 (índice 40)
+        fila_completa[41] = datos.get("cie10Dx3", "")  # AP - CIE-10 Incapacidad Temporal DX 3 (índice 41)
+        fila_completa[42] = datos.get("origenDx3", "")  # AQ - Origen Incapacidad DX 3 (índice 42)
         
         # Insertar la fila en la posición correcta
         log(f"📝 {'ACTUALIZANDO' if fila_existente else 'CREANDO'} registro en fila {siguiente_fila}:")
