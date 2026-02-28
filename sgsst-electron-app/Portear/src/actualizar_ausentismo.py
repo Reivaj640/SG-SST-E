@@ -665,6 +665,23 @@ def guardar_seguimiento(empresa, file_path, datos):
         # Debug: Verificar tipo de dato
         log(f"🔍 DEBUG: siguiente_fila = {siguiente_fila}, tipo = {type(siguiente_fila)}")
         
+        # ============================================
+        # APLANAR DATOS: Extraer todos los campos de los objetos anidados
+        # ============================================
+        # Los datos vienen anidados: {trabajador: {...}, incapacidad: {...}, pric: {...}, calificacion: {...}}
+        # Necesitamos extraerlos al nivel superior para acceder fácilmente
+        
+        trabajador = datos.get("trabajador", {})
+        incapacidad = datos.get("incapacidad", {})
+        pric = datos.get("pric", {})
+        calificacion = datos.get("calificacion", {})
+        recomendaciones = datos.get("recommendations", [])  # Este viene en el nivel superior
+        
+        log(f"🔍 DEBUG: trabajador={trabajador}")
+        log(f"🔍 DEBUG: incapacidad={incapacidad}")
+        log(f"🔍 DEBUG: pric={pric}")
+        log(f"🔍 DEBUG: recomendaciones count={len(recomendaciones) if recomendaciones else 0}")
+        
         # Calcular edad desde fecha de nacimiento
         def calcular_edad(fecha_nacimiento_str):
             if not fecha_nacimiento_str:
@@ -735,61 +752,62 @@ def guardar_seguimiento(empresa, file_path, datos):
             except:
                 return ""
         
-        # Calcular valores derivados
-        edad = calcular_edad(datos.get("fechaNacimiento", ""))
-        antiguedad = calcular_antiguedad(datos.get("fechaIngreso", ""))
-        estado_nutricional = calcular_estado_nutricional(datos.get("imc", ""))
-        dias_trabajados = calcular_dias_trabajados(datos.get("fechaIngreso", ""))
+        # Calcular valores derivados usando datos anidados
+        edad = calcular_edad(trabajador.get("fechaNacimiento", ""))
+        antiguedad = calcular_antiguedad(trabajador.get("fechaIngreso", ""))
+        estado_nutricional = calcular_estado_nutricional(trabajador.get("imc", ""))
+        dias_trabajados = calcular_dias_trabajados(trabajador.get("fechaIngreso", ""))
         
         # Construir la fila de datos ORGANIZADA POR COLUMNAS
-        # Estructura de columnas según PRI.xlsx (ACTUALIZADA con Salario en L y Fecha Inicio en Z):
+        # Estructura de columnas según PRI.xlsx (ACTUALIZADA con todas las columnas hasta ER = índice 147):
         # A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7, I=8, J=9, K=10, L=11 (Salario), M=12, N=13, O=14, P=15, Q=16, R=17, S=18, T=19, U=20, V=21, W=22, X=23, Y=24, Z=25 (Fecha Inicio), AA=26 (Fecha Fin), AB=27 (Código CIE-10), AC=28 (Descripción Diagnóstico), AD=29, AE=30, AF=31, AG=32, AH=33, AI=34, AJ=35, AK=36, AL=37, AM=38, AN=39, AO=40, AP=41, AQ=42, AR=43, AS=44, AT=45, AU=46, AV=47, AW=48, AX=49
+        # Etapas PRIC: AY=50, AZ=51, BA=52, BB=53, BC=54, BD=55, BE=56, BF=57, BG=58, BH=59, BI=60, BJ=61, BK=62, BL=63, BM=64, BN=65, BO=66, BP=67, BQ=68, BR=69, BS=70, BT=71, BU=72, BV=73, BW=74
+        # Seguimientos: BX=75, BY=76, BZ=77, CA=78
+        # Etapa 4: CB=79, CC=80, CD=81
+        # Etapa 5: CE=82, CF=83, CG=84, CH=85
+        # Historial DX: CI=86, CJ=87, CK=88, CL=89, CM=90, CN=91, CO=92, CP=93, CQ=94, CR=95, CS=96, CT=97
+        # Recomendaciones (tabla hasta 10 filas): CU=98, CV=99, CW=100, CX=101, CY=102, CZ=103, DA=104, DB=105, DC=106, DD=107, DE=108, DF=109, DG=110, DH=111, DI=112, DJ=113, DK=114, DL=115, DM=116, DN=117, DO=118, DP=119, DQ=120, DR=121, DS=122, DT=123, DU=124, DV=125, DW=126, DX=127, DY=128, DZ=129, EA=130, EB=131, EC=132, ED=133, EE=134, EF=135, EG=136, EH=137, EI=138, EJ=139, EK=140, EL=141, EM=142, EN=143, EO=144, EP=145, EQ=146, ER=147, ES=148, ET=149, EU=150, EV=151, EW=152, EX=153, EY=154, EZ=155, FA=156, FB=157
 
-        # Crear una lista con todas las columnas (hasta AX = índice 49)
-        fila_completa = [""] * 50  # 50 columnas de A a AX
+        # Crear una lista con todas las columnas (hasta FB = índice 157)
+        fila_completa = [""] * 158  # 158 columnas de A a FB (para soportar 10 recomendaciones de 6 columnas c/u)
 
-        # Asignar valores a las columnas específicas
+        # Asignar valores a las columnas específicas USANDO LOS OBJETOS ANIDADOS
         fila_completa[0] = ""  # A - Índice/Consecutivo (vacío)
-        fila_completa[1] = datos.get("tipoEvento", "")  # B - TIPO DE EVENTO (índice 1)
-        fila_completa[2] = datos.get("employeeName", "")  # C - Nombre (índice 2)
+        fila_completa[1] = trabajador.get("tipoEvento", "")  # B - TIPO DE EVENTO (índice 1)
+        fila_completa[2] = empleado_nombre  # C - Nombre (índice 2)
         fila_completa[3] = empleado_id  # D - Cédula (índice 3)
-        fila_completa[4] = datos.get("genero", "")  # E - Género (índice 4)
-        fila_completa[5] = datos.get("fechaNacimiento", "")  # F - Fecha Nacimiento (índice 5)
+        fila_completa[4] = trabajador.get("genero", "")  # E - Género (índice 4)
+        fila_completa[5] = trabajador.get("fechaNacimiento", "")  # F - Fecha Nacimiento (índice 5)
         fila_completa[6] = edad  # G - Edad (índice 6)
-        fila_completa[7] = datos.get("fechaIngreso", "")  # H - Fecha Ingreso (índice 7)
+        fila_completa[7] = trabajador.get("fechaIngreso", "")  # H - Fecha Ingreso (índice 7)
         fila_completa[8] = dias_trabajados  # I - Días Trabajados (índice 8)
         fila_completa[9] = antiguedad  # J - Antigüedad (índice 9)
-        fila_completa[11] = datos.get("salario", "")  # L - Salario Básico (índice 11) 🆕
-        fila_completa[12] = datos.get("area", "")  # M - Sede/Área (índice 12)
-        fila_completa[13] = datos.get("cargo", "")  # N - Cargo (índice 13)
-        fila_completa[14] = datos.get("tipoCargo", "")  # O - Tipo de Cargo (índice 14)
-        fila_completa[15] = datos.get("tipoContrato", "")  # P - Tipo de Vinculación (índice 15)
-        fila_completa[16] = datos.get("eps", "")  # Q - EPS (índice 16)
-        fila_completa[17] = datos.get("afp", "")  # R - AFP (índice 17)
-        fila_completa[18] = datos.get("peso", "")  # S - Peso (índice 18)
-        fila_completa[19] = datos.get("talla", "")  # T - Talla (índice 19)
-        fila_completa[20] = datos.get("imc", "")  # U - IMC (índice 20)
+        fila_completa[11] = trabajador.get("salario", "")  # L - Salario Básico (índice 11) 🆕
+        fila_completa[12] = trabajador.get("area", "")  # M - Sede/Área (índice 12)
+        fila_completa[13] = trabajador.get("cargo", "")  # N - Cargo (índice 13)
+        fila_completa[14] = trabajador.get("tipoCargo", "")  # O - Tipo de Cargo (índice 14)
+        fila_completa[15] = trabajador.get("tipoContrato", "")  # P - Tipo de Vinculación (índice 15)
+        fila_completa[16] = trabajador.get("eps", "")  # Q - EPS (índice 16)
+        fila_completa[17] = trabajador.get("afp", "")  # R - AFP (índice 17)
+        fila_completa[18] = trabajador.get("peso", "")  # S - Peso (índice 18)
+        fila_completa[19] = trabajador.get("talla", "")  # T - Talla (índice 19)
+        fila_completa[20] = trabajador.get("imc", "")  # U - IMC (índice 20)
         fila_completa[21] = estado_nutricional  # V - Estado Nutricional (índice 21)
-        fila_completa[22] = datos.get("dominancia", "")  # W - Dominancia (índice 22)
-        fila_completa[23] = datos.get("actividadesExtralaborales", "")  # X - Actividades Extralaborales (índice 23)
-        fila_completa[24] = datos.get("diasAcumulados", "")  # Y - Total Días Acumulados (índice 24)
-        fila_completa[25] = datos.get("fechaInicio", "")  # Z - Fecha Inicio de Incapacidad (índice 25) 🆕
-        fila_completa[26] = datos.get("fechaFin", "")  # AA - Fecha Finalización Incapacidad (índice 26)
-        fila_completa[27] = datos.get("codigoCie10", "")  # AB - Código CIE-10 (índice 27)
-        fila_completa[28] = datos.get("descripcionDiagnostico", "")  # AC - Descripción Diagnóstico (índice 28)
-        fila_completa[38] = datos.get("clase", "")  # AM - Clase de Incapacidad (LABORAL/COMÚN) (índice 38)
-        fila_completa[39] = datos.get("cie10Dx2", "")  # AN - CIE-10 Incapacidad Temporal DX 2 (índice 39)
-        fila_completa[40] = datos.get("origenDx2", "")  # AO - Origen Incapacidad DX 2 (índice 40)
-        fila_completa[41] = datos.get("cie10Dx3", "")  # AP - CIE-10 Incapacidad Temporal DX 3 (índice 41)
-        fila_completa[42] = datos.get("origenDx3", "")  # AQ - Origen Incapacidad DX 3 (índice 42)
+        fila_completa[22] = trabajador.get("dominancia", "")  # W - Dominancia (índice 22)
+        fila_completa[23] = trabajador.get("actividadesExtralaborales", "")  # X - Actividades Extralaborales (índice 23)
+        fila_completa[24] = incapacidad.get("diasAcumulados", "")  # Y - Total Días Acumulados (índice 24)
+        fila_completa[25] = incapacidad.get("fechaInicio", "")  # Z - Fecha Inicio de Incapacidad (índice 25) 🆕
+        fila_completa[26] = incapacidad.get("fechaFin", "")  # AA - Fecha Finalización Incapacidad (índice 26)
+        fila_completa[27] = incapacidad.get("codigoCie10", "")  # AB - Código CIE-10 (índice 27)
+        fila_completa[28] = incapacidad.get("descripcionDiagnostico", "")  # AC - Descripción Diagnóstico (índice 28)
+        fila_completa[38] = incapacidad.get("clase", "")  # AM - Clase de Incapacidad (LABORAL/COMÚN) (índice 38)
+        fila_completa[39] = incapacidad.get("cie10Dx2", "")  # AN - CIE-10 Incapacidad Temporal DX 2 (índice 39)
+        fila_completa[40] = incapacidad.get("origenDx2", "")  # AO - Origen Incapacidad DX 2 (índice 40)
+        fila_completa[41] = incapacidad.get("cie10Dx3", "")  # AP - CIE-10 Incapacidad Temporal DX 3 (índice 41)
+        fila_completa[42] = incapacidad.get("origenDx3", "")  # AQ - Origen Incapacidad DX 3 (índice 42)
 
-        # Seguimientos (hasta 5 seguimientos con fecha y descripción)
-        # Seguimiento 1: AD (29) = fecha, AE (30) = descripcion
-        # Seguimiento 2: AF (31) = fecha, AG (32) = descripcion
-        # Seguimiento 3: AH (33) = fecha, AI (34) = descripcion
-        # Seguimiento 4: AJ (35) = fecha, AK (36) = descripcion
-        # Seguimiento 5: AL (37) = fecha, AM (38) = descripcion
-        seguimientos = datos.get("seguimientos", [])
+        # Seguimientos (hasta 5 seguimientos con fecha y descripción) - de incapacidad
+        seguimientos = incapacidad.get("seguimientos", [])
         if seguimientos and isinstance(seguimientos, list):
             for i, seg in enumerate(seguimientos[:5]):  # Máximo 5 seguimientos
                 idx_fecha = 29 + (i * 2)  # 29, 31, 33, 35, 37
@@ -798,16 +816,108 @@ def guardar_seguimiento(empresa, file_path, datos):
                 fila_completa[idx_desc] = seg.get("descripcion", "")
                 log(f"   Seguimiento {i+1}: fecha={seg.get('fecha', '')}, desc={seg.get('descripcion', '')[:50]}")
 
-        # 🆕 Etapa 4: Reincorporación Laboral
-        fila_completa[44] = datos.get("fechaReincorporacion", "")  # AS - Fecha Reincorporación (índice 44)
-        fila_completa[45] = datos.get("tipoReintegro", "")  # AT - Tipo Reintegro (índice 45)
-        fila_completa[46] = datos.get("adaptaciones", "")  # AU - Adaptaciones (índice 46)
+        # 🆕 Etapa 4: Reincorporación Laboral - de incapacidad
+        fila_completa[44] = incapacidad.get("fechaReincorporacion", "")  # AS - Fecha Reincorporación (índice 44)
+        fila_completa[45] = incapacidad.get("tipoReintegro", "")  # AT - Tipo Reintegro (índice 45)
+        fila_completa[46] = incapacidad.get("adaptaciones", "")  # AU - Adaptaciones (índice 46)
+
+        # 🆕 Etapa 5: Cierre de Caso - de incapacidad
+        fila_completa[47] = incapacidad.get("fechaCierre", "")  # AV - Fecha Cierre (índice 47)
+        fila_completa[48] = incapacidad.get("motivoCierre", "")  # AW - Motivo Cierre (índice 48)
+        fila_completa[49] = incapacidad.get("observacionesFinales", "")  # AX - Observaciones Finales (índice 49)
+
+        # 🆕 Condiciones de Salud (índices 50-55) - de pric
+        fila_completa[50] = pric.get("fechaExamenMedico", "")  # AY - Fecha Examen Médico Periódico
+        fila_completa[51] = pric.get("resultadoExamenMedico", "")  # AZ - Resultado Examen Médico
+        fila_completa[52] = pric.get("fechaExamenPeriodico", "")  # BA - Fecha Examen Post Incapacidad
+        fila_completa[53] = pric.get("resultadoExamenPostIncapacidad", "")  # BB - Resultado Examen Post Incapacidad
+        fila_completa[54] = pric.get("trabajadorRemoto", "")  # BC - Trabajador Remoto (SI/NO)
+        fila_completa[55] = pric.get("fechaInicioRemoto", "")  # BD - Fecha Inicio Remoto
+
+        # 🆕 Etapa 1: Captura de Caso (índices 56-58) - de pric
+        fila_completa[56] = pric.get("casoIngresadoPRIC", "")  # BE - Caso Ingresado PRIC (SI/NO)
+        fila_completa[57] = pric.get("mecanismoDeteccion", "")  # BF - Mecanismo Detección
+        fila_completa[58] = pric.get("fechaIngresoPRIC", "")  # BG - Fecha Ingreso PRIC
+
+        # 🆕 Etapa 2: Plan de Tratamiento (índices 59-62) - de pric
+        fila_completa[59] = pric.get("trabajadorPlanTratamiento", "")  # BH - Trabajador Plan Tratamiento
+        fila_completa[60] = pric.get("metaRehabilitacion", "")  # BI - Meta Rehabilitación
+        fila_completa[61] = pric.get("fechaEmisionPlan", "")  # BJ - Fecha Emisión Plan
+        fila_completa[62] = pric.get("fechaProbableReintegro", "")  # BK - Fecha Probable Reintegro
+
+        # 🆕 Etapa 3: Ejecución y Seguimiento (índices 63-74) - de pric
+        fila_completa[63] = pric.get("fechaProximaCita", "")  # BL - Fecha Próxima Cita
+        fila_completa[64] = pric.get("observacionesSeguimiento", "")  # BM - Observaciones Seguimiento
+        fila_completa[65] = pric.get("fechaAPTReincorporacion", "")  # BN - Fecha APT Reincorporación
+        fila_completa[66] = pric.get("modalidadReincorporacion", "")  # BO - Modalidad Reincorporación
+        fila_completa[67] = pric.get("fechaReintegro", "")  # BP - Fecha Reintegro
+        fila_completa[68] = pric.get("periodicidadSeguimiento", "")  # BQ - Periodicidad Seguimiento
+        fila_completa[69] = pric.get("recomendacionesLaborales", "")  # BR - Recomendaciones Laborales (SI/NO)
+        fila_completa[70] = pric.get("fechaVencimientoRecomendaciones", "")  # BS - Fecha Vencimiento Recomendaciones
+        fila_completa[71] = pric.get("descripcionRecomendaciones", "")  # BT - Descripción Recomendaciones
+        fila_completa[72] = pric.get("fechaProximoSeguimientoRecomendaciones", "")  # BU - Fecha Próximo Seguimiento
+        fila_completa[73] = pric.get("tieneDesercion", "")  # BV - Tiene Deserción (SI/NO)
+        fila_completa[74] = pric.get("logroMejoriaMedica", "")  # BW - Logró Mejoría Médica (SI/NO)
+
+        # 🆕 Seguimientos adicionales (índices 75-78) - de pric
+        fila_completa[75] = pric.get("fechaSeguimiento1", "")  # BX - Fecha Seguimiento 1
+        fila_completa[76] = pric.get("descripcionSeguimiento1", "")  # BY - Descripción Seguimiento 1
+        fila_completa[77] = pric.get("fechaSeguimiento2", "")  # BZ - Fecha Seguimiento 2
+        fila_completa[78] = pric.get("descripcionSeguimiento2", "")  # CA - Descripción Seguimiento 2
+
+        # 🆕 Etapa 4: Reincorporación Laboral (índices 79-81) - de pric
+        fila_completa[79] = pric.get("fechaReincorporacion", "")  # CB - Fecha Reincorporación
+        fila_completa[80] = pric.get("tipoReintegro", "")  # CC - Tipo Reintegro
+        fila_completa[81] = pric.get("adaptaciones", "")  # CD - Adaptaciones
+
+        # 🆕 Etapa 5: Cierre de Caso (índices 82-85) - de pric
+        fila_completa[82] = pric.get("fechaCierre", "")  # CE - Fecha Cierre PRIC
+        fila_completa[83] = pric.get("motivoCierre", "")  # CF - Motivo Cierre (SI/NO)
+        fila_completa[84] = pric.get("fechaCalificacionPCL", "")  # CG - Fecha Calificación PCL
+        fila_completa[85] = pric.get("porcentajePCLCalificacion", "")  # CH - Porcentaje PCL
+
+        # 🆕 Historial de Diagnóstico (índices 86-97) - de pric
+        fila_completa[86] = pric.get("cie10CalificadaDX1", "")  # CI - CIE-10 DX1 Calificada
+        fila_completa[87] = pric.get("origenDX1", "")  # CJ - Origen DX1 (AT/EL)
+        fila_completa[88] = pric.get("cie10CalificadaDX2", "")  # CK - CIE-10 DX2 Calificada
+        fila_completa[89] = pric.get("origenDX2", "")  # CL - Origen DX2 (AT/EL)
+        fila_completa[90] = pric.get("cie10CalificadaDX3", "")  # CM - CIE-10 DX3 Calificada
+        fila_completa[91] = pric.get("origenDX3", "")  # CN - Origen DX3 (AT/EL)
+        fila_completa[92] = pric.get("cie10CalificadaDX4", "")  # CO - CIE-10 DX4 Calificada
+        fila_completa[93] = pric.get("origenDX4", "")  # CP - Origen DX4 (AT/EL)
+        fila_completa[94] = pric.get("origenCaso", "")  # CQ - Origen del Caso
+        fila_completa[95] = pric.get("ingresoSVE", "")  # CR - Ingreso SVE (SI/NO)
+        fila_completa[96] = pric.get("anioUltimaCalificacionPCL", "")  # CS - Año Última Calificación PCL
+        fila_completa[97] = pric.get("anioSeguimientoEmpresa", "")  # CT - Año Seguimiento Empresa
+
+        # 🆕 Recomendaciones Médico Laborales (tabla hasta 10 filas, índices 98-147)
+        # Cada fila tiene 6 columnas: Item, Recomendación, Entidad, Fecha Límite, Cumple, Observación
+        # Fila 1: CU(98), CV(99), CW(100), CX(101), CY(102), CZ(103)
+        # Fila 2: DA(104), DB(105), DC(106), DD(107), DE(108), DF(109)
+        # Fila 3: DG(110), DH(111), DI(112), DJ(113), DK(114), DL(115)
+        # ... hasta Fila 10 (índices 98-147 = 60 columnas totales)
+
+        log(f"🔍 DEBUG: recomendaciones tipo={type(recomendaciones)}, valor={recomendaciones}")
         
-        # 🆕 Etapa 5: Cierre de Caso
-        fila_completa[47] = datos.get("fechaCierre", "")  # AV - Fecha Cierre (índice 47)
-        fila_completa[48] = datos.get("motivoCierre", "")  # AW - Motivo Cierre (índice 48)
-        fila_completa[49] = datos.get("observacionesFinales", "")  # AX - Observaciones Finales (índice 49)
-        
+        if recomendaciones and isinstance(recomendaciones, list) and len(recomendaciones) > 0:
+            for i, rec in enumerate(recomendaciones[:10]):  # Máximo 10 recomendaciones
+                # Calcular índices para esta fila de recomendaciones
+                # Cada fila usa 6 columnas consecutivas (Item + 5 campos)
+                base_idx = 98 + (i * 6)  # 98, 104, 110, 116, 122, 128, 134, 140, 146, 152
+
+                # Asignar valores (6 campos por fila)
+                # El Item se calcula automáticamente como i+1
+                fila_completa[base_idx] = str(i + 1) if rec.get("item") is None else str(rec.get("item", i + 1))  # Item (numeración automática) - CU, DA, DG, etc.
+                fila_completa[base_idx + 1] = rec.get("recomendacion", "")  # Recomendación Emitida - CV, DB, DH, etc.
+                fila_completa[base_idx + 2] = rec.get("entidad", "")  # Entidad que Emite - CW, DC, DI, etc.
+                fila_completa[base_idx + 3] = rec.get("fechaLimite", "")  # Fecha Límite - CX, DD, DJ, etc.
+                fila_completa[base_idx + 4] = rec.get("cumple", "")  # Cumple? (SI/NO/EN PROCESO) - CY, DE, DK, etc.
+                fila_completa[base_idx + 5] = rec.get("observacion", "")  # Observación / Evidencia - CZ, DF, DL, etc.
+
+                log(f"   Recomendación {i+1}: item={fila_completa[base_idx]}, rec={rec.get('recomendacion', '')[:30]}, entidad={rec.get('entidad', '')}, cumple={rec.get('cumple', '')}")
+        else:
+            log("   No hay recomendaciones para guardar")
+
         # Insertar la fila en la posición correcta
         log(f"📝 {'ACTUALIZANDO' if fila_existente else 'CREANDO'} registro en fila {siguiente_fila}:")
         log(f"   Nombre: {fila_completa[2]}, Cédula: {fila_completa[3]}, Edad: {fila_completa[6]}")

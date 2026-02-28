@@ -2314,31 +2314,77 @@ class MedicionAusentismoComponent {
                     <!-- SECCIÓN 3: ETAPAS PRIC -->
                     <div id="sp-section-etapas" class="sp-form-section">
                         <div class="sp-section-title"><i class="fas fa-tasks"></i> 3. Proceso de Rehabilitación y Reincorporación (PRIC)</div>
-                        
+
+                        <!-- Condiciones de Salud (NUEVO) -->
+                        <div class="sp-subsection">
+                            <div class="sp-subsection-title" style="color: #174ea6;"><i class="fas fa-heartbeat"></i> Condiciones de Salud</div>
+                            <div class="sp-form-grid">
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Fecha del Último Examen Médico Periódico</label>
+                                    <input type="date" id="sp-fecha-examen-medico" class="sp-form-control">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Resultado Examen Médico Periódico</label>
+                                    <select id="sp-resultado-examen-medico" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="Apto">Apto</option>
+                                        <option value="Apto con Restricciones">Apto con Restricciones</option>
+                                        <option value="No Apto">No Apto</option>
+                                    </select>
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Fecha Último Examen Médico Post Incapacidad</label>
+                                    <input type="date" id="sp-fecha-examen-periodico" class="sp-form-control">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Resultado Examen Médico Post Incapacidad</label>
+                                    <select id="sp-resultado-examen-post-incapacidad" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="Apto">Apto</option>
+                                        <option value="Apto con Restricciones">Apto con Restricciones</option>
+                                        <option value="No Apto">No Apto</option>
+                                        <option value="Pendiente">Pendiente</option>
+                                    </select>
+                                </div>
+                                <div class="sp-form-group full-width">
+                                    <label class="sp-form-label">Trabajador Remoto / Teletrabajo / Trabajo en Casa</label>
+                                    <select id="sp-trabajador-remoto" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="SI">Sí</option>
+                                        <option value="NO">No</option>
+                                    </select>
+                                </div>
+                                <div class="sp-form-group full-width">
+                                    <label class="sp-form-label">Fecha de Inicio en Trabajo Remoto / Teletrabajo / Trabajo en Casa (si aplica)</label>
+                                    <input type="date" id="sp-fecha-inicio-remoto" class="sp-form-control">
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Etapa 1 -->
                         <div class="sp-subsection">
                             <div class="sp-subsection-title">Etapa 1: Captura de Caso</div>
                             <div class="sp-form-grid">
                                 <div class="sp-form-group">
-                                    <label class="sp-form-label">Fecha de Detección</label>
-                                    <input type="date" id="sp-fecha-deteccion" class="sp-form-control">
+                                    <label class="sp-form-label">¿El caso es ingresado en PRIC?</label>
+                                    <select id="sp-caso-ingresado-pric" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="SI">Sí</option>
+                                        <option value="NO">No</option>
+                                    </select>
                                 </div>
                                 <div class="sp-form-group">
                                     <label class="sp-form-label">Mecanismo de Detección</label>
                                     <select id="sp-mecanismo-deteccion" class="sp-form-control">
                                         <option value="">Seleccione...</option>
-                                        <option value="Reporte ARL">Reporte ARL</option>
-                                        <option value="Reporte EPS">Reporte EPS</option>
-                                        <option value="Inasistencia">Inasistencia</option>
+                                        <option value="Accidente de trabajo">Accidente de trabajo</option>
+                                        <option value="Enfermedad general">Enfermedad general</option>
+                                        <option value="Enfermedad laboral">Enfermedad laboral</option>
                                     </select>
                                 </div>
                                 <div class="sp-form-group">
-                                    <label class="sp-form-label">Fecha Reporte a ARL</label>
-                                    <input type="date" id="sp-fecha-reporte-arl" class="sp-form-control">
-                                </div>
-                                <div class="sp-form-group">
-                                    <label class="sp-form-label">Responsable Reporte</label>
-                                    <input type="text" id="sp-responsable-reporte" class="sp-form-control">
+                                    <label class="sp-form-label">Fecha de Ingreso al PRIC</label>
+                                    <input type="date" id="sp-fecha-ingreso-pric" class="sp-form-control">
                                 </div>
                             </div>
                         </div>
@@ -2348,20 +2394,24 @@ class MedicionAusentismoComponent {
                             <div class="sp-subsection-title">Etapa 2: Plan de Tratamiento</div>
                             <div class="sp-form-grid">
                                 <div class="sp-form-group full-width">
-                                    <label class="sp-form-label">Objetivos del Plan de Tratamiento</label>
+                                    <label class="sp-form-label">¿El trabajador tiene plan de tratamiento autorizado?</label>
+                                    <select id="sp-trabajador-plan-tratamiento" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="SI">Sí</option>
+                                        <option value="NO">No</option>
+                                    </select>
+                                </div>
+                                <div class="sp-form-group full-width">
+                                    <label class="sp-form-label">Meta de Rehabilitación</label>
                                     <textarea id="sp-objetivos-tratamiento" class="sp-form-control" rows="2"></textarea>
                                 </div>
                                 <div class="sp-form-group">
-                                    <label class="sp-form-label">Fecha Inicio Plan</label>
+                                    <label class="sp-form-label">Fecha de Emisión del Plan de Tratamiento</label>
                                     <input type="date" id="sp-fecha-inicio-plan" class="sp-form-control">
                                 </div>
                                 <div class="sp-form-group">
-                                    <label class="sp-form-label">Fecha Probable de Alta</label>
+                                    <label class="sp-form-label">Fecha Probable de Reintegro</label>
                                     <input type="date" id="sp-fecha-probable-alta" class="sp-form-control">
-                                </div>
-                                <div class="sp-form-group full-width">
-                                    <label class="sp-form-label">Tratamientos Ordenados</label>
-                                    <input type="text" id="sp-tratamientos" class="sp-form-control" placeholder="Medicamentos, Terapias, Cirugías...">
                                 </div>
                             </div>
                         </div>
@@ -2370,12 +2420,20 @@ class MedicionAusentismoComponent {
                         <div class="sp-subsection">
                             <div class="sp-subsection-title">Etapa 3: Ejecución y Seguimiento</div>
                             <div class="sp-form-grid">
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Fecha de Próxima Cita Médica</label>
+                                    <input type="date" id="sp-fecha-proxima-cita" class="sp-form-control">
+                                </div>
                                 <div class="sp-form-group full-width">
-                                    <label class="sp-form-label">Evolución Clínica</label>
-                                    <textarea id="sp-evolucion-clinica" class="sp-form-control" rows="2" placeholder="Detalle de la evolución médica..."></textarea>
+                                    <label class="sp-form-label">Observaciones del Seguimiento - Citas</label>
+                                    <textarea id="sp-evolucion-clinica" class="sp-form-control" rows="2" placeholder="Detalle de las observaciones..."></textarea>
                                 </div>
                                 <div class="sp-form-group">
-                                    <label class="sp-form-label">Adherencia al Tratamiento</label>
+                                    <label class="sp-form-label">Fecha de APT para Reincorporación Laboral (si aplica)</label>
+                                    <input type="date" id="sp-fecha-ultimo-seguimiento" class="sp-form-control">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Modalidad de Reincorporación</label>
                                     <select id="sp-adherencia" class="sp-form-control">
                                         <option value="">Seleccione...</option>
                                         <option value="Si">Sí</option>
@@ -2384,8 +2442,88 @@ class MedicionAusentismoComponent {
                                     </select>
                                 </div>
                                 <div class="sp-form-group">
-                                    <label class="sp-form-label">Fecha Último Seguimiento</label>
-                                    <input type="date" id="sp-fecha-ultimo-seguimiento" class="sp-form-control">
+                                    <label class="sp-form-label">Fecha de Reintegro</label>
+                                    <input type="date" id="sp-fecha-reintegro" class="sp-form-control">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Periodicidad del Seguimiento al Trabajador</label>
+                                    <select id="sp-periodicidad-seguimiento" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="Semanal">Semanal</option>
+                                        <option value="Quincenal">Quincenal</option>
+                                        <option value="Mensual">Mensual</option>
+                                        <option value="Bimensual">Bimensual</option>
+                                        <option value="Trimestral">Trimestral</option>
+                                        <option value="Cuatrimestral">Cuatrimestral</option>
+                                        <option value="Semestral">Semestral</option>
+                                        <option value="Anual">Anual</option>
+                                        <option value="No Aplica">No Aplica</option>
+                                    </select>
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Recomendaciones Laborales Vigentes</label>
+                                    <select id="sp-recomendaciones-laborales" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="SI">Sí</option>
+                                        <option value="NO">No</option>
+                                    </select>
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Fecha de Vencimiento de Recomendaciones Laborales (si aplica)</label>
+                                    <input type="date" id="sp-fecha-vencimiento-recomendaciones" class="sp-form-control">
+                                </div>
+                                <div class="sp-form-group full-width">
+                                    <label class="sp-form-label">Descripción Recomendaciones Laborales Vigentes: Incluye Tareas Asignadas</label>
+                                    <textarea id="sp-descripcion-recomendaciones" class="sp-form-control" rows="2" placeholder="Describa las recomendaciones..."></textarea>
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Fecha de Próximo Seguimiento a las Recomendaciones en Puesto de Trabajo (si aplica)</label>
+                                    <input type="date" id="sp-fecha-proximo-seguimiento-recomendaciones" class="sp-form-control">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">¿Tiene Deserción o Incumplimiento de Citas?</label>
+                                    <select id="sp-tiene-desercion" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="SI">Sí</option>
+                                        <option value="NO">No</option>
+                                    </select>
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">¿Logró Mejoría Médica Máxima?</label>
+                                    <select id="sp-logro-mejoria-medica" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="SI">Sí</option>
+                                        <option value="NO">No</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Seguimientos (Sección Intermedia - Parte de Etapa 3) -->
+                        <div class="sp-subsection">
+                            <div class="sp-subsection-title" style="color: #174ea6;">Seguimientos</div>
+                            <div class="sp-form-grid">
+                                <div class="sp-form-group full-width">
+                                    <label class="sp-form-label" style="font-weight: 600;">Seguimiento 1</label>
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Fecha Seguimiento 1</label>
+                                    <input type="date" id="sp-fecha-seguimiento-1" class="sp-form-control">
+                                </div>
+                                <div class="sp-form-group full-width">
+                                    <label class="sp-form-label">Descripción Seguimiento 1</label>
+                                    <textarea id="sp-descripcion-seguimiento-1" class="sp-form-control" rows="2" placeholder="Describa el seguimiento..."></textarea>
+                                </div>
+                                <div class="sp-form-group full-width" style="margin-top: 10px;">
+                                    <label class="sp-form-label" style="font-weight: 600;">Seguimiento 2</label>
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Fecha Seguimiento 2</label>
+                                    <input type="date" id="sp-fecha-seguimiento-2" class="sp-form-control">
+                                </div>
+                                <div class="sp-form-group full-width">
+                                    <label class="sp-form-label">Descripción Seguimiento 2</label>
+                                    <textarea id="sp-descripcion-seguimiento-2" class="sp-form-control" rows="2" placeholder="Describa el seguimiento..."></textarea>
                                 </div>
                             </div>
                         </div>
@@ -2395,7 +2533,7 @@ class MedicionAusentismoComponent {
                             <div class="sp-subsection-title">Etapa 4: Reincorporación Laboral</div>
                             <div class="sp-form-grid">
                                 <div class="sp-form-group">
-                                    <label class="sp-form-label">Fecha de Reincorporación</label>
+                                    <label class="sp-form-label">Fecha de Reincorporación Laboral</label>
                                     <input type="date" id="sp-fecha-reincorporacion" class="sp-form-control">
                                 </div>
                                 <div class="sp-form-group">
@@ -2408,7 +2546,7 @@ class MedicionAusentismoComponent {
                                     </select>
                                 </div>
                                 <div class="sp-form-group full-width">
-                                    <label class="sp-form-label">Adaptaciones en el Puesto de Trabajo</label>
+                                    <label class="sp-form-label">Adaptación en el Puesto de Trabajo</label>
                                     <input type="text" id="sp-adaptaciones" class="sp-form-control" placeholder="Ej: Silla ergonómica, Rotación de turnos...">
                                 </div>
                             </div>
@@ -2419,21 +2557,119 @@ class MedicionAusentismoComponent {
                             <div class="sp-subsection-title">Etapa 5: Cierre de Caso</div>
                             <div class="sp-form-grid">
                                 <div class="sp-form-group">
-                                    <label class="sp-form-label">Fecha de Cierre</label>
+                                    <label class="sp-form-label">Fecha de Cierre de Caso por PRIC</label>
                                     <input type="date" id="sp-fecha-cierre" class="sp-form-control">
                                 </div>
                                 <div class="sp-form-group">
-                                    <label class="sp-form-label">Motivo de Cierre</label>
+                                    <label class="sp-form-label">Caso con Cierre de Seguimientos por PRIC sin Seguimientos Pendientes</label>
                                     <select id="sp-motivo-cierre" class="sp-form-control">
                                         <option value="">Seleccione...</option>
-                                        <option value="Alta Médica">Alta Médica</option>
-                                        <option value="Calificación PCL">Calificación PCL</option>
-                                        <option value="Retiro Voluntario">Retiro Voluntario</option>
+                                        <option value="SI">Sí</option>
+                                        <option value="NO">No</option>
                                     </select>
                                 </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Fecha de Calificación de PCL (Pérdida de Capacidad Laboral)</label>
+                                    <input type="date" id="sp-fecha-calificacion-pcl" class="sp-form-control">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Porcentaje de PCL</label>
+                                    <input type="number" id="sp-porcentaje-pcl-calificacion" class="sp-form-control" placeholder="0.00%" step="0.01">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Historial de Diagnóstico -->
+                        <div class="sp-subsection">
+                            <div class="sp-subsection-title" style="color: #174ea6;"><i class="fas fa-file-medical"></i> Historial de Diagnóstico</div>
+                            <div class="sp-form-grid">
                                 <div class="sp-form-group full-width">
-                                    <label class="sp-form-label">Observaciones Finales</label>
-                                    <textarea id="sp-observaciones-finales" class="sp-form-control" rows="2"></textarea>
+                                    <label class="sp-form-label" style="font-weight: 600;">Diagnóstico 1 (DX 1)</label>
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">CIE-10 Calificada DX 1</label>
+                                    <input type="text" id="sp-cie10-dx1-calificada" class="sp-form-control" placeholder="Ej: M545">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Origen DX 1</label>
+                                    <select id="sp-origen-dx1" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="AT">AT (Accidente de Trabajo)</option>
+                                        <option value="EL">EL (Enfermedad Laboral)</option>
+                                    </select>
+                                </div>
+                                <div class="sp-form-group full-width" style="margin-top: 10px;">
+                                    <label class="sp-form-label" style="font-weight: 600;">Diagnóstico 2 (DX 2)</label>
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">CIE-10 Calificada DX 2</label>
+                                    <input type="text" id="sp-cie10-dx2-calificada" class="sp-form-control" placeholder="Ej: M545">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Origen DX 2</label>
+                                    <select id="sp-origen-dx2-calificada" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="AT">AT (Accidente de Trabajo)</option>
+                                        <option value="EL">EL (Enfermedad Laboral)</option>
+                                    </select>
+                                </div>
+                                <div class="sp-form-group full-width" style="margin-top: 10px;">
+                                    <label class="sp-form-label" style="font-weight: 600;">Diagnóstico 3 (DX 3)</label>
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">CIE-10 Calificada DX 3</label>
+                                    <input type="text" id="sp-cie10-dx3-calificada" class="sp-form-control" placeholder="Ej: M545">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Origen DX 3</label>
+                                    <select id="sp-origen-dx3-calificada" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="AT">AT (Accidente de Trabajo)</option>
+                                        <option value="EL">EL (Enfermedad Laboral)</option>
+                                    </select>
+                                </div>
+                                <div class="sp-form-group full-width" style="margin-top: 10px;">
+                                    <label class="sp-form-label" style="font-weight: 600;">Diagnóstico 4 (DX 4)</label>
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">CIE-10 Calificada DX 4</label>
+                                    <input type="text" id="sp-cie10-dx4-calificada" class="sp-form-control" placeholder="Ej: M545">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Origen DX 4</label>
+                                    <select id="sp-origen-dx4-calificada" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="AT">AT (Accidente de Trabajo)</option>
+                                        <option value="EL">EL (Enfermedad Laboral)</option>
+                                    </select>
+                                </div>
+                                <div class="sp-form-group full-width" style="margin-top: 15px; border-top: 1px solid #dee2e6; padding-top: 15px;">
+                                    <label class="sp-form-label" style="font-weight: 600;">Información Adicional</label>
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Origen del Caso</label>
+                                    <select id="sp-origen-caso" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="Enfermedad General">Enfermedad General</option>
+                                        <option value="Accidente de Trabajo">Accidente de Trabajo</option>
+                                        <option value="Enfermedad Laboral">Enfermedad Laboral</option>
+                                    </select>
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Ingreso a SVE</label>
+                                    <select id="sp-ingreso-sve" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="SI">Sí</option>
+                                        <option value="NO">No</option>
+                                    </select>
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Año Última Calificación PCL</label>
+                                    <input type="number" id="sp-anio-ultima-calificacion-pcl" class="sp-form-control" placeholder="Ej: 2024" min="2000" max="2100">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Año en que se Realiza Seguimiento por Parte de la Empresa</label>
+                                    <input type="number" id="sp-anio-seguimiento-empresa" class="sp-form-control" placeholder="Ej: 2025" min="2000" max="2100">
                                 </div>
                             </div>
                         </div>
@@ -2443,20 +2679,22 @@ class MedicionAusentismoComponent {
                     <div id="sp-section-recomendaciones" class="sp-form-section">
                         <div class="sp-section-title"><i class="fas fa-clipboard-check"></i> 4. Seguimiento a Recomendaciones Médico Laborales</div>
                         <p style="font-size: 13px; color: var(--sp-text-muted); margin-bottom: 15px;">Listado de recomendaciones emitidas por la ARL/EPS y su cumplimiento por parte de la empresa y el trabajador.</p>
-                        
+
                         <table class="sp-data-table">
                             <thead>
                                 <tr>
-                                    <th width="30%">Recomendación Emitida</th>
-                                    <th width="15%">Entidad que Emite</th>
-                                    <th width="12%">Fecha Límite</th>
-                                    <th width="12%">Cumple?</th>
+                                    <th width="5%">Item</th>
+                                    <th width="28%">Recomendación Emitida</th>
+                                    <th width="14%">Entidad que Emite</th>
+                                    <th width="11%">Fecha Límite</th>
+                                    <th width="11%">Cumple?</th>
                                     <th width="23%">Observación / Evidencia</th>
                                     <th width="8%">Acción</th>
                                 </tr>
                             </thead>
                             <tbody id="sp-recomTableBody">
                                 <tr>
+                                    <td style="text-align: center; vertical-align: middle;"><span class="recom-item-number">1</span></td>
                                     <td><input type="text" class="sp-form-control" placeholder="Ej: Reposo absoluto"></td>
                                     <td>
                                         <select class="sp-form-control">
@@ -2481,6 +2719,7 @@ class MedicionAusentismoComponent {
                                     </td>
                                 </tr>
                                 <tr>
+                                    <td style="text-align: center; vertical-align: middle;"><span class="recom-item-number">2</span></td>
                                     <td><input type="text" class="sp-form-control" placeholder="Ej: Prohibido levantar >5kg"></td>
                                     <td>
                                         <select class="sp-form-control">
@@ -3144,6 +3383,14 @@ class MedicionAusentismoComponent {
         document.getElementById('sp-cie10-dx3').value = '';
         document.getElementById('sp-origen-dx3').value = '';
 
+        // 🆕 Campos de Condiciones de Salud vacíos
+        document.getElementById('sp-fecha-examen-medico').value = '';
+        document.getElementById('sp-resultado-examen-medico').value = '';
+        document.getElementById('sp-fecha-examen-periodico').value = '';
+        document.getElementById('sp-resultado-examen-post-incapacidad').value = '';
+        document.getElementById('sp-trabajador-remoto').value = '';
+        document.getElementById('sp-fecha-inicio-remoto').value = '';
+
         console.log('[SEGUIMIENTO][PANEL] Panel vacío para nuevo caso - solo nombre y cédula precargados');
     }
 
@@ -3152,13 +3399,18 @@ class MedicionAusentismoComponent {
      */
     addRecomRow() {
         const tbody = document.getElementById('sp-recomTableBody');
+        const rows = tbody.querySelectorAll('tr');
+        const newItemNumber = rows.length + 1;
+        
         const newRow = document.createElement('tr');
         newRow.innerHTML = `
-            <td><input type="text" class="sp-form-control"></td>
+            <td style="text-align: center; vertical-align: middle;"><span class="recom-item-number">${newItemNumber}</span></td>
+            <td><input type="text" class="sp-form-control" placeholder="Ej: Reposo absoluto"></td>
             <td>
                 <select class="sp-form-control">
                     <option>ARL</option>
                     <option>EPS</option>
+                    <option>JRC</option>
                 </select>
             </td>
             <td><input type="date" class="sp-form-control"></td>
@@ -3166,9 +3418,10 @@ class MedicionAusentismoComponent {
                 <select class="sp-form-control">
                     <option>SI</option>
                     <option>NO</option>
+                    <option>EN PROCESO</option>
                 </select>
             </td>
-            <td><input type="text" class="sp-form-control"></td>
+            <td><input type="text" class="sp-form-control" placeholder="Detalle"></td>
             <td style="text-align:center;">
                 <button class="sp-btn sp-btn-outline sp-btn-sm" onclick="window.medicAusentismoComponent.removeRecomRow(this)">
                     <i class="fas fa-trash"></i>
@@ -3176,6 +3429,7 @@ class MedicionAusentismoComponent {
             </td>
         `;
         tbody.appendChild(newRow);
+        this.updateRecomItemNumbers();
     }
 
     /**
@@ -3183,6 +3437,21 @@ class MedicionAusentismoComponent {
      */
     removeRecomRow(button) {
         button.closest('tr').remove();
+        this.updateRecomItemNumbers();
+    }
+
+    /**
+     * Actualiza la numeración de la columna Item en la tabla de recomendaciones
+     */
+    updateRecomItemNumbers() {
+        const tbody = document.getElementById('sp-recomTableBody');
+        const rows = tbody.querySelectorAll('tr');
+        rows.forEach((row, index) => {
+            const itemSpan = row.querySelector('.recom-item-number');
+            if (itemSpan) {
+                itemSpan.textContent = index + 1;
+            }
+        });
     }
 
     /**
@@ -3323,23 +3592,62 @@ class MedicionAusentismoComponent {
             },
             // Etapas PRIC
             pric: {
-                fechaDeteccion: document.getElementById('sp-fecha-deteccion').value,
+                // 🆕 Condiciones de Salud (antes de Etapa 1) - Columnas AY(50), AZ(51), BA(52), BB(53), BC(54), BD(55)
+                fechaExamenMedico: document.getElementById('sp-fecha-examen-medico').value,
+                resultadoExamenMedico: document.getElementById('sp-resultado-examen-medico').value,
+                fechaExamenPeriodico: document.getElementById('sp-fecha-examen-periodico').value,
+                resultadoExamenPostIncapacidad: document.getElementById('sp-resultado-examen-post-incapacidad').value,
+                trabajadorRemoto: document.getElementById('sp-trabajador-remoto').value,
+                fechaInicioRemoto: document.getElementById('sp-fecha-inicio-remoto').value,
+                // Etapa 1: Captura de Caso - Columnas BE(56), BF(57), BG(58)
+                casoIngresadoPRIC: document.getElementById('sp-caso-ingresado-pric').value,
                 mecanismoDeteccion: document.getElementById('sp-mecanismo-deteccion').value,
-                fechaReporteArl: document.getElementById('sp-fecha-reporte-arl').value,
-                responsableReporte: document.getElementById('sp-responsable-reporte').value,
-                objetivosTratamiento: document.getElementById('sp-objetivos-tratamiento').value,
-                fechaInicioPlan: document.getElementById('sp-fecha-inicio-plan').value,
-                fechaProbableAlta: document.getElementById('sp-fecha-probable-alta').value,
-                tratamientos: document.getElementById('sp-tratamientos').value,
-                evolucionClinica: document.getElementById('sp-evolucion-clinica').value,
-                adherencia: document.getElementById('sp-adherencia').value,
-                fechaUltimoSeguimiento: document.getElementById('sp-fecha-ultimo-seguimiento').value,
+                fechaIngresoPRIC: document.getElementById('sp-fecha-ingreso-pric').value,
+                // Etapa 2: Plan de Tratamiento - Columnas BH(59), BI(60), BJ(61), BK(62)
+                trabajadorPlanTratamiento: document.getElementById('sp-trabajador-plan-tratamiento').value,
+                metaRehabilitacion: document.getElementById('sp-objetivos-tratamiento').value,
+                fechaEmisionPlan: document.getElementById('sp-fecha-inicio-plan').value,
+                fechaProbableReintegro: document.getElementById('sp-fecha-probable-alta').value,
+                // Etapa 3: Ejecución y Seguimiento - Columnas BL(63) a BW(74)
+                fechaProximaCita: document.getElementById('sp-fecha-proxima-cita').value,
+                observacionesSeguimiento: document.getElementById('sp-evolucion-clinica').value,
+                fechaAPTReincorporacion: document.getElementById('sp-fecha-ultimo-seguimiento').value,
+                modalidadReincorporacion: document.getElementById('sp-adherencia').value,
+                fechaReintegro: document.getElementById('sp-fecha-reintegro').value,
+                periodicidadSeguimiento: document.getElementById('sp-periodicidad-seguimiento').value,
+                recomendacionesLaborales: document.getElementById('sp-recomendaciones-laborales').value,
+                fechaVencimientoRecomendaciones: document.getElementById('sp-fecha-vencimiento-recomendaciones').value,
+                descripcionRecomendaciones: document.getElementById('sp-descripcion-recomendaciones').value,
+                fechaProximoSeguimientoRecomendaciones: document.getElementById('sp-fecha-proximo-seguimiento-recomendaciones').value,
+                tieneDesercion: document.getElementById('sp-tiene-desercion').value,
+                logroMejoriaMedica: document.getElementById('sp-logro-mejoria-medica').value,
+                // 🆕 Seguimientos (Sección Intermedia - Parte de Etapa 3) - Columnas BX(75), BY(76), BZ(77), CA(78)
+                fechaSeguimiento1: document.getElementById('sp-fecha-seguimiento-1').value,
+                descripcionSeguimiento1: document.getElementById('sp-descripcion-seguimiento-1').value,
+                fechaSeguimiento2: document.getElementById('sp-fecha-seguimiento-2').value,
+                descripcionSeguimiento2: document.getElementById('sp-descripcion-seguimiento-2').value,
+                // Etapa 4: Reincorporación Laboral - Columnas CB(79), CC(80), CD(81)
                 fechaReincorporacion: document.getElementById('sp-fecha-reincorporacion').value,
                 tipoReintegro: document.getElementById('sp-tipo-reintegro').value,
                 adaptaciones: document.getElementById('sp-adaptaciones').value,
+                // Etapa 5: Cierre de Caso - Columnas CE(82), CF(83), CG(84), CH(85)
                 fechaCierre: document.getElementById('sp-fecha-cierre').value,
                 motivoCierre: document.getElementById('sp-motivo-cierre').value,
-                observacionesFinales: document.getElementById('sp-observaciones-finales').value
+                fechaCalificacionPCL: document.getElementById('sp-fecha-calificacion-pcl').value,
+                porcentajePCLCalificacion: document.getElementById('sp-porcentaje-pcl-calificacion').value,
+                // 🆕 Historial de Diagnóstico - Columnas CI(86) a CT(96)
+                cie10CalificadaDX1: document.getElementById('sp-cie10-dx1-calificada').value,
+                origenDX1: document.getElementById('sp-origen-dx1').value,
+                cie10CalificadaDX2: document.getElementById('sp-cie10-dx2-calificada').value,
+                origenDX2: document.getElementById('sp-origen-dx2-calificada').value,
+                cie10CalificadaDX3: document.getElementById('sp-cie10-dx3-calificada').value,
+                origenDX3: document.getElementById('sp-origen-dx3-calificada').value,
+                cie10CalificadaDX4: document.getElementById('sp-cie10-dx4-calificada').value,
+                origenDX4: document.getElementById('sp-origen-dx4-calificada').value,
+                origenCaso: document.getElementById('sp-origen-caso').value,
+                ingresoSVE: document.getElementById('sp-ingreso-sve').value,
+                anioUltimaCalificacionPCL: document.getElementById('sp-anio-ultima-calificacion-pcl').value,
+                anioSeguimientoEmpresa: document.getElementById('sp-anio-seguimiento-empresa').value
             },
             // Calificación PCL
             calificacion: {
@@ -3356,20 +3664,25 @@ class MedicionAusentismoComponent {
         };
 
         // Recopilar recomendaciones de la tabla
-        document.querySelectorAll('#sp-recomTableBody tr').forEach(row => {
+        // La columna 0 es Item (numeración automática, no se guarda)
+        // Las columnas 1-5 son: Recomendación, Entidad, Fecha Límite, Cumple, Observación
+        document.querySelectorAll('#sp-recomTableBody tr').forEach((row, index) => {
             const inputs = row.querySelectorAll('input, select');
+            // Necesitamos al menos 5 inputs (excluyendo el Item que es un span)
             if (inputs.length >= 5) {
                 seguimientoData.recomendaciones.push({
-                    recomendacion: inputs[0].value,
-                    entidad: inputs[1].value,
-                    fechaLimite: inputs[2].value,
-                    cumple: inputs[3].value,
-                    observacion: inputs[4].value
+                    item: index + 1,  // Numeración automática
+                    recomendacion: inputs[0].value,  // Columna 1: Recomendación Emitida
+                    entidad: inputs[1].value,        // Columna 2: Entidad que Emite
+                    fechaLimite: inputs[2].value,    // Columna 3: Fecha Límite
+                    cumple: inputs[3].value,         // Columna 4: Cumple?
+                    observacion: inputs[4].value     // Columna 5: Observación / Evidencia
                 });
             }
         });
 
         console.log('[GUARDAR SEGUIMIENTO] Datos recopilados:', seguimientoData);
+        console.log('[GUARDAR SEGUIMIENTO] Recomendaciones:', seguimientoData.recomendaciones);
 
         // === GUARDAR DIRECTAMENTE (sin mostrar modal) ===
         // El usuario ya seleccionó qué hacer al abrir el panel (actualizar o crear nuevo)
@@ -3669,8 +3982,8 @@ class MedicionAusentismoComponent {
             saveButton.disabled = true;
             saveButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
         }
-        
-        // Preparar datos para guardar
+
+        // Preparar datos para guardar - ESTRUCTURA ANIDADA para coincidir con Python
         const followUpData = {
             employeeId: seguimientoData.trabajador.cedula,
             employeeName: seguimientoData.trabajador.nombre,
@@ -3678,50 +3991,114 @@ class MedicionAusentismoComponent {
             followUpDate: new Date().toISOString().split('T')[0],
             followUpType: 'presencial',
             evolution: seguimientoData.incapacidad.contingencia,
-            recommendations: seguimientoData.recomendaciones.map(r => r.descripcion).join('; '),
+            // 🆕 Enviar array completo de recomendaciones (no un string)
+            recommendations: seguimientoData.recomendaciones || [],
             nextFollowUp: seguimientoData.pric.fechaProbableAlta || '',
             caseStatus: 'En seguimiento',
             timestamp: new Date().toISOString(),
-            // Datos adicionales de Salud
-            peso: seguimientoData.trabajador.peso || '',
-            talla: seguimientoData.trabajador.talla || '',
-            imc: seguimientoData.trabajador.imc || '',
-            actividadesExtralaborales: seguimientoData.trabajador.actividadesExtralaborales || '',
-            dominancia: seguimientoData.trabajador.dominancia || '',  // 🆕 Dominancia
-            // Datos laborales adicionales
-            tipoEvento: seguimientoData.trabajador.tipoEvento || '',
-            tipoCargo: seguimientoData.trabajador.tipoCargo || '',
-            // Datos necesarios para las columnas del PRI.xlsx
-            fechaNacimiento: seguimientoData.trabajador.fechaNacimiento || '',
-            genero: seguimientoData.trabajador.genero || '',
-            fechaIngreso: seguimientoData.trabajador.fechaIngreso || '',
-            area: seguimientoData.trabajador.area || '',
-            cargo: seguimientoData.trabajador.cargo || '',  // Asegurar que se envíe
-            tipoContrato: seguimientoData.trabajador.tipoContrato || '',
-            eps: seguimientoData.trabajador.eps || '',  // Asegurar que se envíe
-            afp: seguimientoData.trabajador.afp || '',
-            diasAcumulados: seguimientoData.incapacidad.diasAcumulados || '',
-            codigoCie10: seguimientoData.incapacidad.codigoCie10 || '',
-            clase: seguimientoData.incapacidad.clase || '',  // 🆕 Clase (LABORAL/COMÚN)
-            fechaFin: seguimientoData.incapacidad.fechaFin || '',
-            // 🆕 Diagnósticos adicionales
-            cie10Dx2: seguimientoData.incapacidad.cie10Dx2 || '',
-            origenDx2: seguimientoData.incapacidad.origenDx2 || '',
-            cie10Dx3: seguimientoData.incapacidad.cie10Dx3 || '',
-            origenDx3: seguimientoData.incapacidad.origenDx3 || '',
-            // 🆕 Etapa 4: Reincorporación Laboral
-            fechaReincorporacion: seguimientoData.incapacidad.fechaReincorporacion || '',
-            tipoReintegro: seguimientoData.incapacidad.tipoReintegro || '',
-            adaptaciones: seguimientoData.incapacidad.adaptaciones || '',
-            // 🆕 Etapa 5: Cierre de Caso
-            fechaCierre: seguimientoData.incapacidad.fechaCierre || '',
-            motivoCierre: seguimientoData.incapacidad.motivoCierre || '',
-            observacionesFinales: seguimientoData.incapacidad.observacionesFinales || '',
-            // Enviar seguimientos al backend
-            seguimientos: seguimientoData.incapacidad.seguimientos || []
+            // Datos anidados para coincidir con Python
+            trabajador: {
+                cedula: seguimientoData.trabajador.cedula,
+                nombre: seguimientoData.trabajador.nombre,
+                fechaNacimiento: seguimientoData.trabajador.fechaNacimiento || '',
+                genero: seguimientoData.trabajador.genero || '',
+                fechaIngreso: seguimientoData.trabajador.fechaIngreso || '',
+                area: seguimientoData.trabajador.area || '',
+                cargo: seguimientoData.trabajador.cargo || '',
+                tipoCargo: seguimientoData.trabajador.tipoCargo || '',
+                tipoContrato: seguimientoData.trabajador.tipoContrato || '',
+                salario: seguimientoData.trabajador.salario || '',
+                eps: seguimientoData.trabajador.eps || '',
+                afp: seguimientoData.trabajador.afp || '',
+                peso: seguimientoData.trabajador.peso || '',
+                talla: seguimientoData.trabajador.talla || '',
+                imc: seguimientoData.trabajador.imc || '',
+                dominancia: seguimientoData.trabajador.dominancia || '',
+                actividadesExtralaborales: seguimientoData.trabajador.actividadesExtralaborales || '',
+                tipoEvento: seguimientoData.trabajador.tipoEvento || ''
+            },
+            incapacidad: {
+                diasAcumulados: seguimientoData.incapacidad.diasAcumulados || '',
+                codigoCie10: seguimientoData.incapacidad.codigoCie10 || '',
+                clase: seguimientoData.incapacidad.clase || '',
+                fechaInicio: seguimientoData.incapacidad.fechaInicio || '',
+                fechaFin: seguimientoData.incapacidad.fechaFin || '',
+                descripcionDiagnostico: seguimientoData.incapacidad.descripcionDiagnostico || '',
+                cie10Dx2: seguimientoData.incapacidad.cie10Dx2 || '',
+                origenDx2: seguimientoData.incapacidad.origenDx2 || '',
+                cie10Dx3: seguimientoData.incapacidad.cie10Dx3 || '',
+                origenDx3: seguimientoData.incapacidad.origenDx3 || '',
+                fechaReincorporacion: seguimientoData.incapacidad.fechaReincorporacion || '',
+                tipoReintegro: seguimientoData.incapacidad.tipoReintegro || '',
+                adaptaciones: seguimientoData.incapacidad.adaptaciones || '',
+                fechaCierre: seguimientoData.incapacidad.fechaCierre || '',
+                motivoCierre: seguimientoData.incapacidad.motivoCierre || '',
+                observacionesFinales: seguimientoData.incapacidad.observacionesFinales || '',
+                seguimientos: seguimientoData.incapacidad.seguimientos || []
+            },
+            pric: {
+                fechaExamenMedico: seguimientoData.pric.fechaExamenMedico || '',
+                resultadoExamenMedico: seguimientoData.pric.resultadoExamenMedico || '',
+                fechaExamenPeriodico: seguimientoData.pric.fechaExamenPeriodico || '',
+                resultadoExamenPostIncapacidad: seguimientoData.pric.resultadoExamenPostIncapacidad || '',
+                trabajadorRemoto: seguimientoData.pric.trabajadorRemoto || '',
+                fechaInicioRemoto: seguimientoData.pric.fechaInicioRemoto || '',
+                casoIngresadoPRIC: seguimientoData.pric.casoIngresadoPRIC || '',
+                mecanismoDeteccion: seguimientoData.pric.mecanismoDeteccion || '',
+                fechaIngresoPRIC: seguimientoData.pric.fechaIngresoPRIC || '',
+                trabajadorPlanTratamiento: seguimientoData.pric.trabajadorPlanTratamiento || '',
+                metaRehabilitacion: seguimientoData.pric.metaRehabilitacion || '',
+                fechaEmisionPlan: seguimientoData.pric.fechaEmisionPlan || '',
+                fechaProbableReintegro: seguimientoData.pric.fechaProbableReintegro || '',
+                fechaProximaCita: seguimientoData.pric.fechaProximaCita || '',
+                observacionesSeguimiento: seguimientoData.pric.observacionesSeguimiento || '',
+                fechaAPTReincorporacion: seguimientoData.pric.fechaAPTReincorporacion || '',
+                modalidadReincorporacion: seguimientoData.pric.modalidadReincorporacion || '',
+                fechaReintegro: seguimientoData.pric.fechaReintegro || '',
+                periodicidadSeguimiento: seguimientoData.pric.periodicidadSeguimiento || '',
+                recomendacionesLaborales: seguimientoData.pric.recomendacionesLaborales || '',
+                fechaVencimientoRecomendaciones: seguimientoData.pric.fechaVencimientoRecomendaciones || '',
+                descripcionRecomendaciones: seguimientoData.pric.descripcionRecomendaciones || '',
+                fechaProximoSeguimientoRecomendaciones: seguimientoData.pric.fechaProximoSeguimientoRecomendaciones || '',
+                tieneDesercion: seguimientoData.pric.tieneDesercion || '',
+                logroMejoriaMedica: seguimientoData.pric.logroMejoriaMedica || '',
+                fechaSeguimiento1: seguimientoData.pric.fechaSeguimiento1 || '',
+                descripcionSeguimiento1: seguimientoData.pric.descripcionSeguimiento1 || '',
+                fechaSeguimiento2: seguimientoData.pric.fechaSeguimiento2 || '',
+                descripcionSeguimiento2: seguimientoData.pric.descripcionSeguimiento2 || '',
+                fechaReincorporacion: seguimientoData.pric.fechaReincorporacion || '',
+                tipoReintegro: seguimientoData.pric.tipoReintegro || '',
+                adaptaciones: seguimientoData.pric.adaptaciones || '',
+                fechaCierre: seguimientoData.pric.fechaCierre || '',
+                motivoCierre: seguimientoData.pric.motivoCierre || '',
+                fechaCalificacionPCL: seguimientoData.pric.fechaCalificacionPCL || '',
+                porcentajePCLCalificacion: seguimientoData.pric.porcentajePCLCalificacion || '',
+                cie10CalificadaDX1: seguimientoData.pric.cie10CalificadaDX1 || '',
+                origenDX1: seguimientoData.pric.origenDX1 || '',
+                cie10CalificadaDX2: seguimientoData.pric.cie10CalificadaDX2 || '',
+                origenDX2: seguimientoData.pric.origenDX2 || '',
+                cie10CalificadaDX3: seguimientoData.pric.cie10CalificadaDX3 || '',
+                origenDX3: seguimientoData.pric.origenDX3 || '',
+                cie10CalificadaDX4: seguimientoData.pric.cie10CalificadaDX4 || '',
+                origenDX4: seguimientoData.pric.origenDX4 || '',
+                origenCaso: seguimientoData.pric.origenCaso || '',
+                ingresoSVE: seguimientoData.pric.ingresoSVE || '',
+                anioUltimaCalificacionPCL: seguimientoData.pric.anioUltimaCalificacionPCL || '',
+                anioSeguimientoEmpresa: seguimientoData.pric.anioSeguimientoEmpresa || ''
+            },
+            calificacion: {
+                estadoProceso: seguimientoData.calificacion.estadoProceso || '',
+                fechaSolicitud: seguimientoData.calificacion.fechaSolicitud || '',
+                fechaDictamen: seguimientoData.calificacion.fechaDictamen || '',
+                porcentajePcl: seguimientoData.calificacion.porcentajePcl || '',
+                origenCalificacion: seguimientoData.calificacion.origenCalificacion || '',
+                fechaEstructuracion: seguimientoData.calificacion.fechaEstructuracion || '',
+                observacionesCalificacion: seguimientoData.calificacion.observacionesCalificacion || ''
+            }
         };
 
         console.log('[GUARDAR SEGUIMIENTO] Enviando datos:', followUpData);
+        console.log('[GUARDAR SEGUIMIENTO] Recomendaciones:', seguimientoData.recomendaciones);
         console.log('[GUARDAR SEGUIMIENTO] Seguimientos:', seguimientoData.incapacidad.seguimientos);
         console.log('[GUARDAR SEGUIMIENTO] Empresa:', this.currentCompany);
         
