@@ -1,7 +1,7 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.51
-**Última actualización:** 27 de febrero de 2026
+**Versión:** 0.1.52
+**Última actualización:** 28 de febrero de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
 ---
@@ -22,6 +22,8 @@
 - ✅ **Alertas Inteligentes**: Detección de registros duplicados con modal interactivo
 - ✅ **Cálculos Automáticos**: Edad, IMC, Estado Nutricional, Días Trabajados, Antigüedad, Días Acumulados de Incapacidad
 - ✅ **Seguimientos Múltiples**: Hasta 5 seguimientos por caso con fecha y descripción
+- ✅ **Etapas de Reincorporación y Cierre**: Gestión completa de reincorporación laboral y cierre de casos
+- ✅ **Diagnósticos Múltiples**: Hasta 3 diagnósticos CIE-10 por caso (DX principal + DX2 + DX3)
 - ✅ **KPIs en Tiempo Real**: Actualización dinámica con filtros de año/mes
 - ✅ **Solo 13 archivos en raíz**: Proyecto limpio y organizado
 
@@ -58,19 +60,19 @@
 
 ### Raíz del Proyecto (13 archivos)
 
-| Archivo | Líneas | Propósito |
-|---------|--------|-----------|
-| `index.html` | 143 | Punto de entrada HTML |
-| `main.js` | 4766 | Proceso principal Electron |
-| `preload.js` | ~180 | Puente IPC seguro |
-| `renderer.js` | 3170 | Lógica de renderizado |
-| `styles.css` | ~2500 | Estilos globales |
-| `development-styles.css` | ~500 | Estilos desarrollo |
-| `package.json` | 85 | Configuración npm |
-| `package-lock.json` | - | Bloqueo dependencias |
-| `README.md` | - | Este archivo |
-| `docker-compose.yml` | - | Configuración Docker |
-| `icon-config.json` | - | Configuración iconos |
+| Archivo                  | Líneas | Propósito                  |
+|--------------------------|--------|----------------------------|
+| `index.html`             | 143    | Punto de entrada HTML      |
+| `main.js`                | 4766   | Proceso principal Electron |
+| `preload.js`             | ~180   | Puente IPC seguro          |
+| `renderer.js`            | 3170   | Lógica de renderizado      |
+| `styles.css`             | ~2500  | Estilos globales           |
+| `development-styles.css` | ~500   | Estilos desarrollo         |
+| `package.json`           | 85     | Configuración npm          |
+| `package-lock.json`      | -      | Bloqueo dependencias       |
+| `README.md`              | -      | Este archivo               |
+| `docker-compose.yml`     | -      | Configuración Docker       |
+| `icon-config.json`       | -      | Configuración iconos       |
 
 ### Módulos Principales (8 módulos)
 
@@ -128,18 +130,18 @@ modules/
 
 ### Directorios Adicionales
 
-| Directorio | Propósito |
-|------------|-----------|
-| `assets/` | Iconos, imágenes y recursos gráficos |
-| `backup_archivos_originales/` | Respaldo histórico (67 archivos) |
-| `components/` | Componentes reutilizables (config, seguimiento) |
-| `docs/` | Documentación completa (137 archivos) |
-| `examples/` | Ejemplos de código y vistas de prueba |
-| `logs/` | Registros de la aplicación |
-| `Portear/` | Módulo Python con 15+ scripts especializados |
-| `scripts/` | Scripts de utilidad (generar docs, temas) |
-| `test/` | Archivos de prueba |
-| `utils/` | Utilidades y archivos de soporte |
+| Directorio                     | Propósito                                       |
+|--------------------------------|-------------------------------------------------|
+| `assets/`                      | Iconos, imágenes y recursos gráficos            |
+| `backup_archivos_originales/`  | Respaldo histórico (67 archivos)                |
+| `components/`                  | Componentes reutilizables (config, seguimiento) |
+| `docs/`                        | Documentación completa (137 archivos)           |
+| `examples/`                    | Ejemplos de código y vistas de prueba           |
+| `logs/`                        | Registros de la aplicación                      |
+| `Portear/`                     | Módulo Python con 15+ scripts especializados    |
+| `scripts/`                     | Scripts de utilidad (generar docs, temas)       |
+| `test/`                        | Archivos de prueba                              |
+| `utils/`                       | Utilidades y archivos de soporte                |
 
 ---
 
@@ -147,13 +149,13 @@ modules/
 
 ### Requisitos del Sistema
 
-| Componente | Versión Mínima | Recomendada |
-|------------|----------------|-------------|
-| **Node.js** | 18.x | 20.x |
-| **Python** | 3.10 | 3.11-3.12 |
-| **RAM** | 8 GB | 16 GB |
-| **Almacenamiento** | 2 GB | 5 GB SSD |
-| **CUDA** (opcional) | 12.x | Para IA con GPU |
+| Componente          | Versión Mínima | Recomendada     |
+|---------------------|----------------|-----------------|
+| **Node.js**         | 18.x           | 20.x            |
+| **Python**          | 3.10           | 3.11-3.12       |
+| **RAM**             | 8 GB           | 16 GB           |
+| **Almacenamiento**  | 2 GB           | 5 GB SSD        |
+| **CUDA** (opcional) | 12.x           | Para IA con GPU |
 
 ### Instalación Paso a Paso
 
@@ -216,50 +218,50 @@ npm run docs:watch     # Vigilar cambios y regenerar
 
 ### Módulo 1: Recursos (11 submódulos)
 
-| Código | Submódulo | Archivos Principales |
-|--------|-----------|---------------------|
-| 1.1.1 | Responsable del SG | `responsable-sg-logic.js`, `viewer.js`, `view.html` |
-| 1.1.2 | Roles y Responsabilidades | `roles-responsabilidades-logic.js`, `viewer.js` |
-| 1.1.3 | Asignación de Recursos | `presupuesto-logic.js`, `presupuesto-gestion.html` |
-| 1.1.4 | Afiliación al SSSI | `afiliacion-logic.js`, `viewer.js` |
-| 1.1.5 | Trabajo de Alto Riesgo | `trabajo-alto-riesgo-logic.js`, `viewer.js` |
-| 1.1.6 | Conformación de Copasst | `copasst-logic.js`, `viewer.js` |
-| 1.1.7 | Capacitación al Copasst | `capacitacion-copasst-logic.js`, `viewer.js` |
-| 1.1.8 | Comité de Convivencia | `comite-convivencia-logic.js`, `viewer.js` |
-| 1.2.1 | Programa de Capacitación | `capacitaciones-logic.js`, `viewer.js` |
-| 1.2.2 | Inducción y Reinducción | `inducciones-logic.js`, `viewer.js` |
-| 1.2.3 | Curso Virtual 50 Horas | `curso-virtual-logic.js`, `viewer.js` |
+| Código | Submódulo                 | Archivos Principales                                |
+|--------|---------------------------|-----------------------------------------------------|
+| 1.1.1  | Responsable del SG        | `responsable-sg-logic.js`, `viewer.js`, `view.html` |
+| 1.1.2  | Roles y Responsabilidades | `roles-responsabilidades-logic.js`, `viewer.js`     |
+| 1.1.3  | Asignación de Recursos    | `presupuesto-logic.js`, `presupuesto-gestion.html`  |
+| 1.1.4  | Afiliación al SSSI        | `afiliacion-logic.js`, `viewer.js`                  |
+| 1.1.5  | Trabajo de Alto Riesgo    | `trabajo-alto-riesgo-logic.js`, `viewer.js`         |
+| 1.1.6  | Conformación de Copasst   | `copasst-logic.js`, `viewer.js`                     |
+| 1.1.7  | Capacitación al Copasst   | `capacitacion-copasst-logic.js`, `viewer.js`        |
+| 1.1.8  | Comité de Convivencia     | `comite-convivencia-logic.js`, `viewer.js`          |
+| 1.2.1  | Programa de Capacitación  | `capacitaciones-logic.js`, `viewer.js`              |
+| 1.2.2  | Inducción y Reinducción   | `inducciones-logic.js`, `viewer.js`                 |
+| 1.2.3  | Curso Virtual 50 Horas    | `curso-virtual-logic.js`, `viewer.js`               |
 
 ### Módulo 2: Gestión Integral (6 submódulos)
 
-| Código | Submódulo | Archivos Principales |
-|--------|-----------|---------------------|
-| 2.1.1 | Política del SG-SST | `politica-logic.js`, `viewer.js`, `onlyoffice-bridge.js` |
-| 2.2.1 | Objetivos SST | `objetivos-sst-logic.js`, `viewer.js` |
-| 2.3.1 | Evaluación Inicial SG-SST | `evaluacion-inicial-sg-sst-logic.js`, `test.html` |
-| 2.4.1 | Plan de Trabajo Anual | `plan-trabajo-logic.js`, `plan-home.js` |
-| 2.5.1 | Archivo y Retención Documental | En `renderer.js` |
-| 2.6.1 | Rendición de Cuentas | `rendicion-logic.js`, `viewer.js` |
+| Código | Submódulo                      | Archivos Principales                                     |
+|--------|--------------------------------|----------------------------------------------------------|
+| 2.1.1  | Política del SG-SST            | `politica-logic.js`, `viewer.js`, `onlyoffice-bridge.js` |
+| 2.2.1  | Objetivos SST                  | `objetivos-sst-logic.js`, `viewer.js`                    |
+| 2.3.1  | Evaluación Inicial SG-SST      | `evaluacion-inicial-sg-sst-logic.js`, `test.html`        |
+| 2.4.1  | Plan de Trabajo Anual          | `plan-trabajo-logic.js`, `plan-home.js`                  |
+| 2.5.1  | Archivo y Retención Documental | En `renderer.js`                                         |
+| 2.6.1  | Rendición de Cuentas           | `rendicion-logic.js`, `viewer.js`                        |
 
 ### Módulo 3: Gestión de la Salud (6 submódulos)
 
-| Código | Submódulo | Archivos Principales |
-|--------|-----------|---------------------|
-| 3.1.1 | Diagnóstico Sociodemográfico | `sociodemografica-component.js`, `viewer.js` |
-| 3.1.4 | Evaluaciones Médicas | `evaluaciones-medicas-logic.js`, `component.js` |
-| 3.1.6 | Restricciones Médicas | `restricciones-medicas-logic.js`, `component.js` |
-| 3.2.1 | Reporte de Accidentes | `reportes-accidentes-logic.js`, `viewer.js` |
-| 3.2.2 | Investigación de Accidentes | `investigacion-accidentes-logic.js`, `handlers.js` 🤖 |
-| 3.3.6 | Medición del Ausentismo | `medicion-ausentismo.js`, `registrar-ausentismo.js` |
+| Código | Submódulo                    | Archivos Principales                                   |
+|--------|------------------------------|--------------------------------------------------------|
+| 3.1.1  | Diagnóstico Sociodemográfico | `sociodemografica-component.js`, `viewer.js`           |
+| 3.1.4  | Evaluaciones Médicas         | `evaluaciones-medicas-logic.js`, `component.js`        |
+| 3.1.6  | Restricciones Médicas        | `restricciones-medicas-logic.js`, `component.js`       |
+| 3.2.1  | Reporte de Accidentes        | `reportes-accidentes-logic.js`, `viewer.js`            |
+| 3.2.2  | Investigación de Accidentes  | `investigacion-accidentes-logic.js`, `handlers.js`  🤖|
+| 3.3.6  | Medición del Ausentismo      | `medicion-ausentismo.js`, `registrar-ausentismo.js`    |
 
 ### Módulos 4-7 (Resumen)
 
-| Módulo | Submódulos | Estado |
-|--------|-----------|--------|
+| Módulo                           | Submódulos  | Estado    |
+|----------------------------------|-------------|-----------|
 | 4. Gestión de Peligros y Riesgos | Home module | ✅ Activo |
-| 5. Gestión de Amenazas | Home module | ✅ Activo |
-| 6. Verificación | Home module | ✅ Activo |
-| 7. Mejoramiento | Home module | ✅ Activo |
+| 5. Gestión de Amenazas           | Home module | ✅ Activo |
+| 6. Verificación                  | Home module | ✅ Activo |
+| 7. Mejoramiento                  | Home module | ✅ Activo |
 
 ---
 
@@ -320,9 +322,9 @@ El módulo de **Medición del Ausentismo** permite gestionar, registrar y hacer 
 
 El sistema identifica automáticamente empleados que cumplen **una de dos condiciones**:
 
-| Condición | Criterio | Ejemplo |
-|-----------|----------|---------|
-| **Condición 1** | Incapacidad individual ≥ 10 días | Incapacidad de 15 días por cirugía |
+| Condición       | Criterio                                          | Ejemplo                                                 |
+|-----------------|---------------------------------------------------|---------------------------------------------------------|
+| **Condición 1** | Incapacidad individual ≥ 10 días                  | Incapacidad de 15 días por cirugía                      |
 | **Condición 2** | Suma de incapacidades ≥ 10 días con gaps ≤ 3 días | 3 incapacidades de 4, 3 y 5 días con 2 días entre ellas |
 
 **Algoritmo de Detección:**
@@ -428,7 +430,7 @@ Al hacer clic en "Ver Detalles", se muestra un modal con:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ 📋 Seguimientos                          [+ Agregar]        │
+│ 📋 Seguimientos                          [+ Agregar]       │
 ├─────────────────────────────────────────────────────────────┤
 │ [Fecha] [Descripción del seguimiento..............] [🗑️]   │
 │ [Fecha] [Descripción del seguimiento..............] [🗑️]   │
@@ -444,22 +446,22 @@ Al hacer clic en "Ver Detalles", se muestra un modal con:
 **Columnas de Indexación en PRI.xlsx:**
 
 | Seguimiento | Fecha (Columna) | Índice | Descripción (Columna) | Índice |
-|-------------|-----------------|--------|----------------------|--------|
-| 1 | AB | 27 | AC | 28 |
-| 2 | AD | 29 | AE | 30 |
-| 3 | AF | 31 | AG | 32 |
-| 4 | AH | 33 | AI | 34 |
-| 5 | AJ | 35 | AK | 36 |
+|-------------|-----------------|--------|-----------------------|--------|
+| 1           | AB              | 27     | AC                    | 28     |
+| 2           | AD              | 29     | AE                    | 30     |
+| 3           | AF              | 31     | AG                    | 32     |
+| 4           | AH              | 33     | AI                    | 34     |
+| 5           | AJ              | 35     | AK                    | 36     |
 
 **Lógica de Actualización vs Creación:**
 
 El sistema ahora usa **criterio inteligente** para determinar si actualiza o crea:
 
-| Condición | Acción |
-|-----------|--------|
+| Condición                                | Acción                           |
+|------------------------------------------|----------------------------------|
 | MISMA cédula + MISMAS fechas (fecha_fin) | ✅ ACTUALIZA registro existente |
-| MISMA cédula + DIFERENTES fechas | ✅ CREA NUEVO registro |
-| Cédula diferente | ✅ CREA NUEVO registro |
+| MISMA cédula + DIFERENTES fechas         | ✅ CREA NUEVO registro          |
+| Cédula diferente                         | ✅ CREA NUEVO registro          |
 
 Esto permite que un mismo empleado tenga **múltiples registros** en PRI.xlsx, uno por cada incapacidad diferente.
 
@@ -877,9 +879,102 @@ Este software es propietario y confidencial. No se permite la reproducción, dis
 
 ---
 
-## 📝 Cambios Recientes (v0.1.51 - 27 Feb 2026)
+## 📝 Cambios Recientes
 
-### Mejoras en Módulo de Ausentismo PRIC
+### v0.1.52 - 28 Feb 2026 🆕
+
+#### Módulo de Ausentismo PRIC - Actualización Mayor
+
+**Nuevas Funcionalidades:**
+
+1. **Etapas 4 y 5 en Incapacidad Temporal** 🆕
+   - **Etapa 4: Reincorporación Laboral**
+     - Fecha de Reincorporación
+     - Tipo de Reintegro (Mismo Cargo, Funciones Restrictivas, Otro Oficio)
+     - Adaptaciones en el Puesto de Trabajo
+   - **Etapa 5: Cierre de Caso**
+     - Fecha de Cierre
+     - Motivo de Cierre (Alta Médica, Calificación PCL, Retiro Voluntario)
+     - Observaciones Finales
+
+2. **Nuevas Columnas en PRI.xlsx** 🆕
+
+| Columna | Índice | Campo | Descripción |
+|---------|--------|-------|-------------|
+| L | 11 | Salario Básico | Salario del empleado |
+| Z | 25 | Fecha Inicio | Fecha de inicio de incapacidad |
+| AA | 26 | Fecha Fin | Fecha de finalización |
+| AB | 27 | Código CIE-10 | Código del diagnóstico |
+| AC | 28 | Descripción | Descripción del diagnóstico |
+| AD-AE | 29-30 | Seguimiento 1 | Fecha y descripción |
+| AF-AG | 31-32 | Seguimiento 2 | Fecha y descripción |
+| AH-AI | 33-34 | Seguimiento 3 | Fecha y descripción |
+| AJ-AK | 35-36 | Seguimiento 4 | Fecha y descripción |
+| AL-AM | 37-38 | Seguimiento 5 | Fecha y descripción |
+| AM | 39 | Clase | LABORAL/COMÚN |
+| AN | 40 | CIE-10 DX2 | Segundo diagnóstico |
+| AO | 41 | Origen DX2 | Origen del DX2 |
+| AP | 42 | CIE-10 DX3 | Tercer diagnóstico |
+| AQ | 43 | Origen DX3 | Origen del DX3 |
+| AS | 44 | Fecha Reincorporación | Etapa 4 |
+| AT | 45 | Tipo Reintegro | Etapa 4 |
+| AU | 46 | Adaptaciones | Etapa 4 |
+| AV | 47 | Fecha Cierre | Etapa 5 |
+| AW | 48 | Motivo Cierre | Etapa 5 |
+| AX | 49 | Observaciones Finales | Etapa 5 |
+
+3. **Mejoras en Carga de Casos Existentes** 🆕
+   - Carga TODOS los campos del registro
+   - Carga seguimientos múltiples automáticamente
+   - Carga Etapas 4 y 5 completas
+   - Cálculo automático de días al cargar fechas
+
+4. **Modal de Registros Existentes Mejorado** 🆕
+   - Muestra código CIE-10 + descripción completa
+   - Permite seleccionar caso específico para cargar
+   - Opción "Crear nuevo registro" disponible
+
+5. **Eliminado Campo Obsoleto** 🗑️
+   - Caja de Compensación removido de Seguridad Social
+
+**Archivos Modificados:**
+
+| Archivo | Cambios |
+|---------|---------|
+| `modules/gestion-salud/ausentismo/medicion-ausentismo.js` | + Etapas 4 y 5, + carga completa de registros, + campos followUpData |
+| `Portear/src/actualizar_ausentismo.py` | + Columnas L, Z-AX, + lectura/escritura Etapas 4 y 5, + seguimientos |
+| `main.js` | Handler `leer-casos-pri` para búsqueda |
+| `preload.js` | API `leerCasosPRI()` expuesta |
+
+**Estructura de Datos Actualizada:**
+
+```javascript
+{
+  // Datos básicos
+  nombre, cedula, genero, fechaNacimiento, fechaIngreso
+  // Información laboral
+  cargo, area, tipoEvento, tipoCargo, tipoContrato, salario
+  // Seguridad social
+  eps, afp
+  // Salud
+  peso, talla, imc, dominancia, actividadesExtralaborales
+  // Incapacidad
+  fechaInicio, fechaFin, diasAcumulados, clase, codigoCie10, descripcionDiagnostico
+  cie10Dx2, origenDx2, cie10Dx3, origenDx3
+  // Etapa 4: Reincorporación
+  fechaReincorporacion, tipoReintegro, adaptaciones
+  // Etapa 5: Cierre
+  fechaCierre, motivoCierre, observacionesFinales
+  // Seguimientos (hasta 5)
+  seguimientos: [{fecha, descripcion}, ...]
+}
+```
+
+---
+
+### v0.1.51 - 27 Feb 2026
+
+#### Módulo de Ausentismo PRIC
 
 1. **Incapacidades Seleccionables** - Checkboxes en modal de detalles
 2. **Flujo de Selección de Casos** - Modal después de "Abrir Seguimiento"
@@ -888,30 +983,15 @@ Este software es propietario y confidencial. No se permite la reproducción, dis
 5. **Lógica Inteligente** - Actualiza o crea según fechas
 6. **Carga Automática** - Datos desde incapacidad seleccionada
 
-### Archivos Modificados
+**Archivos Modificados:**
 
 - `modules/gestion-salud/ausentismo/medicion-ausentismo.js` - +12 funciones nuevas
 - `Portear/src/actualizar_ausentismo.py` - Seguimientos múltiples en columnas AB-AK
 - `main.js` - Handler `leer-casos-pri`
 - `preload.js` - API `leerCasosPRI()`
 
-### Columnas PRI.xlsx (Nuevas 🆕)
-
-| Columna | Índice | Campo |
-|---------|--------|-------|
-| AB | 27 | Seguimiento 1 - Fecha 🆕 |
-| AC | 28 | Seguimiento 1 - Descripción 🆕 |
-| AD | 29 | Seguimiento 2 - Fecha 🆕 |
-| AE | 30 | Seguimiento 2 - Descripción 🆕 |
-| AF | 31 | Seguimiento 3 - Fecha 🆕 |
-| AG | 32 | Seguimiento 3 - Descripción 🆕 |
-| AH | 33 | Seguimiento 4 - Fecha 🆕 |
-| AI | 34 | Seguimiento 4 - Descripción 🆕 |
-| AJ | 35 | Seguimiento 5 - Fecha 🆕 |
-| AK | 36 | Seguimiento 5 - Descripción 🆕 |
-
 ---
 
-**Última actualización:** 27 de febrero de 2026  
-**Versión del documento:** 2.2 (Seguimientos múltiples implementados)  
-**Versión de la aplicación:** 0.1.51
+**Última actualización:** 28 de febrero de 2026  
+**Versión del documento:** 2.3 (Etapas 4 y 5 + Diagnósticos múltiples implementados)  
+**Versión de la aplicación:** 0.1.52
