@@ -2117,10 +2117,6 @@ class MedicionAusentismoComponent {
                                     <label class="sp-form-label">ARL</label>
                                     <input type="text" id="sp-arl" class="sp-form-control" value="COLMENA SEGUROS" readonly>
                                 </div>
-                                <div class="sp-form-group">
-                                    <label class="sp-form-label">Caja de Compensación</label>
-                                    <input type="text" id="sp-caja-compensacion" class="sp-form-control">
-                                </div>
                             </div>
                         </div>
 
@@ -2262,6 +2258,54 @@ class MedicionAusentismoComponent {
                                         <option value="LABORAL">LABORAL</option>
                                         <option value="COMÚN">COMÚN</option>
                                     </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Etapa 4: Reincorporación Laboral -->
+                        <div class="sp-subsection" style="margin-top: 20px;">
+                            <div class="sp-subsection-title"><i class="fas fa-briefcase"></i> Etapa 4: Reincorporación Laboral</div>
+                            <div class="sp-form-grid">
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Fecha de Reincorporación</label>
+                                    <input type="date" id="sp-fecha-reincorporacion-inc" class="sp-form-control">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Tipo de Reintegro</label>
+                                    <select id="sp-tipo-reintegro-inc" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="Mismo Cargo">Mismo Cargo</option>
+                                        <option value="Funciones Restrictivas">Funciones Restrictivas</option>
+                                        <option value="Otro Oficio">Otro Oficio</option>
+                                    </select>
+                                </div>
+                                <div class="sp-form-group full-width">
+                                    <label class="sp-form-label">Adaptaciones en el Puesto de Trabajo</label>
+                                    <input type="text" id="sp-adaptaciones-inc" class="sp-form-control" placeholder="Ej: Silla ergonómica, Rotación de turnos...">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Etapa 5: Cierre de Caso -->
+                        <div class="sp-subsection" style="margin-top: 20px;">
+                            <div class="sp-subsection-title"><i class="fas fa-check-circle"></i> Etapa 5: Cierre de Caso</div>
+                            <div class="sp-form-grid">
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Fecha de Cierre</label>
+                                    <input type="date" id="sp-fecha-cierre-inc" class="sp-form-control">
+                                </div>
+                                <div class="sp-form-group">
+                                    <label class="sp-form-label">Motivo de Cierre</label>
+                                    <select id="sp-motivo-cierre-inc" class="sp-form-control">
+                                        <option value="">Seleccione...</option>
+                                        <option value="Alta Médica">Alta Médica</option>
+                                        <option value="Calificación PCL">Calificación PCL</option>
+                                        <option value="Retiro Voluntario">Retiro Voluntario</option>
+                                    </select>
+                                </div>
+                                <div class="sp-form-group full-width">
+                                    <label class="sp-form-label">Observaciones Finales</label>
+                                    <textarea id="sp-observaciones-finales-inc" class="sp-form-control" rows="2"></textarea>
                                 </div>
                             </div>
                         </div>
@@ -3080,7 +3124,6 @@ class MedicionAusentismoComponent {
         document.getElementById('sp-tipo-contrato').value = '';
         document.getElementById('sp-salario').value = '';
         document.getElementById('sp-afp').value = '';
-        document.getElementById('sp-caja-compensacion').value = '';
         document.getElementById('sp-peso').value = '';
         document.getElementById('sp-talla').value = '';
         document.getElementById('sp-imc').value = '';
@@ -3242,7 +3285,6 @@ class MedicionAusentismoComponent {
                 eps: document.getElementById('sp-eps').value,
                 afp: document.getElementById('sp-afp').value,
                 arl: document.getElementById('sp-arl').value,
-                cajaCompensacion: document.getElementById('sp-caja-compensacion').value,
                 // Nuevos campos de Salud
                 peso: document.getElementById('sp-peso').value,
                 talla: document.getElementById('sp-talla').value,
@@ -3268,6 +3310,14 @@ class MedicionAusentismoComponent {
                 origenDx2: document.getElementById('sp-origen-dx2').value,
                 cie10Dx3: document.getElementById('sp-cie10-dx3').value,
                 origenDx3: document.getElementById('sp-origen-dx3').value,
+                // 🆕 Etapa 4: Reincorporación Laboral
+                fechaReincorporacion: document.getElementById('sp-fecha-reincorporacion-inc').value,
+                tipoReintegro: document.getElementById('sp-tipo-reintegro-inc').value,
+                adaptaciones: document.getElementById('sp-adaptaciones-inc').value,
+                // 🆕 Etapa 5: Cierre de Caso
+                fechaCierre: document.getElementById('sp-fecha-cierre-inc').value,
+                motivoCierre: document.getElementById('sp-motivo-cierre-inc').value,
+                observacionesFinales: document.getElementById('sp-observaciones-finales-inc').value,
                 // Seguimientos múltiples
                 seguimientos: this.obtenerSeguimientos()
             },
@@ -3452,7 +3502,8 @@ class MedicionAusentismoComponent {
      */
     cargarRegistroYAbrirPanel(registro) {
         console.log('[CARGAR REGISTRO] Cargando registro fila:', registro.fila);
-        
+        console.log('[CARGAR REGISTRO] Datos del registro:', registro);
+
         // Cerrar modal
         const modal = document.getElementById('modalSeleccionRegistro');
         if (modal) {
@@ -3464,30 +3515,105 @@ class MedicionAusentismoComponent {
             this.abrirPanelSeguimientoConEmpleado(this.currentDetalleEmpleado);
         }
 
-        // Esperar a que el panel esté visible y cargar datos
+        // Esperar a que el panel esté visible y cargar TODOS los datos
         setTimeout(() => {
             // Cambiar a sección de datos generales
             this.showSeguimientoPanelSection('datos', document.querySelector('.sp-nav-item'));
 
             // === Cargar TODOS los datos del registro ===
+
+            // Datos básicos del trabajador
+            document.getElementById('sp-nombre').value = registro.nombre || this.currentDetalleEmpleado?.nombre || '';
+            document.getElementById('sp-cedula').value = registro.cedula || this.currentDetalleEmpleado?.cedula || '';
+            document.getElementById('sp-genero').value = registro.genero || '';
+            document.getElementById('sp-cargo').value = registro.cargo || '';
+            document.getElementById('sp-area').value = registro.area || '';
+            document.getElementById('sp-eps').value = registro.eps || '';
+            document.getElementById('sp-afp').value = registro.afp || '';
             
-            // Datos básicos
-            document.getElementById('sp-nombre').value = this.currentDetalleEmpleado?.nombre || '';
-            document.getElementById('sp-cedula').value = this.currentDetalleEmpleado?.cedula || '';
+            // Fechas
+            if (registro.fecha_nacimiento) {
+                try {
+                    const fecha = new Date(registro.fecha_nacimiento);
+                    if (!isNaN(fecha.getTime())) {
+                        document.getElementById('sp-fecha-nacimiento').value = fecha.toISOString().split('T')[0];
+                        this.calcularEdad();
+                    }
+                } catch (e) { console.warn('Error fecha_nacimiento:', e); }
+            }
             
+            if (registro.fecha_ingreso) {
+                try {
+                    const fecha = new Date(registro.fecha_ingreso);
+                    if (!isNaN(fecha.getTime())) {
+                        document.getElementById('sp-fecha-ingreso').value = fecha.toISOString().split('T')[0];
+                        this.calcularAntiguedad();
+                    }
+                } catch (e) { console.warn('Error fecha_ingreso:', e); }
+            }
+            
+            // Información laboral
+            document.getElementById('sp-tipo-evento').value = registro.tipo_evento || '';
+            document.getElementById('sp-tipo-cargo').value = registro.tipo_cargo || '';
+            document.getElementById('sp-tipo-contrato').value = registro.tipo_contrato || '';
+            document.getElementById('sp-salario').value = registro.salario || '';
+            
+            // Salud
+            document.getElementById('sp-peso').value = registro.peso || '';
+            document.getElementById('sp-talla').value = registro.talla || '';
+            document.getElementById('sp-imc').value = registro.imc || '';
+            document.getElementById('sp-dominancia').value = registro.dominancia || '';
+
             // Datos de incapacidad
+            if (registro.fecha_inicio) {
+                try {
+                    const fecha = new Date(registro.fecha_inicio);
+                    if (!isNaN(fecha.getTime())) {
+                        document.getElementById('sp-fecha-inicio').value = fecha.toISOString().split('T')[0];
+                        this.calcularDiasAcumulados();
+                    }
+                } catch (e) { console.warn('Error fecha_inicio:', e); }
+            }
+            
             if (registro.fecha_fin) {
                 try {
                     const fecha = new Date(registro.fecha_fin);
                     if (!isNaN(fecha.getTime())) {
                         document.getElementById('sp-fecha-fin').value = fecha.toISOString().split('T')[0];
+                        this.calcularDiasAcumulados();
                     }
                 } catch (e) { console.warn('Error fecha_fin:', e); }
             }
-            
+
             document.getElementById('sp-dias-acumulados').value = registro.dias || '';
+            document.getElementById('sp-clase-incapacidad').value = registro.clase || '';
+            document.getElementById('sp-codigo-cie10').value = registro.cie10 || '';
             document.getElementById('sp-descripcion-diagnostico').value = registro.diagnostico || '';
-            
+
+            // 🆕 Cargar seguimientos múltiples
+            if (registro.seguimientos && registro.seguimientos.length > 0) {
+                // Limpiar contenedor primero
+                const container = document.getElementById('sp-seguimientos-container');
+                if (container) {
+                    container.innerHTML = '';
+                    // Cargar cada seguimiento
+                    registro.seguimientos.forEach(seg => {
+                        this.agregarSeguimiento(seg.fecha || '', seg.descripcion || '');
+                    });
+                    console.log(`[CARGAR REGISTRO] ${registro.seguimientos.length} seguimientos cargados`);
+                }
+            }
+
+            // 🆕 Cargar Etapa 4: Reincorporación Laboral
+            document.getElementById('sp-fecha-reincorporacion-inc').value = registro.fecha_reincorporacion || '';
+            document.getElementById('sp-tipo-reintegro-inc').value = registro.tipo_reintegro || '';
+            document.getElementById('sp-adaptaciones-inc').value = registro.adaptaciones || '';
+
+            // 🆕 Cargar Etapa 5: Cierre de Caso
+            document.getElementById('sp-fecha-cierre-inc').value = registro.fecha_cierre || '';
+            document.getElementById('sp-motivo-cierre-inc').value = registro.motivo_cierre || '';
+            document.getElementById('sp-observaciones-finales-inc').value = registro.observaciones_finales || '';
+
             // Navegar a incapacidad para mostrar datos
             setTimeout(() => {
                 const navIncapacidad = document.querySelector('.sp-nav-item:nth-child(2)');
@@ -3497,8 +3623,8 @@ class MedicionAusentismoComponent {
             }, 500);
 
             // Mostrar notificación
-            this.showNotification(`✅ Registro cargado: ${this.currentDetalleEmpleado?.nombre || ''}`, 'success');
-            console.log('[CARGAR REGISTRO] Datos cargados:', registro);
+            this.showNotification(`✅ Registro cargado: ${registro.nombre || ''}`, 'success');
+            console.log('[CARGAR REGISTRO] TODOS los datos cargados exitosamente');
         }, 300);
     }
 
@@ -3583,6 +3709,14 @@ class MedicionAusentismoComponent {
             origenDx2: seguimientoData.incapacidad.origenDx2 || '',
             cie10Dx3: seguimientoData.incapacidad.cie10Dx3 || '',
             origenDx3: seguimientoData.incapacidad.origenDx3 || '',
+            // 🆕 Etapa 4: Reincorporación Laboral
+            fechaReincorporacion: seguimientoData.incapacidad.fechaReincorporacion || '',
+            tipoReintegro: seguimientoData.incapacidad.tipoReintegro || '',
+            adaptaciones: seguimientoData.incapacidad.adaptaciones || '',
+            // 🆕 Etapa 5: Cierre de Caso
+            fechaCierre: seguimientoData.incapacidad.fechaCierre || '',
+            motivoCierre: seguimientoData.incapacidad.motivoCierre || '',
+            observacionesFinales: seguimientoData.incapacidad.observacionesFinales || '',
             // Enviar seguimientos al backend
             seguimientos: seguimientoData.incapacidad.seguimientos || []
         };
