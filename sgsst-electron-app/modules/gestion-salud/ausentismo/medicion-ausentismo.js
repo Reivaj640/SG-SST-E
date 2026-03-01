@@ -527,6 +527,37 @@ class MedicionAusentismoComponent {
 
                 console.log('[DEBUG loadSeguimientoData] Total de filas leídas:', result.rows.length);
 
+                // === CARGAR DATOS DE PRI.xlsx PARA OBTENER FECHAS DE CIERRE ===
+                console.log('[DEBUG loadSeguimientoData] Cargando datos de PRI.xlsx...');
+                console.log('[DEBUG loadSeguimientoData] Empresa:', this.currentCompany);
+                console.log('[DEBUG loadSeguimientoData] window.electronAPI existe:', !!window.electronAPI);
+                console.log('[DEBUG loadSeguimientoData] buscarTodosRegistrosPRI existe:', typeof window.electronAPI?.buscarTodosRegistrosPRI);
+                
+                // Declarar priMap fuera del try para que esté disponible en todo el scope
+                let priMap = new Map();
+                
+                try {
+                    const priData = await window.electronAPI.buscarTodosRegistrosPRI(this.currentCompany);
+                    console.log('[DEBUG loadSeguimientoData] Resultado de buscarTodosRegistrosPRI:', priData);
+                    
+                    if (priData && priData.success && priData.registros) {
+                        console.log('[DEBUG loadSeguimientoData] ✅ Registros PRI cargados:', priData.registros.length);
+                        // Crear mapa por cédula para acceso rápido
+                        priData.registros.forEach(reg => {
+                            const cedulaLimpia = reg.cedula?.replace(/,/g, '') || reg.CEDULA?.replace(/,/g, '') || '';
+                            priMap.set(cedulaLimpia, reg);
+                        });
+                        console.log('[DEBUG loadSeguimientoData] Empleados en PRI:', priMap.size);
+                    } else {
+                        console.warn('[DEBUG loadSeguimientoData] ⚠️ No se pudieron cargar datos de PRI.xlsx');
+                        console.warn('[DEBUG loadSeguimientoData] priData:', priData);
+                    }
+                } catch (error) {
+                    console.error('[DEBUG loadSeguimientoData] ❌ ERROR cargando PRI.xlsx:', error);
+                    console.error('[DEBUG loadSeguimientoData] Error stack:', error.stack);
+                }
+                // ================================================================
+
                 // Convertir filas a objetos
                 const allRecords = result.rows.map(row => {
                     const rowObj = {};
@@ -547,6 +578,9 @@ class MedicionAusentismoComponent {
                 allRecords.forEach(record => {
                     const cedula = record['CEDULA'] || record['cedula'];
                     if (!cedula) return;
+                    
+                    // Limpiar cédula para buscar en PRI
+                    const cedulaLimpia = cedula.replace(/,/g, '').replace(/\./g, '').trim();
                     
                     // Limpiar y parsear días de incapacidad
                     let diasIncapacidad = 0;
@@ -610,7 +644,8 @@ class MedicionAusentismoComponent {
                             departamento: record['ÁREA O DPTO'] || record['area_o_dpto'] || '',
                             empresaUsuaria: record['EMPRESA USUARIA'] || record['empresa_usuaria'] || '',
                             genero: record['GENERO'] || record['genero'] || '',
-                            incapacidades: []
+                            incapacidades: [],
+                            registroPRI: priMap.get(cedulaLimpia) || null  // 🆕 Agregar datos de PRI
                         });
                     }
 
@@ -623,6 +658,7 @@ class MedicionAusentismoComponent {
                 });
 
                 console.log('[DEBUG loadSeguimientoData] Total de empleados únicos:', empleadosMap.size);
+                console.log('[DEBUG loadSeguimientoData] Empleados con datos PRI:', Array.from(empleadosMap.values()).filter(emp => emp.registroPRI).length);
                 
                 // LOG DETALLADO: Mostrar TODAS las incapacidades de cada empleado
                 console.log('========== DETALLE DE EMPLEADOS ==========');
@@ -958,6 +994,99 @@ class MedicionAusentismoComponent {
         this.renderSeguimientoTableWithBody(tbody, data);
     }
 
+    /**
+     * Determina el estado de un caso basado en la disponibilidad de datos en el Excel
+     * @param {Object} incapacidad - Objeto de incapacidad con fechaInicio, fechaFin y record (datos del Excel de Ausentismo)
+     * @param {Object} registroPRI - Registro completo desde PRI.xlsx (opcional, contiene fechas de cierre)
+     * @returns {Object} { estado: string, badgeClass: string, progressClass: string }
+     */
+    determinarEstadoCaso(incapacidad, registroPRI = null) {
+        // Los datos del Excel de Ausentismo están en incapacidad.record
+        const recordAusentismo = incapacidad?.record || {};
+        
+        // Los datos de PRI.xlsx (si están disponibles)
+        const recordPRI = registroPRI || {};
+        
+        console.log('[DETERMINAR ESTADO] Record Ausentismo:', recordAusentismo);
+        console.log('[DETERMINAR ESTADO] Record PRI:', recordPRI);
+        
+        // === Buscar fecha de cierre en PRI.xlsx (fuente primaria) ===
+        let fechaCierreInc = null;
+        let fechaCierrePric = null;
+        
+        if (recordPRI && Object.keys(recordPRI).length > 0) {
+            // Buscar en PRI.xlsx primero
+            fechaCierreInc = recordPRI.fecha_cierre || recordPRI.fechaCierre || null;
+            fechaCierrePric = recordPRI.pric?.fechaCierre || recordPRI.fecha_cierre_pric || null;
+        } else {
+            // Si no hay PRI, buscar en Ausentismo (backup)
+            fechaCierreInc = recordAusentismo['FECHA CIERRE'] || recordAusentismo['fecha_cierre'] || 
+                            recordAusentismo['FECHA CIERRE INC'] || recordAusentismo['fecha_cierre_inc'] || null;
+            fechaCierrePric = recordAusentismo['FECHA CIERRE PRIC'] || recordAusentismo['fecha_cierre_pric'] || null;
+        }
+        
+        const tieneFechaCierre = fechaCierreInc || fechaCierrePric;
+
+        // === Buscar fecha de seguimiento ===
+        let fechaSeguimiento1 = null;
+        
+        if (recordPRI && Object.keys(recordPRI).length > 0) {
+            // Buscar en PRI.xlsx primero
+            fechaSeguimiento1 = recordPRI.seguimientos?.[0]?.fecha || 
+                               recordPRI.fecha_seguimiento_1 || 
+                               recordPRI.pric?.fechaSeguimiento1 || null;
+        } else {
+            // Si no hay PRI, buscar en Ausentismo (backup)
+            fechaSeguimiento1 = recordAusentismo['FECHA SEGUIMIENTO 1'] || recordAusentismo['fecha_seguimiento_1'] || null;
+        }
+        
+        const tieneSeguimientos = fechaSeguimiento1 ? true : false;
+
+        // === Verificar si hay cédula (siempre debería haberla si estamos en la tabla) ===
+        const tieneCedulaEnExcel = recordAusentismo['CEDULA'] || recordAusentismo['cedula'] || 
+                                   recordPRI.cedula || recordPRI.CEDULA || null;
+
+        console.log('[DETERMINAR ESTADO] fechaCierreInc:', fechaCierreInc, 'fechaCierrePric:', fechaCierrePric, 'tieneFechaCierre:', tieneFechaCierre);
+        console.log('[DETERMINAR ESTADO] fechaSeguimiento1:', fechaSeguimiento1, 'tieneSeguimientos:', tieneSeguimientos);
+        console.log('[DETERMINAR ESTADO] tieneCedulaEnExcel:', tieneCedulaEnExcel);
+
+        // Estado por defecto
+        let estado = 'Sin Iniciar';
+        let badgeClass = 'badge-pending';
+        let progressClass = 'warning';
+
+        // Regla 1: Si tiene fecha de cierre → CERRADO
+        if (tieneFechaCierre) {
+            estado = 'Cerrado';
+            badgeClass = 'badge-finished';
+            progressClass = 'success';
+            console.log('[DETERMINAR ESTADO] Estado determinado: CERRADO (tiene fecha de cierre:', tieneFechaCierre + ')');
+        }
+        // Regla 2: Si tiene fecha de seguimiento → EN SEGUIMIENTO
+        else if (tieneSeguimientos) {
+            estado = 'En Seguimiento';
+            badgeClass = 'badge-active';
+            progressClass = '';
+            console.log('[DETERMINAR ESTADO] Estado determinado: EN SEGUIMIENTO (tiene fecha de seguimiento:', fechaSeguimiento1 + ')');
+        }
+        // Regla 3: Si NO tiene información de la cédula en el Excel → SIN INICIAR
+        else if (!tieneCedulaEnExcel) {
+            estado = 'Sin Iniciar';
+            badgeClass = 'badge-pending';
+            progressClass = 'warning';
+            console.log('[DETERMINAR ESTADO] Estado determinado: SIN INICIAR (no tiene cédula en Excel)');
+        }
+        // Regla 4: Por defecto, si tiene cédula pero no seguimiento ni cierre → SIN INICIAR
+        else {
+            estado = 'Sin Iniciar';
+            badgeClass = 'badge-pending';
+            progressClass = 'warning';
+            console.log('[DETERMINAR ESTADO] Estado determinado: SIN INICIAR (por defecto)');
+        }
+
+        return { estado, badgeClass, progressClass };
+    }
+
     renderSeguimientoTableWithBody(tbody, data) {
         console.log('[DEBUG renderSeguimientoTableWithBody] Renderizando', data.length, 'empleados en la tabla');
 
@@ -985,12 +1114,12 @@ class MedicionAusentismoComponent {
 
             // IDENTIFICAR la incapacidad PRINCIPAL que activa el seguimiento
             // Las incapacidades ya están ordenadas por fecha de inicio (ascendente) en loadSeguimientoData
-            
+
             // Primero, buscar incapacidades >= 10 días (Condición 1)
             const incapacidadesLargas = empleado.incapacidades.filter(inc => inc.diasIncapacidad >= 10);
-            
+
             let incapacidadPrincipal = null;
-            
+
             if (incapacidadesLargas.length > 0) {
                 // Condición 1: Tomar la incapacidad >= 10 días MÁS RECIENTE
                 incapacidadPrincipal = incapacidadesLargas[incapacidadesLargas.length - 1];
@@ -1014,10 +1143,15 @@ class MedicionAusentismoComponent {
             const fechaFin = incapacidadPrincipal?.fechaFin || null;
             const diasIncapacidad = incapacidadPrincipal?.diasIncapacidad || 0;
 
+            // 🆕 Determinar estado usando la nueva lógica con fechas de cierre
+            const estadoInfo = this.determinarEstadoCaso(incapacidadPrincipal, empleado.registroPRI);
+            const estado = estadoInfo.estado;
+            const badgeClass = estadoInfo.badgeClass;
+            const progressClass = estadoInfo.progressClass;
+
             // Calcular días transcurridos desde el inicio de la incapacidad más reciente
             let diasTranscurridos = 0;
             let avance = 0;
-            let estado = 'En curso';
 
             if (fechaInicio && fechaFin) {
                 const totalTime = fechaFin - fechaInicio;
@@ -1027,29 +1161,6 @@ class MedicionAusentismoComponent {
                 diasTranscurridos = Math.max(0, Math.ceil(currentTime / (1000 * 60 * 60 * 24)) + 1);
 
                 avance = Math.min(100, Math.round((diasTranscurridos / diasTotales) * 100));
-
-                // Determinar estado
-                const diffTime = fechaFin - today;
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-                if (diffDays < 0) {
-                    estado = 'Finalizado';
-                } else if (diffDays <= 2) {
-                    estado = 'Próximo a vencer';
-                } else {
-                    estado = 'En curso';
-                }
-            }
-
-            // Colores según estado
-            let badgeClass = 'badge-active';
-            let progressClass = '';
-            if (estado === 'Próximo a vencer') {
-                badgeClass = 'badge-pending';
-                progressClass = 'warning';
-            } else if (estado === 'Finalizado') {
-                badgeClass = 'badge-finished';
-                progressClass = 'success';
             }
 
             // Iniciales para avatar

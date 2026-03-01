@@ -3961,11 +3961,11 @@ ipcMain.handle('save-follow-up', async (event, followUpData, companyName) => {
 ipcMain.handle('buscar-registros-cedula', async (event, cedula, companyName) => {
   console.log('========================================');
   console.log(`[PRI][BUSCAR] Buscando registros para cédula: ${cedula}, empresa: ${companyName}`);
-  
+
   try {
     const filePath = await obtenerRutaPri(companyName);
     console.log(`[PRI][BUSCAR] ✅ PRI.xlsx encontrado: ${filePath}`);
-    
+
     const { spawn } = require('child_process');
     const scriptPath = path.join(__dirname, 'Portear', 'src', 'actualizar_ausentismo.py');
     const pythonPath = await getPython();
@@ -4028,6 +4028,80 @@ ipcMain.handle('buscar-registros-cedula', async (event, cedula, companyName) => 
 
   } catch (error) {
     console.error('[PRI][BUSCAR][ERROR] Error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Manejador para cargar TODOS los registros de PRI.xlsx (para tabla de seguimiento)
+ipcMain.handle('buscar-todos-registros-pri', async (event, companyName) => {
+  console.log('========================================');
+  console.log(`[PRI][TODOS] Cargando todos los registros de PRI para empresa: ${companyName}`);
+
+  try {
+    const filePath = await obtenerRutaPri(companyName);
+    console.log(`[PRI][TODOS] ✅ PRI.xlsx encontrado: ${filePath}`);
+
+    const { spawn } = require('child_process');
+    const scriptPath = path.join(__dirname, 'Portear', 'src', 'actualizar_ausentismo.py');
+    const pythonPath = await getPython();
+
+    return new Promise((resolve, reject) => {
+      const python = spawn(pythonPath, [
+        scriptPath,
+        'cargar_todos_registros_pri',
+        companyName,
+        filePath
+      ], {
+        cwd: path.dirname(scriptPath),
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+      });
+
+      let buffer = '';
+
+      python.stdout.on('data', (data) => {
+        buffer += data.toString();
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        lines.forEach(line => {
+          line = line.trim();
+          if (!line) return;
+
+          try {
+            const obj = JSON.parse(line);
+            if (obj.type === 'log') {
+              sendLog(`[Python Todos PRI] ${obj.message}`, 'INFO');
+            } else if (obj.type === 'result') {
+              console.log(`[PRI][TODOS] Resultado: ${obj.payload.registros?.length || 0} registros`);
+              resolve(obj.payload);
+            }
+          } catch (e) {
+            sendLog(`[Python Todos PRI - RAW] ${line}`, 'DEBUG');
+          }
+        });
+      });
+
+      python.stderr.on('data', (data) => {
+        sendLog(`[Python Todos PRI - STDERR] ${data.toString()}`, 'ERROR');
+      });
+
+      python.on('close', (code) => {
+        if (buffer?.trim()) {
+          try {
+            const last = JSON.parse(buffer.trim());
+            if (last.type === 'result') return resolve(last.payload);
+          } catch { /* ignore */ }
+        }
+        resolve({ success: false, error: 'Proceso cerrado sin resultado.' });
+      });
+
+      python.on('error', (err) => {
+        sendLog(`Error al iniciar Python para cargar todos PRI: ${err.message}`, 'CRITICAL');
+        reject(err);
+      });
+    });
+
+  } catch (error) {
+    console.error('[PRI][TODOS][ERROR] Error:', error);
     return { success: false, error: error.message };
   }
 });

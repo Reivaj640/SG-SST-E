@@ -193,6 +193,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getFollowUpHistory: (caseId, companyName) => ipcRenderer.invoke('get-follow-up-history', caseId, companyName),
   loadFollowUpData: (companyName) => ipcRenderer.invoke('load-follow-up-data', companyName),
   saveDebugHtml: (htmlContent) => ipcRenderer.invoke('save-debug-html', htmlContent),
+  buscarTodosRegistrosPRI: (companyName) => ipcRenderer.invoke('buscar-todos-registros-pri', companyName),
 
   // --- Objetivos SST ---
   getObjetivosExcelPath: (companyName) => ipcRenderer.invoke('get-objetivos-excel-path', companyName),

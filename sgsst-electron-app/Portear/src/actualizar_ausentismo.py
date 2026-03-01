@@ -415,6 +415,312 @@ def buscar_empleado_main(cedula, empresa):
             "error": str(e)
         }
 
+def cargar_todos_registros_pri(empresa, file_path):
+    """
+    Carga TODOS los registros de PRI.xlsx (hoja "Casos en seguimiento")
+    Retorna lista de todos los registros con TODA su información (trabajador, incapacidad, pric, calificacion, recomendaciones)
+    """
+    try:
+        log(f"📥 Cargando todos los registros de PRI.xlsx para empresa: {empresa}")
+
+        if not os.path.exists(file_path):
+            return {"success": False, "error": "El archivo PRI.xlsx no existe"}
+
+        wb = load_workbook(file_path)
+        SHEET_NAME = "Casos en seguimiento"
+
+        if SHEET_NAME not in wb.sheetnames:
+            return {"success": False, "error": f"La hoja '{SHEET_NAME}' no existe"}
+
+        ws = wb[SHEET_NAME]
+        registros_encontrados = []
+
+        # Buscar desde fila 7 (datos comienzan ahí)
+        for fila_idx in range(7, ws.max_row + 1):
+            celda_cedula = ws[f"D{fila_idx}"].value
+            if not celda_cedula:
+                continue  # Saltar filas vacías
+
+            # ============================================
+            # LEER TODOS LOS DATOS DEL REGISTRO
+            # ============================================
+
+            # --- 1. Datos del Trabajador (columnas B-W) ---
+            tipo_evento = ws[f"B{fila_idx}"].value or ""
+            nombre = ws[f"C{fila_idx}"].value or ""
+            genero = ws[f"E{fila_idx}"].value or ""
+            fecha_nacimiento = str(ws[f"F{fila_idx}"].value) if ws[f"F{fila_idx}"].value else ""
+            fecha_ingreso = str(ws[f"H{fila_idx}"].value) if ws[f"H{fila_idx}"].value else ""
+            salario = ws[f"L{fila_idx}"].value or ""
+            area = ws[f"M{fila_idx}"].value or ""
+            cargo = ws[f"N{fila_idx}"].value or ""
+            tipo_cargo = ws[f"O{fila_idx}"].value or ""
+            tipo_contrato = ws[f"P{fila_idx}"].value or ""
+            eps = ws[f"Q{fila_idx}"].value or ""
+            afp = ws[f"R{fila_idx}"].value or ""
+            peso = ws[f"S{fila_idx}"].value or ""
+            talla = ws[f"T{fila_idx}"].value or ""
+            imc = ws[f"U{fila_idx}"].value or ""
+            dominancia = ws[f"W{fila_idx}"].value or ""
+            actividades_extralaborales = ws[f"X{fila_idx}"].value or ""
+
+            # --- 2. Incapacidad Temporal (columnas Y-AX) ---
+            dias_acumulados = ws[f"Y{fila_idx}"].value or ""
+            fecha_inicio = str(ws[f"Z{fila_idx}"].value) if ws[f"Z{fila_idx}"].value else ""
+            fecha_fin = str(ws[f"AA{fila_idx}"].value) if ws[f"AA{fila_idx}"].value else ""
+            codigo_cie10 = ws[f"AB{fila_idx}"].value or ""
+            descripcion_diagnostico = ws[f"AC{fila_idx}"].value or ""
+            clase = ws[f"AM{fila_idx}"].value or ""
+
+            # CIE-10 DX2, DX3 y orígenes (columnas AO-AR)
+            cie10_dx2 = ws[f"AO{fila_idx}"].value or ""
+            origen_dx2 = ws[f"AP{fila_idx}"].value or ""
+            cie10_dx3 = ws[f"AQ{fila_idx}"].value or ""
+            origen_dx3 = ws[f"AR{fila_idx}"].value or ""
+
+            # Número de prórrogas y fecha última prórroga
+            numero_prorrogas = ws[f"AD{fila_idx}"].value or ""
+            fecha_ultima_prorroga = str(ws[f"AE{fila_idx}"].value) if ws[f"AE{fila_idx}"].value else ""
+
+            # Leer seguimientos múltiples (columnas AD-AE, AF-AG, AH-AI, AJ-AK, AL-AM)
+            seguimientos = []
+            for i in range(5):
+                idx_fecha = 29 + (i * 2)  # 29, 31, 33, 35, 37
+                idx_desc = 30 + (i * 2)   # 30, 32, 34, 36, 38
+                col_fecha = chr(65 + idx_fecha) if idx_fecha < 26 else chr(65 + (idx_fecha // 26 - 1)) + chr(65 + (idx_fecha % 26))
+                col_desc = chr(65 + idx_desc) if idx_desc < 26 else chr(65 + (idx_desc // 26 - 1)) + chr(65 + (idx_desc % 26))
+                
+                fecha_seg = ws[f"{col_fecha}{fila_idx}"].value
+                desc_seg = ws[f"{col_desc}{fila_idx}"].value
+                
+                if fecha_seg or desc_seg:
+                    seguimientos.append({
+                        "fecha": str(fecha_seg) if fecha_seg else "",
+                        "descripcion": desc_seg or ""
+                    })
+
+            # --- 3. PRIC (columnas AY-CU) ---
+            # Condiciones de Salud (columnas AY-BD)
+            fecha_examen_medico = str(ws[f"AY{fila_idx}"].value) if ws[f"AY{fila_idx}"].value else ""
+            resultado_examen_medico = ws[f"AZ{fila_idx}"].value or ""
+            fecha_examen_periodico = str(ws[f"BA{fila_idx}"].value) if ws[f"BA{fila_idx}"].value else ""
+            resultado_examen_post_incapacidad = ws[f"BB{fila_idx}"].value or ""
+            trabajador_remoto = ws[f"BC{fila_idx}"].value or ""
+            fecha_inicio_remoto = str(ws[f"BD{fila_idx}"].value) if ws[f"BD{fila_idx}"].value else ""
+
+            # Etapa 1: Captura de Caso (columnas BE-BG)
+            caso_ingresado_pric = ws[f"BE{fila_idx}"].value or ""
+            mecanismo_deteccion = ws[f"BF{fila_idx}"].value or ""
+            fecha_ingreso_pric = str(ws[f"BG{fila_idx}"].value) if ws[f"BG{fila_idx}"].value else ""
+
+            # Etapa 2: Plan de Tratamiento (columnas BH-BK)
+            trabajador_plan_tratamiento = ws[f"BH{fila_idx}"].value or ""
+            meta_rehabilitacion = ws[f"BI{fila_idx}"].value or ""
+            fecha_emision_plan = str(ws[f"BJ{fila_idx}"].value) if ws[f"BJ{fila_idx}"].value else ""
+            fecha_probable_reintegro = str(ws[f"BK{fila_idx}"].value) if ws[f"BK{fila_idx}"].value else ""
+
+            # Etapa 3: Ejecución y Seguimiento (columnas BL-BW)
+            fecha_proxima_cita = str(ws[f"BL{fila_idx}"].value) if ws[f"BL{fila_idx}"].value else ""
+            observaciones_seguimiento = ws[f"BM{fila_idx}"].value or ""
+            fecha_apt_reincorporacion = str(ws[f"BN{fila_idx}"].value) if ws[f"BN{fila_idx}"].value else ""
+            modalidad_reincorporacion = ws[f"BO{fila_idx}"].value or ""
+            fecha_reintegro = str(ws[f"BP{fila_idx}"].value) if ws[f"BP{fila_idx}"].value else ""
+            periodicidad_seguimiento = ws[f"BQ{fila_idx}"].value or ""
+            recomendaciones_laborales = ws[f"BR{fila_idx}"].value or ""
+            fecha_vencimiento_recomendaciones = str(ws[f"BS{fila_idx}"].value) if ws[f"BS{fila_idx}"].value else ""
+            descripcion_recomendaciones = ws[f"BT{fila_idx}"].value or ""
+            fecha_proximo_seguimiento_recomendaciones = str(ws[f"BU{fila_idx}"].value) if ws[f"BU{fila_idx}"].value else ""
+            tiene_desercion = ws[f"BV{fila_idx}"].value or ""
+            logro_mejoria_medica = ws[f"BW{fila_idx}"].value or ""
+
+            # Seguimientos adicionales (columnas BX-CA)
+            fecha_seguimiento_1 = str(ws[f"BX{fila_idx}"].value) if ws[f"BX{fila_idx}"].value else ""
+            descripcion_seguimiento_1 = ws[f"BY{fila_idx}"].value or ""
+            fecha_seguimiento_2 = str(ws[f"BZ{fila_idx}"].value) if ws[f"BZ{fila_idx}"].value else ""
+            descripcion_seguimiento_2 = ws[f"CA{fila_idx}"].value or ""
+
+            # Etapa 4: Reincorporación Laboral (columnas CB-CD)
+            fecha_reincorporacion = str(ws[f"CB{fila_idx}"].value) if ws[f"CB{fila_idx}"].value else ""
+            tipo_reintegro = ws[f"CC{fila_idx}"].value or ""
+            adaptaciones = ws[f"CD{fila_idx}"].value or ""
+
+            # Etapa 5: Cierre de Caso (columnas CE-CH)
+            fecha_cierre = str(ws[f"CE{fila_idx}"].value) if ws[f"CE{fila_idx}"].value else ""
+            motivo_cierre = ws[f"CF{fila_idx}"].value or ""
+            fecha_calificacion_pcl = str(ws[f"CG{fila_idx}"].value) if ws[f"CG{fila_idx}"].value else ""
+            porcentaje_pcl_calificacion = ws[f"CH{fila_idx}"].value or ""
+
+            # Historial de Diagnóstico (columnas CI-CT)
+            cie10_calificada_dx1 = ws[f"CI{fila_idx}"].value or ""
+            origen_dx1 = ws[f"CJ{fila_idx}"].value or ""
+            cie10_calificada_dx2 = ws[f"CK{fila_idx}"].value or ""
+            origen_dx2_calificada = ws[f"CL{fila_idx}"].value or ""
+            cie10_calificada_dx3 = ws[f"CM{fila_idx}"].value or ""
+            origen_dx3_calificada = ws[f"CN{fila_idx}"].value or ""
+            cie10_calificada_dx4 = ws[f"CO{fila_idx}"].value or ""
+            origen_dx4_calificada = ws[f"CP{fila_idx}"].value or ""
+            origen_caso = ws[f"CQ{fila_idx}"].value or ""
+            ingreso_sve = ws[f"CR{fila_idx}"].value or ""
+            anio_ultima_calificacion_pcl = ws[f"CS{fila_idx}"].value or ""
+            anio_seguimiento_empresa = ws[f"CT{fila_idx}"].value or ""
+
+            # --- 4. Calificación PCL (columnas FC-FP) ---
+            # Calificación Regional (columnas FC-FI)
+            estado_proceso_regional = ws[f"FC{fila_idx}"].value or ""
+            fecha_solicitud_regional = str(ws[f"FD{fila_idx}"].value) if ws[f"FD{fila_idx}"].value else ""
+            fecha_dictamen_regional = str(ws[f"FE{fila_idx}"].value) if ws[f"FE{fila_idx}"].value else ""
+            porcentaje_pcl_regional = ws[f"FF{fila_idx}"].value or ""
+            origen_calificacion_regional = ws[f"FG{fila_idx}"].value or ""
+            fecha_estructuracion_regional = str(ws[f"FH{fila_idx}"].value) if ws[f"FH{fila_idx}"].value else ""
+            observaciones_calificacion_regional = ws[f"FI{fila_idx}"].value or ""
+
+            # Calificación Nacional (columnas FJ-FP)
+            estado_proceso_nacional = ws[f"FJ{fila_idx}"].value or ""
+            fecha_solicitud_nacional = str(ws[f"FK{fila_idx}"].value) if ws[f"FK{fila_idx}"].value else ""
+            fecha_dictamen_nacional = str(ws[f"FL{fila_idx}"].value) if ws[f"FL{fila_idx}"].value else ""
+            porcentaje_pcl_nacional = ws[f"FM{fila_idx}"].value or ""
+            origen_calificacion_nacional = ws[f"FN{fila_idx}"].value or ""
+            fecha_estructuracion_nacional = str(ws[f"FO{fila_idx}"].value) if ws[f"FO{fila_idx}"].value else ""
+            observaciones_calificacion_nacional = ws[f"FP{fila_idx}"].value or ""
+
+            # --- 5. Recomendaciones (columnas FQ en adelante, una fila por recomendación) ---
+            # Las recomendaciones están en filas separadas, asociadas por cédula en columna D
+            recomendaciones = []
+            cedula_limpia_actual = str(celda_cedula).replace(',', '').replace('.', '').replace(' ', '').strip()
+            for rec_fila_idx in range(7, ws.max_row + 1):
+                celda_cedula_rec = ws[f"D{rec_fila_idx}"].value
+                if celda_cedula_rec:
+                    cedula_rec_str = str(celda_cedula_rec).replace(',', '').replace('.', '').replace(' ', '').strip()
+                    if cedula_rec_str == cedula_limpia_actual:
+                        # Verificar si es una fila de recomendación (tiene valor en columna FQ o posterior)
+                        recomendacion_texto = ws[f"FQ{rec_fila_idx}"].value
+                        if recomendacion_texto:
+                            recomendaciones.append({
+                                "item": len(recomendaciones) + 1,
+                                "recomendacion": recomendacion_texto or "",
+                                "entidad": ws[f"FR{rec_fila_idx}"].value or "",
+                                "fecha_limite": str(ws[f"FS{rec_fila_idx}"].value) if ws[f"FS{rec_fila_idx}"].value else "",
+                                "cumple": ws[f"FT{rec_fila_idx}"].value or "",
+                                "observacion": ws[f"FU{rec_fila_idx}"].value or ""
+                            })
+
+            # ============================================
+            # CONSTRUIR OBJETO REGISTRO
+            # ============================================
+            registro = {
+                "fila": fila_idx,
+                "cedula": str(celda_cedula),
+                "nombre": nombre,
+                "tipo_evento": tipo_evento,
+                "genero": genero,
+                "fecha_nacimiento": fecha_nacimiento,
+                "fecha_ingreso": fecha_ingreso,
+                "salario": salario,
+                "area": area,
+                "cargo": cargo,
+                "tipo_cargo": tipo_cargo,
+                "tipo_contrato": tipo_contrato,
+                "eps": eps,
+                "afp": afp,
+                "peso": peso,
+                "talla": talla,
+                "imc": imc,
+                "dominancia": dominancia,
+                "actividades_extralaborales": actividades_extralaborales,
+                "dias_acumulados": dias_acumulados,
+                "fecha_inicio": fecha_inicio,
+                "fecha_fin": fecha_fin,
+                "codigo_cie10": codigo_cie10,
+                "descripcion_diagnostico": descripcion_diagnostico,
+                "clase": clase,
+                "cie10_dx2": cie10_dx2,
+                "origen_dx2": origen_dx2,
+                "cie10_dx3": cie10_dx3,
+                "origen_dx3": origen_dx3,
+                "numero_prorrogas": numero_prorrogas,
+                "fecha_ultima_prorroga": fecha_ultima_prorroga,
+                "seguimientos": seguimientos,
+                "pric": {
+                    "fechaExamenMedico": fecha_examen_medico,
+                    "resultadoExamenMedico": resultado_examen_medico,
+                    "fechaExamenPeriodico": fecha_examen_periodico,
+                    "resultadoExamenPostIncapacidad": resultado_examen_post_incapacidad,
+                    "trabajadorRemoto": trabajador_remoto,
+                    "fechaInicioRemoto": fecha_inicio_remoto,
+                    "casoIngresadoPRIC": caso_ingresado_pric,
+                    "mecanismoDeteccion": mecanismo_deteccion,
+                    "fechaIngresoPRIC": fecha_ingreso_pric,
+                    "trabajadorPlanTratamiento": trabajador_plan_tratamiento,
+                    "metaRehabilitacion": meta_rehabilitacion,
+                    "fechaEmisionPlan": fecha_emision_plan,
+                    "fechaProbableReintegro": fecha_probable_reintegro,
+                    "fechaProximaCita": fecha_proxima_cita,
+                    "observacionesSeguimiento": observaciones_seguimiento,
+                    "fechaAPTReincorporacion": fecha_apt_reincorporacion,
+                    "modalidadReincorporacion": modalidad_reincorporacion,
+                    "fechaReintegro": fecha_reintegro,
+                    "periodicidadSeguimiento": periodicidad_seguimiento,
+                    "recomendacionesLaborales": recomendaciones_laborales,
+                    "fechaVencimientoRecomendaciones": fecha_vencimiento_recomendaciones,
+                    "descripcionRecomendaciones": descripcion_recomendaciones,
+                    "fechaProximoSeguimientoRecomendaciones": fecha_proximo_seguimiento_recomendaciones,
+                    "tieneDesercion": tiene_desercion,
+                    "logroMejoriaMedica": logro_mejoria_medica,
+                    "fechaSeguimiento1": fecha_seguimiento_1,
+                    "descripcionSeguimiento1": descripcion_seguimiento_1,
+                    "fechaSeguimiento2": fecha_seguimiento_2,
+                    "descripcionSeguimiento2": descripcion_seguimiento_2,
+                    "fechaReincorporacion": fecha_reincorporacion,
+                    "tipoReintegro": tipo_reintegro,
+                    "adaptaciones": adaptaciones,
+                    "fechaCierre": fecha_cierre,
+                    "motivoCierre": motivo_cierre,
+                    "fechaCalificacionPCL": fecha_calificacion_pcl,
+                    "porcentajePCLCalificacion": porcentaje_pcl_calificacion,
+                    "cie10CalificadaDX1": cie10_calificada_dx1,
+                    "origenDX1": origen_dx1,
+                    "cie10CalificadaDX2": cie10_calificada_dx2,
+                    "origenDX2": origen_dx2_calificada,
+                    "cie10CalificadaDX3": cie10_calificada_dx3,
+                    "origenDX3": origen_dx3_calificada,
+                    "cie10CalificadaDX4": cie10_calificada_dx4,
+                    "origenDX4": origen_dx4_calificada,
+                    "origenCaso": origen_caso,
+                    "ingresoSVE": ingreso_sve,
+                    "anioUltimaCalificacionPCL": anio_ultima_calificacion_pcl,
+                    "anioSeguimientoEmpresa": anio_seguimiento_empresa
+                },
+                "calificacion": {
+                    "estadoProcesoRegional": estado_proceso_regional,
+                    "fechaSolicitudRegional": fecha_solicitud_regional,
+                    "fechaDictamenRegional": fecha_dictamen_regional,
+                    "porcentajePclRegional": porcentaje_pcl_regional,
+                    "origenCalificacionRegional": origen_calificacion_regional,
+                    "fechaEstructuracionRegional": fecha_estructuracion_regional,
+                    "observacionesCalificacionRegional": observaciones_calificacion_regional,
+                    "estadoProcesoNacional": estado_proceso_nacional,
+                    "fechaSolicitudNacional": fecha_solicitud_nacional,
+                    "fechaDictamenNacional": fecha_dictamen_nacional,
+                    "porcentajePclNacional": porcentaje_pcl_nacional,
+                    "origenCalificacionNacional": origen_calificacion_nacional,
+                    "fechaEstructuracionNacional": fecha_estructuracion_nacional,
+                    "observacionesCalificacionNacional": observaciones_calificacion_nacional
+                },
+                "recomendaciones": recomendaciones
+            }
+
+            registros_encontrados.append(registro)
+
+        log(f"✅ Se encontraron {len(registros_encontrados)} registros en PRI.xlsx")
+        return {"success": True, "registros": registros_encontrados, "total": len(registros_encontrados)}
+
+    except Exception as e:
+        log(f"❌ Error cargando todos los registros: {str(e)}")
+        import traceback
+        log(traceback.format_exc())
+        return {"success": False, "error": f"Error al cargar registros: {str(e)}"}
+
+
 def buscar_registros_por_cedula(empresa, file_path, cedula):
     """
     Busca todos los registros existentes con la misma cédula en PRI.xlsx
@@ -1522,6 +1828,20 @@ if __name__ == "__main__":
         except Exception as e:
             print(json.dumps({"type": "result", "payload": {"success": False, "error": str(e)}}))
     
+    elif comando == "cargar_todos_registros_pri":
+        if len(sys.argv) != 4:
+            print(json.dumps({"type": "result", "payload": {"success": False, "error": "Uso: python actualizar_ausentismo.py cargar_todos_registros_pri <empresa> <ruta_archivo>"}}))
+            sys.exit(1)
+
+        empresa = sys.argv[2]
+        file_path = sys.argv[3]
+
+        try:
+            resultado = cargar_todos_registros_pri(empresa, file_path)
+            print(json.dumps({"type": "result", "payload": resultado}, ensure_ascii=False))
+        except Exception as e:
+            print(json.dumps({"type": "result", "payload": {"success": False, "error": str(e)}}))
+    
     else:
-        print(json.dumps({"type": "result", "payload": {"success": False, "error": f"Comando desconocido: {comando}. Comandos válidos: 'actualizar', 'buscar_empleado', 'buscar_cie10', 'registrar_incapacidad', 'guardar_seguimiento', 'cargar_seguimientos', 'buscar_registros_por_cedula'"}}))
+        print(json.dumps({"type": "result", "payload": {"success": False, "error": f"Comando desconocido: {comando}. Comandos válidos: 'actualizar', 'buscar_empleado', 'buscar_cie10', 'registrar_incapacidad', 'guardar_seguimiento', 'cargar_seguimientos', 'buscar_registros_por_cedula', 'cargar_todos_registros_pri'"}}))
         sys.exit(1)
