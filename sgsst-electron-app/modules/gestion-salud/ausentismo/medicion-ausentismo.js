@@ -326,25 +326,25 @@ class MedicionAusentismoComponent {
         // Crear las 4 tarjetas KPI
         kpiGrid.appendChild(createKPICard(
             'fas fa-spinner',
-            'Casos Activos',
-            this.kpiCasosActivos || '0',
-            'En seguimiento actual',
+            'En Seguimiento',
+            this.kpiEnSeguimiento || '0',
+            'Casos con seguimiento activo',
             { bg: 'rgba(59, 130, 246, 0.1)', text: '#3B82F6' }
         ));
 
         kpiGrid.appendChild(createKPICard(
             'fas fa-hourglass-half',
-            'Próximos a Vencer',
-            this.kpiProximosVencer || '0',
-            'Menos de 2 días',
+            'Casos PRIC',
+            this.kpiCasosPRIC || '0',
+            'Próximos a vencer',
             { bg: 'rgba(245, 158, 11, 0.1)', text: '#F59E0B' }
         ));
 
         kpiGrid.appendChild(createKPICard(
             'fas fa-file-exclamation',
-            'Docs Pendientes',
-            this.kpiDocsPendientes || '0',
-            'Requieren escaneo',
+            'Sin Iniciar',
+            this.kpiSinIniciar || '0',
+            'Requieren iniciar gestión',
             { bg: 'rgba(239, 68, 68, 0.1)', text: '#EF4444' }
         ));
 
@@ -525,36 +525,25 @@ class MedicionAusentismoComponent {
                 const today = new Date();
                 const currentMonth = today.toLocaleString('default', { month: 'long' }).toUpperCase();
 
-                console.log('[DEBUG loadSeguimientoData] Total de filas leídas:', result.rows.length);
+                console.log('✅ Ausentismo cargado correctamente');
 
                 // === CARGAR DATOS DE PRI.xlsx PARA OBTENER FECHAS DE CIERRE ===
-                console.log('[DEBUG loadSeguimientoData] Cargando datos de PRI.xlsx...');
-                console.log('[DEBUG loadSeguimientoData] Empresa:', this.currentCompany);
-                console.log('[DEBUG loadSeguimientoData] window.electronAPI existe:', !!window.electronAPI);
-                console.log('[DEBUG loadSeguimientoData] buscarTodosRegistrosPRI existe:', typeof window.electronAPI?.buscarTodosRegistrosPRI);
-                
+
                 // Declarar priMap fuera del try para que esté disponible en todo el scope
                 let priMap = new Map();
-                
+
                 try {
                     const priData = await window.electronAPI.buscarTodosRegistrosPRI(this.currentCompany);
-                    console.log('[DEBUG loadSeguimientoData] Resultado de buscarTodosRegistrosPRI:', priData);
-                    
+
                     if (priData && priData.success && priData.registros) {
-                        console.log('[DEBUG loadSeguimientoData] ✅ Registros PRI cargados:', priData.registros.length);
                         // Crear mapa por cédula para acceso rápido
                         priData.registros.forEach(reg => {
                             const cedulaLimpia = reg.cedula?.replace(/,/g, '') || reg.CEDULA?.replace(/,/g, '') || '';
                             priMap.set(cedulaLimpia, reg);
                         });
-                        console.log('[DEBUG loadSeguimientoData] Empleados en PRI:', priMap.size);
-                    } else {
-                        console.warn('[DEBUG loadSeguimientoData] ⚠️ No se pudieron cargar datos de PRI.xlsx');
-                        console.warn('[DEBUG loadSeguimientoData] priData:', priData);
                     }
                 } catch (error) {
-                    console.error('[DEBUG loadSeguimientoData] ❌ ERROR cargando PRI.xlsx:', error);
-                    console.error('[DEBUG loadSeguimientoData] Error stack:', error.stack);
+                    console.error('❌ ERROR cargando PRI.xlsx:', error);
                 }
                 // ================================================================
 
@@ -567,7 +556,7 @@ class MedicionAusentismoComponent {
                     return rowObj;
                 });
 
-                console.log('[DEBUG loadSeguimientoData] Primer registro:', allRecords[0]);
+                //console.log('[DEBUG loadSeguimientoData] Primer registro:', allRecords[0]);
 
                 // Calcular KPIs con TODOS los registros (antes de filtrar)
                 this.calculateKPIsFromRawData(allRecords);
@@ -657,33 +646,33 @@ class MedicionAusentismoComponent {
                     });
                 });
 
-                console.log('[DEBUG loadSeguimientoData] Total de empleados únicos:', empleadosMap.size);
-                console.log('[DEBUG loadSeguimientoData] Empleados con datos PRI:', Array.from(empleadosMap.values()).filter(emp => emp.registroPRI).length);
+                //console.log('[DEBUG loadSeguimientoData] Total de empleados únicos:', empleadosMap.size);
+                //console.log('[DEBUG loadSeguimientoData] Empleados con datos PRI:', Array.from(empleadosMap.values()).filter(emp => emp.registroPRI).length);
                 
                 // LOG DETALLADO: Mostrar TODAS las incapacidades de cada empleado
-                console.log('========== DETALLE DE EMPLEADOS ==========');
-                empleadosMap.forEach((empleado, cedula) => {
-                    console.log(`\n[EMPLEADO] ${empleado.nombre} (CC: ${cedula})`);
-                    console.log(`  Total incapacidades: ${empleado.incapacidades.length}`);
-                    empleado.incapacidades.forEach((inc, idx) => {
-                        const fechaIniStr = inc.fechaInicio ? inc.fechaInicio.toLocaleDateString() : 'N/A';
-                        const fechaFinStr = inc.fechaFin ? inc.fechaFin.toLocaleDateString() : 'N/A';
-                        console.log(`    [${idx}] ${fechaIniStr} a ${fechaFinStr} = ${inc.diasIncapacidad} días`);
-                    });
-                });
-                console.log('==========================================');
+                //console.log('========== DETALLE DE EMPLEADOS ==========');
+                //empleadosMap.forEach((empleado, cedula) => {
+                //    console.log(`\n[EMPLEADO] ${empleado.nombre} (CC: ${cedula})`);
+                //    console.log(`  Total incapacidades: ${empleado.incapacidades.length}`);
+                //    empleado.incapacidades.forEach((inc, idx) => {
+                //        const fechaIniStr = inc.fechaInicio ? inc.fechaInicio.toLocaleDateString() : 'N/A';
+                //        const fechaFinStr = inc.fechaFin ? inc.fechaFin.toLocaleDateString() : 'N/A';
+                //        console.log(`    [${idx}] ${fechaIniStr} a ${fechaFinStr} = ${inc.diasIncapacidad} días`);
+                //    });
+                //});
+                //console.log('==========================================');
                 
-                console.log('[DEBUG loadSeguimientoData] Empleados agrupados:', Array.from(empleadosMap.entries()).map(([cedula, emp]) => ({
-                    cedula,
-                    nombre: emp.nombre,
-                    totalIncapacidades: emp.incapacidades.length,
-                    totalDias: emp.incapacidades.reduce((sum, inc) => sum + inc.diasIncapacidad, 0),
-                    incapacidades: emp.incapacidades.map(inc => ({
-                        dias: inc.diasIncapacidad,
-                        inicio: inc.fechaInicio,
-                        fin: inc.fechaFin
-                    }))
-                })).slice(0, 5)); // Mostrar solo primeros 5
+                //console.log('[DEBUG loadSeguimientoData] Empleados agrupados:', Array.from(empleadosMap.entries()).map(([cedula, emp]) => ({
+                //    cedula,
+                //    nombre: emp.nombre,
+                //    totalIncapacidades: emp.incapacidades.length,
+                //    totalDias: emp.incapacidades.reduce((sum, inc) => sum + inc.diasIncapacidad, 0),
+                //    incapacidades: emp.incapacidades.map(inc => ({
+                //        dias: inc.diasIncapacidad,
+                //        inicio: inc.fechaInicio,
+                //        fin: inc.fechaFin
+                //    }))
+                //})).slice(0, 5)); // Mostrar solo primeros 5
 
                 // FILTRAR empleados que cumplen las condiciones
                 this.seguimientoData = Array.from(empleadosMap.values()).filter(empleado => {
@@ -700,12 +689,12 @@ class MedicionAusentismoComponent {
                     });
                     
                     if (tieneIncapacidadLarga) {
-                        console.log('[DEBUG FILTRO] Empleado cumple Condición 1 (incapacidad >= 10 días):', empleado.nombre, 'Cédula:', empleado.cedula);
+                        //console.log('[DEBUG FILTRO] Empleado cumple Condición 1 (incapacidad >= 10 días):', empleado.nombre, 'Cédula:', empleado.cedula);
                         // Log de qué incapacidades cumplen >= 10 días
                         empleado.incapacidades.forEach((inc, idx) => {
                             if (inc.diasIncapacidad >= 10) {
                                 const fechaStr = inc.fechaInicio ? inc.fechaInicio.toLocaleDateString() : 'N/A';
-                                console.log(`  → Incapacidad [${idx}]: ${fechaStr} = ${inc.diasIncapacidad} días (CUMPLE >= 10)`);
+                                // console.log(`  → Incapacidad [${idx}]: ${fechaStr} = ${inc.diasIncapacidad} días (CUMPLE >= 10)`);
                             }
                         });
                         return true;
@@ -738,41 +727,41 @@ class MedicionAusentismoComponent {
                         }
                         
                         if (gapValido && empleado.incapacidades.length > 1) {
-                            console.log('[DEBUG FILTRO] Empleado cumple Condición 2 (suma >= 10 y gaps <= 3):', empleado.nombre, 'Cédula:', empleado.cedula, 'Total días:', totalDias);
+                            //console.log('[DEBUG FILTRO] Empleado cumple Condición 2 (suma >= 10 y gaps <= 3):', empleado.nombre, 'Cédula:', empleado.cedula, 'Total días:', totalDias);
                             return true;
                         } else {
-                            console.log('[DEBUG FILTRO] Empleado NO cumple Condición 2 (gaps > 3):', empleado.nombre, 'Cédula:', empleado.cedula, 'Total días:', totalDias);
+                            //console.log('[DEBUG FILTRO] Empleado NO cumple Condición 2 (gaps > 3):', empleado.nombre, 'Cédula:', empleado.cedula, 'Total días:', totalDias);
                         }
                     }
 
                     return false;
                 });
 
-                console.log('[DEBUG loadSeguimientoData] Total de empleados que cumplen filtros:', this.seguimientoData.length);
-                console.log('[DEBUG loadSeguimientoData] Empleados filtrados:', this.seguimientoData.map(emp => ({
-                    nombre: emp.nombre,
-                    cedula: emp.cedula,
-                    totalIncapacidades: emp.incapacidades.length,
-                    totalDias: emp.incapacidades.reduce((sum, inc) => sum + inc.diasIncapacidad, 0),
-                    ultimaIncapacidad: emp.incapacidades.length > 0 ? {
-                        fechaInicio: emp.incapacidades[emp.incapacidades.length - 1].fechaInicio,
-                        dias: emp.incapacidades[emp.incapacidades.length - 1].diasIncapacidad
-                    } : null
-                })));
+                //console.log('[DEBUG loadSeguimientoData] Total de empleados que cumplen filtros:', this.seguimientoData.length);
+                //console.log('[DEBUG loadSeguimientoData] Empleados filtrados:', this.seguimientoData.map(emp => ({
+                //    nombre: emp.nombre,
+                //    cedula: emp.cedula,
+                //    totalIncapacidades: emp.incapacidades.length,
+                //    totalDias: emp.incapacidades.reduce((sum, inc) => sum + inc.diasIncapacidad, 0),
+                //    ultimaIncapacidad: emp.incapacidades.length > 0 ? {
+                //        fechaInicio: emp.incapacidades[emp.incapacidades.length - 1].fechaInicio,
+                //        dias: emp.incapacidades[emp.incapacidades.length - 1].diasIncapacidad
+                //    } : null
+                //})));
 
                 // Verificar si hay datos antes de renderizar
                 if (this.seguimientoData.length === 0) {
-                    console.warn('[DEBUG loadSeguimientoData] ⚠️ ADVERTENCIA: No hay empleados que cumplan las condiciones!');
-                    console.log('[DEBUG loadSeguimientoData] Revisar datos de ejemplo:', Array.from(empleadosMap.values()).slice(0, 3).map(emp => ({
-                        nombre: emp.nombre,
-                        incapacidades: emp.incapacidades.map(inc => ({
-                            dias: inc.diasIncapacidad,
-                            inicio: inc.fechaInicio,
-                            fin: inc.fechaFin
-                        }))
-                    })));
+                    //console.warn('[DEBUG loadSeguimientoData] ⚠️ ADVERTENCIA: No hay empleados que cumplan las condiciones!');
+                    //console.log('[DEBUG loadSeguimientoData] Revisar datos de ejemplo:', Array.from(empleadosMap.values()).slice(0, 3).map(emp => ({
+                    //    nombre: emp.nombre,
+                    //    incapacidades: emp.incapacidades.map(inc => ({
+                    //        dias: inc.diasIncapacidad,
+                    //        inicio: inc.fechaInicio,
+                    //        fin: inc.fechaFin
+                    //    }))
+                    //})));
                 } else {
-                    console.log('[DEBUG loadSeguimientoData] ✅ Hay', this.seguimientoData.length, 'empleados para mostrar en la tabla');
+                    //console.log('[DEBUG loadSeguimientoData] ✅ Hay', this.seguimientoData.length, 'empleados para mostrar en la tabla');
                 }
 
                 // Llenar el filtro de años con todos los años únicos de los datos
@@ -781,12 +770,12 @@ class MedicionAusentismoComponent {
                 // Calcular KPIs
                 this.calculateKPIs();
 
-                console.log('[DEBUG loadSeguimientoData] Renderizando tabla con', this.seguimientoData.length, 'empleados');
+                //console.log('[DEBUG loadSeguimientoData] Renderizando tabla con', this.seguimientoData.length, 'empleados');
 
                 // Renderizar tabla
                 this.renderSeguimientoTable(this.seguimientoData);
             } else {
-                console.log('[DEBUG loadSeguimientoData] No hay datos o error en result');
+                //console.log('[DEBUG loadSeguimientoData] No hay datos o error en result');
                 this.renderSeguimientoTable([]);
             }
         } catch (error) {
@@ -829,15 +818,15 @@ class MedicionAusentismoComponent {
     calculateKPIs() {
         const today = new Date();
         const currentMonth = today.toLocaleString('default', { month: 'long' }).toUpperCase();
-        let casosActivos = 0;
-        let proximosVencer = 0;
-        let docsPendientes = 0;
+        let enSeguimiento = 0;
+        let casosPRIC = 0;
+        let sinIniciar = 0;
         let cerradosMes = 0;
 
-        console.log('[KPIs] Calculando con', this.seguimientoData ? this.seguimientoData.length : 0, 'registros');
+        //console.log('[KPIs] Calculando con', this.seguimientoData ? this.seguimientoData.length : 0, 'empleados');
 
         if (!this.seguimientoData || this.seguimientoData.length === 0) {
-            console.warn('[KPIs] No hay datos para calcular KPIs');
+            //console.warn('[KPIs] No hay datos para calcular KPIs');
             // Actualizar UI con 0
             const kpiElements = document.querySelectorAll('.kpi-value');
             if (kpiElements[0]) kpiElements[0].textContent = '0';
@@ -848,54 +837,67 @@ class MedicionAusentismoComponent {
         }
 
         this.seguimientoData.forEach(empleado => {
-            // Cada empleado tiene un array de incapacidades
+            // 🆕 IMPORTANTE: Contar solo UNA vez por EMPLEADO, no por cada incapacidad
+            // Identificar la incapacidad PRINCIPAL (la más reciente) para determinar el estado
             const incapacidades = empleado.incapacidades || [];
             
-            incapacidades.forEach(inc => {
-                const fechaFin = inc.fechaFin ? new Date(inc.fechaFin) : null;
-                const fechaInicio = inc.fechaInicio ? new Date(inc.fechaInicio) : null;
+            if (incapacidades.length === 0) {
+                // Sin incapacidades -> Sin Iniciar
+                sinIniciar++;
+                //console.log(`[KPIs] ${empleado.nombre}: SIN INICIAR (sin incapacidades)`);
+                return;
+            }
 
-                if (!fechaFin || !fechaInicio) return;
+            // Tomar la incapacidad más reciente para determinar el estado
+            const incapacidadPrincipal = incapacidades[incapacidades.length - 1];
+            const fechaFin = incapacidadPrincipal.fechaFin ? new Date(incapacidadPrincipal.fechaFin) : null;
+            const fechaInicio = incapacidadPrincipal.fechaInicio ? new Date(incapacidadPrincipal.fechaInicio) : null;
 
-                const diffTime = fechaFin - today;
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            if (!fechaFin || !fechaInicio) {
+                // Sin fechas válidas -> Sin Iniciar
+                sinIniciar++;
+                //console.log(`[KPIs] ${empleado.nombre}: SIN INICIAR (sin fechas)`);
+                return;
+            }
 
-                // Casos activos (fecha fin futura o dentro de los últimos 30 días)
-                if (diffDays >= -30) {
-                    casosActivos++;
+            const diffTime = fechaFin - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-                    // Próximos a vencer (menos de 2 días)
-                    if (diffDays >= 0 && diffDays <= 2) {
-                        proximosVencer++;
-                    }
-                }
+            // 🆕 Determinar estado usando la nueva lógica con fechas de cierre
+            const estadoInfo = this.determinarEstadoCaso(incapacidadPrincipal, empleado.registroPRI);
+            const estado = estadoInfo.estado;
 
+            //console.log(`[KPIs] ${empleado.nombre}: ${estado} (registroPRI: ${empleado.registroPRI ? 'SÍ' : 'NO'})`);
+
+            // Contar por estado (UNA SOLA VEZ por empleado)
+            if (estado === 'En Seguimiento') {
+                enSeguimiento++;
+            } else if (estado === 'Cerrado') {
+                casosPRIC++;
                 // Casos cerrados este mes (fecha fin en el mes actual y ya venció)
                 const finMonth = fechaFin.toLocaleString('default', { month: 'long' }).toUpperCase();
                 const finYear = fechaFin.getFullYear();
                 if (finMonth === currentMonth && finYear === today.getFullYear() && diffDays < 0) {
                     cerradosMes++;
                 }
-            });
-
-            // Docs pendientes (simulado - verificar si hay diagnóstico)
-            if (!empleado.incapacidades || empleado.incapacidades.every(inc => !inc.diagnostico)) {
-                docsPendientes++;
+            } else if (estado === 'Sin Iniciar') {
+                sinIniciar++;
             }
         });
 
-        this.kpiCasosActivos = casosActivos;
-        this.kpiProximosVencer = proximosVencer;
-        this.kpiDocsPendientes = docsPendientes;
+        this.kpiEnSeguimiento = enSeguimiento;
+        this.kpiCasosPRIC = casosPRIC;
+        this.kpiSinIniciar = sinIniciar;
         this.kpiCerradosMes = cerradosMes;
 
-        console.log('[KPIs] Resultados:', { casosActivos, proximosVencer, docsPendientes, cerradosMes });
+        //console.log('[KPIs] Resultados:', { enSeguimiento, casosPRIC, sinIniciar, cerradosMes, total: this.seguimientoData.length });
+        //console.log('[KPIs] Verificación:', enSeguimiento + casosPRIC + sinIniciar, '==', this.seguimientoData.length);
 
         // Actualizar UI de KPIs
         const kpiElements = document.querySelectorAll('.kpi-value');
-        if (kpiElements[0]) kpiElements[0].textContent = casosActivos;
-        if (kpiElements[1]) kpiElements[1].textContent = proximosVencer;
-        if (kpiElements[2]) kpiElements[2].textContent = docsPendientes;
+        if (kpiElements[0]) kpiElements[0].textContent = enSeguimiento;
+        if (kpiElements[1]) kpiElements[1].textContent = casosPRIC;
+        if (kpiElements[2]) kpiElements[2].textContent = sinIniciar;
         if (kpiElements[3]) kpiElements[3].textContent = cerradosMes;
     }
 
@@ -911,7 +913,7 @@ class MedicionAusentismoComponent {
         let docsPendientes = 0;
         let cerradosMes = 0;
 
-        console.log('[KPIs Raw] Calculando con', allRecords.length, 'registros crudos');
+        //console.log('[KPIs Raw] Calculando con', allRecords.length, 'registros crudos');
 
         allRecords.forEach(row => {
             // Leer fechas directamente del row
@@ -958,7 +960,7 @@ class MedicionAusentismoComponent {
         this.kpiDocsPendientes = docsPendientes;
         this.kpiCerradosMes = cerradosMes;
 
-        console.log('[KPIs Raw] Resultados:', { casosActivos, proximosVencer, docsPendientes, cerradosMes });
+        //console.log('[KPIs Raw] Resultados:', { casosActivos, proximosVencer, docsPendientes, cerradosMes });
 
         // Actualizar UI de KPIs
         const kpiElements = document.querySelectorAll('.kpi-value');
@@ -969,23 +971,15 @@ class MedicionAusentismoComponent {
     }
 
     renderSeguimientoTable(data) {
-        console.log('[DEBUG renderSeguimientoTable] Iniciando renderizado con', data.length, 'empleados');
-        
         const tbody = document.getElementById('seguimientoTableBody');
-        
-        console.log('[DEBUG renderSeguimientoTable] tbody encontrado:', tbody ? '✅ SÍ' : '❌ NO');
         
         if (!tbody) {
             console.error('[DEBUG renderSeguimientoTable] ERROR: Elemento seguimientoTableBody no encontrado en el DOM!');
-            console.log('[DEBUG renderSeguimientoTable] Elementos en el DOM:', document.querySelectorAll('*').length);
-            console.log('[DEBUG renderSeguimientoTable] Buscando por ID alternativo...');
             
             // Intentar buscar con otros selectores
             const alternativeTbody = document.querySelector('#seguimientoTableBody, tbody[id*="seguimiento"], tbody');
-            console.log('[DEBUG renderSeguimientoTable] tbody alternativo encontrado:', alternativeTbody ? '✅ SÍ' : '❌ NO');
             
             if (alternativeTbody) {
-                console.log('[DEBUG renderSeguimientoTable] Usando tbody alternativo');
                 this.renderSeguimientoTableWithBody(alternativeTbody, data);
             }
             return;
@@ -1007,8 +1001,8 @@ class MedicionAusentismoComponent {
         // Los datos de PRI.xlsx (si están disponibles)
         const recordPRI = registroPRI || {};
         
-        console.log('[DETERMINAR ESTADO] Record Ausentismo:', recordAusentismo);
-        console.log('[DETERMINAR ESTADO] Record PRI:', recordPRI);
+        //console.log('[DETERMINAR ESTADO] Record Ausentismo:', recordAusentismo);
+        //console.log('[DETERMINAR ESTADO] Record PRI:', recordPRI);
         
         // === Buscar fecha de cierre en PRI.xlsx (fuente primaria) ===
         let fechaCierreInc = null;
@@ -1046,9 +1040,9 @@ class MedicionAusentismoComponent {
         const tieneCedulaEnExcel = recordAusentismo['CEDULA'] || recordAusentismo['cedula'] || 
                                    recordPRI.cedula || recordPRI.CEDULA || null;
 
-        console.log('[DETERMINAR ESTADO] fechaCierreInc:', fechaCierreInc, 'fechaCierrePric:', fechaCierrePric, 'tieneFechaCierre:', tieneFechaCierre);
-        console.log('[DETERMINAR ESTADO] fechaSeguimiento1:', fechaSeguimiento1, 'tieneSeguimientos:', tieneSeguimientos);
-        console.log('[DETERMINAR ESTADO] tieneCedulaEnExcel:', tieneCedulaEnExcel);
+        //console.log('[DETERMINAR ESTADO] fechaCierreInc:', fechaCierreInc, 'fechaCierrePric:', fechaCierrePric, 'tieneFechaCierre:', tieneFechaCierre);
+        //console.log('[DETERMINAR ESTADO] fechaSeguimiento1:', fechaSeguimiento1, 'tieneSeguimientos:', tieneSeguimientos);
+        //console.log('[DETERMINAR ESTADO] tieneCedulaEnExcel:', tieneCedulaEnExcel);
 
         // Estado por defecto
         let estado = 'Sin Iniciar';
@@ -1067,7 +1061,7 @@ class MedicionAusentismoComponent {
             estado = 'En Seguimiento';
             badgeClass = 'badge-active';
             progressClass = '';
-            console.log('[DETERMINAR ESTADO] Estado determinado: EN SEGUIMIENTO (tiene fecha de seguimiento:', fechaSeguimiento1 + ')');
+            //console.log('[DETERMINAR ESTADO] Estado determinado: EN SEGUIMIENTO (tiene fecha de seguimiento:', fechaSeguimiento1 + ')');
         }
         // Regla 3: Si NO tiene información de la cédula en el Excel → SIN INICIAR
         else if (!tieneCedulaEnExcel) {
@@ -1081,7 +1075,7 @@ class MedicionAusentismoComponent {
             estado = 'Sin Iniciar';
             badgeClass = 'badge-pending';
             progressClass = 'warning';
-            console.log('[DETERMINAR ESTADO] Estado determinado: SIN INICIAR (por defecto)');
+            //console.log('[DETERMINAR ESTADO] Estado determinado: SIN INICIAR (por defecto)');
         }
 
         return { estado, badgeClass, progressClass };
@@ -1137,8 +1131,8 @@ class MedicionAusentismoComponent {
         const tieneFechaCierre = fechaCierreInc || fechaCierrePric;
         const cantidadSeguimientos = seguimientos.filter(s => s.fecha && s.fecha.trim() !== '').length;
         
-        console.log('[CALCULAR AVANCE] Seguimientos encontrados:', cantidadSeguimientos, seguimientos);
-        console.log('[CALCULAR AVANCE] Tiene fecha de cierre:', tieneFechaCierre);
+        //console.log('[CALCULAR AVANCE] Seguimientos encontrados:', cantidadSeguimientos, seguimientos);
+        //console.log('[CALCULAR AVANCE] Tiene fecha de cierre:', tieneFechaCierre);
         
         // === Reglas de porcentaje de avance ===
         let porcentaje = 0;

@@ -1,8 +1,6 @@
 // investigacion-accidentes.js - Componente para el submódulo "3.2.2 Investigación de Accidentes, indicentes y Enfermedades"
 
-console.log('================================================================================');
-console.log('[CARGA] investigacion-accidentes-logic.js - INICIO DE CARGA');
-console.log('================================================================================');
+
 
 class InvestigacionAccidentesComponent {
     constructor(container, currentCompany, moduleName, submoduleName, onBack) {
@@ -580,7 +578,3 @@ InvestigacionAccidentesComponent.prototype.showNewDocumentViewer = function() {
 // Hacer la clase disponible globalmente
 window.InvestigacionAccidentesComponent = InvestigacionAccidentesComponent;
 
-console.log('================================================================================');
-console.log('[CARGA] InvestigacionAccidentesComponent expuesto a window');
-console.log('[CARGA] typeof window.InvestigacionAccidentesComponent:', typeof window.InvestigacionAccidentesComponent);
-console.log('================================================================================');

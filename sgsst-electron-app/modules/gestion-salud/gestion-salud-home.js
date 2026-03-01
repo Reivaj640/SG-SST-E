@@ -614,7 +614,7 @@ class GestionSaludHome {
                                     totalPendientes++; // Por seguridad, contamos sin estado como pendiente
                                 }
                             } else {
-                                console.log(`[DEBUG] Empleado ${empId} tiene seguimiento pero casos <= 15 días en total, ignorado`);
+                                // console.log(`[DEBUG] Empleado ${empId} tiene seguimiento pero casos <= 15 días en total, ignorado`);
                             }
                         }
                     }
