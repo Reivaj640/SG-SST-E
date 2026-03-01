@@ -18,7 +18,7 @@ async function loadStats() {
         if (window.electronAPI && window.electronAPI.getAusentismoStats) {
             const companyName = getCompanyName();
             const stats = await window.electronAPI.getAusentismoStats(companyName);
-            
+
             if (stats && stats.success) {
                 const data = stats.data || {};
                 document.getElementById('ausentismoPendientes').textContent = data.pendientes || 0;
@@ -94,8 +94,55 @@ function verEstadisticas() {
     }
 }
 
-function exportarDatos() {
-    alert('Función: Exportar Datos de Ausentismo\n\nSe generará un archivo Excel/PDF con los datos consolidados de ausentismo e incapacidades.');
+/**
+ * 🆕 Abre el constructor de informes PRI multicaso DENTRO de la misma ventana
+ */
+function generarInforme() {
+    console.log('[HOME] Abriendo constructor de informes PRI en la misma ventana...');
+    
+    // Enviar mensaje a la ventana padre para que cargue la vista del informe
+    if (window.parent && window.parent.postMessage) {
+        console.log('[HOME] Enviando solicitud para cargar informe-pri-builder.html');
+        window.parent.postMessage({
+            type: 'load-module-view',
+            path: 'modules/gestion-salud/ausentismo/informe-pri-builder.html'
+        }, '*');
+    } else {
+        // Fallback: intentar cargar directamente si estamos en el contexto principal
+        loadInformePriBuilder();
+    }
+}
+
+/**
+ * Carga el constructor de informes PRI en el área de contenido principal
+ */
+function loadInformePriBuilder() {
+    console.log('[HOME] Cargando informe PRI builder directamente...');
+    
+    // Buscar el content-area
+    const contentArea = document.getElementById('content-area');
+    if (!contentArea) {
+        console.error('[HOME] No se encontró content-area');
+        alert('❌ Error: No se pudo cargar la vista del informe');
+        return;
+    }
+    
+    // Cargar el HTML del constructor
+    fetch('modules/gestion-salud/ausentismo/informe-pri-builder.html')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Error al cargar el archivo del informe');
+            }
+            return response.text();
+        })
+        .then(html => {
+            contentArea.innerHTML = html;
+            console.log('[HOME] Informe PRI builder cargado exitosamente');
+        })
+        .catch(error => {
+            console.error('[HOME] Error cargando informe:', error);
+            alert('❌ Error al cargar el constructor de informes: ' + error.message);
+        });
 }
 
 function abrirConfiguracion() {

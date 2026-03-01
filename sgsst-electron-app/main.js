@@ -346,6 +346,17 @@ ipcMain.handle('get-app-version', async () => {
   }
 });
 
+// Manejar la obtención de la ruta de la aplicación
+ipcMain.handle('get-app-path', async () => {
+  try {
+    console.log('Handling get-app-path request');
+    return app.getAppPath();
+  } catch (error) {
+    console.error('Error getting app path:', error);
+    return __dirname; // Valor por defecto en caso de error
+  }
+});
+
 // ===============================
 // 🎨 SISTEMA DE TEMAS (Claro/Oscuro/Sistema)
 // ===============================

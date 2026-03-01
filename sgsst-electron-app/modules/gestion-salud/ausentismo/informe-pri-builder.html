@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Informe PRI - K+AIR</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --primary-light: #EEF2FF;
+            --secondary: #F1F5F9;
+            --accent: #10B981;
+            --danger: #EF4444;
+            --warning: #F59E0B;
+            --text-main: #1E293B;
+            --text-muted: #64748B;
+            --border: #E2E8F0;
+            --bg: #F8FAFC;
+        }
+
+        * { box-sizing: border-box; }
+        
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: var(--bg); 
+            color: var(--text-main); 
+            margin: 0; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+            padding: 20px;
+        }
+
+        .trigger-btn { 
+            background: linear-gradient(135deg, #4F46E5, #4338CA); 
+            color: white; 
+            border: none; 
+            padding: 15px 30px; 
+            border-radius: 8px; 
+            font-size: 16px; 
+            font-weight: 600; 
+            cursor: pointer; 
+            box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.3);
+            transition: transform 0.2s;
+        }
+        
+        .trigger-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 20px -3px rgba(79, 70, 229, 0.4);
+        }
+        
+        /* Modal Principal */
+        .modal-backdrop { 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background: rgba(15, 23, 42, 0.7); 
+            backdrop-filter: blur(5px); 
+            display: none; 
+            justify-content: center; 
+            align-items: center; 
+            z-index: 1000; 
+        }
+        
+        .modal-backdrop.active { 
+            display: flex; 
+        }
+        
+        .report-builder { 
+            background: white; 
+            width: 98%; 
+            height: 95vh; 
+            border-radius: 12px; 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); 
+        }
+
+        /* Header */
+        .builder-header { 
+            padding: 12px 24px; 
+            border-bottom: 1px solid var(--border); 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            background: #FFFFFF; 
+        }
+        
+        .builder-title { 
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
+        }
+        
+        .builder-title i { 
+            font-size: 20px; 
+            color: var(--primary); 
+        }
+        
+        .btn-close { 
+            background: none; 
+            border: none; 
+            font-size: 20px; 
+            color: var(--text-muted); 
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        
+        .btn-close:hover {
+            color: var(--danger);
+        }
+
+        /* Body */
+        .builder-body { 
+            display: flex; 
+            flex: 1; 
+            overflow: hidden; 
+        }
+        
+        /* Sidebar */
+        .config-sidebar { 
+            width: 280px; 
+            background: #F8FAFC; 
+            border-right: 1px solid var(--border); 
+            padding: 16px; 
+            overflow-y: auto; 
+        }
+        
+        .config-section { 
+            margin-bottom: 20px; 
+            border-bottom: 1px solid #E2E8F0; 
+            padding-bottom: 15px; 
+        }
+        
+        .config-section:last-child { 
+            border-bottom: none; 
+        }
+        
+        .config-section h4 { 
+            font-size: 11px; 
+            text-transform: uppercase; 
+            color: var(--text-muted); 
+            margin-bottom: 10px; 
+            font-weight: 700; 
+        }
+        
+        .form-control { 
+            width: 100%; 
+            padding: 6px 8px; 
+            border: 1px solid var(--border); 
+            border-radius: 4px; 
+            font-size: 12px; 
+            margin-bottom: 8px; 
+        }
+        
+        .checkbox-label { 
+            display: flex; 
+            align-items: center; 
+            gap: 8px; 
+            cursor: pointer; 
+            font-size: 12px; 
+            margin-bottom: 6px; 
+        }
+        
+        input[type="checkbox"] { 
+            width: 14px; 
+            height: 14px; 
+            accent-color: var(--primary); 
+        }
+
+        /* Navigation List (Casos detectados) */
+        .case-list { 
+            max-height: 200px; 
+            overflow-y: auto; 
+            border: 1px solid var(--border); 
+            border-radius: 6px; 
+            background: white; 
+        }
+        
+        .case-item { 
+            padding: 8px 10px; 
+            border-bottom: 1px solid #f1f1f1; 
+            cursor: pointer; 
+            font-size: 11px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            transition: background 0.2s;
+        }
+        
+        .case-item:hover { 
+            background: var(--primary-light); 
+        }
+        
+        .case-item.active { 
+            background: var(--primary-light); 
+            border-left: 3px solid var(--primary); 
+            font-weight: 600; 
+        }
+        
+        .case-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        
+        .case-name {
+            font-weight: 500;
+            color: var(--text-main);
+        }
+        
+        .case-meta {
+            font-size: 9px;
+            color: var(--text-muted);
+        }
+
+        /* Preview Area */
+        .preview-area { 
+            flex: 1; 
+            background: #E2E8F0; 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+            position: relative; 
+        }
+        
+        /* Pagination Controls */
+        .preview-controls {
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            padding: 10px 20px; 
+            background: white; 
+            border-bottom: 1px solid var(--border);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05); 
+            z-index: 10;
+        }
+        
+        .page-info { 
+            font-size: 12px; 
+            color: var(--text-muted); 
+            font-weight: 500; 
+        }
+        
+        .btn-nav { 
+            background: white; 
+            border: 1px solid var(--border); 
+            padding: 4px 10px; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+        
+        .btn-nav:hover:not(:disabled) {
+            background: var(--primary-light);
+            border-color: var(--primary);
+        }
+        
+        .btn-nav:disabled { 
+            opacity: 0.5; 
+            cursor: not-allowed; 
+        }
+
+        /* Report Container (Scrollable) */
+        .report-container {
+            flex: 1; 
+            padding: 20px; 
+            overflow-y: auto;
+            display: flex; 
+            flex-direction: column; 
+            align-items: center;
+        }
+
+        /* ESTILOS DEL INFORME */
+        .report-page {
+            width: 210mm; 
+            min-height: 297mm; 
+            background: white;
+            padding: 40px 50px; 
+            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px; 
+            position: relative;
+        }
+        
+        /* Specific Styles */
+        .report-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: flex-start; 
+            margin-bottom: 30px; 
+            border-bottom: 2px solid var(--primary); 
+            padding-bottom: 10px; 
+        }
+        
+        .report-title-main { 
+            margin: 0; 
+            font-size: 16pt; 
+            color: var(--primary); 
+            font-weight: 800; 
+        }
+        
+        .section-header { 
+            background: var(--primary-light); 
+            color: var(--primary); 
+            padding: 5px 10px; 
+            font-weight: 700; 
+            font-size: 10pt; 
+            border-left: 4px solid var(--primary); 
+            margin-bottom: 10px; 
+            margin-top: 20px; 
+        }
+        
+        /* Tables */
+        .data-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            font-size: 9pt; 
+            margin-bottom: 10px; 
+        }
+        
+        .data-table th { 
+            background: #F1F5F9; 
+            color: #64748B; 
+            padding: 4px 6px; 
+            border: 1px solid #E2E8F0; 
+            text-align: left; 
+            font-size: 8pt; 
+        }
+        
+        .data-table td { 
+            padding: 4px 6px; 
+            border: 1px solid #E2E8F0; 
+            vertical-align: top; 
+        }
+        
+        .label-cell { 
+            width: 20%; 
+            font-weight: 600; 
+            background: #F8FAFC; 
+        }
+        
+        /* Timeline Seguimiento */
+        .timeline-seguimiento { 
+            margin-top: 10px; 
+        }
+        
+        .timeline-item { 
+            display: flex; 
+            gap: 10px; 
+            margin-bottom: 8px; 
+        }
+        
+        .timeline-date { 
+            width: 60px; 
+            font-size: 8pt; 
+            color: var(--text-muted); 
+            text-align: right; 
+            flex-shrink: 0; 
+        }
+        
+        .timeline-content { 
+            border-left: 2px solid var(--border); 
+            padding-left: 10px; 
+            font-size: 9pt; 
+        }
+        
+        .timeline-content strong { 
+            display: block; 
+            color: var(--text-main); 
+        }
+
+        /* Badge */
+        .badge { 
+            display: inline-block; 
+            padding: 2px 6px; 
+            border-radius: 4px; 
+            font-size: 8pt; 
+            font-weight: 700; 
+        }
+        
+        .bg-success-light { 
+            background: #D1FAE5; 
+            color: #059669; 
+        }
+        
+        .bg-warning-light { 
+            background: #FEF3C7; 
+            color: #B45309; 
+        }
+        
+        .bg-danger-light {
+            background: #FEE2E2;
+            color: #DC2626;
+        }
+
+        /* Footer Modal */
+        .builder-footer { 
+            padding: 10px 24px; 
+            border-top: 1px solid var(--border); 
+            background: #F8FAFC; 
+            display: flex; 
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .btn { 
+            padding: 8px 16px; 
+            border-radius: 6px; 
+            font-size: 12px; 
+            font-weight: 500; 
+            cursor: pointer; 
+            display: inline-flex; 
+            align-items: center; 
+            gap: 6px; 
+            border: none;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary { 
+            background: var(--primary); 
+            color: white; 
+        }
+        
+        .btn-primary:hover {
+            background: #4338CA;
+            transform: translateY(-1px);
+        }
+        
+        .btn-success { 
+            background: var(--accent); 
+            color: white; 
+        }
+        
+        .btn-success:hover {
+            background: #059669;
+            transform: translateY(-1px);
+        }
+        
+        .btn-secondary {
+            background: #6B7280;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #4B5563;
+        }
+
+        /* Loading State */
+        .loading-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-muted);
+        }
+        
+        .loading-state i {
+            font-size: 48px;
+            color: var(--primary);
+            margin-bottom: 16px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Print Styles */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .report-container, .report-container * {
+                visibility: visible;
+            }
+            .report-container {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                padding: 0;
+            }
+            .report-page {
+                box-shadow: none;
+                margin: 0;
+                page-break-after: always;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <button class="trigger-btn" onclick="openReportBuilder()">
+        <i class="fas fa-file-contract"></i> Generar Informe PRI (Multicaso)
+    </button>
+
+    <!-- Modal Principal -->
+    <div class="modal-backdrop" id="reportModal">
+        <div class="report-builder">
+            
+            <div class="builder-header">
+                <div class="builder-title">
+                    <i class="fas fa-file-medical-alt"></i>
+                    <div>
+                        <h2 style="margin:0; font-size:16px;">Informe de Gestión PRI</h2>
+                        <span style="font-size:11px; color:var(--text-muted);">Seguimiento de incapacidades - K+AIR</span>
+                    </div>
+                </div>
+                <button class="btn-close" onclick="closeReportBuilder()">&times;</button>
+            </div>
+
+            <div class="builder-body">
+                <!-- Sidebar Config -->
+                <div class="config-sidebar">
+                    
+                    <div class="config-section">
+                        <h4>1. Periodo del Informe</h4>
+                        <label style="font-size:10px; color:var(--text-muted); display:block; margin-bottom:5px;">Fecha de inicio:</label>
+                        <input type="date" class="form-control" id="startDate">
+                        <label style="font-size:10px; color:var(--text-muted); display:block; margin-bottom:5px;">Fecha de fin:</label>
+                        <input type="date" class="form-control" id="endDate">
+                        <select class="form-control" id="companyFilter">
+                            <option value="">Todas las empresas</option>
+                        </select>
+                    </div>
+
+                    <div class="config-section">
+                        <h4>2. Casos Detectados (<span id="caseCount">0</span>)</h4>
+                        <p style="font-size:10px; color:var(--text-muted); margin-bottom:5px;">Seleccione un caso para ver detalle:</p>
+                        <div class="case-list" id="caseList">
+                            <!-- Se llena dinámicamente -->
+                        </div>
+                    </div>
+
+                    <div class="config-section">
+                        <h4>3. Contenido del Informe</h4>
+                        <label class="checkbox-label">
+                            <input type="checkbox" checked disabled> 
+                            Datos Personales
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" checked id="includeIncapacidad"> 
+                            Incapacidad
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" checked id="includePRIC"> 
+                            Proceso PRIC
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" checked id="includeSeguimientos"> 
+                            Seguimientos
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="includePCL"> 
+                            Calificación PCL
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" checked id="includeRecomendaciones"> 
+                            Recomendaciones
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Preview Area -->
+                <div class="preview-area">
+                    
+                    <!-- Controles de Paginación -->
+                    <div class="preview-controls">
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <button class="btn-nav" onclick="prevPage()" id="prevBtn">
+                                <i class="fas fa-chevron-left"></i> Anterior
+                            </button>
+                            <button class="btn-nav" onclick="nextPage()" id="nextBtn">
+                                Siguiente <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                        <div class="page-info" id="pageInfoText">Página 1 de 1</div>
+                        <div style="display:flex; gap:5px;">
+                            <button class="btn-nav" onclick="window.print()">
+                                <i class="fas fa-print"></i> Imprimir
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Contenedor de Páginas -->
+                    <div class="report-container" id="reportContainer">
+                        <div class="loading-state">
+                            <i class="fas fa-spinner"></i>
+                            <p>Cargando datos del informe...</p>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="builder-footer">
+                <div style="font-size: 11px; color: var(--text-muted); display:flex; align-items:center; gap:5px;">
+                    <i class="fas fa-info-circle"></i> 
+                    <span>El informe incluye resumen consolidado y detalle individual por cada caso.</span>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-secondary" onclick="exportToExcel()">
+                        <i class="fas fa-file-excel"></i> Excel
+                    </button>
+                    <button class="btn btn-success" onclick="exportToPDF()">
+                        <i class="fas fa-file-pdf"></i> Generar PDF
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- VARIABLES GLOBALES ---
+        let currentPage = 0;
+        let totalPages = 0;
+        let casesData = [];
+        let summaryData = {};
+        let reportConfig = {
+            includeIncapacidad: true,
+            includePRIC: true,
+            includeSeguimientos: true,
+            includePCL: false,
+            includeRecomendaciones: true
+        };
+
+        // --- INICIALIZACIÓN ---
+        
+        function openReportBuilder() {
+            document.getElementById('reportModal').classList.add('active');
+            loadCasesData();
+            
+            // Set default dates (current year)
+            const today = new Date();
+            const startOfYear = new Date(today.getFullYear(), 0, 1);
+            document.getElementById('startDate').value = startOfYear.toISOString().split('T')[0];
+            document.getElementById('endDate').value = today.toISOString().split('T')[0];
+            
+            // Event listeners for checkboxes
+            document.getElementById('includeIncapacidad').addEventListener('change', (e) => {
+                reportConfig.includeIncapacidad = e.target.checked;
+                renderPage(currentPage);
+            });
+            document.getElementById('includePRIC').addEventListener('change', (e) => {
+                reportConfig.includePRIC = e.target.checked;
+                renderPage(currentPage);
+            });
+            document.getElementById('includeSeguimientos').addEventListener('change', (e) => {
+                reportConfig.includeSeguimientos = e.target.checked;
+                renderPage(currentPage);
+            });
+            document.getElementById('includePCL').addEventListener('change', (e) => {
+                reportConfig.includePCL = e.target.checked;
+                renderPage(currentPage);
+            });
+            document.getElementById('includeRecomendaciones').addEventListener('change', (e) => {
+                reportConfig.includeRecomendaciones = e.target.checked;
+                renderPage(currentPage);
+            });
+        }
+        
+        function closeReportBuilder() {
+            document.getElementById('reportModal').classList.remove('active');
+        }
+
+        // --- CARGA DE DATOS ---
+        
+        async function loadCasesData() {
+            const container = document.getElementById('reportContainer');
+            container.innerHTML = `
+                <div class="loading-state">
+                    <i class="fas fa-spinner"></i>
+                    <p>Cargando casos desde PRI.xlsx...</p>
+                </div>
+            `;
+
+            try {
+                // Intentar obtener datos desde Electron API
+                if (window.electronAPI && window.electronAPI.getPriSeguimientoData) {
+                    const companyName = document.getElementById('companyFilter').value || '';
+                    const startDate = document.getElementById('startDate').value;
+                    const endDate = document.getElementById('endDate').value;
+                    
+                    const result = await window.electronAPI.getPriSeguimientoData(companyName, startDate, endDate);
+                    
+                    if (result && result.success && result.data) {
+                        casesData = result.data;
+                        processCasesData();
+                    } else {
+                        // Datos de prueba si falla la API
+                        loadMockData();
+                    }
+                } else {
+                    // Datos de prueba si no hay API
+                    loadMockData();
+                }
+            } catch (error) {
+                console.error('Error cargando datos:', error);
+                loadMockData();
+            }
+        }
+
+        function loadMockData() {
+            // Datos de prueba para demostración
+            casesData = [
+                { 
+                    id: 1, 
+                    name: "Juan Carlos Pérez", 
+                    id_doc: "1.234.567", 
+                    status: "En Seguimiento", 
+                    days: 45, 
+                    diag: "Fractura de fémur",
+                    cie10: "S72.0",
+                    origin: "AT",
+                    cargo: "Operario de Producción",
+                    area: "Planta",
+                    eps: "Sanitas",
+                    arl: "Colmena",
+                    fechaInicio: "2024-09-01",
+                    fechaFin: "2024-10-15",
+                    antiguedad: "2 años",
+                    seguimientos: [
+                        { fecha: "2024-09-10", descripcion: "Revisión médica inicial. Paciente estable." },
+                        { fecha: "2024-09-25", descripcion: "Inicio terapia física. Mejía movilidad." },
+                        { fecha: "2024-10-10", descripcion: "Valoración por ortopedia. Autoriza retorno parcial." }
+                    ],
+                    pric: {
+                        etapa1: { estado: "OK", fecha: "2024-09-02", responsable: "Gerencia" },
+                        etapa2: { estado: "OK", fecha: "2024-09-05", responsable: "ARL" },
+                        etapa3: { estado: "EN CURSO", fecha: "-", responsable: "EPS" }
+                    },
+                    recomendaciones: [
+                        { recomendacion: "Retorno gradual", entidad: "ARL", cumple: "SI" },
+                        { recomendacion: "Evitar cargar peso >10kg", entidad: "EPS", cumple: "EN PROCESO" }
+                    ]
+                },
+                { 
+                    id: 2, 
+                    name: "Maria Gomez", 
+                    id_doc: "9.876.543", 
+                    status: "Cerrado", 
+                    days: 10, 
+                    diag: "Infección respiratoria",
+                    cie10: "J06.9",
+                    origin: "Común",
+                    cargo: "Auxiliar Administrativo",
+                    area: "Oficinas",
+                    eps: "Nueva EPS",
+                    arl: "Colmena",
+                    fechaInicio: "2024-08-15",
+                    fechaFin: "2024-08-25",
+                    antiguedad: "5 años",
+                    seguimientos: [
+                        { fecha: "2024-08-20", descripcion: "Control médico. Mejoría notable." }
+                    ],
+                    pric: {
+                        etapa1: { estado: "OK", fecha: "2024-08-16", responsable: "RRHH" },
+                        etapa2: { estado: "OK", fecha: "2024-08-17", responsable: "EPS" },
+                        etapa3: { estado: "OK", fecha: "2024-08-24", responsable: "EPS" }
+                    },
+                    recomendaciones: [
+                        { recomendacion: "Reposo completo 10 días", entidad: "EPS", cumple: "SI" }
+                    ]
+                },
+                { 
+                    id: 3, 
+                    name: "Carlos Ruiz", 
+                    id_doc: "1.122.334", 
+                    status: "Cerrado", 
+                    days: 12, 
+                    diag: "Lumbago agudo",
+                    cie10: "M54.5",
+                    origin: "EL",
+                    cargo: "Conductor",
+                    area: "Logística",
+                    eps: "Sanitas",
+                    arl: "Colmena",
+                    fechaInicio: "2024-07-10",
+                    fechaFin: "2024-07-22",
+                    antiguedad: "3 años",
+                    seguimientos: [
+                        { fecha: "2024-07-15", descripcion: "Valoración por medicina laboral." },
+                        { fecha: "2024-07-20", descripcion: "Alta con recomendaciones ergonómicas." }
+                    ],
+                    pric: {
+                        etapa1: { estado: "OK", fecha: "2024-07-11", responsable: "Seguridad" },
+                        etapa2: { estado: "OK", fecha: "2024-07-12", responsable: "ARL" },
+                        etapa3: { estado: "OK", fecha: "2024-07-21", responsable: "ARL" }
+                    },
+                    recomendaciones: [
+                        { recomendacion: "Ajuste de silla", entidad: "ARL", cumple: "SI" },
+                        { recomendacion: "Pausas activas cada 2h", entidad: "EPS", cumple: "SI" }
+                    ]
+                }
+            ];
+            
+            processCasesData();
+        }
+
+        function processCasesData() {
+            // Calcular resumen
+            const totalDays = casesData.reduce((sum, c) => sum + c.days, 0);
+            const criticalCases = casesData.filter(c => c.status === "En Seguimiento" || c.status === "Crítico").length;
+            const closedCases = casesData.filter(c => c.status === "Cerrado").length;
+            
+            summaryData = {
+                totalCases: casesData.length,
+                totalDays: totalDays,
+                criticalCases: criticalCases,
+                closedCases: closedCases,
+                avgDays: Math.round(totalDays / casesData.length)
+            };
+
+            // Actualizar UI
+            document.getElementById('caseCount').textContent = casesData.length;
+            renderCaseList();
+            
+            // Configurar paginación
+            totalPages = 1 + casesData.length; // 1 resumen + N casos
+            currentPage = 0;
+            
+            renderPage(0);
+        }
+
+        function renderCaseList() {
+            const list = document.getElementById('caseList');
+            
+            // Agregar item de resumen
+            let html = `
+                <div class="case-item active" onclick="goToPage(0)">
+                    <div class="case-info">
+                        <span><i class="fas fa-chart-pie"></i> Resumen General</span>
+                        <span class="case-meta">${casesData.length} casos detectados</span>
+                    </div>
+                </div>
+            `;
+            
+            // Agregar casos individuales
+            casesData.forEach((c, index) => {
+                const statusClass = c.status === "En Seguimiento" || c.status === "Crítico" 
+                    ? 'bg-warning-light' 
+                    : 'bg-success-light';
+                
+                html += `
+                    <div class="case-item" onclick="goToPage(${index + 1})">
+                        <div class="case-info">
+                            <span class="case-name"><i class="fas fa-user"></i> ${c.name}</span>
+                            <span class="case-meta">${c.diag} • ${c.days} días</span>
+                        </div>
+                        <span class="badge ${statusClass}">${c.status}</span>
+                    </div>
+                `;
+            });
+            
+            list.innerHTML = html;
+        }
+
+        // --- RENDERIZADO DE PÁGINAS ---
+        
+        function renderPage(pageIndex) {
+            const container = document.getElementById('reportContainer');
+            container.innerHTML = '';
+            
+            if (pageIndex === 0) {
+                container.innerHTML = renderSummaryPage();
+            } else {
+                container.innerHTML = renderCaseDetailPage(casesData[pageIndex - 1]);
+            }
+            
+            updateUI();
+        }
+
+        function renderSummaryPage() {
+            const today = new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+            
+            return `
+            <div class="report-page">
+                <div class="report-header">
+                    <div>
+                        <h1 class="report-title-main">INFORME CONSOLIDADO PRI</h1>
+                        <p style="margin:5px 0 0 0; font-size:10pt; color:#64748B;">
+                            Seguimiento de Incapacidades - K+AIR
+                        </p>
+                        <p style="margin:2px 0 0 0; font-size:9pt; color:#64748B;">
+                            Periodo: ${document.getElementById('startDate').value} al ${document.getElementById('endDate').value}
+                        </p>
+                    </div>
+                    <div style="text-align:right">
+                        <h2 style="font-size:12pt; margin:0;">EMPRESA S.A.S</h2>
+                        <span style="font-size:9pt; color:#64748B;">Generado: ${today}</span>
+                    </div>
+                </div>
+
+                <!-- RESUMEN EJECUTIVO -->
+                <div class="section-header">1. RESUMEN EJECUTIVO</div>
+                <p style="font-size:9pt; line-height:1.5;">
+                    En el periodo analizado se identificaron <strong>${summaryData.totalCases} casos</strong> que requirieron seguimiento PRI. 
+                    El total de días perdidos asciende a <strong>${summaryData.totalDays} días</strong>, con un promedio de 
+                    <strong>${summaryData.avgDays} días por caso</strong>.
+                </p>
+                
+                <table class="data-table">
+                    <tr>
+                        <td class="label-cell">Total Días Perdidos</td>
+                        <td style="font-weight:700; color:var(--danger); font-size:11pt;">${summaryData.totalDays} Días</td>
+                        <td class="label-cell">Casos Activos</td>
+                        <td style="font-weight:700; color:var(--warning);">${summaryData.criticalCases} Casos</td>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">Total Casos</td>
+                        <td style="font-weight:700;">${summaryData.totalCases} Casos</td>
+                        <td class="label-cell">Casos Cerrados</td>
+                        <td style="font-weight:700; color:var(--accent);">${summaryData.closedCases} Casos</td>
+                    </tr>
+                </table>
+
+                <!-- TABLA COMPARATIVA DE CASOS -->
+                <div class="section-header">2. LISTADO DE CASOS EN PERIODO</div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th style="width:15%;">ID</th>
+                            <th style="width:25%;">Nombre</th>
+                            <th style="width:20%;">Diagnóstico</th>
+                            <th style="width:10%;">Origen</th>
+                            <th style="width:10%;">Días</th>
+                            <th style="width:20%;">Estado Actual</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${casesData.map(c => `
+                            <tr>
+                                <td style="font-size:8pt;">${c.id_doc}</td>
+                                <td style="font-weight:500;">${c.name}</td>
+                                <td>${c.diag}</td>
+                                <td>${c.origin}</td>
+                                <td style="font-weight:600;">${c.days}</td>
+                                <td>
+                                    <span class="badge ${c.status === 'En Seguimiento' || c.status === 'Crítico' ? 'bg-warning-light' : 'bg-success-light'}">
+                                        ${c.status}
+                                    </span>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+
+                <!-- DISTRIBUCIÓN POR ÁREA -->
+                <div class="section-header">3. DISTRIBUCIÓN POR ÁREA</div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Área / Departamento</th>
+                            <th>Casos</th>
+                            <th>Días Totales</th>
+                            <th>% del Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${getAreaDistribution().map(area => `
+                            <tr>
+                                <td style="font-weight:500;">${area.name}</td>
+                                <td>${area.cases}</td>
+                                <td style="font-weight:600;">${area.days}</td>
+                                <td>${area.percentage}%</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+
+                <div style="position:absolute; bottom:15mm; width:calc(100% - 100px); text-align:center; font-size:8pt; color:#94A3B8; border-top:1px solid #E2E8F0; padding-top:10px;">
+                    Página 1 - Resumen Gerencial | K+AIR - Sistema de Gestión SG-SST
+                </div>
+            </div>`;
+        }
+
+        function getAreaDistribution() {
+            // Agrupar casos por área
+            const areas = {};
+            casesData.forEach(c => {
+                if (!areas[c.area]) {
+                    areas[c.area] = { name: c.area, cases: 0, days: 0 };
+                }
+                areas[c.area].cases++;
+                areas[c.area].days += c.days;
+            });
+            
+            const totalDays = summaryData.totalDays;
+            return Object.values(areas).map(area => ({
+                ...area,
+                percentage: Math.round((area.days / totalDays) * 100)
+            })).sort((a, b) => b.days - a.days);
+        }
+
+        function renderCaseDetailPage(c) {
+            const statusClass = c.status === "En Seguimiento" || c.status === "Crítico" 
+                ? 'bg-warning-light' 
+                : 'bg-success-light';
+            
+            return `
+            <div class="report-page">
+                <!-- Encabezado Individual -->
+                <div class="report-header" style="border-bottom:1px solid #E2E8F0;">
+                    <div>
+                        <h2 style="font-size:14pt; color:#1E293B; margin:0;">FICHA DETALLADA DE CASO</h2>
+                        <p style="font-size:9pt; color:#64748B; margin:5px 0 0 0;">
+                            ID Caso: PRI-2024-${c.id} | ${c.name}
+                        </p>
+                    </div>
+                    <div style="text-align:right">
+                        <span class="badge ${statusClass}" style="font-size:10pt; padding:6px 10px;">${c.status.toUpperCase()}</span>
+                    </div>
+                </div>
+
+                <!-- DATOS PERSONALES -->
+                <div class="section-header">1. INFORMACIÓN DEL TRABAJADOR</div>
+                <table class="data-table">
+                    <tr>
+                        <td class="label-cell">Nombre Completo</td>
+                        <td style="font-weight:500;">${c.name}</td>
+                        <td class="label-cell">Cédula</td>
+                        <td>${c.id_doc}</td>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">Cargo</td>
+                        <td>${c.cargo}</td>
+                        <td class="label-cell">Área</td>
+                        <td>${c.area}</td>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">Antigüedad</td>
+                        <td>${c.antiguedad}</td>
+                        <td class="label-cell">EPS / ARL</td>
+                        <td>${c.eps} / ${c.arl}</td>
+                    </tr>
+                </table>
+
+                <!-- INCAPACIDAD -->
+                ${reportConfig.includeIncapacidad ? `
+                <div class="section-header">2. DETALLE DE INCAPACIDAD</div>
+                <table class="data-table">
+                    <tr>
+                        <td class="label-cell">Fecha de Inicio</td>
+                        <td style="font-weight:600;">${formatDate(c.fechaInicio)}</td>
+                        <td class="label-cell">Fecha de Fin</td>
+                        <td style="font-weight:600;">${formatDate(c.fechaFin)}</td>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">Duración Total</td>
+                        <td style="font-weight:700; color:var(--danger);">${c.days} días</td>
+                        <td class="label-cell">Origen</td>
+                        <td>${c.origin}</td>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">Diagnóstico</td>
+                        <td colspan="3">
+                            <strong>${c.diag}</strong> 
+                            <span style="color:#64748B; font-size:8pt;">(CIE-10: ${c.cie10})</span>
+                        </td>
+                    </tr>
+                </table>
+                ` : ''}
+
+                <!-- PRIC -->
+                ${reportConfig.includePRIC && c.pric ? `
+                <div class="section-header">3. PROCESO PRIC</div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th style="width:30%;">Etapa</th>
+                            <th style="width:20%;">Estado</th>
+                            <th style="width:25%;">Fecha</th>
+                            <th style="width:25%;">Responsable</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${renderPRICStage('1. Captura', c.pric.etapa1)}
+                        ${renderPRICStage('2. Plan de Tratamiento', c.pric.etapa2)}
+                        ${renderPRICStage('3. Ejecución', c.pric.etapa3)}
+                    </tbody>
+                </table>
+                ` : ''}
+
+                <!-- SEGUIMIENTOS -->
+                ${reportConfig.includeSeguimientos && c.seguimientos && c.seguimientos.length > 0 ? `
+                <div class="section-header">4. HISTORIAL DE SEGUIMIENTOS</div>
+                <div class="timeline-seguimiento">
+                    ${c.seguimientos.map(s => `
+                        <div class="timeline-item">
+                            <div class="timeline-date">${formatDate(s.fecha)}</div>
+                            <div class="timeline-content">
+                                <strong>Nota de Seguimiento</strong>
+                                ${s.descripcion}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                ` : ''}
+
+                <!-- RECOMENDACIONES -->
+                ${reportConfig.includeRecomendaciones && c.recomendaciones && c.recomendaciones.length > 0 ? `
+                <div class="section-header">5. RECOMENDACIONES</div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th style="width:40%;">Recomendación</th>
+                            <th style="width:25%;">Entidad</th>
+                            <th style="width:20%;">Cumplimiento</th>
+                            <th style="width:15%;">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${c.recomendaciones.map(r => `
+                            <tr>
+                                <td style="font-weight:500;">${r.recomendacion}</td>
+                                <td>${r.entidad}</td>
+                                <td>${r.cumple || 'N/A'}</td>
+                                <td>
+                                    <span class="badge ${r.cumple === 'SI' ? 'bg-success-light' : r.cumple === 'EN PROCESO' ? 'bg-warning-light' : 'bg-danger-light'}">
+                                        ${r.cumple === 'SI' ? 'CUMPLIDO' : r.cumple === 'EN PROCESO' ? 'EN PROCESO' : 'PENDIENTE'}
+                                    </span>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                ` : ''}
+
+                <div style="position:absolute; bottom:15mm; width:calc(100% - 100px); text-align:center; font-size:8pt; color:#94A3B8; border-top:1px solid #E2E8F0; padding-top:10px;">
+                    Página ${currentPage + 1} - Detalle Individual: ${c.name} | K+AIR - Sistema de Gestión SG-SST
+                </div>
+            </div>`;
+        }
+
+        function renderPRICStage(stageName, stage) {
+            if (!stage) return '';
+            
+            const statusClass = stage.estado === 'OK' 
+                ? 'bg-success-light' 
+                : stage.estado === 'EN CURSO' 
+                    ? 'bg-warning-light' 
+                    : 'bg-danger-light';
+            
+            return `
+                <tr>
+                    <td class="label-cell" style="font-weight:600;">${stageName}</td>
+                    <td><span class="badge ${statusClass}">${stage.estado}</span></td>
+                    <td>${stage.fecha !== '-' ? formatDate(stage.fecha) : '-'}</td>
+                    <td>${stage.responsable}</td>
+                </tr>
+            `;
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
+
+        // --- CONTROLES DE NAVEGACIÓN ---
+        
+        function nextPage() {
+            if (currentPage < totalPages - 1) {
+                currentPage++;
+                renderPage(currentPage);
+            }
+        }
+
+        function prevPage() {
+            if (currentPage > 0) {
+                currentPage--;
+                renderPage(currentPage);
+            }
+        }
+
+        function goToPage(index) {
+            currentPage = index;
+            renderPage(index);
+        }
+
+        function updateUI() {
+            document.getElementById('pageInfoText').innerText = `Página ${currentPage + 1} de ${totalPages}`;
+            document.getElementById('prevBtn').disabled = currentPage === 0;
+            document.getElementById('nextBtn').disabled = currentPage === totalPages - 1;
+
+            // Actualizar active en sidebar
+            document.querySelectorAll('.case-item').forEach((item, index) => {
+                if(index === currentPage) item.classList.add('active');
+                else item.classList.remove('active');
+            });
+        }
+
+        // --- EXPORTACIÓN ---
+        
+        function exportToExcel() {
+            alert('Función de exportación a Excel en desarrollo...\n\nEsta función generará un archivo Excel con:\n- Hoja 1: Resumen consolidado\n- Hoja 2-N: Detalle por caso');
+        }
+
+        function exportToPDF() {
+            // Usar la función de impresión del navegador
+            window.print();
+        }
+
+        // Cerrar modal con ESC
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && document.getElementById('reportModal').classList.contains('active')) {
+                closeReportBuilder();
+            }
+        });
+    </script>
+</body>
+</html>

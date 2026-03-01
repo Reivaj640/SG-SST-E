@@ -458,31 +458,6 @@ class MedicionAusentismoComponent {
         `;
 
         mainContent.appendChild(tableContainer);
-
-        // Floating Action Button
-        const fab = document.createElement('button');
-        fab.className = 'fab-report';
-        fab.style.cssText = `
-            position: fixed; bottom: 30px; right: 30px; width: 56px; height: 56px;
-            border-radius: 50%; background: linear-gradient(135deg, #174ea6, #2d5dc7);
-            color: white; border: none; box-shadow: 0 4px 12px rgba(23, 78, 166, 0.4);
-            cursor: pointer; display: flex; align-items: center; justify-content: center;
-            font-size: 24px; transition: transform 0.2s; z-index: 50;
-        `;
-        fab.innerHTML = '<i class="fas fa-file-export"></i><span class="fab-tooltip" style="position: absolute; right: 65px; background: #333; color: white; padding: 5px 10px; border-radius: 4px; font-size: 12px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.2s;">Generar Informe</span>';
-        fab.onmouseover = function() {
-            this.style.transform = 'scale(1.1)';
-            this.querySelector('.fab-tooltip').style.opacity = '1';
-        };
-        fab.onmouseout = function() {
-            this.style.transform = 'scale(1)';
-            this.querySelector('.fab-tooltip').style.opacity = '0';
-        };
-        fab.onclick = () => {
-            this.openExportModal();
-        };
-
-        mainContent.appendChild(fab);
         container.appendChild(mainContent);
 
         // Crear modales
@@ -1575,6 +1550,34 @@ class MedicionAusentismoComponent {
         const modal = document.getElementById('exportModal');
         if (modal) {
             modal.style.display = 'flex';
+        }
+    }
+
+    /**
+     * 🆕 Abre el constructor de informes PRI multicaso
+     */
+    openReportBuilder() {
+        console.log('[REPORT BUILDER] Abriendo constructor de informes PRI...');
+        
+        // Abrir el archivo HTML en una ventana modal o nueva ventana
+        const reportUrl = 'modules/gestion-salud/ausentismo/informe-pri-builder.html';
+        
+        // Opción 1: Abrir en ventana emergente
+        const reportWindow = window.open(
+            reportUrl, 
+            'Informe PRI - K+AIR', 
+            'width=1400,height=900,resizable=yes,scrollbars=yes,status=no'
+        );
+        
+        if (reportWindow) {
+            // Pasar datos de seguimiento si es necesario
+            reportWindow.addEventListener('load', () => {
+                console.log('[REPORT BUILDER] Ventana cargada');
+                // Aquí se podrían pasar los datos via postMessage si se necesita
+            });
+        } else {
+            console.error('[REPORT BUILDER] No se pudo abrir la ventana');
+            this.showNotification('⚠️ Bloquee de pop-ups detectado. Permita las ventanas emergentes para este sitio.', 'warning');
         }
     }
 

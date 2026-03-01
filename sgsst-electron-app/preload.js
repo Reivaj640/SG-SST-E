@@ -10,6 +10,7 @@ function log(level, message) {
 contextBridge.exposeInMainWorld('electronAPI', {
   // --- App & Configuración ---
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  getAppPath: () => ipcRenderer.invoke('get-app-path'),
   getRecursosStats: (companyName) => ipcRenderer.invoke('get-recursos-stats', companyName),
   saveConfig: (config) => ipcRenderer.invoke('save-config', config),
   loadConfig: () => ipcRenderer.invoke('load-config'),

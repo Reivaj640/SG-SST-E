@@ -698,6 +698,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                       showHomePage();
                   }
                   return;
+              case 'load-module-view':
+                  // Cargar una vista de módulo específica (ej: informe-pri-builder)
+                  console.log('RENDERER: Received load-module-view request:', payload);
+                  const viewPath = payload.path || payload.view;
+                  if (viewPath) {
+                      loadModuleViewInContentArea(viewPath);
+                  }
+                  return;
               case 'theme-preference-changed':
                   // El usuario cambió el tema desde el iframe de configuración
                   const themeMode = event.data.theme || payload;
@@ -2631,6 +2639,117 @@ function createModuleCard(title, description, onClick) {
     card.appendChild(cardButton);
 
     return card;
+  }
+
+  /**
+   * Carga una vista de módulo HTML en el área de contenido principal
+   * @param {string} viewPath - Ruta del archivo HTML a cargar
+   */
+  function loadModuleViewInContentArea(viewPath) {
+    console.log('[RENDERER] Cargando vista de módulo:', viewPath);
+    
+    // Verificar que contentArea exista
+    if (!contentArea) {
+      console.error('contentArea is not defined or accessible in loadModuleViewInContentArea.');
+      contentArea = document.getElementById('content-area');
+      if (!contentArea) {
+        console.error('Critical: content-area element still not found.');
+        return;
+      }
+    }
+
+    // Limpiar contenido anterior y ocultar calendario
+    hideCalendar(contentArea);
+    contentArea.innerHTML = '';
+
+    // Crear contenedor principal
+    const mainCanvas = document.createElement('div');
+    mainCanvas.className = 'main-canvas';
+
+    // Mostrar mensaje de carga
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'loading-message';
+    loadingDiv.innerHTML = '<p>Cargando constructor de informes...</p>';
+    mainCanvas.appendChild(loadingDiv);
+    contentArea.appendChild(mainCanvas);
+
+    // Cargar el HTML usando fetch
+    fetch(viewPath)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Error al cargar el archivo: ' + response.statusText);
+        }
+        return response.text();
+      })
+      .then(html => {
+        console.log('[RENDERER] Vista cargada exitosamente:', viewPath);
+        
+        // Limpiar el contenido
+        mainCanvas.innerHTML = '';
+        
+        // Crear un contenedor temporal para parsear el HTML
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        
+        // Extraer y cargar los estilos del head
+        const styles = tempDiv.querySelectorAll('link[rel="stylesheet"], style');
+        styles.forEach(style => {
+          if (style.tagName === 'LINK') {
+            const newLink = document.createElement('link');
+            newLink.rel = style.rel;
+            newLink.href = style.href;
+            document.head.appendChild(newLink);
+          } else {
+            const newStyle = document.createElement('style');
+            newStyle.textContent = style.textContent;
+            document.head.appendChild(newStyle);
+          }
+        });
+        
+        // Extraer el body content (excluyendo head)
+        const bodyContent = tempDiv.querySelectorAll('body > *');
+        if (bodyContent.length > 0) {
+          bodyContent.forEach(el => {
+            mainCanvas.appendChild(el.cloneNode(true));
+          });
+        } else {
+          // Si no hay body, usar todos los elementos del tempDiv
+          Array.from(tempDiv.childNodes).forEach(node => {
+            if (node.nodeType === Node.ELEMENT_NODE && 
+                node.tagName !== 'HEAD' && 
+                node.tagName !== 'HTML') {
+              mainCanvas.appendChild(node.cloneNode(true));
+            }
+          });
+        }
+        
+        // Ejecutar scripts inline si los hay
+        const scripts = mainCanvas.querySelectorAll('script');
+        scripts.forEach(oldScript => {
+          if (oldScript.src) {
+            const newScript = document.createElement('script');
+            newScript.src = oldScript.src;
+            document.head.appendChild(newScript);
+          } else if (oldScript.textContent) {
+            const newScript = document.createElement('script');
+            newScript.textContent = oldScript.textContent;
+            mainCanvas.appendChild(newScript);
+          }
+        });
+        
+        console.log('[RENDERER] Vista renderizada:', viewPath);
+      })
+      .catch(error => {
+        console.error('[RENDERER] Error cargando vista:', error);
+        mainCanvas.innerHTML = `
+          <div class="error-message">
+            <h3>Error al cargar la vista</h3>
+            <p>No se pudo cargar el constructor de informes.</p>
+            <p>Error: ${error.message}</p>
+            <button class="btn" onclick="location.reload()">Recargar</button>
+          </div>
+        `;
+      });
   }
 
   function showSettingsPage() {
