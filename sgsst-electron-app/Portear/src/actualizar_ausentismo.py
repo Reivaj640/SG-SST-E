@@ -1069,6 +1069,30 @@ def guardar_seguimiento(empresa, file_path, datos):
         fila_completa[96] = pric.get("anioUltimaCalificacionPCL", "")  # CS - Año Última Calificación PCL
         fila_completa[97] = pric.get("anioSeguimientoEmpresa", "")  # CT - Año Seguimiento Empresa
 
+        # Extender la lista para soportar columnas hasta FP (índice 171)
+        if len(fila_completa) < 172:
+            fila_completa.extend([""] * (172 - len(fila_completa)))
+
+        # 🆕 Calificación Regional (índices 158-164) - de calificacion
+        # Columnas FC(158), FD(159), FE(160), FF(161), FG(162), FH(163), FI(164)
+        fila_completa[158] = calificacion.get("estadoProcesoRegional", "")  # FC - Estado del Proceso Regional
+        fila_completa[159] = calificacion.get("fechaSolicitudRegional", "")  # FD - Fecha de Solicitud Regional
+        fila_completa[160] = calificacion.get("fechaDictamenRegional", "")  # FE - Fecha de Dictamen Regional
+        fila_completa[161] = calificacion.get("porcentajePclRegional", "")  # FF - % PCL Regional
+        fila_completa[162] = calificacion.get("origenCalificacionRegional", "")  # FG - Origen Calificado Regional
+        fila_completa[163] = calificacion.get("fechaEstructuracionRegional", "")  # FH - Fecha de Estructuración Regional
+        fila_completa[164] = calificacion.get("observacionesCalificacionRegional", "")  # FI - Observaciones Calificación Regional
+
+        # 🆕 Calificación Nacional (índices 165-171) - de calificacion
+        # Columnas FJ(165), FK(166), FL(167), FM(168), FN(169), FO(170), FP(171)
+        fila_completa[165] = calificacion.get("estadoProcesoNacional", "")  # FJ - Estado del Proceso Nacional
+        fila_completa[166] = calificacion.get("fechaSolicitudNacional", "")  # FK - Fecha de Solicitud Nacional
+        fila_completa[167] = calificacion.get("fechaDictamenNacional", "")  # FL - Fecha de Dictamen Nacional
+        fila_completa[168] = calificacion.get("porcentajePclNacional", "")  # FM - % PCL Nacional
+        fila_completa[169] = calificacion.get("origenCalificacionNacional", "")  # FN - Origen Calificado Nacional
+        fila_completa[170] = calificacion.get("fechaEstructuracionNacional", "")  # FO - Fecha de Estructuración Nacional
+        fila_completa[171] = calificacion.get("observacionesCalificacionNacional", "")  # FP - Observaciones Calificación Nacional
+
         # 🆕 Recomendaciones Médico Laborales (tabla hasta 10 filas, índices 98-147)
         # Cada fila tiene 6 columnas: Item, Recomendación, Entidad, Fecha Límite, Cumple, Observación
         # Fila 1: CU(98), CV(99), CW(100), CX(101), CY(102), CZ(103)

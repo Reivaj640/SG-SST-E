@@ -2743,11 +2743,18 @@ class MedicionAusentismoComponent {
                     <!-- SECCIÓN 5: CALIFICACIÓN PCL -->
                     <div id="sp-section-calificacion" class="sp-form-section">
                         <div class="sp-section-title"><i class="fas fa-balance-scale"></i> 5. Proceso de Calificación / PCL</div>
-                        
+
                         <div class="sp-form-grid">
+                            <!-- CALIFICACIÓN REGIONAL -->
+                            <div class="sp-form-group full-width" style="margin-top: 10px; padding-top: 15px; border-top: 2px solid #E2E8F0;">
+                                <label class="sp-form-label" style="color: #4F46E5; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
+                                    <i class="fas fa-map-marker-alt"></i> Calificación Regional
+                                </label>
+                            </div>
+
                             <div class="sp-form-group">
                                 <label class="sp-form-label">Estado del Proceso</label>
-                                <select id="sp-estado-proceso" class="sp-form-control">
+                                <select id="sp-estado-proceso-regional" class="sp-form-control">
                                     <option value="">Seleccione...</option>
                                     <option value="No Requiere">No Requiere</option>
                                     <option value="Solicitud Radicada">Solicitud Radicada</option>
@@ -2757,19 +2764,19 @@ class MedicionAusentismoComponent {
                             </div>
                             <div class="sp-form-group">
                                 <label class="sp-form-label">Fecha de Solicitud</label>
-                                <input type="date" id="sp-fecha-solicitud" class="sp-form-control">
+                                <input type="date" id="sp-fecha-solicitud-regional" class="sp-form-control">
                             </div>
                             <div class="sp-form-group">
                                 <label class="sp-form-label">Fecha Dictamen</label>
-                                <input type="date" id="sp-fecha-dictamen" class="sp-form-control">
+                                <input type="date" id="sp-fecha-dictamen-regional" class="sp-form-control">
                             </div>
                             <div class="sp-form-group">
-                                <label class="sp-form-label">% PCL (Pérdida Capacidad)</label>
-                                <input type="number" id="sp-porcentaje-pcl" class="sp-form-control" placeholder="0.00%" step="0.01">
+                                <label class="sp-form-label">% PCL Regional</label>
+                                <input type="number" id="sp-porcentaje-pcl-regional" class="sp-form-control" placeholder="0.00%" step="0.01">
                             </div>
                             <div class="sp-form-group">
                                 <label class="sp-form-label">Origen Calificado</label>
-                                <select id="sp-origen-calificacion" class="sp-form-control">
+                                <select id="sp-origen-calificacion-regional" class="sp-form-control">
                                     <option value="">Seleccione...</option>
                                     <option value="Común">Común</option>
                                     <option value="Laboral">Laboral</option>
@@ -2778,8 +2785,57 @@ class MedicionAusentismoComponent {
                             </div>
                             <div class="sp-form-group">
                                 <label class="sp-form-label">Fecha de Estructuración</label>
-                                <input type="date" id="sp-fecha-estructuracion" class="sp-form-control">
+                                <input type="date" id="sp-fecha-estructuracion-regional" class="sp-form-control">
                             </div>
+
+                            <div class="sp-form-group full-width">
+                                <label class="sp-form-label">Observaciones Calificación Regional</label>
+                                <textarea id="sp-observaciones-calificacion-regional" class="sp-form-control" rows="2"></textarea>
+                            </div>
+
+                            <!-- CALIFICACIÓN NACIONAL -->
+                            <div class="sp-form-group full-width" style="margin-top: 10px; padding-top: 15px; border-top: 2px solid #E2E8F0;">
+                                <label class="sp-form-label" style="color: #174ea6; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
+                                    <i class="fas fa-building"></i> Calificación Nacional
+                                </label>
+                            </div>
+
+                            <div class="sp-form-group">
+                                <label class="sp-form-label">Estado del Proceso</label>
+                                <select id="sp-estado-proceso-nacional" class="sp-form-control">
+                                    <option value="">Seleccione...</option>
+                                    <option value="No Requiere">No Requiere</option>
+                                    <option value="Solicitud Radicada">Solicitud Radicada</option>
+                                    <option value="En Estudio">En Estudio</option>
+                                    <option value="Calificado">Calificado</option>
+                                </select>
+                            </div>
+                            <div class="sp-form-group">
+                                <label class="sp-form-label">Fecha de Solicitud</label>
+                                <input type="date" id="sp-fecha-solicitud-nacional" class="sp-form-control">
+                            </div>
+                            <div class="sp-form-group">
+                                <label class="sp-form-label">Fecha Dictamen</label>
+                                <input type="date" id="sp-fecha-dictamen-nacional" class="sp-form-control">
+                            </div>
+                            <div class="sp-form-group">
+                                <label class="sp-form-label">% PCL Nacional</label>
+                                <input type="number" id="sp-porcentaje-pcl-nacional" class="sp-form-control" placeholder="0.00%" step="0.01">
+                            </div>
+                            <div class="sp-form-group">
+                                <label class="sp-form-label">Origen Calificado</label>
+                                <select id="sp-origen-calificacion-nacional" class="sp-form-control">
+                                    <option value="">Seleccione...</option>
+                                    <option value="Común">Común</option>
+                                    <option value="Laboral">Laboral</option>
+                                    <option value="Accidente Trabajo">Accidente de Trabajo</option>
+                                </select>
+                            </div>
+                            <div class="sp-form-group">
+                                <label class="sp-form-label">Fecha de Estructuración</label>
+                                <input type="date" id="sp-fecha-estructuracion-nacional" class="sp-form-control">
+                            </div>
+
                             <div class="sp-form-group full-width">
                                 <label class="sp-form-label">Observaciones de la Calificación</label>
                                 <textarea id="sp-observaciones-calificacion" class="sp-form-control" rows="3"></textarea>
@@ -3642,12 +3698,31 @@ class MedicionAusentismoComponent {
             },
             // Calificación PCL
             calificacion: {
-                estadoProceso: document.getElementById('sp-estado-proceso').value,
-                fechaSolicitud: document.getElementById('sp-fecha-solicitud').value,
-                fechaDictamen: document.getElementById('sp-fecha-dictamen').value,
-                porcentajePcl: document.getElementById('sp-porcentaje-pcl').value,
-                origenCalificacion: document.getElementById('sp-origen-calificacion').value,
-                fechaEstructuracion: document.getElementById('sp-fecha-estructuracion').value,
+                // 🆕 Calificación Regional (columnas FC-FI, índices 158-164)
+                estadoProcesoRegional: document.getElementById('sp-estado-proceso-regional').value,
+                fechaSolicitudRegional: document.getElementById('sp-fecha-solicitud-regional').value,
+                fechaDictamenRegional: document.getElementById('sp-fecha-dictamen-regional').value,
+                porcentajePclRegional: document.getElementById('sp-porcentaje-pcl-regional').value,
+                origenCalificacionRegional: document.getElementById('sp-origen-calificacion-regional').value,
+                fechaEstructuracionRegional: document.getElementById('sp-fecha-estructuracion-regional').value,
+                observacionesCalificacionRegional: document.getElementById('sp-observaciones-calificacion-regional').value,
+                // 🆕 Calificación Nacional (columnas FJ-FP, índices 165-171)
+                estadoProcesoNacional: document.getElementById('sp-estado-proceso-nacional').value,
+                fechaSolicitudNacional: document.getElementById('sp-fecha-solicitud-nacional').value,
+                fechaDictamenNacional: document.getElementById('sp-fecha-dictamen-nacional').value,
+                porcentajePclNacional: document.getElementById('sp-porcentaje-pcl-nacional').value,
+                origenCalificacionNacional: document.getElementById('sp-origen-calificacion-nacional').value,
+                fechaEstructuracionNacional: document.getElementById('sp-fecha-estructuracion-nacional').value,
+                observacionesCalificacionNacional: document.getElementById('sp-observaciones-calificacion').value
+            },
+            // Campos legacy (para compatibilidad con logs antiguos)
+            calificacionLegacy: {
+                estadoProceso: document.getElementById('sp-estado-proceso-regional').value,
+                fechaSolicitud: document.getElementById('sp-fecha-solicitud-regional').value,
+                fechaDictamen: document.getElementById('sp-fecha-dictamen-regional').value,
+                porcentajePcl: document.getElementById('sp-porcentaje-pcl-regional').value,
+                origenCalificacion: document.getElementById('sp-origen-calificacion-regional').value,
+                fechaEstructuracion: document.getElementById('sp-fecha-estructuracion-regional').value,
                 observacionesCalificacion: document.getElementById('sp-observaciones-calificacion').value
             },
             // Recomendaciones (tabla)
@@ -4003,6 +4078,33 @@ class MedicionAusentismoComponent {
             }
 
             // ============================================
+            // 🆕 Cargar campos de Calificación Regional y Nacional
+            // ============================================
+            if (registro.calificacion) {
+                const calificacion = registro.calificacion;
+
+                // 🆕 Calificación Regional (columnas FC-FI, índices 158-164)
+                document.getElementById('sp-estado-proceso-regional').value = calificacion.estadoProcesoRegional || '';
+                document.getElementById('sp-fecha-solicitud-regional').value = calificacion.fechaSolicitudRegional || '';
+                document.getElementById('sp-fecha-dictamen-regional').value = calificacion.fechaDictamenRegional || '';
+                document.getElementById('sp-porcentaje-pcl-regional').value = calificacion.porcentajePclRegional || '';
+                document.getElementById('sp-origen-calificacion-regional').value = calificacion.origenCalificacionRegional || '';
+                document.getElementById('sp-fecha-estructuracion-regional').value = calificacion.fechaEstructuracionRegional || '';
+                document.getElementById('sp-observaciones-calificacion-regional').value = calificacion.observacionesCalificacionRegional || '';
+
+                // 🆕 Calificación Nacional (columnas FJ-FP, índices 165-171)
+                document.getElementById('sp-estado-proceso-nacional').value = calificacion.estadoProcesoNacional || '';
+                document.getElementById('sp-fecha-solicitud-nacional').value = calificacion.fechaSolicitudNacional || '';
+                document.getElementById('sp-fecha-dictamen-nacional').value = calificacion.fechaDictamenNacional || '';
+                document.getElementById('sp-porcentaje-pcl-nacional').value = calificacion.porcentajePclNacional || '';
+                document.getElementById('sp-origen-calificacion-nacional').value = calificacion.origenCalificacionNacional || '';
+                document.getElementById('sp-fecha-estructuracion-nacional').value = calificacion.fechaEstructuracionNacional || '';
+                document.getElementById('sp-observaciones-calificacion').value = calificacion.observacionesCalificacionNacional || '';
+
+                console.log('[CARGAR REGISTRO] Campos de Calificación Regional y Nacional cargados exitosamente');
+            }
+
+            // ============================================
             // 🆕 Cargar Recomendaciones (tabla)
             // ============================================
             if (registro.recomendaciones && registro.recomendaciones.length > 0) {
@@ -4207,13 +4309,22 @@ class MedicionAusentismoComponent {
                 anioSeguimientoEmpresa: seguimientoData.pric.anioSeguimientoEmpresa || ''
             },
             calificacion: {
-                estadoProceso: seguimientoData.calificacion.estadoProceso || '',
-                fechaSolicitud: seguimientoData.calificacion.fechaSolicitud || '',
-                fechaDictamen: seguimientoData.calificacion.fechaDictamen || '',
-                porcentajePcl: seguimientoData.calificacion.porcentajePcl || '',
-                origenCalificacion: seguimientoData.calificacion.origenCalificacion || '',
-                fechaEstructuracion: seguimientoData.calificacion.fechaEstructuracion || '',
-                observacionesCalificacion: seguimientoData.calificacion.observacionesCalificacion || ''
+                // 🆕 Calificación Regional (columnas FC-FI, índices 158-164)
+                estadoProcesoRegional: seguimientoData.calificacion.estadoProcesoRegional || '',
+                fechaSolicitudRegional: seguimientoData.calificacion.fechaSolicitudRegional || '',
+                fechaDictamenRegional: seguimientoData.calificacion.fechaDictamenRegional || '',
+                porcentajePclRegional: seguimientoData.calificacion.porcentajePclRegional || '',
+                origenCalificacionRegional: seguimientoData.calificacion.origenCalificacionRegional || '',
+                fechaEstructuracionRegional: seguimientoData.calificacion.fechaEstructuracionRegional || '',
+                observacionesCalificacionRegional: seguimientoData.calificacion.observacionesCalificacionRegional || '',
+                // 🆕 Calificación Nacional (columnas FJ-FP, índices 165-171)
+                estadoProcesoNacional: seguimientoData.calificacion.estadoProcesoNacional || '',
+                fechaSolicitudNacional: seguimientoData.calificacion.fechaSolicitudNacional || '',
+                fechaDictamenNacional: seguimientoData.calificacion.fechaDictamenNacional || '',
+                porcentajePclNacional: seguimientoData.calificacion.porcentajePclNacional || '',
+                origenCalificacionNacional: seguimientoData.calificacion.origenCalificacionNacional || '',
+                fechaEstructuracionNacional: seguimientoData.calificacion.fechaEstructuracionNacional || '',
+                observacionesCalificacionNacional: seguimientoData.calificacion.observacionesCalificacionNacional || ''
             }
         };
 

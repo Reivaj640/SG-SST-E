@@ -5,6 +5,77 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.51] - 2026-02-28
+
+### Added
+- **Calificación PCL Regional y Nacional** 🆕
+  - Dos secciones separadas en la UI con identificación visual clara
+  - Calificación Regional: Ícono de marcador, color azul índigo (#4F46E5)
+  - Calificación Nacional: Ícono de edificio, color azul oscuro (#174ea6)
+  - 14 campos en total (7 Regional + 7 Nacional)
+
+- **Campos de Calificación Regional** (Columnas FC-FI, Índices 158-164)
+  - Estado del Proceso Regional
+  - Fecha de Solicitud Regional
+  - Fecha Dictamen Regional
+  - % PCL Regional
+  - Origen Calificado Regional
+  - Fecha de Estructuración Regional
+  - Observaciones Calificación Regional
+
+- **Campos de Calificación Nacional** (Columnas FJ-FP, Índices 165-171)
+  - Estado del Proceso Nacional
+  - Fecha de Solicitud Nacional
+  - Fecha Dictamen Nacional
+  - % PCL Nacional
+  - Origen Calificado Nacional
+  - Fecha de Estructuración Nacional
+  - Observaciones Calificación Nacional
+
+### Fixed
+- **Error `list assignment index out of range`** 🐛
+  - Movida la extensión de `fila_completa` antes de las asignaciones de Calificación
+  - Ahora se extiende a 172 elementos antes de asignar índices 158-171
+  - Archivo: `Portear/src/actualizar_ausentismo.py` (líneas 1073-1075)
+
+- **Datos de Calificación no se guardaban en Excel** 🐛
+  - Corregido mapeo de campos en `ejecutarGuardadoReal()`
+  - Ahora se envían correctamente los campos Regional y Nacional a Python
+  - Archivo: `modules/gestion-salud/ausentismo/medicion-ausentismo.js` (líneas 4311-4328)
+
+### Changed
+- **Estructura de Datos de Calificación** 🔄
+  - Objeto `followUpData.calificacion` ahora contiene campos Regional y Nacional
+  - Compatibilidad mantenida con `calificacionLegacy` para registros antiguos
+  - Función `cargarRegistroYAbrirPanel()` actualizada para cargar ambos conjuntos
+
+- **UI del Panel de Seguimiento** 🎨
+  - Sección 5: Calificación PCL ahora tiene dos subsecciones visuales
+  - Separadores con bordes de 2px y colores distintivos
+  - Títulos con íconos y uppercase para claridad
+
+### Technical Details
+- **Frontend:** `medicion-ausentismo.js`
+  - Líneas 2743-2845: UI de Calificación PCL
+  - Líneas 3600-3620: `saveSeguimientoData()` - Recolección de datos
+  - Líneas 4070-4095: `cargarRegistroYAbrirPanel()` - Carga de datos
+  - Líneas 4311-4328: `ejecutarGuardadoReal()` - Envío a Python
+
+- **Backend:** `Portear/src/actualizar_ausentismo.py`
+  - Líneas 985-1000: Índices de columnas Regional/Nacional
+  - Líneas 1073-1075: Extensión de lista antes de asignaciones
+  - Líneas 1077-1092: Asignación de campos Regional (FC-FI)
+  - Líneas 1094-1100: Asignación de campos Nacional (FJ-FP)
+
+### Documentation
+- **Nueva Documentación:** `docs/ACTUALIZACION_v0.1.51_CALIFICACION_PCL.md`
+  - Estructura de datos completa
+  - Flujo de datos frontend → backend → Excel
+  - Errores corregidos y soluciones
+  - Pruebas realizadas
+
+---
+
 ## [0.1.50] - 2026-02-26
 
 ### Added

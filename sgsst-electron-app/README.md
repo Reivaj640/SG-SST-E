@@ -18,6 +18,7 @@
 - ✅ **27 Submódulos**: Cada uno con su propia lógica y vistas especializadas
 - ✅ **IA Integrada**: Análisis de accidentes con LLM (Mistral 3 3B)
 - ✅ **Seguimiento PRIC**: Gestión completa de casos de incapacidad y rehabilitación
+- ✅ **Calificación PCL Dual**: Secciones separadas para Calificación Regional y Nacional (14 campos)
 - ✅ **Sistema Dual de Archivos**: PI-FO-076 (lista general) + PRI.xlsx (seguimiento)
 - ✅ **Alertas Inteligentes**: Detección de registros duplicados con modal interactivo
 - ✅ **Cálculos Automáticos**: Edad, IMC, Estado Nutricional, Días Trabajados, Antigüedad, Días Acumulados de Incapacidad
