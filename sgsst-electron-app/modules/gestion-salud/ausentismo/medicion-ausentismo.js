@@ -1087,6 +1087,106 @@ class MedicionAusentismoComponent {
         return { estado, badgeClass, progressClass };
     }
 
+    /**
+     * Calcula el porcentaje de avance del caso basado en hitos del proceso en PRI.xlsx
+     * @param {Object} incapacidad - Objeto de incapacidad con fechaInicio, fechaFin y record
+     * @param {Object} registroPRI - Registro completo desde PRI.xlsx (opcional)
+     * @returns {Object} { porcentaje: number, color: string, descripcion: string }
+     */
+    calcularPorcentajeAvance(incapacidad, registroPRI = null) {
+        const recordAusentismo = incapacidad?.record || {};
+        const recordPRI = registroPRI || {};
+        
+        // === Buscar fechas de seguimiento en PRI.xlsx (fuente primaria) ===
+        let seguimientos = [];
+        
+        if (recordPRI && Object.keys(recordPRI).length > 0) {
+            // Buscar en PRI.xlsx primero
+            seguimientos = recordPRI.seguimientos || [];
+            
+            // Si no hay seguimientos en el array, intentar con campos individuales
+            if (seguimientos.length === 0) {
+                if (recordPRI.fecha_seguimiento_1) seguimientos.push({ fecha: recordPRI.fecha_seguimiento_1 });
+                if (recordPRI.fecha_seguimiento_2) seguimientos.push({ fecha: recordPRI.fecha_seguimiento_2 });
+                if (recordPRI.pric?.fechaSeguimiento1) seguimientos.push({ fecha: recordPRI.pric.fechaSeguimiento1 });
+                if (recordPRI.pric?.fechaSeguimiento2) seguimientos.push({ fecha: recordPRI.pric.fechaSeguimiento2 });
+            }
+        } else {
+            // Si no hay PRI, buscar en Ausentismo (backup)
+            if (recordAusentismo['FECHA SEGUIMIENTO 1'] || recordAusentismo['fecha_seguimiento_1']) {
+                seguimientos.push({ fecha: recordAusentismo['FECHA SEGUIMIENTO 1'] || recordAusentismo['fecha_seguimiento_1'] });
+            }
+            if (recordAusentismo['FECHA SEGUIMIENTO 2'] || recordAusentismo['fecha_seguimiento_2']) {
+                seguimientos.push({ fecha: recordAusentismo['FECHA SEGUIMIENTO 2'] || recordAusentismo['fecha_seguimiento_2'] });
+            }
+        }
+        
+        // === Buscar fecha de cierre ===
+        let fechaCierreInc = null;
+        let fechaCierrePric = null;
+        
+        if (recordPRI && Object.keys(recordPRI).length > 0) {
+            fechaCierreInc = recordPRI.fecha_cierre || recordPRI.fechaCierre || null;
+            fechaCierrePric = recordPRI.pric?.fechaCierre || recordPRI.fecha_cierre_pric || null;
+        } else {
+            fechaCierreInc = recordAusentismo['FECHA CIERRE'] || recordAusentismo['fecha_cierre'] || 
+                            recordAusentismo['FECHA CIERRE INC'] || recordAusentismo['fecha_cierre_inc'] || null;
+            fechaCierrePric = recordAusentismo['FECHA CIERRE PRIC'] || recordAusentismo['fecha_cierre_pric'] || null;
+        }
+        
+        const tieneFechaCierre = fechaCierreInc || fechaCierrePric;
+        const cantidadSeguimientos = seguimientos.filter(s => s.fecha && s.fecha.trim() !== '').length;
+        
+        console.log('[CALCULAR AVANCE] Seguimientos encontrados:', cantidadSeguimientos, seguimientos);
+        console.log('[CALCULAR AVANCE] Tiene fecha de cierre:', tieneFechaCierre);
+        
+        // === Reglas de porcentaje de avance ===
+        let porcentaje = 0;
+        let color = '#F59E0B'; // Ámbar por defecto (0%)
+        let descripcion = 'Sin iniciar';
+        
+        // Regla 1: Si tiene fecha de cierre → 100%
+        if (tieneFechaCierre) {
+            porcentaje = 100;
+            color = '#10B981'; // Verde
+            descripcion = 'Caso cerrado';
+            console.log('[CALCULAR AVANCE] 100% - Caso cerrado');
+        }
+        // Regla 2: Basado en cantidad de seguimientos
+        else if (cantidadSeguimientos >= 4) {
+            porcentaje = 80;
+            color = '#3B82F6'; // Azul
+            descripcion = '4° seguimiento realizado';
+            console.log('[CALCULAR AVANCE] 80% - 4 seguimientos');
+        }
+        else if (cantidadSeguimientos === 3) {
+            porcentaje = 60;
+            color = '#3B82F6'; // Azul
+            descripcion = '3° seguimiento realizado';
+            console.log('[CALCULAR AVANCE] 60% - 3 seguimientos');
+        }
+        else if (cantidadSeguimientos === 2) {
+            porcentaje = 30;
+            color = '#8B5CF6'; // Violeta
+            descripcion = '2° seguimiento realizado';
+            console.log('[CALCULAR AVANCE] 30% - 2 seguimientos');
+        }
+        else if (cantidadSeguimientos === 1) {
+            porcentaje = 10;
+            color = '#A78BFA'; // Violeta claro
+            descripcion = '1° seguimiento realizado';
+            console.log('[CALCULAR AVANCE] 10% - 1 seguimiento');
+        }
+        else {
+            porcentaje = 0;
+            color = '#F59E0B'; // Ámbar
+            descripcion = 'Sin iniciar';
+            console.log('[CALCULAR AVANCE] 0% - Sin seguimientos');
+        }
+        
+        return { porcentaje, color, descripcion };
+    }
+
     renderSeguimientoTableWithBody(tbody, data) {
         console.log('[DEBUG renderSeguimientoTableWithBody] Renderizando', data.length, 'empleados en la tabla');
 
@@ -1147,21 +1247,12 @@ class MedicionAusentismoComponent {
             const estadoInfo = this.determinarEstadoCaso(incapacidadPrincipal, empleado.registroPRI);
             const estado = estadoInfo.estado;
             const badgeClass = estadoInfo.badgeClass;
-            const progressClass = estadoInfo.progressClass;
-
-            // Calcular días transcurridos desde el inicio de la incapacidad más reciente
-            let diasTranscurridos = 0;
-            let avance = 0;
-
-            if (fechaInicio && fechaFin) {
-                const totalTime = fechaFin - fechaInicio;
-                const diasTotales = Math.ceil(totalTime / (1000 * 60 * 60 * 24)) + 1;
-
-                const currentTime = today - fechaInicio;
-                diasTranscurridos = Math.max(0, Math.ceil(currentTime / (1000 * 60 * 60 * 24)) + 1);
-
-                avance = Math.min(100, Math.round((diasTranscurridos / diasTotales) * 100));
-            }
+            
+            // 🆕 Calcular avance basado en hitos del proceso (seguimientos + cierre)
+            const avanceInfo = this.calcularPorcentajeAvance(incapacidadPrincipal, empleado.registroPRI);
+            const avancePorcentaje = avanceInfo.porcentaje;
+            const avanceColor = avanceInfo.color;
+            const avanceDescripcion = avanceInfo.descripcion;
 
             // Iniciales para avatar
             const initials = nombre.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
@@ -1191,9 +1282,9 @@ class MedicionAusentismoComponent {
                     </td>
                     <td style="padding: 15px;">
                         <div style="width: 100px;">
-                            <div style="font-size: 11px; color: #64748B; margin-bottom: 2px; text-align: right;">${avance}% (${diasTranscurridos} días)</div>
+                            <div style="font-size: 11px; color: #64748B; margin-bottom: 2px; text-align: right;">${avancePorcentaje}% (${avanceDescripcion})</div>
                             <div style="width: 100%; height: 6px; background: #E2E8F0; border-radius: 3px; overflow: hidden;">
-                                <div style="width: ${avance}%; height: 100%; background: ${progressClass === 'warning' ? '#F59E0B' : progressClass === 'success' ? '#10B981' : '#3B82F6'}; border-radius: 3px;"></div>
+                                <div style="width: ${avancePorcentaje}%; height: 100%; background: ${avanceColor}; border-radius: 3px; transition: width 0.3s ease;"></div>
                             </div>
                         </div>
                     </td>
@@ -4481,6 +4572,16 @@ class MedicionAusentismoComponent {
                         );
                         console.log('[GUARDAR SEGUIMIENTO] ✅ Registro creado');
                     }
+                    
+                    // 🆕 ACTUALIZAR LA TABLA AUTOMÁTAMENTE DESPUÉS DE GUARDAR
+                    console.log('[GUARDAR SEGUIMIENTO] 🔄 Actualizando tabla de seguimiento...');
+                    this.loadSeguimientoData()
+                        .then(() => {
+                            console.log('[GUARDAR SEGUIMIENTO] ✅ Tabla actualizada correctamente');
+                        })
+                        .catch(error => {
+                            console.error('[GUARDAR SEGUIMIENTO] ❌ Error actualizando tabla:', error);
+                        });
                     
                     // Cerrar el panel después de un breve delay
                     setTimeout(() => {
