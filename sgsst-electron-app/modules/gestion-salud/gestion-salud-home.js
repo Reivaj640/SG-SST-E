@@ -600,17 +600,17 @@ class GestionSaludHome {
 
                             // Solo procesar si el empleado tiene casos que suman más de 15 días
                             if (empleadoTieneMasDe15Dias) {
-                                console.log(`[DEBUG] Procesando empleado con seguimiento: ${empId}, Último estado: ${estado}, Total días > 15`);
+                                // console.log(`[DEBUG] Procesando empleado con seguimiento: ${empId}, Último estado: ${estado}, Total días > 15`);
 
                                 if (estado && estado.toLowerCase() === 'recovered') {
                                     totalRealizados++;
-                                    console.log(`[DEBUG] Caso contado como realizado: ${estado}`);
+                                    // console.log(`[DEBUG] Caso contado como realizado: ${estado}`);
                                 } else if (estado) {
                                     // Considerar como pendiente/activo cualquier estado que no sea recovered
                                     totalPendientes++;
-                                    console.log(`[DEBUG] Caso contado como pendiente: ${estado}`);
+                                    // console.log(`[DEBUG] Caso contado como pendiente: ${estado}`);
                                 } else {
-                                    console.log(`[DEBUG] Caso sin estado definido, contado como pendiente`);
+                                    // console.log(`[DEBUG] Caso sin estado definido, contado como pendiente`);
                                     totalPendientes++; // Por seguridad, contamos sin estado como pendiente
                                 }
                             } else {

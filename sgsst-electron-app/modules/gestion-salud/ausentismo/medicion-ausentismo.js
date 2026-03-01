@@ -836,11 +836,24 @@ class MedicionAusentismoComponent {
             return;
         }
 
+        // 🆕 CONTAR CASOS PRIC (ARL) - Buscar en TODOS los registros por tipo ARL
+        this.seguimientoData.forEach(empleado => {
+            const incapacidades = empleado.incapacidades || [];
+            incapacidades.forEach(incapacidad => {
+                const tipo = incapacidad.record?.['CLASE DE INCAPACIDAD'] || 
+                            incapacidad.record?.['clase_de_incapacidad'] || 
+                            incapacidad.record?.['TIPO'] || '';
+                if (tipo.toUpperCase() === 'ARL') {
+                    casosPRIC++;
+                }
+            });
+        });
+
         this.seguimientoData.forEach(empleado => {
             // 🆕 IMPORTANTE: Contar solo UNA vez por EMPLEADO, no por cada incapacidad
             // Identificar la incapacidad PRINCIPAL (la más reciente) para determinar el estado
             const incapacidades = empleado.incapacidades || [];
-            
+
             if (incapacidades.length === 0) {
                 // Sin incapacidades -> Sin Iniciar
                 sinIniciar++;
@@ -873,13 +886,7 @@ class MedicionAusentismoComponent {
             if (estado === 'En Seguimiento') {
                 enSeguimiento++;
             } else if (estado === 'Cerrado') {
-                casosPRIC++;
-                // Casos cerrados este mes (fecha fin en el mes actual y ya venció)
-                const finMonth = fechaFin.toLocaleString('default', { month: 'long' }).toUpperCase();
-                const finYear = fechaFin.getFullYear();
-                if (finMonth === currentMonth && finYear === today.getFullYear() && diffDays < 0) {
-                    cerradosMes++;
-                }
+                cerradosMes++; // 🆕 Ahora cuenta TODOS los casos cerrados, no solo los del mes
             } else if (estado === 'Sin Iniciar') {
                 sinIniciar++;
             }
@@ -1391,56 +1398,77 @@ class MedicionAusentismoComponent {
     calculateKPIsFromFilteredData(filteredData) {
         const today = new Date();
         const currentMonth = today.toLocaleString('default', { month: 'long' }).toUpperCase();
-        let casosActivos = 0;
-        let proximosVencer = 0;
-        let docsPendientes = 0;
+        let enSeguimiento = 0;
+        let casosPRIC = 0;
+        let sinIniciar = 0;
         let cerradosMes = 0;
 
         console.log('[KPIs Filtered] Calculando con', filteredData.length, 'registros filtrados');
 
+        // Calcular KPIs usando EXACTAMENTE la misma lógica que renderSeguimientoTableWithBody()
         filteredData.forEach(empleado => {
             const incapacidades = empleado.incapacidades || [];
-            
-            incapacidades.forEach(inc => {
-                const fechaFin = inc.fechaFin ? new Date(inc.fechaFin) : null;
-                const fechaInicio = inc.fechaInicio ? new Date(inc.fechaInicio) : null;
 
-                if (!fechaFin || !fechaInicio) return;
+            if (incapacidades.length === 0) {
+                sinIniciar++;
+                console.log(`[KPIs Filtered] ${empleado.nombre}: SIN INICIAR (sin incapacidades)`);
+                return;
+            }
 
-                const diffTime = fechaFin - today;
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            // 🆕 IDENTIFICAR la incapacidad PRINCIPAL (MISMA LÓGICA QUE LA TABLA)
+            // Primero, buscar incapacidades >= 10 días (Condición 1)
+            const incapacidadesLargas = incapacidades.filter(inc => inc.diasIncapacidad >= 10);
 
-                // Casos activos (fecha fin futura o dentro de los últimos 30 días)
-                if (diffDays >= -30) {
-                    casosActivos++;
+            let incapacidadPrincipal = null;
 
-                    // Próximos a vencer (menos de 2 días)
-                    if (diffDays >= 0 && diffDays <= 2) {
-                        proximosVencer++;
-                    }
-                }
+            if (incapacidadesLargas.length > 0) {
+                // Condición 1: Tomar la incapacidad >= 10 días MÁS RECIENTE
+                incapacidadPrincipal = incapacidadesLargas[incapacidadesLargas.length - 1];
+            } else if (incapacidades.length > 1) {
+                // Condición 2: Secuencia de incapacidades - Tomar la última de la secuencia
+                incapacidadPrincipal = incapacidades[incapacidades.length - 1];
+            } else {
+                // Caso fallback: tomar la única incapacidad disponible
+                incapacidadPrincipal = incapacidades.length > 0 ? incapacidades[incapacidades.length - 1] : null;
+            }
 
-                // Casos cerrados este mes (fecha fin en el mes actual y ya venció)
-                const finMonth = fechaFin.toLocaleString('default', { month: 'long' }).toUpperCase();
-                const finYear = fechaFin.getFullYear();
-                if (finMonth === currentMonth && finYear === today.getFullYear() && diffDays < 0) {
-                    cerradosMes++;
-                }
-            });
+            if (!incapacidadPrincipal) {
+                sinIniciar++;
+                return;
+            }
 
-            // Docs pendientes (simulado - verificar si hay diagnóstico)
-            if (!empleado.incapacidades || empleado.incapacidades.every(inc => !inc.diagnostico)) {
-                docsPendientes++;
+            // 🆕 CONTAR CASOS PRIC (ARL) - Solo de la incapacidad principal (la que se muestra en la columna "Tipo" de la tabla)
+            const tipoPrincipal = incapacidadPrincipal.record?.['CLASE DE INCAPACIDAD'] ||
+                                 incapacidadPrincipal.record?.['clase_de_incapacidad'] ||
+                                 incapacidadPrincipal.record?.['TIPO'] || '';
+            if (tipoPrincipal.toUpperCase() === 'ARL') {
+                casosPRIC++;
+            }
+
+            // 🆕 Determinar estado usando la misma lógica con fechas de cierre
+            const estadoInfo = this.determinarEstadoCaso(incapacidadPrincipal, empleado.registroPRI);
+            const estado = estadoInfo.estado;
+
+            console.log(`[KPIs Filtered] ${empleado.nombre}: ${estado} (Tipo: ${tipoPrincipal}, registroPRI: ${empleado.registroPRI ? 'SÍ' : 'NO'})`);
+
+            // Contar por estado (UNA SOLA VEZ por empleado)
+            if (estado === 'En Seguimiento') {
+                enSeguimiento++;
+            } else if (estado === 'Cerrado') {
+                cerradosMes++; // Ahora cuenta TODOS los casos cerrados filtrados
+            } else if (estado === 'Sin Iniciar') {
+                sinIniciar++;
             }
         });
 
-        console.log('[KPIs Filtered] Resultados:', { casosActivos, proximosVencer, docsPendientes, cerradosMes });
+        console.log('[KPIs Filtered] Resultados:', { enSeguimiento, casosPRIC, sinIniciar, cerradosMes, total: filteredData.length });
+        console.log('[KPIs Filtered] Verificación:', enSeguimiento + casosPRIC + sinIniciar, '==', filteredData.length);
 
-        // Actualizar UI de KPIs
+        // Actualizar UI de KPIs - MISMAS TARJETAS QUE calculateKPIs()
         const kpiElements = document.querySelectorAll('.kpi-value');
-        if (kpiElements[0]) kpiElements[0].textContent = casosActivos;
-        if (kpiElements[1]) kpiElements[1].textContent = proximosVencer;
-        if (kpiElements[2]) kpiElements[2].textContent = docsPendientes;
+        if (kpiElements[0]) kpiElements[0].textContent = enSeguimiento;
+        if (kpiElements[1]) kpiElements[1].textContent = casosPRIC;
+        if (kpiElements[2]) kpiElements[2].textContent = sinIniciar;
         if (kpiElements[3]) kpiElements[3].textContent = cerradosMes;
     }
 
