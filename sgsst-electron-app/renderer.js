@@ -1017,20 +1017,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     logMessage('Renderer: Conectado al sistema de logs del proceso principal.', 'DEBUG');
 
-    // --- Lógica para Auto Updater ---
-    window.electronAPI.onUpdateAvailable(() => {
-      logMessage('Nueva actualización disponible. Descargando en segundo plano.', 'INFO');
-      // Opcional: Muestra una notificación no intrusiva en tu UI.
-      // Por ejemplo, usando tu función de alerta personalizada:
-      showCustomAlert('Hay una nueva actualización disponible y se está descargando.');
+    // --- Lógica para Auto Updater con Notificaciones Modernas ---
+    
+    // Cuando hay una actualización disponible (comienza la descarga)
+    window.electronAPI.onUpdateAvailable && window.electronAPI.onUpdateAvailable((info) => {
+      logMessage(`Actualización disponible: ${info ? info.version : 'nueva versión'}`, 'INFO');
+      // El sistema de notificaciones se activa automáticamente desde update-notifications.js
     });
 
-    window.electronAPI.onUpdateDownloaded(() => {
-      logMessage('Actualización lista para instalar.', 'INFO');
-      // Usar confirm() es simple, pero una ventana modal personalizada sería mejor UX.
-      const userResponse = confirm('¡Actualización descargada! ¿Desea reiniciar la aplicación ahora para instalarla?');
-      if (userResponse) {
-        window.electronAPI.restartApp();
+    // Cuando la descarga se completa
+    window.electronAPI.onUpdateDownloaded && window.electronAPI.onUpdateDownloaded((info) => {
+      logMessage('Actualización descargada y lista para instalar', 'INFO');
+      
+      // Mostrar notificación moderna con botón de reinicio
+      const version = info ? info.version : 'más reciente';
+      
+      if (window.updateNotifier) {
+        window.updateNotifier.notifyDownloaded(version, () => {
+          // Reiniciar la aplicación cuando el usuario hace clic en el botón
+          logMessage('Usuario solicitó reiniciar para instalar actualización', 'INFO');
+          window.electronAPI.restartApp && window.electronAPI.restartApp();
+        });
+      } else {
+        // Fallback a confirmación tradicional si el sistema de notificaciones no está disponible
+        const userResponse = confirm(`¡Actualización ${version} descargada! ¿Desea reiniciar la aplicación ahora para instalarla?`);
+        if (userResponse) {
+          window.electronAPI.restartApp && window.electronAPI.restartApp();
+        }
       }
     });
 
