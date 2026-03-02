@@ -99,13 +99,15 @@ function verEstadisticas() {
  */
 function generarInforme() {
     console.log('[HOME] Abriendo constructor de informes PRI en la misma ventana...');
-    
+
     // Enviar mensaje a la ventana padre para que cargue la vista del informe
     if (window.parent && window.parent.postMessage) {
         console.log('[HOME] Enviando solicitud para cargar informe-pri-builder.html');
         window.parent.postMessage({
             type: 'load-module-view',
-            path: 'modules/gestion-salud/ausentismo/informe-pri-builder.html'
+            payload: {
+                path: 'modules/gestion-salud/ausentismo/informe-pri-builder.html'
+            }
         }, '*');
     } else {
         // Fallback: intentar cargar directamente si estamos en el contexto principal

@@ -21,65 +21,24 @@
         }
 
         * { box-sizing: border-box; }
-        
-        body { 
-            font-family: 'Inter', sans-serif; 
-            background: var(--bg); 
-            color: var(--text-main); 
-            margin: 0; 
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            min-height: 100vh; 
-            padding: 20px;
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
         }
 
-        .trigger-btn { 
-            background: linear-gradient(135deg, #4F46E5, #4338CA); 
-            color: white; 
-            border: none; 
-            padding: 15px 30px; 
-            border-radius: 8px; 
-            font-size: 16px; 
-            font-weight: 600; 
-            cursor: pointer; 
-            box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.3);
-            transition: transform 0.2s;
-        }
-        
-        .trigger-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 15px 20px -3px rgba(79, 70, 229, 0.4);
-        }
-        
-        /* Modal Principal */
-        .modal-backdrop { 
-            position: fixed; 
-            top: 0; 
-            left: 0; 
-            width: 100%; 
-            height: 100%; 
-            background: rgba(15, 23, 42, 0.7); 
-            backdrop-filter: blur(5px); 
-            display: none; 
-            justify-content: center; 
-            align-items: center; 
-            z-index: 1000; 
-        }
-        
-        .modal-backdrop.active { 
-            display: flex; 
-        }
-        
-        .report-builder { 
-            background: white; 
-            width: 98%; 
-            height: 95vh; 
-            border-radius: 12px; 
-            display: flex; 
-            flex-direction: column; 
-            overflow: hidden; 
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); 
+        /* Report Builder - Ahora se muestra directamente */
+        .report-builder {
+            background: white;
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
 
         /* Header */
@@ -499,125 +458,119 @@
 </head>
 <body>
 
-    <button class="trigger-btn" onclick="openReportBuilder()">
-        <i class="fas fa-file-contract"></i> Generar Informe PRI (Multicaso)
-    </button>
+    <!-- Report Builder - Se muestra directamente sin modal -->
+    <div class="report-builder" id="reportBuilder">
 
-    <!-- Modal Principal -->
-    <div class="modal-backdrop" id="reportModal">
-        <div class="report-builder">
-            
-            <div class="builder-header">
-                <div class="builder-title">
-                    <i class="fas fa-file-medical-alt"></i>
-                    <div>
-                        <h2 style="margin:0; font-size:16px;">Informe de Gestión PRI</h2>
-                        <span style="font-size:11px; color:var(--text-muted);">Seguimiento de incapacidades - K+AIR</span>
-                    </div>
-                </div>
-                <button class="btn-close" onclick="closeReportBuilder()">&times;</button>
-            </div>
-
-            <div class="builder-body">
-                <!-- Sidebar Config -->
-                <div class="config-sidebar">
-                    
-                    <div class="config-section">
-                        <h4>1. Periodo del Informe</h4>
-                        <label style="font-size:10px; color:var(--text-muted); display:block; margin-bottom:5px;">Fecha de inicio:</label>
-                        <input type="date" class="form-control" id="startDate">
-                        <label style="font-size:10px; color:var(--text-muted); display:block; margin-bottom:5px;">Fecha de fin:</label>
-                        <input type="date" class="form-control" id="endDate">
-                        <select class="form-control" id="companyFilter">
-                            <option value="">Todas las empresas</option>
-                        </select>
-                    </div>
-
-                    <div class="config-section">
-                        <h4>2. Casos Detectados (<span id="caseCount">0</span>)</h4>
-                        <p style="font-size:10px; color:var(--text-muted); margin-bottom:5px;">Seleccione un caso para ver detalle:</p>
-                        <div class="case-list" id="caseList">
-                            <!-- Se llena dinámicamente -->
-                        </div>
-                    </div>
-
-                    <div class="config-section">
-                        <h4>3. Contenido del Informe</h4>
-                        <label class="checkbox-label">
-                            <input type="checkbox" checked disabled> 
-                            Datos Personales
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox" checked id="includeIncapacidad"> 
-                            Incapacidad
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox" checked id="includePRIC"> 
-                            Proceso PRIC
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox" checked id="includeSeguimientos"> 
-                            Seguimientos
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="includePCL"> 
-                            Calificación PCL
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox" checked id="includeRecomendaciones"> 
-                            Recomendaciones
-                        </label>
-                    </div>
-                </div>
-
-                <!-- Preview Area -->
-                <div class="preview-area">
-                    
-                    <!-- Controles de Paginación -->
-                    <div class="preview-controls">
-                        <div style="display:flex; gap:10px; align-items:center;">
-                            <button class="btn-nav" onclick="prevPage()" id="prevBtn">
-                                <i class="fas fa-chevron-left"></i> Anterior
-                            </button>
-                            <button class="btn-nav" onclick="nextPage()" id="nextBtn">
-                                Siguiente <i class="fas fa-chevron-right"></i>
-                            </button>
-                        </div>
-                        <div class="page-info" id="pageInfoText">Página 1 de 1</div>
-                        <div style="display:flex; gap:5px;">
-                            <button class="btn-nav" onclick="window.print()">
-                                <i class="fas fa-print"></i> Imprimir
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Contenedor de Páginas -->
-                    <div class="report-container" id="reportContainer">
-                        <div class="loading-state">
-                            <i class="fas fa-spinner"></i>
-                            <p>Cargando datos del informe...</p>
-                        </div>
-                    </div>
-
+        <div class="builder-header">
+            <div class="builder-title">
+                <i class="fas fa-file-medical-alt"></i>
+                <div>
+                    <h2 style="margin:0; font-size:16px;">Informe de Gestión PRI</h2>
+                    <span style="font-size:11px; color:var(--text-muted);">Seguimiento de incapacidades - K+AIR</span>
                 </div>
             </div>
-
-            <div class="builder-footer">
-                <div style="font-size: 11px; color: var(--text-muted); display:flex; align-items:center; gap:5px;">
-                    <i class="fas fa-info-circle"></i> 
-                    <span>El informe incluye resumen consolidado y detalle individual por cada caso.</span>
-                </div>
-                <div style="display: flex; gap: 10px;">
-                    <button class="btn btn-secondary" onclick="exportToExcel()">
-                        <i class="fas fa-file-excel"></i> Excel
-                    </button>
-                    <button class="btn btn-success" onclick="exportToPDF()">
-                        <i class="fas fa-file-pdf"></i> Generar PDF
-                    </button>
-                </div>
-            </div>
-
+            <button class="btn-close" onclick="closeReportBuilder()" title="Cerrar">&times;</button>
         </div>
+
+        <div class="builder-body">
+            <!-- Sidebar Config -->
+            <div class="config-sidebar">
+                
+                <div class="config-section">
+                    <h4>1. Periodo del Informe</h4>
+                    <label style="font-size:10px; color:var(--text-muted); display:block; margin-bottom:5px;">Fecha de inicio:</label>
+                    <input type="date" class="form-control" id="startDate">
+                    <label style="font-size:10px; color:var(--text-muted); display:block; margin-bottom:5px;">Fecha de fin:</label>
+                    <input type="date" class="form-control" id="endDate">
+                    <select class="form-control" id="companyFilter">
+                        <option value="">Todas las empresas</option>
+                    </select>
+                </div>
+
+                <div class="config-section">
+                    <h4>2. Casos Detectados (<span id="caseCount">0</span>)</h4>
+                    <p style="font-size:10px; color:var(--text-muted); margin-bottom:5px;">Seleccione un caso para ver detalle:</p>
+                    <div class="case-list" id="caseList">
+                        <!-- Se llena dinámicamente -->
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h4>3. Contenido del Informe</h4>
+                    <label class="checkbox-label">
+                        <input type="checkbox" checked disabled> 
+                        Datos Personales
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" checked id="includeIncapacidad"> 
+                        Incapacidad
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" checked id="includePRIC"> 
+                        Proceso PRIC
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" checked id="includeSeguimientos"> 
+                        Seguimientos
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="includePCL"> 
+                        Calificación PCL
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" checked id="includeRecomendaciones"> 
+                        Recomendaciones
+                    </label>
+                </div>
+            </div>
+
+            <!-- Preview Area -->
+            <div class="preview-area">
+                
+                <!-- Controles de Paginación -->
+                <div class="preview-controls">
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <button class="btn-nav" onclick="prevPage()" id="prevBtn">
+                            <i class="fas fa-chevron-left"></i> Anterior
+                        </button>
+                        <button class="btn-nav" onclick="nextPage()" id="nextBtn">
+                            Siguiente <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                    <div class="page-info" id="pageInfoText">Página 1 de 1</div>
+                    <div style="display:flex; gap:5px;">
+                        <button class="btn-nav" onclick="window.print()">
+                            <i class="fas fa-print"></i> Imprimir
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Contenedor de Páginas -->
+                <div class="report-container" id="reportContainer">
+                    <div class="loading-state">
+                        <i class="fas fa-spinner"></i>
+                        <p>Cargando datos del informe...</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="builder-footer">
+            <div style="font-size: 11px; color: var(--text-muted); display:flex; align-items:center; gap:5px;">
+                <i class="fas fa-info-circle"></i> 
+                <span>El informe incluye resumen consolidado y detalle individual por cada caso.</span>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-secondary" onclick="exportToExcel()">
+                    <i class="fas fa-file-excel"></i> Excel
+                </button>
+                <button class="btn btn-success" onclick="exportToPDF()">
+                    <i class="fas fa-file-pdf"></i> Generar PDF
+                </button>
+            </div>
+        </div>
+
     </div>
 
     <script>
@@ -636,47 +589,105 @@
 
         // --- INICIALIZACIÓN ---
         
-        function openReportBuilder() {
-            document.getElementById('reportModal').classList.add('active');
-            loadCasesData();
+        console.log('========================================');
+        console.log('[INFORME-PRI] Archivo CARGADO - Versión actualizada');
+        console.log('========================================');
+
+        try {
+            // Inicialización directa al cargar la vista
+            function initializeReportBuilder() {
+                console.log('[INFORME-PRI] Inicializando builder...');
+                
+                // Verificar si existen los elementos del DOM
+                const startDateEl = document.getElementById('startDate');
+                const endDateEl = document.getElementById('endDate');
+                console.log('[INFORME-PRI] Elementos DOM encontrados:', {
+                    startDate: !!startDateEl,
+                    endDate: !!endDateEl
+                });
+                
+                loadCasesData();
+                
+                // Set default dates (current year)
+                const today = new Date();
+                const startOfYear = new Date(today.getFullYear(), 0, 1);
+                if (startDateEl) startDateEl.value = startOfYear.toISOString().split('T')[0];
+                if (endDateEl) endDateEl.value = today.toISOString().split('T')[0];
+                
+                // Event listeners for checkboxes
+                const checkboxes = ['includeIncapacidad', 'includePRIC', 'includeSeguimientos', 'includePCL', 'includeRecomendaciones'];
+                checkboxes.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.addEventListener('change', (e) => {
+                            reportConfig[id] = e.target.checked;
+                            renderPage(currentPage);
+                        });
+                    }
+                });
+            }
             
-            // Set default dates (current year)
-            const today = new Date();
-            const startOfYear = new Date(today.getFullYear(), 0, 1);
-            document.getElementById('startDate').value = startOfYear.toISOString().split('T')[0];
-            document.getElementById('endDate').value = today.toISOString().split('T')[0];
+            function closeReportBuilder() {
+                // Opcional: navegar atrás o cerrar
+                if (window.parent && window.parent.postMessage) {
+                    window.parent.postMessage({ type: 'back-to-module-request' }, '*');
+                }
+            }
+
+            // Auto-inicializar al cargar el DOM
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('[INFORME-PRI] DOMContentLoaded disparado');
+                initializeReportBuilder();
+            });
             
-            // Event listeners for checkboxes
-            document.getElementById('includeIncapacidad').addEventListener('change', (e) => {
-                reportConfig.includeIncapacidad = e.target.checked;
-                renderPage(currentPage);
-            });
-            document.getElementById('includePRIC').addEventListener('change', (e) => {
-                reportConfig.includePRIC = e.target.checked;
-                renderPage(currentPage);
-            });
-            document.getElementById('includeSeguimientos').addEventListener('change', (e) => {
-                reportConfig.includeSeguimientos = e.target.checked;
-                renderPage(currentPage);
-            });
-            document.getElementById('includePCL').addEventListener('change', (e) => {
-                reportConfig.includePCL = e.target.checked;
-                renderPage(currentPage);
-            });
-            document.getElementById('includeRecomendaciones').addEventListener('change', (e) => {
-                reportConfig.includeRecomendaciones = e.target.checked;
-                renderPage(currentPage);
-            });
-        }
-        
-        function closeReportBuilder() {
-            document.getElementById('reportModal').classList.remove('active');
+            // También intentar inicializar inmediatamente si el DOM ya está listo
+            if (document.readyState === 'interactive' || document.readyState === 'complete') {
+                console.log('[INFORME-PRI] DOM ya está listo, inicializando inmediatamente...');
+                setTimeout(() => initializeReportBuilder(), 100);
+            }
+            
+            // Función para obtener la empresa actual
+            function getCurrentCompany() {
+                // Intentar obtener desde diferentes fuentes
+                if (window.currentCompany && window.currentCompany !== 'default_company') {
+                    console.log('[INFORME-PRI] Empresa desde window.currentCompany:', window.currentCompany);
+                    return window.currentCompany;
+                }
+                if (window.rendererState && window.rendererState.selectedCompany) {
+                    console.log('[INFORME-PRI] Empresa desde window.rendererState:', window.rendererState.selectedCompany);
+                    return window.rendererState.selectedCompany;
+                }
+                // Fallback: intentar desde el iframe padre
+                try {
+                    const companyNameEl = window.parent.document.getElementById('company-name');
+                    if (companyNameEl && companyNameEl.textContent && companyNameEl.textContent !== 'Empresa') {
+                        const company = companyNameEl.textContent.trim();
+                        console.log('[INFORME-PRI] Empresa desde DOM padre:', company);
+                        return company;
+                    }
+                } catch (e) {
+                    console.log('[INFORME-PRI] No se pudo obtener empresa del padre:', e.message);
+                }
+                console.log('[INFORME-PRI] Usando empresa por defecto: Aseplus');
+                return 'Aseplus'; // Valor por defecto
+            }
+        } catch (error) {
+            console.error('========================================');
+            console.error('[INFORME-PRI] ERROR CRÍTICO en inicialización:', error);
+            console.error('========================================');
         }
 
         // --- CARGA DE DATOS ---
         
         async function loadCasesData() {
+            console.log('[INFORME-PRI] loadCasesData iniciado');
+            
             const container = document.getElementById('reportContainer');
+            if (!container) {
+                console.error('[INFORME-PRI] No se encontró reportContainer');
+                return;
+            }
+            
             container.innerHTML = `
                 <div class="loading-state">
                     <i class="fas fa-spinner"></i>
@@ -685,29 +696,214 @@
             `;
 
             try {
+                // Obtener la empresa actual
+                const companyName = getCurrentCompany();
+                console.log('[INFORME-PRI] Empresa detectada:', companyName);
+                
                 // Intentar obtener datos desde Electron API
                 if (window.electronAPI && window.electronAPI.getPriSeguimientoData) {
-                    const companyName = document.getElementById('companyFilter').value || '';
-                    const startDate = document.getElementById('startDate').value;
-                    const endDate = document.getElementById('endDate').value;
+                    console.log('[INFORME-PRI] Llamando a getPriSeguimientoData para:', companyName);
+                    const result = await window.electronAPI.getPriSeguimientoData(companyName);
                     
-                    const result = await window.electronAPI.getPriSeguimientoData(companyName, startDate, endDate);
-                    
-                    if (result && result.success && result.data) {
-                        casesData = result.data;
+                    console.log('[INFORME-PRI] Resultado:', result);
+
+                    if (result && result.success && result.rows && result.rows.length > 0) {
+                        // Procesar las filas del Excel a objetos caso
+                        casesData = processPriRowsToCases(result.rows, result.headers);
+                        console.log('[INFORME-PRI] Casos procesados:', casesData.length);
                         processCasesData();
                     } else {
-                        // Datos de prueba si falla la API
+                        console.log('[INFORME-PRI] No hay datos en el PRI (rows:', result?.rows?.length, '), usando datos de prueba');
+                        console.log('[INFORME-PRI] Error del backend:', result?.error);
+                        // Datos de prueba si falla la API o no hay datos
                         loadMockData();
                     }
                 } else {
+                    console.log('[INFORME-PRI] No hay electronAPI.getPriSeguimientoData, usando datos de prueba');
+                    console.log('[INFORME-PRI] window.electronAPI existe:', !!window.electronAPI);
+                    if (window.electronAPI) {
+                        console.log('[INFORME-PRI] Funciones disponibles:', Object.keys(window.electronAPI));
+                    }
                     // Datos de prueba si no hay API
                     loadMockData();
                 }
             } catch (error) {
-                console.error('Error cargando datos:', error);
+                console.error('[INFORME-PRI] Error cargando datos:', error);
                 loadMockData();
             }
+        }
+
+        /**
+         * Convierte las filas del PRI.xlsx a objetos caso estructurados
+         * @param {Array[]} rows - Filas del Excel (array de arrays)
+         * @param {String[]} headers - Encabezados del Excel
+         * @returns {Object[]} Array de objetos caso
+         */
+        function processPriRowsToCases(rows, headers) {
+            console.log('[INFORME-PRI] Headers completos:', headers);
+            
+            // Mapeo de columnas basado en la estructura REAL del PRI.xlsx
+            const colIndex = {
+                item: headers.findIndex(h => h && h.toString().toLowerCase().includes('item')),
+                tipoEvento: headers.findIndex(h => h && h.toString().toLowerCase().includes('tipo de evento')),
+                nombre: headers.findIndex(h => h && h.toString().toLowerCase().includes('nombre trabajador')),
+                cedula: headers.findIndex(h => h && (h.toString().toLowerCase().includes('documento') || h.toString().toLowerCase().includes('identidad'))),
+                genero: headers.findIndex(h => h && h.toString().toLowerCase().includes('género')),
+                edad: headers.findIndex(h => h && h.toString().toLowerCase().includes('edad')),
+                area: headers.findIndex(h => h && h.toString().toLowerCase().includes('sede') || h && h.toString().toLowerCase().includes('área')),
+                cargo: headers.findIndex(h => h && h.toString().toLowerCase().includes('cargo')),
+                eps: headers.findIndex(h => h && h.toString().toLowerCase().includes('eps')),
+                diasIncapacidad: headers.findIndex(h => h && h.toString().toLowerCase().includes('días incapacidad acumulados')),
+                fechaInicio: headers.findIndex(h => h && h.toString().toLowerCase().includes('fecha de inicio de incapacidad')),
+                fechaFin: headers.findIndex(h => h && h.toString().toLowerCase().includes('fecha de finalización')),
+                cie10: headers.findIndex(h => h && h.toString().toLowerCase().includes('cie-10') && h.toString().toLowerCase().includes('dx 1') && !h.toString().toLowerCase().includes('calificada')),
+                diagnostico: headers.findIndex(h => h && h.toString().toLowerCase().includes('diagnostico') && !h.toString().toLowerCase().includes('cie')),
+                origen: headers.findIndex(h => h && h.toString().toLowerCase().includes('origen') && h.toString().toLowerCase().includes('dx 1') && !h.toString().toLowerCase().includes('calificada')),
+                estado: headers.findIndex(h => h && h.toString().toLowerCase().includes('estado caso') || h && h.toString().toLowerCase().includes('motivo de cierre')),
+                fechaCierre: headers.findIndex(h => h && h.toString().toLowerCase().includes('fecha de cierre')),
+                antiguedad: headers.findIndex(h => h && h.toString().toLowerCase().includes('antigüedad') && h.toString().toLowerCase().includes('años')),
+                // Seguimientos (columnas múltiples)
+                seguimiento1Fecha: headers.findIndex(h => h && h.toString().toLowerCase().includes('seguimiento 1') && !h.toString().toLowerCase().includes('descr')),
+                seguimiento1Desc: headers.findIndex(h => h && h.toString().toLowerCase().includes('seguimiento 1') && h.toString().toLowerCase().includes('descr')),
+                seguimiento2Fecha: headers.findIndex(h => h && h.toString().toLowerCase().includes('seguimiento 2') && !h.toString().toLowerCase().includes('descr')),
+                seguimiento2Desc: headers.findIndex(h => h && h.toString().toLowerCase().includes('seguimiento 2') && h.toString().toLowerCase().includes('descr')),
+                seguimiento3Fecha: headers.findIndex(h => h && h.toString().toLowerCase().includes('seguimiento 3') && !h.toString().toLowerCase().includes('descr')),
+                seguimiento3Desc: headers.findIndex(h => h && h.toString().toLowerCase().includes('seguimiento 3') && h.toString().toLowerCase().includes('descr')),
+                // PCL - Calificación de Pérdida de Capacidad Laboral
+                pclFecha: headers.findIndex(h => h && h.toString().toLowerCase().includes('fecha de calificación')),
+                pclPorcentaje: headers.findIndex(h => h && h.toString().toLowerCase().includes('porcentaje') && h.toString().toLowerCase().includes('pcl')),
+                pclOrigen: headers.findIndex(h => h && h.toString().toLowerCase().includes('origen del caso')),
+                // PCL - DX 1-4 (CIE-10 y Origen)
+                pclCie10_1: headers.findIndex(h => h && h.toString().toLowerCase().includes('cie-10 calificada') && h.toString().toLowerCase().includes('dx 1')),
+                pclOrigen_1: headers.findIndex(h => h && h.toString().toLowerCase().includes('origen dx 1') && h.toString().toLowerCase().includes('calificada')),
+                pclCie10_2: headers.findIndex(h => h && h.toString().toLowerCase().includes('cie-10 calificada') && h.toString().toLowerCase().includes('dx 2')),
+                pclOrigen_2: headers.findIndex(h => h && h.toString().toLowerCase().includes('origen dx 2') && h.toString().toLowerCase().includes('calificada')),
+                pclCie10_3: headers.findIndex(h => h && h.toString().toLowerCase().includes('cie-10 calificada') && h.toString().toLowerCase().includes('dx 3')),
+                pclOrigen_3: headers.findIndex(h => h && h.toString().toLowerCase().includes('origen dx 3') && h.toString().toLowerCase().includes('calificada')),
+                pclCie10_4: headers.findIndex(h => h && h.toString().toLowerCase().includes('cie-10 calificada') && h.toString().toLowerCase().includes('dx 4')),
+                pclOrigen_4: headers.findIndex(h => h && h.toString().toLowerCase().includes('origen dx 4') && h.toString().toLowerCase().includes('calificada')),
+                // Recomendaciones
+                recomendacionEmitida: headers.findIndex(h => h && h.toString().toLowerCase().includes('recomendación emitida') || h && h.toString().toLowerCase().includes('recomendacion emitida')),
+                recomendacionEntidad: headers.findIndex(h => h && h.toString().toLowerCase().includes('entidad') && h.toString().toLowerCase().includes('recomendación')),
+                recomendacionCumple: headers.findIndex(h => h && h.toString().toLowerCase().includes('cumple') || h && h.toString().toLowerCase().includes('seguimiento a recomendacion')),
+                recomendacionesVigentes: headers.findIndex(h => h && h.toString().toLowerCase().includes('recomendaciones laborales vigentes') || h && h.toString().toLowerCase().includes('descripcion recomendaciones'))
+            };
+
+            console.log('[INFORME-PRI] Mapeo de columnas:', colIndex);
+
+            return rows.map((row, index) => {
+                // Obtener valores con fallback
+                const getCellValue = (colIdx) => {
+                    if (colIdx < 0 || colIdx >= row.length) return null;
+                    const val = row[colIdx];
+                    return val !== null && val !== undefined && val !== '' ? val.toString().trim() : null;
+                };
+
+                const nombre = getCellValue(colIndex.nombre) || 'Sin nombre';
+                const cedula = getCellValue(colIndex.cedula) || `00${index + 1}`;
+                const cargo = getCellValue(colIndex.cargo) || 'Cargo no registrado';
+                const area = getCellValue(colIndex.area) || 'Área no registrada';
+                const eps = getCellValue(colIndex.eps) || 'N/A';
+                
+                // Calcular días
+                let diasRaw = parseInt(getCellValue(colIndex.diasIncapacidad)) || 0;
+                if (!diasRaw) {
+                    const fechaIni = getCellValue(colIndex.fechaInicio);
+                    const fechaFin = getCellValue(colIndex.fechaFin);
+                    if (fechaIni && fechaFin) {
+                        const ini = new Date(fechaIni);
+                        const fin = new Date(fechaFin);
+                        if (!isNaN(ini) && !isNaN(fin)) {
+                            diasRaw = Math.ceil((fin - ini) / (1000 * 60 * 60 * 24)) + 1;
+                        }
+                    }
+                }
+
+                // Determinar estado
+                const estadoRaw = getCellValue(colIndex.estado) || '';
+                const fechaCierreVal = getCellValue(colIndex.fechaCierre);
+                const estado = fechaCierreVal || estadoRaw.toLowerCase().includes('cerrado') || estadoRaw.toLowerCase().includes('alta')
+                    ? 'Cerrado'
+                    : 'En Seguimiento';
+
+                // Determinar origen
+                const origenRaw = getCellValue(colIndex.origen) || getCellValue(colIndex.tipoEvento) || '';
+                const origen = origenRaw.toUpperCase().includes('AT') ? 'AT' :
+                               origenRaw.toUpperCase().includes('EL') || origenRaw.toUpperCase().includes('ENFERMEDAD') ? 'EL' :
+                               origenRaw.toUpperCase().includes('COMÚN') || origenRaw.toUpperCase().includes('COMUN') ? 'Común' : 'Común';
+
+                // Extraer seguimientos de las columnas múltiples
+                const seguimientos = [];
+                for (let i = 1; i <= 5; i++) {
+                    const fechaKey = `seguimiento${i}Fecha`;
+                    const descKey = `seguimiento${i}Desc`;
+                    const fechaSeg = getCellValue(colIndex[fechaKey]);
+                    const descSeg = getCellValue(colIndex[descKey]);
+                    if (fechaSeg || descSeg) {
+                        seguimientos.push({
+                            fecha: fechaSeg || 'N/A',
+                            descripcion: descSeg || 'Sin descripción'
+                        });
+                    }
+                }
+
+                // Datos PCL - Calificación
+                const pclData = {
+                    fecha: getCellValue(colIndex.pclFecha),
+                    porcentaje: getCellValue(colIndex.pclPorcentaje),
+                    origen: getCellValue(colIndex.pclOrigen),
+                    diagnosticos: [
+                        { cie10: getCellValue(colIndex.pclCie10_1), origen: getCellValue(colIndex.pclOrigen_1) },
+                        { cie10: getCellValue(colIndex.pclCie10_2), origen: getCellValue(colIndex.pclOrigen_2) },
+                        { cie10: getCellValue(colIndex.pclCie10_3), origen: getCellValue(colIndex.pclOrigen_3) },
+                        { cie10: getCellValue(colIndex.pclCie10_4), origen: getCellValue(colIndex.pclOrigen_4) }
+                    ].filter(d => d.cie10 || d.origen)
+                };
+
+                // Extraer recomendaciones
+                const recomendaciones = [];
+                const recomendacionTexto = getCellValue(colIndex.recomendacionEmitida) || getCellValue(colIndex.recomendacionesVigentes);
+                const entidadRec = getCellValue(colIndex.recomendacionEntidad) || 'EPS/ARL';
+                const cumpleRec = getCellValue(colIndex.recomendacionCumple);
+
+                if (recomendacionTexto) {
+                    // Si hay múltiples recomendaciones separadas por punto y coma
+                    const recsList = recomendacionTexto.split(/[;|]/).filter(r => r.trim());
+                    recsList.forEach((rec, idx) => {
+                        recomendaciones.push({
+                            recomendacion: rec.trim(),
+                            entidad: entidadRec,
+                            cumple: cumpleRec || (idx === 0 ? 'EN PROCESO' : 'PENDIENTE')
+                        });
+                    });
+                }
+
+                return {
+                    id: index + 1,
+                    name: nombre,
+                    id_doc: cedula,
+                    status: estado,
+                    days: diasRaw,
+                    diag: getCellValue(colIndex.diagnostico) || getCellValue(colIndex.cie10) || 'Diagnóstico no registrado',
+                    cie10: getCellValue(colIndex.cie10) || 'N/A',
+                    origin: origen,
+                    cargo: cargo,
+                    area: area,
+                    eps: eps,
+                    arl: 'N/A', // No hay columna ARL en este PRI
+                    fechaInicio: getCellValue(colIndex.fechaInicio) || '',
+                    fechaFin: getCellValue(colIndex.fechaFin) || '',
+                    antiguedad: getCellValue(colIndex.antiguedad) || 'N/A',
+                    seguimientos: seguimientos,
+                    pcl: pclData,
+                    pric: {
+                        etapa1: { estado: 'OK', fecha: getCellValue(colIndex.fechaInicio) || '-', responsable: 'Gerencia' },
+                        etapa2: { estado: 'OK', fecha: '-', responsable: 'ARL' },
+                        etapa3: { estado: estado === 'En Seguimiento' ? 'EN CURSO' : 'OK', fecha: '-', responsable: 'EPS' }
+                    },
+                    recomendaciones: recomendaciones
+                };
+            }).filter(c => c.name && c.name !== 'Sin nombre');
         }
 
         function loadMockData() {
@@ -1211,9 +1407,9 @@
             window.print();
         }
 
-        // Cerrar modal con ESC
+        // Cerrar con ESC
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && document.getElementById('reportModal').classList.contains('active')) {
+            if (e.key === 'Escape') {
                 closeReportBuilder();
             }
         });
