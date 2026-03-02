@@ -485,6 +485,9 @@
                     <select class="form-control" id="companyFilter">
                         <option value="">Todas las empresas</option>
                     </select>
+                    <button class="btn btn-primary" onclick="applyDateFilter()" style="width: 100%; margin-top: 10px;">
+                        <i class="fas fa-filter"></i> Filtrar por Fechas
+                    </button>
                 </div>
 
                 <div class="config-section">
@@ -578,6 +581,7 @@
         let currentPage = 0;
         let totalPages = 0;
         let casesData = [];
+        let allCasesData = []; // Todos los casos sin filtrar
         let summaryData = {};
         let reportConfig = {
             includeIncapacidad: true,
@@ -585,6 +589,10 @@
             includeSeguimientos: true,
             includePCL: false,
             includeRecomendaciones: true
+        };
+        let dateFilter = {
+            startDate: null,
+            endDate: null
         };
 
         // --- INICIALIZACIÓN ---
@@ -613,6 +621,10 @@
                 const startOfYear = new Date(today.getFullYear(), 0, 1);
                 if (startDateEl) startDateEl.value = startOfYear.toISOString().split('T')[0];
                 if (endDateEl) endDateEl.value = today.toISOString().split('T')[0];
+                
+                // Guardar fechas iniciales
+                dateFilter.startDate = startDateEl ? startDateEl.value : null;
+                dateFilter.endDate = endDateEl ? endDateEl.value : null;
                 
                 // Event listeners for checkboxes
                 const checkboxes = ['includeIncapacidad', 'includePRIC', 'includeSeguimientos', 'includePCL', 'includeRecomendaciones'];
@@ -709,9 +721,11 @@
 
                     if (result && result.success && result.rows && result.rows.length > 0) {
                         // Procesar las filas del Excel a objetos caso
-                        casesData = processPriRowsToCases(result.rows, result.headers);
-                        console.log('[INFORME-PRI] Casos procesados:', casesData.length);
-                        processCasesData();
+                        allCasesData = processPriRowsToCases(result.rows, result.headers);
+                        console.log('[INFORME-PRI] Casos procesados:', allCasesData.length);
+                        
+                        // Aplicar filtro de fechas inicial
+                        applyDateFilter();
                     } else {
                         console.log('[INFORME-PRI] No hay datos en el PRI (rows:', result?.rows?.length, '), usando datos de prueba');
                         console.log('[INFORME-PRI] Error del backend:', result?.error);
@@ -734,6 +748,58 @@
         }
 
         /**
+         * Aplica el filtro de fechas a los casos cargados
+         */
+        function applyDateFilter() {
+            const startDateEl = document.getElementById('startDate');
+            const endDateEl = document.getElementById('endDate');
+            
+            const startDate = startDateEl ? startDateEl.value : null;
+            const endDate = endDateEl ? endDateEl.value : null;
+            
+            console.log('[INFORME-PRI] Aplicando filtro de fechas:', { startDate, endDate });
+            
+            // Guardar filtro
+            dateFilter.startDate = startDate;
+            dateFilter.endDate = endDate;
+            
+            // Filtrar casos
+            if (startDate && endDate) {
+                const start = new Date(startDate);
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999); // Incluir todo el día final
+                
+                casesData = allCasesData.filter(caso => {
+                    const fechaInicio = caso.fechaInicio ? new Date(caso.fechaInicio) : null;
+                    const fechaFin = caso.fechaFin ? new Date(caso.fechaFin) : null;
+                    
+                    // Un caso está dentro del rango si:
+                    // 1. Su fecha de inicio está entre start y end, O
+                    // 2. Su fecha de fin está entre start y end, O
+                    // 3. El rango del caso incluye completamente el rango de filtro
+                    if (fechaInicio && fechaFin) {
+                        return (fechaInicio >= start && fechaInicio <= end) ||
+                               (fechaFin >= start && fechaFin <= end) ||
+                               (fechaInicio <= start && fechaFin >= end);
+                    } else if (fechaInicio) {
+                        return fechaInicio >= start && fechaInicio <= end;
+                    } else if (fechaFin) {
+                        return fechaFin >= start && fechaFin <= end;
+                    }
+                    return false;
+                });
+                
+                console.log('[INFORME-PRI] Casos filtrados:', casesData.length, 'de', allCasesData.length);
+            } else {
+                // Sin filtro, mostrar todos
+                casesData = [...allCasesData];
+                console.log('[INFORME-PRI] Mostrando todos los casos:', casesData.length);
+            }
+            
+            processCasesData();
+        }
+
+        /**
          * Convierte las filas del PRI.xlsx a objetos caso estructurados
          * @param {Array[]} rows - Filas del Excel (array de arrays)
          * @param {String[]} headers - Encabezados del Excel
@@ -745,33 +811,37 @@
             // Mapeo de columnas basado en la estructura REAL del PRI.xlsx
             const colIndex = {
                 item: headers.findIndex(h => h && h.toString().toLowerCase().includes('item')),
-                tipoEvento: headers.findIndex(h => h && h.toString().toLowerCase().includes('tipo de evento')),
+                tipoEvento: headers.findIndex(h => h && h.toString().toLowerCase().includes('tipo de evento at') || h && h.toString().toLowerCase().includes('tipo de evento')),
                 nombre: headers.findIndex(h => h && h.toString().toLowerCase().includes('nombre trabajador')),
-                cedula: headers.findIndex(h => h && (h.toString().toLowerCase().includes('documento') || h.toString().toLowerCase().includes('identidad'))),
+                cedula: headers.findIndex(h => h && (h.toString().toLowerCase().includes('documento de identidad') || h.toString().toLowerCase().includes('identificación'))),
                 genero: headers.findIndex(h => h && h.toString().toLowerCase().includes('género')),
                 edad: headers.findIndex(h => h && h.toString().toLowerCase().includes('edad')),
-                area: headers.findIndex(h => h && h.toString().toLowerCase().includes('sede') || h && h.toString().toLowerCase().includes('área')),
-                cargo: headers.findIndex(h => h && h.toString().toLowerCase().includes('cargo')),
+                area: headers.findIndex(h => h && (h.toString().toLowerCase().includes('sede') || h.toString().toLowerCase().includes('área'))),
+                cargo: headers.findIndex(h => h && h.toString().trim().toLowerCase() === 'cargo'),
                 eps: headers.findIndex(h => h && h.toString().toLowerCase().includes('eps')),
                 diasIncapacidad: headers.findIndex(h => h && h.toString().toLowerCase().includes('días incapacidad acumulados')),
                 fechaInicio: headers.findIndex(h => h && h.toString().toLowerCase().includes('fecha de inicio de incapacidad')),
-                fechaFin: headers.findIndex(h => h && h.toString().toLowerCase().includes('fecha de finalización')),
+                fechaFin: headers.findIndex(h => h && h.toString().toLowerCase().includes('fecha de finalización de incapacidad')),
                 cie10: headers.findIndex(h => h && h.toString().toLowerCase().includes('cie-10') && h.toString().toLowerCase().includes('dx 1') && !h.toString().toLowerCase().includes('calificada')),
                 diagnostico: headers.findIndex(h => h && h.toString().toLowerCase().includes('diagnostico') && !h.toString().toLowerCase().includes('cie')),
-                origen: headers.findIndex(h => h && h.toString().toLowerCase().includes('origen') && h.toString().toLowerCase().includes('dx 1') && !h.toString().toLowerCase().includes('calificada')),
+                origen: headers.findIndex(h => h && h.toString().toLowerCase().includes('origen incapacidad dx 1') || h && h.toString().toLowerCase().includes('origen dx 1') && !h.toString().toLowerCase().includes('calificada')),
                 estado: headers.findIndex(h => h && h.toString().toLowerCase().includes('estado caso') || h && h.toString().toLowerCase().includes('motivo de cierre')),
                 fechaCierre: headers.findIndex(h => h && h.toString().toLowerCase().includes('fecha de cierre')),
-                antiguedad: headers.findIndex(h => h && h.toString().toLowerCase().includes('antigüedad') && h.toString().toLowerCase().includes('años')),
-                // Seguimientos (columnas múltiples)
-                seguimiento1Fecha: headers.findIndex(h => h && h.toString().toLowerCase().includes('seguimiento 1') && !h.toString().toLowerCase().includes('descr')),
-                seguimiento1Desc: headers.findIndex(h => h && h.toString().toLowerCase().includes('seguimiento 1') && h.toString().toLowerCase().includes('descr')),
-                seguimiento2Fecha: headers.findIndex(h => h && h.toString().toLowerCase().includes('seguimiento 2') && !h.toString().toLowerCase().includes('descr')),
-                seguimiento2Desc: headers.findIndex(h => h && h.toString().toLowerCase().includes('seguimiento 2') && h.toString().toLowerCase().includes('descr')),
-                seguimiento3Fecha: headers.findIndex(h => h && h.toString().toLowerCase().includes('seguimiento 3') && !h.toString().toLowerCase().includes('descr')),
-                seguimiento3Desc: headers.findIndex(h => h && h.toString().toLowerCase().includes('seguimiento 3') && h.toString().toLowerCase().includes('descr')),
+                antiguedad: headers.findIndex(h => h && h.toString().toLowerCase().includes('antigüedad en años en empresa actual')),
+                // Seguimientos (columnas múltiples) - Estructura: header "SEGUIMIENTO N" = fecha, header null siguiente = descripción
+                seguimiento1Fecha: headers.findIndex(h => h && h.toString().toLowerCase().includes('seguimiento 1') && !h.toString().toLowerCase().includes('dx')),
+                seguimiento1Desc: 30, // Columna siguiente a SEGUIMIENTO 1 (índice 29)
+                seguimiento2Fecha: headers.findIndex(h => h && h.toString().toLowerCase().includes('seguimiento 2') && !h.toString().toLowerCase().includes('dx')),
+                seguimiento2Desc: 32, // Columna siguiente a SEGUIMIENTO 2 (índice 31)
+                seguimiento3Fecha: headers.findIndex(h => h && h.toString().toLowerCase().includes('seguimiento 3') && !h.toString().toLowerCase().includes('dx')),
+                seguimiento3Desc: 34, // Columna siguiente a SEGUIMIENTO 3 (índice 33)
+                seguimiento4Fecha: headers.findIndex(h => h && h.toString().toLowerCase().includes('seguimiento 4') && !h.toString().toLowerCase().includes('dx')),
+                seguimiento4Desc: 36, // Columna siguiente a SEGUIMIENTO 4 (índice 35)
+                seguimiento5Fecha: headers.findIndex(h => h && h.toString().toLowerCase().includes('seguimiento 5') && !h.toString().toLowerCase().includes('dx')),
+                seguimiento5Desc: 38, // Columna siguiente a SEGUIMIENTO 5 (índice 37)
                 // PCL - Calificación de Pérdida de Capacidad Laboral
-                pclFecha: headers.findIndex(h => h && h.toString().toLowerCase().includes('fecha de calificación')),
-                pclPorcentaje: headers.findIndex(h => h && h.toString().toLowerCase().includes('porcentaje') && h.toString().toLowerCase().includes('pcl')),
+                pclFecha: headers.findIndex(h => h && h.toString().toLowerCase().includes('fecha de calificación de pcl')),
+                pclPorcentaje: headers.findIndex(h => h && h.toString().toLowerCase().includes('porcentaje de pcl')),
                 pclOrigen: headers.findIndex(h => h && h.toString().toLowerCase().includes('origen del caso')),
                 // PCL - DX 1-4 (CIE-10 y Origen)
                 pclCie10_1: headers.findIndex(h => h && h.toString().toLowerCase().includes('cie-10 calificada') && h.toString().toLowerCase().includes('dx 1')),
@@ -782,10 +852,22 @@
                 pclOrigen_3: headers.findIndex(h => h && h.toString().toLowerCase().includes('origen dx 3') && h.toString().toLowerCase().includes('calificada')),
                 pclCie10_4: headers.findIndex(h => h && h.toString().toLowerCase().includes('cie-10 calificada') && h.toString().toLowerCase().includes('dx 4')),
                 pclOrigen_4: headers.findIndex(h => h && h.toString().toLowerCase().includes('origen dx 4') && h.toString().toLowerCase().includes('calificada')),
-                // Recomendaciones
-                recomendacionEmitida: headers.findIndex(h => h && h.toString().toLowerCase().includes('recomendación emitida') || h && h.toString().toLowerCase().includes('recomendacion emitida')),
-                recomendacionEntidad: headers.findIndex(h => h && h.toString().toLowerCase().includes('entidad') && h.toString().toLowerCase().includes('recomendación')),
-                recomendacionCumple: headers.findIndex(h => h && h.toString().toLowerCase().includes('cumple') || h && h.toString().toLowerCase().includes('seguimiento a recomendacion')),
+                // Recomendaciones - Estructura: 10 filas repetidas (índices 99-102, 105-108, 111-114, etc.)
+                // Fila 1: 99 (RECOMENDACIÓN), 100 (ENTIDAD), 101 (FECHA LIMITE), 102 (CUMPLE?)
+                // Fila 2: 105 (RECOMENDACIÓN), 106 (ENTIDAD), 107 (FECHA LIMITE), 108 (CUMPLE?)
+                // etc.
+                recomendacionesFilas: [
+                    { emitida: 99, entidad: 100, fechaLimite: 101, cumple: 102 },
+                    { emitida: 105, entidad: 106, fechaLimite: 107, cumple: 108 },
+                    { emitida: 111, entidad: 112, fechaLimite: 113, cumple: 114 },
+                    { emitida: 117, entidad: 118, fechaLimite: 119, cumple: 120 },
+                    { emitida: 123, entidad: 124, fechaLimite: 125, cumple: 126 },
+                    { emitida: 129, entidad: 130, fechaLimite: 131, cumple: 132 },
+                    { emitida: 135, entidad: 136, fechaLimite: 137, cumple: 138 },
+                    { emitida: 141, entidad: 142, fechaLimite: 143, cumple: 144 },
+                    { emitida: 147, entidad: 148, fechaLimite: 149, cumple: 150 },
+                    { emitida: 153, entidad: 154, fechaLimite: 155, cumple: 156 }
+                ],
                 recomendacionesVigentes: headers.findIndex(h => h && h.toString().toLowerCase().includes('recomendaciones laborales vigentes') || h && h.toString().toLowerCase().includes('descripcion recomendaciones'))
             };
 
@@ -860,22 +942,38 @@
                     ].filter(d => d.cie10 || d.origen)
                 };
 
-                // Extraer recomendaciones
+                // Extraer recomendaciones - Iterar sobre las 10 filas posibles
                 const recomendaciones = [];
-                const recomendacionTexto = getCellValue(colIndex.recomendacionEmitida) || getCellValue(colIndex.recomendacionesVigentes);
-                const entidadRec = getCellValue(colIndex.recomendacionEntidad) || 'EPS/ARL';
-                const cumpleRec = getCellValue(colIndex.recomendacionCumple);
-
-                if (recomendacionTexto) {
-                    // Si hay múltiples recomendaciones separadas por punto y coma
-                    const recsList = recomendacionTexto.split(/[;|]/).filter(r => r.trim());
-                    recsList.forEach((rec, idx) => {
+                
+                // Extraer de las filas estructuradas (índices 99-156)
+                colIndex.recomendacionesFilas.forEach((fila, idx) => {
+                    const recomendacionTexto = getCellValue(fila.emitida);
+                    const entidadRec = getCellValue(fila.entidad) || 'EPS/ARL';
+                    const cumpleRec = getCellValue(fila.cumple);
+                    
+                    if (recomendacionTexto) {
                         recomendaciones.push({
-                            recomendacion: rec.trim(),
+                            recomendacion: recomendacionTexto.trim(),
                             entidad: entidadRec,
-                            cumple: cumpleRec || (idx === 0 ? 'EN PROCESO' : 'PENDIENTE')
+                            cumple: cumpleRec || 'PENDIENTE'
                         });
-                    });
+                    }
+                });
+                
+                // Si no hay recomendaciones en las filas estructuradas, intentar con recomendaciones vigentes
+                if (recomendaciones.length === 0) {
+                    const recomendacionVigenteTexto = getCellValue(colIndex.recomendacionesVigentes);
+                    if (recomendacionVigenteTexto) {
+                        // Si hay múltiples recomendaciones separadas por punto y coma
+                        const recsList = recomendacionVigenteTexto.split(/[;|]/).filter(r => r.trim());
+                        recsList.forEach((rec, idx) => {
+                            recomendaciones.push({
+                                recomendacion: rec.trim(),
+                                entidad: 'EPS/ARL',
+                                cumple: idx === 0 ? 'EN PROCESO' : 'PENDIENTE'
+                            });
+                        });
+                    }
                 }
 
                 return {
@@ -897,7 +995,7 @@
                     seguimientos: seguimientos,
                     pcl: pclData,
                     pric: {
-                        etapa1: { estado: 'OK', fecha: getCellValue(colIndex.fechaInicio) || '-', responsable: 'Gerencia' },
+                        etapa1: { estado: 'OK', fecha: getCellValue(colIndex.fechaInicio) || '-', responsable: 'Responsable de SST' },
                         etapa2: { estado: 'OK', fecha: '-', responsable: 'ARL' },
                         etapa3: { estado: estado === 'En Seguimiento' ? 'EN CURSO' : 'OK', fecha: '-', responsable: 'EPS' }
                     },
@@ -908,7 +1006,7 @@
 
         function loadMockData() {
             // Datos de prueba para demostración
-            casesData = [
+            allCasesData = [
                 { 
                     id: 1, 
                     name: "Juan Carlos Pérez", 
@@ -1000,7 +1098,8 @@
                 }
             ];
             
-            processCasesData();
+            // Aplicar filtro inicial
+            applyDateFilter();
         }
 
         function processCasesData() {
@@ -1079,6 +1178,12 @@
         function renderSummaryPage() {
             const today = new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
             
+            // Obtener fechas del filtro para mostrar en el informe
+            const startDateEl = document.getElementById('startDate');
+            const endDateEl = document.getElementById('endDate');
+            const startDate = startDateEl ? startDateEl.value : '';
+            const endDate = endDateEl ? endDateEl.value : '';
+            
             return `
             <div class="report-page">
                 <div class="report-header">
@@ -1088,7 +1193,7 @@
                             Seguimiento de Incapacidades - K+AIR
                         </p>
                         <p style="margin:2px 0 0 0; font-size:9pt; color:#64748B;">
-                            Periodo: ${document.getElementById('startDate').value} al ${document.getElementById('endDate').value}
+                            Periodo: ${startDate} al ${endDate}
                         </p>
                     </div>
                     <div style="text-align:right">
@@ -1203,7 +1308,15 @@
                 ? 'bg-warning-light' 
                 : 'bg-success-light';
             
-            return `
+            // Determinar si necesitamos dos páginas
+            // Criterio: Si hay PCL O Recomendaciones con contenido, usar dos páginas
+            const hasPCLContent = reportConfig.includePCL && c.pcl && (c.pcl.fecha || c.pcl.porcentaje || c.pcl.diagnosticos?.length > 0);
+            const hasRecomendacionesContent = reportConfig.includeRecomendaciones && c.recomendaciones && c.recomendaciones.length > 0;
+            
+            const needsTwoPages = hasPCLContent || hasRecomendacionesContent;
+            
+            // Página 1: Datos personales, Incapacidad, PRIC, Seguimientos
+            let page1Content = `
             <div class="report-page">
                 <!-- Encabezado Individual -->
                 <div class="report-header" style="border-bottom:1px solid #E2E8F0;">
@@ -1303,39 +1416,107 @@
                 </div>
                 ` : ''}
 
-                <!-- RECOMENDACIONES -->
-                ${reportConfig.includeRecomendaciones && c.recomendaciones && c.recomendaciones.length > 0 ? `
-                <div class="section-header">5. RECOMENDACIONES</div>
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th style="width:40%;">Recomendación</th>
-                            <th style="width:25%;">Entidad</th>
-                            <th style="width:20%;">Cumplimiento</th>
-                            <th style="width:15%;">Estado</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${c.recomendaciones.map(r => `
-                            <tr>
-                                <td style="font-weight:500;">${r.recomendacion}</td>
-                                <td>${r.entidad}</td>
-                                <td>${r.cumple || 'N/A'}</td>
-                                <td>
-                                    <span class="badge ${r.cumple === 'SI' ? 'bg-success-light' : r.cumple === 'EN PROCESO' ? 'bg-warning-light' : 'bg-danger-light'}">
-                                        ${r.cumple === 'SI' ? 'CUMPLIDO' : r.cumple === 'EN PROCESO' ? 'EN PROCESO' : 'PENDIENTE'}
-                                    </span>
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-                ` : ''}
-
                 <div style="position:absolute; bottom:15mm; width:calc(100% - 100px); text-align:center; font-size:8pt; color:#94A3B8; border-top:1px solid #E2E8F0; padding-top:10px;">
-                    Página ${currentPage + 1} - Detalle Individual: ${c.name} | K+AIR - Sistema de Gestión SG-SST
+                    Página ${currentPage + 1}${needsTwoPages ? ' de 2' : ''} - Detalle Individual: ${c.name} | K+AIR - Sistema de Gestión SG-SST
                 </div>
             </div>`;
+
+            // Página 2: Calificación PCL + Recomendaciones (solo si necesita dos páginas)
+            let page2Content = '';
+            if (needsTwoPages) {
+                page2Content = `
+                <div class="report-page">
+                    <!-- Encabezado Página 2 -->
+                    <div class="report-header" style="border-bottom:1px solid #E2E8F0;">
+                        <div>
+                            <h2 style="font-size:14pt; color:#1E293B; margin:0;">FICHA DETALLADA DE CASO (Continuación)</h2>
+                            <p style="font-size:9pt; color:#64748B; margin:5px 0 0 0;">
+                                ID Caso: PRI-2024-${c.id} | ${c.name}
+                            </p>
+                        </div>
+                        <div style="text-align:right">
+                            <span class="badge ${statusClass}" style="font-size:10pt; padding:6px 10px;">${c.status.toUpperCase()}</span>
+                        </div>
+                    </div>
+
+                    <!-- CALIFICACIÓN PCL -->
+                    ${hasPCLContent ? `
+                    <div class="section-header">5. CALIFICACIÓN DE PÉRDIDA DE CAPACIDAD LABORAL (PCL)</div>
+                    <table class="data-table">
+                        <tr>
+                            <td class="label-cell">Fecha de Calificación</td>
+                            <td>${c.pcl.fecha ? formatDate(c.pcl.fecha) : 'N/A'}</td>
+                            <td class="label-cell">Porcentaje PCL</td>
+                            <td style="font-weight:700; color:var(--primary);">${c.pcl.porcentaje || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td class="label-cell">Origen del Caso</td>
+                            <td>${c.pcl.origen || 'N/A'}</td>
+                            <td class="label-cell">Año Última Calificación</td>
+                            <td>${c.pcl.fecha ? new Date(c.pcl.fecha).getFullYear() : 'N/A'}</td>
+                        </tr>
+                    </table>
+
+                    <div style="margin-top:10px;">
+                        <strong style="font-size:9pt; color:var(--text-muted);">Diagnósticos Calificados:</strong>
+                        <table class="data-table" style="margin-top:5px;">
+                            <thead>
+                                <tr>
+                                    <th style="width:40%;">CIE-10</th>
+                                    <th style="width:40%;">Origen</th>
+                                    <th style="width:20%;">Prioridad</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${c.pcl.diagnosticos && c.pcl.diagnosticos.length > 0 ? c.pcl.diagnosticos.map((d, idx) => `
+                                    <tr>
+                                        <td style="font-weight:500;">${d.cie10 || 'N/A'}</td>
+                                        <td>${d.origen || 'N/A'}</td>
+                                        <td><span class="badge bg-primary-light">DX ${idx + 1}</span></td>
+                                    </tr>
+                                `).join('') : '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">No hay diagnósticos calificados registrados</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                    ` : ''}
+
+                    <!-- RECOMENDACIONES -->
+                    ${hasRecomendacionesContent ? `
+                    <div class="section-header" style="margin-top: 20px;">${hasPCLContent ? '6' : '5'}. RECOMENDACIONES</div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th style="width:40%;">Recomendación</th>
+                                <th style="width:25%;">Entidad</th>
+                                <th style="width:20%;">Cumplimiento</th>
+                                <th style="width:15%;">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${c.recomendaciones.map(r => `
+                                <tr>
+                                    <td style="font-weight:500;">${r.recomendacion}</td>
+                                    <td>${r.entidad}</td>
+                                    <td>${r.cumple || 'N/A'}</td>
+                                    <td>
+                                        <span class="badge ${r.cumple === 'SI' ? 'bg-success-light' : r.cumple === 'EN PROCESO' ? 'bg-warning-light' : 'bg-danger-light'}">
+                                            ${r.cumple === 'SI' ? 'CUMPLIDO' : r.cumple === 'EN PROCESO' ? 'EN PROCESO' : 'PENDIENTE'}
+                                        </span>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    ` : ''}
+
+                    <!-- Footer Página 2 -->
+                    <div style="position:absolute; bottom:15mm; width:calc(100% - 100px); text-align:center; font-size:8pt; color:#94A3B8; border-top:1px solid #E2E8F0; padding-top:10px;">
+                        Página ${currentPage + 2} de 2 - Detalle Individual: ${c.name} | K+AIR - Sistema de Gestión SG-SST
+                    </div>
+                </div>`;
+            }
+
+            return page1Content + page2Content;
         }
 
         function renderPRICStage(stageName, stage) {

@@ -188,6 +188,51 @@
             background-color: var(--bg-general);
         }
 
+        /* Scrollbar personalizado - Estilo moderno K+AIR */
+        .settings-content::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .settings-content::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        .settings-content::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+
+        .settings-content::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+
+        /* Scrollbar para tema oscuro */
+        [data-theme="dark"] .settings-content::-webkit-scrollbar-track {
+            background: #2d3748;
+        }
+
+        [data-theme="dark"] .settings-content::-webkit-scrollbar-thumb {
+            background: #4a5568;
+        }
+
+        [data-theme="dark"] .settings-content::-webkit-scrollbar-thumb:hover {
+            background: #5a6d7a;
+        }
+
+        /* Scrollbar para tema dark-legacy */
+        [data-theme="dark-legacy"] .settings-content::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+
+        [data-theme="dark-legacy"] .settings-content::-webkit-scrollbar-thumb {
+            background: #404040;
+        }
+
+        [data-theme="dark-legacy"] .settings-content::-webkit-scrollbar-thumb:hover {
+            background: #505050;
+        }
+
         .section-container {
             display: none;
             animation: fadeIn 0.3s ease-out;
