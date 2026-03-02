@@ -9,9 +9,7 @@ const { exec, spawn, execFile } = require('child_process'); // Asegúrate de inc
 const { promisify } = require('util');
 const xlsx = require('xlsx');
 const os = require('os');
-// TEMPORAL: Comentado para pruebas de OnlyOffice Bridge
-// const { autoUpdater } = require('electron-updater');
-const autoUpdater = null; // Placeholder
+const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
 const ExcelJS = require('exceljs');
 
@@ -40,7 +38,9 @@ Reason: ${reason instanceof Error ? reason.stack : JSON.stringify(reason)}
 
 // --- Configuración del Auto-Updater ---
 log.transports.file.level = 'info';
-// autoUpdater.logger = log; // TEMPORAL: Comentado
+autoUpdater.logger = log;
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = true;
 // ------------------------------------
 
 const execPromise = promisify(exec);
@@ -141,6 +141,51 @@ function sendLog(message, level = 'INFO') {
 
 // Ruta del archivo de configuración
 const configPath = path.join(app.getPath('userData'), 'config.json');
+
+// ===============================
+// 🔄 SISTEMA DE AUTO-ACTUALIZACIONES
+// ===============================
+
+// Verificar actualizaciones disponibles
+autoUpdater.on('checking-for-update', () => {
+  sendLog('Verificando actualizaciones disponibles...', 'INFO');
+});
+
+// Cuando hay una actualización disponible
+autoUpdater.on('update-available', (info) => {
+  sendLog(`Actualización disponible: v${info.version}`, 'INFO');
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('update_available', info);
+  }
+});
+
+// Cuando NO hay actualizaciones
+autoUpdater.on('update-not-available', (info) => {
+  sendLog(`No hay actualizaciones disponibles. Versión actual: v${info.version}`, 'INFO');
+});
+
+// Progreso de descarga
+autoUpdater.on('download-progress', (progressObj) => {
+  const percent = Math.round(progressObj.percent);
+  const speed = (progressObj.bytesPerSecond / 1024 / 1024).toFixed(2);
+  sendLog(`Descargando: ${percent}% (${speed} MB/s)`, 'INFO');
+});
+
+// Cuando la descarga se completa
+autoUpdater.on('update-downloaded', (info) => {
+  sendLog(`Actualización v${info.version} descargada. Lista para instalar.`, 'INFO');
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('update_downloaded', info);
+  }
+});
+
+// Errores
+autoUpdater.on('error', (err) => {
+  sendLog(`Error en el auto-updater: ${err.message}`, 'ERROR');
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('update-error', err);
+  }
+});
 
 // Verificar si se está ejecutando con squirrel (instalador de Windows)
 if (require('electron-squirrel-startup')) {
@@ -2908,7 +2953,10 @@ app.whenReady().then(() => {
   }
 
   // Iniciar la búsqueda de actualizaciones una vez que la app esté lista
-// autoUpdater.checkForUpdatesAndNotify(); // TEMPORAL: Comentado
+  setTimeout(() => {
+    sendLog('Iniciando verificación de actualizaciones...', 'INFO');
+    autoUpdater.checkForUpdatesAndNotify();
+  }, 3000);  // Esperar 3 segundos después de cargar la ventana
 
   app.on('activate', () => {
     // En macOS, es común volver a crear una ventana en la aplicación cuando
@@ -4774,7 +4822,7 @@ ipcMain.handle('get-inducciones-data', async (event, companyName) => {
 
 ipcMain.on('restart_app', () => {
   log.info('El usuario ha aceptado la actualización. Reiniciando para instalar...');
-  // autoUpdater.quitAndInstall(); // TEMPORAL: Comentado
+  autoUpdater.quitAndInstall();
 });
 
 // --- FUNCIONES AUXILIARES INTERNAS PARA ESTADÍSTICAS ---
