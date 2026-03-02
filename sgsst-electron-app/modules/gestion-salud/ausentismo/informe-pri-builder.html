@@ -296,15 +296,22 @@
         .data-table td { 
             padding: 4px 6px; 
             border: 1px solid #E2E8F0; 
-            vertical-align: top; 
+            vertical-align: top;
+            text-align: left; 
         }
         
-        .label-cell { 
-            width: 20%; 
-            font-weight: 600; 
-            background: #F8FAFC; 
+        .label-cell {
+            width: 20% !important;
+            font-weight: 600;
+            background: #F8FAFC;
+            text-align: left !important;
+            padding: 4px 6px !important;
         }
         
+        .data-table td:not(.label-cell) { 
+            text-align: left; 
+        }
+
         /* Timeline Seguimiento */
         .timeline-seguimiento { 
             margin-top: 10px; 
