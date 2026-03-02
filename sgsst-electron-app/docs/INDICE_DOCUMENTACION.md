@@ -1,7 +1,7 @@
 # 📚 Índice Maestro de Documentación K+AIR
 
-**Versión:** 2.0  
-**Fecha:** 24 de febrero de 2026  
+**Versión:** 2.1
+**Fecha:** 1 de marzo de 2026
 **Estado:** Actualizado Post-Reorganización
 
 ---
@@ -45,6 +45,7 @@
 | [docs/escenarios-normativos.md](escenarios-normativos.md) | Escenarios aplicables | ✅ Actual |
 | [docs/flujo-creacion-empresa.md](flujo-creacion-empresa.md) | Flujo de creación | ✅ Actual |
 | [docs/renderer.md](renderer.md) | Sistema de renderizado | ✅ Actual |
+| [docs/ARQUITECTURA_AUSENTISMO_DUAL.md](ARQUITECTURA_AUSENTISMO_DUAL.md) | Sistema dual de archivos | ✅ Actual |
 
 ### 3. Documentación de Módulos
 
@@ -79,6 +80,17 @@
 | Documento | Tipo | Propósito |
 |-----------|------|-----------|
 | [docs/acerca-de-actualizacion.md](acerca-de-actualizacion.md) | Guía | Actualización del sistema |
+
+### 7. Actualizaciones por Versión
+
+| Documento | Versión | Fecha | Descripción |
+|-----------|---------|-------|-------------|
+| [ACTUALIZACION_v0.1.52_INFORME_PRI_BUILDER.md](ACTUALIZACION_v0.1.52_INFORME_PRI_BUILDER.md) | 0.1.52 | 2026-03-01 | Informe PRI Builder Multicaso |
+| [ACTUALIZACION_v0.1.51_CALIFICACION_PCL.md](ACTUALIZACION_v0.1.51_CALIFICACION_PCL.md) | 0.1.51 | 2026-02-28 | Calificación PCL Regional/Nacional |
+| [RESUMEN_CAMBIOS_v0.1.50.md](RESUMEN_CAMBIOS_v0.1.50.md) | 0.1.50 | 2026-02-26 | Alertas, cálculos, KPIs |
+| [RESUMEN_CAMBIOS_v0.1.49.md](RESUMEN_CAMBIOS_v0.1.49.md) | 0.1.49 | 2026-02-26 | Sistema dual de archivos |
+| [ACTUALIZACION_FRONTEND_SEGUIMIENTO_v0.1.49.md](ACTUALIZACION_FRONTEND_SEGUIMIENTO_v0.1.49.md) | 0.1.49 | 2026-02-26 | Frontend seguimiento |
+| [ACTUALIZACION_v0.1.48_SEGUIMIENTO_PRIC.md](ACTUALIZACION_v0.1.48_SEGUIMIENTO_PRIC.md) | 0.1.48 | 2026-02-25 | Panel PRIC |
 
 ---
 

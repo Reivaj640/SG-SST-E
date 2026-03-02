@@ -5,6 +5,150 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.52] - 2026-03-01
+
+### Added
+- **Informe PRI Builder Multicaso** 🆕
+  - Constructor de informes de seguimiento de incapacidades
+  - Lectura directa desde PRI.xlsx (hoja "Casos en seguimiento")
+  - Vista consolidada con resumen ejecutivo y detalle por caso
+  - Navegación por páginas (resumen + casos individuales)
+
+- **Extracción de Datos del PRI.xlsx** 📊
+  - Mapeo automático de 173 columnas disponibles
+  - Detección inteligente de columnas por nombre de encabezado
+  - Extracción de seguimientos desde 5 columnas múltiples (SEGUIMIENTO 1-5)
+  - Extracción de calificación PCL con 4 diagnósticos (CIE-10 + Origen)
+  - Extracción de recomendaciones (soporta múltiples separadas por `;`)
+
+- **Interfaz Mejorada** 🎨
+  - Visualización directa sin modal (eliminado botón trigger)
+  - Sidebar con configuración de periodo y filtros
+  - Lista de casos detectados con estado visual (En Seguimiento/Cerrado)
+  - Checkboxes para mostrar/ocultar secciones del informe
+  - Controles de paginación (Anterior/Siguiente)
+  - Botones de exportación (Excel, PDF/Imprimir)
+
+- **Secciones del Informe** 📄
+  - Resumen Ejecutivo (estadísticas consolidadas)
+  - Listado de Casos en Periodo (tabla comparativa)
+  - Distribución por Área (casos y días por departamento)
+  - Ficha Detallada por Caso:
+    - Información del Trabajador (nombre, cédula, cargo, área)
+    - Detalle de Incapacidad (fechas, días, origen, diagnóstico, CIE-10)
+    - Proceso PRIC (etapas 1, 2, 3 con estado y responsable)
+    - Historial de Seguimientos (timeline con fechas y descripciones)
+    - Calificación PCL (porcentaje, fecha, 4 diagnósticos con CIE-10)
+    - Recomendaciones (tabla con entidad y cumplimiento)
+
+### Fixed
+- **Error: Empresa vacía al consultar backend** 🐛
+  - Implementada función `getCurrentCompany()` con múltiples fuentes
+  - Fuentes: window.currentCompany → window.rendererState → DOM padre → fallback 'Aseplus'
+  - Archivo: `informe-pri-builder.html` (líneas 650-673)
+
+- **Error: Interfaz no se visualizaba (solo botón)** 🐛
+  - Eliminado botón trigger y modal backdrop
+  - El `.report-builder` ahora se muestra directamente como elemento raíz
+  - Auto-inicialización con `DOMContentLoaded`
+  - Archivo: `informe-pri-builder.html` (líneas 457-467)
+
+- **Error: Mapeo incorrecto de columnas del Excel** 🐛
+  - Corregida búsqueda de columnas por nombre real en PRI.xlsx
+  - `cedula`: Ahora busca `includes('documento')` en lugar de `includes('cedula')`
+  - `area`: Ahora busca `includes('sede')` en lugar de `includes('área')`
+  - `diagnostico`: Ahora excluye columnas CIE-10 con `!includes('cie')`
+  - `estado`: Ahora busca `includes('estado caso')` o `includes('motivo de cierre')`
+  - Archivo: `informe-pri-builder.html` (líneas 747-793)
+
+- **Error: Seguimientos no se renderizaban** 🐛
+  - Implementada extracción desde 5 columnas múltiples (SEGUIMIENTO 1-5)
+  - Cada seguimiento tiene fecha y descripción separadas
+  - Renderizado en timeline vertical con fechas a la izquierda
+  - Archivo: `informe-pri-builder.html` (líneas 824-833)
+
+- **Error: Checkbox PCL no mostraba contenido** 🐛
+  - Agregada estructura `pcl.diagnosticos[]` con 4 diagnósticos
+  - Cada diagnóstico tiene CIE-10 y origen calificado
+  - Renderizado condicional activado por `reportConfig.includePCL`
+  - Archivo: `informe-pri-builder.html` (líneas 847-855)
+
+- **Error: Recomendaciones no se extraían** 🐛
+  - Implementada extracción desde columnas `recomendacionEmitida` y `recomendacionesVigentes`
+  - Soporte para múltiples recomendaciones separadas por `;` o `|`
+  - Cada recomendación tiene entidad y estado de cumplimiento
+  - Renderizado condicional activado por `reportConfig.includeRecomendaciones`
+  - Archivo: `informe-pri-builder.html` (líneas 857-871)
+
+### Changed
+- **Estructura de Datos de Casos** 🔄
+  - Objeto caso ahora incluye: `seguimientos[]`, `pcl`, `recomendaciones[]`
+  - `pcl` contiene: `fecha`, `porcentaje`, `origen`, `diagnosticos[]`
+  - `diagnosticos[]` es array de hasta 4 elementos con `cie10` y `origen`
+  - `recomendaciones[]` es array dinámico según datos del Excel
+
+- **Flujo de Carga de Datos** 🔄
+  - `loadCasesData()` → `getPriSeguimientoData(companyName)` → backend
+  - `processPriRowsToCases(rows, headers)` → transforma filas a objetos
+  - `processCasesData()` → calcula resumen y renderiza UI
+  - Fallback a `loadMockData()` si no hay datos o falla API
+
+- **Comunicación entre Módulos** 🔄
+  - `medicion-ausentismo-home.js` envía `postMessage` con `payload.path`
+  - Formato corregido: `{ type: 'load-module-view', payload: { path: '...' } }`
+  - `renderer.js` recibe y carga vista en área de contenido
+
+### Technical Details
+- **Frontend:** `modules/gestion-salud/ausentismo/informe-pri-builder.html`
+  - Líneas 1-450: Estilos CSS (Inter font, colores, layout)
+  - Líneas 457-590: Estructura HTML (builder, sidebar, preview)
+  - Líneas 592-650: Variables globales e inicialización
+  - Líneas 650-673: `getCurrentCompany()` - Detección de empresa
+  - Líneas 675-740: `loadCasesData()` - Carga desde backend
+  - Líneas 743-908: `processPriRowsToCases()` - Mapeo y transformación
+  - Líneas 910-980: `loadMockData()` - Datos de prueba
+  - Líneas 982-1010: `processCasesData()` - Cálculo de resumen
+  - Líneas 1012-1040: `renderCaseList()` - Lista de casos en sidebar
+  - Líneas 1042-1060: `renderPage()` - Renderizado por página
+  - Líneas 1062-1140: `renderSummaryPage()` - Resumen consolidado
+  - Líneas 1142-1300: `renderCaseDetailPage()` - Ficha detallada
+  - Líneas 1302-1419: Funciones auxiliares y exportación
+
+- **Backend:** `main.js`
+  - Líneas 3355-3550: Handler `get-pri-seguimiento-data`
+  - Lee configuración de empresa y estructura de carpetas
+  - Busca archivo PRI.xlsx en carpeta de ausentismo
+  - Lee hoja "Casos en seguimiento" con `xlsx.readFile()`
+  - Retorna: `{ success: true, headers: [...], rows: [...], filePath, sheetName }`
+
+- **Comunicación:** `medicion-ausentismo-home.js`
+  - Líneas 101-112: `generarInforme()` - Envío de postMessage
+  - Formato: `{ type: 'load-module-view', payload: { path: '...' } }`
+
+### Documentation
+- **Nueva Documentación:** `docs/ACTUALIZACION_v0.1.52_INFORME_PRI_BUILDER.md`
+  - Resumen ejecutivo de cambios
+  - Estructura de columnas del PRI.xlsx
+  - Flujo de datos completo (frontend → backend → Excel)
+  - Errores corregidos y soluciones
+  - Pruebas realizadas
+  - Guía de uso paso a paso
+
+### Testing
+- **Pruebas Exitosas:** ✅
+  - Carga de vista sin modal
+  - Detección de empresa "Aseplus"
+  - Lectura de PRI.xlsx (4 registros)
+  - Mapeo correcto de 173 columnas
+  - Extracción de seguimientos (5 columnas)
+  - Extracción de PCL (4 diagnósticos)
+  - Extracción de recomendaciones (múltiples)
+  - Renderizado de resumen consolidado
+  - Navegación entre páginas
+  - Checkboxes condicionales funcionales
+
+---
+
 ## [0.1.51] - 2026-02-28
 
 ### Added
@@ -21,7 +165,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - % PCL Regional
   - Origen Calificado Regional
   - Fecha de Estructuración Regional
-  - Observaciones Calificación Regional
+  - Observaciones Calificación Nacional
 
 - **Campos de Calificación Nacional** (Columnas FJ-FP, Índices 165-171)
   - Estado del Proceso Nacional
