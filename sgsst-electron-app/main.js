@@ -149,16 +149,21 @@ const configPath = path.join(app.getPath('userData'), 'config.json');
 // Verificar actualizaciones disponibles
 autoUpdater.on('checking-for-update', () => {
   sendLog('Verificando actualizaciones disponibles...', 'INFO');
+  sendLog(`[UPDATER] mainWindow existe: ${mainWindow !== null}`, 'DEBUG');
+  sendLog(`[UPDATER] mainWindow destruida: ${mainWindow && mainWindow.isDestroyed()}`, 'DEBUG');
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('update_checking');
+    sendLog('[UPDATER] Enviado: update_checking', 'DEBUG');
   }
 });
 
 // Cuando hay una actualización disponible
 autoUpdater.on('update-available', (info) => {
   sendLog(`Actualización disponible: v${info.version}`, 'INFO');
+  sendLog(`[UPDATER] Enviando evento update_available con versión: ${info.version}`, 'INFO');
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('update_available', info);
+    sendLog('[UPDATER] Enviado: update_available', 'DEBUG');
   }
   // Iniciar descarga automáticamente
   autoUpdater.downloadUpdate();
@@ -169,6 +174,7 @@ autoUpdater.on('update-not-available', (info) => {
   sendLog(`No hay actualizaciones disponibles. Versión actual: v${info.version}`, 'INFO');
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('update_not_available', info);
+    sendLog('[UPDATER] Enviado: update_not_available', 'DEBUG');
   }
 });
 

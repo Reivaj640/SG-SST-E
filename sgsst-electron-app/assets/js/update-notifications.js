@@ -215,11 +215,15 @@ class UpdateNotificationManager {
 window.updateNotifier = new UpdateNotificationManager();
 
 // Integración con electronAPI (si está disponible)
+console.log('[UPDATER] update-notifications.js: Verificando electronAPI...');
+console.log('[UPDATER] electronAPI disponible:', !!window.electronAPI);
+
 if (window.electronAPI) {
-    // Escuchar eventos del auto-updater desde el proceso principal
+    console.log('[UPDATER] Configurando listeners en update-notifications.js...');
     
-    // Cuando comienza a buscar actualizaciones
+    // Cuando hay actualización disponible
     window.electronAPI.onUpdateAvailable && window.electronAPI.onUpdateAvailable((info) => {
+        console.log('[UPDATER] update-notifications.js: update_available recibido', info);
         if (info && info.version) {
             window.updateNotifier.notifyAvailable(info.version);
         }
@@ -227,6 +231,7 @@ if (window.electronAPI) {
 
     // Cuando la descarga se completa
     window.electronAPI.onUpdateDownloaded && window.electronAPI.onUpdateDownloaded((info) => {
+        console.log('[UPDATER] update-notifications.js: update_downloaded recibido', info);
         const version = info ? info.version : 'nueva';
         window.updateNotifier.notifyDownloaded(version, () => {
             // Reiniciar la aplicación
@@ -235,6 +240,8 @@ if (window.electronAPI) {
             }
         });
     });
+    
+    console.log('[UPDATER] Listeners configurados en update-notifications.js');
 }
 
 // Exportar para uso en otros módulos

@@ -1018,9 +1018,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     logMessage('Renderer: Conectado al sistema de logs del proceso principal.', 'DEBUG');
 
     // --- Lógica para Auto Updater con Notificaciones Modernas ---
+    console.log('[UPDATER] Verificando disponibilidad de electronAPI para updates...');
+    console.log('[UPDATER] onUpdateChecking disponible:', typeof window.electronAPI?.onUpdateChecking);
+    console.log('[UPDATER] onUpdateAvailable disponible:', typeof window.electronAPI?.onUpdateAvailable);
+    console.log('[UPDATER] updateNotifier disponible:', typeof window.updateNotifier);
     
     // Cuando comienza a buscar actualizaciones
-    window.electronAPI.onUpdateChecking && window.electronAPI.onUpdateChecking(() => {
+    window.electronAPI?.onUpdateChecking && window.electronAPI.onUpdateChecking(() => {
+      console.log('[UPDATER] Evento recibido: update_checking');
       logMessage('Buscando actualizaciones...', 'INFO');
       if (window.updateNotifier) {
         window.updateNotifier.notifyChecking();
@@ -1028,7 +1033,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // Cuando hay una actualización disponible (comienza la descarga)
-    window.electronAPI.onUpdateAvailable && window.electronAPI.onUpdateAvailable((info) => {
+    window.electronAPI?.onUpdateAvailable && window.electronAPI.onUpdateAvailable((info) => {
+      console.log('[UPDATER] Evento recibido: update_available', info);
       logMessage(`Actualización disponible: ${info ? info.version : 'nueva versión'}`, 'INFO');
       if (window.updateNotifier && info && info.version) {
         window.updateNotifier.notifyAvailable(info.version);
@@ -1036,7 +1042,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // Cuando NO hay actualizaciones disponibles
-    window.electronAPI.onUpdateNotAvailable && window.electronAPI.onUpdateNotAvailable((info) => {
+    window.electronAPI?.onUpdateNotAvailable && window.electronAPI.onUpdateNotAvailable((info) => {
+      console.log('[UPDATER] Evento recibido: update_not_available', info);
       logMessage('No hay actualizaciones disponibles', 'INFO');
       if (window.updateNotifier) {
         window.updateNotifier.notifyNotAvailable();
@@ -1044,14 +1051,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // Progreso de descarga
-    window.electronAPI.onUpdateProgress && window.electronAPI.onUpdateProgress((data) => {
+    window.electronAPI?.onUpdateProgress && window.electronAPI.onUpdateProgress((data) => {
+      console.log('[UPDATER] Evento recibido: update_progress', data);
       if (window.updateNotifier && data) {
         window.updateNotifier.updateProgress(data.percent, data.speed);
       }
     });
 
     // Cuando la descarga se completa
-    window.electronAPI.onUpdateDownloaded && window.electronAPI.onUpdateDownloaded((info) => {
+    window.electronAPI?.onUpdateDownloaded && window.electronAPI.onUpdateDownloaded((info) => {
+      console.log('[UPDATER] Evento recibido: update_downloaded', info);
       logMessage('Actualización descargada y lista para instalar', 'INFO');
       
       // Mostrar notificación moderna con botón de reinicio
@@ -1073,7 +1082,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // Error en la actualización
-    window.electronAPI.onUpdateError && window.electronAPI.onUpdateError((data) => {
+    window.electronAPI?.onUpdateError && window.electronAPI.onUpdateError((data) => {
+      console.log('[UPDATER] Evento recibido: update_error', data);
       logMessage(`Error de actualización: ${data ? data.message : 'error desconocido'}`, 'ERROR');
       if (window.updateNotifier && data) {
         window.updateNotifier.notifyError(data.message);
