@@ -2,6 +2,7 @@
  * ==========================================
  * SISTEMA DE NOTIFICACIONES MODERNO - K+AIR
  * Gestor de Notificaciones de Actualizaciones
+ * Diseño Limpio sin Franjas Laterales
  * ==========================================
  */
 
@@ -42,9 +43,10 @@ class UpdateNotificationManager {
         }
 
         const toast = document.createElement('div');
+        // Clase base toast-card + clase de tipo para colores de icono
         toast.className = `toast-card toast-${type}`;
         
-        // Iconos según tipo
+        // Iconos según tipo - Usando los mismos del diseño proporcionado
         const icons = {
             info: 'fa-sync-alt',
             success: 'fa-rocket',
@@ -52,6 +54,7 @@ class UpdateNotificationManager {
             warning: 'fa-bell'
         };
 
+        // Generar HTML de progreso si existe
         let progressHTML = '';
         if (progress !== undefined) {
             progressHTML = `
@@ -67,6 +70,7 @@ class UpdateNotificationManager {
             `;
         }
 
+        // Generar HTML de botón de acción si existe
         let actionHTML = '';
         if (buttonText && onClick) {
             actionHTML = `
@@ -76,6 +80,7 @@ class UpdateNotificationManager {
             `;
         }
 
+        // Estructura HTML del toast - Sin franjas laterales, solo icono circular coloreado
         toast.innerHTML = `
             <div class="toast-header">
                 <div class="toast-icon ${type === 'info' && !progress ? 'pulse-icon' : ''}">

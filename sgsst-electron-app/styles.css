@@ -3112,6 +3112,7 @@ select.form-control {
 /* ==========================================
    SISTEMA DE NOTIFICACIONES MODERNO - K+AIR
    Actualizaciones de la Aplicación
+   Diseño Limpio sin Franjas Laterales
    ========================================== */
 
 /* Contenedor principal de notificaciones */
@@ -3119,16 +3120,16 @@ select.form-control {
     position: fixed;
     bottom: 20px;
     right: 20px;
-    width: 380px;
+    width: 360px;
     z-index: 99999;
     display: flex;
     flex-direction: column;
     gap: 12px;
     pointer-events: none;
-    font-family: 'Segoe UI', 'Roboto', sans-serif;
+    font-family: 'Inter', 'Segoe UI', 'Roboto', sans-serif;
 }
 
-/* Tarjeta de Notificación Base */
+/* Tarjeta de Notificación Base - Sin franjas laterales */
 .toast-card {
     background: #FFFFFF;
     border-radius: 12px;
@@ -3156,7 +3157,7 @@ select.form-control {
     gap: 12px;
 }
 
-/* Icono circular */
+/* Icono circular con gradiente - Único elemento coloreado */
 .toast-icon {
     width: 36px;
     height: 36px;
@@ -3169,18 +3170,18 @@ select.form-control {
     flex-shrink: 0;
 }
 
-/* Colores de iconos por tipo - Adaptados al sistema K+AIR */
+/* Colores de iconos por tipo - Exactos al diseño proporcionado */
 .toast-info .toast-icon {
-    background: linear-gradient(135deg, #174ea6, #185abd);
+    background: linear-gradient(135deg, #3B82F6, #2563EB);
 }
 .toast-success .toast-icon {
-    background: linear-gradient(135deg, #28a745, #218838);
+    background: linear-gradient(135deg, #10B981, #059669);
 }
 .toast-error .toast-icon {
-    background: linear-gradient(135deg, #dc3545, #c82333);
+    background: linear-gradient(135deg, #EF4444, #DC2626);
 }
 .toast-warning .toast-icon {
-    background: linear-gradient(135deg, #ffc107, #e0a800);
+    background: linear-gradient(135deg, #F59E0B, #D97706);
 }
 
 /* Grupo de título */
@@ -3243,7 +3244,7 @@ select.form-control {
 /* Barra de progreso llenada */
 .progress-bar-fill {
     height: 100%;
-    background: linear-gradient(90deg, #174ea6, #185abd);
+    background: linear-gradient(90deg, #3B82F6, #60A5FA);
     border-radius: 3px;
     transition: width 0.2s ease;
 }
@@ -3263,11 +3264,11 @@ select.form-control {
     margin: 0 16px 14px 16px;
 }
 
-/* Botón de acción */
+/* Botón de acción - Verde como en diseño proporcionado */
 .btn-toast-action {
     width: 100%;
     padding: 10px;
-    background: #174ea6;
+    background: #10B981;
     color: white;
     border: none;
     border-radius: 6px;
@@ -3278,7 +3279,7 @@ select.form-control {
 }
 
 .btn-toast-action:hover {
-    background: #185abd;
+    background: #059669;
 }
 
 .btn-toast-action:active {
