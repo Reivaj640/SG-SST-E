@@ -13,10 +13,18 @@ class UpdateNotificationManager {
         this.currentVersion = null;
     }
     
-    get hub() {
+        get hub() {
         if (!this._hub) {
             this._hub = document.getElementById('notification-hub');
-            console.log('[UPDATER] get hub(): Elemento encontrado:', !!this._hub);
+            
+            // Si no existe el contenedor en el HTML, lo creamos dinámicamente
+            if (!this._hub) {
+                console.log('[UPDATER] Creando #notification-hub dinámicamente...');
+                const newHub = document.createElement('div');
+                newHub.id = 'notification-hub';
+                document.body.appendChild(newHub);
+                this._hub = newHub;
+            }
         }
         return this._hub;
     }

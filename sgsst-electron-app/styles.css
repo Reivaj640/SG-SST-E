@@ -3330,11 +3330,17 @@ select.form-control {
 /* Responsive para pantallas pequeñas */
 @media (max-width: 480px) {
     #notification-hub {
-        width: calc(100% - 40px);
-        right: 20px;
-        left: 20px;
-        bottom: 10px;
-    }
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 360px;
+    z-index: 99999; /* Mucho más alto que el sidebar (900) o header (1000) */
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    pointer-events: none; /* Permite hacer clic a través del espacio vacío */
+    font-family: 'Inter', 'Segoe UI', 'Roboto', sans-serif; /* Fuerza la fuente moderna */
+  }
 }
 
 /* Tema oscuro */
