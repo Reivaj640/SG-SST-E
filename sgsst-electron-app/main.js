@@ -41,6 +41,11 @@ log.transports.file.level = 'info';
 autoUpdater.logger = log;
 autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = true;
+autoUpdater.autoRunAppAfterInstall = true;
+// Configurar timeout para evitar cuelgues en conexiones lentas
+autoUpdater.requestHeaders = {
+  'Cache-Control': 'no-cache'
+};
 // ------------------------------------
 
 const execPromise = promisify(exec);
@@ -199,25 +204,72 @@ autoUpdater.on('update-downloaded', (info) => {
 // Errores
 autoUpdater.on('error', (err) => {
   sendLog(`Error en el auto-updater: ${err.message}`, 'ERROR');
-  
+  sendLog(`[UPDATER] Error details: ${JSON.stringify(err)}`, 'DEBUG');
+
   let errorMessage = err.message;
-  
+  let shouldRetry = false;
+
   // Detectar error código 2 de Squirrel (archivos en uso)
   if (err.message && err.message.includes('Exit code: 2')) {
     errorMessage = 'No se pudo instalar la actualización. Por favor, cierre otras aplicaciones e intente de nuevo.';
     sendLog('Error Squirrel código 2: archivos en uso. Intentando nuevamente...', 'WARN');
-    
-    // Reintentar después de 3 segundos
-    setTimeout(() => {
-      sendLog('Reintentando verificación de actualizaciones...', 'INFO');
-      autoUpdater.checkForUpdates();
-    }, 3000);
+    shouldRetry = true;
   }
   
+  // Detectar errores de red (HTTP2, conexión, etc.)
+  if (err.message && (
+    err.message.includes('ERR_HTTP2_SERVER_REFUSED_STREAM') ||
+    err.message.includes('ERR_INTERNET_DISCONNECTED') ||
+    err.message.includes('ERR_NAME_NOT_RESOLVED') ||
+    err.message.includes('ERR_CONNECTION_FAILED') ||
+    err.message.includes('net::ERR_')
+  )) {
+    sendLog('[UPDATER] Error de red detectado. No es crítico, la app funcionará normalmente.', 'WARN');
+    errorMessage = 'No se pudo verificar actualizaciones. La aplicación funcionará normalmente. Se reintentará más tarde.';
+    shouldRetry = false; // No reintentar inmediatamente para no saturar
+  }
+  
+  // Detectar errores de rate limiting de GitHub API
+  if (err.message && (
+    err.message.includes('403') ||
+    err.message.includes('rate limit')
+  )) {
+    sendLog('[UPDATER] Rate limit de GitHub API alcanzado. Se reintentará más tarde.', 'WARN');
+    errorMessage = 'Límite de verificaciones alcanzado. Se reintentará más tarde.';
+    shouldRetry = false;
+  }
+
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('update_error', { message: errorMessage });
   }
+  
+  // Reintentar solo si es un error recuperable y después de un delay mayor
+  if (shouldRetry) {
+    setTimeout(() => {
+      sendLog('[UPDATER] Reintentando verificación de actualizaciones...', 'INFO');
+      checkForUpdatesSafe();
+    }, 10000); // 10 segundos de espera
+  }
 });
+
+// Función segura para verificar actualizaciones con try-catch
+function checkForUpdatesSafe() {
+  try {
+    sendLog('[UPDATER] checkForUpdatesSafe: Iniciando verificación...', 'INFO');
+    const result = autoUpdater.checkForUpdates();
+    
+    // Manejar la promesa para evitar unhandled rejections
+    if (result && typeof result.then === 'function') {
+      result.catch((err) => {
+        sendLog(`[UPDATER] checkForUpdatesSafe: Error capturado en Promise: ${err.message}`, 'ERROR');
+        // El error ya será manejado por el event listener 'error'
+      });
+    }
+  } catch (err) {
+    sendLog(`[UPDATER] checkForUpdatesSafe: Error síncrono capturado: ${err.message}`, 'ERROR');
+    // El error ya será manejado por el event listener 'error'
+  }
+}
 
 // Verificar si se está ejecutando con squirrel (instalador de Windows)
 if (require('electron-squirrel-startup')) {
@@ -2985,10 +3037,11 @@ app.whenReady().then(() => {
   }
 
   // Iniciar la búsqueda de actualizaciones una vez que la app esté lista
+  // Usar función segura con manejo de errores
   setTimeout(() => {
     sendLog('Iniciando verificación de actualizaciones...', 'INFO');
-    autoUpdater.checkForUpdates();
-  }, 3000);  // Esperar 3 segundos después de cargar la ventana
+    checkForUpdatesSafe();
+  }, 5000);  // Esperar 5 segundos después de cargar la ventana para evitar conflictos
 
   app.on('activate', () => {
     // En macOS, es común volver a crear una ventana en la aplicación cuando

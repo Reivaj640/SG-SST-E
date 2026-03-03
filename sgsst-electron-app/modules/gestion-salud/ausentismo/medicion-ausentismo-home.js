@@ -12,6 +12,17 @@ async function initializePortal() {
     }
 }
 
+// Función auxiliar segura para establecer textContent
+function safeSetTextContent(elementId, value) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.textContent = value;
+        return true;
+    }
+    console.warn(`[medicion-ausentismo-home] Elemento con ID '${elementId}' no encontrado en el DOM`);
+    return false;
+}
+
 async function loadStats() {
     try {
         // Intentar obtener estadísticas desde la API de Electron si está disponible
@@ -21,19 +32,19 @@ async function loadStats() {
 
             if (stats && stats.success) {
                 const data = stats.data || {};
-                document.getElementById('ausentismoPendientes').textContent = data.pendientes || 0;
-                document.getElementById('ausentismoActivos').textContent = data.activos || 0;
+                safeSetTextContent('ausentismoPendientes', data.pendientes || 0);
+                safeSetTextContent('ausentismoActivos', data.activos || 0);
             }
         } else {
             // Valores por defecto si no hay API disponible
-            document.getElementById('ausentismoPendientes').textContent = '0';
-            document.getElementById('ausentismoActivos').textContent = '0';
+            safeSetTextContent('ausentismoPendientes', '0');
+            safeSetTextContent('ausentismoActivos', '0');
         }
     } catch (error) {
         console.log('[medicion-ausentismo-home] Error cargando estadísticas:', error.message);
         // En caso de error, mostrar 0
-        document.getElementById('ausentismoPendientes').textContent = '0';
-        document.getElementById('ausentismoActivos').textContent = '0';
+        safeSetTextContent('ausentismoPendientes', '0');
+        safeSetTextContent('ausentismoActivos', '0');
     }
 }
 
