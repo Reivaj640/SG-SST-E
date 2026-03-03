@@ -3170,18 +3170,18 @@ select.form-control {
     flex-shrink: 0;
 }
 
-/* Colores de iconos por tipo - Exactos al diseño proporcionado */
+/* Colores de iconos por tipo - Sistema Visual Oficial K+AIR */
 .toast-info .toast-icon {
-    background: linear-gradient(135deg, #3B82F6, #2563EB);
+    background: linear-gradient(135deg, #174ea6, #185abd);
 }
 .toast-success .toast-icon {
-    background: linear-gradient(135deg, #10B981, #059669);
+    background: linear-gradient(135deg, #28a745, #218838);
 }
 .toast-error .toast-icon {
-    background: linear-gradient(135deg, #EF4444, #DC2626);
+    background: linear-gradient(135deg, #dc3545, #c82333);
 }
 .toast-warning .toast-icon {
-    background: linear-gradient(135deg, #F59E0B, #D97706);
+    background: linear-gradient(135deg, #ffc107, #e0a800);
 }
 
 /* Grupo de título */
