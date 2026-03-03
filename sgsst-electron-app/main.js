@@ -39,7 +39,7 @@ Reason: ${reason instanceof Error ? reason.stack : JSON.stringify(reason)}
 // --- Configuración del Auto-Updater ---
 log.transports.file.level = 'info';
 autoUpdater.logger = log;
-autoUpdater.autoDownload = true;
+autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = true;
 // ------------------------------------
 
@@ -149,6 +149,9 @@ const configPath = path.join(app.getPath('userData'), 'config.json');
 // Verificar actualizaciones disponibles
 autoUpdater.on('checking-for-update', () => {
   sendLog('Verificando actualizaciones disponibles...', 'INFO');
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('update_checking');
+  }
 });
 
 // Cuando hay una actualización disponible
@@ -157,11 +160,16 @@ autoUpdater.on('update-available', (info) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('update_available', info);
   }
+  // Iniciar descarga automáticamente
+  autoUpdater.downloadUpdate();
 });
 
 // Cuando NO hay actualizaciones
 autoUpdater.on('update-not-available', (info) => {
   sendLog(`No hay actualizaciones disponibles. Versión actual: v${info.version}`, 'INFO');
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('update_not_available', info);
+  }
 });
 
 // Progreso de descarga
@@ -169,6 +177,9 @@ autoUpdater.on('download-progress', (progressObj) => {
   const percent = Math.round(progressObj.percent);
   const speed = (progressObj.bytesPerSecond / 1024 / 1024).toFixed(2);
   sendLog(`Descargando: ${percent}% (${speed} MB/s)`, 'INFO');
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('update_progress', { percent, speed });
+  }
 });
 
 // Cuando la descarga se completa
@@ -183,7 +194,7 @@ autoUpdater.on('update-downloaded', (info) => {
 autoUpdater.on('error', (err) => {
   sendLog(`Error en el auto-updater: ${err.message}`, 'ERROR');
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('update-error', err);
+    mainWindow.webContents.send('update_error', { message: err.message });
   }
 });
 
@@ -2955,7 +2966,7 @@ app.whenReady().then(() => {
   // Iniciar la búsqueda de actualizaciones una vez que la app esté lista
   setTimeout(() => {
     sendLog('Iniciando verificación de actualizaciones...', 'INFO');
-    autoUpdater.checkForUpdatesAndNotify();
+    autoUpdater.checkForUpdates();
   }, 3000);  // Esperar 3 segundos después de cargar la ventana
 
   app.on('activate', () => {

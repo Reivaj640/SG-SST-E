@@ -1019,10 +1019,35 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- Lógica para Auto Updater con Notificaciones Modernas ---
     
+    // Cuando comienza a buscar actualizaciones
+    window.electronAPI.onUpdateChecking && window.electronAPI.onUpdateChecking(() => {
+      logMessage('Buscando actualizaciones...', 'INFO');
+      if (window.updateNotifier) {
+        window.updateNotifier.notifyChecking();
+      }
+    });
+
     // Cuando hay una actualización disponible (comienza la descarga)
     window.electronAPI.onUpdateAvailable && window.electronAPI.onUpdateAvailable((info) => {
       logMessage(`Actualización disponible: ${info ? info.version : 'nueva versión'}`, 'INFO');
-      // El sistema de notificaciones se activa automáticamente desde update-notifications.js
+      if (window.updateNotifier && info && info.version) {
+        window.updateNotifier.notifyAvailable(info.version);
+      }
+    });
+
+    // Cuando NO hay actualizaciones disponibles
+    window.electronAPI.onUpdateNotAvailable && window.electronAPI.onUpdateNotAvailable((info) => {
+      logMessage('No hay actualizaciones disponibles', 'INFO');
+      if (window.updateNotifier) {
+        window.updateNotifier.notifyNotAvailable();
+      }
+    });
+
+    // Progreso de descarga
+    window.electronAPI.onUpdateProgress && window.electronAPI.onUpdateProgress((data) => {
+      if (window.updateNotifier && data) {
+        window.updateNotifier.updateProgress(data.percent, data.speed);
+      }
     });
 
     // Cuando la descarga se completa
@@ -1044,6 +1069,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (userResponse) {
           window.electronAPI.restartApp && window.electronAPI.restartApp();
         }
+      }
+    });
+
+    // Error en la actualización
+    window.electronAPI.onUpdateError && window.electronAPI.onUpdateError((data) => {
+      logMessage(`Error de actualización: ${data ? data.message : 'error desconocido'}`, 'ERROR');
+      if (window.updateNotifier && data) {
+        window.updateNotifier.notifyError(data.message);
       }
     });
 
