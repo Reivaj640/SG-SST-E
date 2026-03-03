@@ -221,11 +221,25 @@ console.log('[UPDATER] electronAPI disponible:', !!window.electronAPI);
 if (window.electronAPI) {
     console.log('[UPDATER] Configurando listeners en update-notifications.js...');
     
+    // Cuando comienza a buscar actualizaciones
+    window.electronAPI.onUpdateChecking && window.electronAPI.onUpdateChecking(() => {
+        console.log('[UPDATER] update-notifications.js: update_checking recibido');
+        window.updateNotifier.notifyChecking();
+    });
+    
     // Cuando hay actualización disponible
     window.electronAPI.onUpdateAvailable && window.electronAPI.onUpdateAvailable((info) => {
         console.log('[UPDATER] update-notifications.js: update_available recibido', info);
         if (info && info.version) {
             window.updateNotifier.notifyAvailable(info.version);
+        }
+    });
+    
+    // Progreso de descarga
+    window.electronAPI.onUpdateProgress && window.electronAPI.onUpdateProgress((data) => {
+        console.log('[UPDATER] update-notifications.js: update_progress recibido', data);
+        if (data && data.percent !== undefined) {
+            window.updateNotifier.updateProgress(data.percent, data.speed);
         }
     });
 

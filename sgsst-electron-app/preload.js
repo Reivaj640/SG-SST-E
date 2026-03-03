@@ -212,11 +212,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   removeIpcMessageListener: (channel, listener) => {
     ipcRenderer.removeListener(channel, listener);
   },
-  onUpdateAvailable: (callback) => ipcRenderer.on('update_available', callback),
-  onUpdateDownloaded: (callback) => ipcRenderer.on('update_downloaded', callback),
-  onUpdateChecking: (callback) => ipcRenderer.on('update_checking', callback),
-  onUpdateNotAvailable: (callback) => ipcRenderer.on('update_not_available', callback),
-  onUpdateProgress: (callback) => ipcRenderer.on('update_progress', callback),
-  onUpdateError: (callback) => ipcRenderer.on('update_error', callback),
+  onUpdateAvailable: (callback) => ipcRenderer.on('update_available', (event, ...args) => callback(...args)),
+  onUpdateDownloaded: (callback) => ipcRenderer.on('update_downloaded', (event, ...args) => callback(...args)),
+  onUpdateChecking: (callback) => ipcRenderer.on('update_checking', (event, ...args) => callback(...args)),
+  onUpdateNotAvailable: (callback) => ipcRenderer.on('update_not_available', (event, ...args) => callback(...args)),
+  onUpdateProgress: (callback) => ipcRenderer.on('update_progress', (event, ...args) => callback(...args)),
+  onUpdateError: (callback) => ipcRenderer.on('update_error', (event, ...args) => callback(...args)),
   restartApp: () => ipcRenderer.send('restart_app'),
 });
