@@ -1297,6 +1297,7 @@
 
     /* ================= GESTIÓN DE EMPRESAS ================= */
     let companies = [];
+    let originalCompanyName = null; // ← Variable para almacenar el nombre original al editar
 
     // Función para cargar las empresas
     async function loadCompanies() {
@@ -1556,6 +1557,10 @@
     function prepareLinkModal(companyName) {
         // Buscar la empresa en la lista de compañías
         const company = companies.find(c => c.name === companyName);
+
+        // Guardar el nombre original para evitar duplicación al reconfigurar
+        originalCompanyName = companyName;
+        console.log('[CONFIG] Preparando modal para empresa:', companyName, '(originalCompanyName guardado)');
 
         if (company) {
             // Rellenar el formulario con los datos actuales de la empresa
@@ -2007,21 +2012,21 @@
             const mappingTimer = document.getElementById('mapping-timer');
             const mappingDetails = document.getElementById('mapping-details');
             const btnSaveLink = document.getElementById('btn-save-link');
-            
+
             // Mostrar overlay
             mappingOverlay.style.display = 'flex';
             mappingOverlay.style.alignItems = 'center';
             mappingOverlay.style.justifyContent = 'center';
             btnSaveLink.disabled = true;
             btnSaveLink.textContent = 'Mapeando...';
-            
+
             // Iniciar timer
             let seconds = 0;
             const timerInterval = setInterval(() => {
                 seconds++;
                 mappingTimer.textContent = `Tiempo transcurrido: ${seconds}s`;
             }, 1000);
-            
+
             // Actualizar mensaje
             mappingMessage.innerHTML = `
                 <div class="mapping-step active">
@@ -2031,10 +2036,11 @@
             `;
             mappingDetails.style.display = 'none';
             mappingDetails.innerHTML = '';
-            
+
             console.log(`[CONFIG][SAVE] Iniciando guardado para ${companyName}`);
             console.log(`[CONFIG][SAVE] Ruta seleccionada: ${path}`);
-            
+            console.log(`[CONFIG][SAVE] originalCompanyName: ${originalCompanyName}`);
+
             // Verificar si mapDirectory está disponible
             if (!electronAPI.mapDirectory) {
                 console.error('[CONFIG][SAVE] ERROR: electronAPI.mapDirectory no está disponible');
@@ -2045,9 +2051,9 @@
                 showToast('Error: Función de mapeo no disponible', 'error');
                 return;
             }
-            
+
             console.log('[CONFIG][SAVE] Llamando a electronAPI.mapDirectory para mapear la estructura...');
-            
+
             // Ejecutar mapeo
             electronAPI.mapDirectory(path)
                 .then(result => {
@@ -2056,7 +2062,7 @@
                         hasStructure: !!result.structure,
                         hasStructureStructure: !!(result.structure?.structure)
                     });
-                    
+
                     // Actualizar UI con progreso
                     mappingMessage.innerHTML = `
                         <div class="mapping-step success">
@@ -2068,7 +2074,7 @@
                             <span>Guardando configuración...</span>
                         </div>
                     `;
-                    
+
                     // Mostrar detalles del mapeo
                     if (result.structure) {
                         mappingDetails.style.display = 'block';
@@ -2078,21 +2084,34 @@
                             <div>📄 Total archivos: ${result.structure.total_files || 0}</div>
                         `;
                     }
-                    
+
                     if (!result.success || !result.structure) {
                         throw new Error('El mapeo no devolvió una estructura válida');
                     }
-                    
+
                     // === SEGUNDO: CARGAR CONFIGURACIÓN Y ACTUALIZAR ===
                     console.log('[CONFIG][SAVE] Cargando configuración actual...');
                     return electronAPI.loadConfig().then(config => {
                         if (!config.companyPaths) config.companyPaths = {};
 
                         console.log('[CONFIG][SAVE] Actualizando configuración con estructura mapeada...');
-                        
-                        // Actualizar la empresa con todos los datos incluyendo la estructura mapeada
-                        config.companyPaths[companyName] = {
-                            ...config.companyPaths[companyName],
+
+                        // Determinar si es una nueva empresa o una reconfiguración
+                        const isNewCompany = !originalCompanyName || !config.companyPaths[originalCompanyName];
+                        const targetKeyName = isNewCompany ? companyName : originalCompanyName;
+
+                        console.log('[CONFIG][SAVE] ¿Es nueva empresa?', isNewCompany);
+                        console.log('[CONFIG][SAVE] targetKeyName:', targetKeyName);
+
+                        // Si el usuario cambió el nombre y no es una empresa nueva, eliminar la entrada antigua
+                        if (!isNewCompany && companyName !== originalCompanyName && config.companyPaths[originalCompanyName]) {
+                            console.log('[CONFIG][SAVE] El usuario cambió el nombre de la empresa. Eliminando entrada antigua:', originalCompanyName);
+                            delete config.companyPaths[originalCompanyName];
+                        }
+
+                        // Actualizar/crear la empresa con todos los datos incluyendo la estructura mapeada
+                        config.companyPaths[targetKeyName] = {
+                            ...config.companyPaths[targetKeyName],
                             root: path,
                             structure: result.structure,  // ← AGREGAR LA ESTRUCTURA MAPEADA
                             stats: {
@@ -2100,14 +2119,20 @@
                                 risk: risk,
                                 isAgropecuaria: isAgropecuaria,
                                 // Mantener otros stats existentes si existen
-                                ...(config.companyPaths[companyName]?.stats || {})
+                                ...(config.companyPaths[targetKeyName]?.stats || {})
                             }
                         };
-                        
+
+                        // Si el nombre cambió, actualizar también el campo name dentro de los datos
+                        if (!isNewCompany && companyName !== originalCompanyName) {
+                            console.log('[CONFIG][SAVE] Nombre cambiado de', originalCompanyName, 'a', companyName);
+                        }
+
                         console.log('[CONFIG][SAVE] Configuración actualizada:', {
-                            root: config.companyPaths[companyName].root,
-                            hasStructure: !!config.companyPaths[companyName].structure,
-                            hasStructureStructure: !!(config.companyPaths[companyName].structure?.structure)
+                            targetKeyName: targetKeyName,
+                            root: config.companyPaths[targetKeyName].root,
+                            hasStructure: !!config.companyPaths[targetKeyName].structure,
+                            hasStructureStructure: !!(config.companyPaths[targetKeyName].structure?.structure)
                         });
 
                         return electronAPI.saveConfig(config);
@@ -2116,7 +2141,7 @@
                 .then(() => {
                     console.log('[CONFIG][SAVE] Configuración guardada exitosamente');
                     clearInterval(timerInterval);
-                    
+
                     // Actualizar UI con éxito
                     mappingMessage.innerHTML = `
                         <div class="mapping-step success">
@@ -2124,7 +2149,7 @@
                             <span><strong>¡Mapeo completado exitosamente!</strong></span>
                         </div>
                     `;
-                    
+
                     // Cerrar overlay después de un breve delay
                     setTimeout(() => {
                         mappingOverlay.style.display = 'none';
@@ -2133,13 +2158,15 @@
                         showToast('Empresa actualizada correctamente con estructura mapeada', 'success');
                         btnSaveLink.disabled = false;
                         btnSaveLink.textContent = 'Guardar y Vincular';
+                        // Resetear originalCompanyName para la próxima operación
+                        originalCompanyName = null;
                     }, 1500);
                 })
                 .catch(error => {
                     console.error('[CONFIG][SAVE] Error al guardar la empresa:', error);
                     console.error('[CONFIG][SAVE] Stack:', error.stack);
                     clearInterval(timerInterval);
-                    
+
                     // Actualizar UI con error
                     mappingMessage.innerHTML = `
                         <div class="mapping-step error">
@@ -2147,7 +2174,7 @@
                             <span>Error: ${error.message}</span>
                         </div>
                     `;
-                    
+
                     // Cerrar overlay después de un delay más largo para que el usuario vea el error
                     setTimeout(() => {
                         mappingOverlay.style.display = 'none';
