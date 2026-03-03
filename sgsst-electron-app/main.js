@@ -4853,11 +4853,19 @@ ipcMain.handle('get-inducciones-data', async (event, companyName) => {
 });
 
 ipcMain.on('restart_app', () => {
-  log.info('El usuario ha aceptado la actualización. Reiniciando para instalar...');
-  // quitAndInstall([silent], [forceRunAfter])
-  // silent: false = mostrar diálogo de instalación
-  // forceRunAfter: true = forzar ejecución después de instalar
-  autoUpdater.quitAndInstall(false, true);
+    log.info('El usuario ha aceptado la actualización. Reiniciando para instalar...');
+    
+    // 1. Destruir la ventana inmediatamente (fuerza cierre sin diálogos)
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.destroy();
+    }
+    
+    // 2. Esperar 800ms para que Windows libere el proceso completamente
+    setTimeout(() => {
+        // silent: true = saltar diálogo del instalador
+        // forceRunAfter: true = abrir la app después de instalar
+        autoUpdater.quitAndInstall(true, true);
+    }, 800);
 });
 
 // --- FUNCIONES AUXILIARES INTERNAS PARA ESTADÍSTICAS ---
