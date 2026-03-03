@@ -193,8 +193,23 @@ autoUpdater.on('update-downloaded', (info) => {
 // Errores
 autoUpdater.on('error', (err) => {
   sendLog(`Error en el auto-updater: ${err.message}`, 'ERROR');
+  
+  let errorMessage = err.message;
+  
+  // Detectar error código 2 de Squirrel (archivos en uso)
+  if (err.message && err.message.includes('Exit code: 2')) {
+    errorMessage = 'No se pudo instalar la actualización. Por favor, cierre otras aplicaciones e intente de nuevo.';
+    sendLog('Error Squirrel código 2: archivos en uso. Intentando nuevamente...', 'WARN');
+    
+    // Reintentar después de 3 segundos
+    setTimeout(() => {
+      sendLog('Reintentando verificación de actualizaciones...', 'INFO');
+      autoUpdater.checkForUpdates();
+    }, 3000);
+  }
+  
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('update_error', { message: err.message });
+    mainWindow.webContents.send('update_error', { message: errorMessage });
   }
 });
 
@@ -4833,7 +4848,10 @@ ipcMain.handle('get-inducciones-data', async (event, companyName) => {
 
 ipcMain.on('restart_app', () => {
   log.info('El usuario ha aceptado la actualización. Reiniciando para instalar...');
-  autoUpdater.quitAndInstall();
+  // quitAndInstall([silent], [forceRunAfter])
+  // silent: false = mostrar diálogo de instalación
+  // forceRunAfter: true = forzar ejecución después de instalar
+  autoUpdater.quitAndInstall(false, true);
 });
 
 // --- FUNCIONES AUXILIARES INTERNAS PARA ESTADÍSTICAS ---

@@ -55,7 +55,8 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "assets/KIAR256.ico"
+      "icon": "assets/KIAR256.ico",
+      "artifactName": "${productName}-Setup-${version}.${ext}"
     },
     "mac": {
       "target": "dmg",
