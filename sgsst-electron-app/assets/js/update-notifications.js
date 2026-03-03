@@ -7,9 +7,17 @@
 
 class UpdateNotificationManager {
     constructor() {
-        this.hub = document.getElementById('notification-hub');
+        this._hub = null;
         this.currentToast = null;
         this.currentVersion = null;
+    }
+    
+    get hub() {
+        if (!this._hub) {
+            this._hub = document.getElementById('notification-hub');
+            console.log('[UPDATER] get hub(): Elemento encontrado:', !!this._hub);
+        }
+        return this._hub;
     }
 
     /**
@@ -25,6 +33,9 @@ class UpdateNotificationManager {
      * @param {number} options.autoClose - Tiempo de auto-cierre en ms (0 = no auto-cerrar)
      */
     show({ type, title, subtitle, message, progress, buttonText, onClick, autoClose = 5000 }) {
+        console.log('[UPDATER] show() llamado:', { type, title, subtitle });
+        console.log('[UPDATER] notification-hub existe:', !!this.hub);
+        
         // Si hay un toast anterior, removerlo
         if (this.currentToast) {
             this.remove(this.currentToast);
