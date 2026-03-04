@@ -4908,17 +4908,21 @@ ipcMain.handle('get-inducciones-data', async (event, companyName) => {
 ipcMain.on('restart_app', () => {
     log.info('El usuario ha aceptado la actualización. Reiniciando para instalar...');
     
-    // 1. Destruir la ventana inmediatamente (fuerza cierre sin diálogos)
+    // 1. Limpiar procesos secundarios (servidores Python, etc.)
+    cleanupProcesses();
+
+    // 2. Destruir la ventana inmediatamente (fuerza cierre sin diálogos)
     if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.destroy();
     }
     
-    // 2. Esperar 800ms para que Windows libere el proceso completamente
+    // 3. Esperar 1 segundo para que Windows libere los procesos y archivos completamente
     setTimeout(() => {
         // silent: true = saltar diálogo del instalador
         // forceRunAfter: true = abrir la app después de instalar
+        log.info('Ejecutando quitAndInstall...');
         autoUpdater.quitAndInstall(true, true);
-    }, 800);
+    }, 1000);
 });
 
 // --- FUNCIONES AUXILIARES INTERNAS PARA ESTADÍSTICAS ---
@@ -5453,6 +5457,29 @@ function startOnlyOfficeBridge() {
 
 // --- SERVIDOR LLM PARA ANÁLISIS DE ACCIDENTES ---
 let llmServerProcess = null;
+
+// Función para limpiar procesos hijos antes de salir
+function cleanupProcesses() {
+    if (llmServerProcess) {
+        console.log('[MAIN] 🛡️ Limpiando procesos: Cerrando servidor LLM...');
+        try {
+            // En Windows, kill() puede necesitar ser más agresivo si es detached
+            if (process.platform === 'win32') {
+                const { execSync } = require('child_process');
+                execSync(`taskkill /pid ${llmServerProcess.pid} /T /F`);
+            } else {
+                llmServerProcess.kill();
+            }
+            console.log('[MAIN] ✅ Servidor LLM cerrado correctamente');
+        } catch (e) {
+            console.warn('[MAIN] ⚠️ Error al cerrar servidor LLM (puede que ya no exista):', e.message);
+        }
+        llmServerProcess = null;
+    }
+}
+
+// Asegurar limpieza en cualquier intento de cierre
+app.on('before-quit', cleanupProcesses);
 
 async function startLlmServer() {
     const http = require('http');
