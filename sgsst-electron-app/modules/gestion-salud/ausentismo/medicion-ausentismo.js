@@ -5529,7 +5529,7 @@ class MedicionAusentismoComponent {
         // Contenedor principal modernizado
         const mainContent = document.createElement('div');
         mainContent.style.cssText = `
-            max-width: 1200px;
+            max-width: 100%;
             margin: 0 auto;
             padding: 20px;
             width: 100%;
@@ -5734,12 +5734,8 @@ class MedicionAusentismoComponent {
                 background: #94a3b8;
             }
             .ausentismo-table {
-                min-width: 1600px;
-            }
-            @media (max-width: 1400px) {
-                .ausentismo-table {
-                    min-width: 1400px;
-                }
+                width: 100%;
+                min-width: fit-content;
             }
         `;
         listContainer.appendChild(styleTag);
