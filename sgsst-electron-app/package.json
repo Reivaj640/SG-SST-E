@@ -23,6 +23,7 @@
     "appId": "com.jrfsoluciones.sgsst",
     "productName": "K+AIR",
     "copyright": "Copyright Â© 2025 Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos.",
+    "npmRebuild": false,
     "asar": false,
     "directories": {
       "output": "dist"
@@ -33,6 +34,7 @@
       "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
       "!**/node_modules/*.d.ts",
       "!**/node_modules/.bin",
+      "!**/node_modules/@napi-rs/canvas-android-*",
       "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}",
       "!.editorconfig",
       "!**/._*",
@@ -99,7 +101,7 @@
     "express": "^5.2.1",
     "jquery": "^3.7.1",
     "jquery-ui-dist": "^1.13.3",
-    "node-fetch": "^2.6.7",
+    "node-fetch": "^2.7.0",
     "pdf-parse": "^2.4.5",
     "request": "^2.88.2",
     "vanilla-calendar-pro": "^3.0.5",
