@@ -200,7 +200,17 @@ class MedicionAusentismoComponent {
     async renderSeguimientoIncapacidadesView(container) {
         console.log('[DEBUG] renderSeguimientoIncapacidadesView: Iniciando renderizado de seguimiento moderno.');
         container.innerHTML = '';
-        container.style.overflow = 'auto';
+
+        // Contenedor wrapper con scroll condicional
+        const scrollWrapper = document.createElement('div');
+        scrollWrapper.id = 'seguimiento-incapacidades-scroll-wrapper';
+        scrollWrapper.style.cssText = `
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            overflow-x: hidden;
+        `;
 
         // Guardar referencia global del componente
         window.medicAusentismoComponent = this;
@@ -220,6 +230,8 @@ class MedicionAusentismoComponent {
             margin: 0 auto;
             padding: 20px;
             width: 100%;
+            min-height: 100%;
+            box-sizing: border-box;
         `;
 
         // Header con botón volver
@@ -458,7 +470,8 @@ class MedicionAusentismoComponent {
         `;
 
         mainContent.appendChild(tableContainer);
-        container.appendChild(mainContent);
+        scrollWrapper.appendChild(mainContent);
+        container.appendChild(scrollWrapper);
 
         // Crear modales
         this.createSeguimientoModals(container);
@@ -4634,6 +4647,17 @@ class MedicionAusentismoComponent {
         console.log('[DEBUG] renderRegistrarAusentismoView: Iniciando renderizado del formulario modernizado.');
         container.innerHTML = '';
 
+        // Contenedor wrapper con scroll condicional
+        const scrollWrapper = document.createElement('div');
+        scrollWrapper.id = 'registrar-ausentismo-scroll-wrapper';
+        scrollWrapper.style.cssText = `
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            overflow-x: hidden;
+        `;
+
         // Contenedor principal modernizado
         const mainContent = document.createElement('div');
         mainContent.style.cssText = `
@@ -4641,6 +4665,8 @@ class MedicionAusentismoComponent {
             margin: 0 auto;
             padding: 20px;
             width: 100%;
+            min-height: 100%;
+            box-sizing: border-box;
         `;
 
         // Notificación toast
@@ -4935,7 +4961,8 @@ class MedicionAusentismoComponent {
 
         formContainer.appendChild(form);
         mainContent.appendChild(formContainer);
-        container.appendChild(mainContent);
+        scrollWrapper.appendChild(mainContent);
+        container.appendChild(scrollWrapper);
 
         // Setup de eventos
         setTimeout(() => {
@@ -5488,6 +5515,17 @@ class MedicionAusentismoComponent {
         console.log('[DEBUG] renderVerAusentismoView: Iniciando renderizado de lista de registros.');
         container.innerHTML = '';
 
+        // Contenedor wrapper con scroll condicional
+        const scrollWrapper = document.createElement('div');
+        scrollWrapper.id = 'ver-ausentismo-scroll-wrapper';
+        scrollWrapper.style.cssText = `
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            overflow-x: hidden;
+        `;
+
         // Contenedor principal modernizado
         const mainContent = document.createElement('div');
         mainContent.style.cssText = `
@@ -5495,6 +5533,8 @@ class MedicionAusentismoComponent {
             margin: 0 auto;
             padding: 20px;
             width: 100%;
+            min-height: 100%;
+            box-sizing: border-box;
         `;
 
         // Notificación toast
@@ -5742,7 +5782,8 @@ class MedicionAusentismoComponent {
         tableWrapper.appendChild(table);
         listContainer.appendChild(tableWrapper);
         mainContent.appendChild(listContainer);
-        container.appendChild(mainContent);
+        scrollWrapper.appendChild(mainContent);
+        container.appendChild(scrollWrapper);
 
         // Cargar datos
         this.loadAusentismoData(table, notificationDiv);
@@ -5928,7 +5969,17 @@ class MedicionAusentismoComponent {
     renderEstadisticasView(container) {
         console.log('[DEBUG] renderEstadisticasView: Iniciando renderizado de dashboard de estadísticas.');
         container.innerHTML = '';
-        container.style.overflow = 'auto';
+
+        // Contenedor wrapper con scroll condicional
+        const scrollWrapper = document.createElement('div');
+        scrollWrapper.id = 'estadisticas-ausentismo-scroll-wrapper';
+        scrollWrapper.style.cssText = `
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            overflow-x: hidden;
+        `;
 
         // Agregar FontAwesome dinámicamente si no está cargado
         if (!document.querySelector('link[href*="font-awesome"]') && !document.querySelector('link[href*="fontawesome"]')) {
@@ -5939,15 +5990,15 @@ class MedicionAusentismoComponent {
             console.log('[DEBUG] FontAwesome agregado dinámicamente');
         }
 
-        // Contenedor principal con altura controlada
+        // Contenedor principal
         const mainContent = document.createElement('div');
         mainContent.style.cssText = `
             max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
             width: 100%;
-            max-height: calc(100vh - 100px);
-            overflow-y: auto;
+            min-height: 100%;
+            box-sizing: border-box;
         `;
 
         // Notificación toast
@@ -6275,7 +6326,8 @@ class MedicionAusentismoComponent {
 
         dashboardContainer.appendChild(chartsContainer);
         mainContent.appendChild(dashboardContainer);
-        container.appendChild(mainContent);
+        scrollWrapper.appendChild(mainContent);
+        container.appendChild(scrollWrapper);
 
         // Cargar datos y renderizar gráficos
         this.loadEstadisticasData(notificationDiv);

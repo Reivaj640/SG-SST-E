@@ -1,25 +1,77 @@
 // medicion-ausentismo-home.js - Lógica del portal de Medición del Ausentismo
 
+/**
+ * Espera a que un elemento exista en el DOM
+ * @param {string} elementId - ID del elemento a esperar
+ * @param {number} timeout - Tiempo máximo de espera en ms (default: 3000)
+ * @returns {Promise<boolean>} - true si se encontró, false si se agotó el tiempo
+ */
+function waitForElement(elementId, timeout = 3000) {
+    return new Promise((resolve) => {
+        // Si ya existe, resolver inmediatamente
+        if (document.getElementById(elementId)) {
+            resolve(true);
+            return;
+        }
+
+        // Crear observer para monitorear cambios en el DOM
+        const observer = new MutationObserver((mutations, obs) => {
+            if (document.getElementById(elementId)) {
+                obs.disconnect();
+                resolve(true);
+            }
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+
+        // Timeout por seguridad
+        setTimeout(() => {
+            observer.disconnect();
+            // Verificar una última vez
+            resolve(!!document.getElementById(elementId));
+        }, timeout);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     initializePortal();
 });
 
 async function initializePortal() {
     try {
+        // Esperar a que los elementos del DOM estén disponibles
+        const pendientesReady = await waitForElement('ausentismoPendientes');
+        const activosReady = await waitForElement('ausentismoActivos');
+
+        if (!pendientesReady || !activosReady) {
+            console.warn('[medicion-ausentismo-home] Timeout esperando elementos del DOM');
+        }
+
         await loadStats();
     } catch (error) {
         console.log('[medicion-ausentismo-home] Error inicializando:', error.message);
     }
 }
 
-// Función auxiliar segura para establecer textContent
-function safeSetTextContent(elementId, value) {
+/**
+ * Función auxiliar segura para establecer textContent
+ * @param {string} elementId - ID del elemento
+ * @param {string} value - Valor a establecer
+ * @param {boolean} warnOnMissing - Si true, muestra warning si no existe (default: true)
+ * @returns {boolean} - true si se estableció, false si no se encontró
+ */
+function safeSetTextContent(elementId, value, warnOnMissing = true) {
     const element = document.getElementById(elementId);
     if (element) {
         element.textContent = value;
         return true;
     }
-    console.warn(`[medicion-ausentismo-home] Elemento con ID '${elementId}' no encontrado en el DOM`);
+    if (warnOnMissing) {
+        console.warn(`[medicion-ausentismo-home] Elemento con ID '${elementId}' no encontrado en el DOM`);
+    }
     return false;
 }
 
@@ -32,19 +84,19 @@ async function loadStats() {
 
             if (stats && stats.success) {
                 const data = stats.data || {};
-                safeSetTextContent('ausentismoPendientes', data.pendientes || 0);
-                safeSetTextContent('ausentismoActivos', data.activos || 0);
+                safeSetTextContent('ausentismoPendientes', data.pendientes || 0, false);
+                safeSetTextContent('ausentismoActivos', data.activos || 0, false);
             }
         } else {
             // Valores por defecto si no hay API disponible
-            safeSetTextContent('ausentismoPendientes', '0');
-            safeSetTextContent('ausentismoActivos', '0');
+            safeSetTextContent('ausentismoPendientes', '0', false);
+            safeSetTextContent('ausentismoActivos', '0', false);
         }
     } catch (error) {
         console.log('[medicion-ausentismo-home] Error cargando estadísticas:', error.message);
         // En caso de error, mostrar 0
-        safeSetTextContent('ausentismoPendientes', '0');
-        safeSetTextContent('ausentismoActivos', '0');
+        safeSetTextContent('ausentismoPendientes', '0', false);
+        safeSetTextContent('ausentismoActivos', '0', false);
     }
 }
 
