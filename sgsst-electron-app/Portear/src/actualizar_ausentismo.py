@@ -1474,6 +1474,41 @@ def guardar_seguimiento(empresa, file_path, datos):
         return {"success": False, "error": str(e)}
 
 
+def normalizar_header(header):
+    """
+    Normaliza un header para comparación tolerante.
+    Elimina espacios, convierte a mayúsculas, normaliza caracteres especiales.
+    """
+    if not header:
+        return ""
+    import unicodedata
+    # Convertir a mayúsculas, eliminar espacios y normalizar caracteres
+    normalized = str(header).upper().strip()
+    # Eliminar acentos y caracteres especiales
+    normalized = unicodedata.normalize('NFD', normalized)
+    normalized = ''.join(c for c in normalized if unicodedata.category(c) != 'Mn')
+    # Eliminar espacios adicionales
+    normalized = normalized.replace(' ', '').replace('_', '')
+    return normalized
+
+
+def match_header(header, target):
+    """
+    Compara dos headers de forma tolerante.
+    Retorna True si header coincide con target (insensitive, sin espacios, parcial).
+    """
+    if not header or not target:
+        return False
+    norm_header = normalizar_header(header)
+    norm_target = normalizar_header(target)
+    # Coincidencia exacta después de normalizar
+    result = norm_header == norm_target
+    # Log solo para debugging de área (puedes remover después)
+    if "AREA" in norm_header or "DPTO" in norm_header:
+        log(f"  [DEBUG match_header] header='{header}' ({norm_header}) vs target='{target}' ({norm_target}) -> {result}")
+    return result
+
+
 def registrar_incapacidad(empresa, file_path, datos):
     """
     Agrega una nueva fila de incapacidad al archivo de ausentismo.
@@ -1481,6 +1516,31 @@ def registrar_incapacidad(empresa, file_path, datos):
     try:
         log(f"Registrando nueva incapacidad en: {file_path}")
         log(f"Datos recibidos: {datos}")
+
+        # === NORMALIZAR DATOS DEL FRONTEND (camelCase -> snake_case) ===
+        # El frontend envía camelCase, normalizamos a snake_case para compatibilidad
+        datos_normalizados = {
+            "cedula": datos.get("cedula", ""),
+            "nombre": datos.get("nombre", ""),
+            "cargo": datos.get("cargo", ""),
+            "area": datos.get("area", "") or datos.get("departamento", ""),
+            "departamento": datos.get("area", "") or datos.get("departamento", ""),
+            "empresa_usuaria": datos.get("empresa_usuaria", ""),
+            "genero": datos.get("genero", ""),
+            "fecha_inicio": datos.get("fechaInicio", "") or datos.get("fecha_inicio", ""),
+            "fecha_finalizacion": datos.get("fechaFin", "") or datos.get("fecha_finalizacion", "") or datos.get("fecha_finalización", ""),
+            "dias_incapacidad": datos.get("diasIncapacidad", "") or datos.get("dias_incapacidad", ""),
+            "tipo_incapacidad": datos.get("tipoIncapacidad", "") or datos.get("tipo_incapacidad", ""),
+            "clase_incapacidad": datos.get("claseIncapacidad", "") or datos.get("clase_incapacidad", ""),
+            "entidad": datos.get("entidad", ""),
+            "codigo": datos.get("codigo", "") or datos.get("codigo_cie10", ""),
+            "descripcion": datos.get("descripcion", "") or datos.get("diagnostico", "") or datos.get("diagnóstico", ""),
+            "diagnostico": datos.get("descripcion", "") or datos.get("diagnostico", "") or datos.get("diagnóstico", ""),
+            "observaciones": datos.get("observaciones", ""),
+        }
+        # Usar datos normalizados
+        datos = datos_normalizados
+        log(f"Datos normalizados: {datos}")
 
         # Cargar el archivo con openpyxl para preservar formato
         wb = load_workbook(file_path)
@@ -1530,6 +1590,14 @@ def registrar_incapacidad(empresa, file_path, datos):
 
         log(f"Encabezados detectados: {headers}")
 
+        # === DEBUG: Mostrar headers normalizados para diagnóstico ===
+        log("=== HEADERS NORMALIZADOS PARA DIAGNÓSTICO ===")
+        for idx, h in enumerate(headers):
+            norm_h = normalizar_header(h)
+            col_letter = chr(65 + idx) if idx < 26 else chr(65 + (idx // 26 - 1)) + chr(65 + (idx % 26))
+            log(f"  Columna {idx + 1} ({col_letter}): '{h}' -> '{norm_h}'")
+        log("=============================================")
+
         # Mapear los datos del formulario a las columnas correctas
         # Calcular días de incapacidad desde fecha_inicio hasta fecha_finalizacion
         dias_incapacidad = 0
@@ -1547,33 +1615,35 @@ def registrar_incapacidad(empresa, file_path, datos):
 
         nueva_fila = []
         for header in headers:
-            if header == "No":
+            # === USAR MATCH TOLERANTE PARA TODOS LOS HEADERS ===
+            if match_header(header, "No"):
                 # Contar filas existentes para asignar número
                 num_filas_datos = sum(1 for r in range(8, ws.max_row + 1) if ws.cell(row=r, column=1).value)
                 nueva_fila.append(str(num_filas_datos + 1))
-            elif header == "EMPRESA":
+            elif match_header(header, "EMPRESA"):
                 # Columna B (índice 1) - Empresa del empleado
                 nueva_fila.append(empresa)
-            elif header == "NOMBRE ":
+            elif match_header(header, "NOMBRE"):
+                # Columna C (índice 2) - Nombre del empleado
                 nueva_fila.append(datos.get("nombre", ""))
-            elif header == "CEDULA ":
-                # Columna E (índice 4) - Cédula del empleado
+            elif match_header(header, "CEDULA"):
+                # Columna D (índice 3) - Cédula del empleado
                 nueva_fila.append(datos.get("cedula", ""))
-            elif header == "Columna1":
-                # Columna adicional (puede usarse para cédula alternativa o dejar vacío)
-                nueva_fila.append("")
-            elif header == "CARGO ":
+            elif match_header(header, "CARGO"):
                 # Columna F (índice 5) - Cargo del empleado
                 nueva_fila.append(datos.get("cargo", ""))
-            elif header == "EMPRESA USUARIA":
+            elif match_header(header, "EMPRESA USUARIA"):
                 # Columna G (índice 6) - Empresa usuaria donde presta el servicio
                 nueva_fila.append(datos.get("empresa_usuaria", ""))
-            elif header == "ÁREA O DPTO":
-                nueva_fila.append(datos.get("departamento", ""))
-            elif header == "GENERO":
+            elif match_header(header, "ÁREA O DPTO") or match_header(header, "AREA O DPTO") or match_header(header, "ÁREA") or match_header(header, "AREA") or match_header(header, "DPTO") or match_header(header, "DEPARTAMENTO") or match_header(header, "UBICACION") or match_header(header, "UBICACIÓN"):
+                # Columna H (índice 7) - Área o Departamento
+                area_valor = datos.get("area", "") or datos.get("departamento", "")
+                log(f"🔵 MATCH ÁREA encontrado: header='{header}', area_valor='{area_valor}'")
+                nueva_fila.append(area_valor)
+            elif match_header(header, "GENERO") or match_header(header, "GÉNERO") or match_header(header, "SEXO"):
                 # Columna I (índice 8) - Género del empleado
                 nueva_fila.append(datos.get("genero", ""))
-            elif header == "MES":
+            elif match_header(header, "MES"):
                 if datos.get("fecha_inicio"):
                     try:
                         mes_num = int(datos["fecha_inicio"].split("-")[1])
@@ -1584,28 +1654,44 @@ def registrar_incapacidad(empresa, file_path, datos):
                         nueva_fila.append("")
                 else:
                     nueva_fila.append("")
-            elif header == "N° DIAS DE INCAPACIDAD":
+            elif match_header(header, "N° DIAS DE INCAPACIDAD") or match_header(header, "NUM DIAS") or match_header(header, "DIAS INCAPACIDAD"):
                 # Columna K (índice 10) - Días de incapacidad CALCULADOS
                 nueva_fila.append(str(dias_incapacidad) if dias_incapacidad > 0 else "")
-            elif header == "CLASE DE INCAPACIDAD":
+            elif match_header(header, "CLASE DE INCAPACIDAD") or match_header(header, "CLASE"):
                 nueva_fila.append(datos.get("clase_incapacidad", ""))
-            elif header == "TIPO DE INCAPACIDAD":
+            elif match_header(header, "TIPO DE INCAPACIDAD") or match_header(header, "TIPO"):
                 nueva_fila.append(datos.get("tipo_incapacidad", ""))
-            elif header == "ENTIDAD":
+            elif match_header(header, "ENTIDAD"):
                 nueva_fila.append(datos.get("entidad", ""))
-            elif header == "AÑO":
+            elif match_header(header, "AÑO") or match_header(header, "ANO"):
                 nueva_fila.append(datos.get("fecha_inicio", "")[:4] if datos.get("fecha_inicio") else "")
-            elif header == "F. INICIO":
+            elif match_header(header, "F. INICIO") or match_header(header, "FECHA INICIO"):
                 nueva_fila.append(datos.get("fecha_inicio", ""))
-            elif header == "F. FIN":
+            elif match_header(header, "F. FIN") or match_header(header, "FECHA FIN"):
                 nueva_fila.append(datos.get("fecha_finalizacion", ""))
-            elif header == "CODIGO":
+            elif match_header(header, "CODIGO") or match_header(header, "CÓDIGO") or match_header(header, "COD. CIE10"):
                 nueva_fila.append(datos.get("codigo", ""))
-            elif header == "DESCRIPCION":
-                nueva_fila.append(datos.get("descripcion", ""))
+            elif match_header(header, "DESCRIPCION") or match_header(header, "DESCRIPCIÓN") or match_header(header, "DIAGNÓSTICO") or match_header(header, "DIAGNOSTICO"):
+                nueva_fila.append(datos.get("descripcion", "") or datos.get("diagnostico", ""))
+            elif match_header(header, "OBSERVACIONES") or match_header(header, "OBSERVACIÓN"):
+                nueva_fila.append(datos.get("observaciones", ""))
             else:
                 # Columnas calculadas o no mapeadas: dejar vacío
                 nueva_fila.append("")
+
+        # === CORRECCIÓN: Asegurar que la columna E (índice 4) tenga la cédula duplicada ===
+        # Si hay al menos 4 columnas y la columna D (índice 3) tiene cédula, copiar a columna E
+        if len(nueva_fila) >= 4:
+            cedula_valor = nueva_fila[3] if len(nueva_fila) > 3 else ""
+            if cedula_valor and len(nueva_fila) > 4:
+                # Copiar cédula a columna E (índice 4)
+                nueva_fila[4] = cedula_valor
+            elif cedula_valor and len(nueva_fila) == 4:
+                # Agregar cédula en columna E
+                nueva_fila.append(cedula_valor)
+
+        # === LOG: Verificar datos antes de escribir ===
+        log(f"📋 Datos a escribir - area: '{datos.get('area', '')}', departamento: '{datos.get('departamento', '')}'")
 
         # Encontrar la primera fila vacía (después de los datos existentes)
         fila_destino = ws.max_row + 1
@@ -1615,8 +1701,12 @@ def registrar_incapacidad(empresa, file_path, datos):
                 break
 
         # Escribir la nueva fila
+        log(f"📝 Escribiendo fila {fila_destino}:")
         for col_idx, valor in enumerate(nueva_fila, start=1):
             ws.cell(row=fila_destino, column=col_idx, value=valor)
+            if col_idx <= 12:  # Log primeras 12 columnas para depuración
+                col_letter = chr(64 + col_idx) if col_idx <= 26 else chr(65 + (col_idx // 26 - 1)) + chr(65 + (col_idx % 26))
+                log(f"  Columna {col_idx} ({col_letter}): '{valor}'")
 
         # Guardar
         wb.save(file_path)
