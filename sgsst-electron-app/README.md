@@ -1,7 +1,7 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.52
-**Última actualización:** 28 de febrero de 2026
+**Versión:** 0.1.53
+**Última actualización:** 4 de marzo de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
 ---
@@ -27,6 +27,9 @@
 - ✅ **Diagnósticos Múltiples**: Hasta 3 diagnósticos CIE-10 por caso (DX principal + DX2 + DX3)
 - ✅ **KPIs en Tiempo Real**: Actualización dinámica con filtros de año/mes
 - ✅ **Solo 13 archivos en raíz**: Proyecto limpio y organizado
+- ✅ **Tabla de Ausentismo 17 Columnas**: Año, Fecha Inicio, Fecha Fin, Código 🆕
+- ✅ **Filtros Dinámicos Inteligentes**: Año y tipo basados en datos reales 🆕
+- ✅ **Información de Mapeo**: Fecha y tipo de mapeo en tarjetas de empresas 🆕
 
 ---
 
@@ -363,6 +366,47 @@ El sistema identifica automáticamente empleados que cumplen **una de dos condic
 - Año de inicio de incapacidad
 - Mes de inicio de incapacidad
 
+#### 3.1. Tabla de Ausentismo - Vista Completa 🆕
+
+**Columnas de la Tabla (17 columnas):**
+
+| # | Columna | Nombre Técnico | Índice | Ancho Máx. |
+|---|---------|----------------|--------|------------|
+| 1 | No | `no` | - | Auto |
+| 2 | Nombre | `NOMBRE` | 2 | 180px |
+| 3 | Cédula | `CEDULA` | 3 | Auto |
+| 4 | Cargo | `CARGO` | 5 | 120px |
+| 5 | Empresa Usuaria | `EMPRESA USUARIA` | 6 | 150px |
+| 6 | Área/Dpto | `ÁREA O DPTO` | 7 | 120px |
+| 7 | Género | `GENERO` | 8 | Auto |
+| 8 | Mes | `MES` | 9 | Auto |
+| 9 | N° Días | `N° DIAS DE INCAPACIDAD` | 10 | Auto |
+| 10 | Clase | `CLASE DE INCAPACIDAD` | 11 | Auto |
+| 11 | Tipo | `TIPO DE INCAPACIDAD` | 12 | 150px |
+| 12 | Entidad | `ENTIDAD` | 13 | Auto |
+| 13 | **Año** 🆕 | `AÑO` | 14 | Auto |
+| 14 | **Fecha Inicio** 🆕 | `F. INICIO` | 15 | Auto |
+| 15 | **Fecha Fin** 🆕 | `F. FIN` | 16 | Auto |
+| 16 | **Código** 🆕 | `CODIGO` | 17 | Auto |
+| 17 | Descripción | `DESCRIPCION` | 18 | 200px |
+
+**Características de la Tabla:**
+- ✅ **Scroll horizontal responsivo** - Se expande cuando hay espacio
+- ✅ **Columnas sticky** - Header fijo al hacer scroll vertical
+- ✅ **Hover effects** - Resalta fila al pasar el mouse
+- ✅ **Text truncation** - Elipsis para texto largo con tooltip
+- ✅ **Badges de colores** - Clase (EPS, ARL, Licencia) con colores distintivos
+
+**Filtros Dinámicos:**
+
+| Filtro | Funcionamiento |
+|--------|----------------|
+| **Buscar** | Nombre o cédula (búsqueda parcial) |
+| **Año** | Todos los años presentes en datos (descendente) |
+| **Mes** | 12 meses (Enero-Diciembre) |
+| **Tipo** | Todos los tipos únicos de "CLASE DE INCAPACIDAD" |
+| **Botones** | "Filtrar" y "Limpiar" |
+
 #### 4. Modal de Detalles del Caso con Incapacidades Seleccionables 🆕
 
 Al hacer clic en "Ver Detalles", se muestra un modal con:
@@ -564,7 +608,9 @@ El módulo se basa en los lineamientos de la **Resolución 0312 de 2019** para e
 - **Proceso PRIC**: Proceso de Rehabilitación y Reincorporación Laboral con 5 etapas estructuradas
 
 **Documentación Completa:**
-- 📖 [docs/modulo-ausentismo-pric.md](docs/modulo-ausentismo-pric.md) (pendiente)
+- 📖 [docs/modulo-ausentismo.md](docs/modulo-ausentismo.md) - **Tabla de 17 columnas y filtros dinámicos** 🆕
+- 📖 [docs/informacion-mapeo.md](docs/informacion-mapeo.md) - **Información de mapeo en tarjetas** 🆕
+- 📖 [docs/ARQUITECTURA_AUSENTISMO_DUAL.md](docs/ARQUITECTURA_AUSENTISMO_DUAL.md) - Sistema dual de archivos
 
 ---
 
@@ -882,7 +928,105 @@ Este software es propietario y confidencial. No se permite la reproducción, dis
 
 ## 📝 Cambios Recientes
 
-### v0.1.52 - 28 Feb 2026 🆕
+### v0.1.53 - 4 Mar 2026 🆕
+
+#### Módulo de Ausentismo - Mejoras en Tabla y Estadísticas
+
+**1. Tabla de Ausentismo - Nuevas Columnas** 🆕
+
+Se agregaron 4 columnas adicionales entre "Entidad" y "Descripción":
+
+| Columna | Índice | Nombre Técnico | Fuente |
+|---------|--------|----------------|--------|
+| **Año** | 14 (O) | `AÑO` | Columna O del Excel o extraído de F. Inicio |
+| **Fecha Inicio** | 15 (P) | `F. INICIO` | Columna P del Excel |
+| **Fecha Fin** | 16 (Q) | `F. FIN` | Columna Q del Excel |
+| **Código** | 17 (R) | `CODIGO` | Columna R del Excel (Código CIE-10) |
+
+**Características:**
+- ✅ **Scroll horizontal responsivo** - La tabla se expande cuando hay espacio
+- ✅ **Año automático** - Si la columna O está vacía, extrae año de la fecha de inicio
+- ✅ **Índices fijos** - Búsqueda prioritaria por índice (14, 15, 16, 17) con fallback por nombre
+- ✅ **17 columnas en total** - Tabla completa con todas las datos relevantes
+
+**2. Filtros Dinámicos Mejorados** 🆕
+
+| Filtro | Comportamiento Anterior | Comportamiento Nuevo |
+|--------|------------------------|----------------------|
+| **Año** | 3 años hardcodeados (2024, 2023, 2022) | **Todos los años presentes** en datos (orden descendente) |
+| **Tipo (Clase)** | 3 opciones fijas (EPS, ARL, EMPRESA) | **Todos los tipos únicos** de "CLASE DE INCAPACIDAD" (orden alfabético) |
+| **Búsqueda** | Nombre y cédula | Igual (sin cambios) |
+| **Mes** | 12 meses fijos | Igual (sin cambios) |
+
+**Función nueva:** `populateDynamicFilters()`
+- Escanea todos los registros al cargar
+- Extrae valores únicos de año y tipo
+- Actualiza selects dinámicamente
+- Fallback para registros antiguos sin columna AÑO
+
+**3. Estadísticas de Ausentismo - Filtros y Género** 🆕
+
+**Corrección de Género:**
+- ❌ Antes: "MUJER", "HOMBRE" (no coincidía con datos)
+- ✅ Ahora: "FEMENINO", "MASCULINO" (coincide con Excel)
+
+**Filtros Dinámicos en Estadísticas:**
+- **Año**: Todos los años presentes en datos
+- **Mes**: Solo meses con registros
+- **Género**: FEMENINO, MASCULINO
+- **Clase**: Todos los tipos únicos de incapacidad
+
+**Gráfico de Género Actualizado:**
+- Etiquetas: "Femenino", "Masculino", "Otro"
+- Colores: Rosa (#e91e63), Azul (#2196f3), Gris (#9e9e9e)
+- Cálculo: Filtra por `row.GENERO.toUpperCase() === 'FEMENINO'`
+
+**4. Scroll Horizontal Modernizado** 🎨
+
+**Sección Configuración de Empresas:**
+- Scrollbar horizontal y vertical con mismo estilo
+- Ancho: 10px, bordes redondeados 8px
+- Colores: Track #f1f5f9, Thumb #cbd5e1, Hover #94a3b8
+- Soporte completo para temas oscuro y dark-legacy
+
+**Sección Ausentismo:**
+- Tabla con `width: 100%` + `min-width: fit-content`
+- Contenedor con `max-width: 100%`
+- Scroll solo aparece cuando es necesario
+
+**5. Información de Mapeo en Tarjetas** 🆕
+
+**Nueva sección en tarjetas de empresas:**
+
+```
+┌─────────────────────────────────────┐
+│  Tempoactiva        [Riesgo IV]    │
+│  ... stats y botones ...            │
+│  ─────────────────────────────────  │
+│  📅 Último mapeo: 4 mar 2026 10:30 │
+│                      [Primera vez]  │
+└─────────────────────────────────────┘
+```
+
+**Datos almacenados:**
+- `fechaMapeo`: Timestamp ISO de cuándo se mapeó
+- `tipoMapeo`: 'primera_vez' o 'reconfiguracion'
+
+**Badge de tipo:**
+- 🟢 **Primera vez** (verde) - Mapeo inicial
+- 🟡 **Reconfiguración** (ámbar) - Reconfiguración de ruta existente
+
+**Archivos Modificados:**
+
+| Archivo | Cambios |
+|---------|---------|
+| `modules/gestion-salud/ausentismo/medicion-ausentismo.js` | +4 columnas, filtros dinámicos, corrección género, estadísticas |
+| `components/config/config-viewer.html` | + Info de mapeo en tarjetas, scroll modernizado |
+| `renderer.js` | + Guardado de `fechaMapeo` y `tipoMapeo` |
+
+---
+
+### v0.1.52 - 28 Feb 2026
 
 #### Módulo de Ausentismo PRIC - Actualización Mayor
 

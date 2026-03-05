@@ -5660,10 +5660,7 @@ class MedicionAusentismoComponent {
             <div class="filter-group">
                 <label style="display: block; font-size: 12px; font-weight: 500; color: #64748B; margin-bottom: 4px;">Año</label>
                 <select id="yearFilter" style="width: 100%; padding: 8px 12px; border: 1px solid #dee2e6; border-radius: 6px; font-size: 14px;">
-                    <option value="">Todos</option>
-                    ${new Date().getFullYear()}
-                    <option value="${new Date().getFullYear() - 1}">${new Date().getFullYear() - 1}</option>
-                    <option value="${new Date().getFullYear() - 2}">${new Date().getFullYear() - 2}</option>
+                    <option value="">Cargando años...</option>
                 </select>
             </div>
             <div class="filter-group">
@@ -5687,10 +5684,7 @@ class MedicionAusentismoComponent {
             <div class="filter-group">
                 <label style="display: block; font-size: 12px; font-weight: 500; color: #64748B; margin-bottom: 4px;">Tipo</label>
                 <select id="typeFilter" style="width: 100%; padding: 8px 12px; border: 1px solid #dee2e6; border-radius: 6px; font-size: 14px;">
-                    <option value="">Todos</option>
-                    <option value="EPS">EPS</option>
-                    <option value="ARL">ARL</option>
-                    <option value="EMPRESA">EMPRESA</option>
+                    <option value="">Cargando tipos...</option>
                 </select>
             </div>
             <div style="display: flex; align-items: flex-end; gap: 10px;">
@@ -5762,12 +5756,16 @@ class MedicionAusentismoComponent {
                     <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Clase</th>
                     <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Tipo</th>
                     <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Entidad</th>
+                    <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Año</th>
+                    <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Fecha Inicio</th>
+                    <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Fecha Fin</th>
+                    <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Código</th>
                     <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Descripción</th>
                 </tr>
             </thead>
             <tbody id="ausentismoTableBody">
                 <tr>
-                    <td colspan="13" style="text-align: center; padding: 40px; color: #64748B;">
+                    <td colspan="17" style="text-align: center; padding: 40px; color: #64748B;">
                         <i class="fas fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 10px;"></i>
                         <p>Cargando registros...</p>
                     </td>
@@ -5816,23 +5814,40 @@ class MedicionAusentismoComponent {
                 console.log('[DEBUG] Headers del Excel:', result.headers);
                 console.log('[DEBUG] Primera fila de datos:', result.rows[0]);
                 
+                // Log detallado de headers con índices
+                console.log('[DEBUG] Estructura de columnas del Excel:');
+                result.headers.forEach((header, i) => {
+                    console.log(`  [${i}] ${header} → Valor: ${result.rows[0][i]}`);
+                });
+
                 this.currentAusentismoData = result.rows.map((row, index) => {
                     const rowObj = {};
+                    
+                    // Guardar por índice numérico para acceso directo por posición
+                    row.forEach((value, i) => {
+                        rowObj[String(i)] = value;
+                    });
+                    
+                    // Guardar también por nombre de encabezado
                     result.headers.forEach((header, i) => {
                         const cleanHeader = header ? header.trim() : `col_${i}`;
                         rowObj[cleanHeader] = row[i];
                         // Guardar también en minúsculas para búsqueda flexible
                         rowObj[cleanHeader.toLowerCase().replace(/\s+/g, '_')] = row[i];
                     });
+                    
                     rowObj.no = index + 1;
                     return rowObj;
                 });
-                
+
                 // Debug: mostrar las primeras filas con todos sus campos
                 console.log('[DEBUG] Primer registro procesado:', this.currentAusentismoData[0]);
                 console.log('[DEBUG] Total registros:', this.currentAusentismoData.length);
-                
+
                 this.renderTable(tableElement, this.currentAusentismoData);
+                
+                // Actualizar filtros con datos reales
+                this.populateDynamicFilters();
             } else {
                 this.renderTable(tableElement, []);
                 this.showNotification('No hay registros disponibles', 'warning', notificationDiv.id);
@@ -5841,6 +5856,77 @@ class MedicionAusentismoComponent {
             console.error('Error loading ausentismo data:', error);
             this.renderTable(tableElement, []);
             this.showNotification(`Error: ${error.message}`, 'error', notificationDiv.id);
+        }
+    }
+
+    /**
+     * Llena los filtros dinámicos con datos reales del Excel
+     */
+    populateDynamicFilters() {
+        if (!this.currentAusentismoData || this.currentAusentismoData.length === 0) {
+            // Si no hay datos, dejar filtros en blanco
+            const yearFilter = document.getElementById('yearFilter');
+            const typeFilter = document.getElementById('typeFilter');
+            if (yearFilter) yearFilter.innerHTML = '<option value="">Todos</option>';
+            if (typeFilter) typeFilter.innerHTML = '<option value="">Todos</option>';
+            return;
+        }
+
+        // 1. Filtro de AÑO - Extraer años únicos de la columna 14 (O) o de F. INICIO
+        const yearFilter = document.getElementById('yearFilter');
+        if (yearFilter) {
+            const yearsSet = new Set();
+            
+            this.currentAusentismoData.forEach(row => {
+                // Intentar obtener año de columna 14 (O) o AÑO
+                let year = row['14'] || row.AÑO || row.ANO || '';
+                
+                // Si no hay año directo, extraer de F. INICIO (columna 15/P)
+                if (!year || year === '-') {
+                    const fechaInicio = row['15'] || row['F. INICIO'] || '';
+                    if (fechaInicio && fechaInicio.length >= 4) {
+                        const match = fechaInicio.match(/(19|20)\d{2}/);
+                        if (match) {
+                            year = match[0];
+                        }
+                    }
+                }
+                
+                if (year && year !== '-') {
+                    yearsSet.add(year);
+                }
+            });
+
+            // Convertir a array y ordenar descendente
+            const years = Array.from(yearsSet).sort((a, b) => b - a);
+            
+            // Llenar select
+            yearFilter.innerHTML = '<option value="">Todos</option>' + 
+                years.map(year => `<option value="${year}">${year}</option>`).join('');
+            
+            console.log('[DEBUG] Filtro de año actualizado:', years);
+        }
+
+        // 2. Filtro de TIPO (CLASE DE INCAPACIDAD) - Valores únicos
+        const typeFilter = document.getElementById('typeFilter');
+        if (typeFilter) {
+            const typesSet = new Set();
+            
+            this.currentAusentismoData.forEach(row => {
+                const clase = row['CLASE DE INCAPACIDAD'] || row['11'] || '';
+                if (clase && clase !== '-') {
+                    typesSet.add(clase.toUpperCase().trim());
+                }
+            });
+
+            // Convertir a array y ordenar alfabéticamente
+            const types = Array.from(typesSet).sort();
+            
+            // Llenar select
+            typeFilter.innerHTML = '<option value="">Todos</option>' + 
+                types.map(type => `<option value="${type}">${type}</option>`).join('');
+            
+            console.log('[DEBUG] Filtro de tipo actualizado:', types);
         }
     }
 
@@ -5856,16 +5942,26 @@ class MedicionAusentismoComponent {
         }
 
         let filtered = this.currentAusentismoData.filter(row => {
-            const nombre = (row.NOMBRE || '').toLowerCase();
-            const cedula = (row.CEDULA || '').toLowerCase();
+            const nombre = (row.NOMBRE || row['2'] || '').toLowerCase();
+            const cedula = (row.CEDULA || row['3'] || '').toLowerCase();
+            
+            // Búsqueda por nombre o cédula
             const matchesSearch = !search || nombre.includes(search) || cedula.includes(search);
-            const matchesYear = !year || (row['FECHA INICIO'] || '').includes(year);
+            
+            // Filtro por año - Usar columna 14 (O) o AÑO
+            const rowYear = row['14'] || row.AÑO || row.ANO || '';
+            const matchesYear = !year || rowYear === year;
+            
+            // Filtro por mes
             const matchesMonth = !month || {
                 '1': 'ENERO', '2': 'FEBRERO', '3': 'MARZO', '4': 'ABRIL',
                 '5': 'MAYO', '6': 'JUNIO', '7': 'JULIO', '8': 'AGOSTO',
                 '9': 'SEPTIEMBRE', '10': 'OCTUBRE', '11': 'NOVIEMBRE', '12': 'DICIEMBRE'
-            }[month] === row.MES;
-            const matchesType = !type || (row['CLASE DE INCAPACIDAD'] || '').toUpperCase().includes(type);
+            }[month] === (row.MES || row['9'] || '').toUpperCase();
+            
+            // Filtro por tipo (CLASE DE INCAPACIDAD) - Usar columna 11 (L)
+            const rowType = (row['CLASE DE INCAPACIDAD'] || row['11'] || '').toUpperCase();
+            const matchesType = !type || rowType === type;
 
             return matchesSearch && matchesYear && matchesMonth && matchesType;
         });
@@ -5881,7 +5977,7 @@ class MedicionAusentismoComponent {
         if (!data || data.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="13" style="text-align: center; padding: 40px; color: #64748B;">
+                    <td colspan="17" style="text-align: center; padding: 40px; color: #64748B;">
                         <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 15px; opacity: 0.3;"></i>
                         <p>No hay registros para mostrar</p>
                     </td>
@@ -5909,18 +6005,39 @@ class MedicionAusentismoComponent {
             const cedula = row.CEDULA || '-';
             const cargo = row.CARGO || '-';
             const empresaUsuaria = row['EMPRESA USUARIA'] || '-';
-            
+
             // Buscar columna Área/Dpto con múltiples variaciones (igual que Descripción)
             // Según los headers reales del Excel: "ÁREA O DPTO"
-            const areaDpto = row['ÁREA O DPTO'] || row['AREA O DPTO'] || 
-                            row['AREA'] || row['ÁREA'] || row['DEPARTAMENTO'] || 
-                            row.area_o_dpto || row.area || row.departamento || 
+            const areaDpto = row['ÁREA O DPTO'] || row['AREA O DPTO'] ||
+                            row['AREA'] || row['ÁREA'] || row['DEPARTAMENTO'] ||
+                            row.area_o_dpto || row.area || row.departamento ||
                             row['AREA/DPTO'] || row['ÁREA/DPTO'] || '-';
-            
+
             const genero = row.GENERO || '-';
             const mes = row.MES || '-';
             const noDias = row['N° DIAS DE INCAPACIDAD'] || '0';
             const entidad = row.ENTIDAD || '-';
+
+            // Nuevas columnas: Búsqueda por índice de columna específico
+            // Índice 14 (Columna O): AÑO
+            // Índice 15 (Columna P): F. INICIO
+            // Índice 16 (Columna Q): F. FIN
+            // Índice 17 (Columna R): CODIGO
+            const anioDirecto = row['14'] || row.AÑO || row.ANO || '';
+            const fechaInicio = row['15'] || row['F. INICIO'] || row['FECHA INICIO'] || row.fecha_inicio || '-';
+            const fechaFin = row['16'] || row['F. FIN'] || row['FECHA FIN'] || row['FECHA FINALIZACION'] || row.fecha_fin || '-';
+            const codigo = row['17'] || row.CODIGO || row['CÓDIGO'] || row.codigo || '-';
+
+            // Usar año directo del Excel, o extraerlo de la fecha si está vacío
+            let anio = anioDirecto && anioDirecto !== '-' ? anioDirecto : '-';
+            if (anio === '-' && fechaInicio && fechaInicio !== '-' && fechaInicio.length >= 4) {
+                // Fallback: extraer año de la fecha de inicio (para registros antiguos)
+                const match = fechaInicio.match(/(19|20)\d{2}/);
+                if (match) {
+                    anio = match[0];
+                }
+            }
+            
             // Según headers reales del Excel: "DESCRIPCION" (sin tilde en los datos procesados)
             const descripcion = row['DESCRIPCION'] || row['DESCRIPCIÓN'] || '-';
 
@@ -5942,6 +6059,10 @@ class MedicionAusentismoComponent {
                     </td>
                     <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; max-width: 150px; overflow: hidden; text-overflow: ellipsis;" title="${tipo}">${tipo}</td>
                     <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; white-space: nowrap;">${entidad}</td>
+                    <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; white-space: nowrap;">${anio}</td>
+                    <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; white-space: nowrap;">${fechaInicio}</td>
+                    <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; white-space: nowrap;">${fechaFin}</td>
+                    <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; white-space: nowrap;">${codigo}</td>
                     <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; max-width: 200px; overflow: hidden; text-overflow: ellipsis;" title="${descripcion}">${descripcion}</td>
                 </tr>
             `;
@@ -6235,46 +6356,27 @@ class MedicionAusentismoComponent {
             <div class="filter-group">
                 <label style="display: block; font-size: 12px; font-weight: 500; color: #64748B; margin-bottom: 4px;">Año</label>
                 <select id="statsYearFilter" style="width: 100%; padding: 8px 12px; border: 1px solid #dee2e6; border-radius: 6px; font-size: 14px;">
-                    <option value="">Todos</option>
-                    <option value="2026">2026</option>
-                    <option value="2025">2025</option>
-                    <option value="2024">2024</option>
-                    <option value="2023">2023</option>
-                    <option value="2022">2022</option>
+                    <option value="">Cargando años...</option>
                 </select>
             </div>
             <div class="filter-group">
                 <label style="display: block; font-size: 12px; font-weight: 500; color: #64748B; margin-bottom: 4px;">Mes</label>
                 <select id="statsMonthFilter" style="width: 100%; padding: 8px 12px; border: 1px solid #dee2e6; border-radius: 6px; font-size: 14px;">
-                    <option value="">Todos</option>
-                    <option value="ENERO">Enero</option>
-                    <option value="FEBRERO">Febrero</option>
-                    <option value="MARZO">Marzo</option>
-                    <option value="ABRIL">Abril</option>
-                    <option value="MAYO">Mayo</option>
-                    <option value="JUNIO">Junio</option>
-                    <option value="JULIO">Julio</option>
-                    <option value="AGOSTO">Agosto</option>
-                    <option value="SEPTIEMBRE">Septiembre</option>
-                    <option value="OCTUBRE">Octubre</option>
-                    <option value="NOVIEMBRE">Noviembre</option>
-                    <option value="DICIEMBRE">Diciembre</option>
+                    <option value="">Cargando meses...</option>
                 </select>
             </div>
             <div class="filter-group">
                 <label style="display: block; font-size: 12px; font-weight: 500; color: #64748B; margin-bottom: 4px;">Género</label>
                 <select id="statsGenderFilter" style="width: 100%; padding: 8px 12px; border: 1px solid #dee2e6; border-radius: 6px; font-size: 14px;">
                     <option value="">Todos</option>
-                    <option value="MUJER">Mujer</option>
-                    <option value="HOMBRE">Hombre</option>
+                    <option value="FEMENINO">Femenino</option>
+                    <option value="MASCULINO">Masculino</option>
                 </select>
             </div>
             <div class="filter-group">
                 <label style="display: block; font-size: 12px; font-weight: 500; color: #64748B; margin-bottom: 4px;">Clase</label>
                 <select id="statsClassFilter" style="width: 100%; padding: 8px 12px; border: 1px solid #dee2e6; border-radius: 6px; font-size: 14px;">
-                    <option value="">Todos</option>
-                    <option value="EPS">EPS</option>
-                    <option value="ARL">ARL</option>
+                    <option value="">Cargando tipos...</option>
                 </select>
             </div>
             <div style="display: flex; gap: 10px; align-items: center;">
@@ -6394,12 +6496,15 @@ class MedicionAusentismoComponent {
 
                 console.log('[ESTADISTICAS] Datos procesados:', data.length, 'filas');
                 console.log('[ESTADISTICAS] Primera fila:', data[0]);
-                
+
                 // Guardar datos para filtros
                 this.currentAusentismoDataStats = data;
 
                 this.updateStatsMetrics(data);
                 this.renderCharts(data);
+                
+                // Actualizar filtros dinámicos
+                this.populateStatsFilters(data);
             } else {
                 console.warn('[ESTADISTICAS] No hay datos:', result);
                 this.showNotification('No hay datos para mostrar', 'warning', notificationDiv.id);
@@ -6407,6 +6512,73 @@ class MedicionAusentismoComponent {
         } catch (error) {
             console.error('[ESTADISTICAS] Error loading data:', error);
             this.showNotification(`Error: ${error.message}`, 'error', notificationDiv.id);
+        }
+    }
+
+    /**
+     * Llena los filtros de estadísticas con datos reales
+     */
+    populateStatsFilters(data) {
+        if (!data || data.length === 0) {
+            // Si no hay datos, dejar filtros en blanco
+            const yearFilter = document.getElementById('statsYearFilter');
+            const monthFilter = document.getElementById('statsMonthFilter');
+            const classFilter = document.getElementById('statsClassFilter');
+            if (yearFilter) yearFilter.innerHTML = '<option value="">Todos</option>';
+            if (monthFilter) monthFilter.innerHTML = '<option value="">Todos</option>';
+            if (classFilter) classFilter.innerHTML = '<option value="">Todos</option>';
+            return;
+        }
+
+        // 1. Filtro de AÑO
+        const yearFilter = document.getElementById('statsYearFilter');
+        if (yearFilter) {
+            const yearsSet = new Set();
+            data.forEach(row => {
+                let year = row.AÑO || row.ANO || row['14'] || '';
+                if (!year || year === '-') {
+                    const fechaInicio = row['F. INICIO'] || row['FECHA INICIO'] || row['15'] || '';
+                    if (fechaInicio && fechaInicio.length >= 4) {
+                        const match = fechaInicio.match(/(19|20)\d{2}/);
+                        if (match) year = match[0];
+                    }
+                }
+                if (year && year !== '-') yearsSet.add(year);
+            });
+            const years = Array.from(yearsSet).sort((a, b) => b - a);
+            yearFilter.innerHTML = '<option value="">Todos</option>' + 
+                years.map(year => `<option value="${year}">${year}</option>`).join('');
+        }
+
+        // 2. Filtro de MES
+        const monthFilter = document.getElementById('statsMonthFilter');
+        if (monthFilter) {
+            const monthsSet = new Set();
+            data.forEach(row => {
+                const mes = row.MES || row['9'] || '';
+                if (mes && mes !== '-') monthsSet.add(mes.toUpperCase());
+            });
+            const months = Array.from(monthsSet).sort();
+            const monthNames = {
+                'ENERO': 'Enero', 'FEBRERO': 'Febrero', 'MARZO': 'Marzo', 'ABRIL': 'Abril',
+                'MAYO': 'Mayo', 'JUNIO': 'Junio', 'JULIO': 'Julio', 'AGOSTO': 'Agosto',
+                'SEPTIEMBRE': 'Septiembre', 'OCTUBRE': 'Octubre', 'NOVIEMBRE': 'Noviembre', 'DICIEMBRE': 'Diciembre'
+            };
+            monthFilter.innerHTML = '<option value="">Todos</option>' + 
+                months.map(m => `<option value="${m}">${monthNames[m] || m}</option>`).join('');
+        }
+
+        // 3. Filtro de CLASE
+        const classFilter = document.getElementById('statsClassFilter');
+        if (classFilter) {
+            const classSet = new Set();
+            data.forEach(row => {
+                const clase = row['CLASE DE INCAPACIDAD'] || row['11'] || '';
+                if (clase && clase !== '-') classSet.add(clase.toUpperCase().trim());
+            });
+            const classes = Array.from(classSet).sort();
+            classFilter.innerHTML = '<option value="">Todos</option>' + 
+                classes.map(c => `<option value="${c}">${c}</option>`).join('');
         }
     }
 
@@ -6457,9 +6629,9 @@ class MedicionAusentismoComponent {
         const licenciaCount = data.filter(row => (row['CLASE DE INCAPACIDAD'] || '').toUpperCase().includes('LICENCIA')).length;
 
         // Datos para gráfico de género
-        const mujerCount = data.filter(row => (row.GENERO || '').toUpperCase() === 'MUJER').length;
-        const hombreCount = data.filter(row => (row.GENERO || '').toUpperCase() === 'HOMBRE').length;
-        const otroCount = data.length - mujerCount - hombreCount;
+        const femeninoCount = data.filter(row => (row.GENERO || '').toUpperCase() === 'FEMENINO').length;
+        const masculinoCount = data.filter(row => (row.GENERO || '').toUpperCase() === 'MASCULINO').length;
+        const otroCount = data.length - femeninoCount - masculinoCount;
 
         // Renderizar gráfico de barras (Monthly)
         const monthlyCtx = document.getElementById('monthlyChart').getContext('2d');
@@ -6543,9 +6715,9 @@ class MedicionAusentismoComponent {
             new window.Chart(genderCtx, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Mujer', 'Hombre', 'Otro'],
+                    labels: ['Femenino', 'Masculino', 'Otro'],
                     datasets: [{
-                        data: [mujerCount, hombreCount, Math.max(0, otroCount)],
+                        data: [femeninoCount, masculinoCount, Math.max(0, otroCount)],
                         backgroundColor: ['#e91e63', '#2196f3', '#9e9e9e'],
                         borderWidth: 0
                     }]

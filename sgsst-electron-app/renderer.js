@@ -3083,17 +3083,28 @@ ${result.log}
           config.companyPaths = {};
           console.log(`[MAPEO][DEBUG] companyPaths no existía, creado nuevo objeto`);
         }
-        
+
+        // === Determinar si es primera vez o reconfiguración ===
+        const esPrimeraVez = !config.companyPaths[companyName];
+        const tipoMapeo = esPrimeraVez ? 'primera_vez' : 'reconfiguracion';
+        const fechaMapeo = new Date().toISOString();
+
+        console.log(`[MAPEO][DEBUG] Tipo de mapeo: ${tipoMapeo}`);
+
         // === LOG CRÍTICO: Qué se está guardando ===
         console.log(`[MAPEO][DEBUG] Preparando para guardar configuración para ${companyName}:`, {
           root: path,
           structureKeys: result.structure ? Object.keys(result.structure) : 'MISSING',
-          structureHasStructure: !!(result.structure?.structure)
+          structureHasStructure: !!(result.structure?.structure),
+          tipoMapeo,
+          fechaMapeo
         });
-        
+
         config.companyPaths[companyName] = {
           root: path,
-          structure: result.structure
+          structure: result.structure,
+          fechaMapeo,
+          tipoMapeo
         };
         
         console.log(`[MAPEO][DEBUG] Configuración actualizada para ${companyName}:`, {

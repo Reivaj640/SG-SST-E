@@ -233,6 +233,53 @@
             background: #505050;
         }
 
+        /* Scrollbar horizontal para company-grid (cuando hay overflow) */
+        #company-grid::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        #company-grid::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 8px;
+        }
+
+        #company-grid::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 8px;
+            transition: background 0.2s;
+        }
+
+        #company-grid::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Scrollbar horizontal y vertical para tema oscuro */
+        [data-theme="dark"] #company-grid::-webkit-scrollbar-track {
+            background: #2d3748;
+        }
+
+        [data-theme="dark"] #company-grid::-webkit-scrollbar-thumb {
+            background: #4a5568;
+        }
+
+        [data-theme="dark"] #company-grid::-webkit-scrollbar-thumb:hover {
+            background: #5a6d7a;
+        }
+
+        /* Scrollbar para tema dark-legacy */
+        [data-theme="dark-legacy"] #company-grid::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+
+        [data-theme="dark-legacy"] #company-grid::-webkit-scrollbar-thumb {
+            background: #404040;
+        }
+
+        [data-theme="dark-legacy"] #company-grid::-webkit-scrollbar-thumb:hover {
+            background: #505050;
+        }
+
         .section-container {
             display: none;
             animation: fadeIn 0.3s ease-out;
@@ -332,6 +379,8 @@
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
             gap: 1.5rem;
+            overflow-x: auto;
+            padding-bottom: 1rem;
         }
 
         .company-card {
@@ -812,6 +861,62 @@
         }
         .btn-danger-ghost:hover {
             background: rgba(220, 53, 69, 0.1);
+        }
+
+        /* --- Información de mapeo en tarjetas --- */
+        .map-info-section {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .map-info-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        .map-info-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .map-info-icon {
+            color: var(--primary);
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .map-info-label {
+            color: var(--text-muted);
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .map-info-value {
+            color: var(--text-main);
+            font-weight: 400;
+        }
+
+        .map-type-badge {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-left: 0.25rem;
+        }
+
+        .map-type-first {
+            background-color: #d1fae5;
+            color: #059669;
+        }
+
+        .map-type-reconfig {
+            background-color: #fef3c7;
+            color: #d97706;
         }
 
         .btn-icon {
@@ -1298,6 +1403,7 @@
     /* ================= GESTIÓN DE EMPRESAS ================= */
     let companies = [];
     let originalCompanyName = null; // ← Variable para almacenar el nombre original al editar
+    let currentConfig = null; // ← Variable global para almacenar la configuración completa
 
     // Función para cargar las empresas
     async function loadCompanies() {
@@ -1305,10 +1411,10 @@
         try {
             if (electronAPI && typeof electronAPI.loadConfig === 'function') {
                 console.log('📡 Cargando configuración desde Electron API...');
-                const config = await electronAPI.loadConfig();
-                console.log('📦 Configuración recibida:', config);
+                currentConfig = await electronAPI.loadConfig();
+                console.log('📦 Configuración recibida:', currentConfig);
 
-                const companyPaths = config.companyPaths || {};
+                const companyPaths = currentConfig.companyPaths || {};
                 console.log('🏢 Paths de empresas encontrados:', Object.keys(companyPaths));
 
                 companies = Object.keys(companyPaths).map(name => {
@@ -1491,6 +1597,54 @@
             cardBody.appendChild(cardTitleRow);
             cardBody.appendChild(companyStats);
             cardBody.appendChild(buttonsDiv);
+
+            // --- Sección de información de mapeo (solo si la empresa está vinculada) ---
+            if (currentConfig && currentConfig.companyPaths) {
+                const companyConfig = currentConfig.companyPaths[comp.name];
+                if (companyConfig && companyConfig.root) {
+                    const mapInfoSection = document.createElement('div');
+                    mapInfoSection.className = 'map-info-section';
+
+                    const fechaMapeo = companyConfig.fechaMapeo;
+                    const tipoMapeo = companyConfig.tipoMapeo;
+
+                    // Formatear fecha
+                    let fechaDisplay = 'N/A';
+                    if (fechaMapeo) {
+                        try {
+                            const fechaDate = new Date(fechaMapeo);
+                            fechaDisplay = fechaDate.toLocaleDateString('es-CO', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                            }) + ' ' + fechaDate.toLocaleTimeString('es-CO', {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            });
+                        } catch (e) {
+                            fechaDisplay = 'N/A';
+                        }
+                    }
+
+                    // Determinar tipo de mapeo
+                    let tipoBadge = '';
+                    if (tipoMapeo === 'primera_vez') {
+                        tipoBadge = '<span class="map-type-badge map-type-first">Primera vez</span>';
+                    } else if (tipoMapeo === 'reconfiguracion') {
+                        tipoBadge = '<span class="map-type-badge map-type-reconfig">Reconfiguración</span>';
+                    }
+
+                    mapInfoSection.innerHTML = `
+                        <div class="map-info-item">
+                            <i class="fas fa-calendar-check map-info-icon"></i>
+                            <span class="map-info-label">Último mapeo:</span>
+                            <span class="map-info-value">${fechaDisplay}${tipoBadge}</span>
+                        </div>
+                    `;
+
+                    cardBody.appendChild(mapInfoSection);
+                }
+            }
 
             card.appendChild(cardBody);
             companyGrid.appendChild(card);
@@ -2110,10 +2264,13 @@
                         }
 
                         // Actualizar/crear la empresa con todos los datos incluyendo la estructura mapeada
+                        const esPrimeraVez = !config.companyPaths[targetKeyName];
                         config.companyPaths[targetKeyName] = {
                             ...config.companyPaths[targetKeyName],
                             root: path,
                             structure: result.structure,  // ← AGREGAR LA ESTRUCTURA MAPEADA
+                            fechaMapeo: new Date().toISOString(),
+                            tipoMapeo: esPrimeraVez ? 'primera_vez' : 'reconfiguracion',
                             stats: {
                                 employees: employees,
                                 risk: risk,
