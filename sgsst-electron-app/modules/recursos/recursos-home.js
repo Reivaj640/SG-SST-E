@@ -129,10 +129,14 @@ class RecursosHome {
             .k-module-title {
                 font-size: 1.25rem;
                 font-weight: 600;
-                color: var(--k-primary);
+                color: var(--k-primary) !important;
                 display: flex;
                 align-items: center;
                 gap: 0.75rem;
+            }
+
+            .k-module-title i {
+                color: var(--k-primary) !important;
             }
 
             .k-btn-ingresar {

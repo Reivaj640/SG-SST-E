@@ -1,8 +1,8 @@
 # 📚 Índice Maestro de Documentación K+AIR
 
-**Versión:** 2.1
-**Fecha:** 1 de marzo de 2026
-**Estado:** Actualizado Post-Reorganización
+**Versión:** 2.2
+**Fecha:** 5 de marzo de 2026
+**Estado:** Actualizado con Módulo de Inducciones
 
 ---
 
@@ -18,6 +18,7 @@
 1. 📖 [docs/ESTADO_ACTUAL_REORGANIZACION.md](ESTADO_ACTUAL_REORGANIZACION.md) - Cambios recientes
 2. 📖 [docs/LIMPIEZA_REORGANIZACION_FEB_2026.md](LIMPIEZA_REORGANIZACION_FEB_2026.md) - Última limpieza
 3. 📖 [docs/CHANGELOG.md](CHANGELOG.md) - Historial de cambios
+4. 📖 [docs/modulo-inducciones.md](modulo-inducciones.md) - Módulo de Inducciones 🆕
 
 ---
 
@@ -51,6 +52,7 @@
 
 | Documento | Módulo | Descripción |
 |-----------|--------|-------------|
+| [docs/modulo-inducciones.md](modulo-inducciones.md) | 1.2.2 | **Inducciones con sincronización automática** 🆕 |
 | [docs/modulo-investigacion-accidentes.md](modulo-investigacion-accidentes.md) | 3.2.2 | Investigación con IA 🤖 |
 | [docs/ui-update-responsable-sg.md](ui-update-responsable-sg.md) | 1.1.1 | UI Responsable SG |
 | [docs/ui-update-roles-responsabilidades.md](ui-update-roles-responsabilidades.md) | 1.1.2 | UI Roles |

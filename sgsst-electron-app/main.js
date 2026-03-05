@@ -4832,21 +4832,64 @@ ipcMain.handle('get-inducciones-data', async (event, companyName) => {
     const recursosPath = path.join(rootPath, '1. Recursos');
     let targetPath = path.join(recursosPath, '1.1 Inducción y Reinducción');
 
+    sendLog(`[MAIN] Buscando carpeta inducciones en: ${recursosPath}`, 'DEBUG');
+
     if (!fs.existsSync(targetPath)) {
-       if (fs.existsSync(recursosPath)) {
-            const subs = await fsp.readdir(recursosPath);
-            const indFolder = subs.find(s => s.includes('1.1') || s.toLowerCase().includes('inducci'));
-            if (indFolder) targetPath = path.join(recursosPath, indFolder);
-        }
+      sendLog(`[MAIN] Ruta estándar no existe, buscando alternativas...`, 'DEBUG');
+      if (fs.existsSync(recursosPath)) {
+        const subs = await fsp.readdir(recursosPath);
+        sendLog(`[MAIN] Subcarpetas encontradas: ${subs.join(', ')}`, 'DEBUG');
+        
+        // Normalizar nombres (quitar tildes) para comparación
+        const normalize = (str) => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        
+        // PRIORIDAD 1: Buscar carpeta que contenga "induccion" o "reinduccion" (con o sin tildes)
+        const indFolder = subs.find(s => {
+          const norm = normalize(s);
+          return norm.includes('induccion') || norm.includes('reinduccion');
+        });
+        
+        // PRIORIDAD 2: Si no, buscar carpeta 1.1 o 1.2 que contenga "induccion"
+        const indFolderNumeric = subs.find(s => {
+          const norm = normalize(s);
+          return (s.startsWith('1.1') || s.startsWith('1.2')) && norm.includes('induccion');
+        });
+        
+        // PRIORIDAD 3: Si no, buscar cualquier carpeta 1.1
+        const fallbackFolder = subs.find(s => s.includes('1.1') || normalize(s).includes('inducci'));
+        
+        const finalFolder = indFolder || indFolderNumeric || fallbackFolder;
+        
+        sendLog(`[MAIN] Carpeta de inducciones encontrada: ${finalFolder || 'NINGUNA'}`, 'DEBUG');
+        if (finalFolder) targetPath = path.join(recursosPath, finalFolder);
+      }
     }
 
-    if (!fs.existsSync(targetPath)) throw new Error('No se encontró la carpeta de inducciones');
+    if (!fs.existsSync(targetPath)) {
+      sendLog(`[MAIN] ERROR: No se encontró carpeta de inducciones. Ruta buscada: ${targetPath}`, 'ERROR');
+      throw new Error('No se encontró la carpeta de inducciones');
+    }
 
     const files = await fsp.readdir(targetPath);
-    const excelFile = files.find(f =>
-        !f.startsWith('~$') && (f.endsWith('.xlsx') || f.endsWith('.xls')) &&
-        (f.includes('046') || f.toLowerCase().includes('induccion'))
-    );
+    sendLog(`[MAIN] Archivos en carpeta inducciones: ${files.join(', ')}`, 'DEBUG');
+    
+    // Buscar archivo Excel de inducciones con múltiples variaciones
+    const excelFile = files.find(f => {
+        if (!f.startsWith('~$') && (f.endsWith('.xlsx') || f.endsWith('.xls'))) {
+            const lowerName = f.toLowerCase();
+            // Buscar variaciones: inducción, induccion, inducciones, fo-046, 046, registro
+            return lowerName.includes('inducción') ||
+                   lowerName.includes('induccion') || 
+                   lowerName.includes('inducciones') ||
+                   lowerName.includes('fo-046') || 
+                   lowerName.includes('fo_046') ||
+                   lowerName.includes('046') ||
+                   lowerName.includes('registro');  // Para archivos como "Registro de Inducción"
+        }
+        return false;
+    });
+    
+    sendLog(`[MAIN] Archivo Excel encontrado: ${excelFile || 'NINGUNO'}`, 'DEBUG');
 
     if (!excelFile) throw new Error('No se encontró el archivo Excel de inducciones (FO-046)');
 
@@ -4867,6 +4910,16 @@ ipcMain.handle('get-inducciones-data', async (event, companyName) => {
 
         // Detener si es la fila de totalizadores
         if (empleado.toLowerCase().includes('total inducciones')) break;
+        
+        // Saltar fila de encabezados (puede variar entre empresas)
+        const lowerRow = row.join(' ').toLowerCase();
+        if (lowerRow.includes('fecha de ingreso') || 
+            lowerRow.includes('nombre completo') || 
+            lowerRow.includes('cedula') || 
+            lowerRow.includes('cargo') ||
+            lowerRow.includes('fecha') && lowerRow.includes('empleado')) {
+            continue;
+        }
 
         // Fecha en Col D (índice 3)
         let fecha = row[3];
@@ -4901,6 +4954,439 @@ ipcMain.handle('get-inducciones-data', async (event, companyName) => {
     return { success: true, data: inducciones, filePath };
   } catch (error) {
     sendLog(`[MAIN] Error en get-inducciones-data: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// ============================================================================
+// INDUCCIONES - Actualizar Excel Power Query (COM Automation via VBScript)
+// ============================================================================
+async function refreshExcelPowerQuery(filePath) {
+  return new Promise((resolve, reject) => {
+    sendLog(`[EXCEL COM] Iniciando actualización de Power Query`, 'INFO');
+    sendLog(`[EXCEL COM] Ruta del archivo: ${filePath}`, 'DEBUG');
+    
+    // Crear archivo VBScript temporal
+    const vbsPath = path.join(os.tmpdir(), `refresh_excel_${Date.now()}.vbs`);
+    
+    // Script VBScript que recibe la ruta como argumento
+    const vbsScript = `
+On Error Resume Next
+
+Dim excelApp
+Dim workbook
+Dim fso
+Dim filePath
+
+' Obtener ruta desde argumento
+If WScript.Arguments.Count = 0 Then
+    WScript.Echo "ERROR: No se proporcionó ruta de archivo"
+    WScript.Quit 1
+End If
+filePath = WScript.Arguments(0)
+
+' Crear FileSystemObject para verificar archivo
+Set fso = CreateObject("Scripting.FileSystemObject")
+
+' Verificar que el archivo existe
+If Not fso.FileExists(filePath) Then
+    WScript.Echo "ERROR: El archivo no existe: " & filePath
+    WScript.Quit 1
+End If
+
+' Crear instancia de Excel
+Set excelApp = CreateObject("Excel.Application")
+
+If Err.Number <> 0 Then
+    WScript.Echo "ERROR: No se pudo crear Excel.Application - " & Err.Description
+    WScript.Quit 1
+End If
+
+excelApp.Visible = False
+excelApp.DisplayAlerts = False
+
+' Abrir libro
+Set workbook = excelApp.Workbooks.Open(filePath)
+
+If Err.Number <> 0 Then
+    WScript.Echo "ERROR: No se pudo abrir el archivo - " & Err.Description
+    If Not workbook Is Nothing Then workbook.Close False
+    excelApp.Quit
+    WScript.Quit 1
+End If
+
+' Actualizar todas las consultas (Power Query)
+workbook.RefreshAll
+
+' Esperar a que termine la actualización (máximo 60 segundos)
+Dim timeout, startTime, elapsedTime
+timeout = 60
+startTime = Timer
+
+Do While excelApp.BackgroundQueryDownloading
+    WScript.Sleep 500
+    elapsedTime = Timer - startTime
+    If elapsedTime < 0 Then elapsedTime = elapsedTime + 86400 ' Manejar medianoche
+    If elapsedTime > timeout Then
+        WScript.Echo "WARNING: Timeout de actualización alcanzado"
+        Exit Do
+    End If
+Loop
+
+' Esperar un poco más para asegurar que los datos se carguen
+WScript.Sleep 2000
+
+' Guardar y cerrar
+workbook.Save
+workbook.Close
+
+excelApp.Quit
+
+' Liberar objetos
+Set workbook = Nothing
+Set excelApp = Nothing
+Set fso = Nothing
+
+WScript.Echo "SUCCESS: Power Query actualizado correctamente"
+WScript.Quit 0
+`;
+
+    // Escribir archivo VBS
+    fs.writeFile(vbsPath, vbsScript, { encoding: 'utf8' }, (err) => {
+      if (err) {
+        sendLog(`[EXCEL COM] Error al crear VBS: ${err.message}`, 'ERROR');
+        reject(new Error('No se pudo crear script temporal'));
+        return;
+      }
+
+      // Ejecutar VBScript con cscript, pasando la ruta como argumento
+      const vbsProcess = spawn('cscript.exe', [vbsPath, '//Nologo', filePath]);
+      
+      let output = '';
+      let errorOutput = '';
+
+      vbsProcess.stdout.on('data', (data) => {
+        const text = data.toString();
+        output += text;
+        sendLog(`[EXCEL COM] STDOUT: ${text.trim()}`, 'INFO');
+      });
+
+      vbsProcess.stderr.on('data', (data) => {
+        const text = data.toString();
+        errorOutput += text;
+        sendLog(`[EXCEL COM] STDERR: ${text.trim()}`, 'ERROR');
+      });
+
+      vbsProcess.on('close', (code) => {
+        // Limpiar archivo temporal
+        try {
+          fs.unlinkSync(vbsPath);
+        } catch (e) {
+          // Ignorar error al limpiar
+        }
+
+        if (code === 0 || output.includes('SUCCESS')) {
+          sendLog(`[EXCEL COM] Actualización completada exitosamente`, 'INFO');
+          resolve({ success: true, message: 'Power Query actualizado correctamente' });
+        } else {
+          sendLog(`[EXCEL COM] Error en actualización (código ${code}): ${errorOutput || output}`, 'ERROR');
+          reject(new Error(`Error al actualizar Excel: ${errorOutput || output || 'Código de error: ' + code}`));
+        }
+      });
+
+      vbsProcess.on('error', (err) => {
+        sendLog(`[EXCEL COM] Error al ejecutar VBScript: ${err.message}`, 'ERROR');
+        reject(new Error(`No se pudo ejecutar VBScript: ${err.message}`));
+      });
+    });
+  });
+}
+
+// ============================================================================
+// INDUCCIONES - Verificar cambios en el archivo (para sincronización)
+// ============================================================================
+ipcMain.handle('check-inducciones-changes', async (event, companyName, lastKnownHash) => {
+  sendLog(`[MAIN] Verificando cambios en inducciones para: ${companyName}`, 'INFO');
+  try {
+    const rootPath = await getCompanyRootPath(companyName);
+    if (!rootPath) {
+      return { success: false, error: 'Empresa no encontrada' };
+    }
+
+    const recursosPath = path.join(rootPath, '1. Recursos');
+    let targetPath = path.join(recursosPath, '1.1 Inducción y Reinducción');
+
+    sendLog(`[MAIN] Buscando carpeta inducciones en: ${recursosPath}`, 'DEBUG');
+
+    if (!fs.existsSync(targetPath)) {
+      sendLog(`[MAIN] Ruta estándar no existe, buscando alternativas...`, 'DEBUG');
+      if (fs.existsSync(recursosPath)) {
+        const subs = await fsp.readdir(recursosPath);
+        sendLog(`[MAIN] Subcarpetas encontradas: ${subs.join(', ')}`, 'DEBUG');
+        
+        // Normalizar nombres (quitar tildes) para comparación
+        const normalize = (str) => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        
+        // PRIORIDAD 1: Buscar carpeta que contenga "induccion" o "reinduccion" (con o sin tildes)
+        const indFolder = subs.find(s => {
+          const norm = normalize(s);
+          return norm.includes('induccion') || norm.includes('reinduccion');
+        });
+        
+        // PRIORIDAD 2: Si no, buscar carpeta 1.1 o 1.2 que contenga "induccion"
+        const indFolderNumeric = subs.find(s => {
+          const norm = normalize(s);
+          return (s.startsWith('1.1') || s.startsWith('1.2')) && norm.includes('induccion');
+        });
+        
+        // PRIORIDAD 3: Si no, buscar cualquier carpeta 1.1
+        const fallbackFolder = subs.find(s => s.includes('1.1') || normalize(s).includes('inducci'));
+        
+        const finalFolder = indFolder || indFolderNumeric || fallbackFolder;
+        
+        sendLog(`[MAIN] Carpeta de inducciones encontrada: ${finalFolder || 'NINGUNA'}`, 'DEBUG');
+        if (finalFolder) targetPath = path.join(recursosPath, finalFolder);
+      }
+    }
+
+    if (!fs.existsSync(targetPath)) {
+      sendLog(`[MAIN] ERROR: No se encontró carpeta de inducciones. Ruta buscada: ${targetPath}`, 'ERROR');
+      return { success: false, error: 'Carpeta de inducciones no encontrada' };
+    }
+
+    const files = await fsp.readdir(targetPath);
+    sendLog(`[MAIN] Archivos en carpeta inducciones: ${files.join(', ')}`, 'DEBUG');
+    
+    // Buscar archivo Excel de inducciones con múltiples variaciones
+    const excelFile = files.find(f => {
+        if (!f.startsWith('~$') && (f.endsWith('.xlsx') || f.endsWith('.xls'))) {
+            const lowerName = f.toLowerCase();
+            // Buscar variaciones: inducción, induccion, inducciones, fo-046, 046
+            return lowerName.includes('inducción') ||
+                   lowerName.includes('Inducción') ||
+                   lowerName.includes('Induccion') ||
+                   lowerName.includes('induccion') || 
+                   lowerName.includes('inducciones') ||
+                   lowerName.includes('fo-046') || 
+                   lowerName.includes('fo_046') ||
+                   lowerName.includes('Registro');
+        }
+        return false;
+    });
+    
+    sendLog(`[MAIN] Archivo Excel encontrado: ${excelFile || 'NINGUNO'}`, 'DEBUG');
+
+    if (!excelFile) {
+      return { success: false, error: 'Archivo Excel de inducciones no encontrado' };
+    }
+
+    const filePath = path.join(targetPath, excelFile);
+    
+    // Obtener estadísticas del archivo para detectar cambios
+    const stats = await fsp.stat(filePath);
+    const currentHash = `${stats.size}-${stats.mtimeMs}`;
+    
+    // Si no hay hash conocido, retornar solo información del archivo
+    if (!lastKnownHash) {
+      return { 
+        success: true, 
+        hasChanges: false, 
+        currentHash,
+        lastModified: stats.mtime,
+        filePath 
+      };
+    }
+
+    // Comparar hashes
+    const hasChanges = currentHash !== lastKnownHash;
+    
+    if (!hasChanges) {
+      return { 
+        success: true, 
+        hasChanges: false, 
+        currentHash,
+        lastModified: stats.mtime,
+        filePath 
+      };
+    }
+
+    // Si hay cambios, contar registros totales
+    const wb = xlsx.readFile(filePath);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rawData = xlsx.utils.sheet_to_json(ws, { header: 1 });
+    
+    let totalRecords = 0;
+    for (let i = 1; i < rawData.length; i++) {
+        const row = rawData[i];
+        if (!row) continue;
+        const empleado = row[6] ? String(row[6]).trim() : '';
+        if (!empleado || empleado === 'Nombre del empleado' || empleado === '') continue;
+        if (empleado.toLowerCase().includes('total inducciones')) break;
+        
+        // Saltar fila de encabezados (puede variar entre empresas)
+        const lowerRow = row.join(' ').toLowerCase();
+        if (lowerRow.includes('fecha de ingreso') || 
+            lowerRow.includes('nombre completo') || 
+            lowerRow.includes('cedula') || 
+            lowerRow.includes('cargo') ||
+            lowerRow.includes('fecha') && lowerRow.includes('empleado')) {
+            continue;
+        }
+        
+        totalRecords++;
+    }
+
+    return { 
+      success: true, 
+      hasChanges: true, 
+      currentHash,
+      lastModified: stats.mtime,
+      filePath,
+      totalRecords 
+    };
+  } catch (error) {
+    sendLog(`[MAIN] Error en check-inducciones-changes: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// ============================================================================
+// INDUCCIONES - Sincronizar desde Forms (Actualizar Excel + Recargar datos)
+// ============================================================================
+ipcMain.handle('sync-inducciones-from-forms', async (event, companyName) => {
+  sendLog(`[MAIN] Sincronizando inducciones desde Forms para: ${companyName}`, 'INFO');
+  try {
+    const rootPath = await getCompanyRootPath(companyName);
+    if (!rootPath) {
+      return { success: false, error: 'Empresa no encontrada' };
+    }
+
+    const recursosPath = path.join(rootPath, '1. Recursos');
+    let targetPath = path.join(recursosPath, '1.1 Inducción y Reinducción');
+
+    sendLog(`[MAIN] Buscando carpeta inducciones en: ${recursosPath}`, 'DEBUG');
+
+    if (!fs.existsSync(targetPath)) {
+      sendLog(`[MAIN] Ruta estándar no existe, buscando alternativas...`, 'DEBUG');
+      if (fs.existsSync(recursosPath)) {
+        const subs = await fsp.readdir(recursosPath);
+        sendLog(`[MAIN] Subcarpetas encontradas: ${subs.join(', ')}`, 'DEBUG');
+        
+        // Normalizar nombres (quitar tildes) para comparación
+        const normalize = (str) => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        
+        // PRIORIDAD 1: Buscar carpeta que contenga "induccion" o "reinduccion" (con o sin tildes)
+        const indFolder = subs.find(s => {
+          const norm = normalize(s);
+          return norm.includes('induccion') || norm.includes('reinduccion');
+        });
+        
+        // PRIORIDAD 2: Si no, buscar carpeta 1.1 o 1.2 que contenga "induccion"
+        const indFolderNumeric = subs.find(s => {
+          const norm = normalize(s);
+          return (s.startsWith('1.1') || s.startsWith('1.2')) && norm.includes('induccion');
+        });
+        
+        // PRIORIDAD 3: Si no, buscar cualquier carpeta 1.1
+        const fallbackFolder = subs.find(s => s.includes('1.1') || normalize(s).includes('inducci'));
+        
+        const finalFolder = indFolder || indFolderNumeric || fallbackFolder;
+        
+        sendLog(`[MAIN] Carpeta de inducciones encontrada: ${finalFolder || 'NINGUNA'}`, 'DEBUG');
+        if (finalFolder) targetPath = path.join(recursosPath, finalFolder);
+      }
+    }
+
+    if (!fs.existsSync(targetPath)) {
+      sendLog(`[MAIN] ERROR: No se encontró carpeta de inducciones. Ruta buscada: ${targetPath}`, 'ERROR');
+      return { success: false, error: 'Carpeta de inducciones no encontrada' };
+    }
+
+    const files = await fsp.readdir(targetPath);
+    sendLog(`[MAIN] Archivos en carpeta inducciones: ${files.join(', ')}`, 'DEBUG');
+    
+    // Buscar archivo Excel de inducciones con múltiples variaciones
+    const excelFile = files.find(f => {
+        if (!f.startsWith('~$') && (f.endsWith('.xlsx') || f.endsWith('.xls'))) {
+            const lowerName = f.toLowerCase();
+            // Buscar variaciones: inducción, induccion, inducciones, fo-046, 046
+            return lowerName.includes('inducción') ||
+                   lowerName.includes('Inducción') ||
+                   lowerName.includes('Induccion') ||
+                   lowerName.includes('induccion') || 
+                   lowerName.includes('inducciones') ||
+                   lowerName.includes('fo-046') || 
+                   lowerName.includes('fo_046') ||
+                   lowerName.includes('Registro');
+        }
+        return false;
+    });
+    
+    sendLog(`[MAIN] Archivo Excel encontrado: ${excelFile || 'NINGUNO'}`, 'DEBUG');
+
+    if (!excelFile) {
+      return { success: false, error: 'Archivo Excel de inducciones no encontrado' };
+    }
+
+    const filePath = path.join(targetPath, excelFile);
+    
+    // Paso 1: Actualizar Power Query
+    sendLog(`[MAIN] Actualizando Power Query en: ${filePath}`, 'INFO');
+    await refreshExcelPowerQuery(filePath);
+    
+    // Esperar un momento para asegurar que el archivo se guardó
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Paso 2: Leer datos actualizados
+    const wb = xlsx.readFile(filePath);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rawData = xlsx.utils.sheet_to_json(ws, { header: 1 });
+
+    const inducciones = [];
+    for (let i = 1; i < rawData.length; i++) {
+        const row = rawData[i];
+        if (!row) continue;
+
+        const empleado = row[6] ? String(row[6]).trim() : '';
+        if (!empleado || empleado === 'Nombre del empleado' || empleado === '') continue;
+        if (empleado.toLowerCase().includes('total inducciones')) break;
+
+        let fecha = row[3];
+        if (typeof fecha === 'number') {
+            const dateCode = xlsx.SSF.parse_date_code(fecha);
+            fecha = `${dateCode.y}-${String(dateCode.m).padStart(2, '0')}-${String(dateCode.d).padStart(2, '0')}`;
+        } else if (fecha instanceof Date) {
+            fecha = fecha.toISOString().split('T')[0];
+        }
+
+        inducciones.push({
+            id: i,
+            date: fecha || '',
+            year: row[4] || '',
+            name: empleado,
+            idCard: row[7] || 'N/A',
+            position: row[8] || 'N/A',
+            gender: row[11] || '',
+            score: row[1] || '0 / 22',
+            status: (row[2] && row[2].toString().toLowerCase().includes('aprob')) ? 'approved' : 'failed'
+        });
+    }
+
+    // Obtener stats del archivo
+    const stats = await fsp.stat(filePath);
+    
+    sendLog(`[MAIN] Sincronización completada: ${inducciones.length} registros`, 'INFO');
+    
+    return { 
+      success: true, 
+      data: inducciones, 
+      filePath,
+      currentHash: `${stats.size}-${stats.mtimeMs}`,
+      lastModified: stats.mtime,
+      message: `Se sincronizaron ${inducciones.length} registros desde Google Forms`
+    };
+  } catch (error) {
+    sendLog(`[MAIN] Error en sync-inducciones-from-forms: ${error.message}`, 'ERROR');
     return { success: false, error: error.message };
   }
 });

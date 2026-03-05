@@ -2,7 +2,7 @@
    1. SISTEMA VISUAL K+AIR (OFICIAL) - Inducciones
    ========================================= */
 .inducciones-container {
-    /* Colores Principales */
+    /* Colores Principales - Definidos en :root para asegurar disponibilidad */
     --k-primary: #174ea6;
     --k-primary-hover: #185abd;
     --k-primary-light: rgba(23, 78, 166, 0.1);
@@ -40,6 +40,15 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+}
+
+/* Asegurar que los títulos sean siempre visibles */
+.inducciones-container .k-module-title {
+    color: var(--k-primary) !important;
+}
+
+.inducciones-container .k-module-title i {
+    color: var(--k-primary) !important;
 }
 
 .inducciones-container[data-theme="dark"] {
@@ -300,3 +309,73 @@
 .grid-1-1 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
 
 @media (max-width: 900px) { .grid-2-1, .grid-1-2, .grid-1-1 { grid-template-columns: 1fr; } }
+
+/* =========================================
+   SINCRONIZACIÓN - Banner y Estado
+   ========================================= */
+.k-sync-banner {
+    background: linear-gradient(135deg, var(--k-primary-light) 0%, rgba(23, 78, 166, 0.05) 100%);
+    border-bottom: 1px solid var(--k-border);
+    padding: 0.75rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.k-sync-banner-content {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--k-primary);
+    font-weight: 500;
+}
+
+.k-sync-banner-content i {
+    font-size: 1.25rem;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+.k-sync-banner-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.k-sync-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    background: var(--k-success-light);
+    border-radius: var(--k-radius-md);
+}
+
+.k-sync-status.syncing {
+    background: var(--k-warning-light);
+    color: var(--k-warning);
+}
+
+.k-sync-status.syncing i {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.k-sync-status.error {
+    background: var(--k-danger-light);
+    color: var(--k-danger);
+}

@@ -734,16 +734,96 @@ async function initializeLlmServer() {
 
         sendLog(`[LLM] Proceso del servidor iniciado, PID: ${llmServerProcess.pid}`);
         
-        // Capturar stdout del servidor
+        // Variable para tracking de progreso de carga del modelo
+        let lastLoggedPercent = -1;
+        let modelLoadStartTime = Date.now();
+        let progressFinished = false;  // Evitar múltiples mensajes de finalización
+
+        // Función para dibujar barra de progreso en una sola línea (ASCII compatible)
+        function drawProgressBar(percent, elapsed) {
+            const barWidth = 30;
+            const filledWidth = Math.round((barWidth * percent) / 100);
+            const emptyWidth = barWidth - filledWidth;
+            // Usar caracteres ASCII compatibles con Windows
+            const bar = '='.repeat(filledWidth) + '-'.repeat(emptyWidth);
+            
+            // Construir línea de progreso
+            const progressLine = `[LLM] Cargando modelo... [${bar}] ${percent}% (${elapsed}s)`;
+            
+            // Limpiar línea y escribir nueva (compatible con Windows)
+            process.stdout.write(`\r${' '.repeat(80)}\r${progressLine}`);
+        }
+
+        // Función para finalizar la barra de progreso (mover a nueva línea)
+        function finishProgressBar(message) {
+            if (progressFinished) return;  // Evitar múltiples finalizaciones
+            progressFinished = true;
+            process.stdout.write(`\r${' '.repeat(80)}\r${message}\n`);
+        }
+
+        // Capturar stdout del servidor - FILTRAR progreso de tqdm
         llmServerProcess.stdout.on('data', (data) => {
             const msg = data.toString();
+            
+            // Filtrar líneas de progreso de carga de pesos del modelo (tqdm)
+            if (msg.includes('Loading weights:') || msg.includes('Materializing param=')) {
+                // Extraer porcentaje si está disponible
+                const percentMatch = msg.match(/(\d+)%/);
+                if (percentMatch) {
+                    const percent = parseInt(percentMatch[1]);
+                    // Actualizar cada 5% para mayor fluidez
+                    if (percent - lastLoggedPercent >= 5 || percent === 100) {
+                        lastLoggedPercent = percent;
+                        const elapsed = ((Date.now() - modelLoadStartTime) / 1000).toFixed(0);
+                        drawProgressBar(percent, elapsed);
+                        
+                        // Si llegó a 100%, finalizar barra
+                        if (percent === 100) {
+                            finishProgressBar(`[LLM] OK: Modelo cargado exitosamente (${elapsed}s)`);
+                        }
+                    }
+                }
+                return; // No imprimir la línea completa de tqdm
+            }
+            
+            // Imprimir otros mensajes normales
             sendLog(`[LLM SERVER] ${msg.trim()}`);
         });
-        
-        // Capturar stderr del servidor
+
+        // Capturar stderr del servidor - FILTRAR progreso de tqdm
         llmServerProcess.stderr.on('data', (data) => {
             const msg = data.toString();
-            sendLog(`[LLM SERVER ERROR] ${msg.trim()}`, 'ERROR');
+            
+            // Filtrar líneas de progreso de carga de pesos del modelo (también van a stderr)
+            if (msg.includes('Loading weights:') || msg.includes('Materializing param=') || msg.includes('tqdm')) {
+                // Extraer porcentaje si está disponible
+                const percentMatch = msg.match(/(\d+)%/);
+                if (percentMatch) {
+                    const percent = parseInt(percentMatch[1]);
+                    // Actualizar cada 5% para mayor fluidez
+                    if (percent - lastLoggedPercent >= 5 || percent === 100) {
+                        lastLoggedPercent = percent;
+                        const elapsed = ((Date.now() - modelLoadStartTime) / 1000).toFixed(0);
+                        drawProgressBar(percent, elapsed);
+                        
+                        // Si llegó a 100%, finalizar barra
+                        if (percent === 100) {
+                            finishProgressBar(`[LLM] OK: Modelo cargado exitosamente (${elapsed}s)`);
+                        }
+                    }
+                }
+                return; // No imprimir la línea completa de tqdm
+            }
+            
+            // Imprimir solo errores reales (excluyendo progreso)
+            const errorMsg = msg.trim();
+            if (errorMsg && !errorMsg.includes('Loading weights:') && !errorMsg.includes('Materializing')) {
+                // Finalizar barra de progreso si hay error
+                if (lastLoggedPercent < 100 && lastLoggedPercent >= 0 && !progressFinished) {
+                    finishProgressBar(`[LLM] ERROR: Fallo al cargar modelo`);
+                }
+                sendLog(`[LLM SERVER ERROR] ${errorMsg}`, 'ERROR');
+            }
         });
         
         // Manejar cierre del proceso

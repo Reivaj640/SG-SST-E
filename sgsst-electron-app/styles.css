@@ -3378,4 +3378,28 @@ select.form-control {
 .toast-info .toast-icon  { background: linear-gradient(135deg, #174ea6, #185abd) !important; }
 .toast-success .toast-icon { background: linear-gradient(135deg, #28a745, #218838) !important; }
 .toast-error .toast-icon   { background: linear-gradient(135deg, #dc3545, #c82333) !important; }
+
+/* ============================================================================
+   MÓDULOS - Títulos visibles (Fix para texto blanco en temas)
+   ============================================================================ */
+.k-module-title {
+    color: var(--k-primary, #174ea6) !important;
+}
+
+.k-module-title i,
+.k-module-title .bi {
+    color: var(--k-primary, #174ea6) !important;
+}
+
+/* Asegurar que los headers de módulo también sean visibles */
+.k-module-header {
+    color: var(--k-text-main, #212529) !important;
+}
+
+/* Soporte para tema oscuro */
+[data-theme="dark"] .k-module-title,
+[data-theme="dark"] .k-module-title i,
+[data-theme="dark"] .k-module-title .bi {
+    color: var(--k-primary, #4da6ff) !important;
+}
 .toast-warning .toast-icon { background: linear-gradient(135deg, #ffc107, #e0a800) !important; }

@@ -178,6 +178,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // --- Inducciones ---
   getInduccionesData: (companyName) => ipcRenderer.invoke('get-inducciones-data', companyName),
+  syncInduccionesFromForms: (companyName) => ipcRenderer.invoke('sync-inducciones-from-forms', companyName),
+  checkInduccionesChanges: (companyName, lastKnownHash) => ipcRenderer.invoke('check-inducciones-changes', companyName, lastKnownHash),
 
   // --- Actas ---
   getActaData: () => ipcRenderer.invoke('get-acta-data'),

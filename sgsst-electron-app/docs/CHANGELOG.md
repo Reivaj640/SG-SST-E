@@ -5,6 +5,94 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.70] - 2026-03-05
+
+### Added
+- **Módulo de Inducciones con Sincronización Automática** 🆕
+  - Sincronización automática de Google Forms vía Power Query
+  - Detección automática de cambios en el archivo Excel
+  - Actualización automática sin intervención del usuario
+  
+- **Sistema de Búsqueda Inteligente de Carpetas** 🔍
+  - Normalización de tildes (Inducción = induccion)
+  - Sistema de 3 prioridades para encontrar carpeta correcta
+  - Soporte para múltiples variaciones de nombres (1.1.x, 1.2.x, etc.)
+  
+- **Búsqueda Flexible de Archivos Excel** 📊
+  - Soporte para múltiples variaciones de nombres:
+    - `inducción`, `induccion`, `inducciones`
+    - `fo-046`, `fo_046`, `046`
+    - `registro` (para "Registro de Inducción")
+  
+- **COM Automation para Power Query** ⚙️
+  - VBScript para controlar Excel automáticamente
+  - Ejecución de `RefreshAll()` para actualizar datos desde Google Forms
+  - Manejo de timeout (60 segundos máx.)
+  - Limpieza automática de archivos temporales
+  
+- **UI/UX de Sincronización** 🎨
+  - Banner de notificación cuando hay cambios disponibles
+  - Botón manual "Sincronizar" en el header
+  - Indicador de estado ("Sincronizado HH:MM:SS")
+  - Toast notifications para feedback al usuario
+  - Animaciones de carga y sincronización
+  
+- **Filtrado Inteligente de Datos** 🧹
+  - Detección y filtrado automático de filas de encabezado
+  - Soporte para múltiples formatos de archivos entre empresas
+  - Validación de datos antes de mostrar en tabla
+
+### Fixed
+- **Error: Carpeta incorrecta para Asel** 🐛
+  - Corregida búsqueda para priorizar carpetas con "induccion" sobre "1.1"
+  - Implementada normalización de texto para manejar tildes
+  - Ahora encuentra correctamente `1.2.2 Inducción y Reinducción`
+  
+- **Error: Fila de encabezados mostrada como registro** 🐛
+  - Agregada validación para saltar filas con palabras clave de encabezado
+  - Soporte para múltiples variaciones: "Fecha de Ingreso", "Nombre Completo", etc.
+  
+- **Error: Archivo no encontrado en empresas con nombres diferentes** 🐛
+  - Ampliada búsqueda para incluir "registro" como palabra clave
+  - Ahora funciona con `A-FR-07 Registro de Inducción.xlsx` (Asel)
+
+### Changed
+- **Mejora de Rendimiento en Búsqueda de Carpetas** ⚡
+  - Optimizada lógica de búsqueda con normalización NFD
+  - Reducidas colisiones entre carpetas similares (1.1.x vs 1.2.x)
+  
+- **Mejora en Manejo de Errores** 🛡️
+  - Logs de depuración mejorados para diagnóstico
+  - Mensajes de error más descriptivos
+  - Validación de existencia de archivo antes de procesar
+
+### Technical Details
+- **Archivos Modificados:**
+  - `main.js` - Funciones IPC y COM Automation
+  - `preload.js` - Contratos de sincronización
+  - `inducciones-view.html` - UI de sincronización
+  - `inducciones-view.css` - Estilos de banner y estado
+  - `inducciones-logic.js` - Lógica de sincronización frontend
+
+- **Nuevos Contratos IPC:**
+  - `check-inducciones-changes` - Verificar cambios
+  - `sync-inducciones-from-forms` - Sincronizar datos
+
+- **Dependencias:**
+  - Sin dependencias adicionales (usa VBScript nativo de Windows)
+
+### Empresas Soportadas
+- ✅ Tempoactiva Est SAS (`ACT-FO-046 Registro de Inducción_Tempoactiva.xlsx`)
+- ✅ Temposum Est SAS (archivo con "Induccion")
+- ✅ Aseplus (archivo genérico)
+- ✅ Asel S.A.S (`A-FR-07 Registro de Inducción.xlsx`)
+
+### Documentación
+- **Nuevos Documentos:**
+  - `docs/modulo-inducciones.md` - Documentación completa del módulo
+
+---
+
 ## [0.1.52] - 2026-03-01
 
 ### Added

@@ -4,7 +4,23 @@
 <div class="k-toast-container" id="toastContainer"></div>
 
 <div class="k-app-layout">
-    
+
+    <!-- BANNER DE SINCRONIZACIÓN -->
+    <div id="sync-banner" class="k-sync-banner" style="display: none;">
+        <div class="k-sync-banner-content">
+            <i class="bi bi-cloud-download"></i>
+            <span id="sync-banner-message">Hay nuevos registros disponibles en Google Forms</span>
+        </div>
+        <div class="k-sync-banner-actions">
+            <button class="k-btn k-btn-sm k-btn-outline" id="btn-sync-dismiss">
+                <i class="bi bi-x-lg"></i>
+            </button>
+            <button class="k-btn k-btn-sm k-btn-primary" id="btn-sync-now">
+                <i class="bi bi-arrow-clockwise"></i> Sincronizar ahora
+            </button>
+        </div>
+    </div>
+
     <!-- 1. HEADER -->
     <header class="k-module-header">
         <div class="k-module-title">
@@ -12,13 +28,25 @@
                 <i class="bi bi-arrow-left"></i>
             </button>
             <div style="margin-left: 10px;">
-                <div style="display: flex; align-items: center;"><i class="bi bi-person-check-fill me-2"></i>Inducciones y Reinducción</div>
+                <div style="display: flex; align-items: center;">
+                    <i class="bi bi-person-check-fill me-2"></i>
+                    Inducciones y Reinducción
+                </div>
                 <span style="font-size: 0.75rem; font-weight: 400; color: var(--k-text-muted);" id="header-context-text">
                     Recursos / ACT-FO-046
                 </span>
             </div>
         </div>
-        <div>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <!-- Estado de sincronización -->
+            <div id="sync-status" class="k-sync-status" style="font-size: 0.75rem; color: var(--k-text-muted);">
+                <i class="bi bi-check-circle-fill" style="color: var(--k-success);"></i>
+                <span id="sync-status-text">Sincronizado</span>
+            </div>
+            <button class="k-btn k-btn-outline" id="btn-sync-manual" title="Sincronizar con Google Forms">
+                <i class="bi bi-arrow-clockwise"></i>
+                <span style="margin-left: 0.5rem;">Sincronizar</span>
+            </button>
             <button class="k-btn k-btn-outline" id="btn-export-excel">
                 <i class="bi bi-file-earmark-excel"></i> Exportar Datos
             </button>

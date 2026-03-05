@@ -47,14 +47,20 @@ class InduccionesComponent {
             }
 
             const result = await window.electronAPI.getInduccionesData(this.currentCompany);
-            
+
             if (result.success) {
                 console.log('✅ [Inducciones] Datos cargados:', result.data.length, 'registros');
                 this.state.data = result.data;
+                this.state.currentHash = result.currentHash || null;
+                this.state.lastSyncTime = new Date();
+                
                 this.populateYearFilter();
                 this.applyFilters();
                 this.switchView('dashboard');
                 this.showToast(`Se cargaron ${result.data.length} registros exitosamente`, 'success');
+                
+                // Verificar si hay cambios disponibles después de cargar
+                setTimeout(() => this.checkForChanges(), 1000);
             } else {
                 console.warn('⚠️ [Inducciones] No se pudieron cargar datos reales:', result.error);
                 this.showToast('No se encontró el archivo Excel. Usando datos de ejemplo.', 'warning');
@@ -128,10 +134,15 @@ class InduccionesComponent {
         });
         
         document.getElementById('btn-save-induction')?.addEventListener('click', () => this.saveInduction());
-        
+
         // Exportar
         document.getElementById('btn-export-excel')?.addEventListener('click', () => this.showToast('Exportando datos...', 'info'));
         document.getElementById('btn-download-report')?.addEventListener('click', () => this.showToast('Generando informe...', 'success'));
+
+        // Sincronización con Google Forms
+        document.getElementById('btn-sync-manual')?.addEventListener('click', () => {
+            this.syncFromForms();
+        });
     }
 
     switchView(viewId) {
@@ -469,6 +480,122 @@ class InduccionesComponent {
 
     editInduction(id) {
         this.openModal('edit', id);
+    }
+
+    // ============================================
+    // SINCRONIZACIÓN CON GOOGLE FORMS
+    // ============================================
+    
+    /**
+     * Verifica si hay cambios en el archivo Excel desde la última sincronización
+     */
+    async checkForChanges() {
+        try {
+            if (!window.electronAPI || !window.electronAPI.checkInduccionesChanges) {
+                return; // Función no disponible
+            }
+
+            const result = await window.electronAPI.checkInduccionesChanges(
+                this.currentCompany, 
+                this.state.currentHash
+            );
+
+            if (result.success && result.hasChanges) {
+                // Hay cambios disponibles, mostrar banner
+                this.showSyncBanner(result.totalRecords || 0);
+            }
+        } catch (error) {
+            console.error('❌ [Inducciones] Error al verificar cambios:', error);
+        }
+    }
+
+    /**
+     * Muestra el banner de sincronización cuando hay cambios disponibles
+     */
+    showSyncBanner(newRecordsCount) {
+        const banner = document.getElementById('sync-banner');
+        const message = document.getElementById('sync-banner-message');
+        
+        if (banner && message) {
+            message.textContent = `Hay ${newRecordsCount} registros disponibles en Google Forms. ¿Desea sincronizar ahora?`;
+            banner.style.display = 'flex';
+            
+            // Configurar listeners del banner
+            document.getElementById('btn-sync-dismiss')?.addEventListener('click', () => {
+                banner.style.display = 'none';
+            });
+            
+            document.getElementById('btn-sync-now')?.addEventListener('click', () => {
+                banner.style.display = 'none';
+                this.syncFromForms();
+            });
+        }
+    }
+
+    /**
+     * Sincroniza datos desde Google Forms (actualiza Excel y recarga datos)
+     */
+    async syncFromForms() {
+        try {
+            this.setSyncStatus('syncing', 'Sincronizando...');
+            this.showToast('Actualizando datos desde Google Forms...', 'info');
+
+            if (!window.electronAPI || !window.electronAPI.syncInduccionesFromForms) {
+                throw new Error('API de sincronización no disponible');
+            }
+
+            const result = await window.electronAPI.syncInduccionesFromForms(this.currentCompany);
+
+            if (result.success) {
+                console.log('✅ [Inducciones] Sincronización completada:', result.data.length, 'registros');
+                this.state.data = result.data;
+                this.state.currentHash = result.currentHash;
+                this.state.lastSyncTime = new Date();
+                
+                this.populateYearFilter();
+                this.applyFilters();
+                this.setSyncStatus('synced', `Sincronizado ${new Date().toLocaleTimeString()}`);
+                this.showToast(`✓ ${result.message}`, 'success');
+            } else {
+                throw new Error(result.error || 'Error en sincronización');
+            }
+        } catch (error) {
+            console.error('❌ [Inducciones] Error en sincronización:', error);
+            this.setSyncStatus('error', 'Error en sincronización');
+            this.showToast(`Error: ${error.message}`, 'danger');
+        }
+    }
+
+    /**
+     * Actualiza el indicador de estado de sincronización
+     */
+    setSyncStatus(status, text) {
+        const statusEl = document.getElementById('sync-status');
+        const textEl = document.getElementById('sync-status-text');
+        
+        if (!statusEl) return;
+
+        statusEl.className = 'k-sync-status';
+        
+        switch (status) {
+            case 'syncing':
+                statusEl.classList.add('syncing');
+                statusEl.innerHTML = '<i class="bi bi-arrow-clockwise"></i>';
+                break;
+            case 'synced':
+                statusEl.innerHTML = '<i class="bi bi-check-circle-fill" style="color: var(--k-success);"></i>';
+                break;
+            case 'error':
+                statusEl.classList.add('error');
+                statusEl.innerHTML = '<i class="bi bi-exclamation-circle-fill"></i>';
+                break;
+            default:
+                statusEl.innerHTML = '<i class="bi bi-check-circle-fill" style="color: var(--k-success);"></i>';
+        }
+        
+        if (textEl && text) {
+            textEl.textContent = text;
+        }
     }
 
     showToast(msg, type='info') {
