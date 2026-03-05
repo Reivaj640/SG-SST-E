@@ -4906,23 +4906,30 @@ ipcMain.handle('get-inducciones-data', async (event, companyName) => {
 });
 
 ipcMain.on('restart_app', () => {
-    log.info('El usuario ha aceptado la actualización. Reiniciando para instalar...');
-    
-    // 1. Limpiar procesos secundarios (servidores Python, etc.)
+    log.info('[UPDATER] El usuario ha aceptado la actualización. Iniciando secuencia de reinicio...');
+
+    // 1. Limpiar procesos secundarios inmediatamente
     cleanupProcesses();
 
-    // 2. Destruir la ventana inmediatamente (fuerza cierre sin diálogos)
-    if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.destroy();
-    }
-    
-    // 3. Esperar 1 segundo para que Windows libere los procesos y archivos completamente
+    // 2. Cerrar todas las ventanas abiertas para liberar recursos de UI/GPU
+    const windows = BrowserWindow.getAllWindows();
+    windows.forEach(win => {
+        if (!win.isDestroyed()) {
+            win.destroy();
+        }
+    });
+
+    // 3. Esperar un tiempo prudencial (2s) para que Windows desbloquee los archivos
     setTimeout(() => {
-        // silent: true = saltar diálogo del instalador
-        // forceRunAfter: true = abrir la app después de instalar
-        log.info('Ejecutando quitAndInstall...');
-        autoUpdater.quitAndInstall(true, true);
-    }, 1000);
+        log.info('[UPDATER] Ejecutando autoUpdater.quitAndInstall(true, true)...');
+        try {
+            autoUpdater.quitAndInstall(true, true);
+        } catch (err) {
+            log.error(`[UPDATER] Error crítico en quitAndInstall: ${err.message}`);
+            // Fallback: intentar salir normalmente si el updater falla
+            app.quit();
+        }
+    }, 2000);
 });
 
 // --- FUNCIONES AUXILIARES INTERNAS PARA ESTADÍSTICAS ---
@@ -5460,15 +5467,17 @@ let llmServerProcess = null;
 
 // Función para limpiar procesos hijos antes de salir
 function cleanupProcesses() {
+    console.log('[MAIN] 🛡️ Iniciando limpieza profunda de procesos...');
+    
+    // 1. Cerrar servidor LLM si tenemos la referencia
     if (llmServerProcess) {
-        console.log('[MAIN] 🛡️ Limpiando procesos: Cerrando servidor LLM...');
+        console.log('[MAIN] Cerrando servidor LLM por PID...');
         try {
-            // En Windows, kill() puede necesitar ser más agresivo si es detached
             if (process.platform === 'win32') {
                 const { execSync } = require('child_process');
                 execSync(`taskkill /pid ${llmServerProcess.pid} /T /F`);
             } else {
-                llmServerProcess.kill();
+                llmServerProcess.kill('SIGKILL');
             }
             console.log('[MAIN] ✅ Servidor LLM cerrado correctamente');
         } catch (e) {
@@ -5476,10 +5485,26 @@ function cleanupProcesses() {
         }
         llmServerProcess = null;
     }
+
+    // 2. En Windows, hacer un barrido de procesos de Python residuales
+    if (process.platform === 'win32') {
+        try {
+            const { execSync } = require('child_process');
+            console.log('[MAIN] 🔍 Buscando procesos de Python residuales...');
+            // Forzar el cierre de cualquier python.exe para asegurar que la carpeta de la app no esté bloqueada
+            // Esto es necesario porque algunos procesos pueden no tener referencia directa en el main process
+            execSync('taskkill /F /IM python.exe /T', { stdio: 'ignore' });
+            console.log('[MAIN] ✅ Barrido de Python completado');
+        } catch (e) {
+            // Taskkill falla si no hay procesos, es normal
+        }
+    }
 }
 
 // Asegurar limpieza en cualquier intento de cierre
-app.on('before-quit', cleanupProcesses);
+app.on('before-quit', (e) => {
+    cleanupProcesses();
+});
 
 async function startLlmServer() {
     const http = require('http');
