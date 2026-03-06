@@ -4,8 +4,8 @@ class PresupuestoGestionComponent {
         this.currentCompany = currentCompany;
         this.moduleName = moduleName;
         this.onBack = onBack;
-        this.currentView = 'selector'; // 'selector' o 'gestion'
-        this.currentFile = null; // Almacena el objeto del archivo seleccionado
+        this.currentView = 'home'; // 'home' (nuevo), 'selector' o 'gestion'
+        this.currentFile = null; 
         this.messageHandlers = new Map();
 
         this.log('INFO', 'PresupuestoGestionComponent inicializado');
@@ -26,6 +26,9 @@ class PresupuestoGestionComponent {
         mainContainer.className = 'submodule-content';
 
         switch (this.currentView) {
+            case 'home':
+                this.renderIframeView(mainContainer, 'modules/recursos/presupuesto/presupuesto-home.html', 'home');
+                break;
             case 'selector':
                 this.renderIframeView(mainContainer, 'modules/recursos/presupuesto/presupuesto-selector.html', 'selector');
                 break;
@@ -33,8 +36,8 @@ class PresupuestoGestionComponent {
                 this.renderIframeView(mainContainer, 'modules/recursos/presupuesto/presupuesto-gestion.html', 'gestion');
                 break;
             default:
-                this.log('WARN', `Vista desconocida: ${this.currentView}, usando selector.`);
-                this.renderIframeView(mainContainer, 'modules/recursos/presupuesto/presupuesto-selector.html', 'selector');
+                this.log('WARN', `Vista desconocida: ${this.currentView}, usando home.`);
+                this.renderIframeView(mainContainer, 'modules/recursos/presupuesto/presupuesto-home.html', 'home');
         }
 
         this.container.appendChild(mainContainer);
@@ -64,6 +67,11 @@ class PresupuestoGestionComponent {
         iframe.onload = () => {
             this.log('INFO', `✅ Iframe cargado (${viewType})`);
             if (loadingDiv.parentNode) loadingDiv.style.display = 'none';
+
+            // Enviar archivos si es el selector o el home (para detectar año activo)
+            if (viewType === 'selector' || viewType === 'home') {
+                this.sendFilesToSelectorIframe(iframe);
+            }
 
             // Si es la vista de gestión, enviamos el archivo seleccionado para que lo tenga de inmediato.
             if (viewType === 'gestion' && this.currentFile) {
@@ -98,25 +106,34 @@ class PresupuestoGestionComponent {
                 }
                 break;
 
+            case 'backToHome':
+                this.currentFile = null;
+                this.currentView = 'home';
+                this.render();
+                break;
+
+            case 'backToSelector':
+                this.currentFile = null;
+                this.currentView = 'selector';
+                this.render();
+                break;
+
+            case 'backToSubmodules':
+                if (this.onBack) this.onBack();
+                break;
+
             case 'requestBudgetData':
-                // FIX: Use the file object directly from the event data for robustness
                 if (file && file.path) {
                     try {
                         this.log('DEBUG', `Solicitando datos procesados para: ${file.path}`);
-                        // FIX: Use the dedicated function for budget data (headers in row 9, data from row 10)
                         const result = await window.electronAPI.readPresupuestoData(file.path);
-                        this.log('DEBUG', 'Resultado de readPresupuestoData:', result);
-
                         if (result.success) {
                             const gestionIframe = this.container.querySelector('iframe');
                             if (gestionIframe) {
-                                this.log('DEBUG', `Enviando datos, fórmulas y encabezados al iframe.`);
-                                // Usar la función para formatear los datos antes de enviar
                                 const formattedData = this.formatBudgetDataForDisplay(result.data.processedData);
-
                                 gestionIframe.contentWindow.postMessage({
-                                    budgetData: formattedData, // Datos formateados para mostrar en la tabla (incluye filas especiales)
-                                    calculationData: result.data.filteredData, // Datos para cálculos (excluye filas especiales)
+                                    budgetData: formattedData,
+                                    calculationData: result.data.filteredData,
                                     formulaCells: result.data.formulaCells,
                                     headers: result.data.headers
                                 }, '*');
@@ -128,115 +145,37 @@ class PresupuestoGestionComponent {
                         this.log('CRITICAL', `Error en requestBudgetData: ${error.message}`, error.stack);
                         this.showErrorUI(error);
                     }
-                } else {
-                    this.log('ERROR', 'La solicitud requestBudgetData se recibió sin un archivo o ruta de archivo válidos.', event.data);
-                    this.showErrorUI(new Error('No se proporcionó un archivo válido para procesar.'));
-                }
-                break;
-
-            case 'requestCurrentFile':
-                 const gestionIframe = this.container.querySelector('iframe');
-                 if (gestionIframe && this.currentFile) {
-                    gestionIframe.contentWindow.postMessage({ file: this.currentFile }, '*');
-                 }
-                break;
-
-            case 'backToSelector':
-                this.currentFile = null;
-                this.currentView = 'selector';
-                this.render();
-                break;
-
-            case 'backToSubmodules':
-                // Llamar a la función de retorno al módulo principal
-                if (this.onBack) {
-                    this.onBack();
-                }
-                break;
-
-            case 'openOriginalFile':
-                if (file && window.electronAPI.openPath) {
-                    window.electronAPI.openPath(file.path);
                 }
                 break;
 
             case 'duplicate-budget-file':
                 try {
-                    this.log('INFO', `Solicitud de duplicación de archivo recibida: ${event.data.currentFilePath} con nuevo año: ${event.data.newYear}`);
-
-                    // Llamar a la API de Electron para duplicar el archivo
                     const duplicateResult = await window.electronAPI.duplicateBudgetFile(event.data);
-
-                    // Enviar respuesta de vuelta al iframe
-                    const selectorIframe = this.container.querySelector('iframe');
-                    if (selectorIframe) {
-                        selectorIframe.contentWindow.postMessage({
+                    const currentIframe = this.container.querySelector('iframe');
+                    if (currentIframe) {
+                        currentIframe.contentWindow.postMessage({
                             action: 'duplicateBudgetFile',
                             ...duplicateResult
                         }, '*');
-                    }
-
-                    // Si la duplicación fue exitosa, recargar la lista de archivos
-                    if (duplicateResult.success) {
-                        this.sendFilesToSelectorIframe(selectorIframe);
+                        if (duplicateResult.success) this.sendFilesToSelectorIframe(currentIframe);
                     }
                 } catch (error) {
-                    this.log('CRITICAL', `Error al duplicar archivo de presupuesto: ${error.message}`, error.stack);
-
-                    const selectorIframe = this.container.querySelector('iframe');
-                    if (selectorIframe) {
-                        selectorIframe.contentWindow.postMessage({
-                            action: 'duplicateBudgetFile',
-                            success: false,
-                            error: error.message
-                        }, '*');
-                    }
+                    this.log('CRITICAL', `Error al duplicar: ${error.message}`);
                 }
                 break;
 
-            // El guardado es una funcionalidad más compleja
             case 'saveBudgetChanges':
-                this.log('INFO', 'Solicitud de guardado recibida. Llamando a ElectronAPI para guardar el archivo.', event.data);
                 try {
-                    const filePath = event.data.file.path;
-                    const budgetDataToSave = event.data.data;
-
-                    // Validar que los datos sean correctos antes de guardar
-                    if (!budgetDataToSave || !Array.isArray(budgetDataToSave)) {
-                        throw new Error('Datos de presupuesto no válidos');
-                    }
-
-                    // Call Electron API to save the file
-                    const saveResult = await window.electronAPI.saveBudgetFile(filePath, budgetDataToSave);
-
-                    const gestionIframe = this.container.querySelector('iframe');
-                    if (gestionIframe) {
-                        if (saveResult.success) {
-                            this.log('INFO', 'Archivo guardado exitosamente:', saveResult.message);
-                            gestionIframe.contentWindow.postMessage({
-                                action: 'saveBudgetChanges',
-                                success: true,
-                                message: saveResult.message
-                            }, '*');
-                        } else {
-                            this.log('ERROR', 'Error al guardar archivo:', saveResult.error);
-                            gestionIframe.contentWindow.postMessage({
-                                action: 'saveBudgetChanges',
-                                success: false,
-                                error: saveResult.error
-                            }, '*');
-                        }
-                    }
-                } catch (error) {
-                    this.log('CRITICAL', `Error al procesar solicitud de guardado: ${error.message}`, error.stack);
+                    const saveResult = await window.electronAPI.saveBudgetFile(event.data.file.path, event.data.data);
                     const gestionIframe = this.container.querySelector('iframe');
                     if (gestionIframe) {
                         gestionIframe.contentWindow.postMessage({
                             action: 'saveBudgetChanges',
-                            success: false,
-                            error: error.message
+                            ...saveResult
                         }, '*');
                     }
+                } catch (error) {
+                    this.log('CRITICAL', `Error al guardar: ${error.message}`);
                 }
                 break;
         }
