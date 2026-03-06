@@ -34,16 +34,13 @@ class GestionSaludHome {
         header.className = 'k-module-header';
         header.innerHTML = `
             <div class="k-module-title">
-                <i class="bi bi-heart-pulse me-2"></i>
+                <i class="bi bi-heart-pulse me-2" style="color: #212529;"></i>
                 <div>
-                    <div>Gestión de la Salud</div>
-                    <span style="font-size: 0.75rem; font-weight: 400; color: var(--k-text-muted);">
-                        ${this.currentCompany}
+                    <div style="color: #212529; font-weight: 600;">Módulo Gestión de la Salud</div>
+                    <span style="font-size: 0.75rem; font-weight: 400; color: #6c757d;">
+                        ${this.currentCompany} / Gestión de la Salud
                     </span>
                 </div>
-            </div>
-            <div>
-                <button class="k-btn-ingresar"><i class="bi bi-gear"></i> Configuración</button>
             </div>
         `;
         layout.appendChild(header);

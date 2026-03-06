@@ -74,7 +74,7 @@ body {
 }
 
 .header-left { display: flex; align-items: center; gap: 1rem; }
-.app-title { font-family: 'Lexend', sans-serif; font-size: 1.25rem; font-weight: 600; color: var(--text-dark); }
+.app-title { font-family: 'Lexend', sans-serif; font-size: 1.25rem; font-weight: 600; color: #212529; }
 .badge-mod {
     background: var(--primary-light); color: var(--primary);
     font-size: 0.75rem; padding: 2px 8px; border-radius: 12px; font-weight: 600;

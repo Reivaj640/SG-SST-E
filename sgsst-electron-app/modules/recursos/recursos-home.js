@@ -35,16 +35,13 @@ class RecursosHome {
         header.className = 'k-module-header';
         header.innerHTML = `
             <div class="k-module-title">
-                <i class="bi bi-grid-1x2-fill me-2"></i>
+                <i class="bi bi-grid-1x2-fill me-2" style="color: #212529;"></i>
                 <div>
-                    <div>Módulo Recursos</div>
-                    <span style="font-size: 0.75rem; font-weight: 400; color: var(--k-text-muted);">
-                        ${this.currentCompany} / Gestión Integral
+                    <div style="color: #212529; font-weight: 600;">Módulo Recursos</div>
+                    <span style="font-size: 0.75rem; font-weight: 400; color: #6c757d;">
+                        ${this.currentCompany} / Recursos
                     </span>
                 </div>
-            </div>
-            <div>
-                <button class="k-btn-ingresar"><i class="bi bi-gear"></i> Configuración</button>
             </div>
         `;
         layout.appendChild(header);
@@ -129,7 +126,7 @@ class RecursosHome {
             .k-module-title {
                 font-size: 1.25rem;
                 font-weight: 600;
-                color: var(--k-primary);
+                color: var(--k-text-main);
                 display: flex;
                 align-items: center;
                 gap: 0.75rem;
