@@ -956,13 +956,58 @@ ipcMain.handle('process-excel-data', async (event, { buffer, company, period }) 
 
     const XLSX = require('xlsx');
     const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const firstSheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[firstSheetName];
+    
+    // --- NUEVA LÓGICA: BUSCAR LA HOJA CORRECTA ---
+    let worksheet = null;
+    let targetSheetName = "";
+    
+    // 1. Prioridad: Hojas con nombres específicos
+    const priorityNames = ['PLAN DE TRABAJO', 'CRONOGRAMA', 'MATRIZ', 'ACTIVIDADES', 'PLAN ANUAL', 'PROGRAMA'];
+    for (const sheetName of workbook.SheetNames) {
+        const normalizedName = sheetName.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        if (priorityNames.some(p => normalizedName.includes(priorityNames[0]) || normalizedName.includes(p))) {
+            if (normalizedName.includes(period.toString())) { // Si además incluye el año, es la mejor candidata
+                targetSheetName = sheetName;
+                break;
+            }
+            if (!targetSheetName) targetSheetName = sheetName;
+        }
+    }
+
+    // 2. Si no hay por nombre, buscamos la hoja que tenga más meses en las cabeceras
+    if (!targetSheetName) {
+        let maxMatches = 0;
+        for (const sheetName of workbook.SheetNames) {
+            const ws = workbook.Sheets[sheetName];
+            const data = XLSX.utils.sheet_to_json(ws, { header: 1, range: 0, defval: "" });
+            let currentMatches = 0;
+            // Escanear solo las primeras 15 filas para rapidez
+            for (let i = 0; i < Math.min(15, data.length); i++) {
+                const row = data[i];
+                if (!Array.isArray(row)) continue;
+                const rowStr = row.join(' ').toLowerCase();
+                if (['ene', 'feb', 'mar', 'abr', 'may', 'jun'].every(m => rowStr.includes(m))) {
+                    currentMatches = 10; // Alta probabilidad
+                    break;
+                }
+            }
+            if (currentMatches > maxMatches) {
+                maxMatches = currentMatches;
+                targetSheetName = sheetName;
+            }
+        }
+    }
+
+    // Fallback final: Primera hoja
+    if (!targetSheetName) targetSheetName = workbook.SheetNames[0];
+    
+    worksheet = workbook.Sheets[targetSheetName];
+    sendLog(`[MAIN] Hoja seleccionada para procesamiento: "${targetSheetName}"`, 'INFO');
 
     // Leer como matriz de arrays (más fácil para buscar encabezados)
     const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
 
-    sendLog(`[MAIN] Datos crudos extraídos: ${rawData.length} filas`, 'INFO');
+    sendLog(`[MAIN] Datos crudos extraídos de "${targetSheetName}": ${rawData.length} filas`, 'INFO');
 
     // --- DEBUG: IMPRIMIR LAS PRIMERAS 10 FILAS PARA VER LA ESTRUCTURA ---
     sendLog(`[MAIN][DEBUG] --- INICIO ESTRUCTURA DEL ARCHIVO (Primeras 10 filas) ---`, 'DEBUG');
@@ -1021,8 +1066,6 @@ ipcMain.handle('process-excel-data', async (event, { buffer, company, period }) 
             }
         });
 
-        sendLog(`[MAIN][DEBUG] Escaneando fila ${i}: ${matches} coincidencias clave, ${monthMatches} meses encontrados. (${foundKeywords.join(', ')})`, 'DEBUG');
-
         // CRITERIO REFORZADO:
         // 1. Debe haber encontrado al menos una palabra clave de actividad/responsable Y al menos 2 meses.
         // 2. O si encontramos muchos meses (>= 6) aunque la palabra 'actividad' sea sutil.
@@ -1057,67 +1100,40 @@ ipcMain.handle('process-excel-data', async (event, { buffer, company, period }) 
     }
 
     if (headerRowIndex === -1) {
-        sendLog(`[MAIN][WARN] No se encontró fila de encabezados clara. Intentando usar primera fila como fallback.`, 'WARN');
+        sendLog(`[MAIN][WARN] No se encontró fila de encabezados clara en "${targetSheetName}". Intentando fallback estándar.`, 'WARN');
         headerRowIndex = 0;
-        // Fallback: Mapeo por posición estándar si falla la detección
         columnMap = {
-            'actividad': 1, // Columna B
-            'responsable': 6, // Columna G
+            'actividad': 1, 'responsable': 6,
             'enero': 7, 'febrero': 8, 'marzo': 9, 'abril': 10, 'mayo': 11, 'junio': 12,
             'julio': 13, 'agosto': 14, 'septiembre': 15, 'octubre': 16, 'noviembre': 17, 'diciembre': 18,
             'observaciones': 19
         };
     }
 
-    sendLog(`[MAIN] Mapeo de columnas final: ${JSON.stringify(columnMap)}`, 'DEBUG');
-
     const processedData = {};
-    const parentTitles = [
-        'MEDICINA PREVENTIVA Y DEL TRABAJO',
-        'SEGURIDAD INDUSTRIAL',
-        'HIGIENE INDUSTRIAL',
-        'VERIFICACION Y MEJORAMIENTO',
-        'VERIFICACIÓN Y MEJORAMIENTO'
-    ];
+    const parentTitles = ['MEDICINA PREVENTIVA', 'SEGURIDAD INDUSTRIAL', 'HIGIENE INDUSTRIAL', 'VERIFICACION', 'VERIFICACIÓN', 'INTEGRAL'];
     const phvaTitles = ['PLANEAR', 'HACER', 'VERIFICAR', 'ACTUAR'];
 
     for (let year = 2024; year <= 2026; year++) {
       processedData[year] = [];
       if (year == period) {
-        let rowsProcessed = 0;
         for (let i = headerRowIndex + 1; i < rawData.length; i++) {
             const row = rawData[i];
             const actividad = String(row[columnMap['actividad']] || '').trim();
 
-            if (actividad.length > 0) {
-                // Determinar nivel jerárquico
+            // Evitar filas de basura o totales que suelen estar al final de los dashboards
+            if (actividad.length > 2 && !actividad.toLowerCase().includes('total') && !actividad.toLowerCase().includes('velocimetro')) {
                 let level = 4;
                 let type = 'activity';
                 const colA = String(row[0] || '').trim();
                 const normalizedAct = actividad.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-                // 1. Títulos Padre (Nivel 1)
-                if (parentTitles.some(t => normalizedAct.includes(t.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")))) {
-                    level = 1;
-                    type = 'header';
-                }
-                // 2. PHVA (Nivel 3)
-                else if (phvaTitles.includes(normalizedAct)) {
-                    level = 3;
-                    type = 'subtitle';
-                }
-                // 3. Actividades (Nivel 4 - Tienen número en Col A)
-                else if (colA !== '' && !isNaN(parseFloat(colA.replace(',', '.')))) {
-                    level = 4;
-                    type = 'activity';
-                }
-                // 4. Títulos Hijos (Nivel 2)
-                else {
-                    level = 2;
-                    type = 'header';
-                }
+                if (parentTitles.some(t => normalizedAct.includes(t))) { level = 1; type = 'header'; }
+                else if (phvaTitles.includes(normalizedAct)) { level = 3; type = 'subtitle'; }
+                else if (colA !== '' && !isNaN(parseFloat(colA.replace(',', '.')))) { level = 4; type = 'activity'; }
+                else { level = 2; type = 'header'; }
 
-                const activity = {
+                processedData[year].push({
                   id: i + 1,
                   name: actividad,
                   level: level,
@@ -1125,29 +1141,19 @@ ipcMain.handle('process-excel-data', async (event, { buffer, company, period }) 
                   expanded: true,
                   responsible: row[columnMap['responsable']] || 'Profesional SST',
                   months: [
-                    row[columnMap['enero']] || '',
-                    row[columnMap['febrero']] || '',
-                    row[columnMap['marzo']] || '',
-                    row[columnMap['abril']] || '',
-                    row[columnMap['mayo']] || '',
-                    row[columnMap['junio']] || '',
-                    row[columnMap['julio']] || '',
-                    row[columnMap['agosto']] || '',
-                    row[columnMap['septiembre']] || '',
-                    row[columnMap['octubre']] || '',
-                    row[columnMap['noviembre']] || '',
-                    row[columnMap['diciembre']] || ''
+                    row[columnMap['enero']] || '', row[columnMap['febrero']] || '', row[columnMap['marzo']] || '',
+                    row[columnMap['abril']] || '', row[columnMap['mayo']] || '', row[columnMap['junio']] || '',
+                    row[columnMap['julio']] || '', row[columnMap['agosto']] || '', row[columnMap['septiembre']] || '',
+                    row[columnMap['octubre']] || '', row[columnMap['noviembre']] || '', row[columnMap['diciembre']] || ''
                   ],
                   observations: row[columnMap['observaciones']] || ''
-                };
-                processedData[year].push(activity);
-                rowsProcessed++;
+                });
             }
         }
       }
     }
 
-    sendLog(`[INFO] [MAIN] Datos procesados: ${processedData[period].length} filas con jerarquía detectadas.`, 'INFO');
+    sendLog(`[MAIN] Datos procesados exitosamente de la hoja "${targetSheetName}".`, 'INFO');
     return { success: true, data: processedData };
   } catch (error) {
     sendLog(`[MAIN] Error al procesar datos del Excel: ${error.message}`, 'ERROR');

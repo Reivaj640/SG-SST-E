@@ -136,16 +136,18 @@ async function detectAvailablePeriods() {
                 }
             });
 
-            const foundYears = Object.keys(availableFilesMap);
+            let foundYears = Object.keys(availableFilesMap);
             console.log('[detectAvailablePeriods] Años detectados en archivos:', foundYears);
 
-            if (foundYears.length > 0) {
-                renderPeriodSelector(foundYears);
-                document.getElementById('periodSelector').style.display = 'flex';
-            } else {
-                console.warn('[detectAvailablePeriods] No se detectaron años en los nombres de archivo.');
-                initializeDefaultData(); // Fallback si no hay archivos con años claros
+            // Si no hay años detectados, ofrecemos el año actual y el anterior como opciones base
+            if (foundYears.length === 0) {
+                console.warn('[detectAvailablePeriods] No se detectaron años. Ofreciendo años por defecto.');
+                const currentYear = new Date().getFullYear();
+                foundYears = [currentYear.toString(), (currentYear - 1).toString()];
             }
+
+            renderPeriodSelector(foundYears);
+            document.getElementById('periodSelector').style.display = 'flex';
         }
     } catch (error) {
         console.error('Error al detectar períodos:', error);
