@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K+AIR | Portal Asignación de Recursos</title>
+    <!-- Iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Fuentes -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+           SISTEMA VISUAL OFICIAL (K+AIR)
+           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+        :root {
+            --primary: #174ea6;
+            --primary-hover: #185abd;
+            --primary-light: #e8f0fe;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --info: #17a2b8;
+            --text-dark: #212529;
+            --text-muted: #6c757d;
+            --bg-body: #f0f2f5;
+            --bg-card: #ffffff;
+            --border: #dee2e6;
+            --radius: 0.5rem;
+            --shadow-lg: 0 10px 25px rgba(0,0,0,0.05);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
+        
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-dark);
+            font-size: 1rem;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            overflow-y: auto; /* Permitir scroll natural en el body */
+        }
+
+        .portal-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start; /* Alinear al inicio para evitar recortes */
+            padding: 3rem 2rem; /* Más espacio arriba y abajo */
+        }
+
+        .portal-card {
+            background: white;
+            width: 100%;
+            max-width: 1100px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-lg);
+            padding: 3rem;
+            text-align: center;
+            animation: fadeIn 0.5s ease-out;
+            margin-bottom: 2rem; /* Margen de seguridad al final */
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .portal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid #f1f3f5;
+        }
+
+        .portal-logo {
+            font-family: 'Lexend', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .back-btn-internal {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            text-decoration: none;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+            background: #f8f9fa;
+            border: 1px solid var(--border);
+        }
+
+        .back-btn-internal:hover {
+            color: var(--primary);
+            background: var(--primary-light);
+            border-color: var(--primary);
+        }
+
+        .hero-title {
+            font-family: 'Lexend', sans-serif;
+            font-size: 2.5rem;
+            color: var(--text-dark);
+            margin-bottom: 0.5rem;
+        }
+        
+        .hero-subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            margin-bottom: 2.5rem;
+            max-width: 650px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.6;
+        }
+        
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 18px;
+            border-radius: 20px;
+            background: #e8f0fe;
+            color: var(--primary);
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 2rem;
+        }
+
+        .main-actions {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .main-action-card {
+            background: white;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            padding: 2rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+            text-align: left;
+        }
+        
+        .main-action-card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 5px 20px rgba(23, 78, 166, 0.1);
+            transform: translateY(-2px);
+        }
+        
+        .main-action-card.primary {
+            background: linear-gradient(135deg, var(--primary) 0%, #2d5dc7 100%);
+            border-color: var(--primary);
+            color: white;
+        }
+        
+        .main-action-card.primary .action-title,
+        .main-action-card.primary .action-desc { color: white; }
+        
+        .main-action-card.primary .action-icon {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+
+        .main-action-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 10px;
+            background: #f1f3f5;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            flex-shrink: 0;
+        }
+
+        .quick-actions {
+            margin-top: 3.5rem;
+            text-align: left;
+        }
+        
+        .quick-actions-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            color: var(--text-dark);
+            border-bottom: 2px solid #f1f3f5;
+            padding-bottom: 0.5rem;
+            display: inline-block;
+        }
+
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.25rem;
+        }
+
+        .action-card {
+            background: #f8f9fa;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            text-align: left;
+        }
+        
+        .action-card:hover {
+            border-color: var(--primary);
+            background: white;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            transform: translateY(-3px);
+        }
+
+        .action-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 8px;
+            background: white;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .action-title { font-weight: 600; font-size: 0.95rem; margin-bottom: 0.25rem; }
+        .action-desc { font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; }
+
+        .action-icon.success { color: var(--success); }
+        .action-icon.warning { color: var(--warning); }
+        .action-icon.danger { color: var(--danger); }
+        .action-icon.info { color: var(--info); }
+
+        @media (max-width: 768px) {
+            .main-actions { grid-template-columns: 1fr; }
+            .hero-title { font-size: 1.8rem; }
+            .portal-card { padding: 2rem 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="portal-container">
+        <div class="portal-card">
+            
+            <div class="portal-header">
+                <div class="portal-logo">K+<span>AIR</span></div>
+                <a class="back-btn-internal" onclick="goBackToModule()">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Volver al Menú</span>
+                </a>
+            </div>
+
+            <div class="status-pill">
+                <i class="fas fa-coins"></i> Gestión Presupuestal: <span id="activeYear">2025</span>
+            </div>
+
+            <h1 class="hero-title">Asignación de Recursos</h1>
+            <p class="hero-subtitle">
+                Administre los recursos financieros destinados al Sistema de Gestión de Seguridad y Salud en el Trabajo. Controle presupuestos anuales, ejecuciones mensuales y proyecciones de inversión.
+            </p>
+
+            <div class="main-actions">
+                
+                <div class="main-action-card primary" onclick="enterBudget()">
+                    <div class="main-action-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div class="main-action-content">
+                        <div class="action-title">Gestionar Presupuesto</div>
+                        <div class="action-desc">Ver y editar el presupuesto del año actual con detalle de partidas y ejecución.</div>
+                    </div>
+                </div>
+
+                <div class="main-action-card" onclick="openSelector()">
+                    <div class="main-action-icon" style="background: #fff3e0; color: #ff9800;">
+                        <i class="fas fa-history"></i>
+                    </div>
+                    <div class="main-action-content">
+                        <div class="action-title">Histórico de Años</div>
+                        <div class="action-desc">Consultar o abrir presupuestos de años fiscales anteriores almacenados.</div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="quick-actions">
+                <div class="quick-actions-title">Herramientas Presupuestales</div>
+                
+                <div class="actions-grid">
+                    
+                    <div class="action-card" onclick="exportBudget()">
+                        <div class="action-icon success"><i class="fas fa-file-invoice-dollar"></i></div>
+                        <div class="action-title">Informe Financiero</div>
+                        <div class="action-desc">Generar reporte consolidado de ejecución presupuestal en PDF.</div>
+                    </div>
+
+                    <div class="action-card" onclick="cloneBudget()">
+                        <div class="action-icon info"><i class="fas fa-copy"></i></div>
+                        <div class="action-title">Clonar para Próximo Año</div>
+                        <div class="action-desc">Proyectar el presupuesto del siguiente año basado en el actual.</div>
+                    </div>
+
+                    <div class="action-card" onclick="importExpenses()">
+                        <div class="action-icon warning"><i class="fas fa-file-import"></i></div>
+                        <div class="action-title">Importar Gastos</div>
+                        <div class="action-desc">Cargar registros de ejecución desde archivos externos de contabilidad.</div>
+                    </div>
+
+                    <div class="action-card" onclick="configItems()">
+                        <div class="action-icon danger"><i class="fas fa-cogs"></i></div>
+                        <div class="action-title">Configurar Partidas</div>
+                        <div class="action-desc">Ajustar rubros, categorías y límites de gasto del sistema.</div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="presupuesto-home.js"></script>
+</body>
+</html>
