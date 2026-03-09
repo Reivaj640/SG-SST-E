@@ -147,35 +147,39 @@ body {
 }
 
 .panel-header {
-    padding:1rem; 
-    border-bottom: 1px solid var(--border); 
-    background: #fff; 
-    font-weight: 600; 
-    font-size: 0.95rem; 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
+    height: 40px; /* Altura fija para alineación con header de meses */
+    padding: 0 1rem; /* Padding horizontal únicamente */
+    border-bottom: 1px solid var(--border);
+    background: #fff;
+    font-weight: 600;
+    font-size: 0.95rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     flex-shrink: 0;
+    box-sizing: border-box;
 }
 
-.tree-content { 
-    flex: 1; 
-    overflow-y: auto; 
-    padding: 0.5rem 0; 
+.tree-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0; /* Sin padding vertical para alineación exacta con Gantt */
 }
 
 .tree-node {
-    padding: 0.5rem 0.5rem; 
-    cursor: pointer; 
-    display: flex; 
-    align-items: center; 
-    font-size: 0.9rem; 
+    padding: 0 0.5rem; /* Padding horizontal únicamente */
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    font-size: 0.9rem;
     color: var(--text-dark);
-    border-left: 3px solid transparent; 
-    transition: background 0.1s; 
-    white-space: nowrap; 
-    overflow: hidden; 
+    border-left: 3px solid transparent;
+    transition: background 0.1s;
+    white-space: nowrap;
+    overflow: hidden;
     text-overflow: ellipsis;
+    height: 40px; /* Altura fija para alineación con Gantt */
+    box-sizing: border-box;
 }
 
 .tree-node:hover { 
@@ -187,6 +191,15 @@ body {
     border-left-color: var(--primary); 
     color: var(--primary); 
     font-weight: 600; 
+}
+
+/* Fila seleccionada en Gantt - resaltar toda la fila */
+.gantt-row-selected {
+    background-color: var(--primary-light);
+}
+
+.gantt-month-col.selected {
+    background-color: rgba(232, 240, 254, 0.5); /* primary-light semi-transparente */
 }
 
 /* Estilos Jerárquicos */
@@ -277,25 +290,29 @@ body {
 }
 
 .gantt-header-scroll {
-    overflow-x: auto; 
-    background: var(--gantt-header-bg); 
-    border-bottom:1px solid var(--border); 
+    overflow-x: auto;
+    background: var(--gantt-header-bg);
+    border-bottom:1px solid var(--border);
     flex-shrink: 0;
 }
 
 .gantt-months {
-    display: grid; 
+    display: grid;
     grid-template-columns: repeat(12, 1fr); /* 12 columnas iguales */
     min-width: 800px;
 }
 
 .month-label {
-    padding: 0.8rem 0; 
-    text-align: center; 
-    font-size: 0.8rem; 
-    font-weight: 600; 
-    color: var(--text-muted); 
+    height: 40px; /* Altura fija para alineación exacta con filas del Gantt */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
     border-right: 1px solid rgba(0,0,0,0.05);
+    box-sizing: border-box;
 }
 
 .gantt-body-scroll {
@@ -317,11 +334,12 @@ body {
 
 /* Celdas de Gantt */
 .gantt-month-col {
-    border-right:1px dashed var(--border); 
-    border-bottom: 1px solid var(--border); 
-    position: relative; 
-    height: 40px; 
+    border-right: 1px dashed var(--border);
+    border-bottom: 1px solid var(--border); /* Borde inferior para separación de filas */
+    position: relative;
+    height: 40px;
     background: #fff;
+    box-sizing: border-box; /* Incluir border en la altura */
 }
 
 .gantt-bar {

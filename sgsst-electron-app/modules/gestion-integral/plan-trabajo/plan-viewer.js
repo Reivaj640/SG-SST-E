@@ -545,10 +545,15 @@ function renderGantt() {
         // USAR MISMA LÓGICA DE VISIBILIDAD QUE EL ÁRBOL
         if(!isItemVisible(item, index, data)) return;
 
-        // Renderizar Fila
+        // Renderizar fila completa (12 meses) como un grupo
         for(let m=0; m<12; m++) {
             const cell = document.createElement('div');
             cell.className = 'gantt-month-col';
+
+            // Resaltar fila si es la actividad seleccionada
+            if (selectedActivityId === item.id) {
+                cell.classList.add('selected');
+            }
 
             // Celdas de cabecera de grupo (Nivel 1) se marcan visualmente
             if(item.level === 1) {
@@ -568,8 +573,6 @@ function renderGantt() {
                     bar.onclick = () => selectActivity(item.id);
                     cell.appendChild(bar);
                 }
-
-                // CORRECCIÓN BUG: Eliminado el else if que ponía borde azul
             }
 
             rowsContainer.appendChild(cell);
