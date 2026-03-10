@@ -5477,28 +5477,46 @@ ipcMain.handle('sync-inducciones-from-forms', async (event, companyName) => {
 ipcMain.on('restart_app', () => {
     log.info('[UPDATER] El usuario ha aceptado la actualización. Iniciando secuencia de reinicio...');
 
-    // 1. Limpiar procesos secundarios inmediatamente
-    cleanupProcesses();
-
-    // 2. Cerrar todas las ventanas abiertas para liberar recursos de UI/GPU
+    // 1. Cerrar todas las ventanas abiertas para liberar recursos de UI/GPU
     const windows = BrowserWindow.getAllWindows();
     windows.forEach(win => {
         if (!win.isDestroyed()) {
-            win.destroy();
+            win.close();
         }
     });
 
-    // 3. Esperar un tiempo prudencial (2s) para que Windows desbloquee los archivos
-    setTimeout(() => {
-        log.info('[UPDATER] Ejecutando autoUpdater.quitAndInstall(true, true)...');
-        try {
-            autoUpdater.quitAndInstall(true, true);
-        } catch (err) {
-            log.error(`[UPDATER] Error crítico en quitAndInstall: ${err.message}`);
-            // Fallback: intentar salir normalmente si el updater falla
-            app.quit();
+    // 2. Limpiar procesos secundarios inmediatamente
+    cleanupProcesses();
+
+    // 3. Forzar el cierre de la aplicación para que el instalador pueda reemplazar archivos
+    log.info('[UPDATER] Cerrando aplicación para instalación...', 'INFO');
+    
+    // IMPORTANTE: En Windows, quitAndInstall necesita que la app se cierre completamente
+    // Los parámetros (true, true) significan:
+    // - forceQuit: true  = Forzar el cierre de la aplicación
+    // - autoInstall: true = Instalar automáticamente la actualización
+    try {
+        log.info('[UPDATER] Ejecutando autoUpdater.quitAndInstall(true, true)...', 'INFO');
+        autoUpdater.quitAndInstall(true, true);
+    } catch (err) {
+        log.error(`[UPDATER] Error en quitAndInstall: ${err.message}`, 'ERROR');
+        
+        // Fallback: Salir manualmente y esperar que el instalador se ejecute
+        log.info('[UPDATER] Intentando salida de emergencia...', 'WARN');
+        
+        // Cerrar todos los procesos de Python restantes
+        if (process.platform === 'win32') {
+            try {
+                const { execSync } = require('child_process');
+                execSync('taskkill /F /IM python.exe /T', { stdio: 'ignore' });
+            } catch (e) {
+                // Ignorar si no hay procesos Python
+            }
         }
-    }, 2000);
+        
+        // Salir de la aplicación
+        app.quit();
+    }
 });
 
 // --- FUNCIONES AUXILIARES INTERNAS PARA ESTADÍSTICAS ---
