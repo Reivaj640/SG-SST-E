@@ -956,17 +956,17 @@ ipcMain.handle('process-excel-data', async (event, { buffer, company, period }) 
 
     const XLSX = require('xlsx');
     const workbook = XLSX.read(buffer, { type: 'buffer' });
-    
-    // --- NUEVA LÓGICA: BUSCAR LA HOJA CORRECTA ---
+
+    // --- LÓGICA MEJORADA: BUSCAR LA HOJA CORRECTA ---
     let worksheet = null;
     let targetSheetName = "";
-    
-    // 1. Prioridad: Hojas con nombres específicos
+
+    // 1. Prioridad: Hojas con nombres específicos que incluyan el año
     const priorityNames = ['PLAN DE TRABAJO', 'CRONOGRAMA', 'MATRIZ', 'ACTIVIDADES', 'PLAN ANUAL', 'PROGRAMA'];
     for (const sheetName of workbook.SheetNames) {
         const normalizedName = sheetName.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        if (priorityNames.some(p => normalizedName.includes(priorityNames[0]) || normalizedName.includes(p))) {
-            if (normalizedName.includes(period.toString())) { // Si además incluye el año, es la mejor candidata
+        if (priorityNames.some(p => normalizedName.includes(p))) {
+            if (normalizedName.includes(period.toString())) {
                 targetSheetName = sheetName;
                 break;
             }
@@ -981,13 +981,12 @@ ipcMain.handle('process-excel-data', async (event, { buffer, company, period }) 
             const ws = workbook.Sheets[sheetName];
             const data = XLSX.utils.sheet_to_json(ws, { header: 1, range: 0, defval: "" });
             let currentMatches = 0;
-            // Escanear solo las primeras 15 filas para rapidez
             for (let i = 0; i < Math.min(15, data.length); i++) {
                 const row = data[i];
                 if (!Array.isArray(row)) continue;
                 const rowStr = row.join(' ').toLowerCase();
                 if (['ene', 'feb', 'mar', 'abr', 'may', 'jun'].every(m => rowStr.includes(m))) {
-                    currentMatches = 10; // Alta probabilidad
+                    currentMatches = 10;
                     break;
                 }
             }
@@ -1000,86 +999,78 @@ ipcMain.handle('process-excel-data', async (event, { buffer, company, period }) 
 
     // Fallback final: Primera hoja
     if (!targetSheetName) targetSheetName = workbook.SheetNames[0];
-    
+
     worksheet = workbook.Sheets[targetSheetName];
     sendLog(`[MAIN] Hoja seleccionada para procesamiento: "${targetSheetName}"`, 'INFO');
 
-    // Leer como matriz de arrays (más fácil para buscar encabezados)
+    // Leer como matriz de arrays
     const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
 
     sendLog(`[MAIN] Datos crudos extraídos de "${targetSheetName}": ${rawData.length} filas`, 'INFO');
 
-    // --- DEBUG: IMPRIMIR LAS PRIMERAS 10 FILAS PARA VER LA ESTRUCTURA ---
-    sendLog(`[MAIN][DEBUG] --- INICIO ESTRUCTURA DEL ARCHIVO (Primeras 10 filas) ---`, 'DEBUG');
-    for (let i = 0; i < Math.min(10, rawData.length); i++) {
+    // --- DEBUG: IMPRIMIR LAS PRIMERAS 15 FILAS PARA VER LA ESTRUCTURA ---
+    sendLog(`[MAIN][DEBUG] --- INICIO ESTRUCTURA DEL ARCHIVO (Primeras 15 filas) ---`, 'DEBUG');
+    for (let i = 0; i < Math.min(15, rawData.length); i++) {
         sendLog(`[MAIN][DEBUG] Fila ${i}: ${JSON.stringify(rawData[i])}`, 'DEBUG');
     }
     sendLog(`[MAIN][DEBUG] --- FIN ESTRUCTURA DEL ARCHIVO ---`, 'DEBUG');
 
-    // --- 1. BUSCAR LA FILA DE ENCABEZADOS ---
+    // --- 1. BUSCAR LA FILA DE ENCABEZADOS (Formato GI-FO-045) ---
+    // Encabezados esperados: N°, ACTIVIDADES, RESPONSABLE, ENE, FEB, MAR, ABR, MAY, JUN, JUL, AGO, SEP, OCT, NOV, DIC, % AVANCE, ESTADO, OBSERVACIONES
     let headerRowIndex = -1;
-    let columnMap = {}; // { 'actividad': index, 'enero': index, ... }
+    let columnMap = {};
 
-    // Palabras clave para identificar columnas (normalizadas)
-    const keywords = {
-        'actividad': ['actividad', 'actividades', 'descripcion', 'tema', 'nombre actividad', 'item'],
-        'responsable': ['responsable', 'cargo', 'quien', 'asignado'],
-        'meses': ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'set', 'oct', 'nov', 'dic', 'enero']
-    };
-
-    // Función normalizadora
     const normalize = (str) => {
         if (!str) return "";
         return str.toString().toLowerCase().trim()
             .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     };
 
-    // Buscar en las primeras 20 filas
-    for (let i = 0; i < Math.min(20, rawData.length); i++) {
+    // Buscar en las primeras 15 filas la fila de encabezados
+    for (let i = 0; i < Math.min(15, rawData.length); i++) {
         const row = rawData[i];
         if (!Array.isArray(row)) continue;
 
-        // Contar coincidencias en esta fila
-        let matches = 0;
-        let monthMatches = 0;
-        let actOrRespFound = false;
-        let foundKeywords = [];
+        // Contar coincidencias de meses (al menos 6 para confirmar)
+        let monthCount = 0;
+        let hasActividades = false;
+        let hasResponsable = false;
 
         row.forEach(cell => {
             const val = normalize(cell);
-            // Búsqueda más estricta para actividad/responsable para evitar falsos positivos como "Act. Prog."
-            if (keywords.actividad.some(k => val === k || val.startsWith(k + ' ') || val.includes(' ' + k))) {
-                matches++;
-                actOrRespFound = true;
-                foundKeywords.push('actividad');
+            if (['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'set', 'oct', 'nov', 'dic'].includes(val)) {
+                monthCount++;
             }
-            if (keywords.responsable.some(k => val === k || val.startsWith(k + ' ') || val.includes(' ' + k))) {
-                matches++;
-                actOrRespFound = true;
-                foundKeywords.push('responsable');
+            if (val.includes('actividad') || val.includes('actividades')) {
+                hasActividades = true;
             }
-
-            // Verificación de meses (muy importante para confirmar que es la cabecera del cronograma)
-            if (keywords.meses.some(k => val === k)) {
-                monthMatches++;
-                foundKeywords.push('mes');
+            if (val.includes('responsable')) {
+                hasResponsable = true;
             }
         });
 
-        // CRITERIO REFORZADO:
-        // 1. Debe haber encontrado al menos una palabra clave de actividad/responsable Y al menos 2 meses.
-        // 2. O si encontramos muchos meses (>= 6) aunque la palabra 'actividad' sea sutil.
-        if ((actOrRespFound && monthMatches >= 2) || monthMatches >= 6) {
+        // Criterio: al menos 6 meses Y (actividades O responsable)
+        if (monthCount >= 6 && (hasActividades || hasResponsable)) {
             headerRowIndex = i;
-            sendLog(`[MAIN] Encabezados encontrados en la fila ${i + 1}`, 'INFO');
+            sendLog(`[MAIN] Encabezados encontrados en la fila ${i + 1} (índice 0-based)`, 'INFO');
 
-            // Mapear índices de columnas basándose en esta fila
+            // Mapear índices de columnas
             row.forEach((cell, colIndex) => {
                 const val = normalize(cell);
-                if (keywords.actividad.some(k => val.includes(k))) columnMap['actividad'] = colIndex;
-                else if (keywords.responsable.some(k => val.includes(k))) columnMap['responsable'] = colIndex;
-
-                // Mapeo específico de meses (buscando abreviaturas comunes)
+                
+                // Columna N° (índice de actividad)
+                if (val === 'n°' || val === 'n' || val === '#' || val === 'numero' || val === 'número') {
+                    columnMap['numero'] = colIndex;
+                }
+                // Columna ACTIVIDADES
+                else if (val.includes('actividad') || val.includes('actividades')) {
+                    columnMap['actividad'] = colIndex;
+                }
+                // Columna RESPONSABLE
+                else if (val.includes('responsable')) {
+                    columnMap['responsable'] = colIndex;
+                }
+                // Meses
                 else if (val === 'ene' || val === 'enero') columnMap['enero'] = colIndex;
                 else if (val === 'feb' || val === 'febrero') columnMap['febrero'] = colIndex;
                 else if (val === 'mar' || val === 'marzo') columnMap['marzo'] = colIndex;
@@ -1092,68 +1083,154 @@ ipcMain.handle('process-excel-data', async (event, { buffer, company, period }) 
                 else if (val === 'oct' || val === 'octubre') columnMap['octubre'] = colIndex;
                 else if (val === 'nov' || val === 'noviembre') columnMap['noviembre'] = colIndex;
                 else if (val === 'dic' || val === 'diciembre') columnMap['diciembre'] = colIndex;
-
-                else if (['observaciones', 'notas', 'comentarios'].some(k => val.includes(k))) columnMap['observaciones'] = colIndex;
+                // Columnas adicionales
+                else if (val.includes('observacion') || val.includes('seguimiento')) columnMap['observaciones'] = colIndex;
+                else if (val.includes('avance') || val.includes('%')) columnMap['avance'] = colIndex;
+                else if (val.includes('estado')) columnMap['estado'] = colIndex;
             });
             break;
         }
     }
 
+    // Fallback si no se encontraron encabezados
     if (headerRowIndex === -1) {
-        sendLog(`[MAIN][WARN] No se encontró fila de encabezados clara en "${targetSheetName}". Intentando fallback estándar.`, 'WARN');
-        headerRowIndex = 0;
+        sendLog(`[MAIN][WARN] No se encontró fila de encabezados clara. Usando fallback estándar (formato GI-FO-045).`, 'WARN');
+        headerRowIndex = 7; // Fila 8 en índice 0-based (formato típico)
         columnMap = {
-            'actividad': 1, 'responsable': 6,
-            'enero': 7, 'febrero': 8, 'marzo': 9, 'abril': 10, 'mayo': 11, 'junio': 12,
-            'julio': 13, 'agosto': 14, 'septiembre': 15, 'octubre': 16, 'noviembre': 17, 'diciembre': 18,
-            'observaciones': 19
+            'numero': 0,
+            'actividad': 1,
+            'responsable': 2,
+            'enero': 3, 'febrero': 4, 'marzo': 5, 'abril': 6,
+            'mayo': 7, 'junio': 8, 'julio': 9, 'agosto': 10,
+            'septiembre': 11, 'octubre': 12, 'noviembre': 13, 'diciembre': 14,
+            'avance': 15,
+            'estado': 16,
+            'observaciones': 17
         };
     }
 
+    sendLog(`[MAIN] Mapeo de columnas: ${JSON.stringify(columnMap)}`, 'INFO');
+
+    // --- 2. PROCESAR FILAS DE DATOS ---
     const processedData = {};
-    const parentTitles = ['MEDICINA PREVENTIVA', 'SEGURIDAD INDUSTRIAL', 'HIGIENE INDUSTRIAL', 'VERIFICACION', 'VERIFICACIÓN', 'INTEGRAL'];
-    const phvaTitles = ['PLANEAR', 'HACER', 'VERIFICAR', 'ACTUAR'];
+    
+    // Palabras clave para identificar niveles según estructura GI-FO-045
+    // Nivel 1: Títulos mayores (ej: "MEDICINA PREVENTIVA Y DEL TRABAJO")
+    const nivel1Keywords = [
+        'MEDICINA PREVENTIVA', 'SEGURIDAD INDUSTRIAL', 'HIGIENE INDUSTRIAL', 
+        'SALUD PÚBLICA', 'BIENESTAR', 'VERIFICACION', 'VERIFICACIÓN',
+        'GESTIÓN DEL PLAN', 'SST', 'SG-SST', 'INTEGRAL'
+    ];
+    
+    // Nivel 2: Títulos menores (ej: "SVE - Desorden Musculo Esquelético")
+    const nivel2Keywords = [
+        'SVE', 'DESORDEN', 'MUSCULO', 'ESQUELÉTICO', 'ERGONOMÍA',
+        'ENFERMEDAD', 'SALUD MENTAL', 'ESTRÉS', 'RIESGO', 'BIOMECÁNICO',
+        'OSTEOMUSCULAR', 'DISCAPACIDAD', 'REHABILITACIÓN'
+    ];
+    
+    // Nivel 3: Títulos hijos / Fases PHVA (ej: "Planear", "Hacer")
+    const nivel3Keywords = ['PLANEAR', 'HACER', 'VERIFICAR', 'ACTUAR', 'PHVA'];
 
     for (let year = 2024; year <= 2026; year++) {
       processedData[year] = [];
+      
       if (year == period) {
         for (let i = headerRowIndex + 1; i < rawData.length; i++) {
             const row = rawData[i];
+            
+            // Obtener nombre de la actividad (columna B, índice 1)
             const actividad = String(row[columnMap['actividad']] || '').trim();
+            
+            // Saltar filas vacías o de totales
+            if (!actividad || actividad.length < 2) continue;
+            if (actividad.toLowerCase().includes('total') || 
+                actividad.toLowerCase().includes('velocímetro') ||
+                actividad.toLowerCase().includes('velocimetro')) continue;
 
-            // Evitar filas de basura o totales que suelen estar al final de los dashboards
-            if (actividad.length > 2 && !actividad.toLowerCase().includes('total') && !actividad.toLowerCase().includes('velocimetro')) {
-                let level = 4;
-                let type = 'activity';
-                const colA = String(row[0] || '').trim();
-                const normalizedAct = actividad.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-
-                if (parentTitles.some(t => normalizedAct.includes(t))) { level = 1; type = 'header'; }
-                else if (phvaTitles.includes(normalizedAct)) { level = 3; type = 'subtitle'; }
-                else if (colA !== '' && !isNaN(parseFloat(colA.replace(',', '.')))) { level = 4; type = 'activity'; }
-                else { level = 2; type = 'header'; }
-
-                processedData[year].push({
-                  id: i + 1,
-                  name: actividad,
-                  level: level,
-                  type: type,
-                  expanded: true,
-                  responsible: row[columnMap['responsable']] || 'Profesional SST',
-                  months: [
-                    row[columnMap['enero']] || '', row[columnMap['febrero']] || '', row[columnMap['marzo']] || '',
-                    row[columnMap['abril']] || '', row[columnMap['mayo']] || '', row[columnMap['junio']] || '',
-                    row[columnMap['julio']] || '', row[columnMap['agosto']] || '', row[columnMap['septiembre']] || '',
-                    row[columnMap['octubre']] || '', row[columnMap['noviembre']] || '', row[columnMap['diciembre']] || ''
-                  ],
-                  observations: row[columnMap['observaciones']] || ''
-                });
+            // Determinar nivel jerárquico según estructura GI-FO-045
+            let level = 4;
+            let type = 'activity';
+            const normalizedAct = actividad.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            
+            // Obtener valor de columna A (índice de nivel: T1, T2, T3 o número)
+            const colA = String(row[columnMap['numero'] || 0] || '').trim();
+            const normalizedColA = colA.toUpperCase().trim();
+            
+            // PRIORIDAD 1: Si ColA es un número, es actividad (Nivel 4)
+            // Esto previene que actividades con keywords en el nombre se clasifiquen mal
+            if (colA !== '' && colA !== 'undefined' && !isNaN(parseFloat(colA.replace(',', '.')))) {
+                level = 4;
+                type = 'activity';
             }
+            // PRIORIDAD 2: Verificar marcadores T1, T2, T3
+            else if (normalizedColA === 'T1') {
+                level = 1;
+                type = 'header';
+            }
+            else if (normalizedColA === 'T2') {
+                level = 2;
+                type = 'header';
+            }
+            else if (normalizedColA === 'T3') {
+                level = 3;
+                type = 'subtitle';
+            }
+            // PRIORIDAD 3: Fallback a keywords solo si no hay marcador ni número
+            else if (nivel1Keywords.some(k => normalizedAct.includes(k))) {
+                level = 1;
+                type = 'header';
+            }
+            else if (nivel2Keywords.some(k => normalizedAct.includes(k))) {
+                level = 2;
+                type = 'header';
+            }
+            else if (nivel3Keywords.some(k => normalizedAct === k || normalizedAct.startsWith(k))) {
+                level = 3;
+                type = 'subtitle';
+            }
+            // Fallback por defecto
+            else {
+                level = 2;
+                type = 'header';
+            }
+
+            // DEBUG: Log para verificar detección de niveles
+            sendLog(`[DEBUG] Fila ${i}: Actividad="${actividad.substring(0, 50)}...", ColA="${colA}", Nivel Detectado=${level}, Tipo=${type}`, 'DEBUG');
+
+            // Extraer meses (C = ejecutado, P = programado)
+            const months = [
+                row[columnMap['enero']] || '',
+                row[columnMap['febrero']] || '',
+                row[columnMap['marzo']] || '',
+                row[columnMap['abril']] || '',
+                row[columnMap['mayo']] || '',
+                row[columnMap['junio']] || '',
+                row[columnMap['julio']] || '',
+                row[columnMap['agosto']] || '',
+                row[columnMap['septiembre']] || '',
+                row[columnMap['octubre']] || '',
+                row[columnMap['noviembre']] || '',
+                row[columnMap['diciembre']] || ''
+            ];
+
+            processedData[year].push({
+              id: i + 1,
+              name: actividad,
+              level: level,
+              type: type,
+              expanded: true,
+              responsible: row[columnMap['responsable']] || 'Profesional SST',
+              months: months,
+              observations: row[columnMap['observaciones']] || '',
+              avance: row[columnMap['avance']] || '',
+              estado: row[columnMap['estado']] || ''
+            });
         }
       }
     }
 
-    sendLog(`[MAIN] Datos procesados exitosamente de la hoja "${targetSheetName}".`, 'INFO');
+    sendLog(`[MAIN] Datos procesados exitosamente de la hoja "${targetSheetName}". Total actividades: ${processedData[period]?.length || 0}`, 'INFO');
     return { success: true, data: processedData };
   } catch (error) {
     sendLog(`[MAIN] Error al procesar datos del Excel: ${error.message}`, 'ERROR');
