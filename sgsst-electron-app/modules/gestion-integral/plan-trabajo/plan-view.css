@@ -342,6 +342,11 @@ body {
     box-sizing: border-box; /* Incluir border en la altura */
 }
 
+/* Filas de cabecera (Nivel 1) - Altura reducida */
+.gantt-month-col.header-row {
+    height: 30px; /* Altura reducida para títulos */
+}
+
 .gantt-bar {
     position: absolute; 
     top: 8px; 

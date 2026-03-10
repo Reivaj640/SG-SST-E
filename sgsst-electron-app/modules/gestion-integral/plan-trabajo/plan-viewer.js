@@ -550,6 +550,11 @@ function renderGantt() {
             const cell = document.createElement('div');
             cell.className = 'gantt-month-col';
 
+            // Agregar clase especial para filas de cabecera (Nivel 1) - altura reducida
+            if (item.level === 1) {
+                cell.classList.add('header-row');
+            }
+
             // Resaltar fila si es la actividad seleccionada
             if (selectedActivityId === item.id) {
                 cell.classList.add('selected');
