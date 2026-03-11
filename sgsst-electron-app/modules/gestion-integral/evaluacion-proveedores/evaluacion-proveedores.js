@@ -1208,8 +1208,10 @@
          * Cierra el modal
          */
         closeModal() {
+            console.log('[2.9.1][MODAL] Cerrando modal...');
             this.modal.classList.remove('active');
             this.currentSupplier = null;
+            console.log('[2.9.1][MODAL] Modal cerrado, clase active removida');
         }
 
         /**
@@ -1310,14 +1312,15 @@
             const type = document.getElementById('ep-modal-type').value;
             const object = document.getElementById('ep-modal-object').value || "Servicio Genérico";
             const observations = document.getElementById('ep-modal-observations').value;
-            
+
             // Determinar estado según puntaje
             let status = "Pendiente";
             if (score >= 80) status = "Aprobado";
             else if (score < 50 && score > 0) status = "Rechazado";
 
             const saveBtn = document.getElementById('ep-btn-save-modal');
-            
+            const originalText = saveBtn.innerText;
+
             if (this.selectedFiles.length > 0) {
                 // Procesar archivos
                 saveBtn.innerText = "Procesando...";
@@ -1325,15 +1328,23 @@
 
                 try {
                     await this.processFileEvidence(name, this.selectedFiles);
-                    this.finalizeSave(name, nit, type, object, observations, score, status, true);
+                    await this.finalizeSave(name, nit, type, object, observations, score, status, true);
                 } catch (error) {
+                    console.error('[2.9.1][ERROR] Error en saveEvaluation:', error);
                     this.showNotification('Error procesando archivos: ' + error.message, 'error');
                 } finally {
-                    saveBtn.innerText = "Guardar y Archivar";
+                    saveBtn.innerText = originalText;
                     saveBtn.disabled = false;
                 }
             } else {
-                this.finalizeSave(name, nit, type, object, observations, score, status, false);
+                try {
+                    await this.finalizeSave(name, nit, type, object, observations, score, status, false);
+                } catch (error) {
+                    console.error('[2.9.1][ERROR] Error en saveEvaluation:', error);
+                    this.showNotification('Error guardando: ' + error.message, 'error');
+                    saveBtn.innerText = originalText;
+                    saveBtn.disabled = false;
+                }
             }
         }
 
@@ -1440,28 +1451,42 @@
                 // G=Puntaje (%), H=Estado, I=Observaciones, J=Ruta Carpeta,
                 // K=1.ARL/SS, L=2.Política SST, M=3.IPERC, N=4.PTA, O=5.Capacitación,
                 // P=6.EPP, Q=7.Estadísticas, R=8.Cláusula SST, S=9.Reporte, T=10.Investigación
-                const excelData = this.suppliersData.map(s => ({
-                    'ID': s.id || '',
-                    'Razón Social': s.name || '',
-                    'NIT': s.nit || '',
-                    'Tipo': s.type || 'Servicio',
-                    'Objeto Contractual': s.object || s.service || '',
-                    'Fecha Evaluación': s.date ? this.formatDateForExcel(s.date) : '',
-                    'Puntaje (%)': s.score || 0,
-                    'Estado': s.status || 'Pendiente',
-                    'Observaciones': s.observations || '',
-                    'Ruta Carpeta': s.folder || '',
-                    '1. ARL/SS': s.criteria?.arl ? 'X' : '',
-                    '2. Política SST': s.criteria?.politica ? 'X' : '',
-                    '3. IPERC': s.criteria?.iperc ? 'X' : '',
-                    '4. PTA': s.criteria?.pta ? 'X' : '',
-                    '5. Capacitación': s.criteria?.capacitacion ? 'X' : '',
-                    '6. EPP': s.criteria?.epp ? 'X' : '',
-                    '7. Estadísticas': s.criteria?.estadisticas ? 'X' : '',
-                    '8. Cláusula SST': s.criteria?.clausula ? 'X' : '',
-                    '9. Reporte': s.criteria?.reporte ? 'X' : '',
-                    '10. Investigación': s.criteria?.investigacion ? 'X' : ''
-                }));
+                const excelData = this.suppliersData.map((s, index) => {
+                    // Asegurar que el NIT se guarde como texto (prefijando con ' si es necesario)
+                    let nitValue = s.nit || '';
+                    // Si el NIT es numérico, asegurarse de que se guarde como texto
+                    if (nitValue && !isNaN(nitValue)) {
+                        nitValue = String(nitValue);
+                    }
+                    
+                    const rowData = {
+                        'ID': s.id || '',
+                        'Razón Social': s.name || '',
+                        'NIT': nitValue,  // Usar el valor procesado
+                        'Tipo': s.type || 'Servicio',
+                        'Objeto Contractual': s.object || s.service || '',
+                        'Fecha Evaluación': s.date ? this.formatDateForExcel(s.date) : '',
+                        'Puntaje (%)': s.score || 0,
+                        'Estado': s.status || 'Pendiente',
+                        'Observaciones': s.observations || '',
+                        'Ruta Carpeta': s.folder || '',
+                        '1. ARL/SS': s.criteria?.arl ? 'X' : '',
+                        '2. Política SST': s.criteria?.politica ? 'X' : '',
+                        '3. IPERC': s.criteria?.iperc ? 'X' : '',
+                        '4. PTA': s.criteria?.pta ? 'X' : '',
+                        '5. Capacitación': s.criteria?.capacitacion ? 'X' : '',
+                        '6. EPP': s.criteria?.epp ? 'X' : '',
+                        '7. Estadísticas': s.criteria?.estadisticas ? 'X' : '',
+                        '8. Cláusula SST': s.criteria?.clausula ? 'X' : '',
+                        '9. Reporte': s.criteria?.reporte ? 'X' : '',
+                        '10. Investigación': s.criteria?.investigacion ? 'X' : ''
+                    };
+                    
+                    // Log de depuración para verificar NIT
+                    console.log(`[2.9.1][GUARDAR][FILA ${index}] NIT original: "${s.nit}" -> NIT Excel: "${rowData['NIT']}"`);
+                    
+                    return rowData;
+                });
 
                 console.log('[2.9.1][GUARDAR] Enviando datos a backend...');
                 console.log('[2.9.1][GUARDAR] Datos preparados:', JSON.stringify(excelData[0], null, 2));
@@ -1575,8 +1600,14 @@
                 
                 if (result.success) {
                     this.renderTable(this.suppliersData);
+                    
+                    // Cerrar modal y limpiar formulario
                     this.closeModal();
-                    this.showNotification(`Proveedor guardado exitosamente. Estado: ${status}`, 'success');
+                    
+                    // Pequeño delay para asegurar que el modal se cerró visualmente
+                    setTimeout(() => {
+                        this.showNotification(`Proveedor guardado exitosamente. Estado: ${status}`, 'success');
+                    }, 100);
                 } else {
                     this.showNotification(`Error guardando: ${result.error}`, 'error');
                 }
@@ -1643,17 +1674,49 @@
         }
 
         /**
-         * Muestra notificación
+         * Muestra notificación tipo Toast moderna
          */
         showNotification(message, type = 'info') {
-            // Usar sistema de notificaciones existente si está disponible
-            if (window.showNotification) {
-                window.showNotification(message, type);
-            } else {
-                // Fallback: alert simple
-                const icon = type === 'success' ? '✅' : (type === 'error' ? '❌' : 'ℹ️');
-                alert(`${icon} ${message}`);
+            // Crear contenedor de toasts si no existe
+            let toastContainer = document.querySelector('.ep-toast-container');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.className = 'ep-toast-container';
+                document.body.appendChild(toastContainer);
             }
+
+            // Iconos según el tipo
+            const icons = {
+                success: '✓',
+                error: '✕',
+                warning: '⚠',
+                info: 'ℹ'
+            };
+
+            // Crear el toast
+            const toast = document.createElement('div');
+            toast.className = `ep-toast ep-toast-${type}`;
+            
+            toast.innerHTML = `
+                <span class="ep-toast-icon">${icons[type] || icons.info}</span>
+                <span class="ep-toast-message">${message}</span>
+                <button class="ep-toast-close" onclick="this.parentElement.remove()">✕</button>
+            `;
+
+            // Agregar al contenedor
+            toastContainer.appendChild(toast);
+
+            // Auto-eliminar después de 4 segundos
+            setTimeout(() => {
+                if (toast && toast.parentElement) {
+                    toast.classList.add('ep-toast-hiding');
+                    setTimeout(() => {
+                        if (toast && toast.parentElement) {
+                            toast.remove();
+                        }
+                    }, 300);
+                }
+            }, 4000);
         }
 
         /**
@@ -1664,6 +1727,12 @@
             this.suppliersData = [];
             this.selectedFiles = [];
             this.currentSupplier = null;
+            
+            // Limpiar contenedor de toasts
+            const toastContainer = document.querySelector('.ep-toast-container');
+            if (toastContainer) {
+                toastContainer.remove();
+            }
         }
     }
 
