@@ -279,9 +279,9 @@ class CapacitacionesComponent {
 
     async loadDataForYear(year) {
         this.currentYear = year;
-        
+
         // Lógica robusta para encontrar la hoja
-        let sheetName = this.availableSheets.find(s => 
+        let sheetName = this.availableSheets.find(s =>
             s.trim().toLowerCase().includes(`matriz cap.`) && s.includes(year.toString())
         ) || this.availableSheets.find(s => s.includes(year.toString()));
 
@@ -305,6 +305,64 @@ class CapacitacionesComponent {
             this.showNotification(`Error al cargar: ${error.message}`, 'danger');
             this.capacitaciones = [];
             this.applyFilters();
+        }
+    }
+
+    // 📊 MÉTODO DE AUDITORÍA QUIRÚRGICA - Para depurar contenido de Excel
+    async auditExcelContent(year) {
+        this.currentYear = year;
+
+        let sheetName = this.availableSheets.find(s =>
+            s.trim().toLowerCase().includes(`matriz cap.`) && s.includes(year.toString())
+        ) || this.availableSheets.find(s => s.includes(year.toString()));
+
+        if (!sheetName) {
+            this.showNotification(`No hay hoja para el año ${year}.`, 'warning');
+            return;
+        }
+
+        try {
+            console.log('🔍 [AUDIT] Iniciando auditoría del Excel...');
+            const auditResult = await window.electronAPI.auditExcelContent({
+                filePath: this.excelFilePath,
+                sheetName: sheetName
+            });
+
+            if (!auditResult.success) {
+                throw new Error(auditResult.error);
+            }
+
+            const { audit } = auditResult;
+            console.log('✅ [AUDIT] Auditoría completada:', audit);
+
+            // Mostrar resumen en consola
+            console.group('📊 RESUMEN DE AUDITORÍA');
+            console.log('Archivo:', audit.filePath);
+            console.log('Hoja:', audit.sheetName);
+            console.log('Total filas:', audit.totalRows);
+            console.log('Fila de encabezados (índice):', audit.headerRowIndex);
+            console.log('Muestra de filas (primeras 5):');
+            console.table(audit.sampleRows.slice(0, 5).map((row, idx) => {
+                return {
+                    'Fila': idx + 1,
+                    'A': row[0],
+                    'B': row[1],
+                    'C': row[2],
+                    'D': row[3],
+                    'G': row[6],
+                    'H': row[7],
+                    'I': row[8]
+                };
+            }));
+            console.groupEnd();
+
+            this.showNotification('Auditoría completada. Revisa la consola (F12) para ver los detalles.', 'info');
+            return audit;
+
+        } catch (error) {
+            console.error('❌ [AUDIT] Error en auditoría:', error);
+            this.showNotification(`Error en auditoría: ${error.message}`, 'danger');
+            return null;
         }
     }
 

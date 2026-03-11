@@ -2320,6 +2320,18 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 
+    } else if (submoduleName === "2.9.1 Identificación y evaluación para la adquisición de bienes y servicios") {
+      createComponentSafely(window.EvaluacionProveedores,
+        submoduleContentDiv,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback
+      );
+      if (!window.EvaluacionProveedores) {
+        console.error('❌ EvaluacionProveedores no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
     } else if (submoduleName === "3.1.1 Descripción Sociodemografica y diagnostico de condiciones de salud") {
       if (window.SociodemograficaComponent) {
         const sociodemograficaComponent = new window.SociodemograficaComponent(

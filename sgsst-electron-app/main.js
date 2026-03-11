@@ -1256,10 +1256,18 @@ ipcMain.handle('get-capacitaciones-sheets', async (event, filePath) => {
 // Manejador para actualizar el archivo de capacitaciones
 ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacitacionesData, sheetName: requestedSheetName, clearBeforeSave = true, startRow = 7 }) => {
   try {
-    sendLog(`[MAIN] Actualizando archivo de capacitaciones: ${filePath}`, 'INFO');
-    if (requestedSheetName) {
-      sendLog(`[MAIN] Hoja de destino explícita: ${requestedSheetName}`, 'INFO');
-    }
+    sendLog(`[UPDATE-CAP][MAIN] === INICIO ESCRITURA DE CAPACITACIONES ===`, 'INFO');
+    sendLog(`[UPDATE-CAP][MAIN] Archivo: ${filePath}`, 'INFO');
+    sendLog(`[UPDATE-CAP][MAIN] Hoja solicitada: ${requestedSheetName || 'AUTO'}`, 'INFO');
+    sendLog(`[UPDATE-CAP][MAIN] Datos a escribir: ${capacitacionesData.length} capacitaciones`, 'INFO');
+    sendLog(`[UPDATE-CAP][MAIN] startRow: ${startRow}`, 'INFO');
+    sendLog(`[UPDATE-CAP][MAIN] clearBeforeSave: ${clearBeforeSave}`, 'INFO');
+
+    // 📊 LOG QUIRÚRGICO: Mostrar CADA dato que se va a escribir
+    sendLog(`[UPDATE-CAP][DEBUG] === DATOS DE ENTRADA (CAPACITACIONES) ===`, 'DEBUG');
+    capacitacionesData.forEach((cap, idx) => {
+      sendLog(`[UPDATE-CAP][DEBUG] [${idx}] nombre="${cap.nombre}", tipo="${cap.tipo}", fecha="${cap.fechaProgramada}", instructor="${cap.instructor}", duracion="${cap.duracion}", estado="${cap.estado}"`, 'DEBUG');
+    });
 
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(filePath);
@@ -1298,10 +1306,21 @@ ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacita
       throw new Error(`No se pudo encontrar ninguna hoja de trabajo válida para escribir en el archivo.`);
     }
 
+    sendLog(`[UPDATE-CAP][MAIN] Hoja seleccionada: ${sheetName}`, 'INFO');
+    sendLog(`[UPDATE-CAP][MAIN] Filas actuales en la hoja: ${worksheet.rowCount}`, 'INFO');
+
+    // 📊 LOG QUIRÚRGICO: Mostrar estado ANTES de limpiar
+    sendLog(`[UPDATE-CAP][DEBUG] === ESTADO ANTES DE LIMPIEZA ===`, 'DEBUG');
+    for (let i = startRow; i <= Math.min(startRow + 10, worksheet.rowCount); i++) {
+      const row = worksheet.getRow(i);
+      sendLog(`[UPDATE-CAP][DEBUG] Fila ${i}: B="${row.getCell(2).value}", C="${row.getCell(3).value}", D="${row.getCell(4).value}"`, 'DEBUG');
+    }
+
     // --- LÓGICA CLAVE PARA EVITAR DUPLICADOS ---
     // Si se solicita limpiar, borramos todas las filas desde startRow hasta el final
     if (clearBeforeSave) {
         const lastRowNumber = worksheet.rowCount;
+        let deletedCount = 0;
         // Borra las filas en orden inverso para no afectar los índices
         for (let i = lastRowNumber; i >= startRow; i--) {
             const row = worksheet.getRow(i);
@@ -1309,12 +1328,14 @@ ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacita
             // No borrar la fila de "Total capacitaciones programadas" ni las filas después de ella
             if (cellB && typeof cellB === 'string' && cellB.includes('Total capacitaciones programadas')) {
                 // Encontramos la fila de total, dejar de borrar desde aquí hacia abajo
+                sendLog(`[UPDATE-CAP][DEBUG] Deteniendo limpieza en fila ${i} (encontrado 'Total capacitaciones programadas')`, 'DEBUG');
                 break;
             }
             // Eliminar la fila si está dentro del rango de datos
             worksheet.spliceRows(i, 1);
+            deletedCount++;
         }
-        sendLog(`[MAIN] Limpiadas filas desde la fila ${startRow} hasta antes de 'Total capacitaciones programadas'.`, 'INFO');
+        sendLog(`[UPDATE-CAP][MAIN] Limpiadas ${deletedCount} filas desde la fila ${startRow} hasta antes de 'Total capacitaciones programadas'.`, 'INFO');
     } else {
         // Si no se limpia, encontrar la fila de "Total capacitaciones programadas" y limpiar solo hasta allí
         const totalRowCount = worksheet.lastRow ? worksheet.lastRow.number : startRow;
@@ -1332,7 +1353,16 @@ ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacita
                 const row = worksheet.getRow(i);
                 row.values = [];
             }
+            sendLog(`[UPDATE-CAP][MAIN] Limpiadas filas desde ${startRow} hasta ${endCleanRow} (sin borrar estructura)`, 'INFO');
         }
+    }
+
+    // 📊 LOG QUIRÚRGICO: Mostrar estado DESPUÉS de limpiar
+    sendLog(`[UPDATE-CAP][DEBUG] === ESTADO DESPUÉS DE LIMPIEZA ===`, 'DEBUG');
+    sendLog(`[UPDATE-CAP][DEBUG] Filas restantes: ${worksheet.rowCount}`, 'DEBUG');
+    for (let i = startRow; i <= Math.min(startRow + 5, worksheet.rowCount); i++) {
+      const row = worksheet.getRow(i);
+      sendLog(`[UPDATE-CAP][DEBUG] Fila ${i}: B="${row.getCell(2).value}", C="${row.getCell(3).value}", D="${row.getCell(4).value}"`, 'DEBUG');
     }
 
     // Filtrar datos inválidos antes de procesarlos
@@ -1345,10 +1375,20 @@ ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacita
              typeof cap.nombre === 'string';
     });
 
+    sendLog(`[UPDATE-CAP][DEBUG] Capacitaciones válidas después de filtrar: ${validCapacitaciones.length}`, 'DEBUG');
+
+    // 📊 LOG QUIRÚRGICO: Mostrar DÓNDE se va a escribir cada dato
+    sendLog(`[UPDATE-CAP][DEBUG] === ESCRITURA DE DATOS EN EXCEL ===`, 'DEBUG');
+    
     // Escribir nuevos datos
     validCapacitaciones.forEach((capacitacion, index) => {
       const rowIndex = startRow + index;
       const row = worksheet.getRow(rowIndex);
+
+      // Valores ANTES de escribir
+      const oldB = row.getCell(2).value;
+      const oldC = row.getCell(3).value;
+      const oldD = row.getCell(4).value;
 
       row.getCell(2).value = capacitacion.nombre; // B
       row.getCell(3).value = capacitacion.tipo.toUpperCase(); // C
@@ -1377,14 +1417,33 @@ ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacita
       if (row.getCell(4).value) {
         row.getCell(4).numFmt = 'dd/mm/yyyy';
       }
+
+      // 📊 LOG QUIRÚRGICO: Confirmar escritura
+      sendLog(`[UPDATE-CAP][DEBUG] [Fila ${rowIndex}] ESCRITO: B="${capacitacion.nombre}", C="${capacitacion.tipo.toUpperCase()}", D="${capacitacion.fechaProgramada}", G="${capacitacion.instructor}", H="${capacitacion.duracion}", I="${capacitacion.estado}"`, 'DEBUG');
     });
 
+    sendLog(`[UPDATE-CAP][DEBUG] === RESUMEN DE ESCRITURA ===`, 'DEBUG');
+    sendLog(`[UPDATE-CAP][DEBUG] Total capacitaciones escritas: ${validCapacitaciones.length}`, 'DEBUG');
+    sendLog(`[UPDATE-CAP][DEBUG] Última fila ocupada: ${startRow + validCapacitaciones.length - 1}`, 'DEBUG');
+
     await workbook.xlsx.writeFile(filePath);
-    sendLog(`[MAIN] Archivo de capacitaciones actualizado en hoja '${sheetName}' exitosamente.`, 'INFO');
+    sendLog(`[UPDATE-CAP][MAIN] Archivo de capacitaciones actualizado en hoja '${sheetName}' exitosamente.`, 'INFO');
+    
+    // 📊 VERIFICACIÓN POST-ESCRITURA
+    sendLog(`[UPDATE-CAP][DEBUG] === VERIFICACIÓN POST-ESCRITURA ===`, 'DEBUG');
+    const verifyWorkbook = new ExcelJS.Workbook();
+    await verifyWorkbook.xlsx.readFile(filePath);
+    const verifyWorksheet = verifyWorkbook.getWorksheet(sheetName);
+    for (let i = startRow; i <= Math.min(startRow + 5, verifyWorksheet.rowCount); i++) {
+      const row = verifyWorksheet.getRow(i);
+      sendLog(`[UPDATE-CAP][DEBUG] [VERIFICACIÓN] Fila ${i}: B="${row.getCell(2).value}", C="${row.getCell(3).value}", D="${row.getCell(4).value}"`, 'DEBUG');
+    }
+
     return { success: true };
 
   } catch (error) {
-    sendLog(`[MAIN] Error al actualizar el archivo de capacitaciones: ${error.message}`, 'ERROR');
+    sendLog(`[UPDATE-CAP][ERROR] Error al actualizar el archivo de capacitaciones: ${error.message}`, 'ERROR');
+    sendLog(`[UPDATE-CAP][ERROR] Stack: ${error.stack}`, 'ERROR');
     return { success: false, error: error.message };
   }
 });
@@ -1500,6 +1559,151 @@ ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacita
     }
   });
 
+  // ============================================================================
+  // 📊 HANDLER DE AUDITORÍA QUIRÚRGICA - Para depurar contenido de Excel
+  // ============================================================================
+  ipcMain.handle('audit-excel-content', async (event, { filePath, sheetName: requestedSheetName }) => {
+    try {
+      sendLog(`[AUDIT][MAIN] === INICIO AUDITORÍA DE EXCEL ===`, 'INFO');
+      sendLog(`[AUDIT][MAIN] Archivo: ${filePath}`, 'INFO');
+      sendLog(`[AUDIT][MAIN] Hoja solicitada: ${requestedSheetName || 'AUTO'}`, 'INFO');
+
+      await fsp.access(filePath);
+      const workbook = xlsx.readFile(filePath);
+
+      // 1. Listar todas las hojas disponibles
+      sendLog(`[AUDIT][MAIN] Hojas disponibles en el archivo:`, 'INFO');
+      workbook.SheetNames.forEach((name, idx) => {
+        sendLog(`[AUDIT][MAIN]   [${idx}] ${name}`, 'INFO');
+      });
+
+      // 2. Determinar qué hoja usar
+      let sheetName = requestedSheetName;
+      if (!sheetName || !workbook.SheetNames.includes(sheetName)) {
+        if(sheetName) sendLog(`[AUDIT][WARN] Hoja '${sheetName}' no encontrada, buscando alternativa...`, 'WARN');
+
+        const currentYear = new Date().getFullYear().toString();
+        const matrixPatternCurrent = new RegExp(`Matriz Cap\\.\\s*${currentYear}`, 'i');
+        sheetName = workbook.SheetNames.find(name => matrixPatternCurrent.test(name));
+
+        if (!sheetName) {
+          for (let year = parseInt(currentYear); year >= 2017; year--) {
+            const pattern = new RegExp(`Matriz Cap\\.\\s*${year}`, 'i');
+            sheetName = workbook.SheetNames.find(name => pattern.test(name));
+            if (sheetName) {
+              sendLog(`[AUDIT][MAIN] Hoja encontrada por año: ${sheetName}`, 'INFO');
+              break;
+            }
+          }
+        }
+        if (!sheetName) {
+          sheetName = workbook.SheetNames[0];
+          sendLog(`[AUDIT][WARN] Usando primera hoja: ${sheetName}`, 'WARN');
+        }
+      }
+
+      sendLog(`[AUDIT][MAIN] Hoja seleccionada: ${sheetName}`, 'INFO');
+      const worksheet = workbook.Sheets[sheetName];
+
+      if (!worksheet || !worksheet['!ref']) {
+        sendLog(`[AUDIT][ERROR] La hoja '${sheetName}' está vacía o no tiene rango válido`, 'ERROR');
+        return { success: false, error: 'Hoja vacía' };
+      }
+
+      // 3. Mostrar rango de la hoja
+      sendLog(`[AUDIT][MAIN] Rango de la hoja (!ref): ${worksheet['!ref']}`, 'INFO');
+
+      // 4. Leer TODOS los datos como matriz
+      const allData = xlsx.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: '<<EMPTY>>' });
+      sendLog(`[AUDIT][MAIN] Total de filas leídas: ${allData.length}`, 'INFO');
+
+      // 5. Mostrar las primeras 20 filas COMPLETAS (auditoría quirúrgica)
+      sendLog(`[AUDIT][MAIN] === CONTENIDO DE FILAS (Primeras 20 filas) ===`, 'INFO');
+      for (let i = 0; i < Math.min(20, allData.length); i++) {
+        const row = allData[i];
+        const rowStr = row.map((cell, colIdx) => {
+          const colLetter = String.fromCharCode(65 + colIdx); // A, B, C...
+          return `${colLetter}${i+1}="${cell}"`;
+        }).join(' | ');
+        sendLog(`[AUDIT][MAIN] Fila ${i+1}: ${rowStr}`, 'INFO');
+      }
+
+      // 6. Mostrar análisis de encabezados (buscar fila con meses)
+      sendLog(`[AUDIT][MAIN] === ANÁLISIS DE ENCABEZADOS ===`, 'INFO');
+      const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+      let headerRowIndex = -1;
+
+      for (let i = 0; i < Math.min(15, allData.length); i++) {
+        const row = allData[i];
+        const rowText = row.join(' ').toLowerCase();
+        const monthCount = months.filter(m => rowText.includes(m)).length;
+
+        if (monthCount >= 6) {
+          headerRowIndex = i;
+          sendLog(`[AUDIT][MAIN] Fila de encabezados encontrada en índice ${i} (fila ${i+1})`, 'INFO');
+          sendLog(`[AUDIT][MAIN] Encabezados detectados:`, 'INFO');
+
+          row.forEach((cell, colIdx) => {
+            const colLetter = String.fromCharCode(65 + colIdx);
+            sendLog(`[AUDIT][MAIN]   Columna ${colLetter} (${colIdx}): "${cell}"`, 'INFO');
+          });
+          break;
+        }
+      }
+
+      if (headerRowIndex === -1) {
+        sendLog(`[AUDIT][WARN] No se encontró fila de encabezados con meses`, 'WARN');
+      }
+
+      // 7. Mostrar análisis de datos (filas después de encabezados)
+      if (headerRowIndex !== -1) {
+        sendLog(`[AUDIT][MAIN] === MUESTRA DE DATOS (Filas ${headerRowIndex+2} a ${headerRowIndex+6}) ===`, 'INFO');
+        for (let i = headerRowIndex + 1; i < Math.min(headerRowIndex + 6, allData.length); i++) {
+          const row = allData[i];
+          sendLog(`[AUDIT][MAIN] Fila ${i+1} (dato):`, 'INFO');
+          sendLog(`[AUDIT][MAIN]   A${i+1} (Índice): "${row[0]}"`, 'INFO');
+          sendLog(`[AUDIT][MAIN]   B${i+1} (Nombre): "${row[1]}"`, 'INFO');
+          sendLog(`[AUDIT][MAIN]   C${i+1} (Tipo): "${row[2]}"`, 'INFO');
+          sendLog(`[AUDIT][MAIN]   D${i+1} (Fecha): "${row[3]}"`, 'INFO');
+          sendLog(`[AUDIT][MAIN]   G${i+1} (Instructor): "${row[6]}"`, 'INFO');
+          sendLog(`[AUDIT][MAIN]   H${i+1} (Duración): "${row[7]}"`, 'INFO');
+          sendLog(`[AUDIT][MAIN]   I${i+1} (Estado): "${row[8]}"`, 'INFO');
+        }
+      }
+
+      // 8. Mostrar totales y estructura
+      sendLog(`[AUDIT][MAIN] === ESTRUCTURA DEL ARCHIVO ===`, 'INFO');
+      sendLog(`[AUDIT][MAIN] Total filas: ${allData.length}`, 'INFO');
+      sendLog(`[AUDIT][MAIN] Última fila con contenido: ${allData.filter(r => r.some(c => c !== '<<EMPTY>>')).length}`, 'INFO');
+
+      // 9. Buscar filas especiales
+      for (let i = 0; i < allData.length; i++) {
+        const row = allData[i];
+        const rowText = row.join(' ').toLowerCase();
+        if (rowText.includes('total') || rowText.includes('programada')) {
+          sendLog(`[AUDIT][MAIN] Fila especial encontrada en índice ${i} (fila ${i+1}): "${row[1] || row[0]}"`, 'INFO');
+        }
+      }
+
+      sendLog(`[AUDIT][MAIN] === FIN AUDITORÍA DE EXCEL ===`, 'INFO');
+
+      return {
+        success: true,
+        audit: {
+          filePath,
+          sheetName,
+          totalRows: allData.length,
+          headerRowIndex,
+          sampleRows: allData.slice(0, 20),
+          allData // Devolver TODO para análisis en frontend si es necesario
+        }
+      };
+    } catch (error) {
+      sendLog(`[AUDIT][ERROR] Error en auditoría: ${error.message}`, 'ERROR');
+      return { success: false, error: error.message };
+    }
+  });
+
   ipcMain.handle('init-excel', async (event, { filePath, sheetName: requestedSheetName }) => {
   try {
     sendLog(`[MAIN] Inicializando archivo Excel: ${filePath}`, 'INFO');
@@ -1545,6 +1749,17 @@ ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacita
     const allData = xlsx.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: null });
     const headers = allData[5] || []; // Asumiendo que los encabezados están en la fila 6 (índice 5)
     const processedData = allData;
+
+    // 📊 LOG QUIRÚRGICO: Mostrar qué se está leyendo
+    sendLog(`[INIT-EXCEL][DEBUG] === CONTENIDO DEL EXCEL (Hoja: ${sheetName}) ===`, 'DEBUG');
+    sendLog(`[INIT-EXCEL][DEBUG] Total filas: ${allData.length}`, 'DEBUG');
+    sendLog(`[INIT-EXCEL][DEBUG] Encabezados (fila 6): ${JSON.stringify(headers)}`, 'DEBUG');
+
+    // Mostrar primeras 10 filas de datos
+    for (let i = 0; i < Math.min(10, allData.length); i++) {
+      const row = allData[i];
+      sendLog(`[INIT-EXCEL][DEBUG] Fila ${i+1}: [A="${row[0]}", B="${row[1]}", C="${row[2]}", D="${row[3]}", G="${row[6]}", H="${row[7]}", I="${row[8]}"]`, 'DEBUG');
+    }
 
     sendLog(`[MAIN] Archivo Excel procesado. Hoja: ${sheetName}, Filas leídas: ${allData.length}`, 'INFO');
 
@@ -2221,6 +2436,401 @@ ipcMain.handle('save-objetivos-excel-data', async (event, filePath, data) => {
   } catch (error) {
     sendLog(`[MAIN] Error guardando datos en archivo Excel de objetivos: ${error.message}`, 'ERROR');
     return { success: false, error: error.message };
+  }
+});
+
+// Handler para guardar datos en el archivo Excel de proveedores (Submódulo 2.9.1)
+ipcMain.handle('save-proveedores-excel-data', async (event, filePath, proveedoresData) => {
+  try {
+    sendLog(`[PROVEEDORES][MAIN] === INICIO GUARDADO DE PROVEEDORES ===`, 'INFO');
+    sendLog(`[PROVEEDORES][MAIN] Archivo: ${filePath}`, 'INFO');
+    sendLog(`[PROVEEDORES][MAIN] Datos recibidos: ${Array.isArray(proveedoresData) ? proveedoresData.length : 'NO ES ARRAY'} registros`, 'INFO');
+    
+    // 📊 LOG QUIRÚRGICO: Mostrar estructura exacta de datos recibidos
+    if (Array.isArray(proveedoresData) && proveedoresData.length > 0) {
+      sendLog(`[PROVEEDORES][DEBUG] === ESTRUCTURA DEL PRIMER REGISTRO ===`, 'DEBUG');
+      const primerRegistro = proveedoresData[0];
+      sendLog(`[PROVEEDORES][DEBUG] Tipo de dato: ${typeof primerRegistro}`, 'DEBUG');
+      sendLog(`[PROVEEDORES][DEBUG] Claves del objeto: ${Object.keys(primerRegistro).join(', ')}`, 'DEBUG');
+      sendLog(`[PROVEEDORES][DEBUG] Registro completo: ${JSON.stringify(primerRegistro, null, 2)}`, 'DEBUG');
+      
+      // Verificar si viene como objeto plano o con estructura criteria
+      if (primerRegistro.criteria) {
+        sendLog(`[PROVEEDORES][DEBUG] ✅ El registro TIENE objeto 'criteria'`, 'DEBUG');
+        sendLog(`[PROVEEDORES][DEBUG] criteria contenido: ${JSON.stringify(primerRegistro.criteria, null, 2)}`, 'DEBUG');
+      } else {
+        sendLog(`[PROVEEDORES][DEBUG] ❌ El registro NO tiene objeto 'criteria'. Buscando claves alternativas...`, 'DEBUG');
+        // Buscar claves que parezcan criterios
+        const criteriaKeys = Object.keys(primerRegistro).filter(k => 
+          k.includes('ARL') || k.includes('Politica') || k.includes('IPERC') || 
+          k.includes('PTA') || k.includes('Capacitacion') || k.includes('EPP') ||
+          k.includes('Estadisticas') || k.includes('Clausula') || k.includes('Reporte') ||
+          k.includes('Investigacion')
+        );
+        if (criteriaKeys.length > 0) {
+          sendLog(`[PROVEEDORES][DEBUG] Claves encontradas que parecen criterios: ${criteriaKeys.join(', ')}`, 'DEBUG');
+          criteriaKeys.forEach(k => {
+            sendLog(`[PROVEEDORES][DEBUG]   ${k} = ${primerRegistro[k]}`, 'DEBUG');
+          });
+        }
+      }
+    }
+
+    // Verificar que el archivo existe, si no, crear uno nuevo
+    let workbook;
+    let worksheet;
+    let fileExists = false;
+
+    try {
+      await fsp.access(filePath, fs.constants.R_OK);
+      fileExists = true;
+      sendLog(`[MAIN][2.9.1] Archivo Excel existe, leyendo...`, 'DEBUG');
+      
+      // Leer archivo existente
+      workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.readFile(filePath);
+      
+      // Obtener o crear la primera hoja
+      if (workbook.worksheets.length > 0) {
+        worksheet = workbook.getWorksheet(1);
+      } else {
+        worksheet = workbook.addWorksheet('Proveedores');
+      }
+    } catch (accessError) {
+      sendLog(`[MAIN][2.9.1] Archivo no existe, creando nuevo: ${accessError.message}`, 'INFO');
+      
+      // Crear nuevo libro
+      workbook = new ExcelJS.Workbook();
+      worksheet = workbook.addWorksheet('Proveedores');
+      
+      // Configurar encabezados (fila 7)
+      const headers = [
+        'ID', 'Razón Social', 'NIT', 'Tipo', 'Objeto Contractual', 
+        'Fecha Evaluación', 'Puntaje (%)', 'Estado', 'Observaciones', 'Ruta Carpeta',
+        'ARL/SS', 'Política SST', 'IPERC', 'PTA', 'Capacitación', 
+        'EPP', 'Estadísticas', 'Cláusula SST', 'Reporte', 'Investigación'
+      ];
+      
+      // Escribir encabezados en fila 7
+      const headerRow = worksheet.getRow(7);
+      headers.forEach((header, index) => {
+        const cell = headerRow.getCell(index + 1);
+        cell.value = header;
+        cell.font = { bold: true };
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFFFCCCC' } // Rosa claro
+        };
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' }
+        };
+      });
+      
+      // Congelar paneles (dejar filas 1-7 fijas)
+      worksheet.views = [{ state: 'frozen', ySplit: 7 }];
+    }
+
+    // Limpiar datos anteriores (desde fila 8 en adelante)
+    for (let i = 8; i < 1000; i++) {
+      const row = worksheet.getRow(i);
+      for (let col = 1; col <= 20; col++) {
+        row.getCell(col).value = null;
+      }
+    }
+
+    // Escribir nuevos datos desde fila 8
+    proveedoresData.forEach((proveedor, index) => {
+      const row = worksheet.getRow(8 + index);
+
+      // 📊 LOG QUIRÚRGICO: Mostrar qué se va a escribir
+      sendLog(`[PROVEEDORES][DEBUG] === ESCRITURA REGISTRO ${index + 1} ===`, 'DEBUG');
+      sendLog(`[PROVEEDORES][DEBUG] Fila de destino: ${8 + index}`, 'DEBUG');
+      sendLog(`[PROVEEDORES][DEBUG] Datos del registro: ${JSON.stringify(proveedor)}`, 'DEBUG');
+
+      // Columna A: ID
+      const idValue = proveedor['ID'] || proveedor['id'] || (index + 1);
+      row.getCell(1).value = idValue;
+      sendLog(`[PROVEEDORES][DEBUG]   A${8 + index} (ID): ${idValue} ← proveedor['ID']='${proveedor['ID']}', proveedor['id']='${proveedor['id']}'`, 'DEBUG');
+
+      // Columna B: Razón Social
+      const nameValue = proveedor['Razón Social'] || proveedor['name'] || '';
+      row.getCell(2).value = nameValue;
+      sendLog(`[PROVEEDORES][DEBUG]   B${8 + index} (Razón Social): ${nameValue} ← proveedor['Razón Social']='${proveedor['Razón Social']}', proveedor['name']='${proveedor['name']}'`, 'DEBUG');
+
+      // Columna C: NIT
+      const nitValue = proveedor['NIT'] || proveedor['nit'] || '';
+      row.getCell(3).value = nitValue;
+      sendLog(`[PROVEEDORES][DEBUG]   C${8 + index} (NIT): ${nitValue} ← proveedor['NIT']='${proveedor['NIT']}', proveedor['nit']='${proveedor['nit']}'`, 'DEBUG');
+
+      // Columna D: Tipo
+      const typeValue = proveedor['Tipo'] || proveedor['type'] || 'Servicio';
+      row.getCell(4).value = typeValue;
+      sendLog(`[PROVEEDORES][DEBUG]   D${8 + index} (Tipo): ${typeValue} ← proveedor['Tipo']='${proveedor['Tipo']}', proveedor['type']='${proveedor['type']}'`, 'DEBUG');
+
+      // Columna E: Objeto Contractual
+      const objectValue = proveedor['Objeto Contractual'] || proveedor['object'] || '';
+      row.getCell(5).value = objectValue;
+      sendLog(`[PROVEEDORES][DEBUG]   E${8 + index} (Objeto Contractual): ${objectValue} ← proveedor['Objeto Contractual']='${proveedor['Objeto Contractual']}', proveedor['object']='${proveedor['object']}'`, 'DEBUG');
+
+      // Columna F: Fecha Evaluación
+      const dateValue = proveedor['Fecha Evaluación'] || proveedor['date'] || new Date().toISOString().split('T')[0];
+      row.getCell(6).value = dateValue;
+      sendLog(`[PROVEEDORES][DEBUG]   F${8 + index} (Fecha): ${dateValue} ← proveedor['Fecha Evaluación']='${proveedor['Fecha Evaluación']}', proveedor['date']='${proveedor['date']}'`, 'DEBUG');
+
+      // Columna G: Puntaje (%)
+      const scoreValue = proveedor['Puntaje (%)'] || proveedor['score'];
+      row.getCell(7).value = scoreValue !== undefined ? scoreValue : 0;
+      sendLog(`[PROVEEDORES][DEBUG]   G${8 + index} (Puntaje): ${scoreValue !== undefined ? scoreValue : 0} ← proveedor['Puntaje (%)']='${proveedor['Puntaje (%)']}', proveedor['score']='${proveedor['score']}'`, 'DEBUG');
+
+      // Columna H: Estado
+      const statusValue = proveedor['Estado'] || proveedor['status'] || 'Pendiente';
+      row.getCell(8).value = statusValue;
+      sendLog(`[PROVEEDORES][DEBUG]   H${8 + index} (Estado): ${statusValue} ← proveedor['Estado']='${proveedor['Estado']}', proveedor['status']='${proveedor['status']}'`, 'DEBUG');
+
+      // Columna I: Observaciones
+      const obsValue = proveedor['Observaciones'] || proveedor['observations'] || '';
+      row.getCell(9).value = obsValue;
+      sendLog(`[PROVEEDORES][DEBUG]   I${8 + index} (Observaciones): ${obsValue} ← proveedor['Observaciones']='${proveedor['Observaciones']}', proveedor['observations']='${proveedor['observations']}'`, 'DEBUG');
+
+      // Columna J: Ruta Carpeta
+      const folderValue = proveedor['Ruta Carpeta'] || proveedor['folder'] || '';
+      row.getCell(10).value = folderValue;
+      sendLog(`[PROVEEDORES][DEBUG]   J${8 + index} (Ruta Carpeta): ${folderValue} ← proveedor['Ruta Carpeta']='${proveedor['Ruta Carpeta']}', proveedor['folder']='${proveedor['folder']}'`, 'DEBUG');
+
+      // Columnas K-T: Criterios de verificación (objeto plano con claves del Excel)
+      const arlValue = proveedor['1. ARL/SS'] || proveedor['ARL/SS'] || '';
+      row.getCell(11).value = arlValue;
+      sendLog(`[PROVEEDORES][DEBUG]   K${8 + index} (ARL/SS): '${arlValue}' ← proveedor['1. ARL/SS']='${proveedor['1. ARL/SS']}', proveedor['ARL/SS']='${proveedor['ARL/SS']}'`, 'DEBUG');
+      
+      const politicaValue = proveedor['2. Política SST'] || proveedor['Política SST'] || '';
+      row.getCell(12).value = politicaValue;
+      sendLog(`[PROVEEDORES][DEBUG]   L${8 + index} (Política SST): '${politicaValue}' ← proveedor['2. Política SST']='${proveedor['2. Política SST']}', proveedor['Política SST']='${proveedor['Política SST']}'`, 'DEBUG');
+      
+      const ipercValue = proveedor['3. IPERC'] || proveedor['IPERC'] || '';
+      row.getCell(13).value = ipercValue;
+      sendLog(`[PROVEEDORES][DEBUG]   M${8 + index} (IPERC): '${ipercValue}' ← proveedor['3. IPERC']='${proveedor['3. IPERC']}', proveedor['IPERC']='${proveedor['IPERC']}'`, 'DEBUG');
+      
+      const ptaValue = proveedor['4. PTA'] || proveedor['PTA'] || '';
+      row.getCell(14).value = ptaValue;
+      sendLog(`[PROVEEDORES][DEBUG]   N${8 + index} (PTA): '${ptaValue}' ← proveedor['4. PTA']='${proveedor['4. PTA']}', proveedor['PTA']='${proveedor['PTA']}'`, 'DEBUG');
+      
+      const capacitacionValue = proveedor['5. Capacitación'] || proveedor['Capacitación'] || '';
+      row.getCell(15).value = capacitacionValue;
+      sendLog(`[PROVEEDORES][DEBUG]   O${8 + index} (Capacitación): '${capacitacionValue}' ← proveedor['5. Capacitación']='${proveedor['5. Capacitación']}', proveedor['Capacitación']='${proveedor['Capacitación']}'`, 'DEBUG');
+      
+      const eppValue = proveedor['6. EPP'] || proveedor['EPP'] || '';
+      row.getCell(16).value = eppValue;
+      sendLog(`[PROVEEDORES][DEBUG]   P${8 + index} (EPP): '${eppValue}' ← proveedor['6. EPP']='${proveedor['6. EPP']}', proveedor['EPP']='${proveedor['EPP']}'`, 'DEBUG');
+      
+      const estadisticasValue = proveedor['7. Estadísticas'] || proveedor['Estadísticas'] || '';
+      row.getCell(17).value = estadisticasValue;
+      sendLog(`[PROVEEDORES][DEBUG]   Q${8 + index} (Estadísticas): '${estadisticasValue}' ← proveedor['7. Estadísticas']='${proveedor['7. Estadísticas']}', proveedor['Estadísticas']='${proveedor['Estadísticas']}'`, 'DEBUG');
+      
+      const clausulaValue = proveedor['8. Cláusula SST'] || proveedor['Cláusula SST'] || '';
+      row.getCell(18).value = clausulaValue;
+      sendLog(`[PROVEEDORES][DEBUG]   R${8 + index} (Cláusula SST): '${clausulaValue}' ← proveedor['8. Cláusula SST']='${proveedor['8. Cláusula SST']}', proveedor['Cláusula SST']='${proveedor['Cláusula SST']}'`, 'DEBUG');
+      
+      const reporteValue = proveedor['9. Reporte'] || proveedor['Reporte'] || '';
+      row.getCell(19).value = reporteValue;
+      sendLog(`[PROVEEDORES][DEBUG]   S${8 + index} (Reporte): '${reporteValue}' ← proveedor['9. Reporte']='${proveedor['9. Reporte']}', proveedor['Reporte']='${proveedor['Reporte']}'`, 'DEBUG');
+      
+      const investigacionValue = proveedor['10. Investigación'] || proveedor['Investigación'] || '';
+      row.getCell(20).value = investigacionValue;
+      sendLog(`[PROVEEDORES][DEBUG]   T${8 + index} (Investigación): '${investigacionValue}' ← proveedor['10. Investigación']='${proveedor['10. Investigación']}', proveedor['Investigación']='${proveedor['Investigación']}'`, 'DEBUG');
+
+      // Aplicar bordes a la fila
+      for (let col = 1; col <= 20; col++) {
+        row.getCell(col).border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' }
+        };
+      }
+    });
+
+    sendLog(`[PROVEEDORES][DEBUG] === RESUMEN DE ESCRITURA ===`, 'DEBUG');
+    sendLog(`[PROVEEDORES][DEBUG] Total registros escritos: ${proveedoresData.length}`, 'DEBUG');
+    sendLog(`[PROVEEDORES][DEBUG] Última fila ocupada: ${8 + proveedoresData.length - 1}`, 'DEBUG');
+
+    // Ajustar ancho de columnas
+    worksheet.columns = [
+      { key: 'id', width: 8 },
+      { key: 'name', width: 30 },
+      { key: 'nit', width: 15 },
+      { key: 'type', width: 12 },
+      { key: 'object', width: 35 },
+      { key: 'date', width: 14 },
+      { key: 'score', width: 12 },
+      { key: 'status', width: 12 },
+      { key: 'observations', width: 30 },
+      { key: 'folder', width: 25 },
+      { width: 10 }, { width: 10 }, { width: 10 }, { width: 10 },
+      { width: 12 }, { width: 10 }, { width: 12 }, { width: 12 },
+      { width: 10 }, { width: 12 }
+    ];
+
+    // Guardar archivo
+    await workbook.xlsx.writeFile(filePath);
+
+    sendLog(`[PROVEEDORES][MAIN] Archivo guardado exitosamente`, 'INFO');
+    
+    // 📊 VERIFICACIÓN POST-ESCRITURA
+    sendLog(`[PROVEEDORES][DEBUG] === VERIFICACIÓN POST-ESCRITURA ===`, 'DEBUG');
+    const verifyWorkbook = new ExcelJS.Workbook();
+    await verifyWorkbook.xlsx.readFile(filePath);
+    const verifyWorksheet = verifyWorkbook.getWorksheet(1);
+    
+    for (let i = 8; i <= Math.min(8 + Math.min(3, proveedoresData.length), 8 + 3); i++) {
+      const row = verifyWorksheet.getRow(i);
+      sendLog(`[PROVEEDORES][DEBUG] [VERIFICACIÓN] Fila ${i}:`, 'DEBUG');
+      sendLog(`[PROVEEDORES][DEBUG]   A${i} (ID): ${row.getCell(1).value}`, 'DEBUG');
+      sendLog(`[PROVEEDORES][DEBUG]   B${i} (Razón Social): ${row.getCell(2).value}`, 'DEBUG');
+      sendLog(`[PROVEEDORES][DEBUG]   K${i} (ARL/SS): ${row.getCell(11).value}`, 'DEBUG');
+      sendLog(`[PROVEEDORES][DEBUG]   L${i} (Política SST): ${row.getCell(12).value}`, 'DEBUG');
+      sendLog(`[PROVEEDORES][DEBUG]   M${i} (IPERC): ${row.getCell(13).value}`, 'DEBUG');
+    }
+
+    sendLog(`[PROVEEDORES][MAIN] Datos de proveedores guardados exitosamente: ${proveedoresData.length} registros`, 'INFO');
+
+    return { success: true };
+  } catch (error) {
+    sendLog(`[PROVEEDORES][ERROR] Error guardando datos de proveedores: ${error.message}`, 'ERROR');
+    console.error('[PROVEEDORES][ERROR] Error stack:', error.stack);
+    return { success: false, error: error.message };
+  }
+});
+
+// ========================================================================
+// HANDLERS PARA GESTIÓN DE ARCHIVOS DE PROVEEDORES
+// ========================================================================
+
+/**
+ * Crea una carpeta para las evidencias de un proveedor
+ */
+ipcMain.handle('create-provider-folder', async (event, basePath, folderName) => {
+  const sendLog = (msg, level = 'INFO') => {
+    console.log(`[PROVEEDORES][${level}] ${msg}`);
+  };
+
+  try {
+    sendLog(`[MAIN] Creando carpeta para proveedor: ${folderName}`, 'INFO');
+    sendLog(`[MAIN] Ruta base: ${basePath}`, 'INFO');
+
+    // Normalizar ruta
+    const normalizedBase = basePath.replace(/\\/g, '/').replace(/\/+/g, '/');
+    const normalizedFolder = folderName.replace(/[^a-zA-Z0-9_\-]/g, '_');
+    
+    const folderPath = path.join(normalizedBase, normalizedFolder);
+
+    sendLog(`[MAIN] Ruta completa de la carpeta: ${folderPath}`, 'INFO');
+
+    // Verificar si la carpeta ya existe
+    if (fs.existsSync(folderPath)) {
+      sendLog(`[MAIN] La carpeta ya existe: ${folderPath}`, 'WARN');
+      return { success: true, path: folderPath, exists: true };
+    }
+
+    // Crear la carpeta recursivamente
+    await fsp.mkdir(folderPath, { recursive: true });
+
+    sendLog(`[MAIN] Carpeta creada exitosamente: ${folderPath}`, 'INFO');
+
+    return { success: true, path: folderPath, exists: false };
+  } catch (error) {
+    sendLog(`[ERROR] Error creando carpeta: ${error.message}`, 'ERROR');
+    console.error('[PROVEEDORES][ERROR] Error stack:', error.stack);
+    return { success: false, error: error.message };
+  }
+});
+
+/**
+ * Copia un archivo a la carpeta del proveedor (recibe datos en base64)
+ */
+ipcMain.handle('copy-file-to-provider-folder', async (event, base64Data, destFolderPath, fileName, mimeType) => {
+  const sendLog = (msg, level = 'INFO') => {
+    console.log(`[PROVEEDORES][${level}] ${msg}`);
+  };
+
+  try {
+    sendLog(`[MAIN] Copiando archivo: ${fileName}`, 'INFO');
+    sendLog(`[MAIN] Destino: ${destFolderPath}`, 'INFO');
+    sendLog(`[MAIN] Tipo MIME: ${mimeType || 'no especificado'}`, 'INFO');
+
+    // Normalizar rutas
+    const normalizedDest = destFolderPath.replace(/\\/g, '/').replace(/\/+/g, '/');
+    const normalizedFileName = fileName.replace(/[^a-zA-Z0-9._\-]/g, '_');
+
+    const destPath = path.join(normalizedDest, normalizedFileName);
+
+    sendLog(`[MAIN] Ruta completa de destino: ${destPath}`, 'INFO');
+
+    // Decodificar datos base64 a buffer
+    const fileBuffer = Buffer.from(base64Data, 'base64');
+
+    sendLog(`[MAIN] Tamaño del archivo: ${fileBuffer.length} bytes`, 'INFO');
+
+    // Escribir archivo en el destino
+    await fsp.writeFile(destPath, fileBuffer);
+
+    sendLog(`[MAIN] Archivo guardado exitosamente: ${destPath}`, 'INFO');
+
+    return { success: true, path: destPath };
+  } catch (error) {
+    sendLog(`[ERROR] Error guardando archivo: ${error.message}`, 'ERROR');
+    console.error('[PROVEEDORES][ERROR] Error stack:', error.stack);
+    return { success: false, error: error.message };
+  }
+});
+
+/**
+ * Lista los archivos en la carpeta de un proveedor
+ */
+ipcMain.handle('list-provider-files', async (event, folderPath) => {
+  const sendLog = (msg, level = 'INFO') => {
+    console.log(`[PROVEEDORES][${level}] ${msg}`);
+  };
+
+  try {
+    sendLog(`[MAIN] Listando archivos en: ${folderPath}`, 'INFO');
+
+    // Normalizar ruta
+    const normalizedPath = folderPath.replace(/\\/g, '/').replace(/\/+/g, '/');
+
+    // Verificar que la carpeta existe
+    if (!fs.existsSync(normalizedPath)) {
+      sendLog(`[WARN] La carpeta no existe: ${normalizedPath}`, 'WARN');
+      return { success: false, error: 'La carpeta no existe', files: [] };
+    }
+
+    // Leer contenido de la carpeta
+    const files = await fsp.readdir(normalizedPath);
+    
+    // Filtrar solo archivos (no directorios)
+    const fileDetails = [];
+    for (const file of files) {
+      const filePath = path.join(normalizedPath, file);
+      const stats = await fsp.stat(filePath);
+      if (stats.isFile()) {
+        fileDetails.push({
+          name: file,
+          size: stats.size,
+          modified: stats.mtime
+        });
+      }
+    }
+
+    sendLog(`[MAIN] Archivos encontrados: ${fileDetails.length}`, 'INFO');
+
+    return { success: true, files: fileDetails };
+  } catch (error) {
+    sendLog(`[ERROR] Error listando archivos: ${error.message}`, 'ERROR');
+    console.error('[PROVEEDORES][ERROR] Error stack:', error.stack);
+    return { success: false, error: error.message, files: [] };
   }
 });
 

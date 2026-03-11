@@ -75,7 +75,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   readExcelFile: (filePath) => ipcRenderer.invoke('read-excel-file', filePath),
+  saveProveedoresExcelData: (filePath, data) => ipcRenderer.invoke('save-proveedores-excel-data', filePath, data),
   processExcelData: (payload) => ipcRenderer.invoke('process-excel-data', payload),
+
+  // --- Gestión de Archivos de Proveedores (Evidencias) ---
+  createProviderFolder: (basePath, folderName) => ipcRenderer.invoke('create-provider-folder', basePath, folderName),
+  copyFileToProviderFolder: (sourcePath, destFolderPath, fileName) => ipcRenderer.invoke('copy-file-to-provider-folder', sourcePath, destFolderPath, fileName),
+  listProviderFiles: (folderPath) => ipcRenderer.invoke('list-provider-files', folderPath),
 
   // --- New Document Viewer ---
   getDocumentFolders: async (payload) => {
@@ -142,8 +148,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getCapacitacionesSheets: (filePath) => ipcRenderer.invoke('get-capacitaciones-sheets', filePath),
   initExcel: (data) => ipcRenderer.invoke('init-excel', data),
   updateCapacitacionesExcel: (data) => ipcRenderer.invoke('update-capacitaciones-excel', data),
-      duplicateCapacitacionesSheet: (args) => ipcRenderer.invoke('duplicate-capacitaciones-sheet', args),  updateExcelCell: (data) => ipcRenderer.invoke('update-excel-cell', data),
+  duplicateCapacitacionesSheet: (args) => ipcRenderer.invoke('duplicate-capacitaciones-sheet', args),
+  updateExcelCell: (data) => ipcRenderer.invoke('update-excel-cell', data),
   convertExcelToPdf: (filePath) => ipcRenderer.invoke('convertExcelToPdf', filePath),
+  auditExcelContent: (data) => ipcRenderer.invoke('audit-excel-content', data),
 
   // --- Presupuesto ---
   getPresupuestoFiles: (companyName) => ipcRenderer.invoke('getPresupuestoFiles', companyName),
