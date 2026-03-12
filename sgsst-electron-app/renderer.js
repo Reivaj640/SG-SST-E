@@ -449,48 +449,53 @@ let companyLogoPlaceholder;
 // Función para aplicar el tema globalmente
 async function applyGlobalTheme() {
   let savedTheme = 'system';
-  
+
   try {
     if (window.electronAPI && window.electronAPI.getThemePreference) {
       const result = await window.electronAPI.getThemePreference();
       savedTheme = result.theme || 'system';
+      console.log('[Theme] Preferencia cargada desde config.json:', savedTheme);
     } else {
       savedTheme = localStorage.getItem('kair-theme-preference') || 'system';
+      console.log('[Theme] Preferencia cargada desde localStorage:', savedTheme);
     }
   } catch (e) {
+    console.warn('[Theme] Error cargando preferencia, usando fallback:', e);
     savedTheme = localStorage.getItem('kair-theme-preference') || 'system';
   }
-  
-  let effectiveTheme = savedTheme;
-  
-  if (savedTheme === 'system') {
-    if (window.electronAPI && window.electronAPI.getSystemTheme) {
-      try {
-        const result = await window.electronAPI.getSystemTheme();
-        effectiveTheme = result.theme || 'light';
-      } catch (e) {
-        effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      }
-    } else if (window.matchMedia) {
-      effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-  }
 
-  if (effectiveTheme === 'dark') {
-    if (savedTheme === 'dark') {
-      // Tema Oscuro (Paleta Negro/Gris)
-      document.documentElement.setAttribute('data-theme', 'dark-legacy');
-    } else if (savedTheme === 'system') {
-      // Tema de Sistema (cuando el sistema es oscuro)
+  console.log('[Theme] Aplicando tema con preferencia:', savedTheme);
+
+  // Aplicar tema según la preferencia guardada (NO según el tema efectivo)
+  if (savedTheme === 'dark') {
+    // Tema Oscuro (Paleta Negro/Gris) - siempre usa dark-legacy
+    document.documentElement.setAttribute('data-theme', 'dark-legacy');
+    console.log('[Theme] Tema aplicado: dark-legacy');
+  } else if (savedTheme === 'system') {
+    // Tema Sistema - usa 'dark' o ninguno según el sistema
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (isDark) {
       document.documentElement.setAttribute('data-theme', 'dark');
+      console.log('[Theme] Tema aplicado: dark (system)');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+      console.log('[Theme] Tema aplicado: light (system)');
     }
   } else {
-    // Tema Claro
+    // Tema Claro - siempre sin atributo
     document.documentElement.removeAttribute('data-theme');
+    console.log('[Theme] Tema aplicado: light');
   }
-  
+
+  // Sincronizar localStorage con la preferencia
   localStorage.setItem('kair-theme-preference', savedTheme);
+
+  // Retornar el tema efectivo (para referencia)
+  const effectiveTheme = savedTheme === 'system' 
+    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+    : savedTheme;
   
+  console.log('[Theme] Tema efectivo:', effectiveTheme);
   return effectiveTheme;
 }
 

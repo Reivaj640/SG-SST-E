@@ -73,16 +73,20 @@ const ThemeManager = {
      */
     async init() {
         try {
+            // Prioridad: config.json > localStorage > default
             if (window.electronAPI && window.electronAPI.getThemePreference) {
                 const result = await window.electronAPI.getThemePreference();
                 this.currentTheme = result.theme || 'system';
+                console.log('[ThemeManager] Preferencia cargada desde config.json:', this.currentTheme);
             } else {
                 this.currentTheme = localStorage.getItem(this.THEME_KEY) || 'system';
+                console.log('[ThemeManager] Preferencia cargada desde localStorage:', this.currentTheme);
             }
         } catch (e) {
+            console.warn('[ThemeManager] Error cargando preferencia:', e);
             this.currentTheme = localStorage.getItem(this.THEME_KEY) || 'system';
         }
-        
+
         await this.applyTheme(this.currentTheme);
         this._setupSystemThemeListener();
         console.log('[ThemeManager] Initialized with theme:', this.currentTheme);
@@ -269,9 +273,10 @@ const ThemeManager = {
 
 window.ThemeManager = ThemeManager;
 
-document.addEventListener('DOMContentLoaded', () => {
-    ThemeManager.init();
-});
+// NO inicializar automáticamente - renderer.js se encarga de aplicar el tema al cargar
+// document.addEventListener('DOMContentLoaded', () => {
+//     ThemeManager.init();
+// });
 
 window.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'get-theme-request') {
