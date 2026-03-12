@@ -1679,94 +1679,305 @@ function showCompanyHomePage() {
   }
   // ✅ Pasar contentArea a hideCalendar
   hideCalendar(contentArea);
-  console.log(`Showing home page for company: ${currentCompany}`);
-  
+  console.log(`Showing dashboard for company: ${currentCompany}`);
+
   // Asegurar que el sidebar permanezca colapsado
   const sidebar = document.getElementById('sidebar');
   if (sidebar) {
     sidebar.classList.add('sidebar-collapsed');
   }
-  
+
   contentArea.innerHTML = '';
 
-  // Crear el contenedor principal del canvas
+  // Crear el contenedor principal del dashboard
   const mainCanvas = document.createElement('div');
   mainCanvas.className = 'main-canvas';
+  mainCanvas.style.cssText = 'width: 100%; height: 100%; overflow: hidden;';
 
-  // Contenido del home de la empresa
-  const companyHomeDiv = document.createElement('div');
-  companyHomeDiv.className = 'company-home-content';
+  // ==========================================
+  // DASHBOARD K+AIR - COMMAND CENTER
+  // ==========================================
+  
+  const dashboardContainer = document.createElement('div');
+  dashboardContainer.style.cssText = `
+    width: 100%;
+    height: 100%;
+    background: #f0f2f5;
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  `;
 
-  // Título con el nombre de la empresa
-  const title = document.createElement('h2');
-  title.textContent = `Bienvenido a ${currentCompany}`;
-  title.className = 'company-home-title';
-  companyHomeDiv.appendChild(title);
+  // --- HEADER ---
+  const header = document.createElement('header');
+  header.style.cssText = `
+    height: 70px;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 0 30px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: white;
+    flex-shrink: 0;
+    z-index: 10;
+  `;
 
-  // Sección de métricas clave (inspirada en pantalla.png)
-  const metricsSection = document.createElement('div');
-  metricsSection.className = 'metrics-section';
-  metricsSection.innerHTML = `
-    <div class="metrics-grid">
-      <div class="metric-card">
-        <div class="metric-icon-placeholder"></div>
-        <div class="metric-info">
-          <div class="metric-value">8</div>
-          <div class="metric-label">Módulos</div>
-        </div>
+  const headerLeft = document.createElement('div');
+  headerLeft.innerHTML = `
+    <h1 style="font-size: 20px; font-weight: 700; color: #1e293b; margin: 0;">${currentCompany}</h1>
+    <p style="font-size: 12px; color: #64748b; margin-top: 2px;">SG-SST · Riesgo ${currentCompanyData?.risk || 'N/A'} · ${currentCompanyData?.employees || 'N/A'} Colaboradores</p>
+  `;
+
+  const notifBtn = document.createElement('button');
+  notifBtn.style.cssText = `
+    width: 40px; height: 40px; border-radius: 50%; border: 1px solid #e2e8f0;
+    background: white; cursor: pointer; position: relative; display: flex;
+    align-items: center; justify-content: center; font-size: 16px; color: #64748b;
+    transition: all 0.2s;
+  `;
+  notifBtn.innerHTML = `
+    <i class="fas fa-bell"></i>
+    <span class="notif-badge" style="position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; background: #ef4444; color: white; border-radius: 50%; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center;">3</span>
+  `;
+  notifBtn.onmouseover = function() { this.style.background = '#174ea6'; this.style.color = 'white'; this.style.borderColor = '#174ea6'; };
+  notifBtn.onmouseout = function() { this.style.background = 'white'; this.style.color = '#64748b'; this.style.borderColor = '#e2e8f0'; };
+
+  header.appendChild(headerLeft);
+  const headerRight = document.createElement('div');
+  headerRight.style.cssText = 'display: flex; gap: 15px; align-items: center;';
+  headerRight.appendChild(notifBtn);
+  header.appendChild(headerRight);
+  dashboardContainer.appendChild(header);
+
+  // --- KPIs ---
+  const kpiRow = document.createElement('section');
+  kpiRow.style.cssText = `
+    padding: 20px 30px 10px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+    background: #f8fafc;
+  `;
+
+  const kpiCards = [
+    { class: 'success', icon: 'fa-shield-alt', value: '85%', label: 'Cumplimiento', color: '#10b981' },
+    { class: 'warning', icon: 'fa-hard-hat', value: '2', label: 'Accidentes (Mes)', color: '#f59e0b' },
+    { class: 'danger', icon: 'fa-calendar-times', value: '5', label: 'Documentos Vencidos', color: '#ef4444' },
+    { class: 'info', icon: 'fa-user-injured', value: '12', label: 'Casos PRIC Activos', color: '#174ea6' }
+  ];
+
+  kpiCards.forEach(kpi => {
+    const card = document.createElement('div');
+    card.style.cssText = `
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: relative;
+      overflow: hidden;
+    `;
+    card.innerHTML = `
+      <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: ${kpi.color};"></div>
+      <div style="width: 42px; height: 42px; border-radius: 8px; background: #f1f5f9; color: #64748b; display: flex; align-items: center; justify-content: center; font-size: 18px;">
+        <i class="fas ${kpi.icon}"></i>
       </div>
-      <div class="metric-card">
-        <div class="metric-icon-placeholder"></div>
-        <div class="metric-info">
-          <div class="metric-value">24</div>
-          <div class="metric-label">Submódulos</div>
-        </div>
+      <div>
+        <h3 style="font-size: 20px; font-weight: 700; color: #1e293b; margin-bottom: 2px;">${kpi.value}</h3>
+        <span style="font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">${kpi.label}</span>
       </div>
-      <div class="metric-card">
-        <div class="metric-icon-placeholder"></div>
-        <div class="metric-info">
-          <div class="metric-value">15</div>
-          <div class="metric-label">Documentos</div>
-        </div>
+    `;
+    kpiRow.appendChild(card);
+  });
+  dashboardContainer.appendChild(kpiRow);
+
+  // --- MAIN GRID ---
+  const mainGrid = document.createElement('div');
+  mainGrid.style.cssText = `
+    flex: 1;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 20px;
+    padding: 10px 30px 20px;
+    min-height: 0;
+  `;
+
+  // --- PANEL IZQUIERDO: MÓDULOS ---
+  const modulesPanel = document.createElement('aside');
+  modulesPanel.style.cssText = `
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  `;
+
+  const panelHeader = document.createElement('div');
+  panelHeader.style.cssText = `
+    padding: 15px; border-bottom: 1px solid #e2e8f0; font-size: 12px;
+    color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;
+    background: #f8fafc;
+  `;
+  panelHeader.textContent = 'Módulos del Sistema';
+  modulesPanel.appendChild(panelHeader);
+
+  const moduleList = document.createElement('div');
+  moduleList.style.cssText = 'flex: 1; overflow-y: auto; padding: 10px;';
+
+  const modulesData = [
+    { name: 'Gestión de la Salud', subtitle: 'Ausentismo, AT, EL', icon: 'fa-heartbeat', badge: '2 Pendientes', badgeClass: 'bg-red', active: true },
+    { name: 'Recursos', subtitle: 'Capacitación, Roles', icon: 'fa-users-cog', badge: '1 Próx.', badgeClass: 'bg-orange', active: false },
+    { name: 'Gestión Integral', subtitle: 'Política, Planes', icon: 'fa-file-contract', badge: 'OK', badgeClass: 'bg-green', active: false },
+    { name: 'Peligros', subtitle: 'IPERC, Controles', icon: 'fa-radiation-alt', badge: null, badgeClass: null, active: false },
+    { name: 'Amenazas', subtitle: 'Emergencias', icon: 'fa-biohazard', badge: null, badgeClass: null, active: false },
+    { name: 'Verificación', subtitle: 'Auditorías', icon: 'fa-check-double', badge: null, badgeClass: null, active: false },
+    { name: 'Mejoramiento', subtitle: 'Acciones Correctivas', icon: 'fa-chart-line', badge: null, badgeClass: null, active: false }
+  ];
+
+  modulesData.forEach(mod => {
+    const item = document.createElement('div');
+    item.style.cssText = `
+      display: flex; align-items: center; padding: 12px;
+      border-radius: 6px; margin-bottom: 5px; cursor: pointer;
+      border: 1px solid transparent; transition: all 0.2s;
+      background: ${mod.active ? '#eff6ff' : 'transparent'};
+      border-color: ${mod.active ? '#bfdbfe' : 'transparent'};
+    `;
+    item.onmouseover = function() { if (!mod.active) { this.style.background = '#f8fafc'; this.style.borderColor = '#e2e8f0'; } };
+    item.onmouseout = function() { if (!mod.active) { this.style.background = 'transparent'; this.style.borderColor = 'transparent'; } };
+    item.onclick = function() { showModuleContent(mod.name); };
+
+    item.innerHTML = `
+      <div style="width: 36px; height: 36px; border-radius: 6px; background: #f1f5f9; color: #174ea6; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-size: 14px;">
+        <i class="fas ${mod.icon}"></i>
       </div>
-      <div class="metric-card">
-        <div class="metric-icon-placeholder"></div>
-        <div class="metric-info">
-          <div class="metric-value">98%</div>
-          <div class="metric-label">Completado</div>
-        </div>
+      <div style="flex: 1;">
+        <h4 style="font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 1px;">${mod.name}</h4>
+        <span style="font-size: 11px; color: #94a3b8;">${mod.subtitle}</span>
       </div>
+      ${mod.badge ? `<span style="margin-left: auto; font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: 600; background: ${getBadgeColor(mod.badgeClass)}; color: ${getBadgeTextColor(mod.badgeClass)};">${mod.badge}</span>` : ''}
+    `;
+    moduleList.appendChild(item);
+  });
+
+  modulesPanel.appendChild(moduleList);
+  mainGrid.appendChild(modulesPanel);
+
+  // --- PANEL DERECHO: TAREAS ---
+  const tasksPanel = document.createElement('main');
+  tasksPanel.style.cssText = `
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+  `;
+
+  const tasksHeader = document.createElement('div');
+  tasksHeader.style.cssText = `
+    padding: 15px 20px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; justify-content: space-between; align-items: center;
+  `;
+  tasksHeader.innerHTML = `
+    <h2 style="font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; margin: 0;">
+      <i class="fas fa-tasks" style="color: #174ea6;"></i> Pendientes y Tareas
+    </h2>
+    <div style="display: flex; gap: 5px;">
+      <button class="filter-btn active" style="padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; background: #174ea6; color: white; border: none; cursor: pointer;">Todos</button>
+      <button class="filter-btn" style="padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; background: transparent; border: none; cursor: pointer; color: #64748b;">Críticos</button>
+      <button class="filter-btn" style="padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; background: transparent; border: none; cursor: pointer; color: #64748b;">Hoy</button>
     </div>
   `;
-  companyHomeDiv.appendChild(metricsSection);
+  tasksPanel.appendChild(tasksHeader);
 
-  // Mensaje de bienvenida
-  const welcomeText = document.createElement('p');
-  welcomeText.textContent = `Estás trabajando con los documentos de la empresa ${currentCompany}. Selecciona un módulo del menú lateral para comenzar a gestionar los aspectos del Sistema de Gestión de Seguridad y Salud en el Trabajo.`;
-  welcomeText.className = 'company-home-text';
-  companyHomeDiv.appendChild(welcomeText);
+  const tasksList = document.createElement('div');
+  tasksList.style.cssText = 'flex: 1; overflow-y: auto; padding: 15px 20px;';
 
-  // Información de módulos disponibles
-  const modulesInfo = document.createElement('div');
-  modulesInfo.className = 'modules-info';
-  modulesInfo.innerHTML = `
-    <h3>Módulos Disponibles</h3>
-    <p>Puedes acceder a los siguientes módulos principales:</p>
-    <ul>
-      <li><strong>Recursos</strong>: Gestión de recursos humanos y materiales.</li>
-      <li><strong>Gestión Integral</strong>: Políticas, objetivos y planificación general.</li>
-      <li><strong>Gestión de la Salud</strong>: Programas de medicina, seguridad y salud ocupacional.</li>
-      <li><strong>Gestión de Peligros y Riesgos</strong>: Identificación y control de peligros.</li>
-      <li><strong>Gestión de Amenazas</strong>: Planes de emergencia y respuesta a desastres.</li>
-      <li><strong>Verificación</strong>: Auditorías y revisiones del sistema.</li>
-      <li><strong>Mejoramiento</strong>: Acciones correctivas y planes de mejora.</li>
-    </ul>
-  `;
-  companyHomeDiv.appendChild(modulesInfo);
+  const tasksData = [
+    { class: 'critical', tag: 'URGENTE', tagClass: 'red', time: 'Vencido hace 2 días', title: 'Investigación de Accidente AT-001', desc: 'Plazo legal vencido. Informe pendiente de radicación ante ARL.' },
+    { class: 'warning', tag: 'PRÓXIMO', tagClass: 'orange', time: 'Vence mañana', title: 'Seguimiento PRIC - María Gómez', desc: 'Evaluación de reincorporación pendiente. Caso Incapacidad >= 10 días.' },
+    { class: '', tag: 'CAPACITACIÓN', tagClass: 'blue', time: '', title: 'Programar capacitación COPASST', desc: 'Sesión trimestral pendiente según cronograma anual.' },
+    { class: 'warning', tag: 'VENCIDO', tagClass: 'gray', time: '', title: 'Entrega de EPP - Área de Producción', desc: 'Registro de entrega de botas y gafas pendiente.' },
+    { class: '', tag: 'RECORDATORIO', tagClass: 'gray', time: '', title: 'Simulacro de Emergencia', desc: 'Próximo simulacro programado para el 20 de marzo.' }
+  ];
 
-  mainCanvas.appendChild(companyHomeDiv);
+  tasksData.forEach(task => {
+    const card = document.createElement('div');
+    card.style.cssText = `
+      background: ${task.class ? '#f8fafc' : '#f8fafc'};
+      border-radius: 6px;
+      margin-bottom: 10px;
+      border-left: 4px solid ${getTaskBorderColor(task.class)};
+      padding: 12px 15px;
+      display: flex;
+      align-items: center;
+      transition: transform 0.1s, box-shadow 0.1s;
+    `;
+    card.onmouseover = function() { this.style.transform = 'translateY(-1px)'; this.style.boxShadow = '0 4px 6px rgba(0,0,0,0.05)'; this.style.background = 'white'; };
+    card.onmouseout = function() { this.style.transform = 'translateY(0)'; this.style.boxShadow = 'none'; this.style.background = '#f8fafc'; };
+
+    card.innerHTML = `
+      <div style="flex: 1;">
+        <div style="display: flex; gap: 8px; margin-bottom: 4px;">
+          <span class="tag" style="font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; background: ${getTagColor(task.tagClass)}; color: ${getTagTextColor(task.tagClass)};">${task.tag}</span>
+          ${task.time ? `<span style="font-size: 10px; color: #94a3b8;">${task.time}</span>` : ''}
+        </div>
+        <div style="font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 2px;">${task.title}</div>
+        <div style="font-size: 12px; color: #64748b; line-height: 1.3;">${task.desc}</div>
+      </div>
+      <button style="width: 30px; height: 30px; border-radius: 50%; border: none; background: transparent; color: #94a3b8; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#174ea6'; this.style.color='white'" onmouseout="this.style.background='transparent'; this.style.color='#94a3b8'">
+        <i class="fas fa-arrow-right"></i>
+      </button>
+    `;
+    tasksList.appendChild(card);
+  });
+
+  tasksPanel.appendChild(tasksList);
+  mainGrid.appendChild(tasksPanel);
+  dashboardContainer.appendChild(mainGrid);
+  mainCanvas.appendChild(dashboardContainer);
   contentArea.appendChild(mainCanvas);
+
+  // Funciones auxiliares para colores
+  function getBadgeColor(cls) {
+    if (cls === 'bg-red') return '#fee2e2';
+    if (cls === 'bg-orange') return '#ffedd5';
+    if (cls === 'bg-green') return '#dcfce7';
+    return '#e0e7ff';
+  }
+  function getBadgeTextColor(cls) {
+    if (cls === 'bg-red') return '#b91c1c';
+    if (cls === 'bg-orange') return '#c2410c';
+    if (cls === 'bg-green') return '#166534';
+    return '#3730a3';
+  }
+  function getTaskBorderColor(cls) {
+    if (cls === 'critical') return '#ef4444';
+    if (cls === 'warning') return '#f59e0b';
+    return '#cbd5e1';
+  }
+  function getTagColor(cls) {
+    if (cls === 'red') return '#fee2e2';
+    if (cls === 'orange') return '#ffedd5';
+    if (cls === 'blue') return '#e0e7ff';
+    return '#f1f5f9';
+  }
+  function getTagTextColor(cls) {
+    if (cls === 'red') return '#b91c1c';
+    if (cls === 'orange') return '#c2410c';
+    if (cls === 'blue') return '#3730a3';
+    return '#64748b';
+  }
 }
+
+// Datos de la empresa actual (se actualiza al seleccionar empresa)
+let currentCompanyData = null;
+
 
 function showModuleContent(moduleName) {
   console.log(`Showing content for module: ${moduleName}`);
