@@ -785,6 +785,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                   apiCallFunction = window.electronAPI.findSubmodulePath;
                   apiCallArgs = [payload.company, payload.module, payload.submodule];
                   break;
+              case 'read-directory-request':
+                  apiCallFunction = window.electronAPI.readDirectory;
+                  apiCallArgs = [payload.path];
+                  break;
               case 'read-excel-file-request':
                   apiCallFunction = window.electronAPI.readExcelFile;
                   apiCallArgs = [payload.filePath];
@@ -2557,17 +2561,17 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
       }
 
     } else if (submoduleName === "1.2.1 Programa de capacitación Anual") {
-      if (window.CapacitacionesViewer) {
-        const capacitacionesViewer = new window.CapacitacionesViewer(
+      if (window.CapacitacionesPortalComponent) {
+        const capacitacionesPortal = new window.CapacitacionesPortalComponent(
           submoduleContentDiv,
           currentCompany,
           moduleName,
           submoduleName,
-          safeBackToModuleCallback // <-- USAR EL CALLBACK SEGURO
+          safeBackToModuleCallback
         );
-        capacitacionesViewer.render();
+        capacitacionesPortal.render();
       } else {
-        console.error('❌ CapacitacionesViewer no encontrado');
+        console.error('❌ CapacitacionesPortalComponent no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 

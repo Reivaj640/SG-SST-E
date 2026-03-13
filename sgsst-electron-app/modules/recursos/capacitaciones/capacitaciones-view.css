@@ -468,63 +468,244 @@
 .k-badge-warning { background-color: var(--k-warning-light); color: #856404; }
 .k-badge-danger { background-color: var(--k-danger-light); color: var(--k-danger); }
 
-/* Modales */
+/* =========================================
+   15. MODAL MODERNIZADO (Diseño K+AIR 2025) - CORREGIDO
+   ========================================= */
+
+/* Overlay con backdrop blur y animación - SIEMPRE CENTRADO */
 .k-modal-overlay {
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.5);
-    z-index: 1050;
-    display: none;
-    justify-content: center;
-    align-items: center;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    min-width: 100vw !important;
+    min-height: 100vh !important;
+    background: rgba(50, 56, 70, 0.5) !important;
+    backdrop-filter: blur(2px) !important;
+    -webkit-backdrop-filter: blur(2px) !important;
+    display: none !important;
+    justify-content: center !important;
+    align-items: center !important;
+    z-index: 1050 !important;
 }
 
+/* Cuando está abierto - USAR FLEX centrado */
 .k-modal-overlay.open {
-    display: flex;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* Contenedor del modal - CENTRADO PERFECTO EN LA VENTANA */
+.k-modal-overlay.open .k-modal {
+    margin: 60px auto !important;
+    position: relative !important;
+    max-height: calc(100vh - 120px) !important;
+    /* Sin transform aquí para evitar conflicto */
 }
 
 .k-modal {
-    background: white;
-    border-radius: var(--k-radius-lg);
-    width: 100%;
-    max-width: 600px;
-    box-shadow: var(--k-shadow-md);
-    animation: slideUp 0.3s ease;
-    max-height: 90vh;
-    display: flex;
-    flex-direction: column;
+    background: #ffffff !important;
+    width: 90% !important;
+    max-width: 650px !important;
+    border-radius: 12px !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    border: none !important;
+    position: relative !important;
+    /* Centrado absoluto dentro del flex container */
+    margin-left: auto !important;
+    margin-right: auto !important;
 }
 
+/* Header modernizado - Fondo gris muy claro */
 .k-modal-header {
-    padding: 1.25rem 1.5rem;
-    border-bottom: 1px solid var(--k-border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background-color: #fcfcfc;
-    border-radius: var(--k-radius-lg) var(--k-radius-lg) 0 0;
+    padding: 20px 24px !important;
+    background: #f8f9fa !important;
+    border-bottom: 1px solid #e9ecef !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    flex-shrink: 0 !important;
+    width: 100% !important;
 }
 
 .k-modal-title {
-    font-size: 1.15rem;
-    font-weight: 600;
-    color: var(--k-primary);
-    margin: 0;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    color: #1a1a2e !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    margin: 0 !important;
+    line-height: 1 !important;
 }
 
+.k-modal-title i,
+.k-modal-title .bi {
+    color: #174ea6 !important;
+    font-size: 18px !important;
+}
+
+/* Botón de cerrar (X) - Estilo minimalista en la esquina */
+.k-btn-icon {
+    width: 32px !important;
+    height: 32px !important;
+    border: none !important;
+    background: transparent !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #6c757d !important;
+    transition: all 0.2s ease !important;
+    padding: 0 !important;
+    font-size: 14px !important;
+    flex-shrink: 0 !important;
+    margin-left: auto !important;
+}
+
+.k-btn-icon:hover {
+    background: #e9ecef !important;
+    color: #dc3545 !important;
+}
+
+/* Body del modal */
 .k-modal-body {
-    padding: 1.5rem;
-    overflow-y: auto;
+    padding: 24px !important;
+    overflow-y: auto !important;
+    flex: 1 !important;
+    background: #ffffff !important;
+    max-height: calc(70vh - 120px) !important;
 }
 
+/* Grid para formulario en 2 columnas */
+.k-form-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 20px !important;
+    margin-bottom: 20px !important;
+}
+
+.k-form-grid:last-child {
+    margin-bottom: 0 !important;
+}
+
+/* Labels - Estilo uppercase gris */
+.k-form-label {
+    display: block !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    color: #6c757d !important;
+    text-transform: uppercase !important;
+    margin-bottom: 8px !important;
+    letter-spacing: 0.5px !important;
+    line-height: 1.2 !important;
+}
+
+/* Inputs y Selects */
+.k-form-control {
+    width: 100% !important;
+    padding: 10px 14px !important;
+    border: 1px solid #dee2e6 !important;
+    border-radius: 8px !important;
+    font-size: 14px !important;
+    color: #212529 !important;
+    background: #ffffff !important;
+    transition: all 0.2s ease !important;
+    font-family: var(--k-font-family) !important;
+    box-sizing: border-box !important;
+}
+
+.k-form-control:focus {
+    outline: none !important;
+    border-color: #174ea6 !important;
+    box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.1) !important;
+}
+
+.k-form-control::placeholder {
+    color: #adb5bd !important;
+}
+
+/* Footer del modal - Fondo gris claro */
 .k-modal-footer {
-    padding: 1rem 1.5rem;
-    border-top: 1px solid var(--k-border);
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.75rem;
-    background-color: #fcfcfc;
-    border-radius: 0 0 var(--k-radius-lg) var(--k-radius-lg);
+    padding: 16px 24px !important;
+    background: #f8f9fa !important;
+    border-top: 1px solid #e9ecef !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 10px !important;
+    flex-shrink: 0 !important;
+    width: 100% !important;
+}
+
+/* Botones modernizados */
+.k-btn {
+    padding: 10px 20px !important;
+    border-radius: 8px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    border: none !important;
+    transition: all 0.2s ease !important;
+    font-family: var(--k-font-family) !important;
+    white-space: nowrap !important;
+}
+
+/* Botón Cancelar - Blanco con borde */
+.k-btn-outline {
+    background: #ffffff !important;
+    border: 1px solid #dee2e6 !important;
+    color: #495057 !important;
+}
+
+.k-btn-outline:hover {
+    background: #f8f9fa !important;
+    border-color: #adb5bd !important;
+    color: #212529 !important;
+}
+
+/* Botón Actualizar/Guardar - Azul sólido */
+.k-btn-primary {
+    background: #174ea6 !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 4px rgba(23, 78, 166, 0.3) !important;
+}
+
+.k-btn-primary:hover {
+    background: #185abd !important;
+    box-shadow: 0 4px 8px rgba(23, 78, 166, 0.4) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* Responsive para móvil */
+@media (max-width: 480px) {
+    .k-form-grid {
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+    }
+    
+    .k-modal {
+        width: 95% !important;
+        max-width: none !important;
+    }
+    
+    .k-modal-header,
+    .k-modal-body,
+    .k-modal-footer {
+        padding-left: 16px !important;
+        padding-right: 16px !important;
+    }
 }
 
 /* Notificaciones (Toast) */

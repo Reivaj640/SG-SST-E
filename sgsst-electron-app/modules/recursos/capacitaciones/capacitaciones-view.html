@@ -207,120 +207,159 @@
     </main>
 </div>
 
-<!-- MODAL: CREAR -->
+<!-- ======================== -->
+<!-- MODAL: CREAR CAPACITACIÓN (Diseño Modernizado) -->
+<!-- ======================== -->
 <div class="k-modal-overlay" id="addTrainingModal">
     <div class="k-modal">
+        
+        <!-- HEADER -->
         <div class="k-modal-header">
-            <h3 class="k-modal-title" id="modalTitle">Nueva Capacitación</h3>
-            <button class="k-btn k-btn-outline k-btn-icon btn-close-modal">
+            <h3 class="k-modal-title" id="modalTitle">
+                <i class="bi bi-plus-circle"></i>
+                Nueva Capacitación
+            </h3>
+            <button class="k-btn k-btn-icon btn-close-modal">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
+
+        <!-- BODY -->
         <div class="k-modal-body">
             <form id="trainingForm">
                 <input type="hidden" id="edit-id">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+
+                <!-- Fila 1 -->
+                <div class="k-form-grid">
                     <div>
-                        <label class="form-label">Nombre *</label>
-                        <input type="text" id="trainingName" class="form-control" placeholder="Ej: Uso de EPP" required>
+                        <label class="k-form-label">Nombre *</label>
+                        <input type="text" id="trainingName" class="k-form-control" placeholder="Ej: Uso de EPP" required>
                     </div>
                     <div>
-                        <label class="form-label">Tipo *</label>
-                        <select id="trainingType" class="form-control">
+                        <label class="k-form-label">Tipo *</label>
+                        <select id="trainingType" class="k-form-control">
                             <option value="sst">Seguridad (SST)</option>
                             <option value="pyp">Medicina Preventiva (PYP)</option>
                         </select>
                     </div>
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+
+                <!-- Fila 2 -->
+                <div class="k-form-grid">
                     <div>
-                        <label class="form-label">Fecha Programada *</label>
-                        <input type="date" id="trainingDate" class="form-control" required>
+                        <label class="k-form-label">Fecha Programada *</label>
+                        <input type="date" id="trainingDate" class="k-form-control" required>
                     </div>
                     <div>
-                        <label class="form-label">Duración (Horas)</label>
-                        <input type="number" id="trainingDuration" class="form-control" value="2" min="1">
+                        <label class="k-form-label">Duración (Horas)</label>
+                        <input type="number" id="trainingDuration" class="k-form-control" value="2" min="1">
                     </div>
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+
+                <!-- Fila 3 -->
+                <div class="k-form-grid">
                     <div>
-                        <label class="form-label">Instructor</label>
-                        <select id="trainingInstructor" class="form-control">
+                        <label class="k-form-label">Instructor</label>
+                        <select id="trainingInstructor" class="k-form-control">
                             <option value="Técnico">Técnico</option>
                             <option value="ARL">ARL</option>
                             <option value="Olga Pinto">ARL - Olga Pinto</option>
                         </select>
                     </div>
                     <div>
-                        <label class="form-label">Participantes</label>
-                        <input type="number" id="trainingParticipants" class="form-control" value="0" min="0">
+                        <label class="k-form-label">Participantes</label>
+                        <input type="number" id="trainingParticipants" class="k-form-control" value="0" min="0">
                     </div>
                 </div>
             </form>
         </div>
+
+        <!-- FOOTER -->
         <div class="k-modal-footer">
-            <button class="k-btn k-btn-outline btn-close-modal">Cancelar</button>
-            <button class="k-btn k-btn-primary" id="btn-save-training">Guardar</button>
+            <button type="button" class="k-btn k-btn-outline btn-close-modal">Cancelar</button>
+            <button type="button" class="k-btn k-btn-primary" id="btn-save-training">
+                <i class="bi bi-check-lg"></i> Guardar
+            </button>
         </div>
+
     </div>
 </div>
 
-<!-- MODAL: EDITAR -->
+<!-- ======================== -->
+<!-- MODAL: EDITAR CAPACITACIÓN (Diseño Modernizado) -->
+<!-- ======================== -->
 <div class="k-modal-overlay" id="editTrainingModal">
     <div class="k-modal">
+        
+        <!-- HEADER -->
         <div class="k-modal-header">
-            <h3 class="k-modal-title">Editar Capacitación</h3>
-            <button class="k-btn k-btn-outline k-btn-icon btn-close-modal">
+            <h3 class="k-modal-title">
+                <i class="bi bi-pencil-square"></i>
+                Editar Capacitación
+            </h3>
+            <button class="k-btn k-btn-icon btn-close-modal">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
+
+        <!-- BODY -->
         <div class="k-modal-body">
             <form id="editTrainingForm">
-                <!-- Se mantiene el ID del elemento original para compatibilidad con la lógica -->
-                <input type="hidden" id="editTrainingName" data-id=""> 
-                
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <!-- Hidden ID (Lógica original - compatibilidad) -->
+                <input type="hidden" id="editTrainingName" data-id="">
+
+                <!-- Fila 1 -->
+                <div class="k-form-grid">
                     <div>
-                        <label class="form-label">Nombre *</label>
-                        <input type="text" id="editTrainingNameInput" class="form-control" placeholder="Ej: Uso de EPP" required>
+                        <label class="k-form-label">Nombre *</label>
+                        <input type="text" id="editTrainingNameInput" class="k-form-control" placeholder="Ej: Uso de EPP" required>
                     </div>
                     <div>
-                        <label class="form-label">Tipo *</label>
-                        <select id="editTrainingType" class="form-control">
+                        <label class="k-form-label">Tipo *</label>
+                        <select id="editTrainingType" class="k-form-control">
                             <option value="sst">Seguridad (SST)</option>
                             <option value="pyp">Medicina Preventiva (PYP)</option>
                         </select>
                     </div>
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+
+                <!-- Fila 2 -->
+                <div class="k-form-grid">
                     <div>
-                        <label class="form-label">Fecha Programada *</label>
-                        <input type="date" id="editTrainingDate" class="form-control" required>
+                        <label class="k-form-label">Fecha Programada *</label>
+                        <input type="date" id="editTrainingDate" class="k-form-control" required>
                     </div>
                     <div>
-                        <label class="form-label">Duración (Horas)</label>
-                        <input type="number" id="editTrainingDuration" class="form-control" value="2" min="1">
+                        <label class="k-form-label">Duración (Horas)</label>
+                        <input type="number" id="editTrainingDuration" class="k-form-control" value="2" min="1">
                     </div>
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+
+                <!-- Fila 3 -->
+                <div class="k-form-grid">
                     <div>
-                        <label class="form-label">Instructor</label>
-                        <select id="editTrainingInstructor" class="form-control">
+                        <label class="k-form-label">Instructor</label>
+                        <select id="editTrainingInstructor" class="k-form-control">
                             <option value="Técnico">Técnico</option>
                             <option value="ARL">ARL</option>
                             <option value="Olga Pinto">ARL - Olga Pinto</option>
                         </select>
                     </div>
                     <div>
-                        <label class="form-label">Participantes</label>
-                        <input type="number" id="editTrainingParticipants" class="form-control" value="0" min="0">
+                        <label class="k-form-label">Participantes</label>
+                        <input type="number" id="editTrainingParticipants" class="k-form-control" value="0" min="0">
                     </div>
                 </div>
             </form>
         </div>
+
+        <!-- FOOTER -->
         <div class="k-modal-footer">
-            <button class="k-btn k-btn-outline btn-close-modal">Cancelar</button>
-            <button class="k-btn k-btn-primary" id="btn-update-training">Actualizar</button>
+            <button type="button" class="k-btn k-btn-outline btn-close-modal">Cancelar</button>
+            <button type="button" class="k-btn k-btn-primary" id="btn-update-training">
+                <i class="bi bi-check-lg"></i> Actualizar
+            </button>
         </div>
+
     </div>
 </div>
