@@ -789,6 +789,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                   apiCallFunction = window.electronAPI.readDirectory;
                   apiCallArgs = [payload.path];
                   break;
+              case 'get-capacitaciones-sheets-request':
+                  apiCallFunction = window.electronAPI.getCapacitacionesSheets;
+                  apiCallArgs = [payload.filePath];
+                  break;
+              case 'duplicate-capacitaciones-sheet-request':
+                  apiCallFunction = window.electronAPI.duplicateCapacitacionesSheet;
+                  apiCallArgs = [payload];
+                  break;
               case 'read-excel-file-request':
                   apiCallFunction = window.electronAPI.readExcelFile;
                   apiCallArgs = [payload.filePath];

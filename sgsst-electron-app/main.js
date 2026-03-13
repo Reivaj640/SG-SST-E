@@ -1570,6 +1570,17 @@ ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacita
   // --- Handler para duplicar hoja de capacitaciones (Nuevo Periodo) ---
   ipcMain.handle('duplicate-capacitaciones-sheet', async (event, { filePath, currentSheetName, newYear }) => {
     console.log(`[MAIN] Duplicando hoja de capacitaciones. Archivo: ${filePath}, Origen: ${currentSheetName}, Nuevo Año: ${newYear}`);
+    
+    // Verificar extensión del archivo
+    const fileExt = require('path').extname(filePath).toLowerCase();
+    if (fileExt !== '.xlsx') {
+        console.error(`[MAIN] Error: Formato de archivo no soportado. Solo se permiten archivos .xlsx. Archivo actual: ${filePath}`);
+        return { 
+            success: false, 
+            error: `Formato de archivo no soportado. La función solo trabaja con archivos .xlsx. Archivo actual: ${filePath}. Por favor convierte el archivo a formato .xlsx`
+        };
+    }
+    
     try {
       // Verificar que el archivo exista
       try {
@@ -1581,9 +1592,26 @@ ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacita
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.readFile(filePath);
 
-      const sourceSheet = workbook.getWorksheet(currentSheetName);
+      // Debug: Mostrar información del workbook
+      console.log(`[MAIN] Workbook cargado. Total de hojas: ${workbook.worksheets.length}`);
+      console.log(`[MAIN] Hojas: ${workbook.worksheets.map(ws => ws.name).join(', ')}`);
+
+      // Búsqueda flexible de la hoja origen (case-insensitive y trim)
+      let sourceSheet = workbook.getWorksheet(currentSheetName);
+
+      // Si no encuentra exacta, buscar de forma flexible
       if (!sourceSheet) {
-        return { success: false, error: `No se encontró la hoja origen: ${currentSheetName}` };
+          const normalizedSearchName = currentSheetName.trim().toLowerCase();
+          sourceSheet = workbook.worksheets.find(ws =>
+              ws.name.trim().toLowerCase() === normalizedSearchName
+          );
+      }
+
+      if (!sourceSheet) {
+          // Listar hojas disponibles para debug
+          const availableSheets = workbook.worksheets.map(ws => ws.name).join(', ');
+          console.error(`[MAIN] Hoja no encontrada. Hojas disponibles: ${availableSheets}`);
+          return { success: false, error: `No se encontró la hoja origen: ${currentSheetName}. Hojas disponibles: ${availableSheets}` };
       }
 
       // Determinar nombre de la nueva hoja

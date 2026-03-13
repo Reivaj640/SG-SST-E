@@ -130,34 +130,54 @@ async function cloneCronograma() {
         const sourcePath = `${submodulePath}/${cronogramaFileName}`;
         console.log('[cap-home] Archivo fuente:', sourcePath);
 
-        // Leer el archivo fuente para verificar que existe
-        const readResult = await callParentAPI('read-excel-file', {
+        // Primero obtener las hojas disponibles
+        const sheetsResult = await callParentAPI('get-capacitaciones-sheets', {
             filePath: sourcePath
         });
 
-        if (!readResult.success) {
+        if (!sheetsResult.success) {
             hideLoading();
-            alert('Error al leer el archivo fuente: ' + (readResult.error || 'Error desconocido'));
+            alert('Error al leer las hojas del archivo: ' + (sheetsResult.error || 'Error desconocido'));
             return;
         }
 
-        // Crear nuevo nombre de archivo con el siguiente año
-        const newYear = parseInt(activeYear) + 1;
-        console.log('[cap-home] Clonando archivo para el año:', newYear);
+        const availableSheets = sheetsResult.sheets || [];
+        console.log('[cap-home] Hojas disponibles:', availableSheets);
 
-        // Usar la función duplicate-budget-file para clonar el archivo
-        const duplicateResult = await callParentAPI('duplicate-budget-file', {
-            currentFilePath: sourcePath,
+        // Crear nuevo año
+        const newYear = parseInt(activeYear) + 1;
+        console.log('[cap-home] Clonando hoja para el año:', newYear);
+
+        // Buscar la hoja actual que coincida con el año activo
+        // Patrones posibles: "Matriz Cap. 2025", "Matriz Cap 2025", "2025", etc.
+        let currentSheetName = availableSheets.find(sheet => 
+            sheet.includes('Matriz Cap') && sheet.includes(activeYear.toString())
+        ) || availableSheets.find(sheet => 
+            sheet.includes(activeYear.toString())
+        );
+
+        if (!currentSheetName) {
+            hideLoading();
+            alert(`No se encontró una hoja para el año ${activeYear}.\n\nHojas disponibles: ${availableSheets.join(', ')}`);
+            return;
+        }
+
+        console.log('[cap-home] Hoja origen encontrada:', currentSheetName);
+
+        // Usar la función duplicate-capacitaciones-sheet para clonar la hoja
+        const duplicateResult = await callParentAPI('duplicate-capacitaciones-sheet', {
+            filePath: sourcePath,
+            currentSheetName: currentSheetName,
             newYear: newYear.toString()
         });
 
         hideLoading();
 
         if (duplicateResult.success) {
-            alert(`✅ Cronograma clonado exitosamente para el año ${newYear}.\n\nArchivo creado: ${duplicateResult.newFileName}`);
+            alert(`✅ Hoja clonada exitosamente para el año ${newYear}.\n\nNueva hoja: ${duplicateResult.newSheetName || 'Matriz Cap. ' + newYear}`);
             loadActiveYear();
         } else {
-            alert('Error al crear el nuevo archivo: ' + (duplicateResult.error || 'Error desconocido'));
+            alert('Error al clonar la hoja: ' + (duplicateResult.error || 'Error desconocido'));
         }
 
     } catch (error) {
