@@ -1,12 +1,19 @@
 # convert_docx_to_pdf.py - Script para convertir archivos DOC y DOCX a PDF
+# Usa automatización COM de Word en modo invisible para evitar que el documento se abra visiblemente
+
 import sys
 import json
 import os
 from pathlib import Path
 import tempfile
-from contextlib import redirect_stderr
+import time
+
+def send_log(message):
+    """Función auxiliar para enviar logs a stderr"""
+    print(f"[CONVERT_DOCX] {message}", file=sys.stderr)
 
 def main(doc_path_str, output_path=None):
+    word = None
     try:
         # Usar rutas absolutas para mayor compatibilidad con COM
         doc_path = Path(doc_path_str).resolve()
@@ -26,45 +33,94 @@ def main(doc_path_str, output_path=None):
             temp_dir = Path(tempfile.gettempdir())
             pdf_path = (temp_dir / f"{doc_path.stem}_{os.urandom(4).hex()}.pdf").resolve()
 
-        # 3. Realizar la conversión según el tipo de archivo
+        send_log(f"Iniciando conversión: {doc_path}")
+        send_log(f"Archivo de salida: {pdf_path}")
+
+        # 3. Importar win32com para automatización COM
+        try:
+            import win32com.client
+        except ImportError:
+            raise RuntimeError("La librería 'pywin32' es necesaria. Ejecute: pip install pywin32")
+
+        # 4. Iniciar Word en modo INVISIBLE
+        send_log("Iniciando Word.Application en modo invisible...")
+        word = win32com.client.Dispatch("Word.Application")
+        word.Visible = False  # CRUCIAL: Word no debe ser visible
+        word.ScreenUpdating = False  # Deshabilitar actualizaciones de pantalla
+        word.DisplayAlerts = False  # No mostrar alertas
         
-        # Para .docx, usamos la librería directa (método rápido)
-        if file_suffix == '.docx':
-            from docx2pdf import convert
-            # Suprimir la barra de progreso que imprime la librería
-            with open(os.devnull, 'w') as f, redirect_stderr(f):
-                convert(str(doc_path), str(pdf_path))
-        
-        # Para .doc, usamos automatización COM con MS Word (requiere Word instalado)
-        elif file_suffix == '.doc':
-            word = None
+        # 5. Abrir documento en modo solo lectura
+        send_log(f"Abriendo documento: {doc_path}")
+        doc = None
+        try:
+            # Parámetros para abrir en modo seguro y sin bloquear
+            doc = word.Documents.Open(
+                str(doc_path),
+                ConfirmConversions=False,
+                ReadOnly=True,           # Solo lectura
+                AddToRecentFiles=False,  # No agregar a recientes
+                Revert=False,
+                Visible=False            # No mostrar el documento
+            )
+            send_log("Documento abierto exitosamente")
+            
+            # Pequeña pausa para asegurar que el documento se cargó completamente
+            time.sleep(0.2)
+            
+            # 6. Guardar como PDF (17 = wdFormatPDF)
+            send_log(f"Convirtiendo a PDF: {pdf_path}")
+            
+            # Usar SaveAs2 si está disponible (Word 2010+), sino usar SaveAs
             try:
-                import win32com.client
-                word = win32com.client.Dispatch("Word.Application")
-                word.Visible = False
-                doc = word.Documents.Open(str(doc_path))
-                # El valor 17 corresponde al formato wdFormatPDF de Word
+                doc.SaveAs2(str(pdf_path), FileFormat=17)
+            except AttributeError:
+                # Fallback para versiones antiguas de Word
                 doc.SaveAs(str(pdf_path), FileFormat=17)
-                doc.Close()
-            except ImportError:
-                raise RuntimeError("La librería 'pywin32' es necesaria para esta función. Si no está instalada, ejecute: pip install pywin32")
-            except Exception as e:
-                raise RuntimeError(f"Error al convertir con MS Word. ¿Está instalado? Detalle: {e}")
-            finally:
-                if word:
-                    word.Quit()
-
-        if not pdf_path.exists():
-            raise Exception("La conversión falló y el archivo PDF no fue creado.")
-
-        # 4. Devolver la ruta del PDF
+            
+            send_log(f"PDF creado: {pdf_path.exists()}")
+            
+            # 7. Verificar que el PDF se creó correctamente
+            if not pdf_path.exists():
+                raise Exception("La conversión falló y el archivo PDF no fue creado.")
+            
+            # Pequeña pausa para asegurar que el archivo se escribió completamente
+            time.sleep(0.1)
+            
+            # 8. Cerrar documento
+            doc.Close(SaveChanges=False)
+            doc = None
+            send_log("Documento cerrado")
+            
+        except Exception as doc_error:
+            send_log(f"Error al procesar documento: {doc_error}")
+            if doc:
+                try:
+                    doc.Close(SaveChanges=False)
+                except:
+                    pass
+            raise doc_error
+            
+        # 9. Devolver la ruta del PDF
         print(json.dumps({"success": True, "pdf_path": str(pdf_path)}))
+        send_log("Conversión completada exitosamente")
 
     except Exception as e:
-        # 5. Devolver un error JSON claro
+        # 10. Devolver un error JSON claro
         error_message = str(e) if str(e) else "Ocurrió un error desconocido durante la conversión."
+        send_log(f"ERROR: {error_message}")
         print(json.dumps({"success": False, "error": error_message}), file=sys.stderr)
         sys.exit(1)
+        
+    finally:
+        # 11. Limpieza SIEMPRE ocurre
+        if word:
+            try:
+                word.Quit()
+                send_log("Word cerrado")
+            except Exception as cleanup_error:
+                send_log(f"Error al cerrar Word: {cleanup_error}")
+        # Pequeña pausa para asegurar que Word se cerró completamente
+        time.sleep(0.1)
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 or len(sys.argv) > 3:

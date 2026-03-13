@@ -15,6 +15,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveConfig: (config) => ipcRenderer.invoke('save-config', config),
   loadConfig: () => ipcRenderer.invoke('load-config'),
   loadNormativa: () => ipcRenderer.invoke('load-normativa'),
+  
+  // --- Dashboard Scanner ---
+  getDashboardSummary: (companyName) => ipcRenderer.invoke('get-dashboard-summary', companyName),
 
   // --- Sistema de Temas ---
   getSystemTheme: () => ipcRenderer.invoke('get-system-theme'),

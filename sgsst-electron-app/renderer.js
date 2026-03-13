@@ -1697,7 +1697,7 @@ function showCompanyHomePage() {
   // ==========================================
   // DASHBOARD K+AIR - COMMAND CENTER
   // ==========================================
-  
+
   const dashboardContainer = document.createElement('div');
   dashboardContainer.style.cssText = `
     width: 100%;
@@ -1726,10 +1726,11 @@ function showCompanyHomePage() {
   const headerLeft = document.createElement('div');
   headerLeft.innerHTML = `
     <h1 style="font-size: 20px; font-weight: 700; color: #1e293b; margin: 0;">${currentCompany}</h1>
-    <p style="font-size: 12px; color: #64748b; margin-top: 2px;">SG-SST · Riesgo ${currentCompanyData?.risk || 'N/A'} · ${currentCompanyData?.employees || 'N/A'} Colaboradores</p>
+    <p style="font-size: 12px; color: #64748b; margin-top: 2px;" id="company-info-text">SG-SST · Cargando información...</p>
   `;
 
   const notifBtn = document.createElement('button');
+  notifBtn.id = 'notif-btn';
   notifBtn.style.cssText = `
     width: 40px; height: 40px; border-radius: 50%; border: 1px solid #e2e8f0;
     background: white; cursor: pointer; position: relative; display: flex;
@@ -1738,7 +1739,7 @@ function showCompanyHomePage() {
   `;
   notifBtn.innerHTML = `
     <i class="fas fa-bell"></i>
-    <span class="notif-badge" style="position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; background: #ef4444; color: white; border-radius: 50%; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center;">3</span>
+    <span id="notif-badge" style="position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; background: #ef4444; color: white; border-radius: 50%; font-size: 10px; font-weight: 700; display: none; align-items: center; justify-content: center;">0</span>
   `;
   notifBtn.onmouseover = function() { this.style.background = '#174ea6'; this.style.color = 'white'; this.style.borderColor = '#174ea6'; };
   notifBtn.onmouseout = function() { this.style.background = 'white'; this.style.color = '#64748b'; this.style.borderColor = '#e2e8f0'; };
@@ -1761,14 +1762,15 @@ function showCompanyHomePage() {
   `;
 
   const kpiCards = [
-    { class: 'success', icon: 'fa-shield-alt', value: '85%', label: 'Cumplimiento', color: '#10b981' },
-    { class: 'warning', icon: 'fa-hard-hat', value: '2', label: 'Accidentes (Mes)', color: '#f59e0b' },
-    { class: 'danger', icon: 'fa-calendar-times', value: '5', label: 'Documentos Vencidos', color: '#ef4444' },
-    { class: 'info', icon: 'fa-user-injured', value: '12', label: 'Casos PRIC Activos', color: '#174ea6' }
+    { id: 'kpi-accidents', icon: 'fa-shield-alt', value: '-', label: 'Accidentes (Mes)', color: '#f59e0b' },
+    { id: 'kpi-pric', icon: 'fa-user-injured', value: '-', label: 'Casos PRIC Activos', color: '#174ea6' },
+    { id: 'kpi-overdue', icon: 'fa-calendar-times', value: '-', label: 'Documentos Vencidos', color: '#ef4444' },
+    { id: 'kpi-compliance', icon: 'fa-chart-line', value: '-%', label: 'Cumplimiento', color: '#10b981' }
   ];
 
   kpiCards.forEach(kpi => {
     const card = document.createElement('div');
+    card.id = kpi.id;
     card.style.cssText = `
       background: white;
       padding: 15px;
@@ -1829,13 +1831,13 @@ function showCompanyHomePage() {
   moduleList.style.cssText = 'flex: 1; overflow-y: auto; padding: 10px;';
 
   const modulesData = [
-    { name: 'Gestión de la Salud', subtitle: 'Ausentismo, AT, EL', icon: 'fa-heartbeat', badge: '2 Pendientes', badgeClass: 'bg-red', active: true },
-    { name: 'Recursos', subtitle: 'Capacitación, Roles', icon: 'fa-users-cog', badge: '1 Próx.', badgeClass: 'bg-orange', active: false },
-    { name: 'Gestión Integral', subtitle: 'Política, Planes', icon: 'fa-file-contract', badge: 'OK', badgeClass: 'bg-green', active: false },
-    { name: 'Peligros', subtitle: 'IPERC, Controles', icon: 'fa-radiation-alt', badge: null, badgeClass: null, active: false },
-    { name: 'Amenazas', subtitle: 'Emergencias', icon: 'fa-biohazard', badge: null, badgeClass: null, active: false },
-    { name: 'Verificación', subtitle: 'Auditorías', icon: 'fa-check-double', badge: null, badgeClass: null, active: false },
-    { name: 'Mejoramiento', subtitle: 'Acciones Correctivas', icon: 'fa-chart-line', badge: null, badgeClass: null, active: false }
+    { name: 'Gestión de la Salud', subtitle: 'Ausentismo, AT, EL', icon: 'fa-heartbeat', badge: 'Cargando...', badgeClass: 'bg-orange', active: true },
+    { name: 'Recursos', subtitle: 'Capacitación, Roles', icon: 'fa-users-cog', badge: '-', badgeClass: 'bg-green', active: false },
+    { name: 'Gestión Integral', subtitle: 'Política, Planes', icon: 'fa-file-contract', badge: '-', badgeClass: 'bg-green', active: false },
+    { name: 'Peligros', subtitle: 'IPERC, Controles', icon: 'fa-radiation-alt', badge: '-', badgeClass: null, active: false },
+    { name: 'Amenazas', subtitle: 'Emergencias', icon: 'fa-biohazard', badge: '-', badgeClass: null, active: false },
+    { name: 'Verificación', subtitle: 'Auditorías', icon: 'fa-check-double', badge: '-', badgeClass: null, active: false },
+    { name: 'Mejoramiento', subtitle: 'Acciones Correctivas', icon: 'fa-chart-line', badge: '-', badgeClass: null, active: false }
   ];
 
   modulesData.forEach(mod => {
@@ -1859,7 +1861,7 @@ function showCompanyHomePage() {
         <h4 style="font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 1px;">${mod.name}</h4>
         <span style="font-size: 11px; color: #94a3b8;">${mod.subtitle}</span>
       </div>
-      ${mod.badge ? `<span style="margin-left: auto; font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: 600; background: ${getBadgeColor(mod.badgeClass)}; color: ${getBadgeTextColor(mod.badgeClass)};">${mod.badge}</span>` : ''}
+      ${mod.badge ? `<span id="module-badge-${mod.name.replace(/\s+/g, '-').toLowerCase()}" style="margin-left: auto; font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: 600; background: ${getBadgeColor(mod.badgeClass)}; color: ${getBadgeTextColor(mod.badgeClass)};">${mod.badge}</span>` : ''}
     `;
     moduleList.appendChild(item);
   });
@@ -1896,47 +1898,14 @@ function showCompanyHomePage() {
   tasksPanel.appendChild(tasksHeader);
 
   const tasksList = document.createElement('div');
+  tasksList.id = 'tasks-container';
   tasksList.style.cssText = 'flex: 1; overflow-y: auto; padding: 15px 20px;';
-
-  const tasksData = [
-    { class: 'critical', tag: 'URGENTE', tagClass: 'red', time: 'Vencido hace 2 días', title: 'Investigación de Accidente AT-001', desc: 'Plazo legal vencido. Informe pendiente de radicación ante ARL.' },
-    { class: 'warning', tag: 'PRÓXIMO', tagClass: 'orange', time: 'Vence mañana', title: 'Seguimiento PRIC - María Gómez', desc: 'Evaluación de reincorporación pendiente. Caso Incapacidad >= 10 días.' },
-    { class: '', tag: 'CAPACITACIÓN', tagClass: 'blue', time: '', title: 'Programar capacitación COPASST', desc: 'Sesión trimestral pendiente según cronograma anual.' },
-    { class: 'warning', tag: 'VENCIDO', tagClass: 'gray', time: '', title: 'Entrega de EPP - Área de Producción', desc: 'Registro de entrega de botas y gafas pendiente.' },
-    { class: '', tag: 'RECORDATORIO', tagClass: 'gray', time: '', title: 'Simulacro de Emergencia', desc: 'Próximo simulacro programado para el 20 de marzo.' }
-  ];
-
-  tasksData.forEach(task => {
-    const card = document.createElement('div');
-    card.style.cssText = `
-      background: ${task.class ? '#f8fafc' : '#f8fafc'};
-      border-radius: 6px;
-      margin-bottom: 10px;
-      border-left: 4px solid ${getTaskBorderColor(task.class)};
-      padding: 12px 15px;
-      display: flex;
-      align-items: center;
-      transition: transform 0.1s, box-shadow 0.1s;
-    `;
-    card.onmouseover = function() { this.style.transform = 'translateY(-1px)'; this.style.boxShadow = '0 4px 6px rgba(0,0,0,0.05)'; this.style.background = 'white'; };
-    card.onmouseout = function() { this.style.transform = 'translateY(0)'; this.style.boxShadow = 'none'; this.style.background = '#f8fafc'; };
-
-    card.innerHTML = `
-      <div style="flex: 1;">
-        <div style="display: flex; gap: 8px; margin-bottom: 4px;">
-          <span class="tag" style="font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; background: ${getTagColor(task.tagClass)}; color: ${getTagTextColor(task.tagClass)};">${task.tag}</span>
-          ${task.time ? `<span style="font-size: 10px; color: #94a3b8;">${task.time}</span>` : ''}
-        </div>
-        <div style="font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 2px;">${task.title}</div>
-        <div style="font-size: 12px; color: #64748b; line-height: 1.3;">${task.desc}</div>
-      </div>
-      <button style="width: 30px; height: 30px; border-radius: 50%; border: none; background: transparent; color: #94a3b8; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#174ea6'; this.style.color='white'" onmouseout="this.style.background='transparent'; this.style.color='#94a3b8'">
-        <i class="fas fa-arrow-right"></i>
-      </button>
-    `;
-    tasksList.appendChild(card);
-  });
-
+  tasksList.innerHTML = `
+    <div style="text-align: center; padding: 40px; color: #94a3b8;">
+      <i class="fas fa-spinner fa-spin" style="font-size: 32px; margin-bottom: 10px;"></i>
+      <p>Cargando datos del dashboard...</p>
+    </div>
+  `;
   tasksPanel.appendChild(tasksList);
   mainGrid.appendChild(tasksPanel);
   dashboardContainer.appendChild(mainGrid);
@@ -1956,27 +1925,190 @@ function showCompanyHomePage() {
     if (cls === 'bg-green') return '#166534';
     return '#3730a3';
   }
-  function getTaskBorderColor(cls) {
-    if (cls === 'critical') return '#ef4444';
-    if (cls === 'warning') return '#f59e0b';
-    return '#cbd5e1';
-  }
-  function getTagColor(cls) {
-    if (cls === 'red') return '#fee2e2';
-    if (cls === 'orange') return '#ffedd5';
-    if (cls === 'blue') return '#e0e7ff';
-    return '#f1f5f9';
-  }
-  function getTagTextColor(cls) {
-    if (cls === 'red') return '#b91c1c';
-    if (cls === 'orange') return '#c2410c';
-    if (cls === 'blue') return '#3730a3';
-    return '#64748b';
+
+  // ==========================================
+  // CARGAR DATOS DINÁMICOS DEL DASHBOARD
+  // ==========================================
+  loadDashboardData();
+}
+
+// Función para cargar datos del dashboard
+async function loadDashboardData() {
+  console.log('[DASHBOARD] Cargando datos para:', currentCompany);
+
+  const tasksContainer = document.getElementById('tasks-container');
+  const notifBadge = document.getElementById('notif-badge');
+
+  try {
+    // Llamar al backend para obtener datos
+    const response = await window.electronAPI.getDashboardSummary(currentCompany);
+
+    if (response.success && response.data) {
+      const data = response.data;
+
+      // Actualizar KPIs (SOLO si los elementos existen en el DOM)
+      const kpiAccidents = document.getElementById('kpi-accidents');
+      const kpiPric = document.getElementById('kpi-pric');
+      const kpiOverdue = document.getElementById('kpi-overdue');
+      const kpiCompliance = document.getElementById('kpi-compliance');
+
+      if (kpiAccidents) kpiAccidents.querySelector('h3').textContent = data.kpis.accidents_month || '0';
+      if (kpiPric) kpiPric.querySelector('h3').textContent = data.kpis.pric_active || '0';
+      if (kpiOverdue) kpiOverdue.querySelector('h3').textContent = data.kpis.overdue_docs || '0';
+      if (kpiCompliance) kpiCompliance.querySelector('h3').textContent = (data.kpis.compliance || '0') + '%';
+
+      // Actualizar badge de notificaciones
+      const totalTasks = data.tasks ? data.tasks.length : 0;
+      if (notifBadge) {
+        notifBadge.textContent = totalTasks;
+        notifBadge.style.display = totalTasks > 0 ? 'flex' : 'none';
+      }
+
+      // Renderizar tareas
+      renderTasks(data.tasks || []);
+
+      // Actualizar badges de módulos
+      updateModuleBadges(data.module_status || {});
+
+      // Actualizar información de la empresa en el header
+      const companyInfoText = document.getElementById('company-info-text');
+      if (companyInfoText && data.company_info) {
+        companyInfoText.textContent = `SG-SST · Riesgo ${data.company_info.risk || 'N/A'} · ${data.company_info.employees || 'N/A'} Colaboradores`;
+      }
+
+    } else {
+      console.error('[DASHBOARD] Error en respuesta:', response.error);
+      if (tasksContainer) {
+        tasksContainer.innerHTML = `
+          <div style="text-align: center; padding: 40px; color: #ef4444;">
+            <i class="fas fa-exclamation-triangle" style="font-size: 32px; margin-bottom: 10px;"></i>
+            <p>Error al cargar datos del dashboard</p>
+            <p style="font-size: 12px; margin-top: 5px;">${response.error || 'Error desconocido'}</p>
+          </div>
+        `;
+      }
+    }
+  } catch (error) {
+    console.error('[DASHBOARD] Error crítico:', error);
+    if (tasksContainer) {
+      tasksContainer.innerHTML = `
+        <div style="text-align: center; padding: 40px; color: #ef4444;">
+          <i class="fas fa-exclamation-triangle" style="font-size: 32px; margin-bottom: 10px;"></i>
+          <p>Error de conexión con el backend</p>
+          <p style="font-size: 12px; margin-top: 5px;">${error.message}</p>
+        </div>
+      `;
+    }
   }
 }
 
-// Datos de la empresa actual (se actualiza al seleccionar empresa)
-let currentCompanyData = null;
+// Función para renderizar tareas
+function renderTasks(tasks) {
+  const container = document.getElementById('tasks-container');
+  if (!container) return;
+  
+  if (!tasks || tasks.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 40px; color: #10b981;">
+        <i class="fas fa-check-circle" style="font-size: 32px; margin-bottom: 10px;"></i>
+        <h3 style="font-size: 16px; margin: 0;">¡Estás al día!</h3>
+        <p style="font-size: 13px; color: #94a3b8; margin-top: 5px;">No hay pendientes críticos.</p>
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = tasks.map(task => `
+    <div class="task-card ${task.priority || ''}" onclick="navigateToModule('${task.module || ''}')" style="
+      background: #f8fafc;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      border-left: 4px solid ${getTaskBorderColor(task.priority)};
+      padding: 12px 15px;
+      display: flex;
+      align-items: center;
+      transition: transform 0.1s, box-shadow 0.1s;
+      cursor: pointer;
+    " onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.05)'; this.style.background='white';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'; this.style.background='#f8fafc';">
+      <div style="flex: 1;">
+        <div style="display: flex; gap: 8px; margin-bottom: 4px;">
+          <span class="tag" style="font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; background: ${getTagColor(task.priority)}; color: ${getTagTextColor(task.priority)};">${task.priority ? task.priority.toUpperCase() : 'INFO'}</span>
+        </div>
+        <div style="font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 2px;">${task.title || 'Tarea sin título'}</div>
+        <div style="font-size: 12px; color: #64748b; line-height: 1.3;">${task.desc || ''}</div>
+      </div>
+      <button style="width: 30px; height: 30px; border-radius: 50%; border: none; background: transparent; color: #94a3b8; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#174ea6'; this.style.color='white'" onmouseout="this.style.background='transparent'; this.style.color='#94a3b8'">
+        <i class="fas fa-arrow-right"></i>
+      </button>
+    </div>
+  `).join('');
+}
+
+// Función para navegar a un módulo desde una tarea
+function navigateToModule(moduleName) {
+  if (!moduleName) return;
+  console.log('[DASHBOARD] Navegando a módulo:', moduleName);
+  
+  // Mapeo de módulos internos a nombres del sidebar
+  const moduleMap = {
+    'ausentismo': 'Gestión de la Salud',
+    'investigacion': 'Gestión de la Salud',
+    'capacitaciones': 'Recursos',
+    'epp': 'Recursos',
+    'auditorias': 'Verificación'
+  };
+  
+  const targetModule = moduleMap[moduleName] || moduleName;
+  showModuleContent(targetModule);
+}
+
+// Helper para colores de badges
+function getBadgeColor(cls) {
+  if (cls === 'bg-red') return '#fee2e2';
+  if (cls === 'bg-orange') return '#ffedd5';
+  if (cls === 'bg-green') return '#dcfce7';
+  return '#e0e7ff';
+}
+
+function getBadgeTextColor(cls) {
+  if (cls === 'bg-red') return '#b91c1c';
+  if (cls === 'bg-orange') return '#c2410c';
+  if (cls === 'bg-green') return '#166534';
+  return '#3730a3';
+}
+
+// Función para actualizar badges de módulos
+function updateModuleBadges(moduleStatus) {
+  for (const [moduleName, status] of Object.entries(moduleStatus)) {
+    const badgeEl = document.getElementById(`module-badge-${moduleName}`);
+    if (badgeEl) {
+      const statusText = status === 'danger' ? 'Alerta' : (status === 'warning' ? 'Pendiente' : 'OK');
+      const statusClass = status === 'danger' ? 'bg-red' : (status === 'warning' ? 'bg-orange' : 'bg-green');
+      badgeEl.textContent = statusText;
+      badgeEl.style.background = getBadgeColor(statusClass);
+      badgeEl.style.color = getBadgeTextColor(statusClass);
+    }
+  }
+}
+
+// Helper para colores de tareas
+function getTaskBorderColor(priority) {
+  if (priority === 'critical') return '#ef4444';
+  if (priority === 'warning') return '#f59e0b';
+  return '#cbd5e1';
+}
+
+function getTagColor(priority) {
+  if (priority === 'critical') return '#fee2e2';
+  if (priority === 'warning') return '#ffedd5';
+  return '#e0e7ff';
+}
+
+function getTagTextColor(priority) {
+  if (priority === 'critical') return '#b91c1c';
+  if (priority === 'warning') return '#c2410c';
+  return '#3730a3';
+}
 
 
 function showModuleContent(moduleName) {
@@ -2468,6 +2600,22 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         console.error('❌ CursoVirtualComponent no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
+
+    } else if (submoduleName === "1.2.4 Manual de SST para Proveedores y Contratistas") {
+      if (window.ManualProveedoresComponent) {
+        const manualComponent = new window.ManualProveedoresComponent(
+          submoduleContentDiv,
+          currentCompany,
+          moduleName,
+          submoduleName,
+          safeBackToModuleCallback // <-- USAR EL CALLBACK SEGURO
+        );
+        manualComponent.render();
+      } else {
+        console.error('❌ ManualProveedoresComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
     } else if (submoduleName === "2.1.1 Politica del SG-SST") {
       createComponentSafely(window.PoliticaComponent,
         submoduleContentDiv,

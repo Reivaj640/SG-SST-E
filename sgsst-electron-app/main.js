@@ -124,10 +124,25 @@ async function findPython() {
 
 async function getPython() {
     console.log('[DEBUG] Current global.cachedPythonPath:', global.cachedPythonPath);
-    if (global.cachedPythonPath && fs.existsSync(global.cachedPythonPath)) {
-        console.log('[DEBUG] Using cached Python path:', global.cachedPythonPath);
-        return global.cachedPythonPath;
+    
+    // Si hay un cache, verificar que exista y sea ejecutable
+    if (global.cachedPythonPath) {
+        if (fs.existsSync(global.cachedPythonPath)) {
+            try {
+                await execFilePromise(global.cachedPythonPath, ['--version']);
+                console.log('[DEBUG] Using cached Python path:', global.cachedPythonPath);
+                return global.cachedPythonPath;
+            } catch (e) {
+                console.log('[DEBUG] Cached Python path is not executable, clearing cache:', global.cachedPythonPath);
+                global.cachedPythonPath = null;
+            }
+        } else {
+            console.log('[DEBUG] Cached Python path does not exist, clearing cache:', global.cachedPythonPath);
+            global.cachedPythonPath = null;
+        }
     }
+    
+    // Buscar Python desde cero
     global.cachedPythonPath = await findPython();
     console.log('[DEBUG] New Python path cached:', global.cachedPythonPath);
     return global.cachedPythonPath;
@@ -560,12 +575,116 @@ ipcMain.handle('get-effective-theme', async () => {
 nativeTheme.on('updated', () => {
   const systemTheme = nativeTheme.shouldUseDarkColors ? 'dark' : 'light';
   console.log(`[MAIN] Tema del sistema cambiado a: ${systemTheme}`);
-  
+
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('system-theme-changed', systemTheme);
   }
 });
 
+// ===============================
+// 📊 DASHBOARD SCANNER HANDLER
+// ===============================
+ipcMain.handle('get-dashboard-summary', async (event, companyName) => {
+  console.log(`[DASHBOARD] Escaneando datos para: ${companyName}`);
+
+  try {
+    // 1. Cargar configuración para obtener la ruta de la empresa
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+
+    if (!config.companyPaths || !config.companyPaths[companyName]) {
+      throw new Error(`No se encontró configuración para la empresa: ${companyName}`);
+    }
+
+    const companyPath = config.companyPaths[companyName].root;
+    console.log(`[DASHBOARD] Ruta de empresa: ${companyPath}`);
+
+    if (!companyPath) {
+      throw new Error('Ruta de empresa no encontrada en configuración');
+    }
+
+    // 2. Verificar que la ruta existe
+    await fsp.access(companyPath);
+
+    // 3. Ejecutar Script Python
+    const scriptPath = path.join(__dirname, 'Portear', 'src', 'dashboard_scanner.py');
+    
+    // Debug: Verificar que el script existe
+    console.log(`[DASHBOARD] Script path: ${scriptPath}`);
+    console.log(`[DASHBOARD] Script existe: ${fs.existsSync(scriptPath)}`);
+
+    const result = await runPythonScript(scriptPath, [companyPath]);
+
+    if (result.error) {
+      console.error(`[DASHBOARD] Error desde Python: ${result.error}`);
+      return { success: false, error: result.error };
+    }
+
+    console.log(`[DASHBOARD] Escaneo completado exitosamente`);
+    return { success: true, data: result };
+
+  } catch (error) {
+    console.error(`[DASHBOARD] Error crítico: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+});
+
+// Helper para ejecutar Python y devolver JSON
+async function runPythonScript(scriptPath, args) {
+  return new Promise((resolve, reject) => {
+    // Obtener ruta de Python dinámicamente
+    getPython().then(pythonPath => {
+      console.log(`[DASHBOARD] Usando Python: ${pythonPath}`);
+      console.log(`[DASHBOARD] Script: ${scriptPath}`);
+      console.log(`[DASHBOARD] Args: ${JSON.stringify(args)}`);
+      
+      // Verificar que el script existe
+      if (!fs.existsSync(scriptPath)) {
+        console.error(`[DASHBOARD] El script no existe: ${scriptPath}`);
+        resolve({ error: `Script no encontrado: ${scriptPath}` });
+        return;
+      }
+      
+      const pythonProcess = spawn(pythonPath, [scriptPath, ...args], {
+        cwd: path.dirname(scriptPath),
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+      });
+
+      let stdoutData = '';
+      let stderrData = '';
+
+      pythonProcess.stdout.on('data', (data) => {
+        stdoutData += data.toString();
+        console.log(`[PYTHON STDOUT] ${data}`);
+      });
+
+      pythonProcess.stderr.on('data', (data) => {
+        stderrData += data.toString();
+        console.error(`[PYTHON STDERR] ${data}`);
+      });
+
+      pythonProcess.on('close', (code) => {
+        console.log(`[PYTHON] Exit code: ${code}`);
+        if (code !== 0) {
+          console.error(`[PYTHON] Exit code: ${code}`);
+          resolve({ error: stderrData || `Python exit code: ${code}` });
+        } else {
+          try {
+            const jsonData = JSON.parse(stdoutData);
+            resolve(jsonData);
+          } catch (e) {
+            console.error('[PYTHON] Error parseando JSON:', e);
+            console.error('[PYTHON] stdout:', stdoutData);
+            resolve({ error: 'JSON Parse Error: ' + e.message });
+          }
+        }
+      });
+    }).catch(err => {
+      console.error('[DASHBOARD] Error obteniendo Python:', err);
+      resolve({ error: `No se pudo encontrar Python: ${err.message}` });
+    });
+  });
+}
 
 
 // Manejar lectura de carpetas de documentos (versión corregida y unificada)

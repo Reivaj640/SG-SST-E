@@ -194,13 +194,32 @@ class CapacitacionesComponent {
             const filesResult = await window.electronAPI.readDirectory(submodulePath);
             if (!filesResult.success) throw new Error(filesResult.error);
 
-            // Filtrar archivos Excel de capacitaciones
-            const allExcelFiles = (filesResult.files || []).filter(item => {
-                const fileName = (item.name || item.path || '').toLowerCase();
-                return fileName.includes('act-fo-005') &&
-                       (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) &&
-                       !fileName.startsWith('~$');
-            }).map(item => item.name || item.path);
+            const allFiles = filesResult.files || [];
+            
+            // 🔍 FILTRAR SOLO ARCHIVOS CON "CRONOGRAMA" EN EL NOMBRE (Prioridad)
+            const cronogramaFiles = allFiles.filter(item => {
+                const name = (item.name || item.path || '').toLowerCase();
+                const isExcel = name.endsWith('.xlsx') || name.endsWith('.xls');
+                const notTemp = !name.startsWith('~$');
+                const hasCronograma = name.includes('cronograma');
+                return hasCronograma && isExcel && notTemp;
+            });
+
+            console.log(`📋 [CapacitacionesLogic] Archivos con "cronograma": ${cronogramaFiles.length}`);
+            cronogramaFiles.forEach((f, i) => {
+                const fname = f.name || (f.path ? f.path.split(/[/\\]/).pop() : 'unknown');
+                console.log(`   [${i}] ✅ ${fname}`);
+            });
+
+            // Si hay cronogramas, usar SOLO esos
+            const allExcelFiles = cronogramaFiles.length > 0 
+                ? cronogramaFiles.map(item => item.name || item.path)
+                : allFiles.filter(item => {
+                    const fileName = (item.name || item.path || '').toLowerCase();
+                    return fileName.includes('act-fo-005') &&
+                           (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) &&
+                           !fileName.startsWith('~$');
+                }).map(item => item.name || item.path);
 
             // Ordenar: .xlsx preferido
             allExcelFiles.sort((a, b) => {
@@ -212,11 +231,13 @@ class CapacitacionesComponent {
             });
 
             if (allExcelFiles.length === 0) {
-                this.showNotification('No se encontró archivo "ACT-FO-005".', 'info');
+                this.showNotification('No se encontró archivo de capacitaciones (cronograma o ACT-FO-005).', 'info');
                 return;
             }
 
             this.excelFilePath = `${submodulePath}/${allExcelFiles[0]}`;
+            console.log(`✅ [CapacitacionesLogic] Archivo seleccionado: ${allExcelFiles[0]}`);
+            
             window.electronAPI.send('start-watching-capacitaciones', this.excelFilePath);
             await this._populateYearFilterFromSheets();
 
@@ -370,9 +391,35 @@ class CapacitacionesComponent {
         const capacitaciones = [];
         const dataRows = processedData.slice(5); // Datos empiezan en fila 6 (índice 5)
 
+        // 🔍 DETECCIÓN INTELIGENTE DE COLUMNAS
+        // Buscar índices de columnas clave en los encabezados o primeras filas
+        let colNombre = 1; // Por defecto columna B
+        let colFecha = 3;  // Por defecto columna D
+        let colEstado = 8; // Por defecto columna I
+        let colInstructor = 6; // Por defecto columna G
+        let colDuracion = 7; // Por defecto columna H
+
+        // Intentar detectar columnas desde los headers (fila 0-4)
+        for (let i = 0; i < Math.min(5, processedData.length); i++) {
+            const row = processedData[i];
+            if (!Array.isArray(row)) continue;
+            
+            for (let j = 0; j < row.length; j++) {
+                const cell = String(row[j] || '').toLowerCase();
+                
+                if (cell.includes('nombre') || cell.includes('capacitación')) colNombre = j;
+                if (cell.includes('fecha') || cell.includes('programada') || cell.includes('date')) colFecha = j;
+                if (cell.includes('estado') || cell.includes('indicador') || cell.includes('status')) colEstado = j;
+                if (cell.includes('instructor') || cell.includes('facilitador') || cell.includes('trainer')) colInstructor = j;
+                if (cell.includes('duración') || cell.includes('horas') || cell.includes('duration')) colDuracion = j;
+            }
+        }
+
+        console.log(`📊 [CapacitacionesLogic] Columnas detectadas: Nombre=${colNombre}, Fecha=${colFecha}, Estado=${colEstado}, Instructor=${colInstructor}, Duracion=${colDuracion}`);
+
         for (let i = 0; i < dataRows.length; i++) {
             const row = dataRows[i];
-            if (!Array.isArray(row) || row.length < 9) continue;
+            if (!Array.isArray(row) || row.length < Math.max(colNombre, colFecha, colEstado)) continue;
 
             const getCellValue = (cell) => {
                 if (cell === null || cell === undefined) return '';
@@ -380,18 +427,39 @@ class CapacitacionesComponent {
                 return String(cell);
             };
 
-            const nombreRaw = getCellValue(row[1]);
+            const nombreRaw = getCellValue(row[colNombre]);
             const nombre = String(nombreRaw || '').trim();
 
-            if (!nombre || nombre === 'Nombre de la capacitación' || nombre === '') continue;
+            // Filtros de filas no válidas
+            if (!nombre || nombre.length < 3) continue;
+            if (nombre.toLowerCase().includes('nombre de la') || nombre.toLowerCase().includes('contenido de la')) continue;
             if (nombre.toLowerCase().includes('total capacitaciones')) break;
 
-            const tipoRaw = String(getCellValue(row[2]) || 'sst');
+            // Tipo
+            const tipoRaw = String(getCellValue(row[colNombre + 1] || row[2]) || 'sst');
             let tipo = tipoRaw.toLowerCase().includes('pyp') ? 'pyp' : 'sst';
 
-            // Fecha
+            // 🔍 BÚSQUEDA FLEXIBLE DE FECHA
             let fechaProgramada = 'No especificada';
-            const fechaValue = getCellValue(row[3]);
+            
+            // Intentar en columna detectada primero
+            let fechaValue = getCellValue(row[colFecha]);
+            
+            // Si no hay fecha, buscar en columnas adyacentes (D, E, F)
+            if (!fechaValue || fechaValue === '' || fechaValue === 'No especificada') {
+                for (let offset = -2; offset <= 2; offset++) {
+                    const testCol = colFecha + offset;
+                    if (testCol >= 0 && testCol < row.length) {
+                        const testValue = getCellValue(row[testCol]);
+                        if (testValue && testValue !== '' && testValue !== 'No especificada') {
+                            fechaValue = testValue;
+                            colFecha = testCol; // Actualizar columna detectada
+                            break;
+                        }
+                    }
+                }
+            }
+            
             if (fechaValue) {
                 if (typeof fechaValue === 'number' && fechaValue >= 1) {
                     const utcDate = new Date((fechaValue - 25569) * 86400 * 1000);
@@ -410,20 +478,35 @@ class CapacitacionesComponent {
                 }
             }
 
-            const instructor = String(getCellValue(row[6]) || 'No especificado');
-            const duracionNum = parseFloat(String(getCellValue(row[7])));
+            // Instructor
+            const instructor = String(getCellValue(row[colInstructor]) || 'No especificado');
+            
+            // Duración
+            const duracionNum = parseFloat(String(getCellValue(row[colDuracion])));
             const duracion = !isNaN(duracionNum) ? `${Math.floor(duracionNum)} Horas` : '0 Horas';
 
-            const estadoStr = String(getCellValue(row[8]) || '');
-            let estado = (estadoStr.toLowerCase().includes('ejecutado') || estadoStr.toLowerCase().includes('completado')) ? 'completed' : 'pending';
+            // 🔍 ESTADO FLEXIBLE
+            const estadoRaw = getCellValue(row[colEstado]);
+            const estadoStr = String(estadoRaw || '').toLowerCase().trim();
+            
+            // Mapeo de estados numéricos y de texto
+            let estado = 'pending';
+            if (estadoStr.includes('ejecutado') || estadoStr.includes('completado') || 
+                estadoStr.includes('realizado') || estadoStr === '1' || 
+                estadoStr === '3' || estadoStr === '4' || 
+                estadoStr === '100' || estadoStr.includes('si') || estadoStr.includes('sí')) {
+                estado = 'completed';
+            }
 
             capacitaciones.push({
                 id: capacitaciones.length + 1,
                 rowIndex: i + 6,
                 nombre, tipo, fechaProgramada, instructor, duracion, estado,
-                participantes: 0 
+                participantes: 0
             });
         }
+        
+        console.log(`✅ [CapacitacionesLogic] ${capacitaciones.length} capacitaciones parseadas`);
         return capacitaciones;
     }
 
