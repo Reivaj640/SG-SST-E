@@ -158,7 +158,8 @@ async function cloneCronograma() {
 
         if (!currentSheetName) {
             hideLoading();
-            alert(`No se encontró una hoja para el año ${activeYear}.\n\nHojas disponibles: ${availableSheets.join(', ')}`);
+            showNotification(`No se encontró hoja para el año ${activeYear}`, 'warning');
+            console.log('[cap-home] Hojas disponibles:', availableSheets.join(', '));
             return;
         }
 
@@ -174,16 +175,17 @@ async function cloneCronograma() {
         hideLoading();
 
         if (duplicateResult.success) {
-            alert(`✅ Hoja clonada exitosamente para el año ${newYear}.\n\nNueva hoja: ${duplicateResult.newSheetName || 'Matriz Cap. ' + newYear}`);
+            showNotification(`✅ Hoja clonada exitosamente para ${newYear}`, 'success');
+            console.log('[cap-home] Nueva hoja creada:', duplicateResult.newSheetName || 'Matriz Cap. ' + newYear);
             loadActiveYear();
         } else {
-            alert('Error al clonar la hoja: ' + (duplicateResult.error || 'Error desconocido'));
+            showNotification(duplicateResult.error || 'Error al clonar la hoja', 'danger');
         }
 
     } catch (error) {
         hideLoading();
         console.error('[cap-home] Error clonando cronograma:', error);
-        alert('Error al clonar el cronograma. Por favor intente nuevamente.');
+        showNotification('Error al clonar el cronograma', 'danger');
     }
 }
 
@@ -207,6 +209,78 @@ function generateInformeCumplimiento() {
  */
 function openCertificados() {
     alert('Función: Certificados\n\nEsta acción abrirá el módulo de generación y gestión de certificados de capacitación.');
+}
+
+/**
+ * Mostrar notificación toast moderna
+ */
+function showNotification(message, type = 'info') {
+    // Verificar si el contenedor de toasts existe en el portal
+    let container = document.getElementById('toastContainer');
+    
+    // Si no existe, crearlo
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.className = 'k-toast-container';
+        container.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        `;
+        document.body.appendChild(container);
+    }
+    
+    // Colores por tipo
+    const colors = {
+        success: '#28a745',
+        danger: '#dc3545',
+        warning: '#ffc107',
+        info: '#17a2b8'
+    };
+    
+    const icons = {
+        success: 'fa-check-circle',
+        danger: 'fa-times-circle',
+        warning: 'fa-exclamation-triangle',
+        info: 'fa-info-circle'
+    };
+    
+    // Crear el toast
+    const toast = document.createElement('div');
+    toast.className = 'k-toast';
+    toast.style.cssText = `
+        background: white;
+        border-left: 4px solid ${colors[type]};
+        padding: 1rem 1.5rem;
+        border-radius: 0.375rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        min-width: 300px;
+        max-width: 500px;
+        animation: slideInRight 0.3s ease;
+        transition: all 0.3s ease;
+    `;
+    
+    toast.innerHTML = `
+        <i class="fas ${icons[type]}" style="color: ${colors[type]}; font-size: 1.25rem;"></i>
+        <span style="color: #212529; font-size: 0.9rem; font-weight: 500;">${message}</span>
+    `;
+    
+    container.appendChild(toast);
+    
+    // Remover después de 4 segundos
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
 }
 
 /**
