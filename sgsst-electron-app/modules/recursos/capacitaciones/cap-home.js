@@ -1,31 +1,160 @@
 // cap-home.js - Lógica del Portal de Bienvenida Programa de Capacitaciones
 // Este script se carga dinámicamente desde capacitaciones-portal-logic.js
 
-document.addEventListener('DOMContentLoaded', function() {
-    initializePortal();
-});
+// NO usar DOMContentLoaded porque el HTML se carga vía fetch
 
 async function initializePortal() {
+    console.log('════════════════════════════════════════');
+    console.log('[cap-home] 🚀 initializePortal() INICIADO');
+    console.log('════════════════════════════════════════');
+    
+    // Verificar si el elemento existe
+    const yearEl = document.getElementById('activeYear');
+    console.log('[cap-home] 📍 Elemento activeYear:', yearEl ? '✅ ENCONTRADO' : '❌ NO ENCONTRADO');
+    
+    if (!yearEl) {
+        console.error('[cap-home] ❌ ERROR: No se encontró el elemento activeYear en el DOM');
+        return;
+    }
+    
     try {
-        // Cargar el año activo
+        console.log('[cap-home] 🔄 Llamando a loadActiveYear()...');
         await loadActiveYear();
+        console.log('[cap-home] ✅ loadActiveYear() completado');
     } catch (error) {
-        console.log('[cap-home] Error inicializando:', error.message);
-        document.getElementById('activeYear').textContent = new Date().getFullYear();
+        console.log('[cap-home] ❌ Error inicializando:', error.message);
+        console.error('[cap-home] Stack trace:', error.stack);
+        yearEl.textContent = new Date().getFullYear();
+        console.log('[cap-home] ⚠️ Año establecido a fallback:', yearEl.textContent);
     }
 }
 
 async function loadActiveYear() {
-    // Usar el año actual o el que esté disponible en el componente padre
-    const currentYear = new Date().getFullYear();
-    const nextYear = currentYear + 1;
+    console.log('────────────────────────────────────────');
+    console.log('[cap-home] 📅 loadActiveYear() INICIADO');
+    console.log('────────────────────────────────────────');
     
-    // Intentar obtener el año del componente padre si está disponible
-    if (window.capPortalComponent && window.capPortalComponent.companyName) {
-        // El año se mostrará correctamente
-        document.getElementById('activeYear').textContent = currentYear;
-    } else {
-        document.getElementById('activeYear').textContent = currentYear;
+    try {
+        if (!window.capPortalComponent) {
+            console.log('[cap-home] ⚠️ capPortalComponent no disponible');
+            const yearEl = document.getElementById('activeYear');
+            if (yearEl) yearEl.textContent = new Date().getFullYear();
+            return;
+        }
+        console.log('[cap-home] ✅ capPortalComponent disponible');
+        console.log('[cap-home] 🏢 companyName:', window.capPortalComponent.companyName);
+
+        console.log('[cap-home] 📍 Obteniendo ruta del submódulo...');
+        const pathResult = await callParentAPI('find-submodule-path', {
+            company: window.capPortalComponent.companyName,
+            module: 'Recursos',
+            submodule: '1.2.1 Programa de capacitación Anual'
+        });
+
+        if (!pathResult.success) {
+            console.log('[cap-home] ❌ Error obteniendo ruta:', pathResult.error);
+            const yearEl = document.getElementById('activeYear');
+            if (yearEl) yearEl.textContent = new Date().getFullYear();
+            return;
+        }
+
+        const submodulePath = pathResult.path;
+        console.log('[cap-home] ✅ Ruta:', submodulePath);
+
+        console.log('[cap-home] 📂 Leyendo directorio...');
+        const filesResult = await callParentAPI('read-directory', { path: submodulePath });
+        if (!filesResult.success) {
+            console.log('[cap-home] ❌ Error leyendo directorio:', filesResult.error);
+            const yearEl = document.getElementById('activeYear');
+            if (yearEl) yearEl.textContent = new Date().getFullYear();
+            return;
+        }
+
+        console.log('[cap-home] 📁 Archivos encontrados:', filesResult.files?.length || 0);
+
+        const cronogramaFile = filesResult.files?.find(f => {
+            const fileName = typeof f === 'string' ? f : (f.name || f.path || '');
+            const fileNameLower = fileName.toLowerCase();
+            const isExcel = fileNameLower.endsWith('.xlsx') || fileNameLower.endsWith('.xls');
+            const isCronograma = fileNameLower.includes('cronograma');
+            const isNotTemp = !fileNameLower.startsWith('~$');
+            return isCronograma && isExcel && isNotTemp;
+        });
+
+        if (!cronogramaFile) {
+            console.log('[cap-home] ❌ No se encontró cronograma');
+            const yearEl = document.getElementById('activeYear');
+            if (yearEl) yearEl.textContent = new Date().getFullYear();
+            return;
+        }
+
+        const cronogramaFileName = typeof cronogramaFile === 'string' ? cronogramaFile : (cronogramaFile.name || cronogramaFile.path);
+        const sourcePath = `${submodulePath}/${cronogramaFileName}`;
+        console.log('[cap-home] ✅ Archivo:', cronogramaFileName);
+
+        console.log('[cap-home] 📋 Obteniendo hojas...');
+        const sheetsResult = await callParentAPI('get-capacitaciones-sheets', {
+            filePath: sourcePath
+        });
+
+        if (!sheetsResult.success) {
+            console.log('[cap-home] ❌ Error leyendo hojas:', sheetsResult?.error);
+            const yearEl = document.getElementById('activeYear');
+            if (yearEl) yearEl.textContent = new Date().getFullYear();
+            return;
+        }
+
+        const availableSheets = sheetsResult.sheets || [];
+        console.log('[cap-home] ✅ Hojas disponibles:', availableSheets);
+        console.log('[cap-home] 📊 Total hojas:', availableSheets.length);
+
+        const years = availableSheets
+            .map(sheetName => {
+                const match = sheetName.match(/\d{4}/);
+                const year = match ? parseInt(match[0]) : null;
+                console.log(`[cap-home]   📄 "${sheetName}" → ${year}`);
+                return year;
+            })
+            .filter(y => y !== null && !isNaN(y));
+
+        console.log('[cap-home] 📅 Años extraídos:', years);
+
+        if (years.length === 0) {
+            console.log('[cap-home] ❌ No se encontraron años');
+            const yearEl = document.getElementById('activeYear');
+            if (yearEl) yearEl.textContent = new Date().getFullYear();
+            return;
+        }
+
+        const maxYear = Math.max(...years);
+        const currentSystemYear = new Date().getFullYear();
+        const displayYear = maxYear > currentSystemYear + 1 ? currentSystemYear : maxYear;
+
+        console.log('[cap-home] 🔢 maxYear:', maxYear);
+        console.log('[cap-home] 🔢 currentSystemYear:', currentSystemYear);
+        console.log('[cap-home] 🎯 displayYear:', displayYear);
+
+        const yearEl = document.getElementById('activeYear');
+        if (yearEl) {
+            yearEl.textContent = displayYear;
+            console.log('[cap-home] ✅✅✅ Año ESTABLECIDO:', displayYear);
+            console.log('[cap-home] 📍 Elemento:', yearEl);
+            console.log('[cap-home] 📍 textContent:', yearEl.textContent);
+        } else {
+            console.log('[cap-home] ❌ ERROR: No se encontró activeYear');
+        }
+
+        console.log('────────────────────────────────────────');
+        console.log('[cap-home] ✅ loadActiveYear() COMPLETADO');
+        console.log('────────────────────────────────────────');
+
+    } catch (error) {
+        console.error('[cap-home] ❌ ERROR:', error);
+        console.error('[cap-home] Stack:', error.stack);
+        const yearEl = document.getElementById('activeYear');
+        if (yearEl) {
+            yearEl.textContent = new Date().getFullYear();
+        }
     }
 }
 

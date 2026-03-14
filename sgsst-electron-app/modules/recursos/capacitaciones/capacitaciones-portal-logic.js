@@ -52,6 +52,14 @@ class CapacitacionesPortalComponent {
         script.src = './modules/recursos/capacitaciones/cap-home.js';
         script.onload = () => {
             console.log('[CapacitacionesPortalComponent] cap-home.js cargado');
+            // LLAMAR MANUALMENTE A initializePortal() DESPUÉS DE CARGAR
+            console.log('[CapacitacionesPortalComponent] Llamando a initializePortal() manualmente...');
+            if (typeof initializePortal === 'function') {
+                console.log('[CapacitacionesPortalComponent] ✅ initializePortal encontrado, ejecutando...');
+                initializePortal();
+            } else {
+                console.error('[CapacitacionesPortalComponent] ❌ initializePortal NO es una función');
+            }
         };
         script.onerror = () => {
             console.error('[CapacitacionesPortalComponent] Error cargando cap-home.js');
