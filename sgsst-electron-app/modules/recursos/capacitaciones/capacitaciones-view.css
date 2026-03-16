@@ -2,7 +2,6 @@
    1. CORE VISUAL SYSTEM (K+AIR) - Módulo Capacitaciones
    ========================================= */
 
-/* Variables Scopeadas al módulo para evitar colisiones globales si no están en root */
 .capacitaciones-container {
     --k-primary: #174ea6;
     --k-primary-hover: #185abd;
@@ -41,7 +40,7 @@
     width: 100%;
     display: flex;
     flex-direction: column;
-    overflow: hidden; /* Importante para el layout */
+    overflow: hidden;
 }
 
 .capacitaciones-container[data-theme="dark"] {
@@ -72,7 +71,6 @@
     overflow: hidden;
 }
 
-/* Header del Módulo */
 .k-module-header {
     background-color: var(--k-bg-card);
     border-bottom: 1px solid var(--k-border);
@@ -94,7 +92,16 @@
     gap: 0.75rem;
 }
 
-/* Navegación Secundaria (Tabs) */
+/* Subtítulo contextual en el header */
+.k-module-subtitle {
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: var(--k-text-muted);
+    margin-left: 0.625rem;
+    border-left: 1px solid var(--k-border);
+    padding-left: 0.625rem;
+}
+
 .k-tabs-container {
     background-color: var(--k-bg-card);
     padding: 0 1.5rem;
@@ -123,9 +130,7 @@
     gap: 0.5rem;
 }
 
-.k-nav-item:hover {
-    color: var(--k-primary);
-}
+.k-nav-item:hover { color: var(--k-primary); }
 
 .k-nav-item.active {
     color: var(--k-primary);
@@ -143,7 +148,6 @@
     border-radius: 3px 3px 0 0;
 }
 
-/* Área Principal */
 .k-main-content {
     flex: 1;
     overflow-y: auto;
@@ -151,53 +155,63 @@
     position: relative;
 }
 
-.k-view-section {
-    display: none;
-    animation: fadeIn 0.3s ease;
-}
-
-.k-view-section.active {
-    display: block;
-}
+.k-view-section { display: none; animation: fadeIn 0.3s ease; }
+.k-view-section.active { display: block; }
 
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(5px); }
-    to { opacity: 1; transform: translateY(0); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
 /* =========================================
-   3. COMPONENTES UI
+   3. COMPONENTES UI — BOTONES (definición única)
    ========================================= */
 
-/* Botones */
 .k-btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    font-size: 0.9rem;
+    height: 38px;
+    padding: 0 1.125rem;
+    font-size: 0.875rem;
     font-weight: 500;
     border-radius: var(--k-radius-md);
     border: 1px solid transparent;
     cursor: pointer;
     transition: all 0.2s ease;
-    background: none; /* Reset */
-    line-height: 1.5;
+    background: none;
+    line-height: 1;
+    font-family: var(--k-font-family);
+}
+
+/* Variante: solo icono */
+.k-btn.k-btn-icon {
+    height: 32px;
+    width: 32px;
+    padding: 0;
+}
+
+/* Variante: ancho completo */
+.k-btn.k-btn-full {
+    width: 100%;
+    justify-content: center;
 }
 
 .k-btn-primary {
     background-color: var(--k-primary);
-    color: white;
+    color: #ffffff;
     box-shadow: 0 2px 4px rgba(23, 78, 166, 0.2);
 }
 .k-btn-primary:hover {
     background-color: var(--k-primary-hover);
+    box-shadow: 0 2px 6px rgba(23, 78, 166, 0.3);
     transform: translateY(-1px);
-    color: white;
+    color: #ffffff;
 }
 
 .k-btn-outline {
-    background-color: transparent;
+    background-color: var(--k-bg-card);
     border-color: var(--k-border);
     color: var(--k-text-main);
 }
@@ -207,13 +221,10 @@
     background-color: var(--k-primary-light);
 }
 
-.k-btn-icon {
-    padding: 0.4rem;
-    border-radius: var(--k-radius-md);
-    line-height: 1;
-}
+/* =========================================
+   4. DASHBOARD — STATS & GRID
+   ========================================= */
 
-/* Grid Dashboard */
 .k-grid-dashboard {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -232,25 +243,20 @@
     overflow: hidden;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
-
 .k-stat-card:hover {
     transform: translateY(-3px);
     box-shadow: var(--k-shadow-md);
 }
-
 .k-stat-card::before {
     content: '';
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 4px;
-    height: 100%;
+    top: 0; left: 0;
+    width: 4px; height: 100%;
 }
-
 .k-stat-card.primary::before { background-color: var(--k-primary); }
 .k-stat-card.success::before { background-color: var(--k-success); }
 .k-stat-card.warning::before { background-color: var(--k-warning); }
-.k-stat-card.danger::before { background-color: var(--k-danger); }
+.k-stat-card.danger::before  { background-color: var(--k-danger); }
 
 .k-stat-label {
     font-size: 0.85rem;
@@ -259,14 +265,12 @@
     letter-spacing: 0.5px;
     margin-bottom: 0.5rem;
 }
-
 .k-stat-value {
     font-size: 2.25rem;
     font-weight: 700;
     color: var(--k-text-main);
     line-height: 1.1;
 }
-
 .k-stat-meta {
     margin-top: auto;
     padding-top: 1rem;
@@ -274,16 +278,19 @@
     color: var(--k-text-muted);
 }
 
-/* Gráficos y Layout Complejo */
+/* =========================================
+   5. GRÁFICOS
+   ========================================= */
+
 .dashboard-grid {
-    display: grid; 
-    grid-template-columns: 2fr 1fr; 
-    gap: 1.5rem; 
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1.5rem;
     margin-bottom: 2rem;
 }
 
 .k-chart-container {
-    background: white;
+    background: var(--k-bg-card);
     border: 1px solid var(--k-border);
     border-radius: var(--k-radius-lg);
     padding: 1.5rem;
@@ -294,21 +301,24 @@
     flex-direction: column;
 }
 
-.k-chart-body {
-    position: relative;
-    flex: 1; 
-    width: 100%;
-    min-height: 300px; /* Altura mínima fija para asegurar visibilidad */
-    height: 300px; /* Altura base para evitar colapso inicial */
-    overflow: hidden;
+/* Contenedor de reportes (sin alto fijo) */
+.k-chart-container.k-reports-container {
+    max-width: 600px;
+    margin: 0 auto 2rem;
+    height: auto;
 }
 
+.k-chart-body {
+    position: relative;
+    flex: 1;
+    width: 100%;
+    min-height: 300px;
+    height: 300px;
+    overflow: hidden;
+}
 .k-chart-body canvas {
-    position: absolute; /* CLAVE: Saca el canvas del flujo para evitar que empuje al padre */
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
     width: 100% !important;
     height: 100% !important;
 }
@@ -319,23 +329,32 @@
     align-items: center;
     margin-bottom: 1.5rem;
 }
-
 .k-chart-title {
     font-size: 1.1rem;
     font-weight: 600;
     color: var(--k-text-main);
 }
+.k-chart-title.k-chart-title--center {
+    text-align: center;
+    margin-bottom: 2rem;
+}
 
-/* Acciones Rápidas */
+/* =========================================
+   6. ACCIONES RÁPIDAS
+   ========================================= */
+
 .k-actions-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 1rem;
     margin-bottom: 0;
 }
+.k-actions-grid.k-actions-grid--single {
+    grid-template-columns: 1fr;
+}
 
 .k-action-card {
-    background: white;
+    background: var(--k-bg-card);
     border: 1px solid var(--k-border);
     padding: 1.25rem;
     border-radius: var(--k-radius-lg);
@@ -345,26 +364,35 @@
     cursor: pointer;
     transition: all 0.2s;
 }
-
 .k-action-card:hover {
     border-color: var(--k-primary);
     background-color: var(--k-primary-light);
+}
+.k-action-card-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--k-text-main);
+}
+.k-action-card-desc {
+    font-size: 0.75rem;
+    color: var(--k-text-muted);
 }
 
 .k-action-icon {
     width: 40px; height: 40px;
     border-radius: 50%;
-    background-color: #f0f2f5;
+    background-color: var(--k-bg-app);
     display: flex; align-items: center; justify-content: center;
     color: var(--k-primary);
     font-size: 1.2rem;
     flex-shrink: 0;
 }
 
-/* Listas Recientes */
-.k-recent-list-container {
-    margin-bottom: 0;
-}
+/* =========================================
+   7. LISTAS RECIENTES
+   ========================================= */
+
+.k-recent-list-container { margin-bottom: 0; }
 
 .k-recent-item {
     padding: 0.75rem 0;
@@ -373,11 +401,14 @@
     justify-content: space-between;
     align-items: center;
 }
-.k-recent-item:last-child {
-    border-bottom: none;
-}
+.k-recent-item:last-child { border-bottom: none; }
+.k-recent-item-title { font-weight: 600; font-size: 0.9rem; }
+.k-recent-item-meta  { font-size: 0.8rem; color: var(--k-text-muted); }
 
-/* Barra de Herramientas y Filtros */
+/* =========================================
+   8. TOOLBAR & FILTROS
+   ========================================= */
+
 .k-toolbar {
     background: var(--k-bg-card);
     border: 1px solid var(--k-border);
@@ -407,9 +438,13 @@
     color: var(--k-text-main);
     cursor: pointer;
     min-width: 160px;
+    font-family: var(--k-font-family);
 }
 
-/* Tabla */
+/* =========================================
+   9. TABLA
+   ========================================= */
+
 .k-table-container {
     background: var(--k-bg-card);
     border: 1px solid var(--k-border);
@@ -423,9 +458,8 @@
     border-collapse: collapse;
     font-size: 0.95rem;
 }
-
 .k-table th {
-    background-color: #fcfcfc;
+    background-color: var(--k-bg-app);
     color: var(--k-text-muted);
     font-weight: 600;
     text-align: left;
@@ -433,22 +467,19 @@
     border-bottom: 1px solid var(--k-border);
     white-space: nowrap;
 }
-
 .k-table td {
     padding: 1rem 1.5rem;
     border-bottom: 1px solid var(--k-border);
     vertical-align: middle;
+    color: var(--k-text-main);
 }
+.k-table tbody tr:hover { background-color: var(--k-bg-app); }
+.k-table tbody tr:last-child td { border-bottom: none; }
 
-.k-table tbody tr:hover {
-    background-color: #fcfdff;
-}
+/* =========================================
+   10. BADGES
+   ========================================= */
 
-.k-table tbody tr:last-child td {
-    border-bottom: none;
-}
-
-/* Badges */
 .k-badge {
     display: inline-flex;
     align-items: center;
@@ -456,271 +487,179 @@
     font-size: 0.75em;
     font-weight: 600;
     line-height: 1;
-    text-align: center;
     white-space: nowrap;
-    vertical-align: baseline;
     border-radius: var(--k-radius-md);
 }
-
 .k-badge-primary { background-color: var(--k-primary-light); color: var(--k-primary); }
-.k-badge-info { background-color: var(--k-info-light); color: var(--k-info); }
+.k-badge-info    { background-color: var(--k-info-light);    color: var(--k-info); }
 .k-badge-success { background-color: var(--k-success-light); color: var(--k-success); }
 .k-badge-warning { background-color: var(--k-warning-light); color: #856404; }
-.k-badge-danger { background-color: var(--k-danger-light); color: var(--k-danger); }
+.k-badge-danger  { background-color: var(--k-danger-light);  color: var(--k-danger); }
 
 /* =========================================
-   15. MODAL MODERNIZADO (Diseño K+AIR 2025) - CORREGIDO
+   11. MODAL (overlay con !important justificado — escapa el scope del contenedor)
    ========================================= */
 
-/* Overlay con backdrop blur y animación - SIEMPRE CENTRADO */
 .k-modal-overlay {
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
     width: 100vw !important;
     height: 100vh !important;
-    min-width: 100vw !important;
-    min-height: 100vh !important;
-    background: rgba(50, 56, 70, 0.5) !important;
-    backdrop-filter: blur(2px) !important;
-    -webkit-backdrop-filter: blur(2px) !important;
+    background: rgba(15, 23, 42, 0.6) !important;
+    backdrop-filter: blur(4px) !important;
+    -webkit-backdrop-filter: blur(4px) !important;
     display: none !important;
     justify-content: center !important;
     align-items: center !important;
-    z-index: 1050 !important;
+    z-index: 2000 !important;
 }
 
-/* Cuando está abierto - USAR FLEX centrado */
 .k-modal-overlay.open {
     display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
 }
 
-/* Contenedor del modal - CENTRADO PERFECTO EN LA VENTANA */
-.k-modal-overlay.open .k-modal {
-    margin: 60px auto !important;
-    position: relative !important;
-    max-height: calc(100vh - 120px) !important;
-    /* Sin transform aquí para evitar conflicto */
-}
-
+/* Todo lo que está DENTRO del overlay NO necesita !important
+   porque ya está contenido por el overlay mismo */
 .k-modal {
-    background: #ffffff !important;
-    width: 90% !important;
-    max-width: 650px !important;
-    border-radius: 12px !important;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow: hidden !important;
-    border: none !important;
-    position: relative !important;
-    /* Centrado absoluto dentro del flex container */
-    margin-left: auto !important;
-    margin-right: auto !important;
+    background: var(--k-bg-card);
+    width: 90%;
+    max-width: 580px;
+    border-radius: 12px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: none;
+    animation: modalSlideIn 0.3s ease-out;
 }
 
-/* Header modernizado - Fondo gris muy claro */
+@keyframes modalSlideIn {
+    from { transform: translateY(-15px); opacity: 0; }
+    to   { transform: translateY(0);     opacity: 1; }
+}
+
 .k-modal-header {
-    padding: 20px 24px !important;
-    background: #f8f9fa !important;
-    border-bottom: 1px solid #e9ecef !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    flex-shrink: 0 !important;
-    width: 100% !important;
+    padding: 1rem 1.5rem;
+    background: var(--k-bg-app);
+    border-bottom: 1px solid var(--k-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
 
 .k-modal-title {
-    font-size: 16px !important;
-    font-weight: 600 !important;
-    color: #1a1a2e !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 10px !important;
-    margin: 0 !important;
-    line-height: 1 !important;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--k-text-main);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+}
+.k-modal-title i { color: var(--k-primary); font-size: 1.125rem; }
+
+.btn-close-modal {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--k-border);
+    background: var(--k-bg-card);
+    border-radius: var(--k-radius-md);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--k-text-muted);
+    transition: all 0.2s;
+    padding: 0;
+}
+.btn-close-modal:hover {
+    background: var(--k-danger-light);
+    border-color: var(--k-danger);
+    color: var(--k-danger);
 }
 
-.k-modal-title i,
-.k-modal-title .bi {
-    color: #174ea6 !important;
-    font-size: 18px !important;
-}
-
-/* Botón de cerrar (X) - Estilo minimalista en la esquina */
-.k-btn-icon {
-    width: 32px !important;
-    height: 32px !important;
-    border: none !important;
-    background: transparent !important;
-    border-radius: 6px !important;
-    cursor: pointer !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    color: #6c757d !important;
-    transition: all 0.2s ease !important;
-    padding: 0 !important;
-    font-size: 14px !important;
-    flex-shrink: 0 !important;
-    margin-left: auto !important;
-}
-
-.k-btn-icon:hover {
-    background: #e9ecef !important;
-    color: #dc3545 !important;
-}
-
-/* Body del modal */
 .k-modal-body {
-    padding: 24px !important;
-    overflow-y: auto !important;
-    flex: 1 !important;
-    background: #ffffff !important;
-    max-height: calc(70vh - 120px) !important;
+    padding: 1.5rem;
+    background: var(--k-bg-card);
+    overflow-y: auto;
+    max-height: 65vh;
 }
 
-/* Grid para formulario en 2 columnas */
-.k-form-grid {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
-    gap: 20px !important;
-    margin-bottom: 20px !important;
-}
-
-.k-form-grid:last-child {
-    margin-bottom: 0 !important;
-}
-
-/* Labels - Estilo uppercase gris */
-.k-form-label {
-    display: block !important;
-    font-size: 11px !important;
-    font-weight: 600 !important;
-    color: #6c757d !important;
-    text-transform: uppercase !important;
-    margin-bottom: 8px !important;
-    letter-spacing: 0.5px !important;
-    line-height: 1.2 !important;
-}
-
-/* Inputs y Selects */
-.k-form-control {
-    width: 100% !important;
-    padding: 10px 14px !important;
-    border: 1px solid #dee2e6 !important;
-    border-radius: 8px !important;
-    font-size: 14px !important;
-    color: #212529 !important;
-    background: #ffffff !important;
-    transition: all 0.2s ease !important;
-    font-family: var(--k-font-family) !important;
-    box-sizing: border-box !important;
-}
-
-.k-form-control:focus {
-    outline: none !important;
-    border-color: #174ea6 !important;
-    box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.1) !important;
-}
-
-.k-form-control::placeholder {
-    color: #adb5bd !important;
-}
-
-/* Footer del modal - Fondo gris claro */
 .k-modal-footer {
-    padding: 16px 24px !important;
-    background: #f8f9fa !important;
-    border-top: 1px solid #e9ecef !important;
-    display: flex !important;
-    justify-content: flex-end !important;
-    align-items: center !important;
-    gap: 10px !important;
-    flex-shrink: 0 !important;
-    width: 100% !important;
+    padding: 0.875rem 1.5rem;
+    background: var(--k-bg-app);
+    border-top: 1px solid var(--k-border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.625rem;
 }
 
-/* Botones modernizados */
-.k-btn {
-    padding: 10px 20px !important;
-    border-radius: 8px !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
-    cursor: pointer !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 8px !important;
-    border: none !important;
-    transition: all 0.2s ease !important;
-    font-family: var(--k-font-family) !important;
-    white-space: nowrap !important;
+/* =========================================
+   12. FORMULARIOS (modal)
+   ========================================= */
+
+.k-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem 1.25rem;
+    margin-bottom: 1rem;
+}
+.k-form-grid:last-child { margin-bottom: 0; }
+
+.k-form-label {
+    display: block;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: var(--k-text-muted);
+    text-transform: uppercase;
+    margin-bottom: 0.375rem;
+    letter-spacing: 0.5px;
 }
 
-/* Botón Cancelar - Blanco con borde */
-.k-btn-outline {
-    background: #ffffff !important;
-    border: 1px solid #dee2e6 !important;
-    color: #495057 !important;
+.k-form-control {
+    width: 100%;
+    height: 38px;
+    padding: 0 0.75rem;
+    border: 1px solid var(--k-border);
+    border-radius: var(--k-radius-md);
+    font-size: 0.8125rem;
+    color: var(--k-text-main);
+    background: var(--k-bg-card);
+    transition: all 0.2s;
+    font-family: var(--k-font-family);
+    box-sizing: border-box;
+}
+.k-form-control:focus {
+    outline: none;
+    border-color: var(--k-primary);
+    box-shadow: 0 0 0 3px var(--k-primary-light);
+}
+select.k-form-control {
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236c757d' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 2.25rem;
 }
 
-.k-btn-outline:hover {
-    background: #f8f9fa !important;
-    border-color: #adb5bd !important;
-    color: #212529 !important;
-}
+/* =========================================
+   13. TOAST / NOTIFICACIONES
+   ========================================= */
 
-/* Botón Actualizar/Guardar - Azul sólido */
-.k-btn-primary {
-    background: #174ea6 !important;
-    color: #ffffff !important;
-    box-shadow: 0 2px 4px rgba(23, 78, 166, 0.3) !important;
-}
-
-.k-btn-primary:hover {
-    background: #185abd !important;
-    box-shadow: 0 4px 8px rgba(23, 78, 166, 0.4) !important;
-    transform: translateY(-1px) !important;
-}
-
-/* Responsive para móvil */
-@media (max-width: 480px) {
-    .k-form-grid {
-        grid-template-columns: 1fr !important;
-        gap: 16px !important;
-    }
-    
-    .k-modal {
-        width: 95% !important;
-        max-width: none !important;
-    }
-    
-    .k-modal-header,
-    .k-modal-body,
-    .k-modal-footer {
-        padding-left: 16px !important;
-        padding-right: 16px !important;
-    }
-}
-
-/* Notificaciones (Toast) */
 .k-toast-container {
     position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 2000;
+    top: 20px; right: 20px;
+    z-index: 2100;
     display: flex;
     flex-direction: column;
     gap: 10px;
+    pointer-events: none;
 }
 
 .k-toast {
-    background: white;
+    background: var(--k-bg-card);
     border-left: 4px solid var(--k-primary);
     padding: 1rem 1.5rem;
     border-radius: var(--k-radius-md);
@@ -730,17 +669,48 @@
     gap: 1rem;
     min-width: 300px;
     animation: slideInRight 0.3s ease;
-    transition: all 0.3s ease;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    pointer-events: auto;
 }
 
-/* Utilidades */
-.d-flex { display: flex; }
+@keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to   { transform: translateX(0);    opacity: 1; }
+}
+
+/* =========================================
+   14. UTILIDADES
+   ========================================= */
+
+.d-flex     { display: flex; }
 .align-center { align-items: center; }
-.gap-2 { gap: 0.5rem; }
+.gap-2      { gap: 0.5rem; }
 .text-right { text-align: right; }
-.form-label { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; }
-.form-control { width: 100%; padding: 0.6rem 0.8rem; border: 1px solid var(--k-border); border-radius: var(--k-radius-md); font-family: inherit; font-size: 0.95rem; }
-.form-control:focus { outline: none; border-color: var(--k-primary); box-shadow: 0 0 0 3px var(--k-primary-light); }
+.text-center{ text-align: center; }
+.mb-0       { margin-bottom: 0; }
+
+/* Formulario legacy (vista Reportes) */
+.form-label   { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; color: var(--k-text-main); }
+.form-control {
+    width: 100%;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--k-border);
+    border-radius: var(--k-radius-md);
+    font-family: inherit;
+    font-size: 0.95rem;
+    color: var(--k-text-main);
+    background: var(--k-bg-card);
+}
+.form-control:focus {
+    outline: none;
+    border-color: var(--k-primary);
+    box-shadow: 0 0 0 3px var(--k-primary-light);
+}
+.form-group { margin-bottom: 1.5rem; }
+
+/* =========================================
+   15. RESPONSIVE
+   ========================================= */
 
 @media (max-width: 992px) {
     .dashboard-grid { grid-template-columns: 1fr; }

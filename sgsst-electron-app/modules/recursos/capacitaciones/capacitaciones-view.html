@@ -4,17 +4,15 @@
 <div class="k-toast-container" id="toastContainer"></div>
 
 <div class="k-app-layout">
-    
+
     <!-- 1. HEADER DEL MÓDULO -->
     <header class="k-module-header">
         <div class="k-module-title">
-            <button class="k-btn k-btn-outline k-btn-icon" id="btn-back-module" title="Volver al módulo" style="margin-right: 10px;">
+            <button class="k-btn k-btn-outline k-btn-icon" id="btn-back-module" title="Volver al módulo">
                 <i class="bi bi-arrow-left"></i>
             </button>
             <span><i class="bi bi-mortarboard-fill me-2"></i>Capacitaciones</span>
-            <span style="font-size: 0.85rem; font-weight: 400; color: var(--k-text-muted); margin-left: 10px; border-left: 1px solid var(--k-border); padding-left: 10px;" id="header-context-text">
-                Gestión SG-SST
-            </span>
+            <span class="k-module-subtitle" id="header-context-text">Gestión SG-SST</span>
         </div>
         <div class="d-flex gap-2">
             <button class="k-btn k-btn-outline" id="btn-export-excel">
@@ -40,11 +38,11 @@
 
     <!-- 3. CONTENIDO PRINCIPAL -->
     <main class="k-main-content">
-        
+
         <!-- VISTA: DASHBOARD -->
         <section id="view-dashboard" class="k-view-section active">
-            
-            <!-- Métricas (Grid 4 columnas) -->
+
+            <!-- Métricas -->
             <div class="k-grid-dashboard">
                 <div class="k-stat-card primary">
                     <div class="k-stat-label">Total Programadas</div>
@@ -68,54 +66,49 @@
                 </div>
             </div>
 
-            <!-- Gráfico y Acciones Rápidas (Grid 2:1) -->
+            <!-- Gráfico y Acciones Rápidas -->
             <div class="dashboard-grid">
                 <div class="k-chart-container">
                     <div class="k-chart-header">
                         <div class="k-chart-title">Ejecución Mensual (SST vs PYP)</div>
                     </div>
-                    <!-- Contenedor ajustado con clase .k-chart-body para evitar desbordes -->
                     <div class="k-chart-body">
                         <canvas id="trainingChart"></canvas>
                     </div>
                 </div>
 
-                <div class="k-actions-grid" style="grid-template-columns: 1fr; gap: 1rem;">
-                    <button class="k-btn k-btn-primary" id="btn-quick-add" style="justify-content: center; width: 100%;">
+                <div class="k-actions-grid k-actions-grid--single">
+                    <button class="k-btn k-btn-primary k-btn-full" id="btn-quick-add">
                         <i class="bi bi-plus-circle"></i> Nueva Capacitación
                     </button>
                     <div class="k-action-card" id="btn-create-period">
                         <div class="k-action-icon"><i class="bi bi-calendar-plus"></i></div>
                         <div>
-                            <div style="font-weight: 600; font-size: 0.9rem;">Crear Periodo</div>
-                            <div style="font-size: 0.75rem; color: var(--k-text-muted);">Duplicar a año siguiente</div>
+                            <div class="k-action-card-title">Crear Periodo</div>
+                            <div class="k-action-card-desc">Duplicar a año siguiente</div>
                         </div>
                     </div>
-                    <!-- Placeholder para más acciones -->
                     <div class="k-action-card">
                         <div class="k-action-icon"><i class="bi bi-envelope"></i></div>
                         <div>
-                            <div style="font-weight: 600; font-size: 0.9rem;">Recordatorios</div>
-                            <div style="font-size: 0.75rem; color: var(--k-text-muted);">Enviar notificaciones</div>
+                            <div class="k-action-card-title">Recordatorios</div>
+                            <div class="k-action-card-desc">Enviar notificaciones</div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Listas Recientes -->
+            <!-- Próximas Capacitaciones -->
             <div class="k-chart-container k-recent-list-container">
                 <div class="k-chart-title" style="margin-bottom: 1rem;">Próximas Capacitaciones</div>
-                <div id="recent-list">
-                    <!-- Items inyectados dinámicamente -->
-                </div>
+                <div id="recent-list"></div>
             </div>
 
         </section>
 
         <!-- VISTA: LISTADO -->
         <section id="view-trainings" class="k-view-section">
-            
-            <!-- Barra de Herramientas -->
+
             <div class="k-toolbar">
                 <div class="k-filter-group">
                     <select id="yearFilter" class="k-form-select">
@@ -147,8 +140,8 @@
                         <option value="12">Diciembre</option>
                     </select>
                 </div>
-                <div>
-                    <button class="k-btn k-btn-outline" id="btn-clear-filters" style="margin-right: 0.5rem;">
+                <div class="d-flex gap-2">
+                    <button class="k-btn k-btn-outline" id="btn-clear-filters">
                         <i class="bi bi-arrow-clockwise"></i> Limpiar
                     </button>
                     <button class="k-btn k-btn-primary" id="btn-add-training">
@@ -157,7 +150,6 @@
                 </div>
             </div>
 
-            <!-- Tabla de Datos -->
             <div class="k-table-container">
                 <table class="k-table">
                     <thead>
@@ -171,18 +163,16 @@
                             <th class="text-right">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody id="trainings-table-body">
-                        <!-- Filas dinámicas -->
-                    </tbody>
+                    <tbody id="trainings-table-body"></tbody>
                 </table>
             </div>
         </section>
 
         <!-- VISTA: REPORTES -->
         <section id="view-reports" class="k-view-section">
-            <div class="k-chart-container" style="max-width: 600px; margin: 0 auto; min-height: auto;">
-                <h3 class="k-chart-title" style="text-align: center; margin-bottom: 2rem;">Generador de Reportes</h3>
-                <div style="margin-bottom: 1.5rem;">
+            <div class="k-chart-container k-reports-container">
+                <h3 class="k-chart-title k-chart-title--center">Generador de Reportes</h3>
+                <div class="form-group">
                     <label class="form-label">Tipo de Reporte</label>
                     <select class="form-control">
                         <option>Informe Mensual de Cumplimiento</option>
@@ -190,14 +180,14 @@
                         <option>Certificados Asistencia</option>
                     </select>
                 </div>
-                <div style="margin-bottom: 1.5rem;">
+                <div class="form-group">
                     <label class="form-label">Periodo</label>
                     <select class="form-control">
                         <option>Actual</option>
                     </select>
                 </div>
-                <div style="text-align: right;">
-                    <button class="k-btn k-btn-primary" onclick="window.currentCapacitacionesComponent.showNotification('Generando reporte PDF...', 'info')">
+                <div class="text-right">
+                    <button class="k-btn k-btn-primary" id="btn-generate-report">
                         <i class="bi bi-file-earmark-pdf"></i> Descargar
                     </button>
                 </div>
@@ -208,35 +198,35 @@
 </div>
 
 <!-- ======================== -->
-<!-- MODAL: CREAR CAPACITACIÓN (Diseño Modernizado) -->
+<!-- MODAL UNIFICADO: AGREGAR / EDITAR CAPACITACIÓN -->
 <!-- ======================== -->
-<div class="k-modal-overlay" id="addTrainingModal">
+<div class="k-modal-overlay" id="trainingModal">
     <div class="k-modal">
-        
-        <!-- HEADER -->
+
         <div class="k-modal-header">
-            <h3 class="k-modal-title" id="modalTitle">
-                <i class="bi bi-plus-circle"></i>
+            <h3 class="k-modal-title" id="modal-title">
+                <i class="bi bi-plus-circle" id="modal-icon"></i>
                 Nueva Capacitación
             </h3>
-            <button class="k-btn k-btn-icon btn-close-modal">
+            <button type="button" class="btn-close-modal" aria-label="Cerrar">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
 
-        <!-- BODY -->
         <div class="k-modal-body">
-            <form id="trainingForm">
-                <input type="hidden" id="edit-id">
+            <form id="trainingForm" novalidate>
+                <!-- ID oculto del registro en edición (vacío en modo crear) -->
+                <input type="hidden" id="training-id" value="">
 
-                <!-- Fila 1 -->
+                <!-- Fila 1: Nombre y Tipo -->
                 <div class="k-form-grid">
                     <div>
-                        <label class="k-form-label">Nombre *</label>
-                        <input type="text" id="trainingName" class="k-form-control" placeholder="Ej: Uso de EPP" required>
+                        <label class="k-form-label" for="trainingName">Nombre *</label>
+                        <input type="text" id="trainingName" class="k-form-control"
+                               placeholder="Ej: Uso de EPP" required>
                     </div>
                     <div>
-                        <label class="k-form-label">Tipo *</label>
+                        <label class="k-form-label" for="trainingType">Tipo *</label>
                         <select id="trainingType" class="k-form-control">
                             <option value="sst">Seguridad (SST)</option>
                             <option value="pyp">Medicina Preventiva (PYP)</option>
@@ -244,120 +234,42 @@
                     </div>
                 </div>
 
-                <!-- Fila 2 -->
+                <!-- Fila 2: Fecha y Duración -->
                 <div class="k-form-grid">
                     <div>
-                        <label class="k-form-label">Fecha Programada *</label>
+                        <label class="k-form-label" for="trainingDate">Fecha Programada *</label>
                         <input type="date" id="trainingDate" class="k-form-control" required>
                     </div>
                     <div>
-                        <label class="k-form-label">Duración (Horas)</label>
-                        <input type="number" id="trainingDuration" class="k-form-control" value="2" min="1">
+                        <label class="k-form-label" for="trainingDuration">Duración (Horas)</label>
+                        <input type="number" id="trainingDuration" class="k-form-control"
+                               placeholder="2" value="2" min="1">
                     </div>
                 </div>
 
-                <!-- Fila 3 -->
+                <!-- Fila 3: Instructor y Participantes -->
                 <div class="k-form-grid">
                     <div>
-                        <label class="k-form-label">Instructor</label>
+                        <label class="k-form-label" for="trainingInstructor">Instructor</label>
                         <select id="trainingInstructor" class="k-form-control">
-                            <option value="Técnico">Técnico</option>
+                            <option value="Técnico">Técnico Interno</option>
                             <option value="ARL">ARL</option>
                             <option value="Olga Pinto">ARL - Olga Pinto</option>
                         </select>
                     </div>
                     <div>
-                        <label class="k-form-label">Participantes</label>
-                        <input type="number" id="trainingParticipants" class="k-form-control" value="0" min="0">
+                        <label class="k-form-label" for="trainingParticipants">Participantes</label>
+                        <input type="number" id="trainingParticipants" class="k-form-control"
+                               placeholder="0" value="0" min="0">
                     </div>
                 </div>
             </form>
         </div>
 
-        <!-- FOOTER -->
         <div class="k-modal-footer">
             <button type="button" class="k-btn k-btn-outline btn-close-modal">Cancelar</button>
             <button type="button" class="k-btn k-btn-primary" id="btn-save-training">
                 <i class="bi bi-check-lg"></i> Guardar
-            </button>
-        </div>
-
-    </div>
-</div>
-
-<!-- ======================== -->
-<!-- MODAL: EDITAR CAPACITACIÓN (Diseño Modernizado) -->
-<!-- ======================== -->
-<div class="k-modal-overlay" id="editTrainingModal">
-    <div class="k-modal">
-        
-        <!-- HEADER -->
-        <div class="k-modal-header">
-            <h3 class="k-modal-title">
-                <i class="bi bi-pencil-square"></i>
-                Editar Capacitación
-            </h3>
-            <button class="k-btn k-btn-icon btn-close-modal">
-                <i class="bi bi-x-lg"></i>
-            </button>
-        </div>
-
-        <!-- BODY -->
-        <div class="k-modal-body">
-            <form id="editTrainingForm">
-                <!-- Hidden ID (Lógica original - compatibilidad) -->
-                <input type="hidden" id="editTrainingName" data-id="">
-
-                <!-- Fila 1 -->
-                <div class="k-form-grid">
-                    <div>
-                        <label class="k-form-label">Nombre *</label>
-                        <input type="text" id="editTrainingNameInput" class="k-form-control" placeholder="Ej: Uso de EPP" required>
-                    </div>
-                    <div>
-                        <label class="k-form-label">Tipo *</label>
-                        <select id="editTrainingType" class="k-form-control">
-                            <option value="sst">Seguridad (SST)</option>
-                            <option value="pyp">Medicina Preventiva (PYP)</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Fila 2 -->
-                <div class="k-form-grid">
-                    <div>
-                        <label class="k-form-label">Fecha Programada *</label>
-                        <input type="date" id="editTrainingDate" class="k-form-control" required>
-                    </div>
-                    <div>
-                        <label class="k-form-label">Duración (Horas)</label>
-                        <input type="number" id="editTrainingDuration" class="k-form-control" value="2" min="1">
-                    </div>
-                </div>
-
-                <!-- Fila 3 -->
-                <div class="k-form-grid">
-                    <div>
-                        <label class="k-form-label">Instructor</label>
-                        <select id="editTrainingInstructor" class="k-form-control">
-                            <option value="Técnico">Técnico</option>
-                            <option value="ARL">ARL</option>
-                            <option value="Olga Pinto">ARL - Olga Pinto</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="k-form-label">Participantes</label>
-                        <input type="number" id="editTrainingParticipants" class="k-form-control" value="0" min="0">
-                    </div>
-                </div>
-            </form>
-        </div>
-
-        <!-- FOOTER -->
-        <div class="k-modal-footer">
-            <button type="button" class="k-btn k-btn-outline btn-close-modal">Cancelar</button>
-            <button type="button" class="k-btn k-btn-primary" id="btn-update-training">
-                <i class="bi bi-check-lg"></i> Actualizar
             </button>
         </div>
 

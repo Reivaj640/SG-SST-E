@@ -1,7 +1,7 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.70
-**Última actualización:** 5 de marzo de 2026
+**Versión:** 0.1.71
+**Última actualización:** 13 de marzo de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
 ---
@@ -33,6 +33,10 @@
 - ✅ **Tabla de Ausentismo 17 Columnas**: Año, Fecha Inicio, Fecha Fin, Código 🆕
 - ✅ **Filtros Dinámicos Inteligentes**: Año y tipo basados en datos reales 🆕
 - ✅ **Información de Mapeo**: Fecha y tipo de mapeo en tarjetas de empresas 🆕
+- ✅ **Portales de Bienvenida (Antesalas)** 🆕: Interfaz moderna tipo portal para submódulos clave
+- ✅ **Sistema de Notificaciones Toast** 🆕: Notificaciones modernas no intrusivas
+- ✅ **Modales Modernizados** 🆕: Diseño centrado, animaciones suaves, UX mejorada
+- ✅ **Detección Automática de Año Activo** 🆕: El sistema detecta automáticamente el año más reciente
 
 ---
 
@@ -235,9 +239,52 @@ npm run docs:watch     # Vigilar cambios y regenerar
 | 1.1.6  | Conformación de Copasst   | `copasst-logic.js`, `viewer.js`                     |
 | 1.1.7  | Capacitación al Copasst   | `capacitacion-copasst-logic.js`, `viewer.js`        |
 | 1.1.8  | Comité de Convivencia     | `comite-convivencia-logic.js`, `viewer.js`          |
-| 1.2.1  | Programa de Capacitación  | `capacitaciones-logic.js`, `viewer.js`              |
+| 1.2.1  | Programa de Capacitación  | `capacitaciones-logic.js`, `capacitaciones-viewer.js`, `capacitaciones-portal-logic.js` 🆕, `cap-home.html` 🆕, `cap-home.js` 🆕 |
 | 1.2.2  | Inducción y Reinducción   | `inducciones-logic.js`, `viewer.js`                 |
 | 1.2.3  | Curso Virtual 50 Horas    | `curso-virtual-logic.js`, `viewer.js`               |
+
+### 🆕 Módulo 1.2.1 - Programa de Capacitaciones (Actualizado v0.1.71)
+
+**Archivos Principales:**
+- `capacitaciones-logic.js` - Lógica del componente viewer (tabla de capacitaciones)
+- `capacitaciones-viewer.js` - Wrapper del componente viewer
+- `capacitaciones-portal-logic.js` 🆕 - Componente portal de bienvenida (antesala)
+- `cap-home.html` 🆕 - Interfaz del portal de bienvenida
+- `cap-home.js` 🆕 - Lógica del portal
+- `capacitaciones-view.html` - Vista de la tabla de capacitaciones (modales modernizados)
+- `capacitaciones-view.css` - Estilos modernizados (modales centrados)
+
+**Características Implementadas:**
+- ✅ **Portal de Bienvenida (Antesala)**: Interfaz moderna tipo portal similar a Plan de Trabajo (2.4.1)
+- ✅ **Clonar Cronograma**: Duplica hojas dentro del mismo archivo Excel (Matriz Cap. YYYY → Matriz Cap. YYYY+1)
+- ✅ **Detección Automática de Año Activo**: El sistema detecta automáticamente el año más reciente en las hojas del Excel
+- ✅ **Notificaciones Toast Modernas**: Reemplazan los `alert()` nativos por notificaciones no intrusivas
+- ✅ **Modales Modernizados**: Diseño centrado, animaciones suaves, header/footer con fondo gris claro
+- ✅ **Soporte para Archivos .xlsx**: La función de clonado requiere formato .xlsx (Excel 2007+)
+
+**Flujo de Navegación:**
+```
+Menú Principal → 1.2.1 Programa de Capacitaciones
+                ↓
+        [Portal cap-home.html]
+        - Ver Cronograma → Viewer existente
+        - Importar desde Excel
+        - Clonar Cronograma → Nueva hoja Matriz Cap. (Año+1)
+        - Exportar, Matriz de Formación, etc.
+```
+
+**Funciones Clave:**
+| Función | Descripción |
+|---------|-------------|
+| `cloneCronograma()` | Clona la hoja del año actual al siguiente año, reseteando fechas y estados |
+| `loadActiveYear()` | Detecta automáticamente el año más reciente en las hojas disponibles |
+| `showNotification()` | Muestra notificaciones toast modernas (success, danger, warning, info) |
+| `enterViewer()` | Navega al viewer de capacitaciones existente |
+
+**Requisitos:**
+- 📄 Formato de archivo: `.xlsx` (requerido para clonado de hojas)
+- 📊 Estructura de hojas: `Matriz Cap. YYYY` (ej: `Matriz Cap. 2025`, `Matriz Cap. 2026`)
+- 🔄 Función backend: `duplicate-capacitaciones-sheet` (main.js)
 
 ### Módulo 2: Gestión Integral (6 submódulos)
 
