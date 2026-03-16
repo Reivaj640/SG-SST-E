@@ -2441,6 +2441,15 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
     // --- Callback SEGURO para componentes que se portan mal ---
     const safeBackToModuleCallback = () => {
         console.warn('[safeBackToModuleCallback] Se ha llamado al callback de retorno. Limpiando estado y mostrando home del módulo.');
+        if (currentActiveComponent && typeof currentActiveComponent.destroy === 'function') {
+          try {
+            currentActiveComponent.destroy();
+          } catch (e) {
+            console.warn('Error al destruir componente activo en retorno:', e);
+          } finally {
+            currentActiveComponent = null;
+          }
+        }
         currentSubmodule = null;
         showModuleContent(moduleName);
     };
@@ -2577,6 +2586,7 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
           submoduleName,
           safeBackToModuleCallback
         );
+        currentActiveComponent = capacitacionesPortal;
         capacitacionesPortal.render();
       } else {
         console.error('❌ CapacitacionesPortalComponent no encontrado');

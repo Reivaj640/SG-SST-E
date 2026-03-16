@@ -8,6 +8,8 @@ class CapacitacionesPortalComponent {
         this.moduleName = moduleName;
         this.submoduleName = submoduleName;
         this.onBackToModuleHome = onBackToModuleHome;
+        this.viewerComponent = null;
+        this.portalScript = null;
     }
 
     async render() {
@@ -50,6 +52,7 @@ class CapacitacionesPortalComponent {
         // Cargar el JS del portal dinámicamente
         const script = document.createElement('script');
         script.src = './modules/recursos/capacitaciones/cap-home.js';
+        this.portalScript = script;
         script.onload = () => {
             console.log('[CapacitacionesPortalComponent] cap-home.js cargado');
             // LLAMAR MANUALMENTE A initializePortal() DESPUÉS DE CARGAR
@@ -79,6 +82,13 @@ class CapacitacionesPortalComponent {
         const CapacitacionesComponentClass = window.CapacitacionesComponent;
         
         if (CapacitacionesComponentClass) {
+            if (this.viewerComponent && typeof this.viewerComponent.destroy === 'function') {
+                try {
+                    this.viewerComponent.destroy();
+                } catch (e) {
+                    console.warn('[CapacitacionesPortalComponent] Error destruyendo viewer previo:', e);
+                }
+            }
             const component = new CapacitacionesComponentClass(
                 this.container,
                 this.companyName,
@@ -86,6 +96,7 @@ class CapacitacionesPortalComponent {
                 this.submoduleName,
                 this.onBackToModuleHome
             );
+            this.viewerComponent = component;
             component.render();
         } else {
             // Fallback: cargar directamente la vista
@@ -205,6 +216,39 @@ class CapacitacionesPortalComponent {
 
     openMatrizFormacion() {
         alert('Función: Matriz de Formación\n\nEsta acción abrirá el módulo de gestión de matriz de formación.');
+    }
+
+    destroy() {
+        if (this.viewerComponent && typeof this.viewerComponent.destroy === 'function') {
+            try {
+                this.viewerComponent.destroy();
+            } catch (e) {
+                console.warn('[CapacitacionesPortalComponent] Error destruyendo viewer:', e);
+            } finally {
+                this.viewerComponent = null;
+            }
+        }
+
+        const modal = document.getElementById('trainingModal');
+        if (modal && modal.parentNode === document.body) {
+            document.body.removeChild(modal);
+        }
+
+        if (this.portalScript && this.portalScript.parentNode === document.body) {
+            document.body.removeChild(this.portalScript);
+            this.portalScript = null;
+        }
+
+        if (window.capPortalComponent === this) {
+            window.capPortalComponent = null;
+        }
+        if (window.capPortalContainer) {
+            window.capPortalContainer = null;
+        }
+
+        if (this.container) {
+            this.container.innerHTML = '';
+        }
     }
 }
 

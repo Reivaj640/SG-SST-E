@@ -506,9 +506,9 @@
     left: 0 !important;
     width: 100vw !important;
     height: 100vh !important;
-    background: rgba(15, 23, 42, 0.6) !important;
-    backdrop-filter: blur(4px) !important;
-    -webkit-backdrop-filter: blur(4px) !important;
+    background: rgba(45, 48, 55, 0.72) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
     display: none !important;
     justify-content: center !important;
     align-items: center !important;
@@ -520,13 +520,19 @@
 }
 
 /* Todo lo que está DENTRO del overlay NO necesita !important
-   porque ya está contenido por el overlay mismo */
-.k-modal {
+   porque ya está contenido por el overlay mismo.
+   Se usa selector más específico para neutralizar CSS global de otros módulos. */
+.k-modal-overlay .k-modal {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    height: auto !important;
+    max-height: 80vh;
     background: var(--k-bg-card);
-    width: 90%;
-    max-width: 580px;
+    width: 92%;
+    max-width: 620px;
     border-radius: 12px;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.22);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -540,16 +546,20 @@
 }
 
 .k-modal-header {
-    padding: 1rem 1.5rem;
+    padding: 0.95rem 1.25rem;
     background: var(--k-bg-app);
     border-bottom: 1px solid var(--k-border);
     display: flex;
     align-items: center;
     justify-content: space-between;
+    width: 100%;
+    box-sizing: border-box;
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
 }
 
 .k-modal-title {
-    font-size: 1rem;
+    font-size: 1.02rem;
     font-weight: 600;
     color: var(--k-text-main);
     margin: 0;
@@ -559,7 +569,7 @@
 }
 .k-modal-title i { color: var(--k-primary); font-size: 1.125rem; }
 
-.btn-close-modal {
+.k-modal-header .btn-close-modal {
     width: 32px;
     height: 32px;
     border: 1px solid var(--k-border);
@@ -573,26 +583,37 @@
     transition: all 0.2s;
     padding: 0;
 }
-.btn-close-modal:hover {
+.k-modal-header .btn-close-modal:hover {
     background: var(--k-danger-light);
     border-color: var(--k-danger);
     color: var(--k-danger);
 }
 
+/* El botón "Cancelar" también usa .btn-close-modal para cerrar el modal */
+.k-modal-footer .btn-close-modal {
+    width: auto;
+    height: 38px;
+    padding: 0 1.125rem;
+}
+
 .k-modal-body {
-    padding: 1.5rem;
+    padding: 1.25rem;
     background: var(--k-bg-card);
     overflow-y: auto;
-    max-height: 65vh;
+    max-height: calc(80vh - 116px);
 }
 
 .k-modal-footer {
-    padding: 0.875rem 1.5rem;
+    padding: 0.85rem 1.25rem;
     background: var(--k-bg-app);
     border-top: 1px solid var(--k-border);
     display: flex;
     justify-content: flex-end;
     gap: 0.625rem;
+    width: 100%;
+    box-sizing: border-box;
+    border-radius: 0 0 12px 12px;
+    box-shadow: 0 -1px 0 rgba(0, 0, 0, 0.04);
 }
 
 /* =========================================
