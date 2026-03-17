@@ -12,6 +12,9 @@ const os = require('os');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
 const ExcelJS = require('exceljs');
+const Database = require('better-sqlite3');
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 // Importar handlers de investigación de accidentes
 require('./modules/gestion-salud/investigacion-accidentes/investigacion_handlers.js');
@@ -163,6 +166,137 @@ function sendLog(message, level = 'INFO') {
 const configPath = path.join(app.getPath('userData'), 'config.json');
 
 // ===============================
+// 🗄️ BASE DE DATOS LOCAL (SQLite)
+// ===============================
+let db = null;
+let dbInitialized = false;
+
+function readConfigSync() {
+  try {
+    if (!fsSync.existsSync(configPath)) return {};
+    const data = fsSync.readFileSync(configPath, 'utf8');
+    return JSON.parse(data || '{}');
+  } catch (e) {
+    console.warn('[DB] Error leyendo config.json:', e.message);
+    return {};
+  }
+}
+
+function initDbOnce() {
+  if (dbInitialized) return;
+  const dbPath = path.join(app.getPath('userData'), 'kair.db');
+
+  try {
+    db = new Database(dbPath);
+    db.pragma('journal_mode = WAL');
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT UNIQUE NOT NULL,
+        full_name TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL,
+        last_login_at TEXT
+      );
+      CREATE TABLE IF NOT EXISTS roles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS companies (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_key TEXT UNIQUE NOT NULL,
+        display_name TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS user_company_roles (
+        user_id INTEGER NOT NULL,
+        company_id INTEGER NOT NULL,
+        role_id INTEGER NOT NULL,
+        PRIMARY KEY (user_id, company_id, role_id)
+      );
+      CREATE TABLE IF NOT EXISTS sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        token TEXT UNIQUE NOT NULL,
+        created_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL
+      );
+    `);
+
+    const roleNames = ['Administrador', 'SST', 'Auditoría', 'Gerencia', 'Recursos Humanos'];
+    const insertRole = db.prepare('INSERT OR IGNORE INTO roles (name) VALUES (?)');
+    roleNames.forEach(r => insertRole.run(r));
+
+    const userCount = db.prepare('SELECT COUNT(1) AS total FROM users').get().total;
+    if (userCount === 0) {
+      const defaultEmail = 'admin@kair.local';
+      const defaultPass = 'Admin123!';
+      const hash = bcrypt.hashSync(defaultPass, 10);
+      db.prepare(`
+        INSERT INTO users (email, full_name, password_hash, status, created_at)
+        VALUES (?, ?, ?, 'active', ?)
+      `).run(defaultEmail, 'Administrador K+AIR', hash, new Date().toISOString());
+      console.log('[DB] Usuario admin creado por defecto:', defaultEmail);
+    }
+
+    try {
+      companiesSyncInternal(db);
+    } catch (syncErr) {
+      console.warn('[DB] Error en companiesSyncInternal (no crítico):', syncErr.message);
+    }
+    dbInitialized = true;
+    console.log('[DB] Base de datos inicializada en:', dbPath);
+  } catch (e) {
+    console.error('[DB] Error inicializando DB:', e.message);
+    dbInitialized = false;
+  }
+}
+
+function getDb() {
+  if (!dbInitialized) {
+    initDbOnce();
+  }
+  if (!db) throw new Error('DB_NOT_INITIALIZED');
+  return db;
+}
+
+function companiesSyncInternal(localDb = null) {
+  const dbRef = localDb || db;
+  if (!dbRef) {
+    console.warn('[DB] companiesSyncInternal llamado sin DB inicializada');
+    return;
+  }
+  const config = readConfigSync();
+  const companyPaths = config.companyPaths || {};
+  const upsert = dbRef.prepare(`
+    INSERT INTO companies (company_key, display_name)
+    VALUES (?, ?)
+    ON CONFLICT(company_key) DO UPDATE SET display_name=excluded.display_name
+  `);
+  Object.keys(companyPaths).forEach(key => {
+    upsert.run(key, key);
+  });
+}
+
+function validateSession(token) {
+  if (!token) {
+    return { ok: false, error: { code: 'AUTH_REQUIRED', message: 'Token requerido' } };
+  }
+  const localDb = getDb();
+  const row = localDb.prepare('SELECT * FROM sessions WHERE token = ?').get(token);
+  if (!row) {
+    return { ok: false, error: { code: 'INVALID_SESSION', message: 'Sesión inválida' } };
+  }
+  const now = new Date();
+  if (new Date(row.expires_at) <= now) {
+    localDb.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+    return { ok: false, error: { code: 'SESSION_EXPIRED', message: 'Sesión expirada' } };
+  }
+  return { ok: true, session: row };
+}
+
+// ===============================
 // 🔄 SISTEMA DE AUTO-ACTUALIZACIONES
 // ===============================
 
@@ -293,6 +427,7 @@ if (require('electron-squirrel-startup')) {
 
 // Función para crear la ventana principal
 const createWindow = () => {
+  initDbOnce();
   // Verificar si la ventana ya ha sido creada o si mainWindow existe y no está destruida
   if (isWindowCreated && mainWindow && !mainWindow.isDestroyed()) {
     console.log('[MAIN] La ventana ya existe, trayéndola al frente...');
@@ -476,6 +611,362 @@ ipcMain.handle('load-config', async () => {
     }
     console.error('Error loading config:', error);
     return {};
+  }
+});
+
+// ===============================
+// 🔐 AUTH & COMPANIES (V1)
+// ===============================
+ipcMain.handle('auth-login-v1', async (event, payload = {}) => {
+  try {
+    const { email, password } = payload;
+    if (!email || !password) {
+      return { success: false, error: { code: 'INVALID_INPUT', message: 'Email y password son requeridos.' } };
+    }
+
+    const localDb = getDb();
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const user = localDb.prepare('SELECT * FROM users WHERE lower(email) = ?').get(normalizedEmail);
+    if (!user) {
+      return { success: false, error: { code: 'USER_NOT_FOUND', message: 'Usuario no encontrado.' } };
+    }
+    if (user.status !== 'active') {
+      return { success: false, error: { code: 'USER_INACTIVE', message: 'Usuario inactivo.' } };
+    }
+    if (!bcrypt.compareSync(String(password), user.password_hash)) {
+      return { success: false, error: { code: 'INVALID_CREDENTIALS', message: 'Credenciales inválidas.' } };
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+
+    localDb.prepare(`
+      INSERT INTO sessions (user_id, token, created_at, expires_at)
+      VALUES (?, ?, ?, ?)
+    `).run(user.id, token, now.toISOString(), expiresAt.toISOString());
+
+    localDb.prepare('UPDATE users SET last_login_at = ? WHERE id = ?')
+      .run(now.toISOString(), user.id);
+
+    const companies = localDb.prepare(`
+      SELECT c.company_key, c.display_name, r.name AS role
+      FROM user_company_roles ucr
+      JOIN companies c ON c.id = ucr.company_id
+      JOIN roles r ON r.id = ucr.role_id
+      WHERE ucr.user_id = ?
+    `).all(user.id);
+
+    return {
+      success: true,
+      data: {
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          full_name: user.full_name,
+          status: user.status
+        },
+        companies
+      }
+    };
+  } catch (error) {
+    console.error('[AUTH] Error en login:', error);
+    return { success: false, error: { code: 'AUTH_ERROR', message: error.message } };
+  }
+});
+
+ipcMain.handle('auth-logout-v1', async (event, payload = {}) => {
+  try {
+    const { token } = payload;
+    if (!token) {
+      return { success: false, error: { code: 'INVALID_INPUT', message: 'Token requerido.' } };
+    }
+    const localDb = getDb();
+    localDb.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+    return { success: true };
+  } catch (error) {
+    console.error('[AUTH] Error en logout:', error);
+    return { success: false, error: { code: 'AUTH_ERROR', message: error.message } };
+  }
+});
+
+ipcMain.handle('companies-sync-v1', async (event, payload = {}) => {
+  try {
+    const { token } = payload;
+    const sessionCheck = validateSession(token);
+    if (!sessionCheck.ok) {
+      return { success: false, error: sessionCheck.error };
+    }
+
+    const config = readConfigSync();
+    const companyPaths = config.companyPaths || {};
+    companiesSyncInternal(localDb);
+    return { success: true, data: { count: Object.keys(companyPaths).length } };
+  } catch (error) {
+    console.error('[COMPANIES] Error en sync:', error);
+    return { success: false, error: { code: 'SYNC_ERROR', message: error.message } };
+  }
+});
+
+// ===============================
+// 👤 USERS & ASSIGNMENTS (V1)
+// ===============================
+ipcMain.handle('users-list-v1', async (event, payload = {}) => {
+  try {
+    const { token } = payload;
+    const sessionCheck = validateSession(token);
+    if (!sessionCheck.ok) return { success: false, error: sessionCheck.error };
+
+    const localDb = getDb();
+    const users = localDb.prepare(`
+      SELECT id, email, full_name, status, created_at, last_login_at
+      FROM users
+      ORDER BY id ASC
+    `).all();
+
+    return { success: true, data: { users } };
+  } catch (error) {
+    console.error('[USERS] Error listando usuarios:', error);
+    return { success: false, error: { code: 'USERS_LIST_ERROR', message: error.message } };
+  }
+});
+
+ipcMain.handle('users-create-v1', async (event, payload = {}) => {
+  try {
+    const { token, user } = payload;
+    const sessionCheck = validateSession(token);
+    if (!sessionCheck.ok) return { success: false, error: sessionCheck.error };
+
+    if (!user || !user.email || !user.full_name || !user.password) {
+      return { success: false, error: { code: 'INVALID_INPUT', message: 'Datos de usuario incompletos.' } };
+    }
+
+    const localDb = getDb();
+    const email = String(user.email).trim().toLowerCase();
+    const fullName = String(user.full_name).trim();
+    const passwordHash = bcrypt.hashSync(String(user.password), 10);
+
+    const exists = localDb.prepare('SELECT id FROM users WHERE lower(email) = ?').get(email);
+    if (exists) {
+      return { success: false, error: { code: 'EMAIL_EXISTS', message: 'El email ya existe.' } };
+    }
+
+    const result = localDb.prepare(`
+      INSERT INTO users (email, full_name, password_hash, status, created_at)
+      VALUES (?, ?, ?, 'active', ?)
+    `).run(email, fullName, passwordHash, new Date().toISOString());
+
+    return { success: true, data: { userId: result.lastInsertRowid } };
+  } catch (error) {
+    console.error('[USERS] Error creando usuario:', error);
+    return { success: false, error: { code: 'USERS_CREATE_ERROR', message: error.message } };
+  }
+});
+
+ipcMain.handle('users-update-v1', async (event, payload = {}) => {
+  try {
+    const { token, userId, patch } = payload;
+    const sessionCheck = validateSession(token);
+    if (!sessionCheck.ok) return { success: false, error: sessionCheck.error };
+
+    if (!userId || !patch) {
+      return { success: false, error: { code: 'INVALID_INPUT', message: 'userId y patch son requeridos.' } };
+    }
+
+    const localDb = getDb();
+    const current = localDb.prepare('SELECT id, email FROM users WHERE id = ?').get(userId);
+    if (!current) {
+      return { success: false, error: { code: 'USER_NOT_FOUND', message: 'Usuario no encontrado.' } };
+    }
+
+    const updates = [];
+    const params = [];
+
+    if (patch.email) {
+      const email = String(patch.email).trim().toLowerCase();
+      const exists = localDb.prepare('SELECT id FROM users WHERE lower(email) = ? AND id != ?').get(email, userId);
+      if (exists) {
+        return { success: false, error: { code: 'EMAIL_EXISTS', message: 'El email ya existe.' } };
+      }
+      updates.push('email = ?');
+      params.push(email);
+    }
+
+    if (patch.full_name) {
+      updates.push('full_name = ?');
+      params.push(String(patch.full_name).trim());
+    }
+
+    if (patch.status) {
+      updates.push('status = ?');
+      params.push(String(patch.status));
+    }
+
+    if (patch.password) {
+      updates.push('password_hash = ?');
+      params.push(bcrypt.hashSync(String(patch.password), 10));
+    }
+
+    if (updates.length === 0) {
+      return { success: false, error: { code: 'NO_CHANGES', message: 'No hay cambios para aplicar.' } };
+    }
+
+    params.push(userId);
+    localDb.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+    return { success: true };
+  } catch (error) {
+    console.error('[USERS] Error actualizando usuario:', error);
+    return { success: false, error: { code: 'USERS_UPDATE_ERROR', message: error.message } };
+  }
+});
+
+ipcMain.handle('users-disable-v1', async (event, payload = {}) => {
+  try {
+    const { token, userId } = payload;
+    const sessionCheck = validateSession(token);
+    if (!sessionCheck.ok) return { success: false, error: sessionCheck.error };
+
+    if (!userId) {
+      return { success: false, error: { code: 'INVALID_INPUT', message: 'userId es requerido.' } };
+    }
+
+    const localDb = getDb();
+    const result = localDb.prepare('UPDATE users SET status = ? WHERE id = ?').run('inactive', userId);
+    if (result.changes === 0) {
+      return { success: false, error: { code: 'USER_NOT_FOUND', message: 'Usuario no encontrado.' } };
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('[USERS] Error desactivando usuario:', error);
+    return { success: false, error: { code: 'USERS_DISABLE_ERROR', message: error.message } };
+  }
+});
+
+ipcMain.handle('assignments-set-v1', async (event, payload = {}) => {
+  try {
+    const { token, assignments, replaceAllForUser = false } = payload;
+    const sessionCheck = validateSession(token);
+    if (!sessionCheck.ok) return { success: false, error: sessionCheck.error };
+
+    if (!Array.isArray(assignments) || assignments.length === 0) {
+      return { success: false, error: { code: 'INVALID_INPUT', message: 'assignments requeridos.' } };
+    }
+
+    const localDb = getDb();
+    companiesSyncInternal();
+
+    const findUser = localDb.prepare('SELECT id FROM users WHERE id = ?');
+    const findCompany = localDb.prepare('SELECT id FROM companies WHERE company_key = ?');
+    const findRole = localDb.prepare('SELECT id FROM roles WHERE lower(name) = lower(?)');
+    const insertRole = localDb.prepare('INSERT OR IGNORE INTO roles (name) VALUES (?)');
+    const deleteExisting = localDb.prepare('DELETE FROM user_company_roles WHERE user_id = ? AND company_id = ?');
+    const deleteAllForUser = localDb.prepare('DELETE FROM user_company_roles WHERE user_id = ?');
+    const insertAssignment = localDb.prepare(`
+      INSERT OR IGNORE INTO user_company_roles (user_id, company_id, role_id)
+      VALUES (?, ?, ?)
+    `);
+
+    const tx = localDb.transaction((items) => {
+      if (replaceAllForUser) {
+        const firstUserId = items[0]?.userId;
+        if (firstUserId) {
+          deleteAllForUser.run(firstUserId);
+        }
+      }
+      items.forEach(item => {
+        const userId = item.userId;
+        const companyKey = String(item.companyKey || '').trim();
+        const roleName = String(item.role || '').replace(/\s+/g, ' ').trim();
+
+        if (!userId || !companyKey || !roleName) {
+          throw new Error('Asignación inválida: userId, companyKey y role son requeridos.');
+        }
+
+        const user = findUser.get(userId);
+        if (!user) throw new Error(`Usuario no encontrado: ${userId}`);
+
+        const company = findCompany.get(companyKey);
+        if (!company) throw new Error(`Empresa no encontrada: ${companyKey}`);
+
+        let role = findRole.get(roleName);
+        if (!role) {
+          insertRole.run(roleName);
+          role = findRole.get(roleName);
+        }
+        if (!role) throw new Error(`Rol no encontrado: ${roleName}`);
+
+        deleteExisting.run(user.id, company.id);
+        insertAssignment.run(user.id, company.id, role.id);
+      });
+    });
+
+    tx(assignments);
+    return { success: true };
+  } catch (error) {
+    console.error('[ASSIGNMENTS] Error asignando:', error);
+    return { success: false, error: { code: 'ASSIGNMENTS_ERROR', message: error.message } };
+  }
+});
+
+ipcMain.handle('assignments-list-v1', async (event, payload = {}) => {
+  try {
+    const { token } = payload;
+    const sessionCheck = validateSession(token);
+    if (!sessionCheck.ok) return { success: false, error: sessionCheck.error };
+
+    const localDb = getDb();
+    const sessionUserId = sessionCheck.session.user_id;
+    const rows = localDb.prepare(`
+      SELECT
+        u.id AS user_id,
+        u.email AS user_email,
+        u.full_name AS user_full_name,
+        c.company_key AS company_key,
+        c.display_name AS company_name,
+        r.name AS role
+      FROM user_company_roles ucr
+      JOIN users u ON u.id = ucr.user_id
+      JOIN companies c ON c.id = ucr.company_id
+      JOIN roles r ON r.id = ucr.role_id
+      WHERE u.id = ?
+      ORDER BY u.id ASC, c.company_key ASC
+    `).all(sessionUserId);
+
+    return { success: true, data: { assignments: rows } };
+  } catch (error) {
+    console.error('[ASSIGNMENTS] Error listando:', error);
+    return { success: false, error: { code: 'ASSIGNMENTS_LIST_ERROR', message: error.message } };
+  }
+});
+
+ipcMain.handle('assignments-list-by-user-v1', async (event, payload = {}) => {
+  try {
+    const { token, userId } = payload;
+    const sessionCheck = validateSession(token);
+    if (!sessionCheck.ok) return { success: false, error: sessionCheck.error };
+
+    if (!userId) {
+      return { success: false, error: { code: 'INVALID_INPUT', message: 'userId es requerido.' } };
+    }
+
+    const localDb = getDb();
+    const rows = localDb.prepare(`
+      SELECT
+        c.company_key AS company_key,
+        c.display_name AS company_name,
+        r.name AS role
+      FROM user_company_roles ucr
+      JOIN companies c ON c.id = ucr.company_id
+      JOIN roles r ON r.id = ucr.role_id
+      WHERE ucr.user_id = ?
+      ORDER BY c.company_key ASC
+    `).all(userId);
+
+    return { success: true, data: { assignments: rows } };
+  } catch (error) {
+    console.error('[ASSIGNMENTS] Error listando por usuario:', error);
+    return { success: false, error: { code: 'ASSIGNMENTS_LIST_ERROR', message: error.message } };
   }
 });
 

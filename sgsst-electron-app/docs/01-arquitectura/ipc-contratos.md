@@ -1,7 +1,7 @@
 # 📡 Contratos IPC K+AIR
 
 **Versión:** 1.0  
-**Actualizado:** 6 de marzo de 2026  
+**Actualizado:** 16 de marzo de 2026  
 **Estado:** ✅ CRÍTICO - NO TOCAR SIN VERSIONAR
 
 ---
@@ -81,7 +81,49 @@ if (stats.success) {
 
 ---
 
-### 2.2 Sistema de Temas (5 contratos)
+### 2.2 Autenticación y Usuarios (v1) 🆕
+
+| Método Frontend | Handler Backend | Parámetros | Retorno | Descripción |
+|-----------------|-----------------|------------|---------|-------------|
+| `authLoginV1(payload)` | `auth-login-v1` | `{ email, password }` | `{ success, data?, error? }` | Login y creación de sesión |
+| `authLogoutV1(payload)` | `auth-logout-v1` | `{ token }` | `{ success, error? }` | Cerrar sesión |
+| `companiesSyncV1(payload)` | `companies-sync-v1` | `{ token }` | `{ success, data?, error? }` | Sincronizar empresas config.json → DB |
+| `usersListV1(payload)` | `users-list-v1` | `{ token }` | `{ success, data?, error? }` | Listar usuarios |
+| `usersCreateV1(payload)` | `users-create-v1` | `{ token, user }` | `{ success, data?, error? }` | Crear usuario |
+| `usersUpdateV1(payload)` | `users-update-v1` | `{ token, userId, patch }` | `{ success, error? }` | Actualizar usuario |
+| `usersDisableV1(payload)` | `users-disable-v1` | `{ token, userId }` | `{ success, error? }` | Desactivar usuario |
+| `assignmentsSetV1(payload)` | `assignments-set-v1` | `{ token, assignments, replaceAllForUser? }` | `{ success, error? }` | Asignar empresas y rol |
+| `assignmentsListV1(payload)` | `assignments-list-v1` | `{ token }` | `{ success, data?, error? }` | Listar asignaciones del usuario autenticado |
+| `assignmentsListByUserV1(payload)` | `assignments-list-by-user-v1` | `{ token, userId }` | `{ success, data?, error? }` | Listar asignaciones por usuario |
+
+**Estructura de `data` en `authLoginV1`:**
+```javascript
+{
+  token: string,
+  user: { id, email, full_name, status },
+  companies: [{ company_key, display_name, role }]
+}
+```
+
+**Estructura de `user` en `usersCreateV1`:**
+```javascript
+{
+  email: string,
+  full_name: string,
+  password: string
+}
+```
+
+**Estructura de `assignments` en `assignmentsSetV1`:**
+```javascript
+[
+  { userId: number, companyKey: string, role: string }
+]
+```
+
+---
+
+### 2.3 Sistema de Temas (5 contratos)
 
 | Método Frontend | Handler Backend | Parámetros | Retorno | Descripción |
 |-----------------|-----------------|------------|---------|-------------|
@@ -93,7 +135,7 @@ if (stats.success) {
 
 ---
 
-### 2.3 Archivos y Directorios (6 contratos)
+### 2.4 Archivos y Directorios (6 contratos)
 
 | Método Frontend | Handler Backend | Parámetros | Retorno | Descripción |
 |-----------------|-----------------|------------|---------|-------------|
@@ -118,7 +160,7 @@ if (success) {
 
 ---
 
-### 2.4 Ausentismo (4 contratos) 🔴 CRÍTICO
+### 2.5 Ausentismo (4 contratos) 🔴 CRÍTICO
 
 | Método Frontend | Handler Backend | Parámetros | Retorno | Descripción |
 |-----------------|-----------------|------------|---------|-------------|
@@ -172,7 +214,7 @@ if (resultado.success) {
 
 ---
 
-### 2.5 Investigación de Accidentes 🤖 (6 contratos)
+### 2.6 Investigación de Accidentes 🤖 (6 contratos)
 
 | Método Frontend | Handler Backend | Parámetros | Retorno | Descripción |
 |-----------------|-----------------|------------|---------|-------------|
@@ -237,7 +279,7 @@ if (pdfPath.success) {
 
 ---
 
-### 2.6 Presupuesto (5 contratos)
+### 2.7 Presupuesto (5 contratos)
 
 | Método Frontend | Handler Backend | Parámetros | Retorno | Descripción |
 |-----------------|-----------------|------------|---------|-------------|
@@ -249,7 +291,7 @@ if (pdfPath.success) {
 
 ---
 
-### 2.7 Capacitaciones (6 contratos)
+### 2.8 Capacitaciones (6 contratos)
 
 | Método Frontend | Handler Backend | Parámetros | Retorno | Descripción |
 |-----------------|-----------------|------------|---------|-------------|
@@ -262,7 +304,7 @@ if (pdfPath.success) {
 
 ---
 
-### 2.8 OnlyOffice (2 contratos)
+### 2.9 OnlyOffice (2 contratos)
 
 | Método Frontend | Handler Backend | Parámetros | Retorno | Descripción |
 |-----------------|-----------------|------------|---------|-------------|
@@ -271,7 +313,7 @@ if (pdfPath.success) {
 
 ---
 
-### 2.9 Documentos (7 contratos)
+### 2.10 Documentos (7 contratos)
 
 | Método Frontend | Handler Backend | Parámetros | Retorno | Descripción |
 |-----------------|-----------------|------------|---------|-------------|
@@ -285,7 +327,7 @@ if (pdfPath.success) {
 
 ---
 
-### 2.10 Actas (4 contratos)
+### 2.11 Actas (4 contratos)
 
 | Método Frontend | Handler Backend | Parámetros | Retorno | Descripción |
 |-----------------|-----------------|------------|---------|-------------|
@@ -296,7 +338,7 @@ if (pdfPath.success) {
 
 ---
 
-### 2.11 Remisiones (6 contratos)
+### 2.12 Remisiones (6 contratos)
 
 | Método Frontend | Handler Backend | Parámetros | Retorno | Descripción |
 |-----------------|-----------------|------------|---------|-------------|
@@ -310,7 +352,7 @@ if (pdfPath.success) {
 
 ---
 
-### 2.12 Seguimiento de Incapacidades (5 contratos) 🔴 CRÍTICO
+### 2.13 Seguimiento de Incapacidades (5 contratos) 🔴 CRÍTICO
 
 | Método Frontend | Handler Backend | Parámetros | Retorno | Descripción |
 |-----------------|-----------------|------------|---------|-------------|
@@ -402,7 +444,7 @@ if (pdfPath.success) {
 
 ---
 
-### 2.13 Objetivos SST (3 contratos)
+### 2.14 Objetivos SST (3 contratos)
 
 | Método Frontend | Handler Backend | Parámetros | Retorno | Descripción |
 |-----------------|-----------------|------------|---------|-------------|
@@ -412,7 +454,7 @@ if (pdfPath.success) {
 
 ---
 
-### 2.14 Inducciones 🆕 (1 contrato)
+### 2.15 Inducciones 🆕 (1 contrato)
 
 | Método Frontend | Handler Backend | Parámetros | Retorno | Descripción |
 |-----------------|-----------------|------------|---------|-------------|
@@ -712,7 +754,7 @@ node scripts/verify-preload-exposure.js
 ---
 
 **Mantenido por:** Backend Architect  
-**Última actualización:** 6 de marzo de 2026  
-**Versión:** 0.1.70
+**Última actualización:** 16 de marzo de 2026  
+**Versión:** 0.1.75
 
 **Próxima revisión:** Al agregar o modificar handlers IPC

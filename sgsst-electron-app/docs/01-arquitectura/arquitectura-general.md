@@ -1,7 +1,7 @@
 # 🏗️ Arquitectura General K+AIR SG-SST
 
 **Versión:** 3.0 (Unificada)  
-**Actualizado:** 6 de marzo de 2026  
+**Actualizado:** 16 de marzo de 2026  
 **Estado:** ✅ Actualizado
 
 ---
@@ -46,6 +46,8 @@
 | **Backend Python** | Flask + Pandas + OpenPyXL | 3.10-3.12 |
 | **IA/ML** | Mistral 3 3B Reasoning | - |
 | **Build** | electron-builder | 26.0.12 |
+| **DB Local** | SQLite (better-sqlite3) | - |
+| **Auth** | bcryptjs (hash de contraseñas) | - |
 
 ---
 
@@ -89,6 +91,11 @@
 │  │  │  main.js (4766L) - 55+ handlers IPC                 │   │   │
 │  │  └────────────────────────────────────────────────────┘   │   │
 │  └──────────────────────────────────────────────────────────┘   │
+│                              ↕ DB local                         │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │                        SQLite DB                          │   │
+│  │  (kair.db en app.getPath('userData'))                      │   │
+│  └──────────────────────────────────────────────────────────┘   │
 │                              ↕ child_process                    │
 │  ┌──────────────────────────────────────────────────────────┐   │
 │  │                   PYTHON MODULE (Portear/)                │   │
@@ -120,6 +127,9 @@ FileSystem          Python Scripts
 (Excel, PDF)        (LLM, Procesamiento)
 ↓                         ↓
 └────────────┬────────────┘
+             ↓
+        SQLite DB
+     (kair.db local)
              ↓
        Respuesta IPC
              ↓
@@ -505,6 +515,12 @@ Toda respuesta debe seguir este patrón:
 - ✅ Nunca exponer paths completos innecesarios
 - ✅ Usar `path.join()` para rutas cross-platform
 
+### 8.5 Persistencia Local y Autenticación
+
+- ✅ DB local SQLite (`kair.db`) para usuarios, roles, sesiones y asignaciones
+- ✅ Hash de contraseñas con `bcryptjs` (sin almacenar texto plano)
+- ✅ Login obligatorio en cada arranque (no reutiliza sesión previa)
+
 ---
 
 ## 9. Sistema Visual Oficial
@@ -556,5 +572,5 @@ npm run build
 ---
 
 **Mantenido por:** Product Architect & Full-Stack Team  
-**Última actualización:** 6 de marzo de 2026  
-**Versión:** 0.1.70
+**Última actualización:** 16 de marzo de 2026  
+**Versión:** 0.1.75

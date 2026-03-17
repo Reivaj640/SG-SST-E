@@ -539,6 +539,26 @@
             font-weight: 500;
         }
 
+        .user-companies-list {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+            background: #f8f9fa;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 0.75rem;
+            max-height: 160px;
+            overflow-y: auto;
+        }
+
+        .user-company-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-main);
+        }
+
         .status-active { color: var(--success); }
         .status-inactive { color: var(--text-muted); }
 
@@ -1042,8 +1062,8 @@
 
     <!-- NAVEGACIÓN DE CONFIGURACIÓN -->
     <nav class="settings-top-nav">
-        <div class="nav-tab active" onclick="switchTab('empresas', this)">Gestión de Empresas</div>
-        <div class="nav-tab" onclick="switchTab('usuarios', this)">Ajustes de Usuario</div>
+        <div class="nav-tab" onclick="switchTab('empresas', this)">Gestión de Empresas</div>
+        <div class="nav-tab active" onclick="switchTab('usuarios', this)">Ajustes de Usuario</div>
         <div class="nav-tab" onclick="switchTab('ia', this)">Configuración IA</div>
         <div class="nav-tab" onclick="switchTab('interfaz', this)">Interfaz de Usuario</div>
         <div class="nav-tab" onclick="switchTab('acerca', this)">Acerca de la App</div>
@@ -1053,7 +1073,7 @@
     <div class="settings-content">
 
         <!-- SECCIÓN 1: GESTIÓN DE EMPRESAS -->
-        <div id="tab-empresas" class="section-container active">
+        <div id="tab-empresas" class="section-container">
             <div class="section-header">
                 <h2 class="section-title">Gestión de Empresas</h2>
                 <p class="section-subtitle">Administra las empresas vinculadas y sus configuraciones normativas</p>
@@ -1073,7 +1093,7 @@
         </div>
 
         <!-- SECCIÓN 2: AJUSTES DE USUARIO (Gestión de Perfiles) -->
-        <div id="tab-usuarios" class="section-container">
+        <div id="tab-usuarios" class="section-container active">
             <div class="section-header">
                 <h2 class="section-title">Usuarios y Accesos</h2>
                 <p class="section-subtitle">Administra quiénes pueden acceder a K+AIR y sus roles</p>
@@ -1093,6 +1113,7 @@
                         <tr>
                             <th>Usuario</th>
                             <th>Rol</th>
+                            <th>Empresas</th>
                             <th>Último Acceso</th>
                             <th>Estado</th>
                             <th style="text-align: right;">Acciones</th>
@@ -1311,6 +1332,7 @@
 <div class="modal-overlay" id="user-modal">
     <div class="modal-container">
         <h3 style="font-family: var(--font-heading); margin-bottom: 1.5rem;">Gestión de Usuario</h3>
+        <input type="hidden" id="user-id">
         <div class="form-group">
             <label class="form-label">Nombre Completo</label>
             <input type="text" class="form-control" placeholder="Ej. Juan Pérez" id="user-fullname">
@@ -1328,8 +1350,14 @@
             <select class="form-control" id="user-role">
                 <option>Administrador</option>
                 <option>Responsable SST</option>
-                <option>Auditor (Solo lectura)</option>
+                <option>Auditor</option>
+                <option>Gerencia</option>
+                <option>Recursos Humanos</option>
             </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Empresas asignadas</label>
+            <div id="user-companies-list" class="user-companies-list"></div>
         </div>
         <div style="display: flex; gap: 1rem; margin-top: 2rem; justify-content: flex-end;">
             <button class="btn btn-outline" onclick="closeUserModal()">Cancelar</button>
@@ -1775,29 +1803,100 @@
 
     /* ================= GESTIÓN DE USUARIOS ================= */
     let users = [];
+    let companiesList = [];
+    let assignmentsByUser = {};
+    const AUTH_TOKEN_KEY = 'kair-auth-token';
+
+    function mapRoleToDb(roleLabel) {
+        if (roleLabel === 'Responsable SST') return 'SST';
+        if (roleLabel === 'Auditor') return 'Auditoría';
+        return roleLabel;
+    }
+
+    function mapRoleToLabel(roleName) {
+        if (roleName === 'SST') return 'Responsable SST';
+        if (roleName === 'Auditoría') return 'Auditor';
+        return roleName;
+    }
+
+    function getAuthToken() {
+        return localStorage.getItem(AUTH_TOKEN_KEY);
+    }
+
+    async function loadCompaniesList() {
+        companiesList = [];
+        if (electronAPI && typeof electronAPI.loadConfig === 'function') {
+            const config = await electronAPI.loadConfig();
+            companiesList = Object.keys(config.companyPaths || {});
+        }
+    }
+
+    function renderCompaniesChecklist(selectedKeys = []) {
+        const container = document.getElementById('user-companies-list');
+        if (!container) return;
+        container.innerHTML = '';
+        if (!companiesList.length) {
+            container.innerHTML = '<div style="font-size:0.85rem; color: var(--text-muted);">No hay empresas registradas.</div>';
+            return;
+        }
+        companiesList.forEach(key => {
+            const item = document.createElement('label');
+            item.className = 'user-company-item';
+            item.innerHTML = `
+                <input type="checkbox" value="${key}">
+                <span>${key}</span>
+            `;
+            const checkbox = item.querySelector('input');
+            if (selectedKeys.includes(key)) checkbox.checked = true;
+            container.appendChild(item);
+        });
+    }
+
+    function getSelectedCompaniesFromModal() {
+        const container = document.getElementById('user-companies-list');
+        if (!container) return [];
+        return Array.from(container.querySelectorAll('input[type="checkbox"]'))
+            .filter(cb => cb.checked)
+            .map(cb => cb.value);
+    }
 
     // Función para cargar los usuarios
     async function loadUsers() {
         try {
-            if (electronAPI && typeof electronAPI.loadConfig === 'function') {
-                const config = await electronAPI.loadConfig();
-                // Suponiendo que los usuarios están en alguna parte de la configuración
-                // Esta es una implementación de ejemplo
-                users = [
-                    { name: "Admin General", email: "admin@kair.com", role: "Administrador", last: "Hoy 08:00 AM", status: "Activo" },
-                    { name: "Maria SST", email: "maria@tempoactiva.com", role: "Responsable SST", last: "Ayer 16:30 PM", status: "Activo" },
-                    { name: "Carlos Audit", email: "audit@externo.com", role: "Auditor", last: "Hace 3 días", status: "Inactivo" }
-                ];
-                renderUserTable();
-            } else {
-                // Datos de ejemplo si no hay API
-                users = [
-                    { name: "Admin General", email: "admin@kair.com", role: "Administrador", last: "Hoy 08:00 AM", status: "Activo" },
-                    { name: "Maria SST", email: "maria@tempoactiva.com", role: "Responsable SST", last: "Ayer 16:30 PM", status: "Activo" },
-                    { name: "Carlos Audit", email: "audit@externo.com", role: "Auditor", last: "Hace 3 días", status: "Inactivo" }
-                ];
-                renderUserTable();
+            const token = getAuthToken();
+            if (!token) {
+                showToast('Sesión requerida. Inicia sesión nuevamente.', 'error');
+                return;
             }
+
+            if (!electronAPI || typeof electronAPI.usersListV1 !== 'function') {
+                showToast('API de usuarios no disponible.', 'error');
+                return;
+            }
+
+            await loadCompaniesList();
+
+            const result = await electronAPI.usersListV1({ token });
+            if (!result.success) {
+                showToast(result.error?.message || 'Error al cargar usuarios', 'error');
+                return;
+            }
+
+            users = (result.data.users || []).map(u => ({
+                id: u.id,
+                name: u.full_name,
+                email: u.email,
+                status: u.status === 'active' ? 'Activo' : 'Inactivo',
+                last: u.last_login_at ? new Date(u.last_login_at).toLocaleString('es-CO') : '—'
+            }));
+
+            assignmentsByUser = {};
+            await Promise.all(users.map(async u => {
+                const aRes = await electronAPI.assignmentsListByUserV1({ token, userId: u.id });
+                assignmentsByUser[u.id] = aRes.success ? (aRes.data.assignments || []) : [];
+            }));
+
+            renderUserTable();
         } catch (error) {
             console.error('Error al cargar los usuarios:', error);
             showToast('Error al cargar la configuración de usuarios', 'error');
@@ -1809,22 +1908,30 @@
         userTableBody.innerHTML = ''; // Limpiar antes de renderizar
 
         users.forEach(u => {
+            const assignments = assignmentsByUser[u.id] || [];
+            const roleName = assignments[0]?.role ? mapRoleToLabel(assignments[0].role) : 'Sin asignación';
+            const companyList = assignments.map(a => a.company_key).join(', ') || 'Sin asignación';
+            const disableButton = (u.status === 'Activo')
+                ? `<button class="btn btn-sm btn-outline" onclick="disableUser(${u.id})">Desactivar</button>`
+                : '';
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>
                     <div style="display: flex; align-items: center;">
-                        <div class="user-avatar">\${u.name.charAt(0)}</div>
+                        <div class="user-avatar">${u.name.charAt(0)}</div>
                         <div>
-                            <div style="font-weight: 500;">\${u.name}</div>
-                            <div style="font-size: 0.8rem; color: var(--text-muted);">\${u.email}</div>
+                            <div style="font-weight: 500;">${u.name}</div>
+                            <div style="font-size: 0.8rem; color: var(--text-muted);">${u.email}</div>
                         </div>
                     </div>
                 </td>
-                <td><span class="role-badge">\${u.role}</span></td>
-                <td>\${u.last}</td>
-                <td><span class="status-\${u.status.toLowerCase()}">● \${u.status}</span></td>
+                <td><span class="role-badge">${roleName}</span></td>
+                <td>${companyList}</td>
+                <td>${u.last}</td>
+                <td><span class="status-${u.status.toLowerCase()}">● ${u.status}</span></td>
                 <td style="text-align: right;">
-                    <button class="btn btn-sm btn-outline" onclick="resetPassword('\${u.email}')">Resetear Contraseña</button>
+                    <button class="btn btn-sm btn-outline" onclick="openUserModal(${u.id})">Asignar</button>
+                    ${disableButton}
                 </td>
             `;
             userTableBody.appendChild(tr);
@@ -2114,17 +2221,61 @@
         linkModal.classList.remove('active');
     }
 
-    function openUserModal() {
+    async function openUserModal(userId = null) {
         // Limpiar el formulario
+        document.getElementById('user-id').value = userId || '';
         document.getElementById('user-fullname').value = '';
         document.getElementById('user-email').value = '';
         document.getElementById('user-password').value = '';
         document.getElementById('user-role').value = 'Administrador';
+
+        await loadCompaniesList();
+        renderCompaniesChecklist([]);
+
+        if (userId) {
+            const user = users.find(u => u.id === userId);
+            if (user) {
+                document.getElementById('user-fullname').value = user.name;
+                document.getElementById('user-email').value = user.email;
+            }
+
+            const token = getAuthToken();
+            if (token && electronAPI && typeof electronAPI.assignmentsListByUserV1 === 'function') {
+                const aRes = await electronAPI.assignmentsListByUserV1({ token, userId });
+                if (aRes.success) {
+                    const assignments = aRes.data.assignments || [];
+                    const selectedCompanies = assignments.map(a => a.company_key);
+                    const roleName = assignments[0]?.role ? mapRoleToLabel(assignments[0].role) : 'Administrador';
+                    document.getElementById('user-role').value = roleName;
+                    renderCompaniesChecklist(selectedCompanies);
+                }
+            }
+        }
+
         userModal.classList.add('active');
     }
 
     function closeUserModal() {
         userModal.classList.remove('active');
+    }
+
+    async function disableUser(userId) {
+        const token = getAuthToken();
+        if (!token) {
+            showToast('Sesión requerida. Inicia sesión nuevamente.', 'error');
+            return;
+        }
+
+        if (!confirm('¿Desea desactivar este usuario?')) return;
+
+        const result = await electronAPI.usersDisableV1({ token, userId });
+        if (!result.success) {
+            showToast(result.error?.message || 'Error al desactivar usuario', 'error');
+            return;
+        }
+
+        showToast('Usuario desactivado', 'success');
+        loadUsers();
     }
 
     function selectDirectory() {
@@ -2348,21 +2499,93 @@
         }
     }
 
-    function saveUser() {
-        const fullname = document.getElementById('user-fullname').value;
-        const email = document.getElementById('user-email').value;
+    async function saveUser() {
+        const token = getAuthToken();
+        if (!token) {
+            showToast('Sesión requerida. Inicia sesión nuevamente.', 'error');
+            return;
+        }
+
+        const userId = document.getElementById('user-id').value;
+        const fullname = document.getElementById('user-fullname').value.trim();
+        const email = document.getElementById('user-email').value.trim();
         const password = document.getElementById('user-password').value;
-        const role = document.getElementById('user-role').value;
+        const roleLabel = document.getElementById('user-role').value;
+        const role = mapRoleToDb(roleLabel);
+        const selectedCompanies = getSelectedCompaniesFromModal();
 
         if (!fullname || !email) {
             showToast('Por favor complete los campos obligatorios', 'error');
             return;
         }
 
-        // Aquí iría la lógica para guardar el usuario
-        closeUserModal();
-        loadUsers(); // Recargar la lista de usuarios
-        showToast('Usuario guardado correctamente', 'success');
+        if (selectedCompanies.length === 0) {
+            showToast('Seleccione al menos una empresa para asignar.', 'error');
+            return;
+        }
+
+        try {
+            if (!userId) {
+                if (!password) {
+                    showToast('La contraseña es obligatoria para nuevos usuarios.', 'error');
+                    return;
+                }
+                const createRes = await electronAPI.usersCreateV1({
+                    token,
+                    user: { email, full_name: fullname, password }
+                });
+                if (!createRes.success) {
+                    showToast(createRes.error?.message || 'Error al crear usuario', 'error');
+                    return;
+                }
+
+                const newUserId = createRes.data.userId;
+                const assignments = selectedCompanies.map(companyKey => ({
+                    userId: newUserId,
+                    companyKey,
+                    role
+                }));
+                const assignRes = await electronAPI.assignmentsSetV1({
+                    token,
+                    assignments,
+                    replaceAllForUser: true
+                });
+                if (!assignRes.success) {
+                    showToast(assignRes.error?.message || 'Error al asignar empresas', 'error');
+                    return;
+                }
+            } else {
+                const patch = { full_name: fullname, email };
+                if (password) patch.password = password;
+                const updateRes = await electronAPI.usersUpdateV1({ token, userId: parseInt(userId, 10), patch });
+                if (!updateRes.success) {
+                    showToast(updateRes.error?.message || 'Error al actualizar usuario', 'error');
+                    return;
+                }
+
+                const assignments = selectedCompanies.map(companyKey => ({
+                    userId: parseInt(userId, 10),
+                    companyKey,
+                    role
+                }));
+                const assignRes = await electronAPI.assignmentsSetV1({
+                    token,
+                    assignments,
+                    replaceAllForUser: true
+                });
+                if (!assignRes.success) {
+                    showToast(assignRes.error?.message || 'Error al asignar empresas', 'error');
+                    return;
+                }
+            }
+
+            closeUserModal();
+            loadUsers();
+            showToast('Usuario guardado correctamente', 'success');
+        } catch (error) {
+            console.error('Error al guardar usuario:', error);
+            showToast('Error al guardar usuario', 'error');
+        }
     }
 
     function resetPassword(email) {

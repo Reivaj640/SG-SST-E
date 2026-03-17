@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.75] - 2026-03-16
+
+### Added
+- **Autenticación y Base de Datos Local (SQLite)** 🆕
+  - `kair.db` en `app.getPath('userData')` con tablas de usuarios, roles, empresas, asignaciones y sesiones
+  - Login con hash de contraseña (`bcryptjs`)
+  - Usuario admin inicial: `admin@kair.local` / `Admin123!`
+- **Gestión de Usuarios y Roles por Empresa** 🆕
+  - Sección “Ajustes de Usuario” en Configuración
+  - Asignación de empresas y roles por usuario
+  - Nuevo rol de sistema: **Recursos Humanos**
+
+### Changed
+- **Login obligatorio al iniciar la app** (no se reutiliza sesión anterior)
+- **Portal 1.2.1 Capacitaciones** retorna a la antesala en “Volver”
+
+### Fixed
+- **Modal residual** tras actualizar capacitaciones y volver al módulo
+- **Normalización de roles** en asignaciones (case-insensitive, espacios normalizados)
+- **Renderizado de tabla de usuarios** con datos reales (sin placeholders)
+
+### Technical Details
+- **Archivos modificados:**
+  - `main.js` - DB SQLite, auth, usuarios, asignaciones
+  - `preload.js` - contratos IPC v1 para auth/usuarios
+  - `renderer.js` - flujo de login y sesión
+  - `components/config/config-viewer.html` - UI gestión de usuarios
+  - `modules/recursos/capacitaciones/` - limpieza de modal y navegación
+  - `styles.css` - estilos de pantalla de login
+
+---
+
 ## [0.1.70] - 2026-03-05
 
 ### Added

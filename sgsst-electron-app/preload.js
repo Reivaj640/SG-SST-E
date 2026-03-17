@@ -15,6 +15,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveConfig: (config) => ipcRenderer.invoke('save-config', config),
   loadConfig: () => ipcRenderer.invoke('load-config'),
   loadNormativa: () => ipcRenderer.invoke('load-normativa'),
+  authLoginV1: (payload) => ipcRenderer.invoke('auth-login-v1', payload),
+  authLogoutV1: (payload) => ipcRenderer.invoke('auth-logout-v1', payload),
+  companiesSyncV1: (payload) => ipcRenderer.invoke('companies-sync-v1', payload),
+  usersListV1: (payload) => ipcRenderer.invoke('users-list-v1', payload),
+  usersCreateV1: (payload) => ipcRenderer.invoke('users-create-v1', payload),
+  usersUpdateV1: (payload) => ipcRenderer.invoke('users-update-v1', payload),
+  usersDisableV1: (payload) => ipcRenderer.invoke('users-disable-v1', payload),
+  assignmentsSetV1: (payload) => ipcRenderer.invoke('assignments-set-v1', payload),
+  assignmentsListV1: (payload) => ipcRenderer.invoke('assignments-list-v1', payload),
+  assignmentsListByUserV1: (payload) => ipcRenderer.invoke('assignments-list-by-user-v1', payload),
   
   // --- Dashboard Scanner ---
   getDashboardSummary: (companyName) => ipcRenderer.invoke('get-dashboard-summary', companyName),

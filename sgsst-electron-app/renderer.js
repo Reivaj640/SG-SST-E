@@ -298,6 +298,11 @@ function filtrarModulosPorNormativa(escenario) {
 let currentCompany = null;
 let currentModule = null;
 let currentSubmodule = null; // ✅ NUEVA VARIABLE
+// --- Auth & Sesión ---
+let authToken = null;
+let currentUser = null;
+let assignedCompanies = [];
+const AUTH_TOKEN_KEY = 'kair-auth-token';
 let logBuffer = []; // Búfer para almacenar los logs
 let currentCalendarInstance = null; // Para mantener una referencia a la instancia del calendario
 let currentActiveComponent = null; // Para mantener una referencia al componente activo y poder destruirlo adecuadamente
@@ -1155,7 +1160,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error('Calendar button NOT found in DOM.');
   }
 
-  initializeApp();
+  initializeAuthFlow();
 });
 
 // Variable para controlar el estado del modal del calendario
@@ -1331,12 +1336,104 @@ function hideCalendarModal() {
 // Variable para mantener el botón activo del sidebar
 let activeSidebarButton = null;
 
-function initializeApp() {
+// --- Auth UI helpers ---
+function setAuthUIState(isAuthenticated) {
+  const sidebar = document.getElementById('sidebar');
+  const headerButtons = document.querySelectorAll('.header-btn');
+
+  if (sidebar) {
+    sidebar.style.display = isAuthenticated ? '' : 'none';
+  }
+
+  headerButtons.forEach(btn => {
+    btn.style.pointerEvents = isAuthenticated ? 'auto' : 'none';
+    btn.style.opacity = isAuthenticated ? '1' : '0.4';
+  });
+}
+
+function renderLoginScreen(errorMessage = '') {
+  currentCompany = null;
+  currentModule = null;
+  currentSubmodule = null;
+
+  setAuthUIState(false);
+  contentArea.innerHTML = '';
+
+  const authScreen = document.createElement('div');
+  authScreen.className = 'kair-auth-screen';
+  authScreen.innerHTML = `
+    <div class="kair-auth-card">
+      <div class="kair-auth-title">Ingreso a K+AIR</div>
+      <div class="kair-auth-subtitle">Acceso seguro por usuario</div>
+      <form id="kair-login-form" class="kair-auth-form">
+        <label class="kair-auth-label" for="kair-login-email">Correo</label>
+        <input id="kair-login-email" class="kair-auth-input" type="email" autocomplete="username" required />
+        <label class="kair-auth-label" for="kair-login-pass">Contraseña</label>
+        <input id="kair-login-pass" class="kair-auth-input" type="password" autocomplete="current-password" required />
+        <div class="kair-auth-error" id="kair-login-error">${errorMessage || ''}</div>
+        <button class="kair-auth-button" type="submit">Ingresar</button>
+      </form>
+      <div class="kair-auth-hint">Si no tienes acceso, contacta a administración.</div>
+    </div>
+  `;
+
+  contentArea.appendChild(authScreen);
+
+  const form = document.getElementById('kair-login-form');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('kair-login-email').value.trim();
+    const password = document.getElementById('kair-login-pass').value;
+    const errorDiv = document.getElementById('kair-login-error');
+    errorDiv.textContent = '';
+
+    try {
+      const result = await window.electronAPI.authLoginV1({ email, password });
+      if (!result || !result.success) {
+        const msg = result?.error?.message || 'Credenciales inválidas.';
+        errorDiv.textContent = msg;
+        return;
+      }
+
+      authToken = result.data.token;
+      currentUser = result.data.user;
+      assignedCompanies = (result.data.companies || []).map(c => c.company_key || c.company_name || c.company_key);
+      localStorage.setItem(AUTH_TOKEN_KEY, authToken);
+
+      await window.electronAPI.companiesSyncV1({ token: authToken });
+      initializeApp(assignedCompanies);
+    } catch (err) {
+      errorDiv.textContent = 'Error al iniciar sesión.';
+      console.error('Login error:', err);
+    }
+  });
+}
+
+async function loadAssignedCompaniesFromSession(token) {
+  const assignmentsResult = await window.electronAPI.assignmentsListV1({ token });
+  if (!assignmentsResult || !assignmentsResult.success) {
+    return { success: false, error: assignmentsResult?.error };
+  }
+  const list = assignmentsResult.data.assignments || [];
+  const unique = Array.from(new Set(list.map(a => a.company_key)));
+  return { success: true, companies: unique };
+}
+
+async function initializeAuthFlow() {
+  authToken = null;
+  currentUser = null;
+  assignedCompanies = [];
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  renderLoginScreen();
+}
+
+function initializeApp(overrideCompanies = null) {
   console.log('Initializing app...');
+  setAuthUIState(true);
   // Crear los botones del menú lateral
   createSidebarButtons();
   // Mostrar la página de inicio por defecto
-  showHomePage();
+  showHomePage(overrideCompanies);
 }
 
 // --- Funciones de Navegación y UI ---
@@ -1405,7 +1502,7 @@ function setActiveSidebarButton(buttonElement) {
   window.activeSidebarButton = buttonElement;
 }
 
-async function showHomePage() {
+async function showHomePage(overrideCompanies = null) {
   // ✅ LIMPIAR ESTADO
   currentSubmodule = null;
   // ✅ Pasar contentArea a hideCalendar
@@ -1420,15 +1517,19 @@ async function showHomePage() {
 
   // Cargar dinámicamente las empresas desde la configuración
   let dynamicCompanies = [];
-  try {
-    const config = await window.electronAPI.loadConfig();
-    if (config.companyPaths) {
-      dynamicCompanies = Object.keys(config.companyPaths);
+  if (Array.isArray(overrideCompanies)) {
+    dynamicCompanies = overrideCompanies;
+  } else {
+    try {
+      const config = await window.electronAPI.loadConfig();
+      if (config.companyPaths) {
+        dynamicCompanies = Object.keys(config.companyPaths);
+      }
+    } catch (error) {
+      console.error('Error al cargar la configuración de empresas:', error);
+      // Si hay un error, usar la constante existente como fallback
+      dynamicCompanies = ["Tempoactiva", "Temposum", "Aseplus", "Asel"];
     }
-  } catch (error) {
-    console.error('Error al cargar la configuración de empresas:', error);
-    // Si hay un error, usar la constante existente como fallback
-    dynamicCompanies = ["Tempoactiva", "Temposum", "Aseplus", "Asel"];
   }
 
   // Limpiar el área de contenido
@@ -1516,7 +1617,9 @@ async function showHomePage() {
   // Mostrar mensaje si no hay empresas registradas
   if (dynamicCompanies.length === 0) {
     const noCompaniesMessage = document.createElement('p');
-    noCompaniesMessage.textContent = 'No hay empresas registradas. Por favor, crea una empresa en la sección de configuración.';
+    noCompaniesMessage.textContent = Array.isArray(overrideCompanies)
+      ? 'No tienes empresas asignadas. Contacta a administración.'
+      : 'No hay empresas registradas. Por favor, crea una empresa en la sección de configuración.';
     noCompaniesMessage.style.color = 'white';
     noCompaniesMessage.style.fontSize = '18px';
     noCompaniesMessage.style.textAlign = 'center';
@@ -1629,7 +1732,7 @@ async function selectCompany(companyName, buttonElement) {
   showCompanyHomePage();
 }
 
-function handleLogout() {
+async function handleLogout() {
   console.log('Handling logout...');
   currentCompany = null;
   currentModule = null;
@@ -1661,8 +1764,19 @@ function handleLogout() {
     window.updateVantaEffect = null;
   }
 
-  // Limpiar el contenido y volver a la página de inicio
-  showHomePage();
+  // Cerrar sesión si existe token
+  if (authToken) {
+    try {
+      await window.electronAPI.authLogoutV1({ token: authToken });
+    } catch (e) {
+      console.warn('Error al cerrar sesión en backend:', e);
+    }
+  }
+
+  authToken = null;
+  currentUser = null;
+  assignedCompanies = [];
+  localStorage.removeItem(AUTH_TOKEN_KEY);
 
   // Restaurar el sidebar completo (mostrar todos los botones)
   createSidebarButtons(null);
@@ -1673,6 +1787,7 @@ function handleLogout() {
     window.activeSidebarButton = null;
   }
 
+  renderLoginScreen();
   console.log('Usuario desconectado.');
 }
 

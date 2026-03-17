@@ -94,7 +94,7 @@ class CapacitacionesPortalComponent {
                 this.companyName,
                 this.moduleName,
                 this.submoduleName,
-                this.onBackToModuleHome
+                () => this.backToPortal()
             );
             this.viewerComponent = component;
             component.render();
@@ -216,6 +216,19 @@ class CapacitacionesPortalComponent {
 
     openMatrizFormacion() {
         alert('Función: Matriz de Formación\n\nEsta acción abrirá el módulo de gestión de matriz de formación.');
+    }
+
+    backToPortal() {
+        if (this.viewerComponent && typeof this.viewerComponent.destroy === 'function') {
+            try {
+                this.viewerComponent.destroy();
+            } catch (e) {
+                console.warn('[CapacitacionesPortalComponent] Error destruyendo viewer al regresar:', e);
+            } finally {
+                this.viewerComponent = null;
+            }
+        }
+        this.render();
     }
 
     destroy() {

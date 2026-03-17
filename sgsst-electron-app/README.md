@@ -1,7 +1,7 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.71
-**Última actualización:** 13 de marzo de 2026
+**Versión:** 0.1.75
+**Última actualización:** 16 de marzo de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
 ---
@@ -37,6 +37,9 @@
 - ✅ **Sistema de Notificaciones Toast** 🆕: Notificaciones modernas no intrusivas
 - ✅ **Modales Modernizados** 🆕: Diseño centrado, animaciones suaves, UX mejorada
 - ✅ **Detección Automática de Año Activo** 🆕: El sistema detecta automáticamente el año más reciente
+- ✅ **Autenticación de Usuarios** 🆕: Login obligatorio por sesión con control de acceso
+- ✅ **Roles por Empresa** 🆕: Asignación de perfiles por empresa (incluye Recursos Humanos)
+- ✅ **Base de Datos Local (SQLite)** 🆕: Persistencia de usuarios, roles, sesiones y asignaciones
 
 ---
 
@@ -57,6 +60,9 @@
 ├─────────────────────────────────────────────────────────┤
 │  MAIN (Backend Electron)                                │
 │  └── main.js (55+ handlers IPC - 4766 líneas)           │
+├─────────────────────────────────────────────────────────┤
+│  DATABASE                                                │
+│  └── SQLite (kair.db) en app.getPath('userData')         │
 ├─────────────────────────────────────────────────────────┤
 │  PYTHON (Portear/)                                      │
 │  ├── llm_server.py (Servidor Flask puerto 5555)         │
@@ -178,6 +184,10 @@ cd SG-SST-E
 # 2. Instalar dependencias Node.js
 npm install
 
+# 2.1. Recompilar better-sqlite3 si hay error NODE_MODULE_VERSION
+# (solo si aparece el mensaje en consola)
+npm rebuild better-sqlite3 --runtime=electron --target=37.3.0 --disturl=https://electronjs.org/headers
+
 # 3. Configurar entorno virtual Python
 cd Portear
 python -m venv .venv
@@ -222,6 +232,20 @@ npm run build:linux   # Linux
 npm run docs:generate  # Generar documentación API
 npm run docs:watch     # Vigilar cambios y regenerar
 ```
+
+---
+
+## 🔐 Autenticación y Usuarios
+
+### Resumen
+- **Login obligatorio en cada arranque** (no se reutilizan sesiones anteriores).
+- **Asignación de empresas y roles por usuario** desde Configuración.
+- **Roles actuales**: Administrador, SST, Auditoría, Gerencia, Recursos Humanos.
+- **Base de datos local**: `kair.db` en `app.getPath('userData')`.
+
+### Usuario Admin Inicial
+- **Correo:** `admin@kair.local`
+- **Clave:** `Admin123!`
 
 ---
 
@@ -676,6 +700,20 @@ El módulo se basa en los lineamientos de la **Resolución 0312 de 2019** para e
 | `saveConfig(config)` / `loadConfig()` | Guardar/Cargar configuración |
 | `loadNormativa()` | Cargar normativa 0312 |
 
+#### Autenticación y Usuarios (v1) 🆕
+| Método | Descripción |
+|--------|-------------|
+| `authLoginV1(credentials)` | Login y creación de sesión |
+| `authLogoutV1()` | Cerrar sesión |
+| `companiesSyncV1()` | Sincronizar empresas config.json → DB |
+| `usersListV1()` | Listar usuarios |
+| `usersCreateV1(payload)` | Crear usuario |
+| `usersUpdateV1(payload)` | Actualizar usuario |
+| `usersDisableV1(id)` | Desactivar usuario |
+| `assignmentsSetV1(payload)` | Asignar empresas y rol por usuario |
+| `assignmentsListV1()` | Listar asignaciones del usuario autenticado |
+| `assignmentsListByUserV1(userId)` | Listar asignaciones por usuario |
+
 #### Sistema de Temas
 | Método | Descripción |
 |--------|-------------|
@@ -971,7 +1009,7 @@ Este software es propietario y confidencial. No se permite la reproducción, dis
 
 ### Largo Plazo
 - [ ] Versión web (sin Electron)
-- [ ] Base de datos SQL/NoSQL
+- [ ] Sincronización multiusuario en nube
 - [ ] Sincronización en la nube
 
 ---
