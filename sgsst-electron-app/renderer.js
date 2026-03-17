@@ -102,6 +102,152 @@ const ALL_SUBMODULES = {
   ]
 };
 
+function normalizeTextKey(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function normalizeRoleKey(roleName) {
+  const key = normalizeTextKey(roleName);
+  if (key === 'responsable sst') return 'sst';
+  return key;
+}
+
+const SUBMODULE_PERMISSION_MAP_UI = new Map([
+  ['1.1.1 responsable del sg', 'recursos.responsable-sg'],
+  ['1.1.2 roles y responsabilidades', 'recursos.roles-responsabilidades'],
+  ['1.1.3 asignacion de recursos', 'recursos.presupuesto'],
+  ['1.1.4 afiliacion al sssi', 'recursos.afiliacion'],
+  ['1.1.5 trabajo de alto riesgo', 'recursos.trabajo-alto-riesgo'],
+  ['1.1.6 conformacion de copasst', 'recursos.copasst'],
+  ['1.1.7 capacitacion al copasst', 'recursos.capacitacion-copasst'],
+  ['1.1.8 conformacion de comite de convivencia', 'recursos.comite-convivencia'],
+  ['1.2.1 programa de capacitacion anual', 'recursos.capacitaciones'],
+  ['1.2.2 induccion y reinduccion', 'recursos.inducciones'],
+  ['1.2.3 curso virtual 50 horas', 'recursos.curso-virtual'],
+  ['1.2.4 manual de sst para proveedores y contratistas', 'recursos.manual-proveedores'],
+  ['2.1.1 politica del sg-sst', 'gestion-integral.politica'],
+  ['2.2.1 objetivos sst', 'gestion-integral.objetivos'],
+  ['2.3.1 evaluacion inicial del sg-sst', 'gestion-integral.plan-trabajo'],
+  ['2.4.1 plan de trabajo anual', 'gestion-integral.plan-trabajo'],
+  ['2.5.1 archivo y retencion documental del sg-sst', 'gestion-integral.plan-trabajo'],
+  ['2.6.1 rendicion de cuentas', 'gestion-integral.rendicion'],
+  ['2.7.1 matriz de requisitos legales', 'gestion-integral.plan-trabajo'],
+  ['2.8.1 mecanismos de comunicaciones', 'gestion-integral.plan-trabajo'],
+  ['2.9.1 identificacion y evaluacion para la adquisicion de bienes y servicios', 'gestion-integral.plan-trabajo'],
+  ['2.10.1 evaluacion y seleccion de proveedores y contratistas', 'gestion-integral.plan-trabajo'],
+  ['2.11.1 gestion del cambio', 'gestion-integral.plan-trabajo'],
+  ['2.12.1 equipos y herramientas', 'gestion-integral.plan-trabajo'],
+  ['2.13.1 elementos de proteccion personal', 'gestion-integral.plan-trabajo'],
+  ['3.1.1 descripcion sociodemografica y diagnostico de condiciones de salud', 'salud.sociodemografica'],
+  ['3.1.2 actividades de medicina y preventiva y promocion de la salud', 'salud.sociodemografica'],
+  ['3.1.3 perfil de cargo y profesiograma', 'salud.sociodemografica'],
+  ['3.1.4 evaluaciones medicas', 'salud.evaluaciones-medicas'],
+  ['3.1.5 custodia medica ocupacional', 'salud.sociodemografica'],
+  ['3.1.6 restricciones y recomendaciones medicas', 'salud.restricciones-medicas'],
+  ['3.1.7 estilos de vida saludables', 'salud.sociodemografica'],
+  ['3.1.8 servicios de higiene', 'salud.sociodemografica'],
+  ['3.1.9 manejo de residuos', 'salud.sociodemografica'],
+  ['3.2.1 reporte de los accidentes de trabajo', 'salud.reportes-accidentes'],
+  ['3.2.2 investigacion de accidentes, indicentes y enfermedades', 'salud.investigacion-accidentes'],
+  ['3.2.3 registro y analisis estadistico de indicentes, accidentes de trabajo y enfermedades', 'salud.reportes-accidentes'],
+  ['3.3.1 frecuencia de la accidentalidad', 'salud.sociodemografica'],
+  ['3.3.2 severidad de la accidentalidad', 'salud.sociodemografica'],
+  ['3.3.3 proporcion de accidentes de trabajo mortales', 'salud.sociodemografica'],
+  ['3.3.4 medicion de la prevalencia de enfermedades laborales', 'salud.sociodemografica'],
+  ['3.3.5 medicion de la incidencia de enfermedades laborales', 'salud.sociodemografica'],
+  ['3.3.6 medicion del ausentismo por causa medica', 'salud.ausentismo'],
+  ['4.1.1 metodologia ipevr', 'gestion-peligros.general'],
+  ['4.1.2 identificacion de peligros', 'gestion-peligros.general'],
+  ['4.1.3 identificacion de sustancias quimicas carcinogenas o con toxicidad', 'gestion-peligros.general'],
+  ['4.1.4 mediciones ambientales', 'gestion-peligros.general'],
+  ['4.2.1 mediciones de prevencion y control frente a peligros, riesgos identificados', 'gestion-peligros.general'],
+  ['4.2.2 aplicacion de las medidas de prevencion y control por parte de los trabajadores', 'gestion-peligros.general'],
+  ['4.2.3 evaluacion de procedimientos, instructivos internos de seguridad y salud en el trabajo', 'gestion-peligros.general'],
+  ['4.2.4 realizacion de inspecciones sistematicas a las instalaciones, maquinas o equipos', 'gestion-peligros.general'],
+  ['4.2.5 mantenimiento periodico de equipos, instalaciones herramientas', 'gestion-peligros.general'],
+  ['4.2.6 entrega de epp', 'gestion-peligros.general'],
+  ['5.1.1 plan de prevencion de emergencias', 'gestion-amenazas.general'],
+  ['5.1.2 examenes medicos brigadista', 'gestion-amenazas.general'],
+  ['6.1.1 definicion de indicadores', 'verificacion.general'],
+  ['6.1.2 auditoria anual', 'verificacion.general'],
+  ['6.1.3 revision de la alta direccion', 'verificacion.general'],
+  ['6.1.4 planificacion de la auditoria', 'verificacion.general'],
+  ['7.1.1 acciones preventivas y correctivas', 'mejoramiento.general'],
+  ['7.1.2 acciones de mejora conforme a revisiones de la alta gerencia', 'mejoramiento.general'],
+  ['7.1.3 acciones de mejora con base en investigaciones de at y el', 'mejoramiento.general'],
+  ['7.1.4 elaboracion de planes de mejoramiento de medidas y acciones correctivas por autoridades y arl', 'mejoramiento.general']
+]);
+
+function getResourceForSubmodule(moduleName, submoduleName) {
+  const key = normalizeTextKey(submoduleName);
+  const mapped = SUBMODULE_PERMISSION_MAP_UI.get(key);
+  if (mapped) return mapped;
+  const moduleKey = normalizeTextKey(moduleName);
+  if (moduleKey.includes('peligros')) return 'gestion-peligros.general';
+  if (moduleKey.includes('amenazas')) return 'gestion-amenazas.general';
+  if (moduleKey.includes('verificacion')) return 'verificacion.general';
+  if (moduleKey.includes('mejoramiento')) return 'mejoramiento.general';
+  return null;
+}
+
+const ROLE_UI_RULES = {
+  administrador: { allowAll: true },
+  'administrador del sistema': { allowAll: true },
+  sst: { allowAll: true },
+  gerencia: {
+    allow: ['gestion-integral.*', 'verificacion.*', 'mejoramiento.*']
+  },
+  'recursos humanos': {
+    allow: [
+      'recursos.afiliacion',
+      'recursos.capacitaciones',
+      'recursos.inducciones',
+      'salud.evaluaciones-medicas',
+      'salud.restricciones-medicas',
+      'salud.ausentismo'
+    ]
+  }
+};
+
+function roleAllowsResource(roleName, resource) {
+  const roleKey = normalizeRoleKey(roleName);
+  const rule = ROLE_UI_RULES[roleKey];
+  if (!rule) return false;
+  if (rule.allowAll) return true;
+  const allow = rule.allow || [];
+  return allow.some(pattern => {
+    if (pattern.endsWith('.*')) {
+      const prefix = pattern.slice(0, -2);
+      return resource.startsWith(prefix + '.');
+    }
+    return resource === pattern;
+  });
+}
+
+function isSubmoduleAllowed(roleName, moduleName, submoduleName) {
+  const resource = getResourceForSubmodule(moduleName, submoduleName);
+  if (!resource) return false;
+  return roleAllowsResource(roleName, resource);
+}
+
+function filterModulesByPermissions(modules, roleName) {
+  const roleKey = normalizeRoleKey(roleName);
+  if (ROLE_UI_RULES[roleKey] && ROLE_UI_RULES[roleKey].allowAll) return modules;
+  const filtered = {};
+  for (const [moduleName, submodules] of Object.entries(modules)) {
+    const allowedSubs = submodules.filter(sub => isSubmoduleAllowed(roleName, moduleName, sub));
+    if (allowedSubs.length > 0) {
+      filtered[moduleName] = allowedSubs;
+    }
+  }
+  return filtered;
+}
+
 // Botones de selección de empresa
 const COMPANY_BUTTONS = ["Tempoactiva", "Temposum", "Aseplus", "Asel"];
 
@@ -302,6 +448,7 @@ let currentSubmodule = null; // ✅ NUEVA VARIABLE
 let authToken = null;
 let currentUser = null;
 let assignedCompanies = [];
+let companyRoleByKey = {};
 const AUTH_TOKEN_KEY = 'kair-auth-token';
 let logBuffer = []; // Búfer para almacenar los logs
 let currentCalendarInstance = null; // Para mantener una referencia a la instancia del calendario
@@ -1398,6 +1545,11 @@ function renderLoginScreen(errorMessage = '') {
       authToken = result.data.token;
       currentUser = result.data.user;
       assignedCompanies = (result.data.companies || []).map(c => c.company_key || c.company_name || c.company_key);
+      companyRoleByKey = {};
+      (result.data.companies || []).forEach(c => {
+        const key = c.company_key || c.company_name || c.display_name;
+        if (key) companyRoleByKey[key] = c.role;
+      });
       localStorage.setItem(AUTH_TOKEN_KEY, authToken);
 
       await window.electronAPI.companiesSyncV1({ token: authToken });
@@ -1423,6 +1575,7 @@ async function initializeAuthFlow() {
   authToken = null;
   currentUser = null;
   assignedCompanies = [];
+  companyRoleByKey = {};
   localStorage.removeItem(AUTH_TOKEN_KEY);
   renderLoginScreen();
 }
@@ -1672,6 +1825,8 @@ async function selectCompany(companyName, buttonElement) {
 
     // Filtrar los módulos y submódulos según el escenario normativo
     RESOURCES_SUBMODULES = filtrarModulosPorNormativa(escenario);
+    const currentRole = companyRoleByKey[companyName] || '';
+    RESOURCES_SUBMODULES = filterModulesByPermissions(RESOURCES_SUBMODULES, currentRole);
 
     console.log(`Módulos filtrados para la empresa ${companyName} (escenario: ${escenario}):`, RESOURCES_SUBMODULES);
 
@@ -1684,7 +1839,8 @@ async function selectCompany(companyName, buttonElement) {
   } catch (error) {
     console.error('Error al cargar la configuración de la empresa o aplicar normativa:', error);
     // Si hay un error, usar los módulos completos como fallback
-    RESOURCES_SUBMODULES = ALL_SUBMODULES;
+    const currentRole = companyRoleByKey[companyName] || '';
+    RESOURCES_SUBMODULES = filterModulesByPermissions(ALL_SUBMODULES, currentRole);
     // Restaurar sidebar completo en caso de error
     createSidebarButtons(null);
   }
@@ -1776,6 +1932,7 @@ async function handleLogout() {
   authToken = null;
   currentUser = null;
   assignedCompanies = [];
+  companyRoleByKey = {};
   localStorage.removeItem(AUTH_TOKEN_KEY);
 
   // Restaurar el sidebar completo (mostrar todos los botones)
@@ -2530,6 +2687,11 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
   // ✅ Verificar que container no sea null
   if (!container) {
     console.error('❌ Container es null, no se puede mostrar el contenido del submódulo');
+    return;
+  }
+  const currentRole = companyRoleByKey[currentCompany] || '';
+  if (!isSubmoduleAllowed(currentRole, moduleName, submoduleName)) {
+    showErrorMessage(container, submoduleName, 'No tienes permiso para acceder a este submódulo.');
     return;
   }
 

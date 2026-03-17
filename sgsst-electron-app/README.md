@@ -56,10 +56,10 @@
 │  └── modules/ (27 submódulos organizados)               │
 ├─────────────────────────────────────────────────────────┤
 │  PRELOAD (Puente Seguro)                                │
-│  └── preload.js (60+ contratos IPC expuestos)           │
+│  └── preload.js (78 contratos IPC expuestos)            │
 ├─────────────────────────────────────────────────────────┤
 │  MAIN (Backend Electron)                                │
-│  └── main.js (55+ handlers IPC - 4766 líneas)           │
+│  └── main.js (78 handlers IPC - 4766 líneas)            │
 ├─────────────────────────────────────────────────────────┤
 │  DATABASE                                                │
 │  └── SQLite (kair.db) en app.getPath('userData')         │

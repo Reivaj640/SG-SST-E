@@ -1,7 +1,7 @@
 # 📡 Contratos IPC K+AIR
 
-**Versión:** 1.0  
-**Actualizado:** 16 de marzo de 2026  
+**Versión:** 2.0
+**Actualizado:** 17 de marzo de 2026
 **Estado:** ✅ CRÍTICO - NO TOCAR SIN VERSIONAR
 
 ---
@@ -9,13 +9,13 @@
 ## ⚠️ Advertencia Importante
 
 > **ESTE ARCHIVO DOCUMENTA CONTRATOS INQUEBRANTABLES**
-> 
+>
 > - ❌ **NO modificar** estructura de retorno sin versionar
 > - ❌ **NO renombrar** campos existentes
 > - ❌ **NO alterar** tipos de datos
 > - ✅ **SI crear** nueva función versionada (ej: `getPresupuestoV2`)
-> 
-> **Responsable:** Backend Architect  
+>
+> **Responsable:** Backend Architect
 > **Impacto:** Cambios afectan TODOS los módulos frontend
 
 ---
@@ -23,9 +23,10 @@
 ## 📋 Tabla de Contenidos
 
 1. [Arquitectura IPC](#1-arquitectura-ipc)
-2. [Contratos por Categoría](#2-contratos-por-categoría)
-3. [Patrones de Error](#3-patrones-de-error)
-4. [Ejemplos de Uso](#4-ejemplos-de-uso)
+2. [Resumen de Handlers](#2-resumen-de-handlers)
+3. [Contratos por Categoría](#3-contratos-por-categoría)
+4. [Patrones de Error](#4-patrones-de-error)
+5. [Ejemplos de Uso](#5-ejemplos-de-uso)
 
 ---
 
@@ -49,8 +50,36 @@
 
 | Archivo | Líneas | Propósito |
 |---------|--------|-----------|
-| `preload.js` | ~224 | Expone 60+ contratos vía `contextBridge` |
-| `main.js` | 4766 | Implementa 55+ handlers con `ipcMain.handle` |
+| `preload.js` | ~224 | Expone 78 contratos vía `contextBridge` |
+| `main.js` | 7852 | Implementa 78 handlers con `ipcMain.handle` |
+
+---
+
+## 2. Resumen de Handlers
+
+**Total:** 78 handlers `ipcMain.handle()` + 3 listeners `ipcMain.on()`
+
+| Categoría | Handlers | Descripción |
+|-----------|----------|-------------|
+| Archivos y Directorios | 6 | Lectura, mapeo, apertura de archivos |
+| Configuración | 2 | Guardar/cargar config.json |
+| Autenticación y Usuarios | 10 | Login, logout, CRUD usuarios, asignaciones |
+| App y Tema | 7 | Versión, ruta, tema sistema/usuario |
+| Dashboard | 3 | Resumen dashboard, carpetas documentos, remisiones |
+| Excel y Documentos | 5 | Lectura, procesamiento, conversión Excel/PDF |
+| Capacitaciones | 7 | Gestión de cronogramas, auditoría, duplicación |
+| Presupuesto | 4 | Lectura, guardado, duplicación de archivos |
+| Ausentismo | 5 | Búsqueda empleado, CIE-10, procesamiento |
+| PRI Seguimiento | 7 | Seguimientos múltiples, historial, exportación |
+| Inducciones | 3 | Datos, sincronización Google Forms, cambios |
+| Actas | 3 | Generación COPASST, Convivencia |
+| Recursos y Stats | 1 | Estadísticas en tiempo real |
+| Normativa | 1 | Carga de reglas normativas |
+| PDF y Documentos | 6 | Previsualización, edición, OnlyOffice |
+| Proveedores | 4 | Gestión de carpetas y archivos |
+| Objetivos | 3 | Lectura/guardado de Excel objetivos |
+| Utilidades | 1 | Búsqueda de rutas de submódulos |
+| Eventos Sistema | 3 | Reinicio app, watchers de archivos |
 
 ---
 

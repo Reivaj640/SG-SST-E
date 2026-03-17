@@ -130,6 +130,152 @@ const ALL_SUBMODULES = {
   ]
 };
 
+function normalizeTextKey(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function normalizeRoleKey(roleName) {
+  const key = normalizeTextKey(roleName);
+  if (key === 'responsable sst') return 'sst';
+  return key;
+}
+
+const SUBMODULE_PERMISSION_MAP_UI = new Map([
+  ['1.1.1 responsable del sg', 'recursos.responsable-sg'],
+  ['1.1.2 roles y responsabilidades', 'recursos.roles-responsabilidades'],
+  ['1.1.3 asignacion de recursos', 'recursos.presupuesto'],
+  ['1.1.4 afiliacion al sssi', 'recursos.afiliacion'],
+  ['1.1.5 trabajo de alto riesgo', 'recursos.trabajo-alto-riesgo'],
+  ['1.1.6 conformacion de copasst', 'recursos.copasst'],
+  ['1.1.7 capacitacion al copasst', 'recursos.capacitacion-copasst'],
+  ['1.1.8 conformacion de comite de convivencia', 'recursos.comite-convivencia'],
+  ['1.2.1 programa de capacitacion anual', 'recursos.capacitaciones'],
+  ['1.2.2 induccion y reinduccion', 'recursos.inducciones'],
+  ['1.2.3 curso virtual 50 horas', 'recursos.curso-virtual'],
+  ['1.2.4 manual de sst para proveedores y contratistas', 'recursos.manual-proveedores'],
+  ['2.1.1 politica del sg-sst', 'gestion-integral.politica'],
+  ['2.2.1 objetivos sst', 'gestion-integral.objetivos'],
+  ['2.3.1 evaluacion inicial del sg-sst', 'gestion-integral.plan-trabajo'],
+  ['2.4.1 plan de trabajo anual', 'gestion-integral.plan-trabajo'],
+  ['2.5.1 archivo y retencion documental del sg-sst', 'gestion-integral.plan-trabajo'],
+  ['2.6.1 rendicion de cuentas', 'gestion-integral.rendicion'],
+  ['2.7.1 matriz de requisitos legales', 'gestion-integral.plan-trabajo'],
+  ['2.8.1 mecanismos de comunicaciones', 'gestion-integral.plan-trabajo'],
+  ['2.9.1 identificacion y evaluacion para la adquisicion de bienes y servicios', 'gestion-integral.plan-trabajo'],
+  ['2.10.1 evaluacion y seleccion de proveedores y contratistas', 'gestion-integral.plan-trabajo'],
+  ['2.11.1 gestion del cambio', 'gestion-integral.plan-trabajo'],
+  ['2.12.1 equipos y herramientas', 'gestion-integral.plan-trabajo'],
+  ['2.13.1 elementos de proteccion personal', 'gestion-integral.plan-trabajo'],
+  ['3.1.1 descripcion sociodemografica y diagnostico de condiciones de salud', 'salud.sociodemografica'],
+  ['3.1.2 actividades de medicina y preventiva y promocion de la salud', 'salud.sociodemografica'],
+  ['3.1.3 perfil de cargo y profesiograma', 'salud.sociodemografica'],
+  ['3.1.4 evaluaciones medicas', 'salud.evaluaciones-medicas'],
+  ['3.1.5 custodia medica ocupacional', 'salud.sociodemografica'],
+  ['3.1.6 restricciones y recomendaciones medicas', 'salud.restricciones-medicas'],
+  ['3.1.7 estilos de vida saludables', 'salud.sociodemografica'],
+  ['3.1.8 servicios de higiene', 'salud.sociodemografica'],
+  ['3.1.9 manejo de residuos', 'salud.sociodemografica'],
+  ['3.2.1 reporte de los accidentes de trabajo', 'salud.reportes-accidentes'],
+  ['3.2.2 investigacion de accidentes, indicentes y enfermedades', 'salud.investigacion-accidentes'],
+  ['3.2.3 registro y analisis estadistico de indicentes, accidentes de trabajo y enfermedades', 'salud.reportes-accidentes'],
+  ['3.3.1 frecuencia de la accidentalidad', 'salud.sociodemografica'],
+  ['3.3.2 severidad de la accidentalidad', 'salud.sociodemografica'],
+  ['3.3.3 proporcion de accidentes de trabajo mortales', 'salud.sociodemografica'],
+  ['3.3.4 medicion de la prevalencia de enfermedades laborales', 'salud.sociodemografica'],
+  ['3.3.5 medicion de la incidencia de enfermedades laborales', 'salud.sociodemografica'],
+  ['3.3.6 medicion del ausentismo por causa medica', 'salud.ausentismo'],
+  ['4.1.1 metodologia ipevr', 'gestion-peligros.general'],
+  ['4.1.2 identificacion de peligros', 'gestion-peligros.general'],
+  ['4.1.3 identificacion de sustancias quimicas carcinogenas o con toxicidad', 'gestion-peligros.general'],
+  ['4.1.4 mediciones ambientales', 'gestion-peligros.general'],
+  ['4.2.1 mediciones de prevencion y control frente a peligros, riesgos identificados', 'gestion-peligros.general'],
+  ['4.2.2 aplicacion de las medidas de prevencion y control por parte de los trabajadores', 'gestion-peligros.general'],
+  ['4.2.3 evaluacion de procedimientos, instructivos internos de seguridad y salud en el trabajo', 'gestion-peligros.general'],
+  ['4.2.4 realizacion de inspecciones sistematicas a las instalaciones, maquinas o equipos', 'gestion-peligros.general'],
+  ['4.2.5 mantenimiento periodico de equipos, instalaciones herramientas', 'gestion-peligros.general'],
+  ['4.2.6 entrega de epp', 'gestion-peligros.general'],
+  ['5.1.1 plan de prevencion de emergencias', 'gestion-amenazas.general'],
+  ['5.1.2 examenes medicos brigadista', 'gestion-amenazas.general'],
+  ['6.1.1 definicion de indicadores', 'verificacion.general'],
+  ['6.1.2 auditoria anual', 'verificacion.general'],
+  ['6.1.3 revision de la alta direccion', 'verificacion.general'],
+  ['6.1.4 planificacion de la auditoria', 'verificacion.general'],
+  ['7.1.1 acciones preventivas y correctivas', 'mejoramiento.general'],
+  ['7.1.2 acciones de mejora conforme a revisiones de la alta gerencia', 'mejoramiento.general'],
+  ['7.1.3 acciones de mejora con base en investigaciones de at y el', 'mejoramiento.general'],
+  ['7.1.4 elaboracion de planes de mejoramiento de medidas y acciones correctivas por autoridades y arl', 'mejoramiento.general']
+]);
+
+function getResourceForSubmodule(moduleName, submoduleName) {
+  const key = normalizeTextKey(submoduleName);
+  const mapped = SUBMODULE_PERMISSION_MAP_UI.get(key);
+  if (mapped) return mapped;
+  const moduleKey = normalizeTextKey(moduleName);
+  if (moduleKey.includes('peligros')) return 'gestion-peligros.general';
+  if (moduleKey.includes('amenazas')) return 'gestion-amenazas.general';
+  if (moduleKey.includes('verificacion')) return 'verificacion.general';
+  if (moduleKey.includes('mejoramiento')) return 'mejoramiento.general';
+  return null;
+}
+
+const ROLE_UI_RULES = {
+  administrador: { allowAll: true },
+  'administrador del sistema': { allowAll: true },
+  sst: { allowAll: true },
+  gerencia: {
+    allow: ['gestion-integral.*', 'verificacion.*', 'mejoramiento.*']
+  },
+  'recursos humanos': {
+    allow: [
+      'recursos.afiliacion',
+      'recursos.capacitaciones',
+      'recursos.inducciones',
+      'salud.evaluaciones-medicas',
+      'salud.restricciones-medicas',
+      'salud.ausentismo'
+    ]
+  }
+};
+
+function roleAllowsResource(roleName, resource) {
+  const roleKey = normalizeRoleKey(roleName);
+  const rule = ROLE_UI_RULES[roleKey];
+  if (!rule) return false;
+  if (rule.allowAll) return true;
+  const allow = rule.allow || [];
+  return allow.some(pattern => {
+    if (pattern.endsWith('.*')) {
+      const prefix = pattern.slice(0, -2);
+      return resource.startsWith(prefix + '.');
+    }
+    return resource === pattern;
+  });
+}
+
+function isSubmoduleAllowed(roleName, moduleName, submoduleName) {
+  const resource = getResourceForSubmodule(moduleName, submoduleName);
+  if (!resource) return false;
+  return roleAllowsResource(roleName, resource);
+}
+
+function filterModulesByPermissions(modules, roleName) {
+  const roleKey = normalizeRoleKey(roleName);
+  if (ROLE_UI_RULES[roleKey] &amp;&amp; ROLE_UI_RULES[roleKey].allowAll) return modules;
+  const filtered = {};
+  for (const [moduleName, submodules] of Object.entries(modules)) {
+    const allowedSubs = submodules.filter(sub => isSubmoduleAllowed(roleName, moduleName, sub));
+    if (allowedSubs.length > 0) {
+      filtered[moduleName] = allowedSubs;
+    }
+  }
+  return filtered;
+}
+
 // Botones de selección de empresa
 const COMPANY_BUTTONS = ["Tempoactiva", "Temposum", "Aseplus", "Asel"];
 
@@ -326,6 +472,12 @@ function filtrarModulosPorNormativa(escenario) {
 let currentCompany = null;
 let currentModule = null;
 let currentSubmodule = null; // ✅ NUEVA VARIABLE
+// --- Auth &amp; Sesión ---
+let authToken = null;
+let currentUser = null;
+let assignedCompanies = [];
+let companyRoleByKey = {};
+const AUTH_TOKEN_KEY = 'kair-auth-token';
 let logBuffer = []; // Búfer para almacenar los logs
 let currentCalendarInstance = null; // Para mantener una referencia a la instancia del calendario
 let currentActiveComponent = null; // Para mantener una referencia al componente activo y poder destruirlo adecuadamente
@@ -477,48 +629,53 @@ let companyLogoPlaceholder;
 // Función para aplicar el tema globalmente
 async function applyGlobalTheme() {
   let savedTheme = 'system';
-  
+
   try {
     if (window.electronAPI &amp;&amp; window.electronAPI.getThemePreference) {
       const result = await window.electronAPI.getThemePreference();
       savedTheme = result.theme || 'system';
+      console.log('[Theme] Preferencia cargada desde config.json:', savedTheme);
     } else {
       savedTheme = localStorage.getItem('kair-theme-preference') || 'system';
+      console.log('[Theme] Preferencia cargada desde localStorage:', savedTheme);
     }
   } catch (e) {
+    console.warn('[Theme] Error cargando preferencia, usando fallback:', e);
     savedTheme = localStorage.getItem('kair-theme-preference') || 'system';
   }
-  
-  let effectiveTheme = savedTheme;
-  
-  if (savedTheme === 'system') {
-    if (window.electronAPI &amp;&amp; window.electronAPI.getSystemTheme) {
-      try {
-        const result = await window.electronAPI.getSystemTheme();
-        effectiveTheme = result.theme || 'light';
-      } catch (e) {
-        effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      }
-    } else if (window.matchMedia) {
-      effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-  }
 
-  if (effectiveTheme === 'dark') {
-    if (savedTheme === 'dark') {
-      // Tema Oscuro (Paleta Negro/Gris)
-      document.documentElement.setAttribute('data-theme', 'dark-legacy');
-    } else if (savedTheme === 'system') {
-      // Tema de Sistema (cuando el sistema es oscuro)
+  console.log('[Theme] Aplicando tema con preferencia:', savedTheme);
+
+  // Aplicar tema según la preferencia guardada (NO según el tema efectivo)
+  if (savedTheme === 'dark') {
+    // Tema Oscuro (Paleta Negro/Gris) - siempre usa dark-legacy
+    document.documentElement.setAttribute('data-theme', 'dark-legacy');
+    console.log('[Theme] Tema aplicado: dark-legacy');
+  } else if (savedTheme === 'system') {
+    // Tema Sistema - usa 'dark' o ninguno según el sistema
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (isDark) {
       document.documentElement.setAttribute('data-theme', 'dark');
+      console.log('[Theme] Tema aplicado: dark (system)');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+      console.log('[Theme] Tema aplicado: light (system)');
     }
   } else {
-    // Tema Claro
+    // Tema Claro - siempre sin atributo
     document.documentElement.removeAttribute('data-theme');
+    console.log('[Theme] Tema aplicado: light');
   }
-  
+
+  // Sincronizar localStorage con la preferencia
   localStorage.setItem('kair-theme-preference', savedTheme);
+
+  // Retornar el tema efectivo (para referencia)
+  const effectiveTheme = savedTheme === 'system' 
+    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+    : savedTheme;
   
+  console.log('[Theme] Tema efectivo:', effectiveTheme);
   return effectiveTheme;
 }
 
@@ -726,6 +883,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                       showHomePage();
                   }
                   return;
+              case 'load-module-view':
+                  // Cargar una vista de módulo específica (ej: informe-pri-builder)
+                  console.log('RENDERER: Received load-module-view request:', payload);
+                  const viewPath = payload.path || payload.view;
+                  if (viewPath) {
+                      loadModuleViewInContentArea(viewPath);
+                  }
+                  return;
               case 'theme-preference-changed':
                   // El usuario cambió el tema desde el iframe de configuración
                   const themeMode = event.data.theme || payload;
@@ -799,6 +964,18 @@ document.addEventListener('DOMContentLoaded', async () => {
               case 'find-submodule-path-request':
                   apiCallFunction = window.electronAPI.findSubmodulePath;
                   apiCallArgs = [payload.company, payload.module, payload.submodule];
+                  break;
+              case 'read-directory-request':
+                  apiCallFunction = window.electronAPI.readDirectory;
+                  apiCallArgs = [payload.path];
+                  break;
+              case 'get-capacitaciones-sheets-request':
+                  apiCallFunction = window.electronAPI.getCapacitacionesSheets;
+                  apiCallArgs = [payload.filePath];
+                  break;
+              case 'duplicate-capacitaciones-sheet-request':
+                  apiCallFunction = window.electronAPI.duplicateCapacitacionesSheet;
+                  apiCallArgs = [payload];
                   break;
               case 'read-excel-file-request':
                   apiCallFunction = window.electronAPI.readExcelFile;
@@ -1037,20 +1214,76 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     logMessage('Renderer: Conectado al sistema de logs del proceso principal.', 'DEBUG');
 
-    // --- Lógica para Auto Updater ---
-    window.electronAPI.onUpdateAvailable(() => {
-      logMessage('Nueva actualización disponible. Descargando en segundo plano.', 'INFO');
-      // Opcional: Muestra una notificación no intrusiva en tu UI.
-      // Por ejemplo, usando tu función de alerta personalizada:
-      showCustomAlert('Hay una nueva actualización disponible y se está descargando.');
+    // --- Lógica para Auto Updater con Notificaciones Modernas ---
+    console.log('[UPDATER] Verificando disponibilidad de electronAPI para updates...');
+    console.log('[UPDATER] onUpdateChecking disponible:', typeof window.electronAPI?.onUpdateChecking);
+    console.log('[UPDATER] onUpdateAvailable disponible:', typeof window.electronAPI?.onUpdateAvailable);
+    console.log('[UPDATER] updateNotifier disponible:', typeof window.updateNotifier);
+    
+    // Cuando comienza a buscar actualizaciones
+    window.electronAPI?.onUpdateChecking &amp;&amp; window.electronAPI.onUpdateChecking(() => {
+      console.log('[UPDATER] Evento recibido: update_checking');
+      logMessage('Buscando actualizaciones...', 'INFO');
+      if (window.updateNotifier) {
+        window.updateNotifier.notifyChecking();
+      }
     });
 
-    window.electronAPI.onUpdateDownloaded(() => {
-      logMessage('Actualización lista para instalar.', 'INFO');
-      // Usar confirm() es simple, pero una ventana modal personalizada sería mejor UX.
-      const userResponse = confirm('¡Actualización descargada! ¿Desea reiniciar la aplicación ahora para instalarla?');
-      if (userResponse) {
-        window.electronAPI.restartApp();
+    // Cuando hay una actualización disponible (comienza la descarga)
+    window.electronAPI?.onUpdateAvailable &amp;&amp; window.electronAPI.onUpdateAvailable((info) => {
+      console.log('[UPDATER] Evento recibido: update_available', info);
+      logMessage(`Actualización disponible: ${info ? info.version : 'nueva versión'}`, 'INFO');
+      if (window.updateNotifier &amp;&amp; info &amp;&amp; info.version) {
+        window.updateNotifier.notifyAvailable(info.version);
+      }
+    });
+
+    // Cuando NO hay actualizaciones disponibles
+    window.electronAPI?.onUpdateNotAvailable &amp;&amp; window.electronAPI.onUpdateNotAvailable((info) => {
+      console.log('[UPDATER] Evento recibido: update_not_available', info);
+      logMessage('No hay actualizaciones disponibles', 'INFO');
+      if (window.updateNotifier) {
+        window.updateNotifier.notifyNotAvailable();
+      }
+    });
+
+    // Progreso de descarga
+    window.electronAPI?.onUpdateProgress &amp;&amp; window.electronAPI.onUpdateProgress((data) => {
+      console.log('[UPDATER] Evento recibido: update_progress', data);
+      if (window.updateNotifier &amp;&amp; data) {
+        window.updateNotifier.updateProgress(data.percent, data.speed);
+      }
+    });
+
+    // Cuando la descarga se completa
+    window.electronAPI?.onUpdateDownloaded &amp;&amp; window.electronAPI.onUpdateDownloaded((info) => {
+      console.log('[UPDATER] Evento recibido: update_downloaded', info);
+      logMessage('Actualización descargada y lista para instalar', 'INFO');
+      
+      // Mostrar notificación moderna con botón de reinicio
+      const version = info ? info.version : 'más reciente';
+      
+      if (window.updateNotifier) {
+        window.updateNotifier.notifyDownloaded(version, () => {
+          // Reiniciar la aplicación cuando el usuario hace clic en el botón
+          logMessage('Usuario solicitó reiniciar para instalar actualización', 'INFO');
+          window.electronAPI.restartApp &amp;&amp; window.electronAPI.restartApp();
+        });
+      } else {
+        // Fallback a confirmación tradicional si el sistema de notificaciones no está disponible
+        const userResponse = confirm(`¡Actualización ${version} descargada! ¿Desea reiniciar la aplicación ahora para instalarla?`);
+        if (userResponse) {
+          window.electronAPI.restartApp &amp;&amp; window.electronAPI.restartApp();
+        }
+      }
+    });
+
+    // Error en la actualización
+    window.electronAPI?.onUpdateError &amp;&amp; window.electronAPI.onUpdateError((data) => {
+      console.log('[UPDATER] Evento recibido: update_error', data);
+      logMessage(`Error de actualización: ${data ? data.message : 'error desconocido'}`, 'ERROR');
+      if (window.updateNotifier &amp;&amp; data) {
+        window.updateNotifier.notifyError(data.message);
       }
     });
 
@@ -1102,7 +1335,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error('Calendar button NOT found in DOM.');
   }
 
-  initializeApp();
+  initializeAuthFlow();
 });
 
 // Variable para controlar el estado del modal del calendario
@@ -1278,12 +1511,110 @@ function hideCalendarModal() {
 // Variable para mantener el botón activo del sidebar
 let activeSidebarButton = null;
 
-function initializeApp() {
+// --- Auth UI helpers ---
+function setAuthUIState(isAuthenticated) {
+  const sidebar = document.getElementById('sidebar');
+  const headerButtons = document.querySelectorAll('.header-btn');
+
+  if (sidebar) {
+    sidebar.style.display = isAuthenticated ? '' : 'none';
+  }
+
+  headerButtons.forEach(btn => {
+    btn.style.pointerEvents = isAuthenticated ? 'auto' : 'none';
+    btn.style.opacity = isAuthenticated ? '1' : '0.4';
+  });
+}
+
+function renderLoginScreen(errorMessage = '') {
+  currentCompany = null;
+  currentModule = null;
+  currentSubmodule = null;
+
+  setAuthUIState(false);
+  contentArea.innerHTML = '';
+
+  const authScreen = document.createElement('div');
+  authScreen.className = 'kair-auth-screen';
+  authScreen.innerHTML = `
+    &lt;div class="kair-auth-card">
+      &lt;div class="kair-auth-title">Ingreso a K+AIR&lt;/div>
+      &lt;div class="kair-auth-subtitle">Acceso seguro por usuario&lt;/div>
+      &lt;form id="kair-login-form" class="kair-auth-form">
+        &lt;label class="kair-auth-label" for="kair-login-email">Correo&lt;/label>
+        &lt;input id="kair-login-email" class="kair-auth-input" type="email" autocomplete="username" required />
+        &lt;label class="kair-auth-label" for="kair-login-pass">Contraseña&lt;/label>
+        &lt;input id="kair-login-pass" class="kair-auth-input" type="password" autocomplete="current-password" required />
+        &lt;div class="kair-auth-error" id="kair-login-error">${errorMessage || ''}&lt;/div>
+        &lt;button class="kair-auth-button" type="submit">Ingresar&lt;/button>
+      &lt;/form>
+      &lt;div class="kair-auth-hint">Si no tienes acceso, contacta a administración.&lt;/div>
+    &lt;/div>
+  `;
+
+  contentArea.appendChild(authScreen);
+
+  const form = document.getElementById('kair-login-form');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('kair-login-email').value.trim();
+    const password = document.getElementById('kair-login-pass').value;
+    const errorDiv = document.getElementById('kair-login-error');
+    errorDiv.textContent = '';
+
+    try {
+      const result = await window.electronAPI.authLoginV1({ email, password });
+      if (!result || !result.success) {
+        const msg = result?.error?.message || 'Credenciales inválidas.';
+        errorDiv.textContent = msg;
+        return;
+      }
+
+      authToken = result.data.token;
+      currentUser = result.data.user;
+      assignedCompanies = (result.data.companies || []).map(c => c.company_key || c.company_name || c.company_key);
+      companyRoleByKey = {};
+      (result.data.companies || []).forEach(c => {
+        const key = c.company_key || c.company_name || c.display_name;
+        if (key) companyRoleByKey[key] = c.role;
+      });
+      localStorage.setItem(AUTH_TOKEN_KEY, authToken);
+
+      await window.electronAPI.companiesSyncV1({ token: authToken });
+      initializeApp(assignedCompanies);
+    } catch (err) {
+      errorDiv.textContent = 'Error al iniciar sesión.';
+      console.error('Login error:', err);
+    }
+  });
+}
+
+async function loadAssignedCompaniesFromSession(token) {
+  const assignmentsResult = await window.electronAPI.assignmentsListV1({ token });
+  if (!assignmentsResult || !assignmentsResult.success) {
+    return { success: false, error: assignmentsResult?.error };
+  }
+  const list = assignmentsResult.data.assignments || [];
+  const unique = Array.from(new Set(list.map(a => a.company_key)));
+  return { success: true, companies: unique };
+}
+
+async function initializeAuthFlow() {
+  authToken = null;
+  currentUser = null;
+  assignedCompanies = [];
+  companyRoleByKey = {};
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  renderLoginScreen();
+}
+
+function initializeApp(overrideCompanies = null) {
   console.log('Initializing app...');
+  setAuthUIState(true);
   // Crear los botones del menú lateral
   createSidebarButtons();
   // Mostrar la página de inicio por defecto
-  showHomePage();
+  showHomePage(overrideCompanies);
 }
 
 // --- Funciones de Navegación y UI ---
@@ -1352,7 +1683,7 @@ function setActiveSidebarButton(buttonElement) {
   window.activeSidebarButton = buttonElement;
 }
 
-async function showHomePage() {
+async function showHomePage(overrideCompanies = null) {
   // ✅ LIMPIAR ESTADO
   currentSubmodule = null;
   // ✅ Pasar contentArea a hideCalendar
@@ -1367,15 +1698,19 @@ async function showHomePage() {
 
   // Cargar dinámicamente las empresas desde la configuración
   let dynamicCompanies = [];
-  try {
-    const config = await window.electronAPI.loadConfig();
-    if (config.companyPaths) {
-      dynamicCompanies = Object.keys(config.companyPaths);
+  if (Array.isArray(overrideCompanies)) {
+    dynamicCompanies = overrideCompanies;
+  } else {
+    try {
+      const config = await window.electronAPI.loadConfig();
+      if (config.companyPaths) {
+        dynamicCompanies = Object.keys(config.companyPaths);
+      }
+    } catch (error) {
+      console.error('Error al cargar la configuración de empresas:', error);
+      // Si hay un error, usar la constante existente como fallback
+      dynamicCompanies = ["Tempoactiva", "Temposum", "Aseplus", "Asel"];
     }
-  } catch (error) {
-    console.error('Error al cargar la configuración de empresas:', error);
-    // Si hay un error, usar la constante existente como fallback
-    dynamicCompanies = ["Tempoactiva", "Temposum", "Aseplus", "Asel"];
   }
 
   // Limpiar el área de contenido
@@ -1463,7 +1798,9 @@ async function showHomePage() {
   // Mostrar mensaje si no hay empresas registradas
   if (dynamicCompanies.length === 0) {
     const noCompaniesMessage = document.createElement('p');
-    noCompaniesMessage.textContent = 'No hay empresas registradas. Por favor, crea una empresa en la sección de configuración.';
+    noCompaniesMessage.textContent = Array.isArray(overrideCompanies)
+      ? 'No tienes empresas asignadas. Contacta a administración.'
+      : 'No hay empresas registradas. Por favor, crea una empresa en la sección de configuración.';
     noCompaniesMessage.style.color = 'white';
     noCompaniesMessage.style.fontSize = '18px';
     noCompaniesMessage.style.textAlign = 'center';
@@ -1516,6 +1853,8 @@ async function selectCompany(companyName, buttonElement) {
 
     // Filtrar los módulos y submódulos según el escenario normativo
     RESOURCES_SUBMODULES = filtrarModulosPorNormativa(escenario);
+    const currentRole = companyRoleByKey[companyName] || '';
+    RESOURCES_SUBMODULES = filterModulesByPermissions(RESOURCES_SUBMODULES, currentRole);
 
     console.log(`Módulos filtrados para la empresa ${companyName} (escenario: ${escenario}):`, RESOURCES_SUBMODULES);
 
@@ -1528,7 +1867,8 @@ async function selectCompany(companyName, buttonElement) {
   } catch (error) {
     console.error('Error al cargar la configuración de la empresa o aplicar normativa:', error);
     // Si hay un error, usar los módulos completos como fallback
-    RESOURCES_SUBMODULES = ALL_SUBMODULES;
+    const currentRole = companyRoleByKey[companyName] || '';
+    RESOURCES_SUBMODULES = filterModulesByPermissions(ALL_SUBMODULES, currentRole);
     // Restaurar sidebar completo en caso de error
     createSidebarButtons(null);
   }
@@ -1576,7 +1916,7 @@ async function selectCompany(companyName, buttonElement) {
   showCompanyHomePage();
 }
 
-function handleLogout() {
+async function handleLogout() {
   console.log('Handling logout...');
   currentCompany = null;
   currentModule = null;
@@ -1608,8 +1948,20 @@ function handleLogout() {
     window.updateVantaEffect = null;
   }
 
-  // Limpiar el contenido y volver a la página de inicio
-  showHomePage();
+  // Cerrar sesión si existe token
+  if (authToken) {
+    try {
+      await window.electronAPI.authLogoutV1({ token: authToken });
+    } catch (e) {
+      console.warn('Error al cerrar sesión en backend:', e);
+    }
+  }
+
+  authToken = null;
+  currentUser = null;
+  assignedCompanies = [];
+  companyRoleByKey = {};
+  localStorage.removeItem(AUTH_TOKEN_KEY);
 
   // Restaurar el sidebar completo (mostrar todos los botones)
   createSidebarButtons(null);
@@ -1620,6 +1972,7 @@ function handleLogout() {
     window.activeSidebarButton = null;
   }
 
+  renderLoginScreen();
   console.log('Usuario desconectado.');
 }
 
@@ -1638,94 +1991,437 @@ function showCompanyHomePage() {
   }
   // ✅ Pasar contentArea a hideCalendar
   hideCalendar(contentArea);
-  console.log(`Showing home page for company: ${currentCompany}`);
-  
+  console.log(`Showing dashboard for company: ${currentCompany}`);
+
   // Asegurar que el sidebar permanezca colapsado
   const sidebar = document.getElementById('sidebar');
   if (sidebar) {
     sidebar.classList.add('sidebar-collapsed');
   }
-  
+
   contentArea.innerHTML = '';
 
-  // Crear el contenedor principal del canvas
+  // Crear el contenedor principal del dashboard
   const mainCanvas = document.createElement('div');
   mainCanvas.className = 'main-canvas';
+  mainCanvas.style.cssText = 'width: 100%; height: 100%; overflow: hidden;';
 
-  // Contenido del home de la empresa
-  const companyHomeDiv = document.createElement('div');
-  companyHomeDiv.className = 'company-home-content';
+  // ==========================================
+  // DASHBOARD K+AIR - COMMAND CENTER
+  // ==========================================
 
-  // Título con el nombre de la empresa
-  const title = document.createElement('h2');
-  title.textContent = `Bienvenido a ${currentCompany}`;
-  title.className = 'company-home-title';
-  companyHomeDiv.appendChild(title);
+  const dashboardContainer = document.createElement('div');
+  dashboardContainer.style.cssText = `
+    width: 100%;
+    height: 100%;
+    background: #f0f2f5;
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  `;
 
-  // Sección de métricas clave (inspirada en pantalla.png)
-  const metricsSection = document.createElement('div');
-  metricsSection.className = 'metrics-section';
-  metricsSection.innerHTML = `
-    &lt;div class="metrics-grid">
-      &lt;div class="metric-card">
-        &lt;div class="metric-icon-placeholder">&lt;/div>
-        &lt;div class="metric-info">
-          &lt;div class="metric-value">8&lt;/div>
-          &lt;div class="metric-label">Módulos&lt;/div>
-        &lt;/div>
+  // --- HEADER ---
+  const header = document.createElement('header');
+  header.style.cssText = `
+    height: 70px;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 0 30px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: white;
+    flex-shrink: 0;
+    z-index: 10;
+  `;
+
+  const headerLeft = document.createElement('div');
+  headerLeft.innerHTML = `
+    &lt;h1 style="font-size: 20px; font-weight: 700; color: #1e293b; margin: 0;">${currentCompany}&lt;/h1>
+    &lt;p style="font-size: 12px; color: #64748b; margin-top: 2px;" id="company-info-text">SG-SST · Cargando información...&lt;/p>
+  `;
+
+  const notifBtn = document.createElement('button');
+  notifBtn.id = 'notif-btn';
+  notifBtn.style.cssText = `
+    width: 40px; height: 40px; border-radius: 50%; border: 1px solid #e2e8f0;
+    background: white; cursor: pointer; position: relative; display: flex;
+    align-items: center; justify-content: center; font-size: 16px; color: #64748b;
+    transition: all 0.2s;
+  `;
+  notifBtn.innerHTML = `
+    &lt;i class="fas fa-bell">&lt;/i>
+    &lt;span id="notif-badge" style="position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; background: #ef4444; color: white; border-radius: 50%; font-size: 10px; font-weight: 700; display: none; align-items: center; justify-content: center;">0&lt;/span>
+  `;
+  notifBtn.onmouseover = function() { this.style.background = '#174ea6'; this.style.color = 'white'; this.style.borderColor = '#174ea6'; };
+  notifBtn.onmouseout = function() { this.style.background = 'white'; this.style.color = '#64748b'; this.style.borderColor = '#e2e8f0'; };
+
+  header.appendChild(headerLeft);
+  const headerRight = document.createElement('div');
+  headerRight.style.cssText = 'display: flex; gap: 15px; align-items: center;';
+  headerRight.appendChild(notifBtn);
+  header.appendChild(headerRight);
+  dashboardContainer.appendChild(header);
+
+  // --- KPIs ---
+  const kpiRow = document.createElement('section');
+  kpiRow.style.cssText = `
+    padding: 20px 30px 10px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+    background: #f8fafc;
+  `;
+
+  const kpiCards = [
+    { id: 'kpi-accidents', icon: 'fa-shield-alt', value: '-', label: 'Accidentes (Mes)', color: '#f59e0b' },
+    { id: 'kpi-pric', icon: 'fa-user-injured', value: '-', label: 'Casos PRIC Activos', color: '#174ea6' },
+    { id: 'kpi-overdue', icon: 'fa-calendar-times', value: '-', label: 'Documentos Vencidos', color: '#ef4444' },
+    { id: 'kpi-compliance', icon: 'fa-chart-line', value: '-%', label: 'Cumplimiento', color: '#10b981' }
+  ];
+
+  kpiCards.forEach(kpi => {
+    const card = document.createElement('div');
+    card.id = kpi.id;
+    card.style.cssText = `
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: relative;
+      overflow: hidden;
+    `;
+    card.innerHTML = `
+      &lt;div style="position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: ${kpi.color};">&lt;/div>
+      &lt;div style="width: 42px; height: 42px; border-radius: 8px; background: #f1f5f9; color: #64748b; display: flex; align-items: center; justify-content: center; font-size: 18px;">
+        &lt;i class="fas ${kpi.icon}">&lt;/i>
       &lt;/div>
-      &lt;div class="metric-card">
-        &lt;div class="metric-icon-placeholder">&lt;/div>
-        &lt;div class="metric-info">
-          &lt;div class="metric-value">24&lt;/div>
-          &lt;div class="metric-label">Submódulos&lt;/div>
-        &lt;/div>
+      &lt;div>
+        &lt;h3 style="font-size: 20px; font-weight: 700; color: #1e293b; margin-bottom: 2px;">${kpi.value}&lt;/h3>
+        &lt;span style="font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">${kpi.label}&lt;/span>
       &lt;/div>
-      &lt;div class="metric-card">
-        &lt;div class="metric-icon-placeholder">&lt;/div>
-        &lt;div class="metric-info">
-          &lt;div class="metric-value">15&lt;/div>
-          &lt;div class="metric-label">Documentos&lt;/div>
-        &lt;/div>
+    `;
+    kpiRow.appendChild(card);
+  });
+  dashboardContainer.appendChild(kpiRow);
+
+  // --- MAIN GRID ---
+  const mainGrid = document.createElement('div');
+  mainGrid.style.cssText = `
+    flex: 1;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 20px;
+    padding: 10px 30px 20px;
+    min-height: 0;
+  `;
+
+  // --- PANEL IZQUIERDO: MÓDULOS ---
+  const modulesPanel = document.createElement('aside');
+  modulesPanel.style.cssText = `
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  `;
+
+  const panelHeader = document.createElement('div');
+  panelHeader.style.cssText = `
+    padding: 15px; border-bottom: 1px solid #e2e8f0; font-size: 12px;
+    color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;
+    background: #f8fafc;
+  `;
+  panelHeader.textContent = 'Módulos del Sistema';
+  modulesPanel.appendChild(panelHeader);
+
+  const moduleList = document.createElement('div');
+  moduleList.style.cssText = 'flex: 1; overflow-y: auto; padding: 10px;';
+
+  const modulesData = [
+    { name: 'Gestión de la Salud', subtitle: 'Ausentismo, AT, EL', icon: 'fa-heartbeat', badge: 'Cargando...', badgeClass: 'bg-orange', active: true },
+    { name: 'Recursos', subtitle: 'Capacitación, Roles', icon: 'fa-users-cog', badge: '-', badgeClass: 'bg-green', active: false },
+    { name: 'Gestión Integral', subtitle: 'Política, Planes', icon: 'fa-file-contract', badge: '-', badgeClass: 'bg-green', active: false },
+    { name: 'Peligros', subtitle: 'IPERC, Controles', icon: 'fa-radiation-alt', badge: '-', badgeClass: null, active: false },
+    { name: 'Amenazas', subtitle: 'Emergencias', icon: 'fa-biohazard', badge: '-', badgeClass: null, active: false },
+    { name: 'Verificación', subtitle: 'Auditorías', icon: 'fa-check-double', badge: '-', badgeClass: null, active: false },
+    { name: 'Mejoramiento', subtitle: 'Acciones Correctivas', icon: 'fa-chart-line', badge: '-', badgeClass: null, active: false }
+  ];
+
+  modulesData.forEach(mod => {
+    const item = document.createElement('div');
+    item.style.cssText = `
+      display: flex; align-items: center; padding: 12px;
+      border-radius: 6px; margin-bottom: 5px; cursor: pointer;
+      border: 1px solid transparent; transition: all 0.2s;
+      background: ${mod.active ? '#eff6ff' : 'transparent'};
+      border-color: ${mod.active ? '#bfdbfe' : 'transparent'};
+    `;
+    item.onmouseover = function() { if (!mod.active) { this.style.background = '#f8fafc'; this.style.borderColor = '#e2e8f0'; } };
+    item.onmouseout = function() { if (!mod.active) { this.style.background = 'transparent'; this.style.borderColor = 'transparent'; } };
+    item.onclick = function() { showModuleContent(mod.name); };
+
+    item.innerHTML = `
+      &lt;div style="width: 36px; height: 36px; border-radius: 6px; background: #f1f5f9; color: #174ea6; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-size: 14px;">
+        &lt;i class="fas ${mod.icon}">&lt;/i>
       &lt;/div>
-      &lt;div class="metric-card">
-        &lt;div class="metric-icon-placeholder">&lt;/div>
-        &lt;div class="metric-info">
-          &lt;div class="metric-value">98%&lt;/div>
-          &lt;div class="metric-label">Completado&lt;/div>
-        &lt;/div>
+      &lt;div style="flex: 1;">
+        &lt;h4 style="font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 1px;">${mod.name}&lt;/h4>
+        &lt;span style="font-size: 11px; color: #94a3b8;">${mod.subtitle}&lt;/span>
       &lt;/div>
+      ${mod.badge ? `&lt;span id="module-badge-${mod.name.replace(/\s+/g, '-').toLowerCase()}" style="margin-left: auto; font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: 600; background: ${getBadgeColor(mod.badgeClass)}; color: ${getBadgeTextColor(mod.badgeClass)};">${mod.badge}&lt;/span>` : ''}
+    `;
+    moduleList.appendChild(item);
+  });
+
+  modulesPanel.appendChild(moduleList);
+  mainGrid.appendChild(modulesPanel);
+
+  // --- PANEL DERECHO: TAREAS ---
+  const tasksPanel = document.createElement('main');
+  tasksPanel.style.cssText = `
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+  `;
+
+  const tasksHeader = document.createElement('div');
+  tasksHeader.style.cssText = `
+    padding: 15px 20px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; justify-content: space-between; align-items: center;
+  `;
+  tasksHeader.innerHTML = `
+    &lt;h2 style="font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; margin: 0;">
+      &lt;i class="fas fa-tasks" style="color: #174ea6;">&lt;/i> Pendientes y Tareas
+    &lt;/h2>
+    &lt;div style="display: flex; gap: 5px;">
+      &lt;button class="filter-btn active" style="padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; background: #174ea6; color: white; border: none; cursor: pointer;">Todos&lt;/button>
+      &lt;button class="filter-btn" style="padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; background: transparent; border: none; cursor: pointer; color: #64748b;">Críticos&lt;/button>
+      &lt;button class="filter-btn" style="padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; background: transparent; border: none; cursor: pointer; color: #64748b;">Hoy&lt;/button>
     &lt;/div>
   `;
-  companyHomeDiv.appendChild(metricsSection);
+  tasksPanel.appendChild(tasksHeader);
 
-  // Mensaje de bienvenida
-  const welcomeText = document.createElement('p');
-  welcomeText.textContent = `Estás trabajando con los documentos de la empresa ${currentCompany}. Selecciona un módulo del menú lateral para comenzar a gestionar los aspectos del Sistema de Gestión de Seguridad y Salud en el Trabajo.`;
-  welcomeText.className = 'company-home-text';
-  companyHomeDiv.appendChild(welcomeText);
-
-  // Información de módulos disponibles
-  const modulesInfo = document.createElement('div');
-  modulesInfo.className = 'modules-info';
-  modulesInfo.innerHTML = `
-    &lt;h3>Módulos Disponibles&lt;/h3>
-    &lt;p>Puedes acceder a los siguientes módulos principales:&lt;/p>
-    &lt;ul>
-      &lt;li>&lt;strong>Recursos&lt;/strong>: Gestión de recursos humanos y materiales.&lt;/li>
-      &lt;li>&lt;strong>Gestión Integral&lt;/strong>: Políticas, objetivos y planificación general.&lt;/li>
-      &lt;li>&lt;strong>Gestión de la Salud&lt;/strong>: Programas de medicina, seguridad y salud ocupacional.&lt;/li>
-      &lt;li>&lt;strong>Gestión de Peligros y Riesgos&lt;/strong>: Identificación y control de peligros.&lt;/li>
-      &lt;li>&lt;strong>Gestión de Amenazas&lt;/strong>: Planes de emergencia y respuesta a desastres.&lt;/li>
-      &lt;li>&lt;strong>Verificación&lt;/strong>: Auditorías y revisiones del sistema.&lt;/li>
-      &lt;li>&lt;strong>Mejoramiento&lt;/strong>: Acciones correctivas y planes de mejora.&lt;/li>
-    &lt;/ul>
+  const tasksList = document.createElement('div');
+  tasksList.id = 'tasks-container';
+  tasksList.style.cssText = 'flex: 1; overflow-y: auto; padding: 15px 20px;';
+  tasksList.innerHTML = `
+    &lt;div style="text-align: center; padding: 40px; color: #94a3b8;">
+      &lt;i class="fas fa-spinner fa-spin" style="font-size: 32px; margin-bottom: 10px;">&lt;/i>
+      &lt;p>Cargando datos del dashboard...&lt;/p>
+    &lt;/div>
   `;
-  companyHomeDiv.appendChild(modulesInfo);
-
-  mainCanvas.appendChild(companyHomeDiv);
+  tasksPanel.appendChild(tasksList);
+  mainGrid.appendChild(tasksPanel);
+  dashboardContainer.appendChild(mainGrid);
+  mainCanvas.appendChild(dashboardContainer);
   contentArea.appendChild(mainCanvas);
+
+  // Funciones auxiliares para colores
+  function getBadgeColor(cls) {
+    if (cls === 'bg-red') return '#fee2e2';
+    if (cls === 'bg-orange') return '#ffedd5';
+    if (cls === 'bg-green') return '#dcfce7';
+    return '#e0e7ff';
+  }
+  function getBadgeTextColor(cls) {
+    if (cls === 'bg-red') return '#b91c1c';
+    if (cls === 'bg-orange') return '#c2410c';
+    if (cls === 'bg-green') return '#166534';
+    return '#3730a3';
+  }
+
+  // ==========================================
+  // CARGAR DATOS DINÁMICOS DEL DASHBOARD
+  // ==========================================
+  loadDashboardData();
 }
+
+// Función para cargar datos del dashboard
+async function loadDashboardData() {
+  console.log('[DASHBOARD] Cargando datos para:', currentCompany);
+
+  const tasksContainer = document.getElementById('tasks-container');
+  const notifBadge = document.getElementById('notif-badge');
+
+  try {
+    // Llamar al backend para obtener datos
+    const response = await window.electronAPI.getDashboardSummary(currentCompany);
+
+    if (response.success &amp;&amp; response.data) {
+      const data = response.data;
+
+      // Actualizar KPIs (SOLO si los elementos existen en el DOM)
+      const kpiAccidents = document.getElementById('kpi-accidents');
+      const kpiPric = document.getElementById('kpi-pric');
+      const kpiOverdue = document.getElementById('kpi-overdue');
+      const kpiCompliance = document.getElementById('kpi-compliance');
+
+      if (kpiAccidents) kpiAccidents.querySelector('h3').textContent = data.kpis.accidents_month || '0';
+      if (kpiPric) kpiPric.querySelector('h3').textContent = data.kpis.pric_active || '0';
+      if (kpiOverdue) kpiOverdue.querySelector('h3').textContent = data.kpis.overdue_docs || '0';
+      if (kpiCompliance) kpiCompliance.querySelector('h3').textContent = (data.kpis.compliance || '0') + '%';
+
+      // Actualizar badge de notificaciones
+      const totalTasks = data.tasks ? data.tasks.length : 0;
+      if (notifBadge) {
+        notifBadge.textContent = totalTasks;
+        notifBadge.style.display = totalTasks > 0 ? 'flex' : 'none';
+      }
+
+      // Renderizar tareas
+      renderTasks(data.tasks || []);
+
+      // Actualizar badges de módulos
+      updateModuleBadges(data.module_status || {});
+
+      // Actualizar información de la empresa en el header
+      const companyInfoText = document.getElementById('company-info-text');
+      if (companyInfoText &amp;&amp; data.company_info) {
+        companyInfoText.textContent = `SG-SST · Riesgo ${data.company_info.risk || 'N/A'} · ${data.company_info.employees || 'N/A'} Colaboradores`;
+      }
+
+    } else {
+      console.error('[DASHBOARD] Error en respuesta:', response.error);
+      if (tasksContainer) {
+        tasksContainer.innerHTML = `
+          &lt;div style="text-align: center; padding: 40px; color: #ef4444;">
+            &lt;i class="fas fa-exclamation-triangle" style="font-size: 32px; margin-bottom: 10px;">&lt;/i>
+            &lt;p>Error al cargar datos del dashboard&lt;/p>
+            &lt;p style="font-size: 12px; margin-top: 5px;">${response.error || 'Error desconocido'}&lt;/p>
+          &lt;/div>
+        `;
+      }
+    }
+  } catch (error) {
+    console.error('[DASHBOARD] Error crítico:', error);
+    if (tasksContainer) {
+      tasksContainer.innerHTML = `
+        &lt;div style="text-align: center; padding: 40px; color: #ef4444;">
+          &lt;i class="fas fa-exclamation-triangle" style="font-size: 32px; margin-bottom: 10px;">&lt;/i>
+          &lt;p>Error de conexión con el backend&lt;/p>
+          &lt;p style="font-size: 12px; margin-top: 5px;">${error.message}&lt;/p>
+        &lt;/div>
+      `;
+    }
+  }
+}
+
+// Función para renderizar tareas
+function renderTasks(tasks) {
+  const container = document.getElementById('tasks-container');
+  if (!container) return;
+  
+  if (!tasks || tasks.length === 0) {
+    container.innerHTML = `
+      &lt;div style="text-align: center; padding: 40px; color: #10b981;">
+        &lt;i class="fas fa-check-circle" style="font-size: 32px; margin-bottom: 10px;">&lt;/i>
+        &lt;h3 style="font-size: 16px; margin: 0;">¡Estás al día!&lt;/h3>
+        &lt;p style="font-size: 13px; color: #94a3b8; margin-top: 5px;">No hay pendientes críticos.&lt;/p>
+      &lt;/div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = tasks.map(task => `
+    &lt;div class="task-card ${task.priority || ''}" onclick="navigateToModule('${task.module || ''}')" style="
+      background: #f8fafc;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      border-left: 4px solid ${getTaskBorderColor(task.priority)};
+      padding: 12px 15px;
+      display: flex;
+      align-items: center;
+      transition: transform 0.1s, box-shadow 0.1s;
+      cursor: pointer;
+    " onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.05)'; this.style.background='white';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'; this.style.background='#f8fafc';">
+      &lt;div style="flex: 1;">
+        &lt;div style="display: flex; gap: 8px; margin-bottom: 4px;">
+          &lt;span class="tag" style="font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; background: ${getTagColor(task.priority)}; color: ${getTagTextColor(task.priority)};">${task.priority ? task.priority.toUpperCase() : 'INFO'}&lt;/span>
+        &lt;/div>
+        &lt;div style="font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 2px;">${task.title || 'Tarea sin título'}&lt;/div>
+        &lt;div style="font-size: 12px; color: #64748b; line-height: 1.3;">${task.desc || ''}&lt;/div>
+      &lt;/div>
+      &lt;button style="width: 30px; height: 30px; border-radius: 50%; border: none; background: transparent; color: #94a3b8; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#174ea6'; this.style.color='white'" onmouseout="this.style.background='transparent'; this.style.color='#94a3b8'">
+        &lt;i class="fas fa-arrow-right">&lt;/i>
+      &lt;/button>
+    &lt;/div>
+  `).join('');
+}
+
+// Función para navegar a un módulo desde una tarea
+function navigateToModule(moduleName) {
+  if (!moduleName) return;
+  console.log('[DASHBOARD] Navegando a módulo:', moduleName);
+  
+  // Mapeo de módulos internos a nombres del sidebar
+  const moduleMap = {
+    'ausentismo': 'Gestión de la Salud',
+    'investigacion': 'Gestión de la Salud',
+    'capacitaciones': 'Recursos',
+    'epp': 'Recursos',
+    'auditorias': 'Verificación'
+  };
+  
+  const targetModule = moduleMap[moduleName] || moduleName;
+  showModuleContent(targetModule);
+}
+
+// Helper para colores de badges
+function getBadgeColor(cls) {
+  if (cls === 'bg-red') return '#fee2e2';
+  if (cls === 'bg-orange') return '#ffedd5';
+  if (cls === 'bg-green') return '#dcfce7';
+  return '#e0e7ff';
+}
+
+function getBadgeTextColor(cls) {
+  if (cls === 'bg-red') return '#b91c1c';
+  if (cls === 'bg-orange') return '#c2410c';
+  if (cls === 'bg-green') return '#166534';
+  return '#3730a3';
+}
+
+// Función para actualizar badges de módulos
+function updateModuleBadges(moduleStatus) {
+  for (const [moduleName, status] of Object.entries(moduleStatus)) {
+    const badgeEl = document.getElementById(`module-badge-${moduleName}`);
+    if (badgeEl) {
+      const statusText = status === 'danger' ? 'Alerta' : (status === 'warning' ? 'Pendiente' : 'OK');
+      const statusClass = status === 'danger' ? 'bg-red' : (status === 'warning' ? 'bg-orange' : 'bg-green');
+      badgeEl.textContent = statusText;
+      badgeEl.style.background = getBadgeColor(statusClass);
+      badgeEl.style.color = getBadgeTextColor(statusClass);
+    }
+  }
+}
+
+// Helper para colores de tareas
+function getTaskBorderColor(priority) {
+  if (priority === 'critical') return '#ef4444';
+  if (priority === 'warning') return '#f59e0b';
+  return '#cbd5e1';
+}
+
+function getTagColor(priority) {
+  if (priority === 'critical') return '#fee2e2';
+  if (priority === 'warning') return '#ffedd5';
+  return '#e0e7ff';
+}
+
+function getTagTextColor(priority) {
+  if (priority === 'critical') return '#b91c1c';
+  if (priority === 'warning') return '#c2410c';
+  return '#3730a3';
+}
+
 
 function showModuleContent(moduleName) {
   console.log(`Showing content for module: ${moduleName}`);
@@ -2021,6 +2717,11 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
     console.error('❌ Container es null, no se puede mostrar el contenido del submódulo');
     return;
   }
+  const currentRole = companyRoleByKey[currentCompany] || '';
+  if (!isSubmoduleAllowed(currentRole, moduleName, submoduleName)) {
+    showErrorMessage(container, submoduleName, 'No tienes permiso para acceder a este submódulo.');
+    return;
+  }
 
   // ✅ Limpiar contenido anterior
   container.innerHTML = '';
@@ -2045,6 +2746,15 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
     // --- Callback SEGURO para componentes que se portan mal ---
     const safeBackToModuleCallback = () => {
         console.warn('[safeBackToModuleCallback] Se ha llamado al callback de retorno. Limpiando estado y mostrando home del módulo.');
+        if (currentActiveComponent &amp;&amp; typeof currentActiveComponent.destroy === 'function') {
+          try {
+            currentActiveComponent.destroy();
+          } catch (e) {
+            console.warn('Error al destruir componente activo en retorno:', e);
+          } finally {
+            currentActiveComponent = null;
+          }
+        }
         currentSubmodule = null;
         showModuleContent(moduleName);
     };
@@ -2173,17 +2883,18 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
       }
 
     } else if (submoduleName === "1.2.1 Programa de capacitación Anual") {
-      if (window.CapacitacionesViewer) {
-        const capacitacionesViewer = new window.CapacitacionesViewer(
+      if (window.CapacitacionesPortalComponent) {
+        const capacitacionesPortal = new window.CapacitacionesPortalComponent(
           submoduleContentDiv,
           currentCompany,
           moduleName,
           submoduleName,
-          safeBackToModuleCallback // &lt;-- USAR EL CALLBACK SEGURO
+          safeBackToModuleCallback
         );
-        capacitacionesViewer.render();
+        currentActiveComponent = capacitacionesPortal;
+        capacitacionesPortal.render();
       } else {
-        console.error('❌ CapacitacionesViewer no encontrado');
+        console.error('❌ CapacitacionesPortalComponent no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 
@@ -2216,6 +2927,22 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         console.error('❌ CursoVirtualComponent no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
+
+    } else if (submoduleName === "1.2.4 Manual de SST para Proveedores y Contratistas") {
+      if (window.ManualProveedoresComponent) {
+        const manualComponent = new window.ManualProveedoresComponent(
+          submoduleContentDiv,
+          currentCompany,
+          moduleName,
+          submoduleName,
+          safeBackToModuleCallback // &lt;-- USAR EL CALLBACK SEGURO
+        );
+        manualComponent.render();
+      } else {
+        console.error('❌ ManualProveedoresComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
     } else if (submoduleName === "2.1.1 Politica del SG-SST") {
       createComponentSafely(window.PoliticaComponent,
         submoduleContentDiv,
@@ -2281,6 +3008,18 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         rendicionCuentasComponent.render();
       } else {
         console.error('❌ RendicionCuentasComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
+    } else if (submoduleName === "2.9.1 Identificación y evaluación para la adquisición de bienes y servicios") {
+      createComponentSafely(window.EvaluacionProveedores,
+        submoduleContentDiv,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback
+      );
+      if (!window.EvaluacionProveedores) {
+        console.error('❌ EvaluacionProveedores no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 
@@ -2661,6 +3400,117 @@ function createModuleCard(title, description, onClick) {
     return card;
   }
 
+  /**
+   * Carga una vista de módulo HTML en el área de contenido principal
+   * @param {string} viewPath - Ruta del archivo HTML a cargar
+   */
+  function loadModuleViewInContentArea(viewPath) {
+    console.log('[RENDERER] Cargando vista de módulo:', viewPath);
+    
+    // Verificar que contentArea exista
+    if (!contentArea) {
+      console.error('contentArea is not defined or accessible in loadModuleViewInContentArea.');
+      contentArea = document.getElementById('content-area');
+      if (!contentArea) {
+        console.error('Critical: content-area element still not found.');
+        return;
+      }
+    }
+
+    // Limpiar contenido anterior y ocultar calendario
+    hideCalendar(contentArea);
+    contentArea.innerHTML = '';
+
+    // Crear contenedor principal
+    const mainCanvas = document.createElement('div');
+    mainCanvas.className = 'main-canvas';
+
+    // Mostrar mensaje de carga
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'loading-message';
+    loadingDiv.innerHTML = '&lt;p>Cargando constructor de informes...&lt;/p>';
+    mainCanvas.appendChild(loadingDiv);
+    contentArea.appendChild(mainCanvas);
+
+    // Cargar el HTML usando fetch
+    fetch(viewPath)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Error al cargar el archivo: ' + response.statusText);
+        }
+        return response.text();
+      })
+      .then(html => {
+        console.log('[RENDERER] Vista cargada exitosamente:', viewPath);
+        
+        // Limpiar el contenido
+        mainCanvas.innerHTML = '';
+        
+        // Crear un contenedor temporal para parsear el HTML
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        
+        // Extraer y cargar los estilos del head
+        const styles = tempDiv.querySelectorAll('link[rel="stylesheet"], style');
+        styles.forEach(style => {
+          if (style.tagName === 'LINK') {
+            const newLink = document.createElement('link');
+            newLink.rel = style.rel;
+            newLink.href = style.href;
+            document.head.appendChild(newLink);
+          } else {
+            const newStyle = document.createElement('style');
+            newStyle.textContent = style.textContent;
+            document.head.appendChild(newStyle);
+          }
+        });
+        
+        // Extraer el body content (excluyendo head)
+        const bodyContent = tempDiv.querySelectorAll('body > *');
+        if (bodyContent.length > 0) {
+          bodyContent.forEach(el => {
+            mainCanvas.appendChild(el.cloneNode(true));
+          });
+        } else {
+          // Si no hay body, usar todos los elementos del tempDiv
+          Array.from(tempDiv.childNodes).forEach(node => {
+            if (node.nodeType === Node.ELEMENT_NODE &amp;&amp; 
+                node.tagName !== 'HEAD' &amp;&amp; 
+                node.tagName !== 'HTML') {
+              mainCanvas.appendChild(node.cloneNode(true));
+            }
+          });
+        }
+        
+        // Ejecutar scripts inline si los hay
+        const scripts = mainCanvas.querySelectorAll('script');
+        scripts.forEach(oldScript => {
+          if (oldScript.src) {
+            const newScript = document.createElement('script');
+            newScript.src = oldScript.src;
+            document.head.appendChild(newScript);
+          } else if (oldScript.textContent) {
+            const newScript = document.createElement('script');
+            newScript.textContent = oldScript.textContent;
+            mainCanvas.appendChild(newScript);
+          }
+        });
+        
+        console.log('[RENDERER] Vista renderizada:', viewPath);
+      })
+      .catch(error => {
+        console.error('[RENDERER] Error cargando vista:', error);
+        mainCanvas.innerHTML = `
+          &lt;div class="error-message">
+            &lt;h3>Error al cargar la vista&lt;/h3>
+            &lt;p>No se pudo cargar el constructor de informes.&lt;/p>
+            &lt;p>Error: ${error.message}&lt;/p>
+            &lt;button class="btn" onclick="location.reload()">Recargar&lt;/button>
+          &lt;/div>
+        `;
+      });
+  }
+
   function showSettingsPage() {
     // ✅ Pasar contentArea a hideCalendar
     hideCalendar(contentArea);
@@ -2837,71 +3687,170 @@ function showPathLinkingPage() {
       try {
         loadButton.textContent = 'Mapeando...';
         loadButton.disabled = true;
+        
+        // === LOG DE DEPURACIÓN AGREGADO ===
+        console.log(`[MAPEO][DEBUG] Iniciando mapeo para empresa: ${companyName}`);
+        console.log(`[MAPEO][DEBUG] Ruta seleccionada: ${path}`);
+        console.log(`[MAPEO][DEBUG] window.electronAPI disponible: ${!!window.electronAPI}`);
+        console.log(`[MAPEO][DEBUG] window.electronAPI.mapDirectory disponible: ${!!window.electronAPI?.mapDirectory}`);
+        
         if (logTextarea) {
-          logTextarea.value = `Iniciando mapeo para ${companyName} en la ruta ${path}...
+          logTextarea.value = `[MAPEO] Iniciando mapeo para ${companyName} en la ruta ${path}...
+[DEBUG] Verificando APIs de Electron...
 `;
         }
 
         // Verificar que window.electronAPI exista
         if (!window.electronAPI || !window.electronAPI.mapDirectory) {
-          throw new Error('Electron API not available');
+          const errorMsg = 'Electron API not available';
+          console.error(`[MAPEO][ERROR] ${errorMsg}`);
+          throw new Error(errorMsg);
         }
 
+        if (logTextarea) {
+          logTextarea.value += `[DEBUG] Llamando a mapDirectory con ruta: ${path}
+`;
+        }
+        
+        console.log(`[MAPEO][DEBUG] Llamando a window.electronAPI.mapDirectory("${path}")`);
         const result = await window.electronAPI.mapDirectory(path);
 
         if (logTextarea) {
-          logTextarea.value += `Resultado del proceso Python:
+          logTextarea.value += `
+[DEBUG] Resultado recibido de mapDirectory:
+  - success: ${result.success}
+  - structure: ${result.structure ? 'PRESENT' : 'MISSING'}
+  - structure.structure: ${result.structure?.structure ? 'PRESENT' : 'MISSING'}
+  
+Resultado del proceso Python:
 ${result.log}
 
 `;
+        }
+        
+        console.log(`[MAPEO][DEBUG] Resultado de mapDirectory:`, {
+          success: result.success,
+          hasStructure: !!result.structure,
+          hasStructureStructure: !!(result.structure?.structure),
+          log: result.log
+        });
 
-          if (result.structure &amp;&amp; result.structure.structure) {
-            logTextarea.value += '--- Estructura Mapeada ---';
+        if (result.structure &amp;&amp; result.structure.structure) {
+          if (logTextarea) {
+            logTextarea.value += '--- Estructura Mapeada (resumen) ---\n';
+            logTextarea.value += `  Root: ${result.structure.root}
+`;
+            logTextarea.value += `  Total archivos: ${result.structure.total_files}
+`;
+            logTextarea.value += `  Total carpetas: ${result.structure.total_folders}
+`;
             logTextarea.value += formatStructureForLog(result.structure.structure);
-          } else {
-            logTextarea.value += 'No se pudo mostrar la estructura mapeada.';
           }
+          console.log(`[MAPEO][DEBUG] Estructura mapeada exitosamente para ${companyName}`);
+        } else {
+          if (logTextarea) {
+            logTextarea.value += '[ERROR] No se pudo mostrar la estructura mapeada.\n';
+            logTextarea.value += `  result.structure: ${JSON.stringify(result.structure, null, 2)}
+`;
+          }
+          console.error(`[MAPEO][ERROR] result.structure es:`, result.structure);
         }
 
         const checkmark = document.getElementById(`checkmark-${companyName}`);
         if (checkmark) {
           checkmark.style.display = 'inline';
+          console.log(`[MAPEO][DEBUG] Checkmark mostrado para ${companyName}`);
         }
 
         // Verificar que window.electronAPI exista
         if (!window.electronAPI || !window.electronAPI.loadConfig || !window.electronAPI.saveConfig) {
-          throw new Error('Electron API not available');
+          const errorMsg = 'Electron API not available for config';
+          console.error(`[MAPEO][ERROR] ${errorMsg}`);
+          throw new Error(errorMsg);
         }
 
+        if (logTextarea) {
+          logTextarea.value += `
+[DEBUG] Cargando configuración actual...
+`;
+        }
+        console.log(`[MAPEO][DEBUG] Llamando a window.electronAPI.loadConfig()`);
         const config = await window.electronAPI.loadConfig();
+        
+        console.log(`[MAPEO][DEBUG] Configuración cargada:`, {
+          hasCompanyPaths: !!config.companyPaths,
+          existingCompanies: config.companyPaths ? Object.keys(config.companyPaths) : []
+        });
+        
         if (!config.companyPaths) {
           config.companyPaths = {};
+          console.log(`[MAPEO][DEBUG] companyPaths no existía, creado nuevo objeto`);
         }
+
+        // === Determinar si es primera vez o reconfiguración ===
+        const esPrimeraVez = !config.companyPaths[companyName];
+        const tipoMapeo = esPrimeraVez ? 'primera_vez' : 'reconfiguracion';
+        const fechaMapeo = new Date().toISOString();
+
+        console.log(`[MAPEO][DEBUG] Tipo de mapeo: ${tipoMapeo}`);
+
+        // === LOG CRÍTICO: Qué se está guardando ===
+        console.log(`[MAPEO][DEBUG] Preparando para guardar configuración para ${companyName}:`, {
+          root: path,
+          structureKeys: result.structure ? Object.keys(result.structure) : 'MISSING',
+          structureHasStructure: !!(result.structure?.structure),
+          tipoMapeo,
+          fechaMapeo
+        });
+
         config.companyPaths[companyName] = {
           root: path,
-          structure: result.structure
+          structure: result.structure,
+          fechaMapeo,
+          tipoMapeo
         };
-        await window.electronAPI.saveConfig(config);
+        
+        console.log(`[MAPEO][DEBUG] Configuración actualizada para ${companyName}:`, {
+          root: config.companyPaths[companyName].root,
+          structureKeys: config.companyPaths[companyName].structure ? Object.keys(config.companyPaths[companyName].structure) : 'MISSING',
+          structureHasStructure: !!(config.companyPaths[companyName].structure?.structure)
+        });
+        
+        if (logTextarea) {
+          logTextarea.value += `[DEBUG] Guardando configuración...
+`;
+        }
+        console.log(`[MAPEO][DEBUG] Llamando a window.electronAPI.saveConfig()`);
+        const saveResult = await window.electronAPI.saveConfig(config);
+        console.log(`[MAPEO][DEBUG] Resultado de saveConfig:`, saveResult);
 
         if (logTextarea) {
           logTextarea.value += `
 --- Proceso Finalizado ---
 Ruta para ${companyName} guardada exitosamente.
+[DEBUG] Configuración guardada con:
+  - root: ${path}
+  - structure.structure: ${result.structure?.structure ? 'PRESENT' : 'MISSING'}
 `;
         }
+        console.log(`[MAPEO][SUCCESS] Mapeo completado para ${companyName}`);
         alert(`Ruta para ${companyName} guardada exitosamente.`);
 
       } catch (error) {
-        console.error('Error mapping directory:', error);
+        console.error(`[MAPEO][ERROR] Error en mapeo para ${companyName}:`, error);
         if (logTextarea) {
             logTextarea.value += `
 --- ERROR ---
-Error al mapear el directorio: ${error.message}`;
+Error al mapear el directorio: ${error.message}
+[DEBUG] Stack trace:
+${error.stack}
+`;
         }
         alert(`Error al mapear el directorio: ${error.message}`);
       } finally {
         loadButton.textContent = 'Cargar Vínculo';
         loadButton.disabled = false;
+        console.log(`[MAPEO][DEBUG] Botón reseteado para ${companyName}`);
       }
     });
     companyRow.appendChild(loadButton);
@@ -3195,7 +4144,8 @@ function formatStructureForLog(node, indent = '') {
         }
     }
     return logString;
-}</code></pre>
+}
+</code></pre>
         </article>
     </section>
 
@@ -3205,13 +4155,13 @@ function formatStructureForLog(node, indent = '') {
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-scripts_theme-manager.html">scripts/theme-manager</a></li><li><a href="module-utils_ausentismoUtils.html">utils/ausentismoUtils</a></li><li><a href="module-utils_remisionUtils.html">utils/remisionUtils</a></li></ul><h3>Namespaces</h3><ul><li><a href="module-scripts_theme-manager.ThemeManager.html">ThemeManager</a></li></ul><h3>Classes</h3><ul><li><a href="RendicionCuentasComponent.html">RendicionCuentasComponent</a></li><li><a href="module-utils_ausentismoUtils-AusentismoUtils.html">AusentismoUtils</a></li><li><a href="module-utils_remisionUtils-RemisionUtils.html">RemisionUtils</a></li></ul><h3>Global</h3><ul><li><a href="global.html#analyzeAccidentViaServer">analyzeAccidentViaServer</a></li><li><a href="global.html#callParentAPI">callParentAPI</a></li><li><a href="global.html#checkLlmServerHealth">checkLlmServerHealth</a></li><li><a href="global.html#checkLlmServerRunning">checkLlmServerRunning</a></li><li><a href="global.html#collectInterfaceData">collectInterfaceData</a></li><li><a href="global.html#finalizeReport">finalizeReport</a></li><li><a href="global.html#fs">fs</a></li><li><a href="global.html#hideCalendar">hideCalendar</a></li><li><a href="global.html#initializeEvents">initializeEvents</a></li><li><a href="global.html#initializeLlmServer">initializeLlmServer</a></li><li><a href="global.html#llmServerRequest">llmServerRequest</a></li><li><a href="global.html#loadData">loadData</a></li><li><a href="global.html#loadExcelData">loadExcelData</a></li><li><a href="global.html#render">render</a></li><li><a href="global.html#saveExcelData">saveExcelData</a></li><li><a href="global.html#saveReport">saveReport</a></li><li><a href="global.html#showCalendarInModule">showCalendarInModule</a></li><li><a href="global.html#startLlmServer">startLlmServer</a></li><li><a href="global.html#switchSection">switchSection</a></li><li><a href="global.html#updateIndicatorsFields">updateIndicatorsFields</a></li><li><a href="global.html#updateInterfaceWithExcelData">updateInterfaceWithExcelData</a></li><li><a href="global.html#updateResultsTable">updateResultsTable</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-scripts_theme-manager.html">scripts/theme-manager</a></li><li><a href="module-utils_ausentismoUtils.html">utils/ausentismoUtils</a></li><li><a href="module-utils_remisionUtils.html">utils/remisionUtils</a></li></ul><h3>Namespaces</h3><ul><li><a href="module-scripts_theme-manager.ThemeManager.html">ThemeManager</a></li></ul><h3>Classes</h3><ul><li><a href="RendicionCuentasComponent.html">RendicionCuentasComponent</a></li><li><a href="module-utils_ausentismoUtils-AusentismoUtils.html">AusentismoUtils</a></li><li><a href="module-utils_remisionUtils-RemisionUtils.html">RemisionUtils</a></li></ul><h3>Global</h3><ul><li><a href="global.html#analyzeAccidentViaServer">analyzeAccidentViaServer</a></li><li><a href="global.html#callParentAPI">callParentAPI</a></li><li><a href="global.html#checkLlmServerHealth">checkLlmServerHealth</a></li><li><a href="global.html#checkLlmServerRunning">checkLlmServerRunning</a></li><li><a href="global.html#collectInterfaceData">collectInterfaceData</a></li><li><a href="global.html#finalizeReport">finalizeReport</a></li><li><a href="global.html#fs">fs</a></li><li><a href="global.html#hideCalendar">hideCalendar</a></li><li><a href="global.html#initializeEvents">initializeEvents</a></li><li><a href="global.html#initializeLlmServer">initializeLlmServer</a></li><li><a href="global.html#llmServerRequest">llmServerRequest</a></li><li><a href="global.html#loadData">loadData</a></li><li><a href="global.html#loadExcelData">loadExcelData</a></li><li><a href="global.html#loadModuleViewInContentArea">loadModuleViewInContentArea</a></li><li><a href="global.html#render">render</a></li><li><a href="global.html#saveExcelData">saveExcelData</a></li><li><a href="global.html#saveReport">saveReport</a></li><li><a href="global.html#showCalendarInModule">showCalendarInModule</a></li><li><a href="global.html#startLlmServer">startLlmServer</a></li><li><a href="global.html#switchSection">switchSection</a></li><li><a href="global.html#updateIndicatorsFields">updateIndicatorsFields</a></li><li><a href="global.html#updateInterfaceWithExcelData">updateInterfaceWithExcelData</a></li><li><a href="global.html#updateResultsTable">updateResultsTable</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Mon Feb 23 2026 16:38:39 GMT-0500 (hora estándar de Colombia)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Tue Mar 17 2026 14:47:28 GMT-0500 (hora estándar de Colombia)
 </footer>
 
 <script> prettyPrint(); </script>

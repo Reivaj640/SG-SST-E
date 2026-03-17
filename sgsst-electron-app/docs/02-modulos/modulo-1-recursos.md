@@ -1,8 +1,8 @@
 # 👥 Módulo 1: Recursos
 
-**Versión:** 1.0  
-**Actualizado:** 6 de marzo de 2026  
-**Estado:** ✅ Actualizado
+**Versión:** 2.0
+**Actualizado:** 17 de marzo de 2026
+**Estado:** ✅ Actualizado v0.1.75
 
 ---
 
@@ -17,7 +17,7 @@
 7. [1.1.6 Conformación de Copasst](#116-conformación-de-copasst)
 8. [1.1.7 Capacitación al Copasst](#117-capacitación-al-copasst)
 9. [1.1.8 Comité de Convivencia](#118-comité-de-convivencia)
-10. [1.2.1 Programa de Capacitación](#121-programa-de-capacitación)
+10. [1.2.1 Programa de Capacitación 🆕](#121-programa-de-capacitación)
 11. [1.2.2 Inducción y Reinducción 🆕](#122-inducción-y-reinducción)
 12. [1.2.3 Curso Virtual 50 Horas](#123-curso-virtual-50-horas)
 
@@ -33,17 +33,17 @@ El módulo de **Recursos** gestiona todos los aspectos relacionados con la asign
 
 | Código | Submódulo | Archivos Principales | Estado |
 |--------|-----------|---------------------|--------|
-| 1.1.1 | Responsable del SG | `responsable-sg-logic.js` | ✅ |
-| 1.1.2 | Roles y Responsabilidades | `roles-responsabilidades-logic.js` | ✅ |
-| 1.1.3 | Asignación de Recursos | `presupuesto-logic.js` | ✅ |
-| 1.1.4 | Afiliación al SSSI | `afiliacion-logic.js` | ✅ |
-| 1.1.5 | Trabajo de Alto Riesgo | `trabajo-alto-riesgo-logic.js` | ✅ |
-| 1.1.6 | Conformación de Copasst | `copasst-logic.js` | ✅ |
-| 1.1.7 | Capacitación al Copasst | `capacitacion-copasst-logic.js` | ✅ |
-| 1.1.8 | Comité de Convivencia | `comite-convivencia-logic.js` | ✅ |
-| 1.2.1 | Programa de Capacitación | `capacitaciones-logic.js` | ✅ |
-| 1.2.2 | Inducción y Reinducción | `inducciones-logic.js` 🆕 | ✅ |
-| 1.2.3 | Curso Virtual 50 Horas | `curso-virtual-logic.js` | ✅ |
+| 1.1.1 | Responsable del SG | `responsable-sg-logic.js`, `viewer.js` | ✅ |
+| 1.1.2 | Roles y Responsabilidades | `roles-responsabilidades-logic.js`, `viewer.js` | ✅ |
+| 1.1.3 | Asignación de Recursos | `presupuesto-logic.js`, `presupuesto-gestion.html` | ✅ |
+| 1.1.4 | Afiliación al SSSI | `afiliacion-logic.js`, `viewer.js` | ✅ |
+| 1.1.5 | Trabajo de Alto Riesgo | `trabajo-alto-riesgo-logic.js`, `viewer.js` | ✅ |
+| 1.1.6 | Conformación de Copasst | `copasst-logic.js`, `viewer.js` | ✅ |
+| 1.1.7 | Capacitación al Copasst | `capacitacion-copasst-logic.js`, `viewer.js` | ✅ |
+| 1.1.8 | Comité de Convivencia | `comite-convivencia-logic.js`, `viewer.js` | ✅ |
+| 1.2.1 | Programa de Capacitación | `capacitaciones-logic.js`, `capacitaciones-viewer.js`, `capacitaciones-portal-logic.js` 🆕 | ✅ |
+| 1.2.2 | Inducción y Reinducción | `inducciones-logic.js`, `inducciones-viewer.js` 🆕 | ✅ |
+| 1.2.3 | Curso Virtual 50 Horas | `curso-virtual-logic.js`, `viewer.js` | ✅ |
 
 ### 1.3 Archivos del Módulo
 
@@ -54,17 +54,44 @@ modules/recursos/
 ├── recursos-home.html
 ├── recursos.css
 ├── afiliacion/
+│   ├── afiliacion-logic.js
+│   ├── afiliacion-viewer.js
+│   └── afiliacion-view.html
 ├── capacitacion-copasst/
+│   ├── capacitacion-copasst-logic.js
+│   ├── capacitacion-copasst-viewer.js
+│   └── capacitacion-copasst-view.html
 ├── capacitaciones/
+│   ├── capacitaciones-logic.js
+│   ├── capacitaciones-viewer.js
+│   ├── capacitaciones-portal-logic.js  🆕
+│   ├── cap-home.html  🆕
+│   ├── cap-home.js  🆕
+│   ├── capacitaciones-view.html
+│   └── capacitaciones-view.css
 ├── comite-convivencia/
 ├── copasst/
 ├── curso-virtual/
 ├── inducciones/
+│   ├── inducciones-logic.js
+│   ├── inducciones-viewer.js
+│   └── inducciones-view.html
 ├── presupuesto/
 ├── responsable-sg/
 ├── roles-responsabilidades/
 └── trabajo-alto-riesgo/
 ```
+
+### 1.4 Novedades v0.1.71 🆕
+
+| Funcionalidad | Descripción | Impacto |
+|---------------|-------------|---------|
+| **Portal de Bienvenida Capacitaciones** | Interfaz tipo antesala similar a Plan de Trabajo (2.4.1) | UX mejorada |
+| **Clonar Cronograma** | Duplica hojas Excel (Matriz Cap. YYYY → Matriz Cap. YYYY+1) | Ahorro de tiempo |
+| **Detección Automática de Año Activo** | Detecta automáticamente el año más reciente en hojas | Automatización |
+| **Notificaciones Toast** | Reemplaza `alert()` por notificaciones modernas | UX mejorada |
+| **Modales Modernizados** | Diseño centrado, animaciones suaves | UX mejorada |
+| **Sincronización Inducciones** | Google Forms → Excel → App sin intervención manual | Automatización total |
 
 ---
 

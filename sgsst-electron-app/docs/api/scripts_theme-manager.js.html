@@ -101,16 +101,20 @@ const ThemeManager = {
      */
     async init() {
         try {
+            // Prioridad: config.json > localStorage > default
             if (window.electronAPI &amp;&amp; window.electronAPI.getThemePreference) {
                 const result = await window.electronAPI.getThemePreference();
                 this.currentTheme = result.theme || 'system';
+                console.log('[ThemeManager] Preferencia cargada desde config.json:', this.currentTheme);
             } else {
                 this.currentTheme = localStorage.getItem(this.THEME_KEY) || 'system';
+                console.log('[ThemeManager] Preferencia cargada desde localStorage:', this.currentTheme);
             }
         } catch (e) {
+            console.warn('[ThemeManager] Error cargando preferencia:', e);
             this.currentTheme = localStorage.getItem(this.THEME_KEY) || 'system';
         }
-        
+
         await this.applyTheme(this.currentTheme);
         this._setupSystemThemeListener();
         console.log('[ThemeManager] Initialized with theme:', this.currentTheme);
@@ -297,9 +301,10 @@ const ThemeManager = {
 
 window.ThemeManager = ThemeManager;
 
-document.addEventListener('DOMContentLoaded', () => {
-    ThemeManager.init();
-});
+// NO inicializar automáticamente - renderer.js se encarga de aplicar el tema al cargar
+// document.addEventListener('DOMContentLoaded', () => {
+//     ThemeManager.init();
+// });
 
 window.addEventListener('message', (event) => {
     if (event.data &amp;&amp; event.data.type === 'get-theme-request') {
@@ -327,13 +332,13 @@ if (typeof module !== 'undefined' &amp;&amp; module.exports) {
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-scripts_theme-manager.html">scripts/theme-manager</a></li><li><a href="module-utils_ausentismoUtils.html">utils/ausentismoUtils</a></li><li><a href="module-utils_remisionUtils.html">utils/remisionUtils</a></li></ul><h3>Namespaces</h3><ul><li><a href="module-scripts_theme-manager.ThemeManager.html">ThemeManager</a></li></ul><h3>Classes</h3><ul><li><a href="RendicionCuentasComponent.html">RendicionCuentasComponent</a></li><li><a href="module-utils_ausentismoUtils-AusentismoUtils.html">AusentismoUtils</a></li><li><a href="module-utils_remisionUtils-RemisionUtils.html">RemisionUtils</a></li></ul><h3>Global</h3><ul><li><a href="global.html#analyzeAccidentViaServer">analyzeAccidentViaServer</a></li><li><a href="global.html#callParentAPI">callParentAPI</a></li><li><a href="global.html#checkLlmServerHealth">checkLlmServerHealth</a></li><li><a href="global.html#checkLlmServerRunning">checkLlmServerRunning</a></li><li><a href="global.html#collectInterfaceData">collectInterfaceData</a></li><li><a href="global.html#finalizeReport">finalizeReport</a></li><li><a href="global.html#fs">fs</a></li><li><a href="global.html#hideCalendar">hideCalendar</a></li><li><a href="global.html#initializeEvents">initializeEvents</a></li><li><a href="global.html#initializeLlmServer">initializeLlmServer</a></li><li><a href="global.html#llmServerRequest">llmServerRequest</a></li><li><a href="global.html#loadData">loadData</a></li><li><a href="global.html#loadExcelData">loadExcelData</a></li><li><a href="global.html#render">render</a></li><li><a href="global.html#saveExcelData">saveExcelData</a></li><li><a href="global.html#saveReport">saveReport</a></li><li><a href="global.html#showCalendarInModule">showCalendarInModule</a></li><li><a href="global.html#startLlmServer">startLlmServer</a></li><li><a href="global.html#switchSection">switchSection</a></li><li><a href="global.html#updateIndicatorsFields">updateIndicatorsFields</a></li><li><a href="global.html#updateInterfaceWithExcelData">updateInterfaceWithExcelData</a></li><li><a href="global.html#updateResultsTable">updateResultsTable</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-scripts_theme-manager.html">scripts/theme-manager</a></li><li><a href="module-utils_ausentismoUtils.html">utils/ausentismoUtils</a></li><li><a href="module-utils_remisionUtils.html">utils/remisionUtils</a></li></ul><h3>Namespaces</h3><ul><li><a href="module-scripts_theme-manager.ThemeManager.html">ThemeManager</a></li></ul><h3>Classes</h3><ul><li><a href="RendicionCuentasComponent.html">RendicionCuentasComponent</a></li><li><a href="module-utils_ausentismoUtils-AusentismoUtils.html">AusentismoUtils</a></li><li><a href="module-utils_remisionUtils-RemisionUtils.html">RemisionUtils</a></li></ul><h3>Global</h3><ul><li><a href="global.html#analyzeAccidentViaServer">analyzeAccidentViaServer</a></li><li><a href="global.html#callParentAPI">callParentAPI</a></li><li><a href="global.html#checkLlmServerHealth">checkLlmServerHealth</a></li><li><a href="global.html#checkLlmServerRunning">checkLlmServerRunning</a></li><li><a href="global.html#collectInterfaceData">collectInterfaceData</a></li><li><a href="global.html#finalizeReport">finalizeReport</a></li><li><a href="global.html#fs">fs</a></li><li><a href="global.html#hideCalendar">hideCalendar</a></li><li><a href="global.html#initializeEvents">initializeEvents</a></li><li><a href="global.html#initializeLlmServer">initializeLlmServer</a></li><li><a href="global.html#llmServerRequest">llmServerRequest</a></li><li><a href="global.html#loadData">loadData</a></li><li><a href="global.html#loadExcelData">loadExcelData</a></li><li><a href="global.html#loadModuleViewInContentArea">loadModuleViewInContentArea</a></li><li><a href="global.html#render">render</a></li><li><a href="global.html#saveExcelData">saveExcelData</a></li><li><a href="global.html#saveReport">saveReport</a></li><li><a href="global.html#showCalendarInModule">showCalendarInModule</a></li><li><a href="global.html#startLlmServer">startLlmServer</a></li><li><a href="global.html#switchSection">switchSection</a></li><li><a href="global.html#updateIndicatorsFields">updateIndicatorsFields</a></li><li><a href="global.html#updateInterfaceWithExcelData">updateInterfaceWithExcelData</a></li><li><a href="global.html#updateResultsTable">updateResultsTable</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Mon Feb 23 2026 16:38:39 GMT-0500 (hora estándar de Colombia)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Tue Mar 17 2026 14:47:28 GMT-0500 (hora estándar de Colombia)
 </footer>
 
 <script> prettyPrint(); </script>
