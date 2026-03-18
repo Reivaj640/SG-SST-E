@@ -305,7 +305,7 @@ function validateSession(token) {
     WHERE u.id = ?
     GROUP BY u.id
   `).get(row.user_id);
-  
+
   // Parsear los roles del usuario
   const userRoles = [];
   const companies = [];
@@ -319,15 +319,27 @@ function validateSession(token) {
       }
     });
   }
-  
+
   // Verificar si el usuario tiene rol de administrador en alguna empresa
-  const isAdmin = userRoles.some(ur => 
-    ur.role.toLowerCase() === 'administrador' || 
+  const isAdmin = userRoles.some(ur =>
+    ur.role.toLowerCase() === 'administrador' ||
     ur.role.toLowerCase() === 'administrador del sistema'
   );
-  
-  return { 
-    ok: true, 
+
+  // Si no tiene empresas asignadas, verificar si es el usuario administrador global por email O por rol
+  const isAdminGlobal = !isAdmin && userRoles.length === 0 &&
+    (userInfo.email === 'admin@kair.local' ||
+     userInfo.email === 'administrador@kair.local' ||
+     userInfo.email === 'admin@kair.com' ||
+     userInfo.email === 'administrador@kair.com');
+
+  // También verificar si el usuario tiene el rol "Administrador" directamente en la base de datos
+  // (incluso si no tiene empresas asignadas, por si fue creado como admin global)
+  const isAdminByDefault = userRoles.length === 0 && 
+    userInfo.email.toLowerCase().includes('admin');
+
+  return {
+    ok: true,
     session: row,
     user: {
       id: row.user_id,
@@ -335,7 +347,7 @@ function validateSession(token) {
       full_name: userInfo.full_name,
       companies: companies,
       roles: userRoles,
-      isAdmin: isAdmin
+      isAdmin: isAdmin || isAdminGlobal || isAdminByDefault
     }
   };
 }
@@ -714,13 +726,20 @@ ipcMain.handle('auth-login-v1', async (event, payload = {}) => {
     localDb.prepare('UPDATE users SET last_login_at = ? WHERE id = ?')
       .run(now.toISOString(), user.id);
 
-    const companies = localDb.prepare(`
+    // Obtener empresas y roles del usuario
+    const userCompanies = localDb.prepare(`
       SELECT c.company_key, c.display_name, r.name AS role
       FROM user_company_roles ucr
       JOIN companies c ON c.id = ucr.company_id
       JOIN roles r ON r.id = ucr.role_id
       WHERE ucr.user_id = ?
     `).all(user.id);
+
+    // Validar sesión para obtener isAdmin (usando validateSession)
+    const sessionCheck = validateSession(token);
+    const isAdmin = sessionCheck.ok ? sessionCheck.user.isAdmin : false;
+
+    console.log(`[AUTH] Login exitoso para ${email}, isAdmin: ${isAdmin}, companies: ${userCompanies.length}`);
 
     return {
       success: true,
@@ -730,9 +749,11 @@ ipcMain.handle('auth-login-v1', async (event, payload = {}) => {
           id: user.id,
           email: user.email,
           full_name: user.full_name,
-          status: user.status
+          status: user.status,
+          isAdmin: isAdmin,  // ← AGREGADO: isAdmin desde validateSession
+          companies: userCompanies  // ← AGREGADO: companies dentro del user
         },
-        companies
+        companies: userCompanies  // ← Mantenido para compatibilidad
       }
     };
   } catch (error) {

@@ -3558,29 +3558,35 @@ function createModuleCard(title, description, onClick) {
             iframe.contentDocument.documentElement.removeAttribute('data-theme');
           }
 
-          // Determinar si el usuario es administrador (revisando todas sus empresas asignadas)
-          const isAdmin = currentUser && currentUser.companies && currentUser.companies.some(c => {
-            const role = (c.role || '').toLowerCase();
-            return role === 'administrador' || role === 'administrador del sistema';
-          });
-
           // Enviar mensaje postMessage con el tema y la información del usuario para que el iframe lo procese
+          console.log('[Renderer] === ENVIANDO USUARIO AL IFRAME ===');
+          console.log('[Renderer] currentUser completo:', JSON.stringify(currentUser, null, 2));
+          console.log('[Renderer] currentUser.isAdmin:', currentUser?.isAdmin);
+          console.log('[Renderer] currentUser.email:', currentUser?.email);
+          console.log('[Renderer] currentUser.companies:', currentUser?.companies);
+          
+          const userPayload = currentUser ? {
+            id: currentUser.id,
+            email: currentUser.email,
+            full_name: currentUser.full_name,
+            companies: currentUser.companies || [],
+            // Usar isAdmin directamente del backend (ya incluye validación por email y rol)
+            isAdmin: currentUser.isAdmin || false
+          } : null;
+          
+          console.log('[Renderer] userPayload que se enviará:', JSON.stringify(userPayload, null, 2));
+          
           iframe.contentWindow.postMessage({
             type: 'theme-changed',
             theme: savedTheme,
             effectiveTheme: currentTheme,
             // Información del usuario para validación de permisos
-            user: currentUser ? {
-              id: currentUser.id,
-              email: currentUser.email,
-              full_name: currentUser.full_name,
-              companies: currentUser.companies || [],
-              isAdmin: isAdmin
-            } : null
+            user: userPayload
           }, '*');
 
           console.log('[Renderer] Tema propagado al iframe de configuración:', savedTheme, '(efectivo:', currentTheme + ')');
-          console.log('[Renderer] Usuario propagado al iframe:', { email: currentUser?.email, isAdmin: isAdmin });
+          console.log('[Renderer] Usuario propagado al iframe:', { email: currentUser?.email, isAdmin: currentUser?.isAdmin || false });
+          console.log('[Renderer] === FIN ENVÍO AL IFRAME ===');
         } catch (e) {
           console.warn('[Renderer] Error al propagar tema al iframe:', e);
         }
