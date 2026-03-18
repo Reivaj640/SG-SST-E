@@ -293,7 +293,72 @@ function validateSession(token) {
     localDb.prepare('DELETE FROM sessions WHERE token = ?').run(token);
     return { ok: false, error: { code: 'SESSION_EXPIRED', message: 'Sesión expirada' } };
   }
-  return { ok: true, session: row };
+  
+  // Obtener información completa del usuario incluyendo sus roles y empresas
+  const userInfo = localDb.prepare(`
+    SELECT u.id, u.email, u.full_name, u.status,
+           GROUP_CONCAT(DISTINCT c.company_key || '|' || r.name) AS user_roles
+    FROM users u
+    LEFT JOIN user_company_roles ucr ON ucr.user_id = u.id
+    LEFT JOIN companies c ON c.id = ucr.company_id
+    LEFT JOIN roles r ON r.id = ucr.role_id
+    WHERE u.id = ?
+    GROUP BY u.id
+  `).get(row.user_id);
+  
+  // Parsear los roles del usuario
+  const userRoles = [];
+  const companies = [];
+  if (userInfo.user_roles) {
+    const rolesList = userInfo.user_roles.split(',');
+    rolesList.forEach(roleEntry => {
+      const [companyKey, roleName] = roleEntry.split('|');
+      if (companyKey && roleName) {
+        companies.push(companyKey);
+        userRoles.push({ company: companyKey, role: roleName });
+      }
+    });
+  }
+  
+  // Verificar si el usuario tiene rol de administrador en alguna empresa
+  const isAdmin = userRoles.some(ur => 
+    ur.role.toLowerCase() === 'administrador' || 
+    ur.role.toLowerCase() === 'administrador del sistema'
+  );
+  
+  return { 
+    ok: true, 
+    session: row,
+    user: {
+      id: row.user_id,
+      email: userInfo.email,
+      full_name: userInfo.full_name,
+      companies: companies,
+      roles: userRoles,
+      isAdmin: isAdmin
+    }
+  };
+}
+
+/**
+ * Valida que el usuario tenga rol de administrador
+ * @param {object} sessionResult - Resultado de validateSession
+ * @returns {object} - { ok: boolean, error?: object }
+ */
+function requireAdmin(sessionResult) {
+  if (!sessionResult.ok) {
+    return { ok: false, error: sessionResult.error };
+  }
+  if (!sessionResult.user.isAdmin) {
+    return { 
+      ok: false, 
+      error: { 
+        code: 'PERMISSION_DENIED', 
+        message: 'Acceso denegado. Se requiere rol de administrador.' 
+      } 
+    };
+  }
+  return { ok: true };
 }
 
 // ===============================
@@ -717,6 +782,10 @@ ipcMain.handle('users-list-v1', async (event, payload = {}) => {
     const { token } = payload;
     const sessionCheck = validateSession(token);
     if (!sessionCheck.ok) return { success: false, error: sessionCheck.error };
+
+    // Validar que el usuario tenga rol de administrador
+    const adminCheck = requireAdmin(sessionCheck);
+    if (!adminCheck.ok) return { success: false, error: adminCheck.error };
 
     const localDb = getDb();
     const users = localDb.prepare(`

@@ -1670,9 +1670,27 @@ async function showHomePage(overrideCompanies = null) {
 
   // Cargar dinámicamente las empresas desde la configuración
   let dynamicCompanies = [];
+  
+  // === FUNCIÓN AUXILIAR PARA VERIFICAR SI ES ADMIN ===
+  function checkIsAdmin() {
+    if (!currentUser || !currentUser.companies) return false;
+    return currentUser.companies.some(c => {
+      const role = (c.role || '').toLowerCase();
+      return role === 'administrador' || role === 'administrador del sistema';
+    });
+  }
+  
+  // === FILTRAR EMPRESAS SEGÚN PERMISOS DEL USUARIO ===
   if (Array.isArray(overrideCompanies)) {
+    // Si se proporcionan empresas específicas (ej: desde login), usarlas
     dynamicCompanies = overrideCompanies;
+    console.log('📋 Mostrando empresas desde overrideCompanies:', dynamicCompanies.length);
+  } else if (assignedCompanies && assignedCompanies.length > 0 && !checkIsAdmin()) {
+    // === USUARIO NO-ADMIN: Solo mostrar empresas asignadas ===
+    dynamicCompanies = assignedCompanies;
+    console.log('👤 Usuario NO-ADMIN: mostrando solo empresas asignadas:', dynamicCompanies.length);
   } else {
+    // === ADMINISTRADOR: Mostrar todas las empresas ===
     try {
       const config = await window.electronAPI.loadConfig();
       if (config.companyPaths) {
@@ -1683,6 +1701,7 @@ async function showHomePage(overrideCompanies = null) {
       // Si hay un error, usar la constante existente como fallback
       dynamicCompanies = ["Tempoactiva", "Temposum", "Aseplus", "Asel"];
     }
+    console.log('👑 Usuario ADMIN: mostrando todas las empresas:', dynamicCompanies.length);
   }
 
   // Limpiar el área de contenido
@@ -3539,14 +3558,29 @@ function createModuleCard(title, description, onClick) {
             iframe.contentDocument.documentElement.removeAttribute('data-theme');
           }
 
-          // Enviar mensaje postMessage con el tema para que el iframe lo procese
+          // Determinar si el usuario es administrador (revisando todas sus empresas asignadas)
+          const isAdmin = currentUser && currentUser.companies && currentUser.companies.some(c => {
+            const role = (c.role || '').toLowerCase();
+            return role === 'administrador' || role === 'administrador del sistema';
+          });
+
+          // Enviar mensaje postMessage con el tema y la información del usuario para que el iframe lo procese
           iframe.contentWindow.postMessage({
             type: 'theme-changed',
             theme: savedTheme,
-            effectiveTheme: currentTheme
+            effectiveTheme: currentTheme,
+            // Información del usuario para validación de permisos
+            user: currentUser ? {
+              id: currentUser.id,
+              email: currentUser.email,
+              full_name: currentUser.full_name,
+              companies: currentUser.companies || [],
+              isAdmin: isAdmin
+            } : null
           }, '*');
-          
+
           console.log('[Renderer] Tema propagado al iframe de configuración:', savedTheme, '(efectivo:', currentTheme + ')');
+          console.log('[Renderer] Usuario propagado al iframe:', { email: currentUser?.email, isAdmin: isAdmin });
         } catch (e) {
           console.warn('[Renderer] Error al propagar tema al iframe:', e);
         }

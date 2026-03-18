@@ -1400,6 +1400,10 @@
 <script>
     // Variable para acceder a la API de Electron
     let electronAPI = null;
+    
+    // Variable para almacenar información del usuario y permisos
+    let currentUserInfo = null;
+    let isAdminUser = false;
 
     // Verificar si estamos en un iframe y si hay acceso a la API de Electron
     if (window.parent && window.parent !== window && window.parent.electronAPI) {
@@ -1414,9 +1418,99 @@
             }
         });
     }
+    
+    // Escuchar mensajes del padre (renderer.js) que incluye información del usuario y tema
+    window.addEventListener('message', function(event) {
+        if (event.data && event.data.type === 'theme-changed') {
+            console.log('[ConfigViewer] Mensaje recibido del padre:', event.data);
+            
+            // Guardar información del usuario
+            if (event.data.user) {
+                currentUserInfo = event.data.user;
+                isAdminUser = event.data.user.isAdmin || false;
+                console.log('[ConfigViewer] Usuario autenticado:', currentUserInfo.email, '¿Es admin?', isAdminUser);
+                
+                // Validar permisos para mostrar/ocultar pestaña de usuarios
+                validateUserPermissions();
+            }
+            
+            // Aplicar tema
+            const effectiveTheme = event.data.effectiveTheme || event.data.theme || 'light';
+            const savedTheme = event.data.theme || 'system';
+            
+            if (effectiveTheme === 'dark') {
+                if (savedTheme === 'dark') {
+                    document.documentElement.setAttribute('data-theme', 'dark-legacy');
+                } else if (savedTheme === 'system') {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                }
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+            }
+        }
+    });
+    
+    /**
+     * Valida los permisos del usuario y muestra/oculta funcionalidades según el rol
+     * - Todos los usuarios pueden VER la pestaña y la tabla
+     * - Solo administradores pueden EDITAR (crear, editar, eliminar usuarios)
+     */
+    function validateUserPermissions() {
+        const usuariosTab = document.querySelector('.nav-tab[onclick*="\'usuarios\'"]');
+        const usuariosSection = document.getElementById('tab-usuarios');
+        const nuevoUsuarioBtn = document.querySelector('#tab-usuarios .users-header-actions .btn-primary');
+        
+        if (!isAdminUser) {
+            console.log('[ConfigViewer] Usuario NO es administrador. Mostrando pestaña en modo solo lectura.');
+            
+            // MOSTRAR pestaña de usuarios (siempre visible)
+            if (usuariosTab) {
+                usuariosTab.style.display = 'block';
+            }
+            
+            // OCULTAR botón "Nuevo Usuario" para no-admins
+            if (nuevoUsuarioBtn) {
+                nuevoUsuarioBtn.style.display = 'none';
+            }
+            
+            // Modificar el título SOLO de la sección de usuarios
+            const usuariosSectionTitle = document.querySelector('#tab-usuarios .section-header .section-title');
+            if (usuariosSectionTitle && !usuariosSectionTitle.textContent.includes('(Solo lectura)')) {
+                usuariosSectionTitle.textContent = 'Usuarios y Accesos (Solo lectura)';
+            }
+            
+            // Mostrar mensaje informativo
+            showToast('Modo solo lectura: Solo administradores pueden editar usuarios.', 'info');
+        } else {
+            console.log('[ConfigViewer] Usuario es administrador. Mostrando funcionalidad completa.');
+            
+            // Mostrar pestaña de usuarios
+            if (usuariosTab) {
+                usuariosTab.style.display = 'block';
+            }
+            
+            // Mostrar botón "Nuevo Usuario"
+            if (nuevoUsuarioBtn) {
+                nuevoUsuarioBtn.style.display = 'inline-flex';
+            }
+            
+            // Restaurar título original SOLO de la sección de usuarios
+            const usuariosSectionTitle = document.querySelector('#tab-usuarios .section-header .section-title');
+            if (usuariosSectionTitle) {
+                usuariosSectionTitle.textContent = 'Usuarios y Accesos';
+            }
+        }
+    }
 
     /* ================= LÓGICA DE NAVEGACIÓN ================= */
     function switchTab(tabId, element) {
+        // Validar permisos antes de cambiar a la pestaña de usuarios
+        if (tabId === 'usuarios' && !isAdminUser) {
+            console.warn('[ConfigViewer] Intento de acceso no autorizado a pestaña de usuarios.');
+            showToast('Acceso denegado. Se requiere rol de administrador.', 'error');
+            return;
+        }
+    
         // Remover clase activa de todos los tabs
         document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
         // Agregar clase activa al elemento clickeado
@@ -1445,8 +1539,63 @@
                 const companyPaths = currentConfig.companyPaths || {};
                 console.log('🏢 Paths de empresas encontrados:', Object.keys(companyPaths));
 
-                companies = Object.keys(companyPaths).map(name => {
+                // === FILTRAR EMPRESAS SEGÚN PERMISOS DEL USUARIO ===
+                let companiesToProcess = [];
+                
+                if (isAdminUser) {
+                    // Administrador: ve TODAS las empresas
+                    companiesToProcess = Object.keys(companyPaths);
+                    console.log('👑 Usuario es ADMIN: ve todas las empresas:', companiesToProcess.length);
+                } else {
+                    // Usuario no-admin: solo ve las empresas asignadas
+                    const token = getAuthToken();
+                    if (token && electronAPI && typeof electronAPI.assignmentsListByUserV1 === 'function') {
+                        // Obtener usuario actual del token o información almacenada
+                        const userInfo = currentUserInfo;
+                        if (userInfo && userInfo.id) {
+                            const aRes = await electronAPI.assignmentsListByUserV1({ 
+                                token, 
+                                userId: userInfo.id 
+                            });
+                            if (aRes.success) {
+                                const assignments = aRes.data.assignments || [];
+                                companiesToProcess = assignments.map(a => a.company_key);
+                                console.log('👤 Usuario NO-ADMIN: solo ve empresas asignadas:', companiesToProcess);
+                            } else {
+                                console.warn('⚠️ No se pudieron obtener asignaciones del usuario');
+                                companiesToProcess = [];
+                            }
+                        } else {
+                            console.warn('⚠️ No hay información del usuario disponible');
+                            companiesToProcess = [];
+                        }
+                    } else {
+                        console.warn('⚠️ API de asignaciones no disponible');
+                        companiesToProcess = [];
+                    }
+                }
+                
+                // Si no hay empresas para mostrar (usuario sin asignaciones), mostrar mensaje
+                if (companiesToProcess.length === 0 && !isAdminUser) {
+                    console.log('ℹ️ Usuario no tiene empresas asignadas');
+                    const companyGrid = document.getElementById('company-grid');
+                    companyGrid.innerHTML = `
+                        <div style="grid-column: 1/-1; text-align: center; padding: 3rem; color: var(--text-muted);">
+                            <div style="font-size: 3rem; margin-bottom: 1rem;">📭</div>
+                            <h3 style="color: var(--text-main); margin-bottom: 0.5rem;">No tienes empresas asignadas</h3>
+                            <p>Un administrador debe asignarte al menos una empresa para poder ver su configuración.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Procesar solo las empresas permitidas
+                companies = companiesToProcess.map(name => {
                     const companyData = companyPaths[name];
+                    if (!companyData) {
+                        console.warn(`⚠️ Empresa ${name} no encontrada en companyPaths`);
+                        return null;
+                    }
                     console.log(`📊 Datos de empresa ${name}:`, companyData);
 
                     // Extraer los datos de stats o construirlos a partir de otros campos si no existen
@@ -1467,9 +1616,9 @@
                         path: companyData.root || '',
                         stats: companyStats
                     };
-                });
+                }).filter(c => c !== null); // Filtrar empresas nulas
 
-                console.log('📋 Empresas mapeadas:', companies);
+                console.log('📋 Empresas filtradas para mostrar:', companies.length);
 
                 // Determinar el escenario normativo para cada empresa y calcular los ítems correspondientes
                 companies = companies.map(company => {
@@ -1911,9 +2060,19 @@
             const assignments = assignmentsByUser[u.id] || [];
             const roleName = assignments[0]?.role ? mapRoleToLabel(assignments[0].role) : 'Sin asignación';
             const companyList = assignments.map(a => a.company_key).join(', ') || 'Sin asignación';
-            const disableButton = (u.status === 'Activo')
-                ? `<button class="btn btn-sm btn-outline" onclick="disableUser(${u.id})">Desactivar</button>`
-                : '';
+            
+            // Solo mostrar botones de acción si es administrador
+            let actionsHtml = '<span style="color: var(--text-muted); font-size: 0.85rem;">—</span>';
+            if (isAdminUser) {
+                const disableButton = (u.status === 'Activo')
+                    ? `<button class="btn btn-sm btn-outline" onclick="disableUser(${u.id})">Desactivar</button>`
+                    : '';
+                actionsHtml = `
+                    <button class="btn btn-sm btn-outline" onclick="openUserModal(${u.id})">Asignar</button>
+                    ${disableButton}
+                `;
+            }
+            
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>
@@ -1930,8 +2089,7 @@
                 <td>${u.last}</td>
                 <td><span class="status-${u.status.toLowerCase()}">● ${u.status}</span></td>
                 <td style="text-align: right;">
-                    <button class="btn btn-sm btn-outline" onclick="openUserModal(${u.id})">Asignar</button>
-                    ${disableButton}
+                    ${actionsHtml}
                 </td>
             `;
             userTableBody.appendChild(tr);
