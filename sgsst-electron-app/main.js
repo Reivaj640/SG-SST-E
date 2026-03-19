@@ -58,6 +58,36 @@ const execFilePromise = promisify(execFile);
 // EXPONER A GLOBAL PARA QUE LOS HANDLERS PUEDAN USARLO
 global.cachedPythonPath = null;
 
+/**
+ * Obtiene la ruta de Python empaquetado con la aplicación.
+ * En producción, usa Python embeddable incluido en resources/python-embed/
+ * En desarrollo, usa Python del sistema o .venv
+ * 
+ * @returns {Promise<string>} - Ruta al ejecutable de Python
+ */
+async function getEmbeddedPythonPath() {
+    const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+    
+    if (isDev) {
+        // Desarrollo: usar Python del sistema o .venv
+        console.log('[PYTHON] Modo desarrollo: buscando Python del sistema...');
+        return await findPython();
+    } else {
+        // Producción: usar Python empaquetado
+        const embeddedPythonPath = path.join(process.resourcesPath, 'python-embed', 'python.exe');
+        console.log(`[PYTHON] Modo producción: verificando Python empaquetado en: ${embeddedPythonPath}`);
+        
+        if (fs.existsSync(embeddedPythonPath)) {
+            console.log('[PYTHON] ✓ Python empaquetado encontrado');
+            return embeddedPythonPath;
+        } else {
+            console.warn('[PYTHON] ⚠ Python empaquetado NO encontrado, usando fallback al sistema');
+            // Fallback: buscar Python en sistema
+            return await findPython();
+        }
+    }
+}
+
 async function findPython() {
     console.log('[DEBUG] Starting Python path search');
 
@@ -127,7 +157,7 @@ async function findPython() {
 
 async function getPython() {
     console.log('[DEBUG] Current global.cachedPythonPath:', global.cachedPythonPath);
-    
+
     // Si hay un cache, verificar que exista y sea ejecutable
     if (global.cachedPythonPath) {
         if (fs.existsSync(global.cachedPythonPath)) {
@@ -144,11 +174,29 @@ async function getPython() {
             global.cachedPythonPath = null;
         }
     }
-    
-    // Buscar Python desde cero
-    global.cachedPythonPath = await findPython();
+
+    // Usar Python empaquetado (producción) o buscar Python desde cero (desarrollo)
+    global.cachedPythonPath = await getEmbeddedPythonPath();
     console.log('[DEBUG] New Python path cached:', global.cachedPythonPath);
     return global.cachedPythonPath;
+}
+
+/**
+ * Obtiene la ruta correcta para scripts de Python tanto en desarrollo como en app empaquetada.
+ * En producción, los scripts se empaquetan en process.resourcesPath/python-scripts/
+ * En desarrollo, están en __dirname/Portear/src/
+ * 
+ * @param {string} scriptName - Nombre del script Python (ej: 'map_directory.py')
+ * @returns {string} - Ruta absoluta al script
+ */
+function getPythonScriptPath(scriptName) {
+    const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+    const resourcesPath = isDev 
+        ? __dirname 
+        : (process.resourcesPath || __dirname);
+    
+    const scriptDir = isDev ? 'Portear/src' : 'python-scripts';
+    return path.join(resourcesPath, scriptDir, scriptName);
 }
 
 let mainWindow;
@@ -1062,6 +1110,89 @@ ipcMain.handle('get-app-path', async () => {
 });
 
 // ===============================
+// 🔍 VERIFICACIÓN DE DEPENDENCIAS
+// ===============================
+
+/**
+ * Verifica el estado de las dependencias externas (Python, scripts, etc.)
+ * @returns {object} - Estado de las dependencias
+ */
+ipcMain.handle('check-dependencies', async () => {
+  const result = {
+    python: { available: false, path: null, version: null, error: null },
+    scripts: { available: false, missing: [], error: null },
+    overall: false,
+    messages: []
+  };
+
+  // 1. Verificar Python
+  try {
+    const pythonPath = await getPython();
+    result.python.available = true;
+    result.python.path = pythonPath;
+
+    // Obtener versión de Python
+    try {
+      const { stdout } = await execFilePromise(pythonPath, ['--version']);
+      result.python.version = stdout.trim();
+    } catch (vError) {
+      result.python.version = 'Desconocida';
+    }
+  } catch (pyError) {
+    result.python.error = pyError.message;
+    result.messages.push({
+      type: 'error',
+      title: 'Python no está instalado',
+      message: 'Python 3.10-3.12 no fue encontrado. Instálelo desde python.org y agréguelo al PATH.'
+    });
+  }
+
+  // 2. Verificar scripts críticos de Python
+  const criticalScripts = [
+    'map_directory.py',
+    'actualizar_ausentismo.py',
+    'convert_docx_to_pdf.py',
+    'convert_xlsx_to_pdf.py',
+    'copasst_acta_generator.py',
+    'comite_convivencia_acta_generator.py',
+    'dashboard_scanner.py'
+  ];
+
+  const missingScripts = [];
+  for (const script of criticalScripts) {
+    const scriptPath = getPythonScriptPath(script);
+    if (!fs.existsSync(scriptPath)) {
+      missingScripts.push(script);
+    }
+  }
+
+  if (missingScripts.length === 0) {
+    result.scripts.available = true;
+  } else {
+    result.scripts.missing = missingScripts;
+    result.scripts.error = `Scripts faltantes: ${missingScripts.join(', ')}`;
+    result.messages.push({
+      type: 'error',
+      title: 'Scripts de Python faltantes',
+      message: `Los siguientes scripts no se encontraron: ${missingScripts.join(', ')}. Esto puede indicar un problema con la instalación.`
+    });
+  }
+
+  // 3. Determinar estado general
+  result.overall = result.python.available && result.scripts.available;
+
+  if (result.overall) {
+    result.messages.push({
+      type: 'success',
+      title: 'Todas las dependencias están disponibles',
+      message: 'Python y los scripts requeridos están correctamente instalados.'
+    });
+  }
+
+  return result;
+});
+
+// ===============================
 // 🎨 SISTEMA DE TEMAS (Claro/Oscuro/Sistema)
 // ===============================
 
@@ -1167,11 +1298,15 @@ ipcMain.handle('get-dashboard-summary', async (event, companyName) => {
     await fsp.access(companyPath);
 
     // 3. Ejecutar Script Python
-    const scriptPath = path.join(__dirname, 'Portear', 'src', 'dashboard_scanner.py');
-    
+    const scriptPath = getPythonScriptPath('dashboard_scanner.py');
+
     // Debug: Verificar que el script existe
     console.log(`[DASHBOARD] Script path: ${scriptPath}`);
     console.log(`[DASHBOARD] Script existe: ${fs.existsSync(scriptPath)}`);
+
+    if (!fs.existsSync(scriptPath)) {
+      return { success: false, error: `Script de Python no encontrado: ${scriptPath}` };
+    }
 
     const result = await runPythonScript(scriptPath, [companyPath]);
 
@@ -1470,22 +1605,38 @@ ipcMain.handle('map-directory', async (event, directoryPath) => {
     console.log('[MAPEO][MAIN] Handler map-directory llamado');
     console.log(`[MAPEO][MAIN] Directorio a mapear: ${directoryPath}`);
     console.log(`[MAPEO][MAIN] Verificando existencia del directorio...`);
-    
+
     if (!fs.existsSync(directoryPath)) {
       const errorMsg = `El directorio no existe: ${directoryPath}`;
       console.error(`[MAPEO][MAIN][ERROR] ${errorMsg}`);
       return { success: false, error: errorMsg, log: errorMsg };
     }
     console.log(`[MAPEO][MAIN] Directorio existe: ✅`);
-    
-    const pythonPath = await getPython();
-    const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'map_directory.py');
+
+    // Validar Python disponible
+    let pythonPath;
+    try {
+      pythonPath = await getPython();
+    } catch (pyError) {
+      const errorMsg = 'Python no está instalado en este equipo. Para usar esta función, instale Python 3.10-3.12 desde python.org y agréguelo al PATH.';
+      console.error(`[MAPEO][MAIN][ERROR] ${errorMsg}`);
+      return { success: false, error: errorMsg, log: errorMsg };
+    }
+
+    const pythonScriptPath = getPythonScriptPath('map_directory.py');
+
+    // Validar que el script existe
+    if (!fs.existsSync(pythonScriptPath)) {
+      const errorMsg = `Script de Python no encontrado: ${pythonScriptPath}`;
+      console.error(`[MAPEO][MAIN][ERROR] ${errorMsg}`);
+      return { success: false, error: errorMsg, log: errorMsg };
+    }
 
     console.log(`[MAPEO][MAIN] Python path: ${pythonPath}`);
     console.log(`[MAPEO][MAIN] Script path: ${pythonScriptPath}`);
     console.log(`[MAPEO][MAIN] Ejecutando: ${pythonPath} "${pythonScriptPath}" "${directoryPath}"`);
 
-    const { stdout, stderr } = await execFilePromise(pythonPath, [pythonScriptPath, directoryPath], { 
+    const { stdout, stderr } = await execFilePromise(pythonPath, [pythonScriptPath, directoryPath], {
       cwd: path.dirname(pythonScriptPath),
       env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
     });
@@ -2779,15 +2930,17 @@ ipcMain.handle('convertExcelToPdf', async (event, filePath) => {
     await fsp.access(filePath);
 
     // Para la conversión Excel a PDF, usaríamos un script Python similar al de Word
-    const pythonPath = await getPython();
-    const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'convert_xlsx_to_pdf.py');
+    let pythonPath;
+    try {
+      pythonPath = await getPython();
+    } catch (pyError) {
+      throw new Error('Python no está instalado. Instale Python 3.10-3.12 desde python.org');
+    }
+
+    const pythonScriptPath = getPythonScriptPath('convert_xlsx_to_pdf.py');
 
     // Verificar si el script de conversión existe
-    try {
-      await fsp.access(pythonScriptPath);
-    } catch {
-      // Si no existe el script específico, podríamos usar la conversión de ExcelJS a PDF
-      // pero por ahora lanzamos un error para indicar la funcionalidad faltante
+    if (!fs.existsSync(pythonScriptPath)) {
       throw new Error(`Script de conversión Excel a PDF no encontrado: ${pythonScriptPath}`);
     }
 
@@ -2824,12 +2977,24 @@ ipcMain.handle('get-excel-preview', async (event, filePath) => {
     sendLog(`[MAIN][get-excel-preview] Iniciando conversión de Excel a PDF para: ${filePath}`, 'INFO');
 
     // 2. Obtener ruta de Python
-    const pythonPath = await getPython();
+    let pythonPath;
+    try {
+      pythonPath = await getPython();
+    } catch (pyError) {
+      sendLog(`[MAIN][get-excel-preview] Python no disponible: ${pyError.message}`, 'ERROR');
+      return { success: false, error: 'Python no está instalado. Instale Python 3.10-3.12 desde python.org' };
+    }
     sendLog(`[MAIN][get-excel-preview] Usando Python de: ${pythonPath}`, 'DEBUG');
 
     // 3. Definir rutas de script y archivo temporal
-    const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'convert_xlsx_to_pdf.py');
+    const pythonScriptPath = getPythonScriptPath('convert_xlsx_to_pdf.py');
     tempPdfPath = path.join(os.tmpdir(), `preview-${Date.now()}.pdf`);
+
+    // Verificar que el script existe
+    if (!fs.existsSync(pythonScriptPath)) {
+      sendLog(`[MAIN][get-excel-preview] El script de conversión de Excel no existe: ${pythonScriptPath}`, 'ERROR');
+      return { success: false, error: `Script de conversión no encontrado: ${pythonScriptPath}` };
+    }
 
     sendLog(`[MAIN][get-excel-preview] Script de conversión: ${pythonScriptPath}`, 'DEBUG');
     sendLog(`[MAIN][get-excel-preview] Archivo de entrada: ${filePath}`, 'DEBUG');
@@ -3579,12 +3744,24 @@ ipcMain.handle('get-word-preview', async (event, rawFilePath) => {
     sendLog(`[MAIN][get-word-preview] Iniciando conversión de Word a PDF para: ${filePath}`, 'INFO');
 
     // 1. Obtener ruta de Python
-    const pythonPath = await getPython();
+    let pythonPath;
+    try {
+      pythonPath = await getPython();
+    } catch (pyError) {
+      sendLog(`[MAIN][get-word-preview] Python no disponible: ${pyError.message}`, 'ERROR');
+      return { success: false, error: 'Python no está instalado. Instale Python 3.10-3.12 desde python.org' };
+    }
     sendLog(`[MAIN][get-word-preview] Usando Python de: ${pythonPath}`, 'DEBUG');
 
     // 2. Definir rutas de script y archivo temporal
-    const pythonScriptPath = path.join(__dirname, 'Portear', 'src', 'convert_docx_to_pdf.py');
+    const pythonScriptPath = getPythonScriptPath('convert_docx_to_pdf.py');
     tempPdfPath = path.join(os.tmpdir(), `preview-${Date.now()}.pdf`);
+
+    // Verificar que el script existe
+    if (!fs.existsSync(pythonScriptPath)) {
+      sendLog(`[MAIN][get-word-preview] El script de conversión de Word no existe: ${pythonScriptPath}`, 'ERROR');
+      return { success: false, error: `Script de conversión no encontrado: ${pythonScriptPath}` };
+    }
 
     sendLog(`[MAIN][get-word-preview] Script de conversión: ${pythonScriptPath}`, 'DEBUG');
     sendLog(`[MAIN][get-word-preview] Archivo de entrada: ${filePath}`, 'DEBUG');
@@ -5080,57 +5257,69 @@ ipcMain.handle('buscar-empleado-por-cedula', async (event, { cedula, empresa }) 
   const { spawn } = require('child_process');
   const path = require('path');
 
-  const scriptPath = path.join(__dirname, 'Portear', 'src', 'actualizar_ausentismo.py');
+  const scriptPath = getPythonScriptPath('actualizar_ausentismo.py');
+
+  // Verificar que el script existe
+  if (!fs.existsSync(scriptPath)) {
+    sendLog(`[Python Empleado - ERROR] Script no encontrado: ${scriptPath}`, 'ERROR');
+    return { success: false, error: `Script de Python no encontrado: ${scriptPath}` };
+  }
 
   return new Promise((resolve, reject) => {
     sendLog(`IPC: buscar-empleado-por-cedula recibido. Empresa: ${empresa}, Cédula: ${cedula}`);
 
-    const python = spawn('python', [scriptPath, 'buscar_empleado', cedula, empresa], {
-      cwd: path.dirname(scriptPath),
-      env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
-    });
-
-    let buffer = '';
-
-    python.stdout.on('data', (data) => {
-      buffer += data.toString();
-      const lines = buffer.split('\n');
-      buffer = lines.pop();
-      lines.forEach(line => {
-        line = line.trim();
-        if (!line) return;
-
-        try {
-          const obj = JSON.parse(line);
-          if (obj.type === 'log') {
-            sendLog(`[Python Empleado] ${obj.message}`, 'INFO');
-          } else if (obj.type === 'result') {
-            resolve(obj.payload);
-          }
-        } catch (e) {
-          sendLog(`[Python Empleado - RAW] ${line}`, 'DEBUG');
-        }
+    // Obtener Python path correcto
+    getPython().then(pythonPath => {
+      const python = spawn(pythonPath, [scriptPath, 'buscar_empleado', cedula, empresa], {
+        cwd: path.dirname(scriptPath),
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
       });
-    });
 
-    python.stderr.on('data', (data) => {
-      sendLog(`[Python Empleado - STDERR] ${data.toString()}`, 'ERROR');
-    });
+      let buffer = '';
 
-    python.on('close', (code) => {
-      sendLog(`[Python Empleado] Proceso cerrado con código ${code}`);
-      if (buffer?.trim()) {
-        try {
-          const last = JSON.parse(buffer.trim());
-          if (last.type === 'result') return resolve(last.payload);
-        } catch { /* Ignorar errores menores */ }
-      }
-      resolve({ success: false, error: 'Proceso cerrado sin resultado.' });
-    });
+      python.stdout.on('data', (data) => {
+        buffer += data.toString();
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        lines.forEach(line => {
+          line = line.trim();
+          if (!line) return;
 
-    python.on('error', (err) => {
-      sendLog(`Error al iniciar proceso Python para buscar empleado: ${err.message}`, 'CRITICAL');
-      reject(err);
+          try {
+            const obj = JSON.parse(line);
+            if (obj.type === 'log') {
+              sendLog(`[Python Empleado] ${obj.message}`, 'INFO');
+            } else if (obj.type === 'result') {
+              resolve(obj.payload);
+            }
+          } catch (e) {
+            sendLog(`[Python Empleado - RAW] ${line}`, 'DEBUG');
+          }
+        });
+      });
+
+      python.stderr.on('data', (data) => {
+        sendLog(`[Python Empleado - STDERR] ${data.toString()}`, 'ERROR');
+      });
+
+      python.on('close', (code) => {
+        sendLog(`[Python Empleado] Proceso cerrado con código ${code}`);
+        if (buffer?.trim()) {
+          try {
+            const last = JSON.parse(buffer.trim());
+            if (last.type === 'result') return resolve(last.payload);
+          } catch { /* Ignorar errores menores */ }
+        }
+        resolve({ success: false, error: 'Proceso cerrado sin resultado.' });
+      });
+
+      python.on('error', (err) => {
+        sendLog(`Error al iniciar proceso Python para buscar empleado: ${err.message}`, 'CRITICAL');
+        reject(err);
+      });
+    }).catch(pyErr => {
+      sendLog(`Python no disponible para buscar empleado: ${pyErr.message}`, 'ERROR');
+      resolve({ success: false, error: 'Python no está instalado. Instale Python 3.10-3.12 desde python.org' });
     });
   });
 });
@@ -5160,8 +5349,19 @@ ipcMain.handle('buscar-cie10-descripcion', async (event, { companyName, cie10Cod
     }
 
     // --- Ahora, llamar al script de Python ---
-    const pythonPath = await getPython();
-    const scriptPath = path.join(__dirname, 'Portear', 'src', 'actualizar_ausentismo.py');
+    let pythonPath;
+    try {
+      pythonPath = await getPython();
+    } catch (pyError) {
+      throw new Error('Python no está instalado. Instale Python 3.10-3.12 desde python.org');
+    }
+
+    const scriptPath = getPythonScriptPath('actualizar_ausentismo.py');
+
+    // Verificar que el script existe
+    if (!fs.existsSync(scriptPath)) {
+      throw new Error(`Script de Python no encontrado: ${scriptPath}`);
+    }
 
     const pythonProcess = spawn(pythonPath, [scriptPath, 'buscar_cie10', excelFilePath, cie10Code], {
       cwd: path.dirname(scriptPath),
@@ -5341,8 +5541,19 @@ ipcMain.handle('procesar-ausentismo', async (event, empresa, formData) => {
     sendLog(`[MAIN] Archivo de ausentismo seleccionado: ${filePath}`, 'INFO');
 
     const { spawn } = require('child_process');
-    const scriptPath = path.join(__dirname, 'Portear', 'src', 'actualizar_ausentismo.py');
-    const pythonPath = await getPython();
+    const scriptPath = getPythonScriptPath('actualizar_ausentismo.py');
+
+    // Verificar que el script existe
+    if (!fs.existsSync(scriptPath)) {
+      throw new Error(`Script de Python no encontrado: ${scriptPath}`);
+    }
+
+    let pythonPath;
+    try {
+      pythonPath = await getPython();
+    } catch (pyError) {
+      throw new Error('Python no está instalado. Instale Python 3.10-3.12 desde python.org');
+    }
 
     // ✅ Convertir formData en string seguro para pasar a Python
     const formDataJson = JSON.stringify(formData);
@@ -5425,8 +5636,19 @@ ipcMain.handle('save-follow-up', async (event, followUpData, companyName) => {
     sendLog(`[MAIN] Archivo PRI.xlsx encontrado: ${filePath}`, 'INFO');
 
     const { spawn } = require('child_process');
-    const scriptPath = path.join(__dirname, 'Portear', 'src', 'actualizar_ausentismo.py');
-    const pythonPath = await getPython();
+    const scriptPath = getPythonScriptPath('actualizar_ausentismo.py');
+
+    // Verificar que el script existe
+    if (!fs.existsSync(scriptPath)) {
+      throw new Error(`Script de Python no encontrado: ${scriptPath}`);
+    }
+
+    let pythonPath;
+    try {
+      pythonPath = await getPython();
+    } catch (pyError) {
+      throw new Error('Python no está instalado. Instale Python 3.10-3.12 desde python.org');
+    }
 
     // Convertir followUpData en string seguro para pasar a Python
     const followUpDataJson = JSON.stringify(followUpData);
@@ -5511,8 +5733,19 @@ ipcMain.handle('buscar-registros-cedula', async (event, cedula, companyName) => 
     console.log(`[PRI][BUSCAR] ✅ PRI.xlsx encontrado: ${filePath}`);
 
     const { spawn } = require('child_process');
-    const scriptPath = path.join(__dirname, 'Portear', 'src', 'actualizar_ausentismo.py');
-    const pythonPath = await getPython();
+    const scriptPath = getPythonScriptPath('actualizar_ausentismo.py');
+
+    // Verificar que el script existe
+    if (!fs.existsSync(scriptPath)) {
+      throw new Error(`Script de Python no encontrado: ${scriptPath}`);
+    }
+
+    let pythonPath;
+    try {
+      pythonPath = await getPython();
+    } catch (pyError) {
+      throw new Error('Python no está instalado. Instale Python 3.10-3.12 desde python.org');
+    }
 
     return new Promise((resolve, reject) => {
       const python = spawn(pythonPath, [
@@ -5586,8 +5819,19 @@ ipcMain.handle('buscar-todos-registros-pri', async (event, companyName) => {
     console.log(`[PRI][TODOS] ✅ PRI.xlsx encontrado: ${filePath}`);
 
     const { spawn } = require('child_process');
-    const scriptPath = path.join(__dirname, 'Portear', 'src', 'actualizar_ausentismo.py');
-    const pythonPath = await getPython();
+    const scriptPath = getPythonScriptPath('actualizar_ausentismo.py');
+
+    // Verificar que el script existe
+    if (!fs.existsSync(scriptPath)) {
+      throw new Error(`Script de Python no encontrado: ${scriptPath}`);
+    }
+
+    let pythonPath;
+    try {
+      pythonPath = await getPython();
+    } catch (pyError) {
+      throw new Error('Python no está instalado. Instale Python 3.10-3.12 desde python.org');
+    }
 
     return new Promise((resolve, reject) => {
       const python = spawn(pythonPath, [
@@ -5698,8 +5942,19 @@ ipcMain.handle('get-follow-up-history', async (event, caseId, companyName) => {
     // En este ejemplo simple, creamos datos de historial simulados
     // En una implementación real, esto leería del archivo de datos
     const { spawn } = require('child_process');
-    const scriptPath = path.join(__dirname, 'Portear', 'src', 'actualizar_ausentismo.py');
-    const pythonPath = await getPython();
+    const scriptPath = getPythonScriptPath('actualizar_ausentismo.py');
+
+    // Verificar que el script existe
+    if (!fs.existsSync(scriptPath)) {
+      throw new Error(`Script de Python no encontrado: ${scriptPath}`);
+    }
+
+    let pythonPath;
+    try {
+      pythonPath = await getPython();
+    } catch (pyError) {
+      throw new Error('Python no está instalado. Instale Python 3.10-3.12 desde python.org');
+    }
 
     const params = {
       caseId,
@@ -5821,11 +6076,19 @@ ipcMain.handle('load-follow-up-data', async (event, companyName) => {
 
     const { spawn } = require('child_process');
 
-    const scriptPath = path.join(__dirname, 'Portear', 'src', 'actualizar_ausentismo.py');
+    const scriptPath = getPythonScriptPath('actualizar_ausentismo.py');
 
-    const pythonPath = await getPython();
+    // Verificar que el script existe
+    if (!fs.existsSync(scriptPath)) {
+      throw new Error(`Script de Python no encontrado: ${scriptPath}`);
+    }
 
-
+    let pythonPath;
+    try {
+      pythonPath = await getPython();
+    } catch (pyError) {
+      throw new Error('Python no está instalado. Instale Python 3.10-3.12 desde python.org');
+    }
 
     return new Promise((resolve, reject) => {
 
@@ -5994,11 +6257,22 @@ ipcMain.handle('generate-copasst-acta', async (event, changes, savePath = null) 
     }
 
     // Obtener la ruta de Python
-    const pythonPath = await getPython();
+    let pythonPath;
+    try {
+      pythonPath = await getPython();
+    } catch (pyError) {
+      throw new Error('Python no está instalado. Instale Python 3.10-3.12 desde python.org');
+    }
     sendLog(`[MAIN][generate-copasst-acta] Usando Python de: ${pythonPath}`, 'DEBUG');
 
     // Definir rutas necesarias
-    const scriptPath = path.join(__dirname, 'Portear', 'src', 'copasst_acta_generator.py');
+    const scriptPath = getPythonScriptPath('copasst_acta_generator.py');
+
+    // Verificar que el script existe
+    if (!fs.existsSync(scriptPath)) {
+      throw new Error(`Script de Python no encontrado: ${scriptPath}`);
+    }
+
     const tempDir = app.getPath('temp'); // Directorio temporal del sistema
     const tempJsonPath = path.join(tempDir, `temp_acta_data_${Date.now()}.json`);
 
@@ -6079,11 +6353,22 @@ ipcMain.handle('generate-convivencia-acta', async (event, changes, savePath = nu
     }
 
     // Obtener la ruta de Python
-    const pythonPath = await getPython();
+    let pythonPath;
+    try {
+      pythonPath = await getPython();
+    } catch (pyError) {
+      throw new Error('Python no está instalado. Instale Python 3.10-3.12 desde python.org');
+    }
     sendLog(`[MAIN][generate-convivencia-acta] Usando Python de: ${pythonPath}`, 'DEBUG');
 
     // Definir rutas necesarias
-    const scriptPath = path.join(__dirname, 'Portear', 'src', 'comite_convivencia_acta_generator.py');
+    const scriptPath = getPythonScriptPath('comite_convivencia_acta_generator.py');
+
+    // Verificar que el script existe
+    if (!fs.existsSync(scriptPath)) {
+      throw new Error(`Script de Python no encontrado: ${scriptPath}`);
+    }
+
     const tempDir = app.getPath('temp'); // Directorio temporal del sistema
     const tempJsonPath = path.join(tempDir, `temp_convivencia_acta_changes_${Date.now()}.json`);
 
@@ -7452,11 +7737,11 @@ async function startLlmServer() {
         }
 
         console.log('[MAIN] 🚀 Iniciando servidor LLM...');
-        
+
         // Obtener ruta de Python
         const pythonPath = global.cachedPythonPath || 'python';
-        const serverScript = path.join(__dirname, 'Portear', 'src', 'llm_server.py');
-        
+        const serverScript = getPythonScriptPath('llm_server.py');
+
         if (!fs.existsSync(serverScript)) {
             console.warn('[MAIN] ⚠️ Script del servidor LLM no encontrado:', serverScript);
             return;

@@ -166,15 +166,29 @@ modules/
 
 ### Requisitos del Sistema
 
-| Componente          | Versión Mínima | Recomendada     |
-|---------------------|----------------|-----------------|
-| **Node.js**         | 18.x           | 20.x            |
-| **Python**          | 3.10           | 3.11-3.12       |
-| **RAM**             | 8 GB           | 16 GB           |
-| **Almacenamiento**  | 2 GB           | 5 GB SSD        |
-| **CUDA** (opcional) | 12.x           | Para IA con GPU |
+| Componente          | Versión Mínima | Recomendada     | Crítico |
+|---------------------|----------------|-----------------|---------|
+| **Node.js**         | 18.x           | 20.x            | ✅ Sí - Para desarrollo |
+| **Python**          | 3.10           | 3.11-3.12       | ⚠️ **Incluido en installer** |
+| **Microsoft Office**| 2016+          | 365             | ⚠️ Solo Word para convertir DOCX→PDF |
+| **RAM**             | 8 GB           | 16 GB           | ✅ Sí |
+| **Almacenamiento**  | 2 GB           | 5 GB SSD        | ✅ Sí |
+| **CUDA** (opcional) | 12.x           | Para IA con GPU | ❌ No - Solo para LLM con GPU |
 
-### Instalación Paso a Paso
+### ⚠️ IMPORTANTE: Python Incluido
+
+**La aplicación K+AIR AHORA INCLUYE Python 3.11 empaquetado.**
+
+✅ **Ventajas:**
+- No necesitas instalar Python manualmente
+- Todas las funciones están disponibles inmediatamente
+- Versión de Python controlada y compatible
+
+⚠️ **Excepciones (instalar Python manualmente solo si):**
+- Quieres usar tu propia instalación de Python
+- Hay errores con Python empaquetado (fallback automático)
+
+### Instalación Paso a Paso (Desarrollo)
 
 ```bash
 # 1. Clonar repositorio

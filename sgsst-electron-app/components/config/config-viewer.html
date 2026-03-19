@@ -2633,11 +2633,39 @@
                     console.error('[CONFIG][SAVE] Stack:', error.stack);
                     clearInterval(timerInterval);
 
+                    // Determinar el mensaje de error apropiado
+                    let errorMessage = error.message;
+                    let errorTitle = 'Error al actualizar';
+
+                    // Detectar error de Python no instalado
+                    if (error.message && error.message.includes('Python')) {
+                        errorTitle = 'Python no está instalado';
+                        errorMessage = `
+                            <div style="text-align: left; max-width: 500px; margin: 0 auto;">
+                                <p><strong>Se requiere Python para vincular empresas.</strong></p>
+                                <p>Para usar esta función, necesita instalar Python en su equipo:</p>
+                                <ol style="margin: 10px 0; padding-left: 20px;">
+                                    <li>Descargue Python 3.10, 3.11 o 3.12 desde: 
+                                        <a href="https://www.python.org/downloads/" target="_blank" style="color: #174ea6; text-decoration: underline;">python.org/downloads</a>
+                                    </li>
+                                    <li>Ejecute el instalador</li>
+                                    <li><strong>IMPORTANTE:</strong> Marque la casilla ✅ "Add Python to PATH"</li>
+                                    <li>Haga clic en "Install Now"</li>
+                                    <li>Reinicie K+AIR e intente nuevamente</li>
+                                </ol>
+                                <p style="color: #dc3545; font-size: 0.9em;">
+                                    <strong>Nota:</strong> Sin Python, no se puede completar el mapeo de la estructura de la empresa.
+                                </p>
+                            </div>
+                        `;
+                    }
+
                     // Actualizar UI con error
                     mappingMessage.innerHTML = `
                         <div class="mapping-step error">
                             <span class="step-icon"><i class="fas fa-exclamation-circle"></i></span>
-                            <span>Error: ${error.message}</span>
+                            <span><strong>${errorTitle}</strong></span>
+                            <div style="margin-top: 10px; font-size: 0.95em;">${errorMessage}</div>
                         </div>
                     `;
 
@@ -2646,8 +2674,8 @@
                         mappingOverlay.style.display = 'none';
                         btnSaveLink.disabled = false;
                         btnSaveLink.textContent = 'Guardar y Vincular';
-                        showToast(`Error al actualizar: ${error.message}`, 'error');
-                    }, 4000);
+                        showToast(`${errorTitle}: ${error.message.replace(/<[^>]*>/g, '')}`, 'error');
+                    }, 8000);
                 });
         } else {
             // Simulación para pruebas sin Electron

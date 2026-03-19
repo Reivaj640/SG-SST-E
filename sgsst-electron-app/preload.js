@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // --- App & Configuración ---
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   getAppPath: () => ipcRenderer.invoke('get-app-path'),
+  checkDependencies: () => ipcRenderer.invoke('check-dependencies'),
   getRecursosStats: (companyName) => ipcRenderer.invoke('get-recursos-stats', companyName),
   saveConfig: (config) => ipcRenderer.invoke('save-config', config),
   loadConfig: () => ipcRenderer.invoke('load-config'),
