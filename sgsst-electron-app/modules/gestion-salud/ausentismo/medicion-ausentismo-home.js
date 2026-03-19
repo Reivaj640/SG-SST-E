@@ -1,38 +1,88 @@
 // medicion-ausentismo-home.js - Lógica del portal de Medición del Ausentismo
 
 /**
- * Espera a que un elemento exista en el DOM
- * @param {string} elementId - ID del elemento a esperar
- * @param {number} timeout - Tiempo máximo de espera en ms (default: 3000)
- * @returns {Promise<boolean>} - true si se encontró, false si se agotó el tiempo
+ * Espera a que un elemento exista en el DOM con retry logic y backoff exponencial
+ * @param {string} selector - Selector CSS del elemento a esperar (ID, clase, etc.)
+ * @param {number} timeout - Tiempo máximo de espera en ms (default: 5000)
+ * @param {number} maxRetries - Número máximo de reintentos (default: 10)
+ * @param {number} baseDelay - Retraso base en ms para backoff exponencial (default: 100)
+ * @returns {Promise<Element|null>} - El elemento encontrado o null si se agotó el tiempo
  */
-function waitForElement(elementId, timeout = 3000) {
-    return new Promise((resolve) => {
-        // Si ya existe, resolver inmediatamente
-        if (document.getElementById(elementId)) {
-            resolve(true);
+function waitForElement(selector, timeout = 5000, maxRetries = 10, baseDelay = 100) {
+    return new Promise(async (resolve) => {
+        const startTime = Date.now();
+        let retries = 0;
+        
+        // Función para verificar si el elemento existe
+        const checkElement = () => {
+            const element = typeof selector === 'string' 
+                ? document.querySelector(selector) 
+                : document.getElementById(selector);
+            
+            if (element) {
+                return element;
+            }
+            return null;
+        };
+        
+        // Verificar inmediatamente
+        const initialElement = checkElement();
+        if (initialElement) {
+            console.log(`[waitForElement] Elemento '${selector}' encontrado inmediatamente`);
+            resolve(initialElement);
             return;
         }
-
+        
         // Crear observer para monitorear cambios en el DOM
         const observer = new MutationObserver((mutations, obs) => {
-            if (document.getElementById(elementId)) {
+            const element = checkElement();
+            if (element) {
                 obs.disconnect();
-                resolve(true);
+                console.log(`[waitForElement] Elemento '${selector}' encontrado después de ${Date.now() - startTime}ms`);
+                resolve(element);
             }
         });
-
+        
         observer.observe(document.body, {
             childList: true,
             subtree: true
         });
-
-        // Timeout por seguridad
-        setTimeout(() => {
+        
+        // Timeout con retry logic
+        const checkWithRetry = async () => {
+            while (retries < maxRetries) {
+                await new Promise(r => setTimeout(r, baseDelay * Math.pow(2, retries))); // Backoff exponencial
+                retries++;
+                
+                const element = checkElement();
+                if (element) {
+                    observer.disconnect();
+                    console.log(`[waitForElement] Elemento '${selector}' encontrado en retry ${retries} después de ${Date.now() - startTime}ms`);
+                    resolve(element);
+                    return;
+                }
+                
+                // Verificar si excedimos el timeout
+                if (Date.now() - startTime >= timeout) {
+                    observer.disconnect();
+                    console.warn(`[waitForElement] Timeout después de ${timeout}ms y ${retries} reintentos para '${selector}'`);
+                    resolve(null);
+                    return;
+                }
+            }
+            
+            // Último intento
+            const finalElement = checkElement();
             observer.disconnect();
-            // Verificar una última vez
-            resolve(!!document.getElementById(elementId));
-        }, timeout);
+            if (finalElement) {
+                console.log(`[waitForElement] Elemento '${selector}' encontrado en último intento`);
+            } else {
+                console.warn(`[waitForElement] Elemento '${selector}' no encontrado después de ${maxRetries} reintentos`);
+            }
+            resolve(finalElement);
+        };
+        
+        checkWithRetry();
     });
 }
 
@@ -42,17 +92,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function initializePortal() {
     try {
-        // Esperar a que los elementos del DOM estén disponibles
-        const pendientesReady = await waitForElement('ausentismoPendientes');
-        const activosReady = await waitForElement('ausentismoActivos');
+        console.log('[medicion-ausentismo-home] Iniciando portal, esperando elementos del DOM...');
+        
+        // Esperar a que los elementos del DOM estén disponibles con retry logic
+        const pendientesElement = await waitForElement('#ausentismoPendientes', 8000, 15, 100);
+        const activosElement = await waitForElement('#ausentismoActivos', 8000, 15, 100);
 
-        if (!pendientesReady || !activosReady) {
-            console.warn('[medicion-ausentismo-home] Timeout esperando elementos del DOM');
+        if (!pendientesElement || !activosElement) {
+            console.warn('[medicion-ausentismo-home] ⚠️ Algunos elementos no se encontraron después de 8 segundos');
+            console.warn('[medicion-ausentismo-home] pendientes:', !!pendientesElement, 'activos:', !!activosElement);
+        } else {
+            console.log('[medicion-ausentismo-home] ✅ Elementos del DOM encontrados, cargando stats...');
         }
 
         await loadStats();
     } catch (error) {
-        console.log('[medicion-ausentismo-home] Error inicializando:', error.message);
+        console.error('[medicion-ausentismo-home] Error crítico inicializando:', error);
     }
 }
 
