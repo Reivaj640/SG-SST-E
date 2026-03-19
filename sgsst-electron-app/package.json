@@ -54,7 +54,8 @@
           "**/*",
           "!**/__pycache__/**",
           "!**/*.pyc",
-          "!python-embed.zip"
+          "!python-embed.zip",
+          "!Lib/site-packages/torch/**"
         ]
       },
       {
