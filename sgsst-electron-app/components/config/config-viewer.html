@@ -1101,7 +1101,7 @@
 
             <div class="users-header-actions">
                 <div></div> <!-- Espaciador -->
-                <button class="btn btn-primary" onclick="openUserModal()">
+                <button id="btn-nuevo-usuario" class="btn btn-primary" onclick="openUserModal()">
                     <span>+</span>
                     <span>Nuevo Usuario</span>
                 </button>
@@ -1404,6 +1404,7 @@
     // Variable para almacenar información del usuario y permisos
     let currentUserInfo = null;
     let isAdminUser = false;
+    let userPermissionsInitialized = false; // Flag para rastrear si ya se inicializaron permisos
 
     // Verificar si estamos en un iframe y si hay acceso a la API de Electron
     if (window.parent && window.parent !== window && window.parent.electronAPI) {
@@ -1420,24 +1421,38 @@
     }
     
     // Escuchar mensajes del padre (renderer.js) que incluye información del usuario y tema
+    let permissionsReceivedFromParent = false; // Flag para rastrear si ya recibimos permisos del padre
+    
     window.addEventListener('message', function(event) {
         if (event.data && event.data.type === 'theme-changed') {
             console.log('[ConfigViewer] Mensaje recibido del padre:', event.data);
-            
+
             // Guardar información del usuario
             if (event.data.user) {
                 currentUserInfo = event.data.user;
                 isAdminUser = event.data.user.isAdmin || false;
+                permissionsReceivedFromParent = true; // Marcar que ya recibimos permisos
+
+                // Guardar en sessionStorage para persistir entre cambios de pestaña
+                sessionStorage.setItem('kair-isAdminUser', isAdminUser.toString());
+                sessionStorage.setItem('kair-currentUserInfo', JSON.stringify(currentUserInfo));
+
                 console.log('[ConfigViewer] Usuario autenticado:', currentUserInfo.email, '¿Es admin?', isAdminUser);
-                
+
                 // Validar permisos para mostrar/ocultar pestaña de usuarios
                 validateUserPermissions();
+
+                // Recargar la tabla de usuarios si ya está inicializada
+                if (userPermissionsInitialized) {
+                    console.log('[ConfigViewer] Recargando tabla de usuarios con permisos actualizados');
+                    loadUsers();
+                }
             }
-            
+
             // Aplicar tema
             const effectiveTheme = event.data.effectiveTheme || event.data.theme || 'light';
             const savedTheme = event.data.theme || 'system';
-            
+
             if (effectiveTheme === 'dark') {
                 if (savedTheme === 'dark') {
                     document.documentElement.setAttribute('data-theme', 'dark-legacy');
@@ -1450,6 +1465,31 @@
         }
     });
     
+    // Restaurar permisos desde sessionStorage al cargar la página
+    function restorePermissionsFromStorage() {
+        const storedAdmin = sessionStorage.getItem('kair-isAdminUser');
+        const storedUser = sessionStorage.getItem('kair-currentUserInfo');
+        
+        if (storedAdmin !== null) {
+            isAdminUser = storedAdmin === 'true';
+            console.log('[ConfigViewer] isAdminUser restaurado desde sessionStorage:', isAdminUser);
+        }
+        
+        if (storedUser) {
+            try {
+                currentUserInfo = JSON.parse(storedUser);
+                console.log('[ConfigViewer] currentUserInfo restaurado desde sessionStorage:', currentUserInfo.email);
+            } catch (e) {
+                console.error('[ConfigViewer] Error al parsear currentUserInfo desde sessionStorage:', e);
+            }
+        }
+        
+        // Ejecutar validación de permisos con datos restaurados
+        if (isAdminUser) {
+            validateUserPermissions();
+        }
+    }
+    
     /**
      * Valida los permisos del usuario y muestra/oculta funcionalidades según el rol
      * - Todos los usuarios pueden VER la pestaña y la tabla
@@ -1458,42 +1498,49 @@
     function validateUserPermissions() {
         const usuariosTab = document.querySelector('.nav-tab[onclick*="\'usuarios\'"]');
         const usuariosSection = document.getElementById('tab-usuarios');
-        const nuevoUsuarioBtn = document.querySelector('#tab-usuarios .users-header-actions .btn-primary');
-        
+        // Usar el ID específico para el botón de nuevo usuario
+        const nuevoUsuarioBtn = document.getElementById('btn-nuevo-usuario');
+
+        console.log('[ConfigViewer] validateUserPermissions - isAdminUser:', isAdminUser);
+        console.log('[ConfigViewer] validateUserPermissions - btn encontrado:', !!nuevoUsuarioBtn);
+
         if (!isAdminUser) {
             console.log('[ConfigViewer] Usuario NO es administrador. Mostrando pestaña en modo solo lectura.');
-            
+
             // MOSTRAR pestaña de usuarios (siempre visible)
             if (usuariosTab) {
                 usuariosTab.style.display = 'block';
             }
-            
+
             // OCULTAR botón "Nuevo Usuario" para no-admins
             if (nuevoUsuarioBtn) {
                 nuevoUsuarioBtn.style.display = 'none';
             }
-            
+
             // Modificar el título SOLO de la sección de usuarios
             const usuariosSectionTitle = document.querySelector('#tab-usuarios .section-header .section-title');
             if (usuariosSectionTitle && !usuariosSectionTitle.textContent.includes('(Solo lectura)')) {
                 usuariosSectionTitle.textContent = 'Usuarios y Accesos (Solo lectura)';
             }
-            
+
             // Mostrar mensaje informativo
             showToast('Modo solo lectura: Solo administradores pueden editar usuarios.', 'info');
         } else {
             console.log('[ConfigViewer] Usuario es administrador. Mostrando funcionalidad completa.');
-            
+
             // Mostrar pestaña de usuarios
             if (usuariosTab) {
                 usuariosTab.style.display = 'block';
             }
-            
-            // Mostrar botón "Nuevo Usuario"
+
+            // Mostrar botón "Nuevo Usuario" - FORZAR visibilidad
             if (nuevoUsuarioBtn) {
                 nuevoUsuarioBtn.style.display = 'inline-flex';
+                console.log('[ConfigViewer] Botón Nuevo Usuario mostrado para administrador');
+            } else {
+                console.warn('[ConfigViewer] ERROR: No se encontró el botón btn-nuevo-usuario');
             }
-            
+
             // Restaurar título original SOLO de la sección de usuarios
             const usuariosSectionTitle = document.querySelector('#tab-usuarios .section-header .section-title');
             if (usuariosSectionTitle) {
@@ -1574,18 +1621,36 @@
                         companiesToProcess = [];
                     }
                 }
-                
-                // Si no hay empresas para mostrar (usuario sin asignaciones), mostrar mensaje
-                if (companiesToProcess.length === 0 && !isAdminUser) {
-                    console.log('ℹ️ Usuario no tiene empresas asignadas');
+
+                // Si no hay empresas para mostrar, mostrar mensaje según el rol
+                if (companiesToProcess.length === 0) {
                     const companyGrid = document.getElementById('company-grid');
-                    companyGrid.innerHTML = `
-                        <div style="grid-column: 1/-1; text-align: center; padding: 3rem; color: var(--text-muted);">
-                            <div style="font-size: 3rem; margin-bottom: 1rem;">📭</div>
-                            <h3 style="color: var(--text-main); margin-bottom: 0.5rem;">No tienes empresas asignadas</h3>
-                            <p>Un administrador debe asignarte al menos una empresa para poder ver su configuración.</p>
-                        </div>
-                    `;
+                    
+                    if (isAdminUser) {
+                        // Administrador: no hay empresas registradas en el sistema
+                        console.log('ℹ️ Administrador: no hay empresas registradas en el sistema');
+                        companyGrid.innerHTML = `
+                            <div style="grid-column: 1/-1; text-align: center; padding: 3rem; color: var(--text-muted);">
+                                <div style="font-size: 3rem; margin-bottom: 1rem;">📋</div>
+                                <h3 style="color: var(--text-main); margin-bottom: 0.5rem;">No hay empresas registradas</h3>
+                                <p style="margin-bottom: 1.5rem;">Comienza creando tu primera empresa para gestionar la configuración del SG-SST.</p>
+                                <button class="btn btn-primary" onclick="agregarNuevaEmpresa()">
+                                    <span>+</span>
+                                    <span>Nueva Empresa</span>
+                                </button>
+                            </div>
+                        `;
+                    } else {
+                        // No-admin: no tiene empresas asignadas
+                        console.log('ℹ️ Usuario no tiene empresas asignadas');
+                        companyGrid.innerHTML = `
+                            <div style="grid-column: 1/-1; text-align: center; padding: 3rem; color: var(--text-muted);">
+                                <div style="font-size: 3rem; margin-bottom: 1rem;">📭</div>
+                                <h3 style="color: var(--text-main); margin-bottom: 0.5rem;">No tienes empresas asignadas</h3>
+                                <p>Un administrador debe asignarte al menos una empresa para poder ver su configuración.</p>
+                            </div>
+                        `;
+                    }
                     return;
                 }
 
@@ -2986,6 +3051,11 @@
 
     // Cargar datos cuando se inicialice la página
     document.addEventListener('DOMContentLoaded', async function() {
+        console.log('[ConfigViewer] DOMContentLoaded iniciado');
+        
+        // Restaurar permisos desde sessionStorage (para persistencia entre cambios de pestaña)
+        restorePermissionsFromStorage();
+        
         // Escuchar mensajes de tema desde el padre
         window.addEventListener('message', function(event) {
             if (event.data && event.data.type === 'theme-changed') {
@@ -3037,7 +3107,44 @@
         }
 
         loadCompanies();
-        loadUsers();
+        
+        // ⚠️ IMPORTANTE: Esperar a recibir permisos del padre ANTES de cargar usuarios
+        // Esto asegura que isAdminUser esté correctamente establecido
+        console.log('[ConfigViewer] Esperando permisos del padre antes de cargar usuarios...');
+        
+        const waitForPermissions = () => {
+            if (permissionsReceivedFromParent) {
+                console.log('[ConfigViewer] ✅ Permisos recibidos del padre, cargando usuarios...');
+                loadUsers();
+                userPermissionsInitialized = true;
+                validateUserPermissions();
+            } else {
+                console.log('[ConfigViewer] ⏳ Esperando permisos del padre...');
+                setTimeout(waitForPermissions, 100); // Reintentar en 100ms
+            }
+        };
+        
+        // Iniciar espera de permisos (timeout máximo 5 segundos)
+        const maxWaitTime = 5000;
+        const startTime = Date.now();
+        
+        const waitForPermissionsWithTimeout = () => {
+            if (permissionsReceivedFromParent) {
+                console.log('[ConfigViewer] ✅ Permisos recibidos del padre, cargando usuarios...');
+                loadUsers();
+                userPermissionsInitialized = true;
+                validateUserPermissions();
+            } else if (Date.now() - startTime > maxWaitTime) {
+                console.warn('[ConfigViewer] ⚠️ Timeout esperando permisos del padre. Cargando usuarios de todas formas...');
+                loadUsers();
+                userPermissionsInitialized = true;
+                validateUserPermissions();
+            } else {
+                setTimeout(waitForPermissionsWithTimeout, 100);
+            }
+        };
+        
+        waitForPermissionsWithTimeout();
 
         // Inicializar la sección "Acerca de"
         setTimeout(initializeAboutSection, 100);
