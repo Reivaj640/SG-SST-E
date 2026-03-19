@@ -43,7 +43,8 @@
       "!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}",
       "!Instructivo-Submodulos.txt",
       "!Portear/.venv/**",
-      "!Portear/__pycache__/**"
+      "!Portear/__pycache__/**",
+      "!Portear/python-embed/**"
     ],
     "extraResources": [
       {
