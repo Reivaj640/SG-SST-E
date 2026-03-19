@@ -5,6 +5,73 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.80] - 2026-03-18
+
+### Added
+- **Python Empaquetado en el Installer** 🐍🆕
+  - **Installer incluye Python 3.11.9 embeddable** - NO requiere instalación manual de Python
+  - **79+ paquetes Python críticos** pre-instalados:
+    - `pandas`, `numpy` - Procesamiento de datos
+    - `torch` (2.10.0) - IA/LLM (~114 MB)
+    - `python-docx`, `openpyxl` - Documentos Word/Excel
+    - `PyMuPDF`, `reportlab`, `pillow` - Procesamiento de PDF
+    - `flask`, `pywin32` - Servidor y automatización COM
+    - `pip`, `setuptools`, `wheel` - Gestión de paquetes
+  - **Tamaño del installer:** ~300 MB (antes: ~50 MB)
+  - **Cero configuración** para el cliente final
+
+- **Scripts de Preparación de Python** 🔧
+  - `scripts/prepare-python-embed.bat` - Descarga Python e instala dependencias
+  - `scripts/build-with-python-embed.bat` - Construye installer con Python incluido
+
+- **Detección Automática de Python Empaquetado** ⚙️
+  - Función `getEmbeddedPythonPath()` - Prioriza Python empaquetado en producción
+  - Fallback automático a Python del sistema si no existe
+  - Handler IPC `check-dependencies` - Verifica estado de Python y scripts
+
+- **Mensajes de Error UX-Friendly** 💬
+  - Diálogo claro cuando Python no está instalado
+  - Instrucciones paso a paso para instalar Python
+  - Link directo a python.org/downloads
+
+### Changed
+- **main.js** - Funciones `getEmbeddedPythonPath()`, `getPythonScriptPath()`, `getPython()` actualizadas
+- **package.json** - `extraResources` incluye `Portear/python-embed/`
+- **preload.js** - Expuesto `checkDependencies` en electronAPI
+- **README.md** - Requisitos actualizados (Python incluido)
+- **docs/REQUISITOS.md** - Documentación para clientes actualizada
+
+### Fixed
+- **❌ Error crítico: "ModuleNotFoundError: No module named 'pandas'"** en PCs sin Python
+- **❌ Error: "No se pudo encontrar un ejecutable de Python válido"** en instalación limpia
+- **❌ Dashboard Scanner fallaba** por falta de pandas
+- **❌ Conversión Word/Excel → PDF no funcionaba** sin python-docx/openpyxl
+- **❌ Generación de actas COPASST/Convivencia fallaba** sin docxtpl
+- **❌ Gestión de ausentismo no funcionaba** sin pandas/numpy
+- **❌ IA/LLM no funcionaba** sin torch/transformers
+
+### Technical Details
+- **Archivos modificados:**
+  - `main.js` - Líneas 67, 178, 188, 1120 (getEmbeddedPythonPath, getPythonScriptPath, check-dependencies)
+  - `package.json` - Línea 48 (extraResources)
+  - `preload.js` - Línea 14 (checkDependencies)
+  - `Portear/python-embed/python311._pth` - Configuración crítica (import site descomentado)
+- **Archivos creados:**
+  - `scripts/prepare-python-embed.bat`
+  - `scripts/build-with-python-embed.bat`
+  - `docs/IMPLEMENTACION_PYTHON_EMPAQUETADO_v0.1.80.md`
+- **Paquetes instalados:** 79+ en `Portear/python-embed/Lib/site-packages/`
+
+### Breaking Changes
+- **Ninguno** - Compatible con versiones anteriores
+- **Fallback automático** - Si Python empaquetado falla, usa Python del sistema
+
+### Migration Notes
+- **Para usuarios finales:** Ninguna acción requerida - Python ahora está incluido
+- **Para desarrolladores:** Ejecutar `scripts/prepare-python-embed.bat` antes de build
+
+---
+
 ## [0.1.75] - 2026-03-16
 
 ### Added
