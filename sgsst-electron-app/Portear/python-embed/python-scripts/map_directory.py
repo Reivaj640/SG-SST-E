@@ -4,20 +4,6 @@ import sys
 import json
 from pathlib import Path
 import unicodedata
-import hashlib
-
-def _calculate_checksum(file_path):
-    """Calcula el checksum SHA-256 de un archivo."""
-    sha256_hash = hashlib.sha256()
-    try:
-        with open(file_path, "rb") as f:
-            # Leer y actualizar el hash en bloques de 4K para no consumir mucha memoria
-            for byte_block in iter(lambda: f.read(4096), b""):
-                sha256_hash.update(byte_block)
-        return sha256_hash.hexdigest()
-    except IOError:
-        # Puede fallar si el archivo es eliminado mientras se lee o por permisos
-        return None
 
 def map_directory(root_path):
     """Mapea la estructura de un directorio y devuelve un diccionario con la información."""
@@ -98,7 +84,7 @@ def _map_directory_recursive(directory_path):
                     'created': getattr(file_stat, 'st_birthtime', file_stat.st_ctime),
                     'modified': file_stat.st_mtime,
                     'extension': _clean_string_for_json(item.suffix),
-                    'checksum': _calculate_checksum(item)
+                    'checksum': None
                 }
                 directory_info['files'].append(file_info)
             
