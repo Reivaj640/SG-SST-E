@@ -618,16 +618,40 @@
         };
 
         // --- INICIALIZACIÓN ---
-        
+
         console.log('========================================');
         console.log('[INFORME-PRI] Archivo CARGADO - Versión actualizada');
         console.log('========================================');
+
+        /**
+         * Resetea el estado del informe para evitar persistencia entre cargas
+         * Esto garantiza que cada empresa vea solo sus datos
+         */
+        function resetReportBuilderState() {
+            console.log('[INFORME-PRI] Resetando estado del informe...');
+            currentPage = 0;
+            totalPages = 0;
+            casesData = [];
+            allCasesData = [];
+            summaryData = {};
+            dateFilter = { startDate: null, endDate: null };
+            reportConfig = {
+                includeIncapacidad: true,
+                includePRIC: true,
+                includeSeguimientos: true,
+                includePCL: false,
+                includeRecomendaciones: true
+            };
+        }
 
         try {
             // Inicialización directa al cargar la vista
             function initializeReportBuilder() {
                 console.log('[INFORME-PRI] Inicializando builder...');
-                
+
+                // CRÍTICO: Resetear estado para evitar datos de empresa anterior
+                resetReportBuilderState();
+
                 // Verificar si existen los elementos del DOM
                 const startDateEl = document.getElementById('startDate');
                 const endDateEl = document.getElementById('endDate');
@@ -635,7 +659,7 @@
                     startDate: !!startDateEl,
                     endDate: !!endDateEl
                 });
-                
+
                 loadCasesData();
                 
                 // Set default dates (current year)
@@ -682,13 +706,17 @@
             
             // Función para obtener la empresa actual
             function getCurrentCompany() {
+                console.log('[INFORME-PRI] getCurrentCompany() llamado');
+                console.log('[INFORME-PRI] window.currentCompany:', window.currentCompany);
+                console.log('[INFORME-PRI] window.rendererState:', window.rendererState);
+                
                 // Intentar obtener desde diferentes fuentes
                 if (window.currentCompany && window.currentCompany !== 'default_company') {
-                    console.log('[INFORME-PRI] Empresa desde window.currentCompany:', window.currentCompany);
+                    console.log('[INFORME-PRI] ✅ Empresa desde window.currentCompany:', window.currentCompany);
                     return window.currentCompany;
                 }
                 if (window.rendererState && window.rendererState.selectedCompany) {
-                    console.log('[INFORME-PRI] Empresa desde window.rendererState:', window.rendererState.selectedCompany);
+                    console.log('[INFORME-PRI] ✅ Empresa desde window.rendererState:', window.rendererState.selectedCompany);
                     return window.rendererState.selectedCompany;
                 }
                 // Fallback: intentar desde el iframe padre
@@ -696,13 +724,13 @@
                     const companyNameEl = window.parent.document.getElementById('company-name');
                     if (companyNameEl && companyNameEl.textContent && companyNameEl.textContent !== 'Empresa') {
                         const company = companyNameEl.textContent.trim();
-                        console.log('[INFORME-PRI] Empresa desde DOM padre:', company);
+                        console.log('[INFORME-PRI] ✅ Empresa desde DOM padre:', company);
                         return company;
                     }
                 } catch (e) {
                     console.log('[INFORME-PRI] No se pudo obtener empresa del padre:', e.message);
                 }
-                console.log('[INFORME-PRI] Usando empresa por defecto: Aseplus');
+                console.warn('[INFORME-PRI] ⚠️ No se pudo determinar la empresa, usando fallback: Aseplus');
                 return 'Aseplus'; // Valor por defecto
             }
         } catch (error) {
@@ -732,20 +760,41 @@
             try {
                 // Obtener la empresa actual
                 const companyName = getCurrentCompany();
+                console.log('[INFORME-PRI] ========================================');
                 console.log('[INFORME-PRI] Empresa detectada:', companyName);
-                
+                console.log('[INFORME-PRI] ========================================');
+
                 // Intentar obtener datos desde Electron API
                 if (window.electronAPI && window.electronAPI.getPriSeguimientoData) {
                     console.log('[INFORME-PRI] Llamando a getPriSeguimientoData para:', companyName);
                     const result = await window.electronAPI.getPriSeguimientoData(companyName);
-                    
-                    console.log('[INFORME-PRI] Resultado:', result);
+
+                    console.log('[INFORME-PRI] Resultado del backend:');
+                    console.log('[INFORME-PRI]   - success:', result.success);
+                    console.log('[INFORME-PRI]   - rows.length:', result.rows ? result.rows.length : 0);
+                    console.log('[INFORME-PRI]   - headers.length:', result.headers ? result.headers.length : 0);
+                    console.log('[INFORME-PRI]   - filePath:', result.filePath);
+                    console.log('[INFORME-PRI]   - companyName:', result.companyName);
+
+                    // VALIDACIÓN: Detectar si los datos son sospechosamente similares entre empresas
+                    if (result.rows && result.rows.length > 0) {
+                        const firstRow = result.rows[0];
+                        const firstCell = firstRow && firstRow.length > 0 ? firstRow[0] : null;
+                        console.log('[INFORME-PRI] Primera celda del primer registro:', firstCell);
+                        
+                        // Si el primer registro es igual para todas las empresas, alertar
+                        if (firstCell === '1' && result.rows.length === 5) {
+                            console.warn('[INFORME-PRI] ⚠️ ADVERTENCIA: Los datos del PRI.xlsx parecen ser genéricos (5 registros, primer ID = 1)');
+                            console.warn('[INFORME-PRI] ⚠️ Cada empresa debe tener su propio PRI.xlsx con datos reales');
+                        }
+                    }
 
                     if (result && result.success && result.rows && result.rows.length > 0) {
                         // Procesar las filas del Excel a objetos caso
+                        console.log('[INFORME-PRI] Iniciando procesamiento de', result.rows.length, 'filas...');
                         allCasesData = processPriRowsToCases(result.rows, result.headers);
                         console.log('[INFORME-PRI] Casos procesados:', allCasesData.length);
-                        
+
                         // Aplicar filtro de fechas inicial
                         applyDateFilter();
                     } else {
@@ -829,51 +878,73 @@
          */
         function processPriRowsToCases(rows, headers) {
             console.log('[INFORME-PRI] Headers completos:', headers);
+            console.log('[INFORME-PRI] Total de headers:', headers.length);
             
+            // DEBUG: Mostrar primeros 20 encabezados para diagnóstico
+            console.log('[INFORME-PRI] Primeros 20 encabezados:', headers.slice(0, 20).map((h, i) => `[${i}]: ${h}`));
+
+            // Función auxiliar para encontrar columna con múltiples patrones
+            function findColumnByPatterns(...patterns) {
+                for (let i = 0; i < headers.length; i++) {
+                    const header = headers[i];
+                    if (!header) continue;
+                    const headerLower = header.toString().toLowerCase();
+                    for (const pattern of patterns) {
+                        if (headerLower.includes(pattern)) {
+                            console.log(`[INFORME-PRI] Columna encontrada para patrón "${pattern}": índice ${i} -> "${header}"`);
+                            return i;
+                        }
+                    }
+                }
+                return -1;
+            }
+
             // Mapeo de columnas basado en la estructura REAL del PRI.xlsx
+            // Usamos múltiples patrones para cada columna para mayor robustez
             const colIndex = {
-                item: headers.findIndex(h => h && h.toString().toLowerCase().includes('item')),
-                tipoEvento: headers.findIndex(h => h && h.toString().toLowerCase().includes('tipo de evento at') || h && h.toString().toLowerCase().includes('tipo de evento')),
-                nombre: headers.findIndex(h => h && h.toString().toLowerCase().includes('nombre trabajador')),
-                cedula: headers.findIndex(h => h && (h.toString().toLowerCase().includes('documento de identidad') || h.toString().toLowerCase().includes('identificación'))),
-                genero: headers.findIndex(h => h && h.toString().toLowerCase().includes('género')),
-                edad: headers.findIndex(h => h && h.toString().toLowerCase().includes('edad')),
-                area: headers.findIndex(h => h && (h.toString().toLowerCase().includes('sede') || h.toString().toLowerCase().includes('área'))),
-                cargo: headers.findIndex(h => h && h.toString().trim().toLowerCase() === 'cargo'),
-                eps: headers.findIndex(h => h && h.toString().toLowerCase().includes('eps')),
-                diasIncapacidad: headers.findIndex(h => h && h.toString().toLowerCase().includes('días incapacidad acumulados')),
-                fechaInicio: headers.findIndex(h => h && h.toString().toLowerCase().includes('fecha de inicio de incapacidad')),
-                fechaFin: headers.findIndex(h => h && h.toString().toLowerCase().includes('fecha de finalización de incapacidad')),
-                cie10: headers.findIndex(h => h && h.toString().toLowerCase().includes('cie-10') && h.toString().toLowerCase().includes('dx 1') && !h.toString().toLowerCase().includes('calificada')),
-                diagnostico: headers.findIndex(h => h && h.toString().toLowerCase().includes('diagnostico') && !h.toString().toLowerCase().includes('cie')),
-                origen: headers.findIndex(h => h && h.toString().toLowerCase().includes('origen incapacidad dx 1') || h && h.toString().toLowerCase().includes('origen dx 1') && !h.toString().toLowerCase().includes('calificada')),
-                estado: headers.findIndex(h => h && h.toString().toLowerCase().includes('estado caso') || h && h.toString().toLowerCase().includes('motivo de cierre')),
+                item: findColumnByPatterns('item'),
+                tipoEvento: findColumnByPatterns('tipo de evento at', 'tipo de evento'),
+                // CRÍTICO: Búsqueda mejorada para nombre del trabajador
+                nombre: findColumnByPatterns('nombre trabajador', 'nombre', 'trabajador', 'nombre empleado', 'empleado'),
+                cedula: findColumnByPatterns('documento de identidad', 'identificación', 'cedula', 'cédula', 'id'),
+                genero: findColumnByPatterns('género', 'genero', 'sexo'),
+                edad: findColumnByPatterns('edad'),
+                area: findColumnByPatterns('sede', 'área', 'area', 'departamento'),
+                cargo: findColumnByPatterns('cargo'),
+                eps: findColumnByPatterns('eps'),
+                diasIncapacidad: findColumnByPatterns('días incapacidad acumulados', 'dias incapacidad', 'días acumulados'),
+                fechaInicio: findColumnByPatterns('fecha de inicio de incapacidad', 'fecha inicio', 'f. inicio'),
+                fechaFin: findColumnByPatterns('fecha de finalización de incapacidad', 'fecha fin', 'f. fin', 'fecha finalización'),
+                cie10: findColumnByPatterns('cie-10', 'cie-10 dx 1'),
+                diagnostico: findColumnByPatterns('diagnostico', 'diagnóstico', 'descripción'),
+                origen: findColumnByPatterns('origen incapacidad dx 1', 'origen dx 1'),
+                estado: findColumnByPatterns('estado caso', 'motivo de cierre', 'estado'),
                 fechaCierre: 47, // Columna AV - índice fijo
                 motivoCierre: 48, // Columna AW - índice fijo
-                antiguedad: headers.findIndex(h => h && h.toString().toLowerCase().includes('antigüedad en años en empresa actual')),
+                antiguedad: findColumnByPatterns('antigüedad', 'antiguedad', 'años en empresa'),
                 // Seguimientos (columnas múltiples) - Estructura: header "SEGUIMIENTO N" = fecha, header null siguiente = descripción
-                seguimiento1Fecha: headers.findIndex(h => h && h.toString().toLowerCase().includes('seguimiento 1') && !h.toString().toLowerCase().includes('dx')),
+                seguimiento1Fecha: findColumnByPatterns('seguimiento 1'),
                 seguimiento1Desc: 30, // Columna siguiente a SEGUIMIENTO 1 (índice 29)
-                seguimiento2Fecha: headers.findIndex(h => h && h.toString().toLowerCase().includes('seguimiento 2') && !h.toString().toLowerCase().includes('dx')),
+                seguimiento2Fecha: findColumnByPatterns('seguimiento 2'),
                 seguimiento2Desc: 32, // Columna siguiente a SEGUIMIENTO 2 (índice 31)
-                seguimiento3Fecha: headers.findIndex(h => h && h.toString().toLowerCase().includes('seguimiento 3') && !h.toString().toLowerCase().includes('dx')),
+                seguimiento3Fecha: findColumnByPatterns('seguimiento 3'),
                 seguimiento3Desc: 34, // Columna siguiente a SEGUIMIENTO 3 (índice 33)
-                seguimiento4Fecha: headers.findIndex(h => h && h.toString().toLowerCase().includes('seguimiento 4') && !h.toString().toLowerCase().includes('dx')),
+                seguimiento4Fecha: findColumnByPatterns('seguimiento 4'),
                 seguimiento4Desc: 36, // Columna siguiente a SEGUIMIENTO 4 (índice 35)
-                seguimiento5Fecha: headers.findIndex(h => h && h.toString().toLowerCase().includes('seguimiento 5') && !h.toString().toLowerCase().includes('dx')),
+                seguimiento5Fecha: findColumnByPatterns('seguimiento 5'),
                 seguimiento5Desc: 38, // Columna siguiente a SEGUIMIENTO 5 (índice 37)
                 // PCL - Calificación de Pérdida de Capacidad Laboral
-                pclFecha: headers.findIndex(h => h && h.toString().toLowerCase().includes('fecha de calificación')),
-                pclPorcentaje: headers.findIndex(h => h && h.toString().toLowerCase().includes('porcentaje') && (h.toString().toLowerCase().includes('pcl') || h.toString().toLowerCase().includes('cpcl'))),
-                pclOrigen: headers.findIndex(h => h && h.toString().toLowerCase().includes('origen del caso')),
+                pclFecha: findColumnByPatterns('fecha de calificación'),
+                pclPorcentaje: findColumnByPatterns('porcentaje', 'pcl', 'cpcl'),
+                pclOrigen: findColumnByPatterns('origen del caso'),
                 // PCL - DX 1-4 (CIE-10 y Origen) - Índices fijos por columna
-                pclCie10_1: headers.findIndex(h => h && h.toString().toLowerCase().includes('cie-10') && h.toString().toLowerCase().includes('dx 1') && h.toString().toLowerCase().includes('calificada')),
+                pclCie10_1: findColumnByPatterns('cie-10 calificada dx 1', 'cie-10 dx 1 calificada'),
                 pclOrigen_1: 87, // Columna CJ - índice fijo
-                pclCie10_2: headers.findIndex(h => h && h.toString().toLowerCase().includes('cie-10') && h.toString().toLowerCase().includes('dx 2') && h.toString().toLowerCase().includes('calificada')),
+                pclCie10_2: findColumnByPatterns('cie-10 calificada dx 2', 'cie-10 dx 2 calificada'),
                 pclOrigen_2: 89, // Columna CL - índice fijo
-                pclCie10_3: headers.findIndex(h => h && h.toString().toLowerCase().includes('cie-10') && h.toString().toLowerCase().includes('dx 3') && h.toString().toLowerCase().includes('calificada')),
+                pclCie10_3: findColumnByPatterns('cie-10 calificada dx 3', 'cie-10 dx 3 calificada'),
                 pclOrigen_3: 91, // Columna CN - índice fijo
-                pclCie10_4: headers.findIndex(h => h && h.toString().toLowerCase().includes('cie-10') && h.toString().toLowerCase().includes('dx 4') && h.toString().toLowerCase().includes('calificada')),
+                pclCie10_4: findColumnByPatterns('cie-10 calificada dx 4', 'cie-10 dx 4 calificada'),
                 pclOrigen_4: 93, // Columna CP - índice fijo
                 // Recomendaciones - Estructura: 10 filas repetidas (índices 99-102, 105-108, 111-114, etc.)
                 // Fila 1: 99 (RECOMENDACIÓN), 100 (ENTIDAD), 101 (FECHA LIMITE), 102 (CUMPLE?)
@@ -891,12 +962,26 @@
                     { emitida: 147, entidad: 148, fechaLimite: 149, cumple: 150 },
                     { emitida: 153, entidad: 154, fechaLimite: 155, cumple: 156 }
                 ],
-                recomendacionesVigentes: headers.findIndex(h => h && h.toString().toLowerCase().includes('recomendaciones laborales vigentes') || h && h.toString().toLowerCase().includes('descripcion recomendaciones'))
+                recomendacionesVigentes: findColumnByPatterns('recomendaciones laborales vigentes', 'descripcion recomendaciones', 'recomendaciones')
             };
 
             console.log('[INFORME-PRI] Mapeo de columnas:', colIndex);
+            
+            // DEBUG: Verificar columna de nombre
+            console.log('[INFORME-PRI] === DEBUG COLUMNA DE NOMBRE ===');
+            console.log('[INFORME-PRI] Índice de columna nombre:', colIndex.nombre);
+            if (colIndex.nombre >= 0 && colIndex.nombre < headers.length) {
+                console.log('[INFORME-PRI] Header de nombre:', headers[colIndex.nombre]);
+            }
+            
+            // Contadores para debug
+            let totalRows = rows.length;
+            let rowsWithValidName = 0;
+            let rowsFilteredOut = 0;
+            let firstFilteredRow = null;
 
-            return rows.map((row, index) => {
+            // Primero mapeamos todas las filas a objetos caso
+            const allCases = rows.map((row, index) => {
                 // Obtener valores con fallback
                 const getCellValue = (colIdx) => {
                     if (colIdx < 0 || colIdx >= row.length) return null;
@@ -904,12 +989,21 @@
                     return val !== null && val !== undefined && val !== '' ? val.toString().trim() : null;
                 };
 
-                const nombre = getCellValue(colIndex.nombre) || 'Sin nombre';
+                // CRÍTICO: Obtener nombre con validación mejorada
+                const nombreRaw = getCellValue(colIndex.nombre);
+                // Normalizar nombre: quitar espacios extras, verificar si está vacío
+                const nombre = nombreRaw && nombreRaw.trim().length > 0 ? nombreRaw.trim() : 'Sin nombre';
+                
+                // VALIDACIÓN: Detectar datos corruptos (ej: nombre = "2", cédula = "3")
+                const cedulaRaw = getCellValue(colIndex.cedula);
+                if (nombre && nombre.length < 3 && !isNaN(parseInt(nombre))) {
+                    console.warn(`[INFORME-PRI] ⚠️ Caso #${index + 1} tiene nombre sospechoso: "${nombre}" (posible dato corrupto)`);
+                }
                 const cedula = getCellValue(colIndex.cedula) || `00${index + 1}`;
                 const cargo = getCellValue(colIndex.cargo) || 'Cargo no registrado';
                 const area = getCellValue(colIndex.area) || 'Área no registrada';
                 const eps = getCellValue(colIndex.eps) || 'N/A';
-                
+
                 // Calcular días
                 let diasRaw = parseInt(getCellValue(colIndex.diasIncapacidad)) || 0;
                 if (!diasRaw) {
@@ -965,13 +1059,13 @@
 
                 // Extraer recomendaciones - Iterar sobre las 10 filas posibles
                 const recomendaciones = [];
-                
+
                 // Extraer de las filas estructuradas (índices 99-156)
                 colIndex.recomendacionesFilas.forEach((fila, idx) => {
                     const recomendacionTexto = getCellValue(fila.emitida);
                     const entidadRec = getCellValue(fila.entidad) || 'EPS/ARL';
                     const cumpleRec = getCellValue(fila.cumple);
-                    
+
                     if (recomendacionTexto) {
                         recomendaciones.push({
                             recomendacion: recomendacionTexto.trim(),
@@ -980,7 +1074,7 @@
                         });
                     }
                 });
-                
+
                 // Si no hay recomendaciones en las filas estructuradas, intentar con recomendaciones vigentes
                 if (recomendaciones.length === 0) {
                     const recomendacionVigenteTexto = getCellValue(colIndex.recomendacionesVigentes);
@@ -1025,7 +1119,40 @@
                     },
                     recomendaciones: recomendaciones
                 };
-            }).filter(c => c.name && c.name !== 'Sin nombre');
+            });
+
+            // Ahora filtramos y hacemos debug
+            const filteredCases = allCases.filter((c, index) => {
+                // Contar casos válidos vs filtrados
+                if (c.name && c.name !== 'Sin nombre' && c.name.trim().length > 0) {
+                    rowsWithValidName++;
+                    // Loggear primeros 5 casos válidos para debug
+                    if (rowsWithValidName <= 5) {
+                        console.log(`[INFORME-PRI] Caso válido #${rowsWithValidName}: ${c.name} (cédula: ${c.id_doc})`);
+                    }
+                    return true;
+                } else {
+                    rowsFilteredOut++;
+                    // Guardar información del primer caso filtrado para debug
+                    if (!firstFilteredRow) {
+                        firstFilteredRow = { index, case: c };
+                        console.log(`[INFORME-PRI] Primer caso filtrado (índice ${index}):`, c);
+                    }
+                    return false;
+                }
+            });
+            
+            // Resumen de debug para diagnóstico
+            console.log('[INFORME-PRI] === RESUMEN DE PROCESAMIENTO ===');
+            console.log(`[INFORME-PRI] Total de filas procesadas: ${totalRows}`);
+            console.log(`[INFORME-PRI] Casos válidos: ${rowsWithValidName}`);
+            console.log(`[INFORME-PRI] Casos filtrados: ${rowsFilteredOut}`);
+            if (firstFilteredRow) {
+                console.log(`[INFORME-PRI] Primer caso filtrado en índice: ${firstFilteredRow.index}`);
+            }
+            console.log('[INFORME-PRI] =================================');
+            
+            return filteredCases;
         }
 
         function loadMockData() {
