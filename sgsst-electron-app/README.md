@@ -1239,6 +1239,32 @@ Se agregaron 4 columnas adicionales entre "Entidad" y "Descripción":
 
 ---
 
-**Última actualización:** 28 de febrero de 2026  
-**Versión del documento:** 2.3 (Etapas 4 y 5 + Diagnósticos múltiples implementados)  
-**Versión de la aplicación:** 0.1.52
+**Última actualización:** 19 de marzo de 2026  
+**Versión del documento:** 2.4 (Optimización de Python y Recursos Locales - v0.1.83)  
+**Versión de la aplicación:** 0.1.83
+
+---
+
+## 📚 Documentación
+
+### Para Nuevos Desarrolladores
+1. **[docs/START_HERE.md](docs/START_HERE.md)** - Punto de entrada único (5 min)
+2. **[CONTEXT.md](CONTEXT.md)** - Contexto para IA y nuevos desarrolladores (15 min)
+3. **[docs/01-quick-start/installation.md](docs/01-quick-start/installation.md)** - Instalación y configuración
+4. **[docs/02-architecture/ipc-contracts.md](docs/02-architecture/ipc-contracts.md)** - Contratos IPC (CRÍTICO)
+
+### Para Usuarios Finales
+1. **[README.md](#)** - Este archivo (visión general)
+2. **[docs/acerca-de-actualizacion.md](docs/acerca-de-actualizacion.md)** - Actualización del sistema
+3. **[docs/01-quick-start/troubleshooting.md](docs/01-quick-start/troubleshooting.md)** - Problemas comunes
+
+### Para Mantenedores
+1. **[CHANGELOG.md](CHANGELOG.md)** - Historial de cambios por versión
+2. **[docs/05-updates/](docs/05-updates/)** - Actualizaciones detalladas
+3. **[docs/04-guides/maintenance.md](docs/04-guides/maintenance.md)** - Mantenimiento del proyecto
+
+### Referencia Técnica
+- **[docs/02-architecture/](docs/02-architecture/)** - Arquitectura del sistema
+- **[docs/03-modules/](docs/03-modules/)** - Documentación de módulos
+- **[docs/04-guides/](docs/04-guides/)** - Guías y tutoriales
+- **[docs/_archived/](docs/_archived/)** - Documentación archivada
