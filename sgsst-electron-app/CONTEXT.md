@@ -1,7 +1,7 @@
 # K+AIR - Contexto del Proyecto
 
-**Última actualización:** 19 de marzo de 2026  
-**Versión actual:** 0.1.83  
+**Última actualización:** 20 de marzo de 2026
+**Versión actual:** 0.1.86
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 
 ---
@@ -125,7 +125,7 @@ modules/
 
 ---
 
-## 📊 Estado Actual (v0.1.83)
+## 📊 Estado Actual (v0.1.86)
 
 ### ✅ Funcionalidades Operativas
 
@@ -138,6 +138,9 @@ modules/
 - [x] Autenticación con SQLite
 - [x] Multi-empresa con escenarios normativos
 - [x] Actualizaciones automáticas desde GitHub
+- [x] **Guardado de Presupuesto** - Fórmulas compartidas preservadas 🆕
+- [x] **Inducciones con Cumplimiento Normativo** - Cálculo real basado en nómina 🆕
+- [x] **Visualizador 1.1.1 Mejorado** - Drag & drop, menú contextual, eliminar, toast 🆕
 
 ### ⚠️ Limitaciones Temporales
 
@@ -145,8 +148,28 @@ modules/
   - **Razón:** Build de ~800 MB → ~450 MB, tiempo 15-25 min → 8-12 min
   - **Re-habilitar:** Eliminar `!Lib/site-packages/torch/**` de package.json
 
-### 🔧 Mejoras Recientes (v0.1.83)
+### 🔧 Mejoras Recientes
 
+**v0.1.86 (20 de marzo de 2026):**
+1. **Feature: Drag & Drop en Visualizador 1.1.1** - Arrastrar y soltar archivos en carpetas
+2. **Feature: Menú Contextual** - Clic derecho para abrir o eliminar archivos
+3. **Feature: Modal de Confirmación** - Reemplaza `confirm()` nativo
+4. **Feature: Notificaciones Toast** - Sistema moderno K+AIR
+5. **Feature: Manejo de Errores** - Específico por tipo (EPERM, ENOENT, EACCES)
+
+**v0.1.85 (20 de marzo de 2026):**
+1. **Feature: Cumplimiento Normativo en Inducciones** - Cálculo real basado en nómina
+2. **Cálculo de pendientes** - `empleados - completadas`
+3. **Alertas inteligentes** - Óptimo (≥90%), refuerzo (≥50%), crítico (<50%)
+4. **Fallback automático** - Si no hay empleados configurados, usa histórico
+
+**v0.1.84 (20 de marzo de 2026):**
+1. **Fix: Error "Shared Formula master"** - Guardado de Presupuesto funcional
+2. **Detección de fórmulas compartidas** - Preservación automática
+3. **Cálculo de totales desde backend** - Fila TOTAL calculada automáticamente
+4. **Manejo seguro de merges** - Sin warnings por merges duplicados
+
+**v0.1.83 (19 de marzo de 2026):**
 1. **Exclusión de torch** - Reduce tamaño y tiempo de build
 2. **Eliminación de checksum** - Mapeo 1500+ segundos → <10 segundos
 3. **Recursos locales** - Sin ERR_TIMED_OUT de CDNs

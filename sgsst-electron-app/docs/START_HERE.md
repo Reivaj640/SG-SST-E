@@ -1,8 +1,8 @@
 # 👋 Bienvenido a la Documentación de K+AIR
 
-**Tiempo de lectura:** 5 minutos  
-**Última actualización:** 19 de marzo de 2026  
-**Versión:** 0.1.83
+**Tiempo de lectura:** 5 minutos
+**Última actualización:** 20 de marzo de 2026
+**Versión:** 0.1.86
 
 ---
 
@@ -54,12 +54,12 @@ K+AIR es una aplicación empresarial Electron que implementa un Sistema de Gesti
 1. **CONTEXT.md** (raíz del proyecto) - **LEER PRIMERO**
    - Contexto completo del proyecto
    - Arquitectura resumida
-   - Estado actual (v0.1.83)
+   - Estado actual (v0.1.85)
    - Enlaces críticos
 
 2. **docs/02-architecture/ipc-contracts.md**
    - Todos los 78 handlers IPC
-   - Formato estándar de requests/responses
+   - Formato de requests/responses
    - Ejemplos de uso
 
 3. **docs/03-modules/[módulo específico]**
@@ -68,7 +68,7 @@ K+AIR es una aplicación empresarial Electron que implementa un Sistema de Gesti
 
 4. **CHANGELOG.md**
    - Historial de cambios por versión
-   - Últimos cambios en v0.1.83
+   - Últimos cambios en v0.1.86
 
 ---
 

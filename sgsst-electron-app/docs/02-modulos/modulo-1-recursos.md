@@ -1,8 +1,8 @@
 # 👥 Módulo 1: Recursos
 
-**Versión:** 2.0
-**Actualizado:** 17 de marzo de 2026
-**Estado:** ✅ Actualizado v0.1.75
+**Versión:** 2.3
+**Actualizado:** 20 de marzo de 2026
+**Estado:** ✅ Actualizado v0.1.86
 
 ---
 
@@ -184,6 +184,103 @@ const data = await window.electronAPI.readPresupuestoData(filePath);
 // Guardar presupuesto
 await window.electronAPI.saveBudgetFile(filePath, presupuestoData);
 ```
+
+### 🆕 Novedad v0.1.84 - Fix Error "Shared Formula master"
+
+**Problema:** Al guardar cambios en el presupuesto, la aplicación fallaba con el error:
+```
+Error: Shared Formula master must exist above and or left of clone for cell F25
+```
+
+**Solución implementada:**
+- ✅ Detección previa de celdas con fórmula antes de escribir
+- ✅ Preservación de fórmulas compartidas (columna F % Ejecutado)
+- ✅ Cálculo automático de totales desde backend (fila TOTAL)
+- ✅ Manejo seguro de merges (sin reaplicar sobre existentes)
+
+**Impacto:**
+- Guardado: 0% éxito → 100% éxito
+- Fórmulas preservadas: 0% → 100%
+- Errores en logs: ~20 warnings + 1 error → 0 warnings + 0 errors
+
+**Documentación:** [`docs/05-updates/v0.1.84-presupuesto-shared-formula-fix.md`](../05-updates/v0.1.84-presupuesto-shared-formula-fix.md)
+
+---
+
+### 🆕 Novedad v0.1.85 - Cumplimiento Normativo en Inducciones
+
+**Problema:** La tarjeta de estadísticas de Inducciones mostraba información incompleta:
+```
+Widget anterior: "35 / 35" + "✔ 100% Completado"
+❌ PROBLEMA: Faltan 15 trabajadores por capacitar, pero el widget dice 100%
+```
+
+**Solución implementada:**
+- ✅ Lee `stats.employees` desde config de la empresa
+- ✅ Calcula pendientes: `empleados - completadas`
+- ✅ Calcula porcentaje real: `(completadas / empleados) * 100`
+- ✅ Alertas inteligentes: óptimo (≥90%), refuerzo (≥50%), crítico (<50%)
+
+**Impacto:**
+- Precisión del dato: Histórico → Normativo (+100%)
+- Pendientes visibles: No mostraba → Muestra cantidad exacta
+- Porcentaje útil: 100% (falso) → Real según nómina
+
+**Ejemplo con solución:**
+```
+Empresa: 50 trabajadores (configurado en stats.employees)
+Inducciones completadas: 35
+Widget nuevo: "35 / 50" + "⚠ Refuerzo necesario (15 pendientes)"
+```
+
+**Configuración requerida:**
+- Ir a: Configuración → Ajustes de Empresa
+- Editar campo: "Número de trabajadores"
+- Guardar cambios
+
+**Documentación:** [`docs/05-updates/v0.1.85-inducciones-cumplimiento-normativo.md`](../05-updates/v0.1.85-inducciones-cumplimiento-normativo.md)
+
+---
+
+### 🆕 Novedad v0.1.86 - Visualizador 1.1.1 Mejorado
+
+**Funcionalidades agregadas:**
+
+1. **📤 Arrastrar y Soltar Archivos**
+   - Overlay azul aparece solo en carpeta destino
+   - Borde dashed azul durante drag-over
+   - Múltiples archivos se procesan en paralelo
+   - Validación: 10MB máximo, tipos permitidos
+
+2. **🖱️ Menú Contextual con Clic Derecho**
+   - 🔗 Abrir archivo (aplicación predeterminada)
+   - 🗑️ Eliminar archivo (con confirmación)
+   - Divider horizontal entre opciones
+   - Cierra con clic fuera o Escape
+
+3. **🗑️ Eliminar con Confirmación Moderna**
+   - Modal K+AIR (reemplaza `confirm()` nativo)
+   - Mensaje personalizado con nombre del archivo
+   - Advertencia: "Esta acción no se puede deshacer"
+   - Botones: Cancelar (ghost) vs Eliminar (danger)
+
+4. **🎨 Notificaciones Toast Modernas**
+   - 4 tipos: Success, Error, Warning, Info
+   - Animación slide-in desde derecha
+   - Auto-ocultado (3-6 segundos)
+   - Apilables (múltiples visibles)
+
+5. **⚠️ Manejo Específico de Errores**
+   - EPERM: "El archivo está abierto en otra aplicación..."
+   - ENOENT: "El archivo no existe..."
+   - EACCES: "No tienes permisos..."
+
+**Impacto:**
+- Acciones por archivo: 1 → 3 (+200%)
+- Formas de subir: 1 → 2 (+100%)
+- Errores manejados: 1 → 4 (+300%)
+
+**Documentación:** [`docs/05-updates/v0.1.86-mejoras-visualizador-1.1.1.md`](../05-updates/v0.1.86-mejoras-visualizador-1.1.1.md)
 
 ---
 

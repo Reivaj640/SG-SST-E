@@ -5,7 +5,232 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.80] - 2026-03-18
+## [0.1.86] - 2026-03-20
+
+### Added
+- **📥 Visualizador 1.1.1: Arrastrar y Soltar Archivos** 🆕
+  - **Drag & Drop por carpeta** - Overlay aparece solo en la carpeta destino
+  - **Soporte para múltiples archivos** - Se procesan en paralelo
+  - **Validaciones completas** - Tamaño (10MB), tipos permitidos, caracteres inválidos
+  - **Feedback visual** - Borde dashed azul + overlay con ícono animado
+  - **Notificación toast** - Éxito/error después de cada subida
+
+- **🖱️ Visualizador 1.1.1: Menú Contextual con Clic Derecho** 🆕
+  - **Opción "🔗 Abrir archivo"** - Abre con aplicación predeterminada del sistema
+  - **Opción "🗑️ Eliminar archivo"** - Elimina con confirmación
+  - **Divider horizontal** - Separa visualmente las opciones
+  - **Posicionamiento inteligente** - Se ajusta si se sale de pantalla
+  - **Cierre con clic fuera o Escape** - UX mejorada
+
+- **🗑️ Visualizador 1.1.1: Eliminar con Confirmación Moderna** 🆕
+  - **Modal K+AIR** - Reemplaza `confirm()` nativo
+  - **Animación slide-in** - Desde arriba
+  - **Mensaje personalizado** - Muestra nombre del archivo
+  - **Advertencia amarilla** - "Esta acción no se puede deshacer"
+  - **Botones diferenciados** - Cancelar (ghost) vs Eliminar (danger)
+
+- **🎨 Notificaciones Toast Modernas** 🆕
+  - **Sistema K+AIR** - Reemplaza notificaciones nativas
+  - **4 tipos** - Success, Error, Warning, Info
+  - **Animaciones** - Slide-in desde derecha, slide-out
+  - **Auto-ocultado** - 3-6 segundos según tipo
+  - **Apilables** - Múltiples notificaciones visibles
+
+- **⚠️ Manejo Específico de Errores** 🆕
+  - **EPERM** - "El archivo está abierto en otra aplicación. Ciérralo e intenta nuevamente."
+  - **ENOENT** - "El archivo no existe. Puede que ya haya sido eliminado."
+  - **EACCES** - "No tienes permisos para eliminar este archivo."
+  - **Logging detallado** - Diagnóstico preciso de errores
+
+### Changed
+- **main.js** - Handlers IPC actualizados:
+  - `upload-document` - Soporte drag & drop, validaciones mejoradas
+  - `delete-document` - Manejo específico de errores Windows (EPERM, ENOENT, EACCES)
+  - `open-file` - Nuevo handler para abrir con aplicación predeterminada
+
+- **responsable-sg-viewer.js** - Funciones agregadas:
+  - `setupFolderDragAndDrop()` - Configura drag & drop por carpeta
+  - `showContextMenu()` - Muestra menú contextual
+  - `showConfirmModal()` - Muestra modal de confirmación
+  - `showToast()` - Muestra notificación toast
+  - `openFile()` - Abre archivo con aplicación predeterminada
+  - `deleteDocument()` - Elimina con confirmación moderna
+
+- **responsable-sg-view.html** - Elementos agregados:
+  - `#kToastContainer` - Contenedor de notificaciones toast
+  - `#confirmModal` - Modal de confirmación K+AIR
+  - `#contextMenu` - Menú contextual
+
+- **responsable-sg-view.css** - Estilos agregados:
+  - `.drag-drop-overlay` - Overlay para drag & drop
+  - `.context-menu` - Menú contextual
+  - `.k-toast`, `.k-toast-container` - Notificaciones toast
+  - `.k-modal-overlay`, `.k-modal` - Modal de confirmación
+
+### Technical Details
+- **Archivos modificados:**
+  - `main.js` - Líneas ~4176-4388 (3 handlers IPC)
+  - `preload.js` - Líneas ~133-140 (3 funciones expuestas)
+  - `responsable-sg-view.html` - Líneas ~125-165 (HTML)
+  - `responsable-sg-view.css` - Líneas ~335-650 (estilos)
+  - `responsable-sg-viewer.js` - Líneas ~95-450 (funciones)
+  - `responsable-sg-logic.js` - Líneas ~60-72 (handlers)
+  - `renderer.js` - Líneas ~827-834 (bridge)
+- **Archivos creados:**
+  - `docs/05-updates/v0.1.86-mejoras-visualizador-1.1.1.md`
+
+### Impacto
+- **UX:** Nativo → Moderno K+AIR
+- **Acciones por archivo:** 1 → 3 (+200%)
+- **Formas de subir:** 1 → 2 (+100%)
+- **Errores manejados:** 1 → 4 (+300%)
+- **Líneas agregadas:** ~650
+
+### Breaking Changes
+- **Ninguno** - Compatible con versiones anteriores
+- **Funciones existentes** - No modificadas, solo agregadas
+- **Contratos IPC** - Sin cambios en estructura de retorno
+
+### Migration Notes
+- **Para usuarios finales:** Ninguna acción requerida - funcionalidades adicionales
+- **Para desarrolladores:** Ninguna acción requerida - APIs nuevas, no breaking
+
+---
+
+## [0.1.85] - 2026-03-20
+
+### Added
+- **📊 Feature: Tarjeta de Inducciones con Cumplimiento Normativo Real** 🆕
+  - **Problema:** La tarjeta de Inducciones mostraba información incompleta (histórico en lugar de cumplimiento real)
+  - **Solución:** Ahora usa el número de trabajadores de la empresa como denominador para calcular el porcentaje real
+  - **Cambios principales:**
+    - ✅ Lee `stats.employees` desde `config.companyPaths[empresa].stats`
+    - ✅ Calcula pendientes: `empleados - completadas`
+    - ✅ Calcula porcentaje real: `(completadas / empleados) * 100`
+    - ✅ Alertas inteligentes: óptimo (≥90%), refuerzo (≥50%), crítico (<50%)
+    - ✅ Fallback automático si no hay empleados configurados
+
+### Changed
+- **main.js** - Función `calculateInduccionesStats()` refactorizada:
+  - Nuevo parámetro: `companyName` para leer config de la empresa
+  - Nuevo campo: `totalTrabajadores` (lee desde `stats.employees`)
+  - Nuevo cálculo: `pendientes = totalTrabajadores - completadas`
+  - Nuevo porcentaje: `(completadas / totalTrabajadores) * 100`
+  - Logging detallado para trazabilidad
+
+- **main.js** - Handler `get-recursos-stats`:
+  - Pasa `companyName` a `calculateInduccionesStats()`
+  - Estructura de fallback actualizada con `totalTrabajadores: 0`
+
+- **modules/recursos/recursos-home.js** - Función `createInductionWidget()`:
+  - Usa `totalTrabajadores` como denominador
+  - Fallback a `totalInducciones` si `totalTrabajadores = 0`
+  - Mensaje de guía: `"⚠ Configure N° trabajadores en Ajustes"`
+  - Nuevos umbrales de alerta: 90%, 50%, <50%
+
+- **modules/recursos/recursos-home.js** - Función `loadResourceStats()`:
+  - Estructura inicial incluye `totalTrabajadores: 0`
+
+### Technical Details
+- **Archivos modificados:**
+  - `main.js` - Líneas 7430-7545 (calculateInduccionesStats), 7593-7635 (get-recursos-stats)
+  - `modules/recursos/recursos-home.js` - Líneas 553 (loadResourceStats), 961-992 (createInductionWidget)
+- **Archivos creados:**
+  - `docs/05-updates/v0.1.85-inducciones-cumplimiento-normativo.md`
+- **Contratos IPC:** Sin cambios (getRecursosStats retorna misma estructura)
+- **Frontend:** Solo cambia visualización, sin cambios en contratos
+
+### Impacto
+- **Precisión del dato:** Histórico (inducciones/inducciones) → Normativo (completadas/trabajadores)
+- **Pendientes visibles:** No mostraba → Muestra cantidad exacta
+- **Porcentaje útil:** 100% (falso positivo) → Real según nómina
+- **Acción requerida:** Ninguna → Alerta de refuerzo/crítico
+
+### Ejemplo de Uso
+
+**Antes:**
+```
+Empresa: 50 trabajadores
+Inducciones completadas: 35
+Widget: "35 / 35" + "✔ 100% Completado"  ❌ (falso positivo)
+```
+
+**Ahora:**
+```
+Empresa: 50 trabajadores (configurado en stats.employees)
+Inducciones completadas: 35
+Widget: "35 / 50" + "⚠ Refuerzo necesario (15 pendientes)"  ✅ (real)
+```
+
+### Breaking Changes
+- **Ninguno** - Compatible con versiones anteriores
+- **Fallback automático:** Si `employees = 0`, usa lógica antigua (muestra histórico)
+- **Mensaje de guía:** Indica al usuario configurar empleados si es 0
+
+### Migration Notes
+- **Para usuarios finales:**
+  - Ir a: Configuración → Ajustes de Empresa
+  - Editar campo: "Número de trabajadores"
+  - Guardar cambios
+  - Reiniciar aplicación (opcional)
+- **Para desarrolladores:**
+  - Ninguna acción requerida - los contratos IPC no cambiaron
+
+---
+
+## [0.1.84] - 2026-03-20
+
+### Fixed
+- **🔧 Error crítico: "Shared Formula master must exist" en guardado de Presupuesto** ⚠️
+  - **Problema:** Al guardar cambios en el módulo de Presupuesto, la aplicación fallaba con error de fórmulas compartidas de ExcelJS
+  - **Causa:** El archivo `A-FO-02 Presupuesto *.xlsx` contiene fórmulas compartidas en columna F (% Ejecutado) y fila TOTAL que se sobrescribían con valores directos
+  - **Solución:** 
+    - ✅ Detección previa de celdas con fórmula antes de escribir
+    - ✅ Preservación de fórmulas compartidas (no sobrescribir)
+    - ✅ Cálculo de totales desde el backend para fila TOTAL
+    - ✅ Manejo seguro de merges (verificar si existen antes de aplicar)
+
+- **⚠️ Warnings en merges: "Cannot merge already merged cells"**
+  - **Problema:** Los merges del Excel se intentaban reaplicar sobre celdas ya mergeadas
+  - **Solución:** Verificación de merges existentes antes de intentar aplicarlos
+
+### Changed
+- **main.js** - Función `handleSaveBudgetFile` completamente refactorizada:
+  - Nueva sección: "Detección de Fórmulas Compartidas" (líneas ~4374-4407)
+  - Nueva sección: "Escritura Inteligente (Preservando Fórmulas)" (líneas ~4444-4525)
+  - Nueva sección: "Cálculo de Totales desde Backend" (líneas ~4528-4573)
+  - Nueva sección: "Manejo Seguro de Merges" (líneas ~4576-4610)
+- **Módulo Presupuesto** - Ahora soporta archivos con:
+  - Fórmulas compartidas en columna F (% Ejecutado)
+  - Fórmulas de suma en fila TOTAL
+  - Múltiples rangos mergeados
+
+### Technical Details
+- **Archivos modificados:**
+  - `main.js` - Líneas 4285-4632 (handleSaveBudgetFile)
+- **Archivos creados:**
+  - `docs/05-updates/v0.1.84-presupuesto-shared-formula-fix.md`
+- **Contratos IPC:** Sin cambios (saveBudgetFile, saveBudgetChanges)
+- **Frontend:** Sin cambios (presupuesto-logic.js, presupuesto-gestion.js)
+
+### Impacto
+- **Tasa de éxito guardado:** 0% → 100%
+- **Fórmulas preservadas:** 0% → 100%
+- **Merges preservados:** Parcial → 100%
+- **Errores en logs:** ~20 warnings + 1 error → 0 warnings + 0 errors
+
+### Breaking Changes
+- **Ninguno** - Compatible con versiones anteriores
+- **Fallback automático:** Si no hay fórmulas, escribe valores normales
+- **Cálculo automático:** Totales se calculan incluso si el Excel no tiene fórmulas
+
+### Migration Notes
+- **Para usuarios finales:** Ninguna acción requerida - el guardado ahora funciona correctamente
+- **Para desarrolladores:** Ninguna acción requerida - los contratos IPC no cambiaron
+
+---
+
+## [0.1.83] - 2026-03-19
 
 ### Added
 - **Python Empaquetado en el Installer** 🐍🆕

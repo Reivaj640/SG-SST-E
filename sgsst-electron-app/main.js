@@ -4170,6 +4170,217 @@ ipcMain.handle('download-document', async (event, filePath) => {
   }
 });
 
+// ===============================
+// Manejador para subir documentos (Drag & Drop)
+// ===============================
+ipcMain.handle('upload-document', async (event, payload) => {
+  const { fileName, base64Data, destinationPath } = payload;
+  
+  sendLog(`[MAIN][upload-document] Solicitud para subir archivo: ${fileName} a ${destinationPath}`, 'INFO');
+
+  try {
+    // 1. Validar que se recibieron los datos necesarios
+    if (!fileName || !base64Data || !destinationPath) {
+      throw new Error('Datos incompletos para subir el archivo');
+    }
+
+    // 2. Normalizar ruta (importante para Windows con espacios/caracteres especiales)
+    const normalizedPath = path.normalize(destinationPath);
+    
+    // 3. Validar que la ruta de destino existe
+    await fsp.access(normalizedPath);
+
+    // 4. Validar extensión del archivo (solo tipos permitidos)
+    const allowedExtensions = ['.pdf', '.xls', '.xlsx', '.doc', '.docx', '.txt', '.jpg', '.jpeg', '.png'];
+    const fileExtension = path.extname(fileName).toLowerCase();
+
+    if (!allowedExtensions.includes(fileExtension)) {
+      throw new Error(`Tipo de archivo no permitido: ${fileExtension}. Tipos permitidos: ${allowedExtensions.join(', ')}`);
+    }
+
+    // 5. Validar tamaño del archivo (máximo 10MB)
+    const fileSizeBytes = Math.ceil((base64Data.length * 3) / 4);
+    const maxSizeBytes = 10 * 1024 * 1024; // 10MB
+
+    if (fileSizeBytes > maxSizeBytes) {
+      throw new Error(`El archivo excede el tamaño máximo permitido de 10MB. Tamaño: ${(fileSizeBytes / 1024 / 1024).toFixed(2)}MB`);
+    }
+
+    // 6. Validar y limpiar nombre del archivo (evitar caracteres especiales)
+    const invalidChars = /[<>:"/\\|?*]/g;
+    if (invalidChars.test(fileName)) {
+      throw new Error('El nombre del archivo contiene caracteres inválidos');
+    }
+
+    // 7. Construir ruta completa del archivo (normalizada)
+    const filePath = path.normalize(path.join(normalizedPath, fileName));
+
+    // 8. Verificar si el archivo ya existe
+    const fileExists = await fsp.access(filePath).then(() => true).catch(() => false);
+
+    if (fileExists) {
+      sendLog(`[MAIN][upload-document] El archivo ya existe: ${filePath}`, 'WARN');
+      // Nota: Podríamos agregar lógica para renombrar automáticamente o pedir confirmación
+      // Por ahora, sobrescribimos el archivo
+    }
+
+    // 9. Decodificar base64 a buffer (eliminar data URL prefix si existe)
+    const base64DataClean = base64Data.split(',')[1] || base64Data;
+    const fileBuffer = Buffer.from(base64DataClean, 'base64');
+
+    // 10. Guardar archivo con manejo robusto de errores
+    try {
+      await fsp.writeFile(filePath, fileBuffer);
+    } catch (writeError) {
+      // Si falla con la ruta normalizada, intentar con ruta absoluta
+      const absolutePath = path.resolve(filePath);
+      sendLog(`[MAIN][upload-document] Reintentando con ruta absoluta: ${absolutePath}`, 'INFO');
+      await fsp.writeFile(absolutePath, fileBuffer);
+    }
+
+    sendLog(`[MAIN][upload-document] Archivo subido exitosamente: ${filePath}`, 'INFO');
+
+    return { 
+      success: true, 
+      filePath: filePath,
+      fileName: fileName,
+      message: fileExists ? 'Archivo actualizado' : 'Archivo subido exitosamente'
+    };
+
+  } catch (error) {
+    sendLog(`[MAIN][upload-document] Error al subir archivo: ${error.message}`, 'ERROR');
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+});
+
+// ===============================
+// Manejador para eliminar documentos
+// ===============================
+ipcMain.handle('delete-document', async (event, filePath) => {
+  sendLog(`[MAIN][delete-document] Solicitud para eliminar archivo: ${filePath}`, 'INFO');
+
+  try {
+    // 1. Validar que se recibió la ruta
+    if (!filePath) {
+      sendLog(`[MAIN][delete-document] Error: Ruta vacía`, 'ERROR');
+      throw new Error('Ruta de archivo no válida');
+    }
+
+    // 2. Normalizar ruta
+    const normalizedPath = path.normalize(filePath);
+    sendLog(`[MAIN][delete-document] Ruta normalizada: ${normalizedPath}`, 'DEBUG');
+
+    // 3. Verificar que el archivo existe
+    const fileExists = await fsp.access(normalizedPath).then(() => true).catch(() => false);
+    sendLog(`[MAIN][delete-document] Archivo existe: ${fileExists}`, 'DEBUG');
+
+    if (!fileExists) {
+      sendLog(`[MAIN][delete-document] Error: Archivo no existe en ${normalizedPath}`, 'ERROR');
+      throw new Error('El archivo no existe');
+    }
+
+    // 4. Verificar que es un archivo (no carpeta)
+    const stats = await fsp.stat(normalizedPath);
+    sendLog(`[MAIN][delete-document] Stats del archivo: isFile=${stats.isFile()}, size=${stats.size} bytes`, 'DEBUG');
+    
+    if (!stats.isFile()) {
+      sendLog(`[MAIN][delete-document] Error: No es un archivo`, 'ERROR');
+      throw new Error('La ruta no corresponde a un archivo');
+    }
+
+    // 5. Eliminar archivo
+    sendLog(`[MAIN][delete-document] Ejecutando fsp.unlink...`, 'INFO');
+    await fsp.unlink(normalizedPath);
+    sendLog(`[MAIN][delete-document] fsp.unlink completado`, 'INFO');
+
+    // 6. Verificar que se eliminó
+    const stillExists = await fsp.access(normalizedPath).then(() => true).catch(() => false);
+    sendLog(`[MAIN][delete-document] Archivo después de eliminar: ${stillExists}`, 'DEBUG');
+
+    if (stillExists) {
+      sendLog(`[MAIN][delete-document] ERROR: El archivo sigue existiendo después de unlink`, 'ERROR');
+      throw new Error('No se pudo eliminar el archivo');
+    }
+
+    sendLog(`[MAIN][delete-document] Archivo eliminado exitosamente: ${normalizedPath}`, 'INFO');
+
+    return {
+      success: true,
+      message: 'Archivo eliminado correctamente'
+    };
+
+  } catch (error) {
+    sendLog(`[MAIN][delete-document] Error al eliminar archivo: ${error.message}`, 'ERROR');
+    
+    // Manejo específico para error EPERM (archivo en uso)
+    let userMessage = error.message;
+    let errorCode = error.code || 'UNKNOWN';
+    
+    if (error.code === 'EPERM') {
+      userMessage = 'El archivo está abierto en otra aplicación. Ciérralo e intenta nuevamente.';
+      sendLog(`[MAIN][delete-document] Archivo está en uso o bloqueado (EPERM)`, 'WARN');
+    } else if (error.code === 'ENOENT') {
+      userMessage = 'El archivo no existe. Puede que ya haya sido eliminado.';
+      sendLog(`[MAIN][delete-document] Archivo no existe (ENOENT)`, 'WARN');
+    } else if (error.code === 'EACCES') {
+      userMessage = 'No tienes permisos para eliminar este archivo.';
+      sendLog(`[MAIN][delete-document] Sin permisos (EACCES)`, 'WARN');
+    }
+    
+    return {
+      success: false,
+      error: userMessage,
+      code: errorCode
+    };
+  }
+});
+
+// ===============================
+// Manejador para abrir archivo con aplicación predeterminada
+// ===============================
+ipcMain.handle('open-file', async (event, filePath) => {
+  const { shell } = require('electron');
+  
+  sendLog(`[MAIN][open-file] Solicitud para abrir archivo: ${filePath}`, 'INFO');
+
+  try {
+    // 1. Validar que se recibió la ruta
+    if (!filePath) {
+      throw new Error('Ruta de archivo no válida');
+    }
+
+    // 2. Normalizar ruta
+    const normalizedPath = path.normalize(filePath);
+
+    // 3. Verificar que el archivo existe
+    const fileExists = await fsp.access(normalizedPath).then(() => true).catch(() => false);
+    
+    if (!fileExists) {
+      throw new Error('El archivo no existe');
+    }
+
+    // 4. Abrir con aplicación predeterminada del sistema
+    await shell.openPath(normalizedPath);
+
+    sendLog(`[MAIN][open-file] Archivo abierto exitosamente: ${normalizedPath}`, 'INFO');
+
+    return {
+      success: true,
+      message: 'Archivo abierto'
+    };
+
+  } catch (error) {
+    sendLog(`[MAIN][open-file] Error al abrir archivo: ${error.message}`, 'ERROR');
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+});
+
 // Manejador para obtener la lista de archivos de presupuesto
 ipcMain.handle('getPresupuestoFiles', async (event, companyName) => {
   sendLog(`[MAIN] Buscando archivos de presupuesto para: ${companyName} en el submódulo 1.1.3.`);
@@ -4372,6 +4583,42 @@ async function handleSaveBudgetFile(event, filePath, dataToSave) {
     sendLog(`[DEBUG] Hoja seleccionada: ${worksheet.name || 'Hoja sin nombre'}`, 'DEBUG');
 
     // ============================================================================
+    // 🛡️ DETECCIÓN DE FÓRMULAS - IDENTIFICAR CELDAS CON FÓRMULAS COMPARTIDAS
+    // ============================================================================
+    const formulaCells = new Map(); // Mapa: "row,col" -> { formula, value }
+    const totalRowIndices = new Set(); // Filas que son TOTAL (no se deben sobrescribir fórmulas)
+
+    // Detectar filas con "TOTAL" en la columna A o C
+    for (let rowIdx = 1; rowIdx <= worksheet.rowCount; rowIdx++) {
+      const row = worksheet.getRow(rowIdx);
+      const cellA = row.getCell(1);
+      const cellC = row.getCell(3);
+      
+      if (cellA.value && typeof cellA.value === 'string' && cellA.value.includes('TOTAL')) {
+        totalRowIndices.add(rowIdx);
+        sendLog(`[DEBUG] Fila TOTAL detectada: ${rowIdx}`, 'DEBUG');
+      }
+    }
+
+    // Detectar celdas con fórmula en el rango de datos (filas 10-78, columnas A-R)
+    for (let rowIdx = 10; rowIdx <= Math.min(78, worksheet.rowCount); rowIdx++) {
+      const row = worksheet.getRow(rowIdx);
+      for (let colIdx = 1; colIdx <= 18; colIdx++) { // A=1, R=18
+        const cell = row.getCell(colIdx);
+        if (cell.value && typeof cell.value === 'object' && cell.value.formula) {
+          const key = `${rowIdx},${colIdx}`;
+          formulaCells.set(key, {
+            formula: cell.value.formula,
+            value: cell.value.result,
+            shared: cell.value.sharedFormula
+          });
+          sendLog(`[DEBUG] Fórmula detectada en ${key}: ${cell.value.formula}`, 'DEBUG');
+        }
+      }
+    }
+    sendLog(`[DEBUG] Total de celdas con fórmula detectadas: ${formulaCells.size}`, 'DEBUG');
+
+    // ============================================================================
     // 🛡️ PRESERVACIÓN DE MERGES - LEER Y GUARDAR TODOS LOS MERGES EXISTENTES
     // ============================================================================
     const existingMerges = [];
@@ -4405,33 +4652,36 @@ async function handleSaveBudgetFile(event, filePath, dataToSave) {
       'diciembre': [17, 'R']            // Índice 17, Columna R - Diciembre
     };
 
-    // Actualizar los datos en el archivo Excel desde la fila 10 en adelante
+    // Función interna para parsear de forma segura, similar a la del frontend
+    const parseValue = (val) => {
+      if (typeof val === 'number') return val;
+      if (typeof val !== 'string') return 0;
+      let cleanValue = val.replace(/\$/g, '').replace(/\s/g, '');
+      if (cleanValue.indexOf(',') > cleanValue.indexOf('.')) {
+          return parseFloat(cleanValue.replace(/\./g, '').replace(',', '.')) || 0;
+      }
+      return parseFloat(cleanValue.replace(/,/g, '')) || 0;
+    };
+
+    const parsePercentage = (val) => {
+        if (typeof val === 'number') return val / 100; // Si ya es un número (ej: 50), convertir a 0.5
+        if (typeof val === 'string') {
+            const num = parseValue(val.replace('%', ''));
+            return (num / 100) || 0;
+        }
+        return 0;
+    };
+
+    // ============================================================================
+    // 📝 ESCRITURA DE DATOS - PRESERVANDO FÓRMULAS COMPARTIDAS
+    // ============================================================================
     for (let i = 0; i < dataToSave.length; i++) {
       const rowData = dataToSave[i];
       const rowIndex = i + 10;
       const row = worksheet.getRow(rowIndex);
 
-      const values = new Array(18);
-
-      // Función interna para parsear de forma segura, similar a la del frontend
-      const parseValue = (val) => {
-        if (typeof val === 'number') return val;
-        if (typeof val !== 'string') return 0;
-        let cleanValue = val.replace(/\$/g, '').replace(/\s/g, '');
-        if (cleanValue.indexOf(',') > cleanValue.indexOf('.')) {
-            return parseFloat(cleanValue.replace(/\./g, '').replace(',', '.')) || 0;
-        }
-        return parseFloat(cleanValue.replace(/,/g, '')) || 0;
-      };
-
-      const parsePercentage = (val) => {
-          if (typeof val === 'number') return val / 100; // Si ya es un número (ej: 50), convertir a 0.5
-          if (typeof val === 'string') {
-              const num = parseValue(val.replace('%', ''));
-              return (num / 100) || 0;
-          }
-          return 0;
-      };
+      // Verificar si es una fila TOTAL (no sobrescribir fórmulas)
+      const isTotalRow = totalRowIndices.has(rowIndex);
 
       // Asignar valores CÉLULA POR CÉLULA para preservar completamente la columna B
       // (incluyendo merges, formato y otras propiedades)
@@ -4454,8 +4704,16 @@ async function handleSaveBudgetFile(event, filePath, dataToSave) {
       row.getCell(5).numFmt = '#,##0.00';
 
       // Columna F (índice 5) - Porcentaje Ejecutado
-      row.getCell(6).value = parsePercentage(rowData.porcentaje_ejecutado);
-      row.getCell(6).numFmt = '0.00%';
+      // ⚠️ VERIFICAR si hay fórmula compartida - si es así, NO sobrescribir
+      const formulaKeyF = `${rowIndex},6`; // Columna F = índice 6 en ExcelJS
+      if (formulaCells.has(formulaKeyF) && !isTotalRow) {
+        // Preservar fórmula compartida - no sobrescribir con valor directo
+        sendLog(`[DEBUG] Preservando fórmula en F${rowIndex}`, 'DEBUG');
+      } else {
+        // No hay fórmula o es fila TOTAL (calculamos el valor)
+        row.getCell(6).value = parsePercentage(rowData.porcentaje_ejecutado);
+        row.getCell(6).numFmt = '0.00%';
+      }
 
       // Columnas G a R (índices 6-17) - Meses
       const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
@@ -4463,19 +4721,97 @@ async function handleSaveBudgetFile(event, filePath, dataToSave) {
 
       meses.forEach((mes, idx) => {
         const colIndex = 7 + idx; // 7 = columna G (índice base 1 de ExcelJS)
-        row.getCell(colIndex).value = parseValue(rowData[mes]);
-        row.getCell(colIndex).numFmt = '#,##0.00';
+        const formulaKey = `${rowIndex},${colIndex}`;
+        
+        // ⚠️ VERIFICAR si hay fórmula compartida - si es así, NO sobrescribir
+        if (formulaCells.has(formulaKey)) {
+          // Preservar fórmula compartida
+          sendLog(`[DEBUG] Preservando fórmula en columna ${String.fromCharCode(64 + colIndex)}${rowIndex}`, 'DEBUG');
+        } else {
+          // No hay fórmula, escribir valor normal
+          row.getCell(colIndex).value = parseValue(rowData[mes]);
+          row.getCell(colIndex).numFmt = '#,##0.00';
+        }
       });
 
-      sendLog(`[DEBUG] handleSaveBudgetFile - Escribiendo valores en fila ${rowIndex}`, 'DEBUG');
+      sendLog(`[DEBUG] handleSaveBudgetFile - Escribiendo valores en fila ${rowIndex}${isTotalRow ? ' (TOTAL)' : ''}`, 'DEBUG');
     }
 
     // ============================================================================
-    // 🛡️ RESTAURACIÓN DE MERGES - REAPLICAR TODOS LOS MERGES ORIGINALES
+    // 📊 CÁLCULO DE TOTALES DESDE BACKEND (si existe fila TOTAL)
+    // ============================================================================
+    if (totalRowIndices.size > 0) {
+      sendLog(`[DEBUG] Calculando totales para ${totalRowIndices.size} fila(s) TOTAL`, 'DEBUG');
+      
+      for (const totalRowIdx of totalRowIndices) {
+        const totalRow = worksheet.getRow(totalRowIdx);
+        
+        // Calcular suma de columnas D a R (excluyendo columna F que es porcentaje)
+        const columnsToSum = [4, 5]; // D (Asignación), E (Ejecutado)
+        const monthColumns = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]; // G a R
+        
+        // Sumar columnas D y E
+        columnsToSum.forEach(colIdx => {
+          let sum = 0;
+          for (let i = 0; i < dataToSave.length; i++) {
+            const rowIndex = i + 10;
+            const cell = worksheet.getRow(rowIndex).getCell(colIdx);
+            if (cell.value && typeof cell.value === 'number') {
+              sum += cell.value;
+            }
+          }
+          totalRow.getCell(colIdx).value = sum;
+          totalRow.getCell(colIdx).numFmt = '#,##0.00';
+        });
+        
+        // Sumar columnas de meses (G a R)
+        monthColumns.forEach(colIdx => {
+          let sum = 0;
+          for (let i = 0; i < dataToSave.length; i++) {
+            const rowIndex = i + 10;
+            const cell = worksheet.getRow(rowIndex).getCell(colIdx);
+            if (cell.value && typeof cell.value === 'number') {
+              sum += cell.value;
+            }
+          }
+          totalRow.getCell(colIdx).value = sum;
+          totalRow.getCell(colIdx).numFmt = '#,##0.00';
+        });
+        
+        // Calcular porcentaje total (E / D * 100)
+        const asignacionTotal = totalRow.getCell(4).value || 0;
+        const ejecutadoTotal = totalRow.getCell(5).value || 0;
+        if (asignacionTotal > 0) {
+          const porcentajeTotal = ejecutadoTotal / asignacionTotal;
+          totalRow.getCell(6).value = porcentajeTotal;
+          totalRow.getCell(6).numFmt = '0.00%';
+        }
+        
+        sendLog(`[DEBUG] Totales calculados para fila ${totalRowIdx}`, 'DEBUG');
+      }
+    }
+
+    // ============================================================================
+    // 🛡️ RESTAURACIÓN DE MERGES - REAPLICAR SOLO SI NO EXISTEN YA
     // ============================================================================
     sendLog(`[DEBUG] Restaurando ${existingMerges.length} merges...`, 'DEBUG');
+    
+    // Obtener merges actuales después de la escritura
+    const currentMerges = new Set();
+    if (worksheet.model && worksheet.model.merges) {
+      for (const mergeRange of worksheet.model.merges) {
+        currentMerges.add(mergeRange);
+      }
+    }
+    
     for (const mergeRange of existingMerges) {
       try {
+        // Verificar si el merge ya existe (no intentar reaplicar)
+        if (currentMerges.has(mergeRange)) {
+          sendLog(`[DEBUG] Merge ya existe, omitiendo: ${mergeRange}`, 'DEBUG');
+          continue;
+        }
+        
         // Decodificar el rango del merge (ej: "B11:B20")
         const decodedRange = xlsx.utils.decode_range(mergeRange);
 
@@ -4492,7 +4828,7 @@ async function handleSaveBudgetFile(event, filePath, dataToSave) {
         sendLog(`[WARN] Error al restaurar merge ${mergeRange}: ${mergeError.message}`, 'WARN');
       }
     }
-    sendLog(`[DEBUG] Todos los merges han sido restaurados`, 'DEBUG');
+    sendLog(`[DEBUG] Todos los merges han sido procesados`, 'DEBUG');
 
     // Guardar el archivo actualizado
     await workbook.xlsx.writeFile(filePath);
@@ -7302,16 +7638,32 @@ async function calculateCapacitacionesStats(basePath) {
   return stats;
 }
 
-async function calculateInduccionesStats(basePath) {
+async function calculateInduccionesStats(basePath, companyName) {
   const currentYear = new Date().getFullYear();
   const stats = {
-    totalInducciones: 0,
-    completadas: 0,
-    pendientes: 0,
-    porcentajeCompletado: 0,
+    totalTrabajadores: 0,        // ← NUEVO: Total de trabajadores de la empresa
+    totalInducciones: 0,         // Inducciones detectadas en Excel
+    completadas: 0,              // Inducciones completadas (año actual)
+    pendientes: 0,               // ← CAMBIA: Ahora es employees - completadas
+    porcentajeCompletado: 0,     // ← CAMBIA: (completadas / employees) * 100
     mensual: new Array(12).fill(0)
   };
   try {
+    // ========================================================================
+    // 1. LEER NÚMERO DE TRABAJADORES DESDE CONFIG
+    // ========================================================================
+    if (companyName) {
+      try {
+        const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+        const config = JSON.parse(configData);
+        const employees = config.companyPaths?.[companyName]?.stats?.employees || 0;
+        stats.totalTrabajadores = employees;
+        sendLog(`[DEBUG] calculateInduccionesStats - ${companyName}: ${employees} trabajadores`, 'DEBUG');
+      } catch (configError) {
+        sendLog(`[WARN] Error leyendo config para ${companyName}: ${configError.message}`, 'WARN');
+      }
+    }
+
     if (!basePath) return stats;
 
     const recursosPath = path.join(basePath, '1. Recursos');
@@ -7376,6 +7728,9 @@ async function calculateInduccionesStats(basePath) {
         } catch (err) { continue; }
     }
 
+    // ========================================================================
+    // 2. CALCULAR PENDIENTES Y PORCENTAJE REAL BASADO EN TRABAJADORES
+    // ========================================================================
     // Convertir mensual a acumulado para el gráfico de tendencia
     let cumulative = 0;
     const trendData = [...stats.mensual];
@@ -7384,7 +7739,18 @@ async function calculateInduccionesStats(basePath) {
         stats.mensual[i] = cumulative;
     }
 
-    stats.porcentajeCompletado = stats.totalInducciones > 0 ? 100 : 0;
+    // Calcular pendientes: trabajadores que NO han recibido inducción
+    stats.pendientes = Math.max(0, stats.totalTrabajadores - stats.completadas);
+
+    // Calcular porcentaje REAL: (completadas / totalTrabajadores) * 100
+    if (stats.totalTrabajadores > 0) {
+        stats.porcentajeCompletado = Math.round((stats.completadas / stats.totalTrabajadores) * 100);
+    } else {
+        // Fallback: si no hay empleados configurados, usar lógica antigua
+        stats.porcentajeCompletado = stats.totalInducciones > 0 ? 100 : 0;
+    }
+
+    sendLog(`[DEBUG] calculateInduccionesStats - Completadas: ${stats.completadas}, Pendientes: ${stats.pendientes}, Porcentaje: ${stats.porcentajeCompletado}%`, 'DEBUG');
 
   } catch (e) {
     sendLog(`Error calculando inducciones: ${e.message}`, 'WARN');
@@ -7446,8 +7812,8 @@ ipcMain.handle('get-recursos-stats', async (event, companyName) => {
         return {
             success: true,
             stats: {
-                inducciones: { totalInducciones: 0, completadas: 0, pendientes: 0, porcentajeCompletado: 0 },
-                capacitaciones: { totalCapacitaciones: 0, programadas: 0, realizadas: 0, porcentajeCumplimiento: 0 },
+                inducciones: { totalTrabajadores: 0, totalInducciones: 0, completadas: 0, pendientes: 0, porcentajeCompletado: 0, mensual: new Array(12).fill(0) },
+                capacitaciones: { totalCapacitaciones: 0, programadas: 0, realizadas: 0, porcentajeCumplimiento: 0, mensual: { programadas: new Array(12).fill(0), realizadas: new Array(12).fill(0) } },
                 epps: { totalEPPs: 0, entregados: 0, pendientes: 0, stockActual: 0 }
             }
         };
@@ -7456,7 +7822,7 @@ ipcMain.handle('get-recursos-stats', async (event, companyName) => {
     // Ejecutar cálculos en paralelo
     const [capacitaciones, inducciones, epps] = await Promise.all([
         calculateCapacitacionesStats(rootPath),
-        calculateInduccionesStats(rootPath),
+        calculateInduccionesStats(rootPath, companyName),  // ← AGREGADO: pasar companyName
         calculateEppsStats(rootPath)
     ]);
 

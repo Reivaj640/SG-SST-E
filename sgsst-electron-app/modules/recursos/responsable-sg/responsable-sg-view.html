@@ -49,7 +49,7 @@
         
         <!-- SIDEBAR: NAVIGATION & FILES -->
         <aside class="sidebar">
-            
+
             <!-- BOTÓN DE REGRESO EN SIDEBAR -->
             <div class="sidebar-header">
                 <button class="btn btn-ghost" id="goBackBtn" style="width:100%; justify-content:flex-start; padding-left:0;" disabled>
@@ -121,6 +121,45 @@
     <div class="notification" id="notification">
         <i class="notification-icon fas fa-check-circle"></i>
         <div class="notification-message">Operación completada con éxito</div>
+    </div>
+
+    <!-- Toast Notifications Container (K+AIR Modern) -->
+    <div class="k-toast-container" id="kToastContainer"></div>
+
+    <!-- Confirm Modal (K+AIR Modern) -->
+    <div id="confirmModal" class="k-modal-overlay" style="display: none;">
+        <div class="k-modal">
+            <div class="k-modal-header">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h3>Confirmar eliminación</h3>
+            </div>
+            <div class="k-modal-body">
+                <p>¿Está seguro de eliminar "<strong id="confirmFileName">archivo.pdf</strong>"?</p>
+                <p class="k-modal-warning">
+                    <i class="fas fa-info-circle"></i>
+                    Esta acción no se puede deshacer.
+                </p>
+            </div>
+            <div class="k-modal-footer">
+                <button class="k-btn k-btn-ghost" id="confirmCancelBtn">
+                    Cancelar
+                </button>
+                <button class="k-btn k-btn-danger" id="confirmAcceptBtn">
+                    <i class="fas fa-trash"></i> Eliminar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Context Menu (Clic Derecho) -->
+    <div id="contextMenu" class="context-menu" style="display: none;">
+        <div class="context-menu-item" id="openFileBtn">
+            <i class="fas fa-external-link-alt"></i> Abrir archivo
+        </div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item" id="deleteFileBtn">
+            <i class="fas fa-trash"></i> Eliminar archivo
+        </div>
     </div>
 
     <script src="responsable-sg-viewer.js"></script>

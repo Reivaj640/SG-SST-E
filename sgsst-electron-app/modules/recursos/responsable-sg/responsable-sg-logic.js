@@ -57,6 +57,15 @@ class ResponsableSgComponent {
                 case 'download-document':
                     this.handleStandardRequest(event, 'downloadDocument');
                     break;
+                case 'upload-document':
+                    this.handleStandardRequest(event, 'uploadDocument');
+                    break;
+                case 'open-file':
+                    this.handleStandardRequest(event, 'openFile');
+                    break;
+                case 'delete-document':
+                    this.handleStandardRequest(event, 'deleteDocument');
+                    break;
                 default:
                     console.warn(`[ResponsableLogic] Acción no manejada: ${action}`);
             }

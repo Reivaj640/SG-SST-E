@@ -817,8 +817,20 @@ document.addEventListener('DOMContentLoaded', async () => {
                   apiCallArgs = [payload.filePath]; // Ensure payload is destructured
                   break;
               case 'download-document-request':
-                  apiCallFunction = window.electronAPI.downloadDocument; // Assuming this API exists
-                  apiCallArgs = [payload]; // payload is the filePath string
+                  apiCallFunction = window.electronAPI.downloadDocument;
+                  apiCallArgs = [payload];
+                  break;
+              case 'upload-document-request':
+                  apiCallFunction = window.electronAPI.uploadDocument;
+                  apiCallArgs = [payload];
+                  break;
+              case 'delete-document-request':
+                  apiCallFunction = window.electronAPI.deleteDocument;
+                  apiCallArgs = [payload.filePath];
+                  break;
+              case 'open-file-request':
+                  apiCallFunction = window.electronAPI.openFile;
+                  apiCallArgs = [payload.filePath];
                   break;
               case 'get-editable-content-request':
                   // Manejar solicitud de contenido editable para documentos

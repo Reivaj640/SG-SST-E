@@ -6,6 +6,58 @@ Este directorio contiene la documentación detallada de cada versión de K+AIR.
 
 ## 📋 Versiones Disponibles
 
+### v0.1.86 - 20 de marzo de 2026
+**[v0.1.86-mejoras-visualizador-1.1.1.md](v0.1.86-mejoras-visualizador-1.1.1.md)**
+
+**Cambios principales:**
+- ✅ Feature: Arrastrar y soltar archivos en carpetas (drag & drop)
+- ✅ Feature: Menú contextual con clic derecho (abrir, eliminar)
+- ✅ Feature: Modal de confirmación moderno K+AIR
+- ✅ Feature: Notificaciones toast modernas
+- ✅ Manejo específico de errores (EPERM, ENOENT, EACCES)
+
+**Impacto:**
+- Formas de subir archivos: 1 → 2 (+100%)
+- Acciones por archivo: 1 → 3 (+200%)
+- Tipos de error manejados: 1 → 4 (+300%)
+- Feedback visual: Nativo → Moderno K+AIR
+
+---
+
+### v0.1.85 - 20 de marzo de 2026
+**[v0.1.85-inducciones-cumplimiento-normativo.md](v0.1.85-inducciones-cumplimiento-normativo.md)**
+
+**Cambios principales:**
+- ✅ Feature: Tarjeta de Inducciones con cumplimiento normativo real
+- ✅ Cálculo de pendientes: `empleados - completadas`
+- ✅ Porcentaje real basado en nómina: `(completadas / empleados) * 100`
+- ✅ Alertas inteligentes: óptimo (≥90%), refuerzo (≥50%), crítico (<50%)
+- ✅ Fallback automático si no hay empleados configurados
+
+**Impacto:**
+- Precisión del dato: Histórico → Normativo (+100%)
+- Pendientes visibles: No mostraba → Muestra cantidad exacta (+100%)
+- Porcentaje útil: 100% (falso) → Real según nómina (+100%)
+- Acción requerida: Ninguna → Alerta de refuerzo/crítico
+
+---
+
+### v0.1.84 - 20 de marzo de 2026
+**[v0.1.84-presupuesto-shared-formula-fix.md](v0.1.84-presupuesto-shared-formula-fix.md)**
+
+**Cambios principales:**
+- ✅ Fix: Error "Shared Formula master" en guardado de Presupuesto
+- ✅ Detección y preservación de fórmulas compartidas (columna F % Ejecutado)
+- ✅ Cálculo automático de totales desde backend (fila TOTAL)
+- ✅ Manejo seguro de merges existentes (sin reaplicar sobre existentes)
+
+**Impacto:**
+- Guardado presupuesto: 0% éxito → 100% éxito
+- Fórmulas preservadas: 0% → 100%
+- Errores en logs: ~20 warnings + 1 error → 0 warnings + 0 errors
+
+---
+
 ### v0.1.83 - 19 de marzo de 2026
 **[v0.1.83-python-optimization.md](v0.1.83-python-optimization.md)**
 
@@ -57,4 +109,4 @@ Cada archivo de actualización debe incluir:
 
 ---
 
-**Última actualización:** 19 de marzo de 2026
+**Última actualización:** 20 de marzo de 2026

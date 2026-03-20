@@ -550,7 +550,7 @@ class RecursosHome {
 
             // Inicializar estructura base
             this.resourceStats = {
-                inducciones: { totalInducciones: 0, completadas: 0, pendientes: 0, porcentajeCompletado: 0, mensual: new Array(12).fill(0) },
+                inducciones: { totalTrabajadores: 0, totalInducciones: 0, completadas: 0, pendientes: 0, porcentajeCompletado: 0, mensual: new Array(12).fill(0) },
                 capacitaciones: { totalCapacitaciones: 0, programadas: 0, realizadas: 0, porcentajeCumplimiento: 0, mensual: { programadas: new Array(12).fill(0), realizadas: new Array(12).fill(0) } },
                 epps: { totalEPPs: 0, entregados: 0, pendientes: 0, stockActual: 0 }
             };
@@ -959,20 +959,34 @@ class RecursosHome {
 
     // Nuevo método para crear widget de inducciones con datos reales
     createInductionWidget() {
-        const stats = this.resourceStats?.inducciones || { totalInducciones: 0, completadas: 0, pendientes: 0, porcentajeCompletado: 0 };
+        const stats = this.resourceStats?.inducciones || { 
+            totalTrabajadores: 0, 
+            totalInducciones: 0, 
+            completadas: 0, 
+            pendientes: 0, 
+            porcentajeCompletado: 0 
+        };
+
+        // Usar totalTrabajadores como denominador (o fallback a totalInducciones si es 0)
+        const totalTrabajadores = stats.totalTrabajadores || stats.totalInducciones;
+        const completadas = stats.completadas;
+        const pendientes = stats.pendientes || Math.max(0, totalTrabajadores - completadas);
+        const porcentaje = stats.porcentajeCompletado || 0;
 
         const title = 'Inducciones';
-        const value = `${stats.completadas} / ${stats.totalInducciones}`;
+        const value = `${completadas} / ${totalTrabajadores}`;
 
         let desc = '';
-        const porcentaje = stats.totalInducciones > 0 ? Math.round((stats.completadas / stats.totalInducciones) * 100) : 0;
-
-        if (porcentaje >= 80) {
-            desc = `✔ ${porcentaje}% Completado`;
+        
+        // Manejar caso especial: no hay trabajadores configurados
+        if (totalTrabajadores === 0) {
+            desc = '⚠ Configure N° trabajadores en Ajustes';
+        } else if (porcentaje >= 90) {
+            desc = `✔ Cumplimiento óptimo (${pendientes} pendientes)`;
         } else if (porcentaje >= 50) {
-            desc = `⚠ ${porcentaje}% Completado`;
+            desc = `⚠ Refuerzo necesario (${pendientes} pendientes)`;
         } else {
-            desc = `❌ ${porcentaje}% Completado (${stats.pendientes} Pendientes)`;
+            desc = `❌ Crítico: ${pendientes} trabajadores sin inducción`;
         }
 
         const w = document.createElement('div');

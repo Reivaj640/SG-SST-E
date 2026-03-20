@@ -133,7 +133,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getWordPreview: (filePath) => ipcRenderer.invoke('get-word-preview', filePath),
   getExcelPreview: (filePath) => ipcRenderer.invoke('get-excel-preview', filePath),
   downloadDocument: (filePath) => ipcRenderer.invoke('download-document', filePath),
-  
+  uploadDocument: (payload) => ipcRenderer.invoke('upload-document', payload),
+  deleteDocument: (filePath) => ipcRenderer.invoke('delete-document', filePath),
+  openFile: (filePath) => ipcRenderer.invoke('open-file', filePath),
+
   // --- Edición de documentos ---
   getEditableContent: (payload) => ipcRenderer.invoke('get-editable-content', payload),
   saveEditedDocument: (payload) => ipcRenderer.invoke('save-edited-document', payload),
