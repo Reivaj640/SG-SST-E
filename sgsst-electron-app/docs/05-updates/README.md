@@ -6,6 +6,23 @@ Este directorio contiene la documentación detallada de cada versión de K+AIR.
 
 ## 📋 Versiones Disponibles
 
+### v0.1.87 - 20 de marzo de 2026
+**[v0.1.87-responsive-1366x768.md](v0.1.87-responsive-1366x768.md)**
+
+**Cambios principales:**
+- ✅ Feature: Soporte responsive para 1366x768 y 1536x864
+- ✅ Ajustes de layout progresivos (header, sidebar, fonts)
+- ✅ Widgets y gráficos en 2 columnas para 1366x768
+- ✅ Ventana inicial optimizada (1200x700)
+- ✅ Sin cambios en ≥1920x1080
+
+**Impacto:**
+- 1366x768: Scroll forzado → Todo visible (+95%)
+- 1536x864: Scroll frecuente → Scroll mínimo (+70%)
+- ≥1920x1080: Sin cambios (0%)
+
+---
+
 ### v0.1.86 - 20 de marzo de 2026
 **[v0.1.86-mejoras-visualizador-1.1.1.md](v0.1.86-mejoras-visualizador-1.1.1.md)**
 

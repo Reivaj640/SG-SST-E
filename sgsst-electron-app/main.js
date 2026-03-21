@@ -564,10 +564,10 @@ const createWindow = () => {
   isWindowCreated = true;
   
   mainWindow = new BrowserWindow({
-    width: 1024, // Ancho inicial 1200 para mejor visualización
-    height: 900, // Alto inicial 900 para mejor visualización
-    minWidth: 900,
-    minHeight: 800,
+    width: 1200, // Ancho inicial 1200 para mejor visualización en 1366px y 1920px
+    height: 700, // Alto inicial 700 para que quepa en 768px con margen para barra de título
+    minWidth: 1024, // Mínimo razonable para UI funcional
+    minHeight: 650, // Permite uso en pantallas 1366x768
     icon: path.join(__dirname, 'assets', 'KIAR256.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

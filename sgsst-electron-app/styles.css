@@ -3497,3 +3497,240 @@ select.form-control {
     font-size: 0.8rem;
     color: #6c757d;
 }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   RESPONSIVE PARA 1536x864 (Ajustes Moderados)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+@media (max-width: 1536px) and (max-height: 864px) {
+  :root {
+    --header-height: 42px;
+    --sidebar-width: 170px;
+  }
+
+  body {
+    font-size: 0.9rem;
+  }
+
+  h1 { font-size: 1.6rem; }
+  h2 { font-size: 1.35rem; }
+  h3 { font-size: 1.15rem; }
+
+  .widget-value {
+    font-size: 1.6rem;
+  }
+
+  .widget-grid {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.875rem;
+  }
+
+  .charts-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.875rem;
+  }
+
+  .chart-card {
+    min-height: 220px;
+  }
+
+  .btn {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+  }
+
+  .table th,
+  .table td {
+    padding: 0.6rem;
+  }
+
+  .k-toast {
+    min-width: 300px;
+    padding: 11px 18px;
+  }
+
+  .context-menu {
+    min-width: 170px;
+  }
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   RESPONSIVE PARA 1366x768 (Ajustes Optimizados)
+   NO AFECTA ≥1920x1080
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+@media (max-width: 1366px) and (max-height: 768px) {
+  /* Variables de layout ajustadas */
+  :root {
+    --header-height: 40px;
+    --sidebar-width: 160px;
+  }
+
+  /* Fuente base más pequeña */
+  body {
+    font-size: 0.875rem;
+  }
+
+  /* Títulos proporcionales */
+  h1 { font-size: 1.5rem; }
+  h2 { font-size: 1.25rem; }
+  h3 { font-size: 1.125rem; }
+
+  /* Header más compacto */
+  .app-header {
+    height: var(--header-height);
+    padding: 0 0.75rem;
+  }
+
+  .header-title {
+    font-size: 1rem;
+  }
+
+  /* Sidebar ajustado */
+  .sidebar {
+    width: var(--sidebar-width);
+  }
+
+  .sidebar-header {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .sidebar-menu-item {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+
+  /* Widgets más compactos */
+  .widget {
+    padding: 0.75rem;
+  }
+
+  .widget-value {
+    font-size: 1.5rem;
+  }
+
+  .widget-description {
+    font-size: 0.75rem;
+  }
+
+  /* Grid de widgets: 2 columnas */
+  .widget-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+
+  /* Gráficos: 2 columnas */
+  .charts-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+
+  .chart-card {
+    min-height: 200px;
+  }
+
+  /* Botones más pequeños */
+  .btn {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+
+  /* Tablas compactas */
+  .table-responsive {
+    font-size: 0.8125rem;
+  }
+
+  .table th,
+  .table td {
+    padding: 0.5rem;
+  }
+
+  /* Altura máxima de tablas con scroll */
+  .ausentismo-table-wrapper,
+  .inducciones-table-wrapper,
+  .responsable-sg-table-wrapper {
+    max-height: calc(100vh - 220px);
+  }
+
+  /* Toast notifications compactas */
+  .k-toast {
+    min-width: 280px;
+    max-width: 400px;
+    padding: 10px 16px;
+  }
+
+  .k-toast-message {
+    font-size: 0.8125rem;
+  }
+
+  /* Menú contextual compacto */
+  .context-menu {
+    min-width: 160px;
+  }
+
+  .context-menu-item {
+    padding: 8px 12px;
+    font-size: 0.8125rem;
+  }
+
+  /* Modal de confirmación ajustado */
+  .k-modal {
+    max-width: 400px;
+  }
+
+  .k-modal-header {
+    padding: 16px 20px;
+  }
+
+  .k-modal-body {
+    padding: 20px;
+  }
+
+  /* Submódulos: reducir padding */
+  .submodule-content {
+    padding: 0.75rem;
+  }
+
+  /* Lista de archivos compacta */
+  .list-item {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .item-name {
+    font-size: 0.8125rem;
+  }
+
+  /* Badge más pequeños */
+  .badge {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.6875rem;
+  }
+
+  /* Formularios */
+  .form-control {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+
+  .form-label {
+    font-size: 0.8125rem;
+    margin-bottom: 0.25rem;
+  }
+
+  /* Dashboard */
+  .dashboard-container {
+    padding: 0.75rem;
+  }
+
+  /* Home */
+  .home-container {
+    padding: 0.5rem;
+  }
+
+  /* Ajustes para el visualizador de documentos */
+  .viewer-stage {
+    min-height: calc(100vh - 180px);
+  }
+
+  .sidebar-content {
+    max-height: calc(100vh - 200px);
+  }
+}

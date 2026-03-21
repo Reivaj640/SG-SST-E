@@ -2,7 +2,7 @@
 
 **Tiempo de lectura:** 5 minutos
 **Última actualización:** 20 de marzo de 2026
-**Versión:** 0.1.86
+**Versión:** 0.1.87
 
 ---
 
@@ -68,7 +68,7 @@ K+AIR es una aplicación empresarial Electron que implementa un Sistema de Gesti
 
 4. **CHANGELOG.md**
    - Historial de cambios por versión
-   - Últimos cambios en v0.1.86
+   - Últimos cambios en v0.1.87
 
 ---
 

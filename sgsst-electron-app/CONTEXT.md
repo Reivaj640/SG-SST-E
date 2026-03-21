@@ -1,7 +1,7 @@
 # K+AIR - Contexto del Proyecto
 
 **Última actualización:** 20 de marzo de 2026
-**Versión actual:** 0.1.86
+**Versión actual:** 0.1.87
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 
 ---
@@ -125,7 +125,7 @@ modules/
 
 ---
 
-## 📊 Estado Actual (v0.1.86)
+## 📊 Estado Actual (v0.1.87)
 
 ### ✅ Funcionalidades Operativas
 
@@ -141,6 +141,7 @@ modules/
 - [x] **Guardado de Presupuesto** - Fórmulas compartidas preservadas 🆕
 - [x] **Inducciones con Cumplimiento Normativo** - Cálculo real basado en nómina 🆕
 - [x] **Visualizador 1.1.1 Mejorado** - Drag & drop, menú contextual, eliminar, toast 🆕
+- [x] **Soporte Responsive** - Optimizado para 1366x768 y 1536x864 🆕
 
 ### ⚠️ Limitaciones Temporales
 
@@ -149,6 +150,12 @@ modules/
   - **Re-habilitar:** Eliminar `!Lib/site-packages/torch/**` de package.json
 
 ### 🔧 Mejoras Recientes
+
+**v0.1.87 (20 de marzo de 2026):**
+1. **Feature: Soporte Responsive** - Optimizado para 1366x768 y 1536x864
+2. **Media queries específicas** - Ajustes progresivos por resolución
+3. **Ventana inicial optimizada** - 1200x700 (cabe en 1366x768)
+4. **Sin cambios en ≥1920x1080** - Mantiene UI original
 
 **v0.1.86 (20 de marzo de 2026):**
 1. **Feature: Drag & Drop en Visualizador 1.1.1** - Arrastrar y soltar archivos en carpetas

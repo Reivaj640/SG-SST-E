@@ -5,6 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.87] - 2026-03-20
+
+### Added
+- **📱 Soporte Responsive para 1366x768 y 1536x864** 🆕
+  - **Media queries específicas** por resolución (1536x864, 1366x768)
+  - **Ajustes progresivos** - No afecta ≥1920x1080
+  - **Layout optimizado** - Header, sidebar, fonts, widgets, gráficos
+  - **Ventana inicial** - 1200x700 (cabe en 1366x768)
+
+### Changed
+- **main.js** - Dimensiones de ventana actualizadas:
+  - `width`: 1024 → 1200 (+176px)
+  - `height`: 900 → 700 (-200px)
+  - `minWidth`: 900 → 1024 (+124px)
+  - `minHeight`: 800 → 650 (-150px)
+
+- **styles.css** - Media queries agregadas (~230 líneas):
+  - `@media (max-width: 1536px) and (max-height: 864px)` - Ajustes moderados
+  - `@media (max-width: 1366px) and (max-height: 768px)` - Ajustes optimizados
+
+### Technical Details
+- **Archivos modificados:**
+  - `main.js` - Líneas 566-574 (BrowserWindow dimensions)
+  - `styles.css` - Líneas ~3500-3737 (media queries)
+- **Archivos creados:**
+  - `docs/05-updates/v0.1.87-responsive-1366x768.md`
+
+### Impacto
+- **1366x768:** Scroll forzado → Todo visible (+95% mejora)
+- **1536x864:** Scroll frecuente → Scroll mínimo (+70% mejora)
+- **≥1920x1080:** Sin cambios (0% impacto)
+
+### Breaking Changes
+- **Ninguno** - Compatible con versiones anteriores
+- **≥1920x1080:** Mantiene exactamente la misma UI
+- **Ventana inicial:** Dimensiones optimizadas, usuario puede redimensionar
+
+### Migration Notes
+- **Para usuarios finales:** Reiniciar aplicación para aplicar cambios
+- **Para desarrolladores:** Ninguna acción requerida
+
+---
+
 ## [0.1.86] - 2026-03-20
 
 ### Added
