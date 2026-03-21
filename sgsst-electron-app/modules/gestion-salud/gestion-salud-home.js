@@ -159,8 +159,8 @@ class GestionSaludHome {
             /* Grid de Widgets */
             .widgets-container {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-                gap: 1.5rem;
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                gap: 1rem;
             }
 
             /* Widget Base */
@@ -168,13 +168,13 @@ class GestionSaludHome {
                 background: var(--k-bg-card);
                 border: 1px solid var(--k-border);
                 border-radius: var(--k-radius-lg);
-                padding: 1.25rem;
+                padding: 1rem;
                 display: flex;
                 flex-direction: column;
                 position: relative;
                 box-shadow: var(--k-shadow-sm);
                 transition: transform 0.2s ease;
-                min-height: 140px;
+                min-height: 120px;
             }
             .widget:hover {
                 transform: translateY(-3px);
@@ -182,20 +182,20 @@ class GestionSaludHome {
             }
             .widget h4 {
                 margin: 0 0 0.5rem 0;
-                font-size: 0.8rem;
+                font-size: 0.65rem;
                 color: var(--k-text-muted);
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
                 font-weight: 600;
             }
             .widget-value {
-                font-size: 1.8rem;
+                font-size: 1.4rem;
                 font-weight: 700;
                 color: var(--k-text-main);
                 margin-bottom: 0.5rem;
             }
             .widget-description {
-                font-size: 0.85rem;
+                font-size: 0.65rem;
                 color: var(--k-text-muted);
             }
 
@@ -348,7 +348,6 @@ class GestionSaludHome {
         const widget1 = this.createWidget('Exámenes Médicos', '128', '📅 15 pendientes');
         const widget2 = this.createWidget('Accidentes Reportados', '3', '📉 2 menos que el mes pasado');
         const widget3 = this.createWidget('Remisiones', '7', '↗ 1 nueva hoy');
-        const widget4 = this.createWidget('Inducción de Personal', '24', '👥 5 por inducir');
 
         // Nueva tarjeta de seguimientos médicos
         const seguimientosWidget = this.createSeguimientosWidget();
@@ -356,7 +355,6 @@ class GestionSaludHome {
         widgetsContainer.appendChild(widget1);
         widgetsContainer.appendChild(widget2);
         widgetsContainer.appendChild(widget3);
-        widgetsContainer.appendChild(widget4);
         widgetsContainer.appendChild(seguimientosWidget);
 
         container.appendChild(widgetsContainer);

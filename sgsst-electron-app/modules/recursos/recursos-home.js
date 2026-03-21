@@ -166,8 +166,8 @@ class RecursosHome {
             /* Grid de Widgets */
             .widgets-container {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-                gap: 1.5rem;
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                gap: 1rem;
             }
 
             /* Widget Base */
@@ -175,13 +175,13 @@ class RecursosHome {
                 background: var(--k-bg-card);
                 border: 1px solid var(--k-border);
                 border-radius: var(--k-radius-lg);
-                padding: 1.25rem;
+                padding: 1rem;
                 display: flex;
                 flex-direction: column;
                 position: relative;
                 box-shadow: var(--k-shadow-sm);
                 transition: transform 0.2s ease;
-                min-height: 140px; /* Altura mínima uniforme */
+                min-height: 120px; /* Altura mínima uniforme */
             }
             .widget:hover {
                 transform: translateY(-3px);
@@ -189,20 +189,20 @@ class RecursosHome {
             }
             .widget h4 {
                 margin: 0 0 0.5rem 0;
-                font-size: 0.8rem;
+                font-size: 0.65rem;
                 color: var(--k-text-muted);
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
                 font-weight: 600;
             }
             .widget-value {
-                font-size: 1.8rem;
+                font-size: 1.4rem;
                 font-weight: 700;
                 color: var(--k-text-main);
                 margin-bottom: 0.5rem;
             }
             .widget-description {
-                font-size: 0.85rem;
+                font-size: 0.65rem;
                 color: var(--k-text-muted);
             }
 
@@ -223,15 +223,15 @@ class RecursosHome {
                 margin-bottom: 0.5rem;
             }
             .kb-title {
-                font-size: 0.85rem;
+                font-size: 0.65rem;
                 font-weight: 600;
                 color: var(--k-text-muted);
                 text-transform: uppercase;
             }
             .kb-badge {
-                font-size: 0.85rem;
+                font-size: 0.7rem;
                 font-weight: 700;
-                padding: 0.2rem 0.6rem;
+                padding: 0.15rem 0.5rem;
                 border-radius: 1rem;
                 color: white;
                 background-color: var(--k-success); /* Por defecto verde */
@@ -239,7 +239,7 @@ class RecursosHome {
 
             /* Valor Principal */
             .kb-amount {
-                font-size: 2rem;
+                font-size: 1.4rem;
                 font-weight: 700;
                 color: var(--k-text-main);
                 margin-bottom: 0.75rem;
@@ -269,12 +269,12 @@ class RecursosHome {
             .kb-footer {
                 display: flex;
                 justify-content: space-between;
-                font-size: 0.8rem;
+                font-size: 0.6rem;
                 margin-top: auto;
                 padding-top: 0.5rem;
                 border-top: 1px solid var(--k-border);
             }
-            .kb-label { color: var(--k-text-muted); font-weight: 500; }
+            .kb-label { color: var(--k-text-muted); font-weight: 500; font-size: 0.6rem; }
             .kb-value { font-weight: 600; }
             .kb-exec { color: var(--k-success); }
             .kb-rem { color: var(--k-primary); }
@@ -1047,7 +1047,7 @@ class RecursosHome {
                 <span class="kb-badge ${colorClass}">${porcentaje}%</span>
             </div>
 
-            <div class="kb-amount" style="font-size: 1.8rem;">${realizadas} / ${total}</div>
+            <div class="kb-amount" style="font-size: 1.4rem;">${realizadas} / ${total}</div>
 
             <div class="kb-progress-track">
                 <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};"></div>
@@ -1387,7 +1387,7 @@ class RecursosHome {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: { legend: { position: 'bottom' } },
-                    scales: { y: { beginAtZero: true } }
+                    scales: { y: { display: false, beginAtZero: true } }
                 }
             });
         }
