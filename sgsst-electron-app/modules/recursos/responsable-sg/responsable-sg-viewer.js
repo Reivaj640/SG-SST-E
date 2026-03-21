@@ -111,10 +111,9 @@ function setupFolderDragAndDrop(folderElement, folderPath) {
         <div class="drag-drop-content">
             <i class="fas fa-cloud-upload-alt"></i>
             <h3>Suelta aquí</h3>
-            <p>Se guardará en esta carpeta</p>
         </div>
     `;
-    
+
     folderElement.appendChild(overlay);
     
     let dragCounter = 0;
@@ -301,9 +300,13 @@ async function deleteDocument() {
     // Mostrar modal moderno en lugar de confirm()
     showConfirmModal(doc.name, async () => {
         console.log('[ConfirmModal] Callback ejecutado - Eliminando archivo:', doc.path);
-        
+
         // Callback se ejecuta al aceptar
         try {
+            // Cerrar el documento primero para liberar el archivo de memoria (evita EPERM)
+            console.log('[ContextMenu] Cerrando documento para liberar archivo...');
+            closeDocument();
+
             console.log(`[ContextMenu] Eliminando archivo: ${doc.path}`);
 
             const result = await callParentAPI('delete-document', {
@@ -319,7 +322,7 @@ async function deleteDocument() {
                 await loadDocuments(currentFolderPath);
             } else {
                 console.error('[ContextMenu] Error en respuesta:', result.error);
-                
+
                 // Manejo específico para error EPERM (archivo en uso)
                 if (result.code === 'EPERM') {
                     showToast(

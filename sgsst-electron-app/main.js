@@ -4259,6 +4259,13 @@ ipcMain.handle('upload-document', async (event, payload) => {
 // ===============================
 // Manejador para eliminar documentos
 // ===============================
+// Helper function: Sleep
+// ===============================
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ===============================
 ipcMain.handle('delete-document', async (event, filePath) => {
   sendLog(`[MAIN][delete-document] Solicitud para eliminar archivo: ${filePath}`, 'INFO');
 
@@ -4285,24 +4292,98 @@ ipcMain.handle('delete-document', async (event, filePath) => {
     // 4. Verificar que es un archivo (no carpeta)
     const stats = await fsp.stat(normalizedPath);
     sendLog(`[MAIN][delete-document] Stats del archivo: isFile=${stats.isFile()}, size=${stats.size} bytes`, 'DEBUG');
-    
+
     if (!stats.isFile()) {
       sendLog(`[MAIN][delete-document] Error: No es un archivo`, 'ERROR');
       throw new Error('La ruta no corresponde a un archivo');
     }
 
-    // 5. Eliminar archivo
-    sendLog(`[MAIN][delete-document] Ejecutando fsp.unlink...`, 'INFO');
-    await fsp.unlink(normalizedPath);
-    sendLog(`[MAIN][delete-document] fsp.unlink completado`, 'INFO');
+    // 5. Eliminar archivo - Estrategia múltiple para Google Drive
+    
+    // === ESTRATEGIA 1: Mover a papelera (CORREGIDO) ===
+    sendLog(`[MAIN][delete-document] Intentando mover a papelera (shell.trashItem)...`, 'INFO');
 
-    // 6. Verificar que se eliminó
-    const stillExists = await fsp.access(normalizedPath).then(() => true).catch(() => false);
-    sendLog(`[MAIN][delete-document] Archivo después de eliminar: ${stillExists}`, 'DEBUG');
+    try {
+      await shell.trashItem(normalizedPath);  // ✅ Método correcto Electron 10+
 
-    if (stillExists) {
-      sendLog(`[MAIN][delete-document] ERROR: El archivo sigue existiendo después de unlink`, 'ERROR');
-      throw new Error('No se pudo eliminar el archivo');
+      // Verificar que se movió
+      const stillExists = await fsp.access(normalizedPath).then(() => true).catch(() => false);
+
+      if (!stillExists) {
+        sendLog(`[MAIN][delete-document] Archivo movido a papelera exitosamente`, 'INFO');
+        return {
+          success: true,
+          message: 'Archivo eliminado correctamente'
+        };
+      }
+
+      sendLog(`[MAIN][delete-document] Archivo sigue existiendo después de trashItem`, 'WARN');
+    } catch (trashError) {
+      sendLog(`[MAIN][delete-document] Error al mover a papelera: ${trashError.message}`, 'WARN');
+    }
+
+    // === ESTRATEGIA 2: Liberar handles de Windows (solo Windows) ===
+    if (process.platform === 'win32') {
+      sendLog(`[MAIN][delete-document] Intentando liberar handles de Windows...`, 'DEBUG');
+      try {
+        // Abrir y cerrar para intentar liberar locks
+        const handle = await fsp.open(normalizedPath, 'r');
+        await fsp.close(handle);
+        await sleep(500); // Pequeña pausa para liberar
+      } catch (e) {
+        sendLog(`[MAIN][delete-document] No se pudo liberar handles: ${e.message}`, 'DEBUG');
+      }
+    }
+
+    // === ESTRATEGIA 3: Eliminación forzada con reintentos mejorados ===
+    // Detectar tipo de archivo para ajustar estrategia
+    const fileExt = path.extname(normalizedPath).toLowerCase();
+    const isExcel = fileExt === '.xlsx' || fileExt === '.xls';
+    const isLargeFile = stats.size > 1024 * 1024; // > 1MB
+    
+    // Configurar reintentos basados en tipo de archivo
+    const maxRetries = isExcel || isLargeFile ? 15 : 10;  // 15 para Excel/grandes, 10 para otros
+    const delay = isExcel ? 3000 : 2000;  // 3s para Excel, 2s para otros
+    
+    sendLog(`[MAIN][delete-document] Intentando eliminación forzada (${maxRetries} intentos, ${delay}ms delay)...`, 'INFO');
+    sendLog(`[MAIN][delete-document] Tipo: ${fileExt}, Tamaño: ${stats.size} bytes, Es Excel: ${isExcel}`, 'DEBUG');
+
+    let deleted = false;
+
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        await fsp.unlink(normalizedPath);
+        await sleep(delay);
+
+        const stillExists = await fsp.access(normalizedPath).then(() => true).catch(() => false);
+
+        if (!stillExists) {
+          deleted = true;
+          sendLog(`[MAIN][delete-document] Archivo eliminado en intento ${i + 1}/${maxRetries}`, 'INFO');
+          break;
+        }
+
+        sendLog(`[MAIN][delete-document] Reintento ${i + 1}/${maxRetries} - archivo aún existe`, 'WARN');
+      } catch (retryError) {
+        // Si el error es ENOENT, el archivo ya no existe (éxito)
+        if (retryError.code === 'ENOENT') {
+          deleted = true;
+          break;
+        }
+        // Otros errores, lanzar
+        throw retryError;
+      }
+    }
+
+    if (!deleted) {
+      sendLog(`[MAIN][delete-document] ERROR: El archivo sigue existiendo después de ${maxRetries} intentos`, 'ERROR');
+      
+      // Mensaje específico para Excel
+      if (isExcel) {
+        throw new Error('Google Drive tiene el archivo Excel bloqueado. Cierra Excel y Google Drive, luego intenta nuevamente.');
+      }
+      
+      throw new Error('Google Drive tiene el archivo bloqueado. Cierra Google Drive temporalmente e intenta nuevamente.');
     }
 
     sendLog(`[MAIN][delete-document] Archivo eliminado exitosamente: ${normalizedPath}`, 'INFO');
@@ -4314,11 +4395,11 @@ ipcMain.handle('delete-document', async (event, filePath) => {
 
   } catch (error) {
     sendLog(`[MAIN][delete-document] Error al eliminar archivo: ${error.message}`, 'ERROR');
-    
+
     // Manejo específico para error EPERM (archivo en uso)
     let userMessage = error.message;
     let errorCode = error.code || 'UNKNOWN';
-    
+
     if (error.code === 'EPERM') {
       userMessage = 'El archivo está abierto en otra aplicación. Ciérralo e intenta nuevamente.';
       sendLog(`[MAIN][delete-document] Archivo está en uso o bloqueado (EPERM)`, 'WARN');
@@ -4328,8 +4409,12 @@ ipcMain.handle('delete-document', async (event, filePath) => {
     } else if (error.code === 'EACCES') {
       userMessage = 'No tienes permisos para eliminar este archivo.';
       sendLog(`[MAIN][delete-document] Sin permisos (EACCES)`, 'WARN');
+    } else if (error.message.includes('Google Drive')) {
+      // Error personalizado para Google Drive
+      errorCode = 'GDRIVE_LOCK';
+      sendLog(`[MAIN][delete-document] Google Drive bloqueó la eliminación`, 'WARN');
     }
-    
+
     return {
       success: false,
       error: userMessage,

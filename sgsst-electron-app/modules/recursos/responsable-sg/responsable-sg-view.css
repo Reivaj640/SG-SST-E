@@ -345,7 +345,7 @@ iframe.pdf-viewer, iframe.excel-viewer {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(23, 78, 166, 0.92);
+    background: rgba(90, 136, 211, 0.75);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -359,26 +359,26 @@ iframe.pdf-viewer, iframe.excel-viewer {
 .drag-drop-content {
     text-align: center;
     color: white;
-    padding: 2rem;
+    padding: 0.75rem;
 }
 
 .drag-drop-content i {
-    font-size: 3rem;
-    margin-bottom: 1rem;
+    font-size: 1rem;
+    margin-bottom: 0.55rem;
     color: white;
-    animation: bounce 1s infinite;
+    animation: pulse 1.5s ease-in-out infinite;
 }
 
 .drag-drop-content h3 {
-    font-size: 1.25rem;
+    font-size: 0.75rem;
     font-weight: 600;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.4rem;
     color: white;
 }
 
 .drag-drop-content p {
-    font-size: 0.875rem;
-    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.55rem;
+    color: rgba(255, 255, 255, 0.85);
     margin: 0;
 }
 
@@ -388,9 +388,16 @@ iframe.pdf-viewer, iframe.excel-viewer {
     border: 2px dashed var(--primary);
 }
 
-@keyframes bounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-10px); }
+/* Animación pulse (más suave que bounce) */
+@keyframes pulse {
+    0%, 100% { 
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% { 
+        transform: scale(1.1);
+        opacity: 0.85;
+    }
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━

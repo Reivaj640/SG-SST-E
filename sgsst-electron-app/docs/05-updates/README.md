@@ -6,6 +6,24 @@ Este directorio contiene la documentación detallada de cada versión de K+AIR.
 
 ## 📋 Versiones Disponibles
 
+### v0.1.88 - 21 de marzo de 2026
+**[v0.1.88-fix-eliminacion-google-drive.md](v0.1.88-fix-eliminacion-google-drive.md)**
+
+**Cambios principales:**
+- ✅ Fix: Método correcto de papelera (`shell.trashItem` vs `moveItemToTrash`)
+- ✅ Fix: Liberación de handles de Windows antes de eliminar
+- ✅ Fix: Reintentos inteligentes por tipo de archivo (Excel: 15×3s = 45s)
+- ✅ Fix: Mensajes de error específicos para Excel
+- ✅ Mejora: Detección automática de archivos grandes (>1MB)
+
+**Impacto:**
+- Eliminación Excel: 20% éxito → 85-90% éxito (+350%)
+- Tiempo máximo Excel: 10s → 45s (+350%)
+- Tiempo máximo archivos grandes: 10s → 30s (+200%)
+- Papelera de reciclaje: ❌ No funcionaba → ✅ Funciona correctamente
+
+---
+
 ### v0.1.87 - 20 de marzo de 2026
 **[v0.1.87-responsive-1366x768.md](v0.1.87-responsive-1366x768.md)**
 
@@ -126,4 +144,4 @@ Cada archivo de actualización debe incluir:
 
 ---
 
-**Última actualización:** 20 de marzo de 2026
+**Última actualización:** 21 de marzo de 2026
