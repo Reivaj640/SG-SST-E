@@ -1510,6 +1510,170 @@ function setAuthUIState(isAuthenticated) {
   });
 }
 
+// --- Funciones de Transición Login → Interfaz ---
+
+/**
+ * Espera un tiempo determinado
+ */
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Crea el overlay de transición
+ */
+function createTransitionOverlay() {
+  const overlay = document.createElement('div');
+  overlay.id = 'kair-transition-overlay';
+  overlay.className = 'kair-transition-overlay kair-transition-hidden';
+  overlay.innerHTML = `
+    <!-- Ondas -->
+    <div class="kair-transition-ripple"></div>
+    <div class="kair-transition-ripple"></div>
+    <div class="kair-transition-ripple"></div>
+
+    <!-- Logo -->
+    <div class="kair-transition-logo-container">
+      <div class="kair-transition-logo">
+        <div class="kair-transition-logo-icon">K+</div>
+        <div class="kair-transition-logo-text">
+          <span class="kair-transition-logo-brand">K+AIR</span>
+          <span class="kair-transition-logo-tagline">SG-SST Colombia</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Spinner -->
+    <div class="kair-transition-spinner-container" id="transition-spinner">
+      <div class="kair-transition-spinner"></div>
+      <div class="kair-transition-spinner-inner"></div>
+    </div>
+
+    <!-- Mensajes -->
+    <div class="kair-transition-message" id="transition-message">
+      Verificando credenciales<span class="kair-transition-dots"><span></span><span></span><span></span></span>
+    </div>
+    <div class="kair-transition-submessage" id="transition-submessage">
+      Preparando tu espacio de trabajo
+    </div>
+
+    <!-- Progreso -->
+    <div class="kair-transition-progress-container">
+      <div class="kair-transition-progress-bar" id="transition-progress-bar"></div>
+    </div>
+
+    <!-- Éxito -->
+    <div class="kair-transition-success" id="transition-success">
+      <svg class="kair-transition-success-icon" viewBox="0 0 52 52">
+        <circle class="kair-transition-success-circle" cx="26" cy="26" r="25"/>
+        <path class="kair-transition-success-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+      </svg>
+      <div class="kair-transition-welcome">¡Bienvenido!</div>
+      <div class="kair-transition-welcome-user" id="transition-welcome-user">Usuario</div>
+    </div>
+  `;
+  return overlay;
+}
+
+/**
+ * Actualiza el mensaje de transición
+ */
+function updateTransitionMessage(main, sub) {
+  const messageEl = document.getElementById('transition-message');
+  const submessageEl = document.getElementById('transition-submessage');
+  if (messageEl) {
+    messageEl.innerHTML = `${main}<span class="kair-transition-dots"><span></span><span></span><span></span></span>`;
+  }
+  if (submessageEl) {
+    submessageEl.textContent = sub;
+  }
+}
+
+/**
+ * Ejecuta la transición completa después del login exitoso
+ */
+async function executeLoginTransition(userName) {
+  console.log('🚀 Iniciando transición de login...');
+
+  const authScreen = document.querySelector('.kair-auth-screen');
+  const overlay = createTransitionOverlay();
+  document.body.appendChild(overlay);
+
+  // Forzar reflow
+  overlay.offsetHeight;
+
+  // 1. Fade out del login
+  if (authScreen) {
+    authScreen.style.transition = 'opacity 0.5s ease, transform 0.5s ease, filter 0.5s ease';
+    authScreen.style.opacity = '0';
+    authScreen.style.transform = 'translateY(-40px) scale(0.95)';
+    authScreen.style.filter = 'blur(4px)';
+  }
+  await wait(500);
+
+  // 2. Ocultar login y mostrar overlay
+  if (authScreen) {
+    authScreen.style.display = 'none';
+  }
+  overlay.classList.remove('kair-transition-hidden');
+  await wait(300);
+
+  // 3. Secuencia de mensajes
+  updateTransitionMessage('Verificando credenciales', 'Validando permisos...');
+  document.getElementById('transition-progress-bar').style.width = '25%';
+  await wait(600);
+
+  updateTransitionMessage('Cargando configuración', 'Sincronizando datos...');
+  document.getElementById('transition-progress-bar').style.width = '50%';
+  await wait(500);
+
+  updateTransitionMessage('Preparando interfaz', 'Cargando módulos...');
+  document.getElementById('transition-progress-bar').style.width = '75%';
+  await wait(500);
+
+  updateTransitionMessage('Completando', 'Verificando permisos...');
+  document.getElementById('transition-progress-bar').style.width = '95%';
+  await wait(400);
+
+  // 4. Mostrar éxito
+  document.getElementById('transition-progress-bar').style.width = '100%';
+  await wait(200);
+
+  // Ocultar spinner y mensajes
+  const spinner = document.getElementById('transition-spinner');
+  const progressContainer = document.querySelector('.kair-transition-progress-container');
+  const message = document.getElementById('transition-message');
+  const submessage = document.getElementById('transition-submessage');
+
+  if (spinner) spinner.style.display = 'none';
+  if (progressContainer) progressContainer.style.display = 'none';
+  if (message) message.style.display = 'none';
+  if (submessage) submessage.style.display = 'none';
+
+  // Mostrar check de éxito
+  const welcomeUser = document.getElementById('transition-welcome-user');
+  if (welcomeUser) {
+    welcomeUser.textContent = userName || 'Usuario';
+  }
+  const successContainer = document.getElementById('transition-success');
+  if (successContainer) {
+    successContainer.classList.add('visible');
+  }
+
+  await wait(1200);
+
+  // 5. Fade out del overlay
+  overlay.classList.add('kair-transition-exiting');
+  await wait(400);
+
+  // 6. Limpiar overlay
+  overlay.remove();
+
+  console.log('✅ Transición completada');
+}
+
+// --- Fin Funciones de Transición ---
+
 function renderLoginScreen(errorMessage = '') {
   currentCompany = null;
   currentModule = null;
@@ -1591,11 +1755,11 @@ function renderLoginScreen(errorMessage = '') {
 
     try {
       button.classList.add('kair-auth-button-loading');
-      
+
       const result = await window.electronAPI.authLoginV1({ email, password });
-      
+
       button.classList.remove('kair-auth-button-loading');
-      
+
       if (!result || !result.success) {
         const msg = result?.error?.message || 'Credenciales inválidas.';
         errorDiv.textContent = msg;
@@ -1605,6 +1769,7 @@ function renderLoginScreen(errorMessage = '') {
         return;
       }
 
+      // Login exitoso - ejecutar transición
       authToken = result.data.token;
       currentUser = result.data.user;
       assignedCompanies = (result.data.companies || []).map(c => c.company_key || c.company_name || c.company_key);
@@ -1615,6 +1780,13 @@ function renderLoginScreen(errorMessage = '') {
       });
       localStorage.setItem(AUTH_TOKEN_KEY, authToken);
 
+      // Extraer nombre del usuario para la transición
+      const userName = email.split('@')[0].split('.')[0].charAt(0).toUpperCase() + email.split('@')[0].split('.')[0].slice(1);
+
+      // Ejecutar transición visual
+      await executeLoginTransition(userName);
+
+      // Continuar con la inicialización normal
       await window.electronAPI.companiesSyncV1({ token: authToken });
       initializeApp(assignedCompanies);
     } catch (err) {
@@ -1633,7 +1805,7 @@ function renderLoginScreen(errorMessage = '') {
     emailInput.classList.remove('kair-auth-input-error');
     passwordInput.classList.remove('kair-auth-input-error');
   });
-  
+
   passwordInput.addEventListener('input', () => {
     errorDiv.classList.remove('kair-auth-error-visible');
     emailInput.classList.remove('kair-auth-input-error');

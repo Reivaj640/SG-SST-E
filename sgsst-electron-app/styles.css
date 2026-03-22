@@ -4047,3 +4047,356 @@ select.form-control {
     max-height: calc(100vh - 200px);
   }
 }
+
+/* ============================================================================
+   TRANSICIÓN LOGIN → INTERFAZ PRINCIPAL
+   ============================================================================ */
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   KEYFRAMES - TRANSICIÓN
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+@keyframes kair-login-exit {
+  0% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+  100% { opacity: 0; transform: translateY(-40px) scale(0.95); filter: blur(4px); }
+}
+
+@keyframes kair-transition-enter {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes kair-transition-logo-pulse {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 transparent); }
+  50% { transform: scale(1.03); filter: drop-shadow(0 0 25px rgba(23, 78, 166, 0.4)); }
+}
+
+@keyframes kair-transition-spinner {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes kair-transition-dots {
+  0%, 20% { opacity: 0; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-5px); }
+  60%, 100% { opacity: 0; transform: translateY(0); }
+}
+
+@keyframes kair-transition-progress {
+  0% { width: 0%; }
+  100% { width: 100%; }
+}
+
+@keyframes kair-transition-ripple {
+  0% { transform: scale(0); opacity: 0.6; }
+  100% { transform: scale(4); opacity: 0; }
+}
+
+@keyframes kair-transition-success-circle {
+  0% { stroke-dashoffset: 166; }
+  100% { stroke-dashoffset: 0; }
+}
+
+@keyframes kair-transition-success-check {
+  0% { stroke-dashoffset: 50; }
+  100% { stroke-dashoffset: 0; }
+}
+
+@keyframes kair-interface-enter {
+  0% { opacity: 0; transform: scale(0.98); filter: blur(2px); }
+  100% { opacity: 1; transform: scale(1); filter: blur(0); }
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   OVERLAY DE TRANSICIÓN
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+.kair-transition-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e8f0fe 50%, #f0f4f8 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  opacity: 0;
+  animation: kair-transition-enter 0.3s ease forwards;
+}
+
+[data-theme="dark"] .kair-transition-overlay {
+  background: linear-gradient(135deg, #1a202c 0%, #1e2a3a 50%, #1a2535 100%);
+}
+
+.kair-transition-overlay.kair-transition-exiting {
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+
+.kair-transition-overlay.kair-transition-hidden {
+  display: none;
+}
+
+/* Ondas */
+.kair-transition-ripple {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  border: 2px solid rgba(23, 78, 166, 0.15);
+  border-radius: 50%;
+  animation: kair-transition-ripple 3s ease-out infinite;
+}
+
+.kair-transition-ripple:nth-child(1) { animation-delay: 0s; }
+.kair-transition-ripple:nth-child(2) { animation-delay: 1s; }
+.kair-transition-ripple:nth-child(3) { animation-delay: 2s; }
+
+[data-theme="dark"] .kair-transition-ripple {
+  border-color: rgba(77, 166, 255, 0.15);
+}
+
+/* Logo de transición */
+.kair-transition-logo-container {
+  position: relative;
+  margin-bottom: 2rem;
+}
+
+.kair-transition-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: kair-transition-logo-pulse 2.5s ease-in-out infinite;
+}
+
+.kair-transition-logo-icon {
+  width: 90px;
+  height: 90px;
+  background: linear-gradient(135deg, #174ea6, #185abd);
+  border-radius: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 42px;
+  font-weight: bold;
+  box-shadow: 0 15px 40px rgba(23, 78, 166, 0.35);
+}
+
+[data-theme="dark"] .kair-transition-logo-icon {
+  background: linear-gradient(135deg, #4da6ff, #66b3ff);
+  box-shadow: 0 15px 40px rgba(77, 166, 255, 0.35);
+}
+
+.kair-transition-logo-text {
+  display: flex;
+  flex-direction: column;
+  margin-left: 16px;
+}
+
+.kair-transition-logo-brand {
+  font-size: 2.8rem;
+  font-weight: 700;
+  color: #174ea6;
+  letter-spacing: -1px;
+  line-height: 1;
+}
+
+[data-theme="dark"] .kair-transition-logo-brand {
+  color: #4da6ff;
+}
+
+.kair-transition-logo-tagline {
+  font-size: 0.8rem;
+  color: #6c757d;
+  letter-spacing: 1px;
+  margin-top: 4px;
+}
+
+/* Spinner */
+.kair-transition-spinner-container {
+  position: relative;
+  width: 55px;
+  height: 55px;
+  margin-bottom: 1.5rem;
+}
+
+.kair-transition-spinner {
+  width: 55px;
+  height: 55px;
+  border: 3px solid rgba(23, 78, 166, 0.1);
+  border-top-color: #174ea6;
+  border-radius: 50%;
+  animation: kair-transition-spinner 1s linear infinite;
+}
+
+.kair-transition-spinner-inner {
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  width: 41px;
+  height: 41px;
+  border: 3px solid transparent;
+  border-bottom-color: rgba(23, 78, 166, 0.25);
+  border-radius: 50%;
+  animation: kair-transition-spinner 1.5s linear infinite reverse;
+}
+
+[data-theme="dark"] .kair-transition-spinner {
+  border-color: rgba(77, 166, 255, 0.1);
+  border-top-color: #4da6ff;
+}
+
+[data-theme="dark"] .kair-transition-spinner-inner {
+  border-bottom-color: rgba(77, 166, 255, 0.25);
+}
+
+/* Mensajes */
+.kair-transition-message {
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: #174ea6;
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+
+[data-theme="dark"] .kair-transition-message {
+  color: #4da6ff;
+}
+
+.kair-transition-submessage {
+  font-size: 0.85rem;
+  color: #6c757d;
+  text-align: center;
+  margin-bottom: 1.2rem;
+}
+
+.kair-transition-dots {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 2px;
+}
+
+.kair-transition-dots span {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  background: #174ea6;
+  border-radius: 50%;
+  animation: kair-transition-dots 1.4s ease-in-out infinite;
+}
+
+[data-theme="dark"] .kair-transition-dots span {
+  background: #4da6ff;
+}
+
+.kair-transition-dots span:nth-child(1) { animation-delay: 0s; }
+.kair-transition-dots span:nth-child(2) { animation-delay: 0.2s; }
+.kair-transition-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+/* Progreso */
+.kair-transition-progress-container {
+  width: 180px;
+  height: 4px;
+  background: rgba(23, 78, 166, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+[data-theme="dark"] .kair-transition-progress-container {
+  background: rgba(77, 166, 255, 0.1);
+}
+
+.kair-transition-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #174ea6, #185abd);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+[data-theme="dark"] .kair-transition-progress-bar {
+  background: linear-gradient(90deg, #4da6ff, #66b3ff);
+}
+
+/* Éxito */
+.kair-transition-success {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.kair-transition-success.visible {
+  display: flex;
+}
+
+.kair-transition-success-icon {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 1rem;
+}
+
+.kair-transition-success-circle {
+  stroke: #28a745;
+  stroke-width: 3;
+  fill: none;
+  stroke-dasharray: 166;
+  stroke-dashoffset: 166;
+  animation: kair-transition-success-circle 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+}
+
+.kair-transition-success-check {
+  stroke: #28a745;
+  stroke-width: 3;
+  fill: none;
+  stroke-dasharray: 50;
+  stroke-dashoffset: 50;
+  animation: kair-transition-success-check 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.5s forwards;
+}
+
+.kair-transition-welcome {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #174ea6;
+  margin-bottom: 0.25rem;
+}
+
+[data-theme="dark"] .kair-transition-welcome {
+  color: #4da6ff;
+}
+
+.kair-transition-welcome-user {
+  font-size: 1rem;
+  color: #6c757d;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   ACCESIBILIDAD - prefers-reduced-motion
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+@media (prefers-reduced-motion: reduce) {
+  .kair-auth-screen,
+  .kair-auth-card,
+  .kair-auth-title,
+  .kair-auth-subtitle,
+  .kair-auth-form-group,
+  .kair-auth-button,
+  .kair-auth-hint {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  
+  .kair-transition-overlay,
+  .kair-transition-logo,
+  .kair-transition-spinner,
+  .kair-transition-dots,
+  .kair-transition-ripple {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+}

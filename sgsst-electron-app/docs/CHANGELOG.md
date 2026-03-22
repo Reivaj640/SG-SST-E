@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.90] - 2026-03-21
+
+### Added
+- **🎬 Transición Animada Login → Interfaz** 🆕
+  - **Overlay de transición** con logo animado, spinner doble y ondas
+  - **Mensajes dinámicos** con dots animados ("Verificando credenciales...", "Cargando configuración...", etc.)
+  - **Barra de progreso** lineal con animación suave
+  - **Check de éxito** SVG animado al completar
+  - **Nombre del usuario** personalizado en la bienvenida
+  - **Secuencia completa** de ~4.2 segundos con 8 fases animadas
+
+### Changed
+- **styles.css** - Sección TRANSICIÓN agregada (~350 líneas):
+  - Keyframes: `kair-login-exit`, `kair-transition-enter`, `kair-transition-logo-pulse`, `kair-transition-spinner`, `kair-transition-dots`, `kair-transition-progress`, `kair-transition-ripple`, `kair-transition-success-circle`, `kair-transition-success-check`, `kair-interface-enter`
+  - Clases: `.kair-transition-overlay`, `.kair-transition-logo`, `.kair-transition-spinner`, `.kair-transition-message`, `.kair-transition-progress-bar`, `.kair-transition-success`
+  
+- **renderer.js** - Funciones de transición agregadas:
+  - `wait(ms)` - Utilidad para delays
+  - `createTransitionOverlay()` - Crea overlay dinámicamente
+  - `updateTransitionMessage(main, sub)` - Actualiza mensajes
+  - `executeLoginTransition(userName)` - Ejecuta secuencia completa
+  - `renderLoginScreen()` - Integrada con transición después de login exitoso
+
+### Technical Details
+- **Archivos modificados:**
+  - `styles.css` - Líneas 4050-4403 (sección TRANSICIÓN)
+  - `renderer.js` - Líneas 1514-1812 (funciones de transición)
+- **Tiempos de animación:**
+  - Login exit: 0.5s
+  - Overlay enter: 0.3s
+  - Loading sequence: ~2.0s (4 mensajes)
+  - Success: 1.2s
+  - Overlay exit: 0.4s
+  - **Total:** ~4.4 segundos
+
+### Impacto
+- **UX:** Mejora significativa en percepción de calidad y profesionalismo
+- **Backend:** Sin cambios (mismo contrato `auth-login-v1`)
+- **Temas:** Compatible con claro, oscuro (system), oscuro (legacy)
+- **Accesibilidad:** Respeta `prefers-reduced-motion`
+
+### Breaking Changes
+- **Ninguno** - Cambios 100% visuales, backend sin cambios
+
+### Migration Notes
+- **Para usuarios finales:** Reiniciar aplicación para ver cambios
+- **Para desarrolladores:** 
+  - Funciones de transición están en renderer.js (líneas ~1514-1660)
+  - CSS de transición está en styles.css (líneas ~4050-4403)
+  - No se requiere acción adicional
+
+---
+
 ## [0.1.89] - 2026-03-21
 
 ### Added
