@@ -3405,40 +3405,169 @@ select.form-control {
 .toast-warning .toast-icon { background: linear-gradient(135deg, #ffc107, #e0a800) !important; }
 
 /* ============================================================================
-   AUTH (Login / Selector)
+   AUTH (Login / Selector) - MEJORADO CON ANIMACIONES
    ============================================================================ */
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   KEYFRAMES
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+@keyframes kair-auth-card-enter {
+  0% { opacity: 0; transform: translateY(30px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes kair-auth-fade-in {
+  0% { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes kair-auth-button-shine {
+  0% { left: -100%; opacity: 0; }
+  50% { opacity: 0.4; }
+  100% { left: 100%; opacity: 0; }
+}
+
+@keyframes kair-auth-shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-6px); }
+  20%, 40%, 60%, 80% { transform: translateX(6px); }
+}
+
+@keyframes kair-auth-logo-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
+@keyframes kair-auth-title-glow {
+  0%, 100% { text-shadow: 0 0 0 transparent; }
+  50% { text-shadow: 0 0 20px rgba(23, 78, 166, 0.3); }
+}
+
+@keyframes kair-auth-spinner {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   PANTALLA DE LOGIN
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
 .kair-auth-screen {
     width: 100%;
     height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #f8f9fa;
     font-family: 'Segoe UI', 'Roboto', sans-serif;
+    position: relative;
+    overflow: hidden;
+    background: #f8f9fa;
 }
+
+[data-theme="dark"] .kair-auth-screen {
+    background: #1a202c;
+}
+
+[data-theme="dark-legacy"] .kair-auth-screen {
+    background: #121212;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   TARJETA DE LOGIN
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 
 .kair-auth-card {
     width: 100%;
-    max-width: 420px;
-    background: #ffffff;
-    border: 1px solid #dee2e6;
-    border-radius: 0.375rem;
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.08);
-    padding: 2rem;
+    max-width: 340px;
+    background: var(--widget-bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.08), 0 0.25rem 0.5rem rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(23, 78, 166, 0.05);
+    padding: 1.75rem;
+    position: relative;
+    z-index: 10;
+    animation: kair-auth-card-enter 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
 }
 
-.kair-auth-title {
-    font-size: 1.25rem;
+.kair-auth-card:hover {
+    box-shadow: 0 1rem 2rem rgba(0, 0, 0, 0.12), 0 0.5rem 1rem rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(23, 78, 166, 0.1);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   LOGO
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+.kair-auth-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.75rem;
+    animation: kair-auth-logo-pulse 4s ease-in-out infinite;
+}
+
+.kair-auth-logo-icon {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, #174ea6, #185abd);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 18px;
+    font-weight: bold;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.kair-auth-logo-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.kair-auth-logo-brand {
+    font-size: 1.35rem;
     font-weight: 700;
-    color: #174ea6;
+    color: var(--primary-color);
+    letter-spacing: -0.5px;
+}
+
+.kair-auth-logo-tagline {
+    font-size: 0.6rem;
+    color: var(--text-light-color);
+    letter-spacing: 0.5px;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   TÍTULOS
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+.kair-auth-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--primary-color);
     margin-bottom: 0.25rem;
+    text-align: center;
+    opacity: 0;
+    animation: kair-auth-fade-in 0.5s ease forwards, kair-auth-title-glow 3s ease-in-out infinite;
+    animation-delay: 0.15s, 0.15s;
 }
 
 .kair-auth-subtitle {
-    font-size: 0.9rem;
-    color: #6c757d;
-    margin-bottom: 1.5rem;
+    font-size: 0.7rem;
+    color: var(--text-light-color);
+    margin-bottom: 1.25rem;
+    text-align: center;
+    opacity: 0;
+    animation: kair-auth-fade-in 0.5s ease forwards;
+    animation-delay: 0.25s;
 }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   FORMULARIO
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 
 .kair-auth-form {
     display: flex;
@@ -3446,56 +3575,240 @@ select.form-control {
     gap: 0.75rem;
 }
 
+.kair-auth-form-group {
+    position: relative;
+    opacity: 0;
+    animation: kair-auth-fade-in 0.5s ease forwards;
+}
+
+.kair-auth-form-group:nth-child(1) { animation-delay: 0.35s; }
+.kair-auth-form-group:nth-child(2) { animation-delay: 0.45s; }
+
 .kair-auth-label {
-    font-size: 0.75rem;
+    display: block;
+    font-size: 0.6rem;
     font-weight: 700;
-    color: #6c757d;
+    color: var(--text-light-color);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.6px;
+    margin-bottom: 0.3rem;
+    transition: color 0.2s ease;
+}
+
+.kair-auth-form-group:focus-within .kair-auth-label {
+    color: var(--primary-color);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   INPUTS
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+.kair-auth-input-wrapper {
+    position: relative;
+}
+
+.kair-auth-input-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-lighter-color);
+    font-size: 1rem;
+    pointer-events: none;
+    transition: color 0.2s ease;
 }
 
 .kair-auth-input {
-    height: 38px;
+    width: 100%;
+    height: 34px;
     padding: 0 0.75rem;
-    border: 1px solid #dee2e6;
-    border-radius: 0.375rem;
-    font-size: 0.9rem;
-    background: #ffffff;
-    color: #212529;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    font-size: 0.8rem;
+    background: var(--widget-bg-color);
+    color: var(--text-color);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+    font-family: inherit;
+}
+
+.kair-auth-input-with-icon {
+    padding-left: 40px;
+}
+
+.kair-auth-input::placeholder {
+    color: var(--text-lighter-color);
+    transition: color 0.2s ease;
 }
 
 .kair-auth-input:focus {
     outline: none;
-    border-color: #174ea6;
-    box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.15);
+    border-color: var(--primary-color);
+    background-color: #fafbff;
+    box-shadow: 0 0 0 4px rgba(23, 78, 166, 0.1), 0 2px 8px rgba(23, 78, 166, 0.1);
 }
 
+[data-theme="dark"] .kair-auth-input:focus {
+    background-color: rgba(77, 166, 255, 0.05);
+    box-shadow: 0 0 0 4px rgba(77, 166, 255, 0.1);
+}
+
+.kair-auth-input:hover:not(:focus) {
+    border-color: #b5c4d8;
+    background-color: #fafafa;
+}
+
+.kair-auth-input.kair-auth-input-error {
+    border-color: var(--danger-color);
+    animation: kair-auth-shake 0.5s ease;
+}
+
+.kair-auth-form-group:focus-within .kair-auth-input-icon {
+    color: var(--primary-color);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   BOTÓN
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
 .kair-auth-button {
+    width: 100%;
+    height: 34px;
     margin-top: 0.5rem;
-    height: 38px;
     border: none;
-    border-radius: 0.375rem;
-    background: #174ea6;
-    color: #ffffff;
+    border-radius: var(--border-radius-md);
+    background: var(--primary-color);
+    color: var(--white-color);
+    font-size: 0.8rem;
     font-weight: 600;
+    font-family: inherit;
     cursor: pointer;
-    transition: background 0.2s ease;
+    position: relative;
+    overflow: hidden;
+    opacity: 0;
+    animation: kair-auth-fade-in 0.5s ease forwards;
+    animation-delay: 0.55s;
+    transition: background-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.kair-auth-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
 }
 
 .kair-auth-button:hover {
-    background: #185abd;
+    background: var(--primary-hover-color);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(23, 78, 166, 0.3), 0 2px 6px rgba(23, 78, 166, 0.2);
 }
+
+.kair-auth-button:hover::before {
+    animation: kair-auth-button-shine 0.8s ease;
+}
+
+.kair-auth-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(23, 78, 166, 0.2);
+}
+
+.kair-auth-button:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.3), 0 4px 12px rgba(23, 78, 166, 0.2);
+}
+
+.kair-auth-button-loading {
+    pointer-events: none;
+    background: #6c8cb5 !important;
+}
+
+.kair-auth-button-loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: kair-auth-spinner 0.8s linear infinite;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   ERROR
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 
 .kair-auth-error {
-    min-height: 18px;
+    min-height: 20px;
     font-size: 0.8rem;
-    color: #dc3545;
+    color: var(--danger-color);
+    text-align: center;
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    margin-top: 0.25rem;
+    opacity: 0;
+    transform: translateY(-5px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
+.kair-auth-error-visible {
+    opacity: 1;
+    transform: translateY(0);
+    background-color: rgba(220, 53, 69, 0.08);
+    animation: kair-auth-shake 0.4s ease;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   HINT
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
 .kair-auth-hint {
-    margin-top: 1rem;
-    font-size: 0.8rem;
-    color: #6c757d;
+    margin-top: 0.75rem;
+    font-size: 0.65rem;
+    color: var(--text-light-color);
+    text-align: center;
+    opacity: 0;
+    animation: kair-auth-fade-in 0.5s ease forwards;
+    animation-delay: 0.65s;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   ACCESIBILIDAD - prefers-reduced-motion
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+@media (prefers-reduced-motion: reduce) {
+    .kair-auth-card, .kair-auth-title, .kair-auth-subtitle,
+    .kair-auth-form-group, .kair-auth-button, .kair-auth-hint {
+        animation: none;
+        opacity: 1;
+        transform: none;
+    }
+    .kair-auth-logo { animation: none; }
+    .kair-auth-title { animation: none; }
+    .kair-auth-button::before { display: none; }
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   RESPONSIVE
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+@media (max-width: 480px) {
+    .kair-auth-card {
+        margin: 0.5rem;
+        padding: 1.25rem;
+        max-width: 100%;
+    }
+    .kair-auth-title { font-size: 1rem; }
+    .kair-auth-logo { margin-bottom: 0.5rem; }
+    .kair-auth-logo-icon { width: 32px; height: 32px; font-size: 16px; margin-right: 6px; }
+    .kair-auth-logo-brand { font-size: 1.15rem; }
+    .kair-auth-input { height: 32px; font-size: 0.75rem; }
+    .kair-auth-button { height: 32px; font-size: 0.75rem; }
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━

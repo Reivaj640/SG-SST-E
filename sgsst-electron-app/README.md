@@ -1,6 +1,6 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.88
+**Versión:** 0.1.89
 **Última actualización:** 21 de marzo de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 

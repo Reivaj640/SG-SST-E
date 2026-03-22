@@ -1,7 +1,7 @@
 # K+AIR - Contexto del Proyecto
 
 **Última actualización:** 21 de marzo de 2026
-**Versión actual:** 0.1.88
+**Versión actual:** 0.1.89
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 
 ---
@@ -125,7 +125,7 @@ modules/
 
 ---
 
-## 📊 Estado Actual (v0.1.88)
+## 📊 Estado Actual (v0.1.89)
 
 ### ✅ Funcionalidades Operativas
 
@@ -143,6 +143,7 @@ modules/
 - [x] **Visualizador 1.1.1 Mejorado** - Drag & drop, menú contextual, eliminar, toast 🆕
 - [x] **Soporte Responsive** - Optimizado para 1366x768 y 1536x864 🆕
 - [x] **Espaciado Compacto en Módulo Recursos** - 75% menos espacio entre widgets y gráficas 🆕
+- [x] **Login Modernizado** - Animaciones, logo K+AIR, fondo Vanta.js, íconos en inputs 🆕
 
 ### ️ Limitaciones Temporales
 
@@ -151,6 +152,13 @@ modules/
   - **Re-habilitar:** Eliminar `!Lib/site-packages/torch/**` de package.json
 
 ### 🔧 Mejoras Recientes
+
+**v0.1.89 (21 de marzo de 2026):**
+1. **Feature: Login Modernizado** - Animaciones fade-in, stagger, logo K+AIR
+2. **Fondo Vanta.js** - Olas animadas con colores corporativos en login
+3. **Íconos en inputs** - Sobre (email) y candado (password) con Font Awesome
+4. **Micro-interacciones** - Hover, focus, shake, spinner de carga
+5. **Accesibilidad** - Respeta prefers-reduced-motion
 
 **v0.1.88 (21 de marzo de 2026):**
 1. **Fix: Espaciado Módulo Recursos** - Reducción de 75% en espacio entre widgets y gráficas

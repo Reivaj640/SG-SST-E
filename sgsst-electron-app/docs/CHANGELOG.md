@@ -5,6 +5,57 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.89] - 2026-03-21
+
+### Added
+- **🎨 Login Modernizado con Animaciones y Vanta.js** 🆕
+  - **Animaciones de entrada** - Fade-in + slide-up para tarjeta, stagger para elementos
+  - **Fondo Vanta.js** - Olas animadas que responden al mouse con colores corporativos
+  - **Logo K+AIR** - Ícono K+ en gradiente + tagline "Powered by GEST-IAR"
+  - **Íconos en inputs** - Sobre (email) y candado (password) con Font Awesome
+  - **Micro-interacciones** - Hover, focus, shake en errores, spinner de carga
+  - **Accesibilidad** - Respeta `prefers-reduced-motion`
+
+### Changed
+- **styles.css** - Sección AUTH completamente renovada (~400 líneas):
+  - Keyframes: `kair-auth-card-enter`, `kair-auth-fade-in`, `kair-auth-button-shine`, `kair-auth-shake`, `kair-auth-logo-pulse`, `kair-auth-title-glow`, `kair-auth-spinner`
+  - Selectores: `.kair-auth-logo`, `.kair-auth-logo-icon`, `.kair-auth-form-group`, `.kair-auth-input-wrapper`, `.kair-auth-input-icon`, `.kair-auth-button-loading`
+  
+- **renderer.js** - Función `renderLoginScreen()` renovada:
+  - HTML con logo y íconos en inputs
+  - Integración con Vanta.js para fondo animado
+  - Manejo de errores mejorado con feedback visual
+  - Listeners para limpiar errores al escribir
+
+- **renderer.js** - Función `initializeAuthFlow()` actualizada:
+  - Limpieza de efecto Vanta antes de renderizar login
+
+### Technical Details
+- **Archivos modificados:**
+  - `styles.css` - Líneas 3408-3811 (sección AUTH renovada)
+  - `renderer.js` - Líneas 1513-1650 (renderLoginScreen), 1660-1678 (initializeAuthFlow)
+- **Dependencias requeridas:**
+  - Font Awesome 6.5.0 (íconos)
+  - Vanta.js 0.5.24 (fondo animado)
+  - Three.js r134 (requerido por Vanta)
+
+### Impacto
+- **UX:** Mejora significativa en percepción visual de la aplicación
+- **Backend:** Sin cambios (mismo contrato `auth-login-v1`)
+- **Temas:** Compatible con claro, oscuro (system), oscuro (legacy)
+- **Responsive:** Compatible con 480px+
+
+### Breaking Changes
+- **Ninguno** - Cambios 100% visuales, backend sin cambios
+
+### Migration Notes
+- **Para usuarios finales:** Reiniciar aplicación para ver cambios
+- **Para desarrolladores:** 
+  - Font Awesome y Vanta.js ya están cargados en `index.html`
+  - No se requiere acción adicional
+
+---
+
 ## [0.1.88] - 2026-03-21
 
 ### Fixed

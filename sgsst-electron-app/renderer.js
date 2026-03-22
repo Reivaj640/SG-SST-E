@@ -1520,17 +1520,28 @@ function renderLoginScreen(errorMessage = '') {
 
   const authScreen = document.createElement('div');
   authScreen.className = 'kair-auth-screen';
+  authScreen.id = 'vanta-login-container';
   authScreen.innerHTML = `
     <div class="kair-auth-card">
       <div class="kair-auth-title">Ingreso a K+AIR</div>
       <div class="kair-auth-subtitle">Acceso seguro por usuario</div>
       <form id="kair-login-form" class="kair-auth-form">
-        <label class="kair-auth-label" for="kair-login-email">Correo</label>
-        <input id="kair-login-email" class="kair-auth-input" type="email" autocomplete="username" required />
-        <label class="kair-auth-label" for="kair-login-pass">Contraseña</label>
-        <input id="kair-login-pass" class="kair-auth-input" type="password" autocomplete="current-password" required />
+        <div class="kair-auth-form-group">
+          <label class="kair-auth-label" for="kair-login-email">Correo</label>
+          <div class="kair-auth-input-wrapper">
+            <i class="kair-auth-input-icon fas fa-envelope"></i>
+            <input id="kair-login-email" class="kair-auth-input kair-auth-input-with-icon" type="email" autocomplete="username" placeholder="ejemplo@empresa.com" required />
+          </div>
+        </div>
+        <div class="kair-auth-form-group">
+          <label class="kair-auth-label" for="kair-login-pass">Contraseña</label>
+          <div class="kair-auth-input-wrapper">
+            <i class="kair-auth-input-icon fas fa-lock"></i>
+            <input id="kair-login-pass" class="kair-auth-input kair-auth-input-with-icon" type="password" autocomplete="current-password" placeholder="••••••••" required />
+          </div>
+        </div>
         <div class="kair-auth-error" id="kair-login-error">${errorMessage || ''}</div>
-        <button class="kair-auth-button" type="submit">Ingresar</button>
+        <button class="kair-auth-button" type="submit" id="kair-login-button">Ingresar</button>
       </form>
       <div class="kair-auth-hint">Si no tienes acceso, contacta a administración.</div>
     </div>
@@ -1538,19 +1549,59 @@ function renderLoginScreen(errorMessage = '') {
 
   contentArea.appendChild(authScreen);
 
+  // Aplicar Vanta.js al fondo del login (mismos tonos que selección de empresa)
+  if (typeof VANTA !== 'undefined' && typeof VANTA.WAVES !== 'undefined') {
+    setTimeout(() => {
+      if (window.vantaEffect && typeof window.vantaEffect.destroy === 'function') {
+        window.vantaEffect.destroy();
+      }
+      window.vantaEffect = VANTA.WAVES({
+        el: '#vanta-login-container',
+        mouseControls: true,
+        touchControls: true,
+        gyroControls: false,
+        minHeight: 400,
+        minWidth: 400,
+        scale: 1.00,
+        scaleMobile: 1.00,
+        color: 0x6a7f9b,
+        shininess: 36.00,
+        waveHeight: 16.00,
+        waveSpeed: 1.20,
+        zoom: 0.68
+      });
+      console.log('Vanta.js aplicado al login correctamente');
+    }, 100);
+  }
+
   const form = document.getElementById('kair-login-form');
+  const button = document.getElementById('kair-login-button');
+  const errorDiv = document.getElementById('kair-login-error');
+  const emailInput = document.getElementById('kair-login-email');
+  const passwordInput = document.getElementById('kair-login-pass');
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const email = document.getElementById('kair-login-email').value.trim();
-    const password = document.getElementById('kair-login-pass').value;
-    const errorDiv = document.getElementById('kair-login-error');
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
     errorDiv.textContent = '';
+    errorDiv.classList.remove('kair-auth-error-visible');
+    emailInput.classList.remove('kair-auth-input-error');
+    passwordInput.classList.remove('kair-auth-input-error');
 
     try {
+      button.classList.add('kair-auth-button-loading');
+      
       const result = await window.electronAPI.authLoginV1({ email, password });
+      
+      button.classList.remove('kair-auth-button-loading');
+      
       if (!result || !result.success) {
         const msg = result?.error?.message || 'Credenciales inválidas.';
         errorDiv.textContent = msg;
+        errorDiv.classList.add('kair-auth-error-visible');
+        emailInput.classList.add('kair-auth-input-error');
+        passwordInput.classList.add('kair-auth-input-error');
         return;
       }
 
@@ -1567,9 +1618,26 @@ function renderLoginScreen(errorMessage = '') {
       await window.electronAPI.companiesSyncV1({ token: authToken });
       initializeApp(assignedCompanies);
     } catch (err) {
+      button.classList.remove('kair-auth-button-loading');
       errorDiv.textContent = 'Error al iniciar sesión.';
+      errorDiv.classList.add('kair-auth-error-visible');
+      emailInput.classList.add('kair-auth-input-error');
+      passwordInput.classList.add('kair-auth-input-error');
       console.error('Login error:', err);
     }
+  });
+
+  // Limpiar error al escribir
+  emailInput.addEventListener('input', () => {
+    errorDiv.classList.remove('kair-auth-error-visible');
+    emailInput.classList.remove('kair-auth-input-error');
+    passwordInput.classList.remove('kair-auth-input-error');
+  });
+  
+  passwordInput.addEventListener('input', () => {
+    errorDiv.classList.remove('kair-auth-error-visible');
+    emailInput.classList.remove('kair-auth-input-error');
+    passwordInput.classList.remove('kair-auth-input-error');
   });
 }
 
@@ -1589,6 +1657,17 @@ async function initializeAuthFlow() {
   assignedCompanies = [];
   companyRoleByKey = {};
   localStorage.removeItem(AUTH_TOKEN_KEY);
+  
+  // Destruir efecto Vanta existente si hay uno
+  if (window.vantaEffect && typeof window.vantaEffect.destroy === 'function') {
+    window.vantaEffect.destroy();
+    window.vantaEffect = null;
+  }
+  if (window.updateVantaEffect) {
+    window.removeEventListener('resize', window.updateVantaEffect);
+    window.updateVantaEffect = null;
+  }
+  
   renderLoginScreen();
 }
 
