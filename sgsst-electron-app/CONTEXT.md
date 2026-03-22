@@ -1,7 +1,7 @@
 # K+AIR - Contexto del Proyecto
 
-**Última actualización:** 20 de marzo de 2026
-**Versión actual:** 0.1.87
+**Última actualización:** 21 de marzo de 2026
+**Versión actual:** 0.1.88
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 
 ---
@@ -125,7 +125,7 @@ modules/
 
 ---
 
-## 📊 Estado Actual (v0.1.87)
+## 📊 Estado Actual (v0.1.88)
 
 ### ✅ Funcionalidades Operativas
 
@@ -142,14 +142,20 @@ modules/
 - [x] **Inducciones con Cumplimiento Normativo** - Cálculo real basado en nómina 🆕
 - [x] **Visualizador 1.1.1 Mejorado** - Drag & drop, menú contextual, eliminar, toast 🆕
 - [x] **Soporte Responsive** - Optimizado para 1366x768 y 1536x864 🆕
+- [x] **Espaciado Compacto en Módulo Recursos** - 75% menos espacio entre widgets y gráficas 🆕
 
-### ⚠️ Limitaciones Temporales
+### ️ Limitaciones Temporales
 
 - [ ] **IA/LLM deshabilitada** - torch excluido para reducir tamaño de build
   - **Razón:** Build de ~800 MB → ~450 MB, tiempo 15-25 min → 8-12 min
   - **Re-habilitar:** Eliminar `!Lib/site-packages/torch/**` de package.json
 
 ### 🔧 Mejoras Recientes
+
+**v0.1.88 (21 de marzo de 2026):**
+1. **Fix: Espaciado Módulo Recursos** - Reducción de 75% en espacio entre widgets y gráficas
+2. **Estilos globales anidados** - Solucionado conflicto con `!important` en styles.css
+3. **Selectores con especificidad** - Patrón implementado para evitar conflictos futuros
 
 **v0.1.87 (20 de marzo de 2026):**
 1. **Feature: Soporte Responsive** - Optimizado para 1366x768 y 1536x864

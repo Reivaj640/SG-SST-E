@@ -5,6 +5,72 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.88] - 2026-03-21
+
+### Fixed
+- **🎨 Módulo Recursos: Espaciado entre Widgets y Gráficas** 🆕
+  - **Problema:** Espacio excesivo (~6rem) entre estadísticas y gráficas
+  - **Causa raíz:** Estilos globales en `styles.css` con `!important` sobrescribían estilos locales
+  - **Solución:** Reglas CSS específicas con mayor especificidad para anular estilos globales
+
+### Changed
+- **modules/recursos/recursos-home.js** - Estilos actualizados:
+  - `.main-area { gap }` - 1.5rem → 1rem (espacio entre contenedores)
+  - `.charts-grid { gap }` - 1.5rem → 0.75rem (espacio interno entre gráficas)
+  - `.charts-grid { margin-bottom }` - 2rem → 0.5rem (margen inferior)
+  - `.chart-card { padding }` - 1.5rem → 0.75rem (padding interno de tarjetas)
+  - `.chart-title { margin-bottom }` - 1rem → 0.5rem (margen del título)
+
+### Added
+- **Estilos de anulación agregados** (con `!important` para prioridad):
+  ```css
+  .gestion-integral-home .widget {
+      margin-bottom: 0 !important;
+      padding: 1rem !important;
+  }
+  
+  .gestion-integral-home .widgets-container {
+      margin-bottom: 0 !important;
+      gap: 1rem;
+  }
+  
+  .gestion-integral-home .chart-card {
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+      padding: 0.75rem !important;
+  }
+  
+  .gestion-integral-home .charts-grid {
+      margin-top: 0 !important;
+  }
+  ```
+
+### Technical Details
+- **Archivos modificados:**
+  - `modules/recursos/recursos-home.js` - Líneas ~156-165, ~355-390 (inyección de estilos CSS)
+- **Estilos globales identificados como conflicto:**
+  - `styles.css` línea 1833-1839: `.widget { margin-bottom: 2.5rem !important; }`
+  - `styles.css` línea 1851-1855: `.chart-container { margin-top: 2.5rem !important; }`
+  - `development-styles.css` línea 718: `.widgets-container { margin-bottom: var(--spacer-lg); }`
+
+### Impacto
+- **Espacio visual total:** Reducido de ~6rem a ~1.5rem (75% menos espacio)
+- **Módulo afectado:** Solo Módulo Recursos (home)
+- **Otros módulos:** Sin cambios (0% impacto)
+- **UX:** Mejora significativa en densidad de información visible
+
+### Breaking Changes
+- **Ninguno** - Solo cambios visuales en módulo Recursos
+- **Compatibilidad:** Mantiene coherencia con sistema visual oficial K+AIR
+
+### Migration Notes
+- **Para usuarios finales:** Reiniciar aplicación para aplicar cambios
+- **Para desarrolladores:** 
+  - Al crear nuevos módulos, usar selectores con especificidad para evitar conflictos con estilos globales
+  - Ejemplo: `.gestion-integral-home .widget` en lugar de `.widget`
+
+---
+
 ## [0.1.87] - 2026-03-20
 
 ### Added

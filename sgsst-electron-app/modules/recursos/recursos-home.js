@@ -157,7 +157,7 @@ class RecursosHome {
             .main-area {
                 display: flex;
                 flex-direction: column;
-                gap: 1.5rem;
+                gap: 1rem;
                 overflow-y: auto;
                 padding-right: 0.5rem;
                 width: 100%;
@@ -360,20 +360,45 @@ class RecursosHome {
                 gap: 1.5rem;
             }
 
+            /* =========================================
+               ANULAR ESTILOS GLOBALES (styles.css)
+               Los estilos globales con !important están
+               causando espacio excesivo entre widgets y gráficas
+               ========================================= */
+            .gestion-integral-home .widget {
+                margin-bottom: 0 !important;
+                padding: 1rem !important;
+            }
+
+            .gestion-integral-home .widgets-container {
+                margin-bottom: 0 !important;
+                gap: 1rem;
+            }
+
+            .gestion-integral-home .chart-card {
+                margin-top: 0 !important;
+                margin-bottom: 0 !important;
+                padding: 0.75rem !important;
+            }
+
+            .gestion-integral-home .charts-grid {
+                margin-top: 0 !important;
+            }
+
             /* Layout Grid para los Gráficos - RESPONSIVE */
             .charts-grid {
                 display: grid;
                 grid-template-columns: 2fr 1fr; /* 2/3 para Presupuesto, 1/3 para los otros apilados */
                 grid-template-rows: auto auto;
-                gap: 1.5rem;
-                margin-bottom: 2rem;
+                gap: 0.75rem;
+                margin-bottom: 0.5rem;
             }
 
             .chart-card {
                 background: var(--k-bg-card);
                 border: 1px solid var(--k-border);
                 border-radius: var(--k-radius-lg);
-                padding: 1.5rem;
+                padding: 0.75rem;
                 box-shadow: var(--k-shadow-sm);
                 min-width: 0; /* Prevenir desbordamiento */
             }
@@ -383,7 +408,7 @@ class RecursosHome {
 
             .chart-title {
                 font-size: 1.1rem; font-weight: 600; color: var(--k-text-main);
-                margin-bottom: 1rem; display: flex; justify-content: space-between;
+                margin-bottom: 0.5rem; display: flex; justify-content: space-between;
             }
 
             /* Canvas Container - RESPONSIVE */
