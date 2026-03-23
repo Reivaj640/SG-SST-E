@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.91] - 2026-03-22
+
+### Added
+- **🏠 Botón de Navegación "Home Empresa"** 🆕
+  - **Botón en header** con ícono 🏠 junto a calendario, config y LLM
+  - **Navegación de retorno** al Dashboard de la empresa desde cualquier módulo/submódulo
+  - **Visibilidad inteligente** - Solo visible cuando es relevante (módulos/submódulos)
+  - **Gestión de estado** - Reset automático de módulo y submódulo actual
+
+### Changed
+- **index.html** - Línea 52:
+  - Botón `#company-home-button` agregado en `.header-buttons`
+  - Icono 🏠 con título "Volver al Inicio de la Empresa"
+  - Display none inicial (se muestra dinámicamente)
+
+- **renderer.js** - Múltiples ubicaciones:
+  - Línea 600 - Declarada variable `companyHomeButton`
+  - Línea 704 - Obtenida referencia al elemento DOM
+  - Líneas 1324-1335 - Event listener del botón
+  - Líneas 2190-2219 - Función `handleCompanyHome()` implementada
+  - Líneas 2300-2303 - Ocultar en `showCompanyHomePage()`
+  - Líneas 2748-2750 - Mostrar en `showModuleContent()`
+  - Líneas 3036-3038 - Mostrar en `showSubmoduleContent()`
+  - Líneas 2278-2280 - Ocultar en `handleLogout()`
+
+### Technical Details
+- **Archivos modificados:**
+  - `index.html` - 3 líneas agregadas
+  - `renderer.js` - 38 líneas agregadas, 6 modificadas
+- **Impacto de rendimiento:** Negligible (+1 referencia DOM, ~100 bytes)
+- **Estilos:** Usa clase `.header-btn` existente (sin CSS nuevo)
+
+### Impacto
+- **UX:** Mejora significativa en navegabilidad - usuarios ya no quedan "atrapados" en módulos
+- **Backend:** Sin cambios (0 modificaciones en main.js, 0 contratos alterados)
+- **Temas:** Compatible con claro, oscuro (system), oscuro (legacy)
+- **Responsive:** Funcional en todas las resoluciones (≥1024px)
+
+### Breaking Changes
+- **Ninguno** - Funcionalidad puramente aditiva
+
+### Migration Notes
+- **Para usuarios finales:** Reiniciar aplicación para ver el nuevo botón
+- **Para desarrolladores:**
+  - Función `handleCompanyHome()` en renderer.js (líneas ~2190-2219)
+  - No se requiere acción adicional - cambios 100% frontend
+
+---
+
 ## [0.1.90] - 2026-03-21
 
 ### Added

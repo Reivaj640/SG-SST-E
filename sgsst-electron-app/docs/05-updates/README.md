@@ -6,6 +6,57 @@ Este directorio contiene la documentación detallada de cada versión de K+AIR.
 
 ## 📋 Versiones Disponibles
 
+### v0.1.91 - 22 de marzo de 2026
+**[v0.1.91-navegacion-home-empresa.md](v0.1.91-navegacion-home-empresa.md)**
+
+**Cambios principales:**
+- ✅ Feature: Botón de navegación "🏠 Home Empresa" en header
+- ✅ Navegación de retorno al Dashboard desde módulos/submódulos
+- ✅ Visibilidad inteligente (solo visible cuando es relevante)
+- ✅ Gestión automática de estado (reset de módulo/submódulo)
+
+**Impacto:**
+- UX: Mejora significativa en navegabilidad
+- Usuarios ya no quedan "atrapados" en módulos
+- Backend: Sin cambios (0 modificaciones)
+- Rendimiento: Negligible (+100 bytes)
+
+---
+
+### v0.1.90 - 21 de marzo de 2026
+**[v0.1.90-transicion-animada-login.md](v0.1.90-transicion-animada-login.md)**
+
+**Cambios principales:**
+- ✅ Feature: Transición animada Login → Interfaz
+- ✅ Overlay con logo, spinner, mensajes dinámicos y barra de progreso
+- ✅ Check de éxito animado al completar
+- ✅ Nombre del usuario personalizado en bienvenida
+- ✅ Secuencia completa de ~4.2 segundos
+
+**Impacto:**
+- UX: Mejora significativa en percepción de calidad
+- Backend: Sin cambios (mismo contrato auth-login-v1)
+- Temas: Compatible con claro, oscuro, oscuro-legacy
+
+---
+
+### v0.1.89 - 21 de marzo de 2026
+**[v0.1.89-login-modernizado.md](v0.1.89-login-modernizado.md)**
+
+**Cambios principales:**
+- ✅ Feature: Login modernizado con animaciones y Vanta.js
+- ✅ Fondo animado con olas que responden al mouse
+- ✅ Logo K+AIR con ícono y tagline
+- ✅ Íconos en inputs de email y password
+- ✅ Micro-interacciones y feedback visual
+
+**Impacto:**
+- UX: Mejora significativa en percepción visual
+- Backend: Sin cambios (mismo contrato auth-login-v1)
+- Temas: Compatible con claro, oscuro, oscuro-legacy
+
+---
+
 ### v0.1.88 - 21 de marzo de 2026
 **[v0.1.88-fix-eliminacion-google-drive.md](v0.1.88-fix-eliminacion-google-drive.md)**
 

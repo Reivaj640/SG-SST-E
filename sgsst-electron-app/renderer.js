@@ -597,6 +597,7 @@ let sidebarMenu;
 let companyNameElement;
 let companyLogoElement;
 let companyLogoPlaceholder;
+let companyHomeButton;
 
 // Función para aplicar el tema globalmente
 async function applyGlobalTheme() {
@@ -700,8 +701,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   companyNameElement = document.getElementById('company-name');
   companyLogoElement = document.getElementById('company-logo');
   companyLogoPlaceholder = document.getElementById('company-logo-placeholder');
+  companyHomeButton = document.getElementById('company-home-button');
 
-  console.log('DOM elements found:', { contentArea, sidebarMenu, companyNameElement, companyLogoElement, companyLogoPlaceholder });
+  console.log('DOM elements found:', { contentArea, sidebarMenu, companyNameElement, companyLogoElement, companyLogoPlaceholder, companyHomeButton });
 
   // --- BEGIN: Iframe Communication Logic ---
   window.addEventListener('message', async (event) => {
@@ -1317,6 +1319,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   } else {
     console.error('Calendar button NOT found in DOM.');
+  }
+
+  // Botón de home de empresa
+  const companyHomeButtonElement = document.getElementById('company-home-button');
+  if (companyHomeButtonElement) {
+    console.log('Found company home button, attaching event listener.');
+    companyHomeButtonElement.addEventListener('click', function(event) {
+      console.log('Company home button clicked.');
+      event.preventDefault();
+      handleCompanyHome();
+    });
+  } else {
+    console.error('Company home button NOT found in DOM.');
   }
 
   initializeAuthFlow();
@@ -2170,6 +2185,41 @@ async function selectCompany(companyName, buttonElement) {
   showCompanyHomePage();
 }
 
+/**
+ * Maneja el clic en el botón "Home Empresa" para regresar al dashboard de la empresa actual.
+ */
+function handleCompanyHome() {
+  if (!currentCompany) {
+    if (companyHomeButton) {
+      companyHomeButton.style.display = 'none';
+    }
+    return;
+  }
+  
+  console.log('[NAV] Volviendo al home de la empresa:', currentCompany);
+  
+  // Resetear módulo y submódulo actual
+  currentModule = null;
+  currentSubmodule = null;
+  
+  // Ocultar calendario si existe
+  hideCalendar(contentArea);
+  
+  // Mostrar home de la empresa
+  showCompanyHomePage();
+  
+  // Resetear sidebar activo
+  if (window.activeSidebarButton) {
+    window.activeSidebarButton.classList.remove('active');
+    window.activeSidebarButton = null;
+  }
+  
+  // Ocultar botón home porque YA estamos en home
+  if (companyHomeButton) {
+    companyHomeButton.style.display = 'none';
+  }
+}
+
 async function handleLogout() {
   console.log('Handling logout...');
   currentCompany = null;
@@ -2226,6 +2276,11 @@ async function handleLogout() {
     window.activeSidebarButton = null;
   }
 
+  // Ocultar botón home empresa porque NO hay empresa seleccionada
+  if (companyHomeButton) {
+    companyHomeButton.style.display = 'none';
+  }
+
   renderLoginScreen();
   console.log('Usuario desconectado.');
 }
@@ -2246,6 +2301,11 @@ function showCompanyHomePage() {
   // ✅ Pasar contentArea a hideCalendar
   hideCalendar(contentArea);
   console.log(`Showing dashboard for company: ${currentCompany}`);
+
+  // Ocultar botón home porque YA estamos en home de empresa
+  if (companyHomeButton) {
+    companyHomeButton.style.display = 'none';
+  }
 
   // Asegurar que el sidebar permanezca colapsado
   const sidebar = document.getElementById('sidebar');
@@ -2419,6 +2479,9 @@ function showCompanyHomePage() {
     item.onmouseout = function() { if (!mod.active) { this.style.background = 'transparent'; this.style.borderColor = 'transparent'; } };
     item.onclick = function() { showModuleContent(mod.name); };
 
+    const badgeId = `module-badge-${mod.name.replace(/\s+/g, '-').toLowerCase()}`;
+    const badgeHtml = mod.badge ? `<span id="${badgeId}" data-module="${mod.name}" style="margin-left: auto; font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: 600; background: ${getBadgeColor(mod.badgeClass)}; color: ${getBadgeTextColor(mod.badgeClass)}; cursor: pointer;" title="Click para filtrar tareas de ${mod.name}">${mod.badge}</span>` : '';
+
     item.innerHTML = `
       <div style="width: 36px; height: 36px; border-radius: 6px; background: #f1f5f9; color: #174ea6; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-size: 14px;">
         <i class="fas ${mod.icon}"></i>
@@ -2427,8 +2490,19 @@ function showCompanyHomePage() {
         <h4 style="font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 1px;">${mod.name}</h4>
         <span style="font-size: 11px; color: #94a3b8;">${mod.subtitle}</span>
       </div>
-      ${mod.badge ? `<span id="module-badge-${mod.name.replace(/\s+/g, '-').toLowerCase()}" style="margin-left: auto; font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: 600; background: ${getBadgeColor(mod.badgeClass)}; color: ${getBadgeTextColor(mod.badgeClass)};">${mod.badge}</span>` : ''}
+      ${badgeHtml}
     `;
+    
+    // Agregar event listener al badge para filtrar tareas
+    const badgeEl = item.querySelector(`#${badgeId}`);
+    if (badgeEl) {
+      badgeEl.onclick = function(e) {
+        e.stopPropagation();
+        const moduleName = this.getAttribute('data-module');
+        filterDashboardTasksByModule(moduleName);
+      };
+    }
+    
     moduleList.appendChild(item);
   });
 
@@ -2500,47 +2574,82 @@ function showCompanyHomePage() {
 
 // Función para cargar datos del dashboard
 async function loadDashboardData() {
-  console.log('[DASHBOARD] Cargando datos para:', currentCompany);
+  console.log('🔍 [DASHBOARD] loadDashboardData INICIANDO para:', currentCompany);
 
   const tasksContainer = document.getElementById('tasks-container');
   const notifBadge = document.getElementById('notif-badge');
+  
+  console.log('🔍 [DASHBOARD] tasks-container:', tasksContainer);
+  console.log('🔍 [DASHBOARD] notif-badge:', notifBadge);
 
   try {
-    // Llamar al backend para obtener datos
+    console.log('🔍 [DASHBOARD] Llamando a window.electronAPI.getDashboardSummary...');
     const response = await window.electronAPI.getDashboardSummary(currentCompany);
+    console.log('🔍 [DASHBOARD] Respuesta recibida:', response);
 
     if (response.success && response.data) {
       const data = response.data;
+      console.log('🔍 [DASHBOARD] Datos procesados:', data);
+      console.log('🔍 [DASHBOARD] KPIs:', data.kpis);
+      console.log('🔍 [DASHBOARD] Tasks:', data.tasks);
+      console.log('🔍 [DASHBOARD] Module Status:', data.module_status);
+      console.log('🔍 [DASHBOARD] Recursos Alerts:', data.kpis?.recursos_alerts);
 
       // Actualizar KPIs (SOLO si los elementos existen en el DOM)
       const kpiAccidents = document.getElementById('kpi-accidents');
       const kpiPric = document.getElementById('kpi-pric');
       const kpiOverdue = document.getElementById('kpi-overdue');
       const kpiCompliance = document.getElementById('kpi-compliance');
+      
+      console.log('🔍 [DASHBOARD] Elementos KPI:', {
+        kpiAccidents: !!kpiAccidents,
+        kpiPric: !!kpiPric,
+        kpiOverdue: !!kpiOverdue,
+        kpiCompliance: !!kpiCompliance
+      });
 
-      if (kpiAccidents) kpiAccidents.querySelector('h3').textContent = data.kpis.accidents_month || '0';
-      if (kpiPric) kpiPric.querySelector('h3').textContent = data.kpis.pric_active || '0';
-      if (kpiOverdue) kpiOverdue.querySelector('h3').textContent = data.kpis.overdue_docs || '0';
-      if (kpiCompliance) kpiCompliance.querySelector('h3').textContent = (data.kpis.compliance || '0') + '%';
+      if (kpiAccidents) {
+        console.log('🔍 [DASHBOARD] Actualizando kpi-accidents:', data.kpis.accidents_month || '0');
+        kpiAccidents.querySelector('h3').textContent = data.kpis.accidents_month || '0';
+      }
+      if (kpiPric) {
+        console.log('🔍 [DASHBOARD] Actualizando kpi-pric:', data.kpis.pric_active || '0');
+        kpiPric.querySelector('h3').textContent = data.kpis.pric_active || '0';
+      }
+      if (kpiOverdue) {
+        console.log('🔍 [DASHBOARD] Actualizando kpi-overdue:', data.kpis.overdue_docs || '0');
+        kpiOverdue.querySelector('h3').textContent = data.kpis.overdue_docs || '0';
+      }
+      if (kpiCompliance) {
+        console.log('🔍 [DASHBOARD] Actualizando kpi-compliance:', (data.kpis.compliance || '0') + '%');
+        kpiCompliance.querySelector('h3').textContent = (data.kpis.compliance || '0') + '%';
+      }
 
       // Actualizar badge de notificaciones
       const totalTasks = data.tasks ? data.tasks.length : 0;
+      console.log('🔍 [DASHBOARD] Total tasks:', totalTasks);
       if (notifBadge) {
         notifBadge.textContent = totalTasks;
         notifBadge.style.display = totalTasks > 0 ? 'flex' : 'none';
+        console.log('🔍 [DASHBOARD] Badge actualizado:', totalTasks);
       }
 
       // Renderizar tareas
+      console.log('🔍 [DASHBOARD] Llamando a renderTasks()');
       renderTasks(data.tasks || []);
 
       // Actualizar badges de módulos
-      updateModuleBadges(data.module_status || {});
+      const recursosAlerts = data.kpis?.recursos_alerts || 0;
+      console.log('🔍 [DASHBOARD] Llamando a updateModuleBadges con recursos_alerts:', recursosAlerts);
+      updateModuleBadges(data.module_status || {}, recursosAlerts);
 
       // Actualizar información de la empresa en el header
       const companyInfoText = document.getElementById('company-info-text');
       if (companyInfoText && data.company_info) {
         companyInfoText.textContent = `SG-SST · Riesgo ${data.company_info.risk || 'N/A'} · ${data.company_info.employees || 'N/A'} Colaboradores`;
       }
+
+      console.log('🔍 [DASHBOARD] loadDashboardData COMPLETADO');
 
     } else {
       console.error('[DASHBOARD] Error en respuesta:', response.error);
@@ -2556,6 +2665,7 @@ async function loadDashboardData() {
     }
   } catch (error) {
     console.error('[DASHBOARD] Error crítico:', error);
+    console.error('[DASHBOARD] Stack:', error.stack);
     if (tasksContainer) {
       tasksContainer.innerHTML = `
         <div style="text-align: center; padding: 40px; color: #ef4444;">
@@ -2565,6 +2675,60 @@ async function loadDashboardData() {
         </div>
       `;
     }
+  }
+}
+
+// Variables para el filtro de tareas
+let currentDashboardData = null;
+let currentFilterModule = null;
+
+/**
+ * Filtra las tareas del dashboard por módulo
+ */
+function filterDashboardTasksByModule(moduleName) {
+  console.log('🔍 [DASHBOARD] Filtrando tareas para módulo:', moduleName);
+  
+  if (!currentDashboardData) {
+    console.warn('[DASHBOARD] No hay datos del dashboard para filtrar');
+    return;
+  }
+  
+  // Mapeo de módulos a tipos de tareas
+  const moduleTaskMap = {
+    'Recursos': ['capacitaciones', 'epp', 'copasst', 'comite_convivencia'],
+    'Gestión de la Salud': ['ausentismo', 'investigacion', 'pric'],
+    'Gestión Integral': ['plan-trabajo', 'rendicion', 'politica'],
+    'Peligros': ['iperc', 'controles'],
+    'Amenazas': ['emergencias'],
+    'Verificación': ['auditorias'],
+    'Mejoramiento': ['acciones-correctivas', 'acciones-preventivas']
+  };
+  
+  const taskTypes = moduleTaskMap[moduleName] || [];
+  
+  // Filtrar tareas actuales
+  const filteredTasks = currentDashboardData.tasks.filter(task => 
+    taskTypes.includes(task.module)
+  );
+  
+  // Guardar filtro actual
+  currentFilterModule = moduleName;
+  
+  // Re-renderizar panel de tareas
+  renderTasks(filteredTasks, moduleName);
+  
+  console.log(`🔍 [DASHBOARD] Tareas filtradas: ${filteredTasks.length} de ${currentDashboardData.tasks.length}`);
+}
+
+/**
+ * Limpia el filtro de tareas y muestra todas
+ */
+function clearFilter() {
+  console.log('🔍 [DASHBOARD] Limpiando filtro');
+  currentFilterModule = null;
+  
+  if (currentDashboardData) {
+    renderTasks(currentDashboardData.tasks || []);
   }
 }
 
@@ -2592,18 +2756,23 @@ function renderTasks(tasks) {
       border-left: 4px solid ${getTaskBorderColor(task.priority)};
       padding: 12px 15px;
       display: flex;
-      align-items: center;
+      align-items: flex-start;
+      gap: 12px;
       transition: transform 0.1s, box-shadow 0.1s;
       cursor: pointer;
     " onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.05)'; this.style.background='white';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'; this.style.background='#f8fafc';">
-      <div style="flex: 1;">
-        <div style="display: flex; gap: 8px; margin-bottom: 4px;">
+      <div style="width: 36px; height: 36px; border-radius: 6px; background: #f1f5f9; color: #174ea6; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 14px;">
+        <i class="${task.icon || 'fas fa-tasks'}"></i>
+      </div>
+      <div style="flex: 1; min-width: 0;">
+        <div style="display: flex; gap: 8px; margin-bottom: 4px; flex-wrap: wrap;">
           <span class="tag" style="font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; background: ${getTagColor(task.priority)}; color: ${getTagTextColor(task.priority)};">${task.priority ? task.priority.toUpperCase() : 'INFO'}</span>
+          ${task.submodule ? `<span style="font-size: 10px; font-weight: 500; padding: 2px 6px; border-radius: 4px; background: #e0e7ff; color: #3730a3;">${task.submodule}</span>` : ''}
         </div>
         <div style="font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 2px;">${task.title || 'Tarea sin título'}</div>
         <div style="font-size: 12px; color: #64748b; line-height: 1.3;">${task.desc || ''}</div>
       </div>
-      <button style="width: 30px; height: 30px; border-radius: 50%; border: none; background: transparent; color: #94a3b8; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#174ea6'; this.style.color='white'" onmouseout="this.style.background='transparent'; this.style.color='#94a3b8'">
+      <button style="width: 30px; height: 30px; border-radius: 50%; border: none; background: transparent; color: #94a3b8; cursor: pointer; transition: all 0.2s; flex-shrink: 0;" onmouseover="this.style.background='#174ea6'; this.style.color='white'" onmouseout="this.style.background='transparent'; this.style.color='#94a3b8'">
         <i class="fas fa-arrow-right"></i>
       </button>
     </div>
@@ -2644,15 +2813,22 @@ function getBadgeTextColor(cls) {
 }
 
 // Función para actualizar badges de módulos
-function updateModuleBadges(moduleStatus) {
+function updateModuleBadges(moduleStatus, recursosAlerts = 0) {
   for (const [moduleName, status] of Object.entries(moduleStatus)) {
     const badgeEl = document.getElementById(`module-badge-${moduleName}`);
     if (badgeEl) {
-      const statusText = status === 'danger' ? 'Alerta' : (status === 'warning' ? 'Pendiente' : 'OK');
-      const statusClass = status === 'danger' ? 'bg-red' : (status === 'warning' ? 'bg-orange' : 'bg-green');
-      badgeEl.textContent = statusText;
-      badgeEl.style.background = getBadgeColor(statusClass);
-      badgeEl.style.color = getBadgeTextColor(statusClass);
+      // Para el módulo de recursos, mostrar el número real de alertas si hay
+      if (moduleName === 'recursos' && recursosAlerts > 0) {
+        badgeEl.textContent = `${recursosAlerts} Alertas`;
+        badgeEl.style.background = status === 'danger' ? '#fee2e2' : (status === 'warning' ? '#ffedd5' : '#dcfce7');
+        badgeEl.style.color = status === 'danger' ? '#b91c1c' : (status === 'warning' ? '#c2410c' : '#166534');
+      } else {
+        const statusText = status === 'danger' ? 'Alerta' : (status === 'warning' ? 'Pendiente' : 'OK');
+        const statusClass = status === 'danger' ? 'bg-red' : (status === 'warning' ? 'bg-orange' : 'bg-green');
+        badgeEl.textContent = statusText;
+        badgeEl.style.background = getBadgeColor(statusClass);
+        badgeEl.style.color = getBadgeTextColor(statusClass);
+      }
     }
   }
 }
@@ -2689,6 +2865,11 @@ function showModuleContent(moduleName) {
   // ✅ LIMPIAR ESTADO: Al cambiar de módulo, ya no estamos en un submódulo
   currentSubmodule = null;
   console.log(`🔍 [showModuleContent] currentModule actualizado a: ${currentModule}`);
+
+  // Mostrar botón home empresa porque YA NO estamos en home
+  if (companyHomeButton && currentCompany) {
+    companyHomeButton.style.display = 'flex';
+  }
 
   // Verificar que contentArea exista
   if (!contentArea) {
@@ -2971,6 +3152,12 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
     console.error('❌ Container es null, no se puede mostrar el contenido del submódulo');
     return;
   }
+  
+  // Mostrar botón home empresa porque YA NO estamos en home
+  if (companyHomeButton && currentCompany) {
+    companyHomeButton.style.display = 'flex';
+  }
+  
   const currentRole = companyRoleByKey[currentCompany] || '';
   if (!isSubmoduleAllowed(currentRole, moduleName, submoduleName)) {
     showErrorMessage(container, submoduleName, 'No tienes permiso para acceder a este submódulo.');

@@ -1337,6 +1337,13 @@ ipcMain.handle('get-dashboard-summary', async (event, companyName) => {
     }
 
     console.log(`[DASHBOARD] Escaneo completado exitosamente`);
+    console.log(`[DASHBOARD] Resultado Python (primeros 500 chars):`, JSON.stringify(result).substring(0, 500));
+    
+    // Verificar que la estructura de datos es correcta
+    console.log(`[DASHBOARD] KPIs recibidos:`, result.kpis);
+    console.log(`[DASHBOARD] Recursos Alerts:`, result.kpis?.recursos_alerts);
+    console.log(`[DASHBOARD] Recursos Detail:`, result.recursos_detail);
+    
     return { success: true, data: result };
 
   } catch (error) {

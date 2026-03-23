@@ -1,8 +1,8 @@
 # 👋 Bienvenido a la Documentación de K+AIR
 
 **Tiempo de lectura:** 5 minutos
-**Última actualización:** 20 de marzo de 2026
-**Versión:** 0.1.87
+**Última actualización:** 22 de marzo de 2026
+**Versión:** 0.1.91
 
 ---
 
