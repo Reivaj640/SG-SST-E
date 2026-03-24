@@ -294,12 +294,12 @@ class GestionPeligrosHome {
         `;
         document.head.appendChild(style);
     }
-    
+
     renderMainArea(container) {
         // Widgets con contadores específicos para Gestión de Peligros y Riesgos
         const widgetsContainer = document.createElement('div');
         widgetsContainer.className = 'widgets-container';
-        
+
         const widget1 = this.createWidget('Inspecciones Realizadas', '24', '📅 3 esta semana');
         const widget2 = this.createWidget('Identificaciones de Peligros', '15', '🆕 2 nuevas hoy');
         const widget3 = this.createWidget('Evaluaciones de Riesgos', '8', '📉 1 mitigado');

@@ -27,6 +27,7 @@ def scan_company(company_path):
         "tasks": [],
         "module_status": {
             "recursos": "ok",
+            "gestion-integral": "ok",
             "gestion-salud": "ok",
             "peligros": "ok",
             "amenazas": "ok",

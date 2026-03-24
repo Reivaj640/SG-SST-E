@@ -6,6 +6,7 @@ class GestionIntegralHome {
         this.moduleName = moduleName;
         this.submodules = submodules;
         this.currentCompany = null;
+        this.gestionIntegralStats = null;  // Almacenar estadísticas reales
     }
 
     getCurrentCompany() {
@@ -20,6 +21,9 @@ class GestionIntegralHome {
     async render() {
         this.container.innerHTML = '';
         this.currentCompany = this.getCurrentCompany();
+
+        // 0. Cargar estadísticas reales de Gestión Integral
+        await this.loadGestionIntegralStats();
 
         // 1. Inyectar Estilos K+AIR
         this.injectStyles();
@@ -294,23 +298,53 @@ class GestionIntegralHome {
         `;
         document.head.appendChild(style);
     }
-    
+
+    /**
+     * Cargar estadísticas reales de Gestión Integral
+     */
+    async loadGestionIntegralStats() {
+        try {
+            console.log('🔄 [GestionIntegralHome] Cargando estadísticas para:', this.currentCompany);
+
+            if (window.electronAPI && window.electronAPI.getGestionIntegralStats) {
+                const result = await window.electronAPI.getGestionIntegralStats(this.currentCompany);
+                if (result.success) {
+                    this.gestionIntegralStats = result.stats;
+                    console.log('✅ [GestionIntegralHome] Estadísticas cargadas:', this.gestionIntegralStats);
+                } else {
+                    console.warn('⚠️ [GestionIntegralHome] Error cargando estadísticas:', result.error);
+                    this.gestionIntegralStats = null;
+                }
+            }
+        } catch (error) {
+            console.error('❌ [GestionIntegralHome] Error cargando estadísticas:', error);
+            this.gestionIntegralStats = null;
+        }
+    }
+
     renderMainArea(container) {
+        // Widgets con contadores específicos para Gestión Integral (USANDO DATOS REALES)
         const widgetsContainer = document.createElement('div');
         widgetsContainer.className = 'widgets-container';
-        
-        const widget1 = this.createWidget('Tareas Pendientes', '12', '🔥 3 urgentes');
-        const widget2 = this.createWidget('Documentos por Vencer', '5', '📅 1 esta semana');
-        const widget3 = this.createWidget('Cumplimiento General', '85%', '📈 2% más que el mes pasado');
-        const widget4 = this.createWidget('Comunicados Recientes', '3', '🆕 1 nuevo hoy');
-        
+
+        // Obtener datos reales o usar valores por defecto
+        const politica = this.gestionIntegralStats?.politica || { estado: 'No disponible', actualizada: false };
+        const objetivos = this.gestionIntegralStats?.objetivos || { total: 0, cumplidos: 0, porcentaje: 0 };
+        const plan_trabajo = this.gestionIntegralStats?.plan_trabajo || { tareas_pendientes: 0, tareas_realizadas: 0, total: 0 };
+        const rendicion = this.gestionIntegralStats?.rendicion_cuentas || { actas_realizadas: 0 };
+
+        const widget1 = this.createWidget('Política SST', politica.estado, politica.actualizada ? '✅ Al día' : '⚠️ Por actualizar');
+        const widget2 = this.createWidget('Objetivos SST', `${objetivos.cumplidos}/${objetivos.total}`, `📊 ${objetivos.porcentaje}% cumplimiento`);
+        const widget3 = this.createWidget('Plan de Trabajo', `${plan_trabajo.tareas_pendientes} pendientes`, `✓ ${plan_trabajo.tareas_realizadas} realizadas`);
+        const widget4 = this.createWidget('Rendición de Cuentas', `${rendicion.actas_realizadas} actas`, rendicion.actas_realizadas > 0 ? '✅ Realizadas' : '⚠️ Sin actas');
+
         widgetsContainer.appendChild(widget1);
         widgetsContainer.appendChild(widget2);
         widgetsContainer.appendChild(widget3);
         widgetsContainer.appendChild(widget4);
-        
+
         container.appendChild(widgetsContainer);
-        
+
         const chartContainer = document.createElement('div');
         chartContainer.className = 'chart-container';
         chartContainer.innerHTML = `

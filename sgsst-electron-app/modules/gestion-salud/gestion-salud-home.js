@@ -339,7 +339,7 @@ class GestionSaludHome {
         `;
         document.head.appendChild(style);
     }
-    
+
     renderMainArea(container) {
         // Widgets con contadores específicos para Gestión de la Salud
         const widgetsContainer = document.createElement('div');

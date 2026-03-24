@@ -294,12 +294,12 @@ class MejoramientoHome {
         `;
         document.head.appendChild(style);
     }
-    
+
     renderMainArea(container) {
         // Widgets para Mejoramiento
         const widgetsContainer = document.createElement('div');
         widgetsContainer.className = 'widgets-container';
-        
+
         const widget1 = this.createWidget('Acciones Correctivas', '8', '⚠ 2 pendientes');
         const widget2 = this.createWidget('Planes de Mejora', '4', '📅 1 en ejecución');
         const widget3 = this.createWidget('Eficacia de Acciones', '88%', '📈 +2% este trimestre');

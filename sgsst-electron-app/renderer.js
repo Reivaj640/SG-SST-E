@@ -2457,11 +2457,11 @@ function showCompanyHomePage() {
   moduleList.style.cssText = 'flex: 1; overflow-y: auto; padding: 10px;';
 
   const modulesData = [
-    { name: 'Gestión de la Salud', subtitle: 'Ausentismo, AT, EL', icon: 'fa-heartbeat', badge: 'Cargando...', badgeClass: 'bg-orange', active: true },
-    { name: 'Recursos', subtitle: 'Capacitación, Roles', icon: 'fa-users-cog', badge: '-', badgeClass: 'bg-green', active: false },
+    { name: 'Recursos', subtitle: 'Capacitación, Roles', icon: 'fa-users-cog', badge: 'Cargando...', badgeClass: 'bg-orange', active: true },
     { name: 'Gestión Integral', subtitle: 'Política, Planes', icon: 'fa-file-contract', badge: '-', badgeClass: 'bg-green', active: false },
-    { name: 'Peligros', subtitle: 'IPERC, Controles', icon: 'fa-radiation-alt', badge: '-', badgeClass: null, active: false },
-    { name: 'Amenazas', subtitle: 'Emergencias', icon: 'fa-biohazard', badge: '-', badgeClass: null, active: false },
+    { name: 'Gestión de la Salud', subtitle: 'Ausentismo, AT, EL', icon: 'fa-heartbeat', badge: '-', badgeClass: 'bg-green', active: false },
+    { name: 'Gestión de Peligros y Riesgos', subtitle: 'IPERC, Controles', icon: 'fa-radiation-alt', badge: '-', badgeClass: null, active: false },
+    { name: 'Gestión de Amenazas', subtitle: 'Emergencias', icon: 'fa-biohazard', badge: '-', badgeClass: null, active: false },
     { name: 'Verificación', subtitle: 'Auditorías', icon: 'fa-check-double', badge: '-', badgeClass: null, active: false },
     { name: 'Mejoramiento', subtitle: 'Acciones Correctivas', icon: 'fa-chart-line', badge: '-', badgeClass: null, active: false }
   ];
@@ -2477,10 +2477,13 @@ function showCompanyHomePage() {
     `;
     item.onmouseover = function() { if (!mod.active) { this.style.background = '#f8fafc'; this.style.borderColor = '#e2e8f0'; } };
     item.onmouseout = function() { if (!mod.active) { this.style.background = 'transparent'; this.style.borderColor = 'transparent'; } };
-    item.onclick = function() { showModuleContent(mod.name); };
+    item.onclick = function(e) {
+      e.stopPropagation();
+      filterDashboardTasksByModule(mod.name);
+    };
 
     const badgeId = `module-badge-${mod.name.replace(/\s+/g, '-').toLowerCase()}`;
-    const badgeHtml = mod.badge ? `<span id="${badgeId}" data-module="${mod.name}" style="margin-left: auto; font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: 600; background: ${getBadgeColor(mod.badgeClass)}; color: ${getBadgeTextColor(mod.badgeClass)}; cursor: pointer;" title="Click para filtrar tareas de ${mod.name}">${mod.badge}</span>` : '';
+    const badgeHtml = mod.badge ? `<span id="${badgeId}" data-module="${mod.name}" style="margin-left: auto; font-size: 10px; padding: 4px 10px; border-radius: 12px; font-weight: 600; background: ${getBadgeColor(mod.badgeClass)}; color: ${getBadgeTextColor(mod.badgeClass)}; cursor: pointer; border: 1px solid rgba(0,0,0,0.1);" title="Click para ver alertas de ${mod.name}"><i class="fas fa-filter" style="font-size: 8px; margin-right: 3px;"></i>${mod.badge}</span>` : '';
 
     item.innerHTML = `
       <div style="width: 36px; height: 36px; border-radius: 6px; background: #f1f5f9; color: #174ea6; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-size: 14px;">
@@ -2492,11 +2495,12 @@ function showCompanyHomePage() {
       </div>
       ${badgeHtml}
     `;
-    
+
     // Agregar event listener al badge para filtrar tareas
     const badgeEl = item.querySelector(`#${badgeId}`);
     if (badgeEl) {
       badgeEl.onclick = function(e) {
+        e.preventDefault();
         e.stopPropagation();
         const moduleName = this.getAttribute('data-module');
         filterDashboardTasksByModule(moduleName);
@@ -2520,6 +2524,7 @@ function showCompanyHomePage() {
   `;
 
   const tasksHeader = document.createElement('div');
+  tasksHeader.id = 'tasks-panel-header';
   tasksHeader.style.cssText = `
     padding: 15px 20px;
     border-bottom: 1px solid #e2e8f0;
@@ -2589,6 +2594,11 @@ async function loadDashboardData() {
 
     if (response.success && response.data) {
       const data = response.data;
+      
+      // Guardar datos para filtrado posterior
+      currentDashboardData = data;
+      console.log('🔍 [DASHBOARD] Datos guardados en currentDashboardData:', data);
+      
       console.log('🔍 [DASHBOARD] Datos procesados:', data);
       console.log('🔍 [DASHBOARD] KPIs:', data.kpis);
       console.log('🔍 [DASHBOARD] Tasks:', data.tasks);
@@ -2640,8 +2650,9 @@ async function loadDashboardData() {
 
       // Actualizar badges de módulos
       const recursosAlerts = data.kpis?.recursos_alerts || 0;
-      console.log('🔍 [DASHBOARD] Llamando a updateModuleBadges con recursos_alerts:', recursosAlerts);
-      updateModuleBadges(data.module_status || {}, recursosAlerts);
+      const gestionSaludAlerts = data.kpis?.gestion_salud_alerts || 0;
+      console.log('🔍 [DASHBOARD] Llamando a updateModuleBadges con recursos_alerts:', recursosAlerts, 'gestion_salud_alerts:', gestionSaludAlerts);
+      updateModuleBadges(data.module_status || {}, recursosAlerts, gestionSaludAlerts);
 
       // Actualizar información de la empresa en el header
       const companyInfoText = document.getElementById('company-info-text');
@@ -2687,36 +2698,39 @@ let currentFilterModule = null;
  */
 function filterDashboardTasksByModule(moduleName) {
   console.log('🔍 [DASHBOARD] Filtrando tareas para módulo:', moduleName);
-  
+
   if (!currentDashboardData) {
     console.warn('[DASHBOARD] No hay datos del dashboard para filtrar');
     return;
   }
-  
+
   // Mapeo de módulos a tipos de tareas
   const moduleTaskMap = {
-    'Recursos': ['capacitaciones', 'epp', 'copasst', 'comite_convivencia'],
-    'Gestión de la Salud': ['ausentismo', 'investigacion', 'pric'],
+    'Recursos': ['capacitaciones', 'epp', 'copasst', 'comite_convivencia', 'presupuesto'],
+    'Gestión de la Salud': ['ausentismo', 'investigacion', 'pric', 'inducciones'],
     'Gestión Integral': ['plan-trabajo', 'rendicion', 'politica'],
     'Peligros': ['iperc', 'controles'],
     'Amenazas': ['emergencias'],
     'Verificación': ['auditorias'],
     'Mejoramiento': ['acciones-correctivas', 'acciones-preventivas']
   };
-  
+
   const taskTypes = moduleTaskMap[moduleName] || [];
-  
+
   // Filtrar tareas actuales
-  const filteredTasks = currentDashboardData.tasks.filter(task => 
+  const filteredTasks = currentDashboardData.tasks.filter(task =>
     taskTypes.includes(task.module)
   );
-  
+
   // Guardar filtro actual
   currentFilterModule = moduleName;
-  
+
+  // Actualizar UI del header
+  updateFilterUI(moduleName, filteredTasks.length);
+
   // Re-renderizar panel de tareas
   renderTasks(filteredTasks, moduleName);
-  
+
   console.log(`🔍 [DASHBOARD] Tareas filtradas: ${filteredTasks.length} de ${currentDashboardData.tasks.length}`);
 }
 
@@ -2726,9 +2740,47 @@ function filterDashboardTasksByModule(moduleName) {
 function clearFilter() {
   console.log('🔍 [DASHBOARD] Limpiando filtro');
   currentFilterModule = null;
-  
+
+  // Actualizar UI del header
+  updateFilterUI(null, currentDashboardData?.tasks?.length || 0);
+
   if (currentDashboardData) {
     renderTasks(currentDashboardData.tasks || []);
+  }
+}
+
+// Hacer clearFilter accesible globalmente para el onclick del botón
+window.clearFilter = clearFilter;
+
+/**
+ * Actualiza la UI del header para mostrar filtro activo
+ */
+function updateFilterUI(moduleName, taskCount) {
+  const tasksHeader = document.querySelector('#tasks-panel-header');
+  if (!tasksHeader) return;
+
+  if (moduleName) {
+    tasksHeader.innerHTML = `
+      <h2 style="font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; margin: 0;">
+        <i class="fas fa-filter" style="color: #174ea6;"></i>
+        <span>Filtrando: ${moduleName}</span>
+        <span style="font-size: 12px; color: #64748b;">(${taskCount} tareas)</span>
+      </h2>
+      <button onclick="clearFilter()" style="padding: 6px 12px; border-radius: 12px; font-size: 11px; font-weight: 600; background: #fee2e2; color: #dc2626; border: none; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#fecaca'" onmouseout="this.style.background='#fee2e2'">
+        <i class="fas fa-times" style="margin-right: 4px;"></i> Limpiar filtro
+      </button>
+    `;
+  } else {
+    tasksHeader.innerHTML = `
+      <h2 style="font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; margin: 0;">
+        <i class="fas fa-tasks" style="color: #174ea6;"></i> Pendientes y Tareas
+      </h2>
+      <div style="display: flex; gap: 5px;">
+        <button class="filter-btn active" style="padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; background: #174ea6; color: white; border: none; cursor: pointer;">Todos</button>
+        <button class="filter-btn" style="padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; background: transparent; border: none; cursor: pointer; color: #64748b;">Críticos</button>
+        <button class="filter-btn" style="padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; background: transparent; border: none; cursor: pointer; color: #64748b;">Hoy</button>
+      </div>
+    `;
   }
 }
 
@@ -2790,6 +2842,10 @@ function navigateToModule(moduleName) {
     'investigacion': 'Gestión de la Salud',
     'capacitaciones': 'Recursos',
     'epp': 'Recursos',
+    'presupuesto': 'Recursos',
+    'copasst': 'Recursos',
+    'comite_convivencia': 'Recursos',
+    'inducciones': 'Recursos',
     'auditorias': 'Verificación'
   };
   
@@ -2812,23 +2868,52 @@ function getBadgeTextColor(cls) {
   return '#3730a3';
 }
 
+// Mapeo de claves del backend a IDs de badges en el frontend
+const MODULE_KEY_TO_BADGE_ID = {
+  'recursos': 'module-badge-recursos',
+  'gestion-salud': 'module-badge-gestión-de-la-salud',
+  'gestion-integral': 'module-badge-gestión-integral',
+  'peligros': 'module-badge-peligros',
+  'amenazas': 'module-badge-amenazas',
+  'verificacion': 'module-badge-verificación',
+  'mejoramiento': 'module-badge-mejoramiento'
+};
+
 // Función para actualizar badges de módulos
-function updateModuleBadges(moduleStatus, recursosAlerts = 0) {
+function updateModuleBadges(moduleStatus, recursosAlerts = 0, gestionSaludAlerts = 0) {
+  console.log('🔍 [BADGES] updateModuleBadges llamada con:', { moduleStatus, recursosAlerts, gestionSaludAlerts });
+
   for (const [moduleName, status] of Object.entries(moduleStatus)) {
-    const badgeEl = document.getElementById(`module-badge-${moduleName}`);
+    // Usar el mapeo para encontrar el ID correcto del badge
+    const badgeId = MODULE_KEY_TO_BADGE_ID[moduleName];
+    const badgeEl = document.getElementById(badgeId);
+
+    console.log(`🔍 [BADGES] Módulo: ${moduleName}, Status: ${status}, BadgeID: ${badgeId}, Elemento: ${badgeEl ? 'ENCONTRADO' : 'NO ENCONTRADO'}`);
+
     if (badgeEl) {
       // Para el módulo de recursos, mostrar el número real de alertas si hay
       if (moduleName === 'recursos' && recursosAlerts > 0) {
         badgeEl.textContent = `${recursosAlerts} Alertas`;
         badgeEl.style.background = status === 'danger' ? '#fee2e2' : (status === 'warning' ? '#ffedd5' : '#dcfce7');
         badgeEl.style.color = status === 'danger' ? '#b91c1c' : (status === 'warning' ? '#c2410c' : '#166534');
+        console.log(`✅ [BADGES] ${moduleName}: "${recursosAlerts} Alertas"`);
+      }
+      // Para el módulo de gestión de la salud, mostrar el número real de alertas si hay
+      else if (moduleName === 'gestion-salud' && gestionSaludAlerts > 0) {
+        badgeEl.textContent = `${gestionSaludAlerts} Alertas`;
+        badgeEl.style.background = status === 'danger' ? '#fee2e2' : (status === 'warning' ? '#ffedd5' : '#dcfce7');
+        badgeEl.style.color = status === 'danger' ? '#b91c1c' : (status === 'warning' ? '#c2410c' : '#166534');
+        console.log(`✅ [BADGES] ${moduleName}: "${gestionSaludAlerts} Alertas"`);
       } else {
         const statusText = status === 'danger' ? 'Alerta' : (status === 'warning' ? 'Pendiente' : 'OK');
         const statusClass = status === 'danger' ? 'bg-red' : (status === 'warning' ? 'bg-orange' : 'bg-green');
         badgeEl.textContent = statusText;
         badgeEl.style.background = getBadgeColor(statusClass);
         badgeEl.style.color = getBadgeTextColor(statusClass);
+        console.log(`✅ [BADGES] ${moduleName}: "${statusText}"`);
       }
+    } else {
+      console.error(`❌ [BADGES] Badge NO ENCONTRADO para ${moduleName} (ID: ${badgeId})`);
     }
   }
 }

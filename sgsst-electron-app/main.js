@@ -1294,6 +1294,440 @@ nativeTheme.on('updated', () => {
 });
 
 // ===============================
+// 📊 DASHBOARD ALERTAS - CÁLCULO DESDE DATOS INTERNOS
+// ===============================
+
+/**
+ * Calcula las alertas del dashboard usando las funciones existentes de Recursos
+ * en lugar de depender de archivos Excel externos.
+ */
+async function getDashboardAlertas(rootPath, companyName) {
+  const today = new Date();
+  const currentMonth = today.getMonth();
+  const currentYear = today.getFullYear();
+
+  // Estructura base de retorno (misma que dashboard_scanner.py)
+  const dashboard_data = {
+    kpis: {
+      accidents_month: 0,
+      pric_active: 0,
+      overdue_docs: 0,
+      compliance: 0,
+      recursos_alerts: 0,
+      gestion_salud_alerts: 0
+    },
+    tasks: [],
+    module_status: {
+      recursos: "ok",
+      "gestion-integral": "ok",
+      "gestion-salud": "ok",
+      peligros: "ok",
+      amenazas: "ok",
+      verificacion: "ok",
+      mejoramiento: "ok"
+    },
+    recursos_detail: {
+      capacitaciones_vencidas: {
+        total: 0,
+        copasst: 0,
+        comite_convivencia: 0,
+        inducciones: 0,
+        curso_50_horas: 0,
+        otros: 0
+      },
+      capacitaciones_proximas: {
+        total: 0,
+        en_7_dias: 0,
+        en_15_dias: 0
+      },
+      epp_por_entregar: 0,
+      cumplimiento_porcentaje: 0
+    },
+    overall_status: "ok"
+  };
+
+  try {
+    // ========================================================================
+    // 1. CAPACITACIONES - Usar calculateCapacitacionesStats
+    // ========================================================================
+    const capacitacionesStats = await calculateCapacitacionesStats(rootPath);
+    
+    // Calcular vencidas y próximas desde las capacitaciones programadas
+    const capacitaciones = await obtenerCapacitacionesDetalladas(rootPath);
+    
+    const vencidas = capacitaciones.filter(c => c.vencida && !c.realizada);
+    const proximas_7 = capacitaciones.filter(c => c.proxima_7 && !c.realizada);
+    const proximas_15 = capacitaciones.filter(c => c.proxima_15 && !c.realizada);
+    
+    // Clasificar vencidas por tipo
+    const vencidas_por_tipo = {
+      copasst: 0,
+      comite_convivencia: 0,
+      inducciones: 0,
+      curso_50_horas: 0,
+      otros: 0
+    };
+    
+    vencidas.forEach(c => {
+      const tema = (c.tema || '').toLowerCase();
+      if (tema.includes('copasst') || tema.includes('copas')) {
+        vencidas_por_tipo.copasst++;
+      } else if (tema.includes('comite') || tema.includes('convivencia')) {
+        vencidas_por_tipo.comite_convivencia++;
+      } else if (tema.includes('induccion') || tema.includes('reinduccion')) {
+        vencidas_por_tipo.inducciones++;
+      } else if (tema.includes('50 horas') || tema.includes('curso 50')) {
+        vencidas_por_tipo.curso_50_horas++;
+      } else {
+        vencidas_por_tipo.otros++;
+      }
+    });
+    
+    // Actualizar KPIs
+    dashboard_data.kpis.overdue_docs = vencidas.length;
+    dashboard_data.kpis.compliance = capacitacionesStats.porcentajeCumplimiento;
+    dashboard_data.kpis.recursos_alerts = vencidas.length + proximas_7.length;
+    
+    dashboard_data.recursos_detail.capacitaciones_vencidas = {
+      total: vencidas.length,
+      copasst: vencidas_por_tipo.copasst,
+      comite_convivencia: vencidas_por_tipo.comite_convivencia,
+      inducciones: vencidas_por_tipo.inducciones,
+      curso_50_horas: vencidas_por_tipo.curso_50_horas,
+      otros: vencidas_por_tipo.otros
+    };
+    
+    dashboard_data.recursos_detail.capacitaciones_proximas = {
+      total: proximas_7.length + proximas_15.length,
+      en_7_dias: proximas_7.length,
+      en_15_dias: proximas_15.length
+    };
+    
+    dashboard_data.recursos_detail.cumplimiento_porcentaje = capacitacionesStats.porcentajeCumplimiento;
+
+    // TAREA CRÍTICA: Capacitaciones vencidas
+    if (vencidas.length > 0) {
+      const detalles = [];
+      if (vencidas_por_tipo.copasst > 0) detalles.push(`${vencidas_por_tipo.copasst} COPASST`);
+      if (vencidas_por_tipo.comite_convivencia > 0) detalles.push(`${vencidas_por_tipo.comite_convivencia} Comité Convivencia`);
+      if (vencidas_por_tipo.inducciones > 0) detalles.push(`${vencidas_por_tipo.inducciones} Inducciones`);
+      if (vencidas_por_tipo.curso_50_horas > 0) detalles.push(`${vencidas_por_tipo.curso_50_horas} Curso 50 Horas`);
+      if (vencidas_por_tipo.otros > 0) detalles.push(`${vencidas_por_tipo.otros} Otras`);
+
+      const mensaje_detalles = detalles.length > 0 ? ` (${detalles.join(', ')})` : '';
+      
+      // Obtener nombres de las capacitaciones vencidas para mostrar en la descripción
+      const nombresVencidas = vencidas.slice(0, 3).map(v => v.tema).join('; ');
+      const faltantes = vencidas.length > 3 ? ` (+${vencidas.length - 3} más)` : '';
+
+      dashboard_data.tasks.push({
+        title: `${vencidas.length} Capacitaciones Vencidas${mensaje_detalles}`,
+        desc: `${nombresVencidas}${faltantes}. Cumplimiento actual: ${capacitacionesStats.porcentajeCumplimiento}%`,
+        priority: capacitacionesStats.porcentajeCumplimiento < 50 ? "critical" : "warning",
+        module: "capacitaciones",
+        icon: "fas fa-chalkboard-teacher",
+        submodule: "1.2.1 Programa de Capacitación"
+      });
+
+      dashboard_data.module_status.recursos = capacitacionesStats.porcentajeCumplimiento < 50 ? "danger" : "warning";
+    }
+    // TAREA PREVENTIVA: Capacitaciones próximas (7 días)
+    else if (proximas_7.length > 0) {
+      const nombresProximas = proximas_7.slice(0, 3).map(p => p.tema).join('; ');
+      
+      dashboard_data.tasks.push({
+        title: `${proximas_7.length} Capacitaciones Próximas (7 días)`,
+        desc: `${nombresProximas}. Verificar logística y participantes.`,
+        priority: "info",
+        module: "capacitaciones",
+        icon: "fas fa-calendar-alt",
+        submodule: "1.2.1 Programa de Capacitación"
+      });
+    }
+
+    // ========================================================================
+    // 2. INDUCCIONES - Usar calculateInduccionesStats
+    // ========================================================================
+    const induccionesStats = await calculateInduccionesStats(rootPath, companyName);
+
+    // Si hay inducciones pendientes, agregar alerta
+    if (induccionesStats.pendientes > 0) {
+      const cumplimiento = induccionesStats.porcentajeCompletado;
+
+      dashboard_data.tasks.push({
+        title: `${induccionesStats.pendientes} Inducciones Pendientes`,
+        desc: `Trabajadores sin inducción SST. Cumplimiento: ${cumplimiento}%`,
+        priority: cumplimiento < 50 ? "critical" : (cumplimiento < 90 ? "warning" : "info"),
+        module: "inducciones",
+        icon: "fas fa-user-check",
+        submodule: "1.2.2 Inducción y Reinducción"
+      });
+
+      // Sumar al contador de alertas de gestion-salud
+      if (cumplimiento < 90) {
+        dashboard_data.kpis.gestion_salud_alerts = (dashboard_data.kpis.gestion_salud_alerts || 0) + induccionesStats.pendientes;
+      }
+
+      // Actualizar estado de gestion-salud (NO recursos)
+      if (cumplimiento < 50) {
+        dashboard_data.module_status["gestion-salud"] = "danger";
+      } else if (dashboard_data.module_status["gestion-salud"] !== "danger") {
+        dashboard_data.module_status["gestion-salud"] = "warning";
+      }
+    }
+
+    // ========================================================================
+    // 3. EPP - Usar calculateEppsStats
+    // ========================================================================
+    const eppsStats = await calculateEppsStats(rootPath);
+    
+    // Si hay EPP pendientes, agregar alerta
+    if (eppsStats.pendientes > 0) {
+      dashboard_data.tasks.push({
+        title: `${eppsStats.pendientes} EPP Por Entregar`,
+        desc: "Equipos de protección programados sin registro de entrega.",
+        priority: "critical",
+        module: "epp",
+        icon: "fas fa-vest",
+        submodule: "2.13.1 Elementos de Protección Personal"
+      });
+      
+      dashboard_data.kpis.recursos_alerts += eppsStats.pendientes;
+      dashboard_data.recursos_detail.epp_por_entregar = eppsStats.pendientes;
+      dashboard_data.module_status.recursos = "danger";
+    }
+
+    // ========================================================================
+    // 4. PRESUPUESTO - Usar calculatePresupuestoStats
+    // ========================================================================
+    const presupuestoStats = await calculatePresupuestoStats(rootPath, companyName);
+
+    // Si hay alertas de presupuesto, agregar tarea
+    if (presupuestoStats.alertas.length > 0 || presupuestoStats.estado !== 'ok') {
+      let titulo = `Presupuesto: ${presupuestoStats.porcentajeEjecucion}% ejecutado`;
+      let descripcion = `Total asignado: $${(presupuestoStats.totalAsignado / 1000000).toFixed(1)}M | Ejecutado: $${(presupuestoStats.totalEjecutado / 1000000).toFixed(1)}M | Saldo: $${(presupuestoStats.saldoDisponible / 1000000).toFixed(1)}M`;
+      
+      if (presupuestoStats.alertas.length > 0) {
+        descripcion += ` | Alertas: ${presupuestoStats.alertas.join(', ')}`;
+      }
+
+      dashboard_data.tasks.push({
+        title: titulo,
+        desc: descripcion,
+        priority: presupuestoStats.estado === 'danger' ? 'critical' : 'warning',
+        module: 'presupuesto',
+        icon: 'fas fa-chart-line',
+        submodule: '1.4 Presupuesto'
+      });
+
+      dashboard_data.kpis.recursos_alerts += 1;
+      
+      if (presupuestoStats.estado === 'danger') {
+        dashboard_data.module_status.recursos = 'danger';
+      } else if (dashboard_data.module_status.recursos !== 'danger') {
+        dashboard_data.module_status.recursos = 'warning';
+      }
+    }
+
+    // ========================================================================
+    // 5. VERIFICAR ACTAS COPASST Y COMITÉ DE CONVIVENCIA
+    // ========================================================================
+    const actasPath = path.join(rootPath, '1. Recursos');
+    
+    // Verificar COPASST
+    const copasstPath = path.join(actasPath, '1.1.6 Conformación de Copasst');
+    if (fs.existsSync(copasstPath)) {
+      const archivos = fs.readdirSync(copasstPath);
+      const actaConst = archivos.some(f => 
+        f.toLowerCase().includes('acta') && 
+        (f.toLowerCase().includes('constitutiva') || f.toLowerCase().includes('constitucion'))
+      );
+      
+      if (!actaConst) {
+        dashboard_data.tasks.push({
+          title: "COPASST: Sin Acta Constitutiva",
+          desc: "No se encontró el acta constitutiva de COPASST. Requisito normativo obligatorio.",
+          priority: "critical",
+          module: "copasst",
+          icon: "fas fa-users",
+          submodule: "1.1.6 Conformación de Copasst"
+        });
+        dashboard_data.module_status.recursos = "danger";
+        dashboard_data.kpis.recursos_alerts += 1;
+      }
+    }
+    
+    // Verificar Comité de Convivencia
+    const convivenciaPath = path.join(actasPath, '1.1.8 Comité de Convivencia');
+    if (fs.existsSync(convivenciaPath)) {
+      const archivos = fs.readdirSync(convivenciaPath);
+      const actaConst = archivos.some(f => 
+        f.toLowerCase().includes('acta') && 
+        (f.toLowerCase().includes('constitutiva') || f.toLowerCase().includes('constitucion'))
+      );
+      
+      if (!actaConst) {
+        dashboard_data.tasks.push({
+          title: "Comité de Convivencia: Sin Acta Constitutiva",
+          desc: "No se encontró el acta constitutiva del Comité. Requisito normativo obligatorio.",
+          priority: "critical",
+          module: "comite_convivencia",
+          icon: "fas fa-handshake",
+          submodule: "1.1.8 Comité de Convivencia"
+        });
+        dashboard_data.module_status.recursos = "danger";
+        dashboard_data.kpis.recursos_alerts += 1;
+      }
+    }
+    
+  } catch (error) {
+    console.error(`[DASHBOARD ALERTAS] Error calculando alertas: ${error.message}`);
+    sendLog(`[DASHBOARD ALERTAS] Error: ${error.message}`, 'ERROR');
+  }
+
+  // ========================================================================
+  // ORDENAR TAREAS POR PRIORIDAD
+  // ========================================================================
+  const priority_map = { 'critical': 0, 'warning': 1, 'info': 2 };
+  dashboard_data.tasks.sort((a, b) => (priority_map[a.priority] || 3) - (priority_map[b.priority] || 3));
+
+  // ========================================================================
+  // ACTUALIZAR ESTADO GENERAL
+  // ========================================================================
+  const critical_count = dashboard_data.tasks.filter(t => t.priority === 'critical').length;
+  if (critical_count > 0) {
+    dashboard_data.overall_status = 'critical';
+  } else if (dashboard_data.tasks.length > 0) {
+    dashboard_data.overall_status = 'warning';
+  } else {
+    dashboard_data.overall_status = 'ok';
+  }
+
+  return dashboard_data;
+}
+
+/**
+ * Obtiene detalles de capacitaciones para calcular vencidas y próximas
+ */
+async function obtenerCapacitacionesDetalladas(basePath) {
+  const capacitaciones = [];
+  const today = new Date();
+
+  try {
+    if (!basePath) return capacitaciones;
+
+    const recursosPath = path.join(basePath, '1. Recursos');
+    let targetPath = path.join(recursosPath, '1.2.1 Programa de capacitación Anual');
+
+    if (!fs.existsSync(targetPath)) {
+      if (fs.existsSync(recursosPath)) {
+        const subs = await fsp.readdir(recursosPath);
+        let capFolder = subs.find(s => s.startsWith('1.2.1') && s.toLowerCase().includes('capacita'));
+        if (!capFolder) {
+          capFolder = subs.find(s => (s.includes('1.2') || s.toLowerCase().includes('capacita')) && !s.startsWith('.'));
+        }
+        if (capFolder) targetPath = path.join(recursosPath, capFolder);
+      }
+    }
+
+    if (!fs.existsSync(targetPath)) return capacitaciones;
+
+    const files = await fsp.readdir(targetPath);
+    const excelFile = files.find(f =>
+      (f.toLowerCase().includes('act-fo-005') || f.toLowerCase().includes('cronograma')) &&
+      !f.startsWith('~$') &&
+      (f.endsWith('.xlsx') || f.endsWith('.xls'))
+    );
+
+    if (!excelFile) return capacitaciones;
+
+    const workbook = xlsx.readFile(path.join(targetPath, excelFile));
+    let sheetName = workbook.SheetNames.find(s =>
+      s.toLowerCase().includes('matriz cap') && s.includes(new Date().getFullYear().toString())
+    );
+    if (!sheetName) {
+      sheetName = workbook.SheetNames.find(s => s.includes(new Date().getFullYear().toString()));
+    }
+    if (!sheetName) sheetName = workbook.SheetNames[0];
+
+    const worksheet = workbook.Sheets[sheetName];
+    const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
+
+    // Empezar en fila 6 (índice 5)
+    for (let i = 5; i < data.length; i++) {
+      const row = data[i];
+      if (!Array.isArray(row) || row.length < 2) continue;
+
+      const nombre = row[1];
+      if (!nombre || typeof nombre !== 'string' || nombre.includes('Nombre de la capacitación')) continue;
+      if (nombre.toLowerCase().includes('total')) break;
+
+      // Obtener fecha
+      let fecha = null;
+      const fechaVal = row[3];
+      if (fechaVal) {
+        if (typeof fechaVal === 'number') {
+          const dateCode = xlsx.SSF.parse_date_code(fechaVal);
+          fecha = new Date(dateCode.y, dateCode.m - 1, dateCode.d);
+        } else if (fechaVal instanceof Date) {
+          fecha = fechaVal;
+        } else if (typeof fechaVal === 'string') {
+          const parsed = new Date(fechaVal);
+          if (!isNaN(parsed.getTime())) fecha = parsed;
+        }
+      }
+
+      // Obtener estado
+      const estadoVal = row[8];
+      let realizada = false;
+      if (estadoVal && typeof estadoVal === 'string') {
+        const estadoStr = estadoVal.toLowerCase();
+        realizada = estadoStr.includes('ejecutado') || estadoStr.includes('realizado') || estadoStr.includes('completado');
+      }
+
+      // Obtener tema
+      const tema = row[1] || '';
+
+      // Calcular si está vencida o próxima
+      // IMPORTANTE: Solo marcar como vencida si TIENE fecha y está en el pasado y no se realizó
+      let vencida = false;
+      let proxima_7 = false;
+      let proxima_15 = false;
+
+      if (fecha) {
+        const diffTime = fecha - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        vencida = fecha < today && !realizada;
+        proxima_7 = diffDays >= 0 && diffDays <= 7 && !realizada;
+        proxima_15 = diffDays > 7 && diffDays <= 15 && !realizada;
+
+        // Log para depuración de capacitaciones vencidas
+        if (vencida) {
+          sendLog(`[DASHBOARD] ⚠️ Capacitación VENCIDA detectada: "${tema}" - Fecha programada: ${fecha.toISOString().split('T')[0]} - Días de retraso: ${Math.abs(diffDays)}`, 'WARN');
+        }
+      } else {
+        // Si no hay fecha, no se puede determinar si está vencida
+        sendLog(`[DASHBOARD] ℹ️ Capacitación sin fecha: "${tema}" - No se puede determinar estado`, 'INFO');
+      }
+
+      capacitaciones.push({
+        tema: tema,
+        fecha: fecha,
+        realizada: realizada,
+        vencida: vencida,
+        proxima_7: proxima_7,
+        proxima_15: proxima_15
+      });
+    }
+  } catch (e) {
+    console.error(`[DASHBOARD] Error obteniendo capacitaciones: ${e.message}`);
+  }
+  
+  return capacitaciones;
+}
+
+// ===============================
 // 📊 DASHBOARD SCANNER HANDLER
 // ===============================
 ipcMain.handle('get-dashboard-summary', async (event, companyName) => {
@@ -1318,32 +1752,15 @@ ipcMain.handle('get-dashboard-summary', async (event, companyName) => {
     // 2. Verificar que la ruta existe
     await fsp.access(companyPath);
 
-    // 3. Ejecutar Script Python
-    const scriptPath = getPythonScriptPath('dashboard_scanner.py');
-
-    // Debug: Verificar que el script existe
-    console.log(`[DASHBOARD] Script path: ${scriptPath}`);
-    console.log(`[DASHBOARD] Script existe: ${fs.existsSync(scriptPath)}`);
-
-    if (!fs.existsSync(scriptPath)) {
-      return { success: false, error: `Script de Python no encontrado: ${scriptPath}` };
-    }
-
-    const result = await runPythonScript(scriptPath, [companyPath]);
-
-    if (result.error) {
-      console.error(`[DASHBOARD] Error desde Python: ${result.error}`);
-      return { success: false, error: result.error };
-    }
+    // 3. USAR FUNCIÓN JAVASCRIPT EN LUGAR DE PYTHON
+    console.log(`[DASHBOARD] Calculando alertas con funciones JavaScript...`);
+    const result = await getDashboardAlertas(companyPath, companyName);
 
     console.log(`[DASHBOARD] Escaneo completado exitosamente`);
-    console.log(`[DASHBOARD] Resultado Python (primeros 500 chars):`, JSON.stringify(result).substring(0, 500));
-    
-    // Verificar que la estructura de datos es correcta
-    console.log(`[DASHBOARD] KPIs recibidos:`, result.kpis);
+    console.log(`[DASHBOARD] KPIs:`, result.kpis);
     console.log(`[DASHBOARD] Recursos Alerts:`, result.kpis?.recursos_alerts);
-    console.log(`[DASHBOARD] Recursos Detail:`, result.recursos_detail);
-    
+    console.log(`[DASHBOARD] Tareas:`, result.tasks.length);
+
     return { success: true, data: result };
 
   } catch (error) {
@@ -7892,6 +8309,226 @@ async function calculateEppsStats(basePath) {
   return stats;
 }
 
+/**
+ * Calcula estadísticas del Presupuesto
+ * @param {string} basePath - Ruta raíz de la empresa
+ * @param {string} companyName - Nombre de la empresa
+ * @returns {Promise<Object>} Stats de presupuesto
+ */
+async function calculatePresupuestoStats(basePath, companyName) {
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth(); // 0-11
+  
+  const stats = {
+    totalAsignado: 0,
+    totalEjecutado: 0,
+    porcentajeEjecucion: 0,
+    saldoDisponible: 0,
+    estado: 'ok', // 'ok', 'warning', 'danger'
+    alertas: [],
+    ejecucionMensual: {
+      programada: new Array(12).fill(0),
+      ejecutada: new Array(12).fill(0)
+    },
+    mesesConSobreEjecucion: [],
+    desviacionSignificativa: false
+  };
+
+  try {
+    if (!basePath) return stats;
+
+    const recursosPath = path.join(basePath, '1. Recursos');
+    
+    // Buscar carpeta de Presupuesto en múltiples ubicaciones posibles
+    let targetPath = null;
+    const possiblePaths = [
+      '1.4 Presupuesto',
+      '1.1.3 Asignación de Recursos',
+      '1.1.3 Asignacion de Recursos',
+      '1.3 Presupuesto',
+      'Presupuesto',
+      'Asignación de Recursos',
+      'Asignacion de Recursos'
+    ];
+    
+    if (fs.existsSync(recursosPath)) {
+      const subs = await fsp.readdir(recursosPath);
+      
+      // Intentar encontrar alguna de las carpetas conocidas
+      for (const possiblePath of possiblePaths) {
+        const found = subs.find(s => 
+          s.includes(possiblePath.split(' ')[0]) && // Coincide por el código numérico o primera palabra
+          (s.toLowerCase().includes('presupuesto') || 
+           s.toLowerCase().includes('asignacion') ||
+           s.toLowerCase().includes('asignación') ||
+           s.toLowerCase().includes('recursos'))
+        );
+        if (found) {
+          targetPath = path.join(recursosPath, found);
+          sendLog(`[Presupuesto] Carpeta encontrada: ${found}`, 'INFO');
+          break;
+        }
+      }
+      
+      // Si no se encontró por nombre exacto, buscar cualquier carpeta que contenga "presupuesto" o "asignacion"
+      if (!targetPath) {
+        const budgetFolder = subs.find(s => 
+          s.toLowerCase().includes('presupuesto') || 
+          s.toLowerCase().includes('asignacion') ||
+          s.toLowerCase().includes('asignación')
+        );
+        if (budgetFolder) {
+          targetPath = path.join(recursosPath, budgetFolder);
+          sendLog(`[Presupuesto] Carpeta encontrada por búsqueda flexible: ${budgetFolder}`, 'INFO');
+        }
+      }
+    }
+
+    if (!targetPath || !fs.existsSync(targetPath)) {
+      sendLog(`[Presupuesto] Carpeta no encontrada. Rutas intentadas: ${possiblePaths.join(', ')}`, 'WARN');
+      return stats;
+    }
+
+    // Buscar archivo Excel del año actual con búsqueda flexible
+    const files = await fsp.readdir(targetPath);
+    
+    // Estrategia 1: Buscar archivo con el año actual
+    let budgetFile = files.find(f => 
+      !f.startsWith('~$') && 
+      (f.endsWith('.xlsx') || f.endsWith('.xls')) &&
+      f.includes(currentYear.toString())
+    );
+    
+    // Estrategia 2: Si no hay del año actual, buscar el más reciente
+    if (!budgetFile) {
+      const yearPattern = /(20\d{2})/g;
+      const filesWithYear = files
+        .filter(f => !f.startsWith('~$') && (f.endsWith('.xlsx') || f.endsWith('.xls')))
+        .map(f => {
+          const match = f.match(yearPattern);
+          return { file: f, year: match ? parseInt(match[match.length - 1]) : 0 };
+        })
+        .filter(f => f.year > 0)
+        .sort((a, b) => b.year - a.year);
+      
+      if (filesWithYear.length > 0) {
+        budgetFile = filesWithYear[0].file;
+        sendLog(`[Presupuesto] Usando archivo del año ${filesWithYear[0].year} (más reciente)`, 'INFO');
+      }
+    }
+    
+    // Estrategia 3: Tomar cualquier Excel que contenga "presupuesto" o "ACT-FO-043"
+    if (!budgetFile) {
+      budgetFile = files.find(f => 
+        !f.startsWith('~$') && 
+        (f.endsWith('.xlsx') || f.endsWith('.xls')) &&
+        (f.toLowerCase().includes('presupuesto') || f.includes('ACT-FO-043'))
+      );
+    }
+
+    if (!budgetFile) {
+      sendLog(`[Presupuesto] No se encontró archivo de presupuesto en: ${targetPath}`, 'WARN');
+      return stats;
+    }
+
+    sendLog(`[Presupuesto] Leyendo archivo: ${budgetFile}`, 'INFO');
+
+    // Leer Excel
+    const workbook = xlsx.readFile(path.join(targetPath, budgetFile));
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    
+    if (!worksheet) return stats;
+
+    // Convertir a JSON
+    const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
+    
+    // Buscar fila de "TOTAL AÑO" para obtener totales
+    let totalRow = null;
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+      if (row && row.some(cell => 
+        cell && typeof cell === 'string' && 
+        cell.includes('TOTAL AÑO')
+      )) {
+        totalRow = row;
+        break;
+      }
+    }
+
+    if (totalRow) {
+      // Función para parsear valores monetarios
+      const parseMoney = (value) => {
+        if (!value) return 0;
+        if (typeof value === 'number') return value;
+        if (typeof value === 'string') {
+          // Limpiar formato: "$ 13,407,464" -> 13407464
+          const clean = value
+            .replace(/\$/g, '')
+            .replace(/\s/g, '')
+            .replace(/,/g, '');
+          return parseFloat(clean) || 0;
+        }
+        return 0;
+      };
+
+      // Columnas: D=asignacion, E=ejecutado_acumulado
+      stats.totalAsignado = parseMoney(totalRow[3]); // Columna D
+      stats.totalEjecutado = parseMoney(totalRow[4]); // Columna E
+
+      if (stats.totalAsignado > 0) {
+        stats.porcentajeEjecucion = Math.round((stats.totalEjecutado / stats.totalAsignado) * 100);
+        stats.saldoDisponible = stats.totalAsignado - stats.totalEjecutado;
+      }
+
+      // Determinar estado según ejecución
+      if (stats.porcentajeEjecucion > 100) {
+        stats.estado = 'danger';
+        stats.alertas.push('Sobre-ejecución presupuestal');
+      } else if (stats.porcentajeEjecucion < 50 && currentMonth >= 5) {
+        // Sub-ejecución crítica después de junio
+        stats.estado = 'warning';
+        stats.alertas.push(`Sub-ejecución crítica (${stats.porcentajeEjecucion}%)`);
+      }
+
+      // Calcular ejecución mensual (columnas G-R = índices 6-17)
+      const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
+                          'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+      
+      for (let m = 0; m < 12; m++) {
+        const monthlyValue = parseMoney(totalRow[6 + m]); // Columnas G-R
+        stats.ejecucionMensual.ejecutada[m] = monthlyValue;
+        
+        // Detectar sobre-ejecución mensual
+        if (monthlyValue > (stats.totalAsignado / 12) * 1.2) {
+          stats.mesesConSobreEjecucion.push(monthNames[m]);
+        }
+      }
+
+      // Calcular desviación significativa
+      const promedioMensualEsperado = stats.totalAsignado / 12;
+      const totalEjecutadoHastaFecha = stats.ejecucionMensual.ejecutada
+        .slice(0, currentMonth + 1)
+        .reduce((sum, val) => sum + val, 0);
+      const esperadoHastaFecha = promedioMensualEsperado * (currentMonth + 1);
+      
+      if (esperadoHastaFecha > 0) {
+        const desviacion = Math.abs(totalEjecutadoHastaFecha - esperadoHastaFecha) / esperadoHastaFecha;
+        if (desviacion > 0.3) { // 30% de desviación
+          stats.desviacionSignificativa = true;
+          stats.alertas.push('Desviación significativa vs esperado');
+        }
+      }
+    }
+
+    sendLog(`[Presupuesto] Stats calculados: ${JSON.stringify(stats)}`, 'DEBUG');
+
+  } catch (error) {
+    sendLog(`[Presupuesto] Error: ${error.message}`, 'ERROR');
+  }
+
+  return stats;
+}
+
 // --- API Estadísticas de Recursos (Implementación Real) ---
 ipcMain.handle('get-recursos-stats', async (event, companyName) => {
   try {
@@ -7932,6 +8569,365 @@ ipcMain.handle('get-recursos-stats', async (event, companyName) => {
     return { success: false, error: error.message };
   }
 });
+
+// --- API Estadísticas de Gestión Integral ---
+ipcMain.handle('get-gestion-integral-stats', async (event, companyName) => {
+  try {
+    sendLog(`[MAIN] Obteniendo estadísticas de Gestión Integral para: ${companyName}`, 'INFO');
+
+    const rootPath = await getCompanyRootPath(companyName);
+
+    if (!rootPath) {
+        sendLog(`[MAIN] No se encontró ruta raíz para ${companyName}. Retornando ceros.`, 'WARN');
+        return {
+            success: true,
+            stats: {
+                politica: { actualizada: false, fecha: null, estado: 'No disponible' },
+                objetivos: { total: 0, cumplidos: 0, porcentaje: 0 },
+                plan_trabajo: { tareas_pendientes: 0, tareas_realizadas: 0, total: 0 },
+                rendicion_cuentas: { actas_realizadas: 0, proxima_fecha: null }
+            }
+        };
+    }
+
+    // Calcular estadísticas en paralelo
+    const [politica, objetivos, plan_trabajo, rendicion] = await Promise.all([
+        calculatePoliticaStats(rootPath),
+        calculateObjetivosStats(rootPath),
+        calculatePlanTrabajoStats(rootPath),
+        calculateRendicionCuentasStats(rootPath)
+    ]);
+
+    const stats = {
+        politica,
+        objetivos,
+        plan_trabajo,
+        rendicion_cuentas: rendicion
+    };
+
+    sendLog(`[MAIN] Estadísticas Gestión Integral calculadas: ${JSON.stringify(stats)}`, 'DEBUG');
+    return { success: true, stats };
+
+  } catch (error) {
+    sendLog(`[MAIN] Error crítico en estadísticas de Gestión Integral: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+/**
+ * Calcular estadísticas de Política SST
+ */
+async function calculatePoliticaStats(basePath) {
+  const stats = {
+    actualizada: false,
+    fecha: null,
+    estado: 'No disponible',
+    documento_encontrado: false
+  };
+
+  try {
+    // Intentar múltiples nombres de carpeta (priorizar nombre corto)
+    const posiblesNombres = [
+        '2. Gestión Integral',        // Nombre corto (primero)
+        '2. Gestion Integral',        // Sin tilde
+        '2. Gestión Integral del SG-SST'  // Nombre completo
+    ];
+
+    let gestionIntegralPath = null;
+    for (const nombre of posiblesNombres) {
+        const pathIntento = path.join(basePath, nombre);
+        if (fs.existsSync(pathIntento)) {
+            gestionIntegralPath = pathIntento;
+            break;
+        }
+    }
+
+    if (!gestionIntegralPath) {
+        return stats;
+    }
+
+    const politicaPath = path.join(gestionIntegralPath, '2.1 Política SST');
+    const politicaPathAlt = path.join(gestionIntegralPath, '2.1 Politica SST');
+
+    const rutaFinal = fs.existsSync(politicaPath) ? politicaPath : politicaPathAlt;
+
+    if (!fs.existsSync(rutaFinal)) {
+        return stats;
+    }
+
+    const files = await fsp.readdir(rutaFinal);
+    const politicaFiles = files.filter(f => 
+        f.toLowerCase().includes('politica') && (f.endsWith('.pdf') || f.endsWith('.docx') || f.endsWith('.xlsx'))
+    );
+
+    if (politicaFiles.length > 0) {
+        stats.documento_encontrado = true;
+        stats.estado = 'Disponible';
+        
+        // Obtener fecha del archivo más reciente
+        const filePath = path.join(rutaFinal, politicaFiles[0]);
+        const fileStats = await fsp.stat(filePath);
+        stats.fecha = fileStats.mtime;
+        stats.actualizada = (Date.now() - fileStats.mtime.getTime()) < (365 * 24 * 60 * 60 * 1000); // Menos de 1 año
+        
+        if (stats.actualizada) {
+            stats.estado = 'Actualizada';
+        } else {
+            stats.estado = 'Por actualizar';
+        }
+    }
+  } catch (error) {
+    sendLog(`[MAIN] Error calculando política stats: ${error.message}`, 'WARN');
+  }
+
+  return stats;
+}
+
+/**
+ * Calcular estadísticas de Objetivos SST
+ */
+async function calculateObjetivosStats(basePath) {
+  const stats = {
+    total: 0,
+    cumplidos: 0,
+    porcentaje: 0,
+    vencidos: 0
+  };
+
+  try {
+    // Intentar múltiples nombres de carpeta (priorizar nombre corto)
+    const posiblesNombres = [
+        '2. Gestión Integral',        // Nombre corto (primero)
+        '2. Gestion Integral',        // Sin tilde
+        '2. Gestión Integral del SG-SST'  // Nombre completo
+    ];
+
+    let gestionIntegralPath = null;
+    for (const nombre of posiblesNombres) {
+        const pathIntento = path.join(basePath, nombre);
+        if (fs.existsSync(pathIntento)) {
+            gestionIntegralPath = pathIntento;
+            break;
+        }
+    }
+
+    if (!gestionIntegralPath) {
+        return stats;
+    }
+
+    const objetivosPath = path.join(gestionIntegralPath, '2.2 Objetivos SST');
+    const objetivosPathAlt = path.join(gestionIntegralPath, '2.2 Objetivos');
+
+    const rutaFinal = fs.existsSync(objetivosPath) ? objetivosPath : objetivosPathAlt;
+
+    if (!fs.existsSync(rutaFinal)) {
+        return stats;
+    }
+
+    const files = await fsp.readdir(rutaFinal);
+    const objetivosFiles = files.filter(f => 
+        (f.endsWith('.xlsx') || f.endsWith('.xls')) && !f.startsWith('~$')
+    );
+
+    if (objetivosFiles.length > 0) {
+        const filePath = path.join(rutaFinal, objetivosFiles[0]);
+        const workbook = xlsx.readFile(filePath);
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
+
+        // Asumir que hay columnas: Objetivo, Estado/Cumplimiento, Fecha
+        for (let i = 1; i < data.length; i++) {
+            const row = data[i];
+            if (!row || row.length < 2) continue;
+
+            const objetivo = row[1];
+            if (!objetivo || typeof objetivo !== 'string') continue;
+            if (objetivo.toLowerCase().includes('total') || objetivo.toLowerCase().includes('objetivo')) continue;
+
+            stats.total++;
+
+            // Verificar estado de cumplimiento
+            const estado = (row[2] || row[3] || '').toString().toLowerCase();
+            if (estado.includes('cumplido') || estado.includes('realizado') || estado.includes('completado') || estado === 'si') {
+                stats.cumplidos++;
+            }
+        }
+
+        if (stats.total > 0) {
+            stats.porcentaje = Math.round((stats.cumplidos / stats.total) * 100);
+        }
+    }
+  } catch (error) {
+    sendLog(`[MAIN] Error calculando objetivos stats: ${error.message}`, 'WARN');
+  }
+
+  return stats;
+}
+
+/**
+ * Calcular estadísticas de Plan de Trabajo
+ */
+async function calculatePlanTrabajoStats(basePath) {
+  const stats = {
+    tareas_pendientes: 0,
+    tareas_realizadas: 0,
+    total: 0,
+    vencidas: 0
+  };
+
+  try {
+    // Intentar múltiples nombres de carpeta (priorizar nombre corto)
+    const posiblesNombres = [
+        '2. Gestión Integral',        // Nombre corto (primero)
+        '2. Gestion Integral',        // Sin tilde
+        '2. Gestión Integral del SG-SST'  // Nombre completo
+    ];
+
+    let gestionIntegralPath = null;
+    for (const nombre of posiblesNombres) {
+        const pathIntento = path.join(basePath, nombre);
+        if (fs.existsSync(pathIntento)) {
+            gestionIntegralPath = pathIntento;
+            break;
+        }
+    }
+
+    if (!gestionIntegralPath) {
+        return stats;
+    }
+
+    const planPath = path.join(gestionIntegralPath, '2.4 Plan de Trabajo');
+    const planPathAlt = path.join(gestionIntegralPath, '2.4 Plan de Trabajo Anual');
+
+    const rutaFinal = fs.existsSync(planPath) ? planPath : planPathAlt;
+
+    if (!fs.existsSync(rutaFinal)) {
+        return stats;
+    }
+
+    const files = await fsp.readdir(rutaFinal);
+    const planFiles = files.filter(f => 
+        (f.endsWith('.xlsx') || f.endsWith('.xls')) && !f.startsWith('~$')
+    );
+
+    if (planFiles.length > 0) {
+        const filePath = path.join(rutaFinal, planFiles[0]);
+        const workbook = xlsx.readFile(filePath);
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
+
+        const today = new Date();
+
+        for (let i = 1; i < data.length; i++) {
+            const row = data[i];
+            if (!row || row.length < 2) continue;
+
+            const actividad = row[1];
+            if (!actividad || typeof actividad !== 'string') continue;
+            if (actividad.toLowerCase().includes('total') || actividad.toLowerCase().includes('actividad')) continue;
+
+            stats.total++;
+
+            // Verificar estado
+            const estado = (row[5] || row[6] || '').toString().toLowerCase();
+            const fechaStr = row[3] || row[4]; // Columna de fecha
+
+            if (estado.includes('realizado') || estado.includes('completado') || estado === 'si') {
+                stats.tareas_realizadas++;
+            } else {
+                stats.tareas_pendientes++;
+
+                // Verificar si está vencida
+                if (fechaStr) {
+                    let fecha;
+                    if (typeof fechaStr === 'number') {
+                        const dateCode = xlsx.SSF.parse_date_code(fechaStr);
+                        fecha = new Date(dateCode.y, dateCode.m - 1, dateCode.d);
+                    } else {
+                        fecha = new Date(fechaStr);
+                    }
+
+                    if (fecha < today) {
+                        stats.vencidas++;
+                    }
+                }
+            }
+        }
+    }
+  } catch (error) {
+    sendLog(`[MAIN] Error calculando plan de trabajo stats: ${error.message}`, 'WARN');
+  }
+
+  return stats;
+}
+
+/**
+ * Calcular estadísticas de Rendición de Cuentas
+ */
+async function calculateRendicionCuentasStats(basePath) {
+  const stats = {
+    actas_realizadas: 0,
+    proxima_fecha: null,
+    ultima_fecha: null
+  };
+
+  try {
+    // Intentar múltiples nombres de carpeta (priorizar nombre corto)
+    const posiblesNombres = [
+        '2. Gestión Integral',        // Nombre corto (primero)
+        '2. Gestion Integral',        // Sin tilde
+        '2. Gestión Integral del SG-SST'  // Nombre completo
+    ];
+
+    let gestionIntegralPath = null;
+    for (const nombre of posiblesNombres) {
+        const pathIntento = path.join(basePath, nombre);
+        if (fs.existsSync(pathIntento)) {
+            gestionIntegralPath = pathIntento;
+            break;
+        }
+    }
+
+    if (!gestionIntegralPath) {
+        return stats;
+    }
+
+    const rendicionPath = path.join(gestionIntegralPath, '2.6 Rendición de cuentas');
+    const rendicionPathAlt = path.join(gestionIntegralPath, '2.6 Rendicion de cuentas');
+
+    const rutaFinal = fs.existsSync(rendicionPath) ? rendicionPath : rendicionPathAlt;
+
+    if (!fs.existsSync(rutaFinal)) {
+        return stats;
+    }
+
+    const files = await fsp.readdir(rutaFinal);
+    const actasFiles = files.filter(f => 
+        f.toLowerCase().includes('acta') && (f.endsWith('.pdf') || f.endsWith('.docx'))
+    );
+
+    stats.actas_realizadas = actasFiles.length;
+
+    // Obtener fecha de la última acta
+    if (actasFiles.length > 0) {
+        const sortedFiles = actasFiles.sort();
+        const lastFile = sortedFiles[sortedFiles.length - 1];
+        const filePath = path.join(rutaFinal, lastFile);
+        const fileStats = await fsp.stat(filePath);
+        stats.ultima_fecha = fileStats.mtime;
+
+        // Próxima rendición (aproximadamente 1 año después)
+        stats.proxima_fecha = new Date(stats.ultima_fecha);
+        stats.proxima_fecha.setFullYear(stats.proxima_fecha.getFullYear() + 1);
+    }
+  } catch (error) {
+    sendLog(`[MAIN] Error calculando rendición de cuentas stats: ${error.message}`, 'WARN');
+  }
+
+  return stats;
+}
 
 
 // Manejar la carga del archivo normativa-0312.json

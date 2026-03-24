@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAppPath: () => ipcRenderer.invoke('get-app-path'),
   checkDependencies: () => ipcRenderer.invoke('check-dependencies'),
   getRecursosStats: (companyName) => ipcRenderer.invoke('get-recursos-stats', companyName),
+  getGestionIntegralStats: (companyName) => ipcRenderer.invoke('get-gestion-integral-stats', companyName),
   saveConfig: (config) => ipcRenderer.invoke('save-config', config),
   loadConfig: () => ipcRenderer.invoke('load-config'),
   loadNormativa: () => ipcRenderer.invoke('load-normativa'),

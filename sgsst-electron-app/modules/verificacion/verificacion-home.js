@@ -294,12 +294,12 @@ class VerificacionHome {
         `;
         document.head.appendChild(style);
     }
-    
+
     renderMainArea(container) {
         // Widgets con contadores específicos para Verificación
         const widgetsContainer = document.createElement('div');
         widgetsContainer.className = 'widgets-container';
-        
+
         const widget1 = this.createWidget('Auditorías Realizadas', '4', '📅 1 programada');
         const widget2 = this.createWidget('Hallazgos Identificados', '12', '📉 3 resueltos');
         const widget3 = this.createWidget('Indicadores Monitoreados', '18', '📊 2 fuera de rango');

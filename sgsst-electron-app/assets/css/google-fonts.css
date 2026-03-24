@@ -1,5 +1,11 @@
 /* Google Fonts - Roboto, Lexend, Inter, Teko */
-/* Descargado localmente para evitar dependencias externas */
+/* Roboto: archivos locales en assets/fonts/google/ */
+/* Lexend, Inter, Teko: se cargan desde Google Fonts CDN */
+
+/* Fuentes desde Google Fonts CDN (deben ir antes de @font-face) */
+@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&display=swap');
 
 /* Roboto - Regular (400) */
 @font-face {
@@ -27,15 +33,3 @@
   font-display: swap;
   src: url('../fonts/google/KFOmCnqEu92Fr1Mu4WxKOzY.woff2') format('woff2');
 }
-
-/* Lexend - Regular (400), Medium (500), SemiBold (600) */
-/* Nota: Lexend se carga desde CDN por ahora */
-@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600&display=swap');
-
-/* Inter - Regular (400), Medium (500), SemiBold (600) */
-/* Nota: Inter se carga desde CDN por ahora */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
-
-/* Teko - Regular (400), Medium (500), SemiBold (600), Bold (700) */
-/* Nota: Teko se carga desde CDN por ahora */
-@import url('https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&display=swap');

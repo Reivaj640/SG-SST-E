@@ -294,12 +294,12 @@ class GestionAmenazasHome {
         `;
         document.head.appendChild(style);
     }
-    
+
     renderMainArea(container) {
         // Widgets con contadores específicos para Gestión de Amenazas
         const widgetsContainer = document.createElement('div');
         widgetsContainer.className = 'widgets-container';
-        
+
         const widget1 = this.createWidget('Amenazas Identificadas', '15', '📅 2 críticas');
         const widget2 = this.createWidget('Simulacros Realizados', '3', '✔ Al día');
         const widget3 = this.createWidget('Brigadistas Capacitados', '24', '👥 5 nuevos este mes');
