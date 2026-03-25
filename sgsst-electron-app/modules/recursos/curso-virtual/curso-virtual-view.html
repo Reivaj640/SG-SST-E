@@ -123,6 +123,41 @@
         <div class="notification-message">Operación completada con éxito</div>
     </div>
 
+    <!-- CONTEXT MENU (Clic Derecho) -->
+    <div id="contextMenu" class="context-menu" style="display: none;">
+        <div class="context-menu-item" id="openFileBtn">
+            <i class="fas fa-external-link-alt"></i>
+            <span>Abrir archivo</span>
+        </div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item danger" id="deleteFileBtn">
+            <i class="fas fa-trash-alt"></i>
+            <span>Eliminar</span>
+        </div>
+    </div>
+
+    <!-- CONFIRM MODAL -->
+    <div id="confirmModal" class="confirm-modal" style="display: none;">
+        <div class="confirm-modal-content">
+            <div class="confirm-modal-header">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h3>¿Eliminar archivo?</h3>
+            </div>
+            <div class="confirm-modal-body">
+                <p>Estás a punto de eliminar:</p>
+                <p class="confirm-file-name" id="confirmFileName">nombre_archivo.pdf</p>
+                <p class="confirm-warning">⚠️ Esta acción no se puede deshacer.</p>
+            </div>
+            <div class="confirm-modal-footer">
+                <button class="btn btn-ghost" id="confirmCancelBtn">Cancelar</button>
+                <button class="btn btn-danger" id="confirmAcceptBtn">Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div id="kToastContainer" class="k-toast-container"></div>
+
     <script src="curso-virtual-viewer.js"></script>
 </body>
 </html>

@@ -51,6 +51,8 @@ function callParentAPI(type, payload) {
 // Inicialización
 document.addEventListener('DOMContentLoaded', function() {
     setupEventListeners();
+    setupDragAndDrop(); // Agregar funcionalidad drag & drop
+    setupContextMenu(); // Agregar menú contextual
     loadFolders();
 });
 
@@ -75,6 +77,418 @@ function setupEventListeners() {
     document.getElementById('zoomInBtn').addEventListener('click', zoomIn);
     document.getElementById('zoomOutBtn').addEventListener('click', zoomOut);
     document.getElementById('fitWidthBtn').addEventListener('click', fitWidth);
+}
+
+// ===============================
+// DRAG & DROP FUNCTIONALITY (Por Carpeta)
+// ===============================
+
+// Configurar eventos de drag & drop
+function setupDragAndDrop() {
+    // Se configura dinámicamente en renderFolders() para cada carpeta
+    console.log('[Drag&Drop] Setup completado - se activará por carpeta');
+}
+
+// Configurar drag & drop en una carpeta específica
+function setupFolderDragAndDrop(folderElement, folderPath) {
+    const overlay = document.createElement('div');
+    overlay.className = 'drag-drop-overlay';
+    overlay.style.display = 'none';
+    overlay.innerHTML = `
+        <div class="drag-drop-content">
+            <i class="fas fa-cloud-upload-alt"></i>
+            <h3>Suelta aquí</h3>
+        </div>
+    `;
+
+    folderElement.appendChild(overlay);
+
+    let dragCounter = 0;
+
+    // Prevenir comportamiento por defecto
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        folderElement.addEventListener(eventName, preventDefaults, false);
+    });
+
+    // Mostrar overlay cuando se arrastra sobre la carpeta
+    folderElement.addEventListener('dragenter', (e) => {
+        dragCounter++;
+        if (dragCounter === 1) {
+            overlay.style.display = 'flex';
+            folderElement.classList.add('drag-over');
+            console.log(`[Drag&Drop] Enter en carpeta: ${folderPath}`);
+        }
+    }, false);
+
+    folderElement.addEventListener('dragover', handleDragOver, false);
+
+    folderElement.addEventListener('dragleave', (e) => {
+        dragCounter--;
+        if (dragCounter === 0) {
+            overlay.style.display = 'none';
+            folderElement.classList.remove('drag-over');
+            console.log(`[Drag&Drop] Leave en carpeta: ${folderPath}`);
+        }
+    }, false);
+
+    folderElement.addEventListener('drop', (e) => {
+        e.preventDefault();
+        overlay.style.display = 'none';
+        folderElement.classList.remove('drag-over');
+
+        const files = e.dataTransfer.files;
+
+        if (files.length === 0) {
+            showToast('No se detectaron archivos', 'warning');
+            return;
+        }
+
+        console.log(`[Drag&Drop] Archivos detectados: ${files.length} en carpeta ${folderPath}`);
+
+        // Procesar cada archivo
+        Array.from(files).forEach(file => {
+            uploadFile(file, folderPath);
+        });
+    }, false);
+}
+
+function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+}
+
+function handleDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+}
+
+// Subir archivo
+async function uploadFile(file, folderPath) {
+    try {
+        console.log(`[Drag&Drop] Subiendo archivo: ${file.name} a ${folderPath}`);
+        showToast(`Subiendo ${file.name}...`, 'info');
+
+        // 1. Convertir file a base64
+        const base64Data = await fileToBase64(file);
+
+        // 2. Usar la ruta de la carpeta donde se soltó
+        const destinationPath = folderPath || currentFolderPath;
+
+        if (!destinationPath) {
+            showToast('No hay una carpeta seleccionada', 'error');
+            return;
+        }
+
+        // 3. Enviar al padre via postMessage
+        const result = await callParentAPI('upload-document', {
+            fileName: file.name,
+            base64Data: base64Data,
+            destinationPath: destinationPath
+        });
+
+        // 4. Mostrar resultado
+        if (result.success) {
+            showToast(result.message || 'Archivo subido exitosamente', 'success');
+
+            // 5. Recargar lista de archivos
+            await loadDocuments(destinationPath);
+        } else {
+            showToast(`Error: ${result.error}`, 'error');
+        }
+
+    } catch (error) {
+        console.error('[Drag&Drop] Error al subir archivo:', error);
+        showToast(`Error al subir archivo: ${error.message}`, 'error');
+    }
+}
+
+// Convertir File a Base64
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+    });
+}
+
+// ===============================
+// CONTEXT MENU (CLIC DERECHO)
+// ===============================
+
+let currentContextMenuDoc = null;
+
+// Mostrar menú contextual
+function showContextMenu(x, y, doc) {
+    const menu = document.getElementById('contextMenu');
+    if (!menu) return;
+
+    currentContextMenuDoc = doc;
+
+    // Posicionar menú
+    menu.style.display = 'block';
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+
+    // Ajustar si se sale de la pantalla
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+        menu.style.left = `${window.innerWidth - rect.width - 10}px`;
+    }
+    if (rect.bottom > window.innerHeight) {
+        menu.style.top = `${window.innerHeight - rect.height - 10}px`;
+    }
+
+    console.log(`[ContextMenu] Mostrando menú para: ${doc.name}`);
+}
+
+// Ocultar menú contextual
+function hideContextMenu() {
+    const menu = document.getElementById('contextMenu');
+    if (menu) {
+        menu.style.display = 'none';
+    }
+    currentContextMenuDoc = null;
+}
+
+// Eliminar documento
+async function deleteDocument() {
+    if (!currentContextMenuDoc) {
+        console.error('[ContextMenu] No hay documento seleccionado');
+        showToast('No hay archivo seleccionado', 'error');
+        return;
+    }
+
+    const doc = currentContextMenuDoc;
+
+    console.log('[ContextMenu] Mostrando modal para eliminar:', doc.name);
+
+    // Mostrar modal moderno en lugar de confirm()
+    showConfirmModal(doc.name, async () => {
+        console.log('[ConfirmModal] Callback ejecutado - Eliminando archivo:', doc.path);
+
+        // Callback se ejecuta al aceptar
+        try {
+            // Cerrar el documento primero para liberar el archivo de memoria (evita EPERM)
+            console.log('[ContextMenu] Cerrando documento para liberar archivo...');
+            closeDocument();
+
+            console.log(`[ContextMenu] Eliminando archivo: ${doc.path}`);
+
+            const result = await callParentAPI('delete-document', {
+                filePath: doc.path
+            });
+
+            console.log('[ContextMenu] Resultado de eliminar:', result);
+
+            if (result.success) {
+                showToast('Archivo eliminado correctamente', 'success');
+                // Recargar lista de archivos
+                console.log('[ContextMenu] Recargando lista de archivos...');
+                await loadDocuments(currentFolderPath);
+            } else {
+                console.error('[ContextMenu] Error en respuesta:', result.error);
+
+                // Manejo específico para error EPERM (archivo en uso)
+                if (result.code === 'EPERM') {
+                    showToast(
+                        '⚠️ El archivo está abierto en otra aplicación.<br><strong>CIérralo e intenta nuevamente.</strong>',
+                        'warning',
+                        6000
+                    );
+                } else if (result.code === 'ENOENT') {
+                    showToast('El archivo no existe. Puede que ya haya sido eliminado.', 'info');
+                } else if (result.code === 'EACCES') {
+                    showToast('No tienes permisos para eliminar este archivo.', 'error');
+                } else {
+                    showToast(`Error: ${result.error}`, 'error');
+                }
+            }
+        } catch (error) {
+            console.error('[ContextMenu] Error al eliminar:', error);
+            showToast(`Error al eliminar archivo: ${error.message}`, 'error');
+        }
+    });
+}
+
+// Setup de listeners para el menú contextual
+function setupContextMenu() {
+    // Cerrar menú al hacer clic en cualquier partes
+    document.addEventListener('click', () => {
+        hideContextMenu();
+    });
+
+    // Cerrar menú al presionar Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            hideContextMenu();
+        }
+    });
+
+    // Setup del modal de confirmación
+    setupConfirmModal();
+
+    // Listener para el botón eliminar
+    const deleteBtn = document.getElementById('deleteFileBtn');
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Evitar que se cierre inmediatamente
+            deleteDocument();
+        });
+    }
+
+    // Listener para el botón abrir archivo
+    const openBtn = document.getElementById('openFileBtn');
+    if (openBtn) {
+        openBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFile();
+        });
+    }
+}
+
+// ===============================
+// TOAST NOTIFICATIONS (K+AIR Modern Style)
+// ===============================
+
+function showToast(message, type = 'info', duration = 3000) {
+    const container = document.getElementById('kToastContainer');
+    if (!container) {
+        console.error('[Toast] Contenedor no encontrado');
+        return;
+    }
+
+    // Iconos por tipo
+    const icons = {
+        success: 'fa-check-circle',
+        error: 'fa-times-circle',
+        warning: 'fa-exclamation-circle',
+        info: 'fa-info-circle'
+    };
+
+    // Crear toast
+    const toast = document.createElement('div');
+    toast.className = `k-toast ${type}`;
+    toast.innerHTML = `
+        <i class="fas ${icons[type] || icons.info} k-toast-icon"></i>
+        <span class="k-toast-message">${message}</span>
+    `;
+
+    container.appendChild(toast);
+
+    // Auto-eliminar después del tiempo especificado
+    setTimeout(() => {
+        toast.classList.add('closing');
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
+}
+
+// ===============================
+// CONFIRM MODAL (K+AIR Modern)
+// ===============================
+
+let confirmCallback = null;
+
+function showConfirmModal(fileName, callback) {
+    const modal = document.getElementById('confirmModal');
+    const fileNameEl = document.getElementById('confirmFileName');
+
+    if (!modal || !fileNameEl) {
+        console.error('[ConfirmModal] Elementos no encontrados');
+        return;
+    }
+
+    console.log('[ConfirmModal] Mostrando modal para:', fileName);
+    console.log('[ConfirmModal] Callback registrado:', !!callback);
+
+    fileNameEl.textContent = fileName;
+    confirmCallback = callback;
+
+    modal.style.display = 'flex';
+
+    // Focus en botón cancelar por seguridad
+    document.getElementById('confirmCancelBtn').focus();
+}
+
+function hideConfirmModal() {
+    const modal = document.getElementById('confirmModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    confirmCallback = null;
+}
+
+function acceptConfirm() {
+    console.log('[ConfirmModal] Aceptando confirmación, callback existe:', !!confirmCallback);
+    if (confirmCallback) {
+        console.log('[ConfirmModal] Ejecutando callback...');
+        confirmCallback();
+    } else {
+        console.error('[ConfirmModal] No hay callback registrado');
+    }
+    hideConfirmModal();
+}
+
+function cancelConfirm() {
+    hideConfirmModal();
+}
+
+function setupConfirmModal() {
+    const acceptBtn = document.getElementById('confirmAcceptBtn');
+    const cancelBtn = document.getElementById('confirmCancelBtn');
+    const modal = document.getElementById('confirmModal');
+
+    if (acceptBtn) {
+        acceptBtn.addEventListener('click', acceptConfirm);
+    }
+
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', cancelConfirm);
+    }
+
+    // Cerrar al hacer clic fuera del modal
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                cancelConfirm();
+            }
+        });
+    }
+
+    // Cerrar con Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal && modal.style.display === 'flex') {
+            cancelConfirm();
+        }
+    });
+}
+
+// Abrir archivo con aplicación predeterminada
+async function openFile() {
+    if (!currentContextMenuDoc) {
+        console.error('[ContextMenu] No hay documento seleccionado');
+        showToast('No hay archivo seleccionado', 'error');
+        return;
+    }
+
+    const doc = currentContextMenuDoc;
+
+    try {
+        console.log(`[ContextMenu] Abriendo archivo: ${doc.path}`);
+
+        const result = await callParentAPI('open-file', {
+            filePath: doc.path
+        });
+
+        if (!result.success) {
+            showToast(`Error al abrir archivo: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('[ContextMenu] Error al abrir:', error);
+        showToast(`Error al abrir archivo: ${error.message}`, 'error');
+    }
+
+    hideContextMenu();
 }
 
 // Cargar carpetas
@@ -121,7 +535,7 @@ function renderFolders(folders) {
 
     folders.forEach(folder => {
         const folderItem = document.createElement('div');
-        folderItem.className = 'list-item';
+        folderItem.className = 'list-item folder'; // Agregar clase 'folder' para drag & drop
         folderItem.dataset.path = folder.path;
 
         const iconDiv = document.createElement('div');
@@ -130,7 +544,7 @@ function renderFolders(folders) {
 
         const infoDiv = document.createElement('div');
         infoDiv.className = 'item-info';
-        
+
         const nameDiv = document.createElement('div');
         nameDiv.className = 'item-name';
         nameDiv.textContent = folder.name;
@@ -142,6 +556,9 @@ function renderFolders(folders) {
         folderItem.addEventListener('click', () => {
             selectFolder(folder.path);
         });
+
+        // Configurar drag & drop para esta carpeta específica
+        setupFolderDragAndDrop(folderItem, folder.path);
 
         folderList.appendChild(folderItem);
     });
@@ -187,7 +604,7 @@ async function loadDocuments(folderPath) {
 function renderDocuments(documents) {
     const documentList = document.getElementById('fileList');
     const docCount = document.getElementById('docCount');
-    
+
     documentList.innerHTML = '';
 
     if (!documents || documents.length === 0) {
@@ -204,7 +621,7 @@ function renderDocuments(documents) {
         docItem.dataset.path = doc.path;
 
         const fileTypeInfo = getFileTypeInfo(doc.extension);
-        
+
         const iconDiv = document.createElement('div');
         iconDiv.className = `item-icon ${fileTypeInfo.className}`;
         iconDiv.innerHTML = `<i class="fas ${fileTypeInfo.icon}"></i>`;
@@ -218,7 +635,7 @@ function renderDocuments(documents) {
 
         const metaDiv = document.createElement('div');
         metaDiv.className = 'item-meta';
-        metaDiv.innerHTML = `<span class="badge-type">${doc.extension.toUpperCase()}</span>`; 
+        metaDiv.innerHTML = `<span class="badge-type">${doc.extension.toUpperCase()}</span>`;
 
         infoDiv.appendChild(nameDiv);
         infoDiv.appendChild(metaDiv);
@@ -227,6 +644,12 @@ function renderDocuments(documents) {
 
         docItem.addEventListener('click', () => {
             selectDocument(doc);
+        });
+
+        // Agregar evento de clic derecho (context menu)
+        docItem.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            showContextMenu(e.clientX, e.clientY, doc);
         });
 
         documentList.appendChild(docItem);

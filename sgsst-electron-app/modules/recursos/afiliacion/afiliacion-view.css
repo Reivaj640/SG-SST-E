@@ -332,6 +332,279 @@ iframe.pdf-viewer, iframe.excel-viewer {
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   CONTEXT MENU (CLIC DERECHO)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.context-menu {
+    position: fixed;
+    background: white;
+    border-radius: 6px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    z-index: 10000;
+    min-width: 180px;
+    overflow: hidden;
+    animation: fadeIn 0.2s ease-out;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.context-menu-item {
+    padding: 10px 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-size: 0.9rem;
+    color: var(--text-dark);
+}
+
+.context-menu-item:hover {
+    background: #f5f5f5;
+}
+
+.context-menu-item.danger {
+    color: var(--danger);
+}
+
+.context-menu-item.danger:hover {
+    background: #fee2e2;
+}
+
+.context-menu-divider {
+    height: 1px;
+    background: #e5e7eb;
+    margin: 5px 0;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   CONFIRM MODAL
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.confirm-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10001;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.confirm-modal-content {
+    background: white;
+    border-radius: 12px;
+    max-width: 450px;
+    width: 90%;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.confirm-modal-header {
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #fef3c7;
+    border-bottom: 1px solid #fde68a;
+}
+
+.confirm-modal-header i {
+    font-size: 1.5rem;
+    color: #d97706;
+}
+
+.confirm-modal-header h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #92400e;
+    margin: 0;
+}
+
+.confirm-modal-body {
+    padding: 25px 20px;
+    text-align: center;
+}
+
+.confirm-modal-body p {
+    margin: 10px 0;
+    color: var(--text-dark);
+    font-size: 0.95rem;
+}
+
+.confirm-file-name {
+    font-weight: 600;
+    color: var(--primary);
+    background: #f3f4f6;
+    padding: 10px 15px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    word-break: break-all;
+    margin: 15px 0;
+}
+
+.confirm-warning {
+    color: var(--danger);
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.confirm-modal-footer {
+    padding: 15px 20px;
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    background: #f9fafb;
+    border-top: 1px solid #e5e7eb;
+}
+
+.confirm-modal-footer .btn {
+    padding: 8px 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.confirm-modal-footer .btn-ghost {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid transparent;
+}
+
+.confirm-modal-footer .btn-ghost:hover {
+    background: #f3f4f6;
+    color: var(--text-dark);
+}
+
+.confirm-modal-footer .btn-danger {
+    background: var(--danger);
+    color: white;
+    border: 1px solid var(--danger);
+}
+
+.confirm-modal-footer .btn-danger:hover {
+    background: #c82333;
+    border-color: #bd2130;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   TOAST NOTIFICATIONS (K+AIR Modern)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.k-toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10002;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 400px;
+}
+
+.k-toast {
+    background: white;
+    padding: 15px 18px;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 300px;
+    animation: slideInRight 0.3s ease-out;
+    border-left: 4px solid transparent;
+}
+
+.k-toast.closing {
+    animation: slideOutRight 0.3s ease-out forwards;
+}
+
+@keyframes slideInRight {
+    from { opacity: 0; transform: translateX(100%); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideOutRight {
+    from { opacity: 1; transform: translateX(0); }
+    to { opacity: 0; transform: translateX(100%); }
+}
+
+.k-toast.success { border-left-color: var(--success); }
+.k-toast.error { border-left-color: var(--danger); }
+.k-toast.warning { border-left-color: var(--warning); }
+.k-toast.info { border-left-color: var(--info); }
+
+.k-toast-icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.k-toast.success .k-toast-icon { color: var(--success); }
+.k-toast.error .k-toast-icon { color: var(--danger); }
+.k-toast.warning .k-toast-icon { color: var(--warning); }
+.k-toast.info .k-toast-icon { color: var(--info); }
+
+.k-toast-message {
+    flex: 1;
+    font-size: 0.9rem;
+    color: var(--text-dark);
+    line-height: 1.4;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   DRAG & DROP OVERLAY
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.drag-drop-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(23, 78, 166, 0.1);
+    border: 2px dashed var(--primary);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.drag-drop-content {
+    text-align: center;
+    color: var(--primary);
+}
+
+.drag-drop-content i {
+    font-size: 3rem;
+    margin-bottom: 10px;
+    animation: bounce 1s infinite;
+}
+
+.drag-drop-content h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.list-item.folder.drag-over {
+    background: rgba(23, 78, 166, 0.1);
+    border-color: var(--primary);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .sidebar { width: 250px; position: absolute; height: 100%; z-index: 15; transform: translateX(-100%); transition: transform 0.3s; }
