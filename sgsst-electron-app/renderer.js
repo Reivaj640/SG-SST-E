@@ -1871,6 +1871,13 @@ function initializeApp(overrideCompanies = null) {
 
 function createSidebarButtons(activeModules = null) {
   console.log('Creating sidebar buttons...', activeModules ? `Filtrando por: ${activeModules.length} módulos activos` : 'Mostrando todos');
+  
+  // ✅ LIMPIAR REFERENCIA AL BOTÓN ACTIVO ANTERIOR (el DOM va a ser eliminado)
+  if (window.activeSidebarButton) {
+    console.log('⚠️ [SIDEBAR] Limpiando referencia a botón activo anterior antes de reconstruir');
+    window.activeSidebarButton = null;
+  }
+  
   // Limpiar el menú existente
   sidebarMenu.innerHTML = '';
   // console.log('Cleared sidebar menu'); // Reducir ruido en logs
@@ -2132,6 +2139,12 @@ async function selectCompany(companyName, buttonElement) {
     const activeModuleNames = Object.keys(RESOURCES_SUBMODULES);
     // Reconstruir el sidebar mostrando solo los módulos activos
     createSidebarButtons(activeModuleNames);
+    
+    // ✅ LIMPIAR BOTÓN ACTIVO PREVIO (nueva empresa, nuevo sidebar)
+    if (window.activeSidebarButton) {
+      window.activeSidebarButton.classList.remove('active');
+      window.activeSidebarButton = null;
+    }
 
   } catch (error) {
     console.error('Error al cargar la configuración de la empresa o aplicar normativa:', error);
@@ -2288,6 +2301,13 @@ async function handleLogout() {
 function showCompanyHomePage() {
   // ✅ LIMPIAR ESTADO
   currentSubmodule = null;
+  
+  // ✅ LIMPIAR BOTÓN ACTIVO DEL SIDEBAR (estamos en dashboard, no en módulo)
+  if (window.activeSidebarButton) {
+    window.activeSidebarButton.classList.remove('active');
+    window.activeSidebarButton = null;
+  }
+  
   // Destruir la animación de Vanta si existe
   if (window.vantaEffect && typeof window.vantaEffect.destroy === 'function') {
     window.vantaEffect.destroy();
@@ -2454,10 +2474,11 @@ function showCompanyHomePage() {
   modulesPanel.appendChild(panelHeader);
 
   const moduleList = document.createElement('div');
+  moduleList.setAttribute('data-module-list', 'true');
   moduleList.style.cssText = 'flex: 1; overflow-y: auto; padding: 10px;';
 
   const modulesData = [
-    { name: 'Recursos', subtitle: 'Capacitación, Roles', icon: 'fa-users-cog', badge: 'Cargando...', badgeClass: 'bg-orange', active: true },
+    { name: 'Recursos', subtitle: 'Capacitación, Roles', icon: 'fa-users-cog', badge: 'Cargando...', badgeClass: 'bg-orange', active: false },
     { name: 'Gestión Integral', subtitle: 'Política, Planes', icon: 'fa-file-contract', badge: '-', badgeClass: 'bg-green', active: false },
     { name: 'Gestión de la Salud', subtitle: 'Ausentismo, AT, EL', icon: 'fa-heartbeat', badge: '-', badgeClass: 'bg-green', active: false },
     { name: 'Gestión de Peligros y Riesgos', subtitle: 'IPERC, Controles', icon: 'fa-radiation-alt', badge: '-', badgeClass: null, active: false },
@@ -2468,15 +2489,22 @@ function showCompanyHomePage() {
 
   modulesData.forEach(mod => {
     const item = document.createElement('div');
+    item.setAttribute('data-module-name', mod.name);
     item.style.cssText = `
       display: flex; align-items: center; padding: 12px;
       border-radius: 6px; margin-bottom: 5px; cursor: pointer;
       border: 1px solid transparent; transition: all 0.2s;
-      background: ${mod.active ? '#eff6ff' : 'transparent'};
-      border-color: ${mod.active ? '#bfdbfe' : 'transparent'};
+      background: transparent;
+      border-color: transparent;
     `;
-    item.onmouseover = function() { if (!mod.active) { this.style.background = '#f8fafc'; this.style.borderColor = '#e2e8f0'; } };
-    item.onmouseout = function() { if (!mod.active) { this.style.background = 'transparent'; this.style.borderColor = 'transparent'; } };
+    item.onmouseover = function() {
+      const isActive = this.getAttribute('data-module-active') === 'true';
+      if (!isActive) { this.style.background = '#f8fafc'; this.style.borderColor = '#e2e8f0'; }
+    };
+    item.onmouseout = function() {
+      const isActive = this.getAttribute('data-module-active') === 'true';
+      if (!isActive) { this.style.background = 'transparent'; this.style.borderColor = 'transparent'; }
+    };
     item.onclick = function(e) {
       e.stopPropagation();
       filterDashboardTasksByModule(mod.name);
@@ -2706,7 +2734,7 @@ function filterDashboardTasksByModule(moduleName) {
 
   // Mapeo de módulos a tipos de tareas
   const moduleTaskMap = {
-    'Recursos': ['capacitaciones', 'epp', 'copasst', 'comite_convivencia', 'presupuesto'],
+    'Recursos': ['capacitaciones', 'epp', 'copasst', 'comite_convivencia', 'presupuesto', 'afiliacion', 'inducciones'],
     'Gestión de la Salud': ['ausentismo', 'investigacion', 'pric', 'inducciones'],
     'Gestión Integral': ['plan-trabajo', 'rendicion', 'politica'],
     'Peligros': ['iperc', 'controles'],
@@ -2727,11 +2755,42 @@ function filterDashboardTasksByModule(moduleName) {
 
   // Actualizar UI del header
   updateFilterUI(moduleName, filteredTasks.length);
+  
+  // ✅ ACTUALIZAR VISUALMENTE EL MÓDULO SELECCIONADO
+  updateModuleSelection(moduleName);
 
   // Re-renderizar panel de tareas
   renderTasks(filteredTasks, moduleName);
 
   console.log(`🔍 [DASHBOARD] Tareas filtradas: ${filteredTasks.length} de ${currentDashboardData.tasks.length}`);
+}
+
+/**
+ * Actualiza visualmente el módulo seleccionado en el panel de módulos
+ */
+function updateModuleSelection(selectedModuleName) {
+  const moduleList = document.querySelector('[data-module-list]');
+  if (!moduleList) return;
+  
+  const items = moduleList.querySelectorAll('[data-module-name]');
+  items.forEach(item => {
+    const moduleName = item.getAttribute('data-module-name');
+    const isActive = selectedModuleName && moduleName === selectedModuleName;
+    
+    // Actualizar atributo data-module-active
+    item.setAttribute('data-module-active', isActive ? 'true' : 'false');
+    
+    // Actualizar estilos
+    if (isActive) {
+      item.style.background = '#eff6ff';
+      item.style.borderColor = '#bfdbfe';
+    } else {
+      item.style.background = 'transparent';
+      item.style.borderColor = 'transparent';
+    }
+  });
+  
+  console.log(`🔍 [DASHBOARD] Módulo seleccionado actualizado: ${selectedModuleName || 'NINGUNO (limpiado)'}`);
 }
 
 /**
@@ -2743,6 +2802,9 @@ function clearFilter() {
 
   // Actualizar UI del header
   updateFilterUI(null, currentDashboardData?.tasks?.length || 0);
+  
+  // ✅ LIMPIAR SELECCIÓN DE MÓDULO
+  updateModuleSelection(null);
 
   if (currentDashboardData) {
     renderTasks(currentDashboardData.tasks || []);
@@ -2801,7 +2863,11 @@ function renderTasks(tasks) {
   }
   
   container.innerHTML = tasks.map(task => `
-    <div class="task-card ${task.priority || ''}" onclick="navigateToModule('${task.module || ''}')" style="
+    <div class="task-card ${task.priority || ''}"
+      data-module="${(task.module || '').replace(/"/g, '&quot;')}"
+      data-submodule="${(task.submodule || '').replace(/"/g, '&quot;')}"
+      onclick="navigateToModule(this.dataset.module, this.dataset.submodule)"
+      style="
       background: #f8fafc;
       border-radius: 6px;
       margin-bottom: 10px;
@@ -2832,10 +2898,11 @@ function renderTasks(tasks) {
 }
 
 // Función para navegar a un módulo desde una tarea
-function navigateToModule(moduleName) {
-  if (!moduleName) return;
-  console.log('[DASHBOARD] Navegando a módulo:', moduleName);
-  
+// taskSubmodule: hint opcional del submódulo (ej: "1.2.1 Programa de Capacitación")
+function navigateToModule(taskModule, taskSubmodule) {
+  if (!taskModule) return;
+  console.log('[DASHBOARD] Navegando a módulo:', taskModule, '| hint submódulo:', taskSubmodule || '(ninguno)');
+
   // Mapeo de módulos internos a nombres del sidebar
   const moduleMap = {
     'ausentismo': 'Gestión de la Salud',
@@ -2848,9 +2915,85 @@ function navigateToModule(moduleName) {
     'inducciones': 'Recursos',
     'auditorias': 'Verificación'
   };
-  
-  const targetModule = moduleMap[moduleName] || moduleName;
+
+  const targetModule = moduleMap[taskModule] || taskModule;
+
+  // Si hay hint de submódulo, intentar navegación directa extrayendo el código numérico
+  // Ej: "1.2.1 Programa de Capacitación" → código "1.2.1" → busca en RESOURCES_SUBMODULES
+  if (taskSubmodule) {
+    const codeMatch = String(taskSubmodule).match(/^(\d+(?:\.\d+)+)/);
+    if (codeMatch) {
+      const code = codeMatch[1];
+      const submodules = RESOURCES_SUBMODULES[targetModule] || [];
+      const exactSubmodule = submodules.find(sub =>
+        sub.startsWith(code + ' ') || sub === code
+      );
+      if (exactSubmodule) {
+        console.log(`[DASHBOARD] Navegación directa: "${targetModule}" > "${exactSubmodule}"`);
+        showModuleContentWithSubmodule(targetModule, exactSubmodule);
+        return;
+      } else {
+        console.warn(`[DASHBOARD] Código "${code}" no encontrado en ${targetModule}. Fallback a home del módulo.`);
+      }
+    }
+  }
+
+  // Fallback: mostrar home del módulo
   showModuleContent(targetModule);
+}
+
+/**
+ * Navega directamente a un submódulo específico desde el dashboard,
+ * sin pasar por el home del módulo padre.
+ * Replica la estructura DOM de showModuleHome pero llama
+ * showSubmoduleContent directamente sobre el moduleContentContainer.
+ *
+ * @param {string} moduleName   - Nombre del módulo padre (ej: "Recursos")
+ * @param {string} submoduleName - Nombre exacto del submódulo según RESOURCES_SUBMODULES
+ */
+function showModuleContentWithSubmodule(moduleName, submoduleName) {
+  console.log(`[DASHBOARD NAV] Entrada directa: "${moduleName}" > "${submoduleName}"`);
+
+  // Validar que el módulo y submódulo existan en RESOURCES_SUBMODULES
+  const submodules = RESOURCES_SUBMODULES[moduleName];
+  if (!submodules || submodules.length === 0) {
+    console.warn(`[DASHBOARD NAV] Sin submódulos para "${moduleName}". Redirigiendo a home del módulo.`);
+    showModuleContent(moduleName);
+    return;
+  }
+
+  // Limpiar estado previo (mismo orden que showModuleContent)
+  currentSubmodule = null;
+  currentModule = moduleName;
+
+  // Mostrar botón home empresa
+  if (companyHomeButton && currentCompany) {
+    companyHomeButton.style.display = 'flex';
+  }
+
+  if (!contentArea) {
+    console.error('[DASHBOARD NAV] contentArea no encontrado.');
+    return;
+  }
+
+  // Construir la misma estructura DOM que showModuleHome genera
+  contentArea.innerHTML = '';
+
+  const mainCanvas = document.createElement('div');
+  mainCanvas.className = 'main-canvas';
+  contentArea.appendChild(mainCanvas);
+
+  hideCalendar(mainCanvas);
+
+  const moduleContentContainer = document.createElement('div');
+  moduleContentContainer.className = 'module-content-area';
+  mainCanvas.appendChild(moduleContentContainer);
+
+  // Navegar directo al submódulo
+  // showSubmoduleContent se encarga de establecer currentSubmodule,
+  // verificar permisos y renderizar el componente correcto.
+  // Su safeBackToModuleCallback llamará showModuleContent(moduleName) → home del módulo.
+  showSubmoduleContent(moduleContentContainer, moduleName, submoduleName);
 }
 
 // Helper para colores de badges

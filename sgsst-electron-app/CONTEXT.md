@@ -1,7 +1,7 @@
 # K+AIR - Contexto del Proyecto
 
-**Última actualización:** 22 de marzo de 2026
-**Versión actual:** 0.1.91
+**Última actualización:** 25 de marzo de 2026
+**Versión actual:** 0.1.92
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 
 ---
@@ -290,6 +290,75 @@ npx electron-builder --win --publish=always
 **Tiempos estimados (v0.1.83):**
 - Build: 8-12 minutos
 - Tamaño installer: ~450 MB
+
+---
+
+## 🆕 Cambios Recientes (v0.1.92 - 25 de marzo de 2026)
+
+### 1. Alerta de Afiliación al SSSI
+
+**Backend (`main.js`):**
+- Nueva función `calculateAfiliacionStats()` que busca planillas de afiliación en `1.1.4 Afiliación al SSSI`
+- Detección automática de archivos PDF/XLSX con "planilla" en el nombre
+- Extracción del mes desde el nombre del archivo (ej: "planilla_marzo_2026.pdf")
+- Comparación con el mes en curso y generación de alerta crítica si falta
+- Integración en `get-recursos-stats` API
+- Integración en `getDashboardAlertas()`
+
+**Frontend (`recursos-home.js`):**
+- Nueva función `calculateAfiliacionClientSide()` (espejo del backend)
+- Widget visual `createAfiliacionWidget()` con diseño consistente a presupuesto
+- Badge verde "Al día" o rojo "Pendiente"
+- Muestra mes actual y último mes registrado
+- Actualización en `loadResourceStats()`
+
+**Archivos modificados:**
+- `main.js`: `calculateAfiliacionStats()`, `get-recursos-stats`, `getDashboardAlertas()`
+- `modules/recursos/recursos-home.js`: `calculateAfiliacionClientSide()`, `createAfiliacionWidget()`, `loadResourceStats()`
+
+### 2. Dashboard con Filtros por Módulo
+
+**Panel "MÓDULOS DEL SISTEMA":**
+- Panel lateral en dashboard con lista de módulos interactiva
+- Cada módulo muestra badge con cantidad de alertas
+- Click en módulo filtra tareas del dashboard
+- Resaltado azul del módulo seleccionado
+
+**Funciones implementadas:**
+- `updateModuleSelection(moduleName)`: Actualiza visualmente módulo seleccionado
+- `filterDashboardTasksByModule(moduleName)`: Filtra tareas y actualiza UI
+- `clearFilter()`: Limpia filtro y selección de módulo
+
+**Archivos modificados:**
+- `renderer.js`: Creación del panel, `updateModuleSelection()`, `filterDashboardTasksByModule()`, `clearFilter()`
+
+### 3. Sidebar Inteligente
+
+**Problema corregido:** Botón de módulo permanecía resaltado permanentemente
+
+**Solución implementada:**
+- Limpieza de referencia `window.activeSidebarButton` en `createSidebarButtons()`
+- Limpieza en `showCompanyHomePage()` (al mostrar dashboard)
+- Limpieza en `selectCompany()` (al cambiar de empresa)
+
+**Archivos modificados:**
+- `renderer.js`: `createSidebarButtons()`, `showCompanyHomePage()`, `selectCompany()`
+
+### 4. Logs de Depuración para Alertas
+
+**Backend (`main.js`):**
+- Logs detallados para cada tipo de alerta (capacitaciones, inducciones, EPP, presupuesto, afiliación)
+- Resumen final con total de alertas generadas
+- Detalle de cada tarea con módulo, submódulo y descripción
+
+**Frontend (`recursos-home.js`):**
+- Logs en `calculateAfiliacionClientSide()` con datos para renderizar
+- Logs en `createAfiliacionWidget()` con estado visual
+- Resumen en `loadResourceStats()` con todas las estadísticas cargadas
+
+**Archivos modificados:**
+- `main.js`: `getDashboardAlertas()` con logs para cada alerta
+- `modules/recursos/recursos-home.js`: Logs en funciones de afiliación
 
 ---
 

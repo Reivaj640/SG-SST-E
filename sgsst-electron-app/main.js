@@ -1354,11 +1354,15 @@ async function getDashboardAlertas(rootPath, companyName) {
     
     // Calcular vencidas y próximas desde las capacitaciones programadas
     const capacitaciones = await obtenerCapacitacionesDetalladas(rootPath);
-    
+
     const vencidas = capacitaciones.filter(c => c.vencida && !c.realizada);
     const proximas_7 = capacitaciones.filter(c => c.proxima_7 && !c.realizada);
     const proximas_15 = capacitaciones.filter(c => c.proxima_15 && !c.realizada);
-    
+    // Solo contar como pendientes las que tienen fecha asignada y no están realizadas
+    // Esto alinea el badge del dashboard con el widget de capacitaciones
+    const pendientes_totales = capacitaciones.filter(c => c.fecha && !c.realizada);
+    const sin_fecha = capacitaciones.filter(c => !c.fecha && !c.realizada);
+
     // Clasificar vencidas por tipo
     const vencidas_por_tipo = {
       copasst: 0,
@@ -1386,8 +1390,30 @@ async function getDashboardAlertas(rootPath, companyName) {
     // Actualizar KPIs
     dashboard_data.kpis.overdue_docs = vencidas.length;
     dashboard_data.kpis.compliance = capacitacionesStats.porcentajeCumplimiento;
-    dashboard_data.kpis.recursos_alerts = vencidas.length + proximas_7.length;
+
+    // REGLA DE ORO ACTUALIZADA: Alertas de recursos = Vencidas + Pendientes de gestión
+    // Esto asegura que el badge del home coincida con lo que el usuario ve dentro del módulo.
     
+    // KPI ESPECÍFICO: Solo capacitaciones (para alinear con widget)
+    dashboard_data.kpis.capacitaciones_alertas = pendientes_totales.length;
+    
+    // KPI GENERAL: Todo el módulo Recursos (capacitaciones + presupuesto + comités)
+    dashboard_data.kpis.recursos_alerts = pendientes_totales.length;
+
+    // LOG DE AUDITORÍA: Desglose de alertas para debugging
+    const futuras = pendientes_totales.length - vencidas.length - proximas_7.length;
+    sendLog(`[DASHBOARD] 📊 Capacitaciones: ${pendientes_totales.length} alertas (${vencidas.length} vencidas, ${proximas_7.length} en 7 días, ${futuras > 0 ? futuras : 0} futuras, ${sin_fecha.length} sin fecha)`, 'INFO');
+
+    // LOG DETALLADO: Listar las capacitaciones pendientes con fecha
+    if (pendientes_totales.length > 0) {
+      sendLog(`[DASHBOARD] 📋 Detalle de ${pendientes_totales.length} capacitaciones pendientes:`, 'INFO');
+      pendientes_totales.forEach((c, i) => {
+        const estado = c.vencida ? 'VENCIDA' : c.proxima_7 ? 'PRÓXIMA (7 días)' : c.proxima_15 ? 'PRÓXIMA (15 días)' : 'FUTURA';
+        const fechaStr = c.fecha ? c.fecha.toISOString().split('T')[0] : 'SIN FECHA';
+        sendLog(`  [${i+1}] "${c.tema}" - Fecha: ${fechaStr} - Estado: ${estado}`, 'INFO');
+      });
+    }
+
     dashboard_data.recursos_detail.capacitaciones_vencidas = {
       total: vencidas.length,
       copasst: vencidas_por_tipo.copasst,
@@ -1415,7 +1441,7 @@ async function getDashboardAlertas(rootPath, companyName) {
       if (vencidas_por_tipo.otros > 0) detalles.push(`${vencidas_por_tipo.otros} Otras`);
 
       const mensaje_detalles = detalles.length > 0 ? ` (${detalles.join(', ')})` : '';
-      
+
       // Obtener nombres de las capacitaciones vencidas para mostrar en la descripción
       const nombresVencidas = vencidas.slice(0, 3).map(v => v.tema).join('; ');
       const faltantes = vencidas.length > 3 ? ` (+${vencidas.length - 3} más)` : '';
@@ -1429,20 +1455,40 @@ async function getDashboardAlertas(rootPath, companyName) {
         submodule: "1.2.1 Programa de Capacitación"
       });
 
+      // LOG DE DEPURACIÓN: Alerta de capacitaciones vencidas
+      console.log(`[DASHBOARD] 📋 [CAPACITACIONES] Alerta agregada (VENCIDAS):`, {
+        titulo: `${vencidas.length} Capacitaciones Vencidas${mensaje_detalles}`,
+        descripcion: `${nombresVencidas}${faltantes}. Cumplimiento: ${capacitacionesStats.porcentajeCumplimiento}%`,
+        vencidas: vencidas.length,
+        detalles: detalles,
+        cumplimiento: capacitacionesStats.porcentajeCumplimiento
+      });
+
       dashboard_data.module_status.recursos = capacitacionesStats.porcentajeCumplimiento < 50 ? "danger" : "warning";
     }
-    // TAREA PREVENTIVA: Capacitaciones próximas (7 días)
-    else if (proximas_7.length > 0) {
-      const nombresProximas = proximas_7.slice(0, 3).map(p => p.tema).join('; ');
-      
+    // TAREA DE GESTIÓN: Capacitaciones pendientes (aunque no estén vencidas)
+    else if (pendientes_totales.length > 0) {
+      const proximas_texto = proximas_7.length > 0 ? ` (${proximas_7.length} esta semana)` : '';
+
       dashboard_data.tasks.push({
-        title: `${proximas_7.length} Capacitaciones Próximas (7 días)`,
-        desc: `${nombresProximas}. Verificar logística y participantes.`,
+        title: `${pendientes_totales.length} Capacitaciones Pendientes${proximas_texto}`,
+        desc: `Cronograma anual en curso. Próxima ejecución: ${pendientes_totales[0].fecha || 'Sin fecha'}.`,
         priority: "info",
         module: "capacitaciones",
-        icon: "fas fa-calendar-alt",
+        icon: "fas fa-calendar-check",
         submodule: "1.2.1 Programa de Capacitación"
       });
+
+      // LOG DE DEPURACIÓN: Alerta de capacitaciones pendientes
+      console.log(`[DASHBOARD] 📋 [CAPACITACIONES] Alerta agregada (PENDIENTES):`, {
+        titulo: `${pendientes_totales.length} Capacitaciones Pendientes${proximas_texto}`,
+        descripcion: `Cronograma anual en curso. Próxima: ${pendientes_totales[0].fecha || 'Sin fecha'}`,
+        pendientes: pendientes_totales.length,
+        proximas_7: proximas_7.length
+      });
+    } else {
+      // LOG DE DEPURACIÓN: Sin alertas de capacitaciones
+      console.log(`[DASHBOARD] ✅ [CAPACITACIONES] Sin alertas - ${vencidas.length} vencidas, ${pendientes_totales.length} pendientes`);
     }
 
     // ========================================================================
@@ -1463,6 +1509,16 @@ async function getDashboardAlertas(rootPath, companyName) {
         submodule: "1.2.2 Inducción y Reinducción"
       });
 
+      // LOG DE DEPURACIÓN: Alerta de inducciones
+      console.log(`[DASHBOARD] 📋 [INDUCCIONES] Alerta agregada:`, {
+        titulo: `${induccionesStats.pendientes} Inducciones Pendientes`,
+        descripcion: `Trabajadores sin inducción. Cumplimiento: ${cumplimiento}%`,
+        pendientes: induccionesStats.pendientes,
+        totalTrabajadores: induccionesStats.totalTrabajadores,
+        completadas: induccionesStats.completadas,
+        cumplimiento: cumplimiento
+      });
+
       // Sumar al contador de alertas de gestion-salud
       if (cumplimiento < 90) {
         dashboard_data.kpis.gestion_salud_alerts = (dashboard_data.kpis.gestion_salud_alerts || 0) + induccionesStats.pendientes;
@@ -1474,13 +1530,16 @@ async function getDashboardAlertas(rootPath, companyName) {
       } else if (dashboard_data.module_status["gestion-salud"] !== "danger") {
         dashboard_data.module_status["gestion-salud"] = "warning";
       }
+    } else {
+      // LOG DE DEPURACIÓN: Sin alertas de inducciones
+      console.log(`[DASHBOARD] ✅ [INDUCCIONES] Sin alertas - ${induccionesStats.pendientes} pendientes`);
     }
 
     // ========================================================================
     // 3. EPP - Usar calculateEppsStats
     // ========================================================================
     const eppsStats = await calculateEppsStats(rootPath);
-    
+
     // Si hay EPP pendientes, agregar alerta
     if (eppsStats.pendientes > 0) {
       dashboard_data.tasks.push({
@@ -1491,10 +1550,22 @@ async function getDashboardAlertas(rootPath, companyName) {
         icon: "fas fa-vest",
         submodule: "2.13.1 Elementos de Protección Personal"
       });
-      
+
+      // LOG DE DEPURACIÓN: Alerta de EPP
+      console.log(`[DASHBOARD] 📋 [EPP] Alerta agregada:`, {
+        titulo: `${eppsStats.pendientes} EPP Por Entregar`,
+        descripcion: "Equipos de protección programados sin registro de entrega.",
+        pendientes: eppsStats.pendientes,
+        totalEPPs: eppsStats.totalEPPs,
+        entregados: eppsStats.entregados
+      });
+
       dashboard_data.kpis.recursos_alerts += eppsStats.pendientes;
       dashboard_data.recursos_detail.epp_por_entregar = eppsStats.pendientes;
       dashboard_data.module_status.recursos = "danger";
+    } else {
+      // LOG DE DEPURACIÓN: Sin alertas de EPP
+      console.log(`[DASHBOARD] ✅ [EPP] Sin alertas - ${eppsStats.pendientes} pendientes`);
     }
 
     // ========================================================================
@@ -1506,7 +1577,7 @@ async function getDashboardAlertas(rootPath, companyName) {
     if (presupuestoStats.alertas.length > 0 || presupuestoStats.estado !== 'ok') {
       let titulo = `Presupuesto: ${presupuestoStats.porcentajeEjecucion}% ejecutado`;
       let descripcion = `Total asignado: $${(presupuestoStats.totalAsignado / 1000000).toFixed(1)}M | Ejecutado: $${(presupuestoStats.totalEjecutado / 1000000).toFixed(1)}M | Saldo: $${(presupuestoStats.saldoDisponible / 1000000).toFixed(1)}M`;
-      
+
       if (presupuestoStats.alertas.length > 0) {
         descripcion += ` | Alertas: ${presupuestoStats.alertas.join(', ')}`;
       }
@@ -1520,17 +1591,78 @@ async function getDashboardAlertas(rootPath, companyName) {
         submodule: '1.4 Presupuesto'
       });
 
+      // LOG DE DEPURACIÓN: Alerta de presupuesto
+      console.log(`[DASHBOARD] 📋 [PRESUPUESTO] Alerta agregada:`, {
+        titulo: titulo,
+        descripcion: descripcion,
+        totalAsignado: presupuestoStats.totalAsignado,
+        totalEjecutado: presupuestoStats.totalEjecutado,
+        porcentajeEjecucion: presupuestoStats.porcentajeEjecucion,
+        saldoDisponible: presupuestoStats.saldoDisponible,
+        estado: presupuestoStats.estado,
+        alertas: presupuestoStats.alertas
+      });
+
       dashboard_data.kpis.recursos_alerts += 1;
-      
+
       if (presupuestoStats.estado === 'danger') {
         dashboard_data.module_status.recursos = 'danger';
       } else if (dashboard_data.module_status.recursos !== 'danger') {
         dashboard_data.module_status.recursos = 'warning';
       }
+    } else {
+      // LOG DE DEPURACIÓN: Sin alertas de presupuesto
+      console.log(`[DASHBOARD] ✅ [PRESUPUESTO] Sin alertas - Ejecución: ${presupuestoStats.porcentajeEjecucion}%`);
     }
 
     // ========================================================================
-    // 5. VERIFICAR ACTAS COPASST Y COMITÉ DE CONVIVENCIA
+    // 5. AFILIACIÓN SSSI - Usar calculateAfiliacionStats
+    // ========================================================================
+    const afiliacionStats = await calculateAfiliacionStats(rootPath, companyName);
+
+    // Si hay alertas de afiliación, agregar tarea
+    if (afiliacionStats.estado !== 'ok' || afiliacionStats.alertas.length > 0) {
+      let titulo = `Afiliación SSSI: ${afiliacionStats.planillaMesEnCurso ? 'Al día' : 'Pendiente'}`;
+      let descripcion = `Planillas registradas: ${afiliacionStats.totalPlanillas}`;
+
+      if (afiliacionStats.alertas.length > 0) {
+        descripcion += ` | Alertas: ${afiliacionStats.alertas.join(', ')}`;
+      }
+
+      dashboard_data.tasks.push({
+        title: titulo,
+        desc: descripcion,
+        priority: afiliacionStats.estado === 'danger' ? 'critical' : 'warning',
+        module: 'afiliacion',
+        icon: 'fas fa-file-invoice',
+        submodule: '1.1.4 Afiliación al SSSI'
+      });
+
+      dashboard_data.kpis.recursos_alerts += 1;
+
+      // LOG DE DEPURACIÓN: Alerta de afiliación agregada
+      console.log(`[DASHBOARD] 📋 [AFILIACIÓN] Alerta agregada:`, {
+        titulo: titulo,
+        descripcion: descripcion,
+        priority: afiliacionStats.estado === 'danger' ? 'critical' : 'warning',
+        totalPlanillas: afiliacionStats.totalPlanillas,
+        planillaMesEnCurso: afiliacionStats.planillaMesEnCurso,
+        ultimoMesRegistrado: afiliacionStats.ultimoMesRegistrado,
+        alertas: afiliacionStats.alertas
+      });
+
+      if (afiliacionStats.estado === 'danger') {
+        dashboard_data.module_status.recursos = 'danger';
+      } else if (dashboard_data.module_status.recursos !== 'danger') {
+        dashboard_data.module_status.recursos = 'warning';
+      }
+    } else {
+      // LOG DE DEPURACIÓN: Afiliación al día
+      console.log(`[DASHBOARD] ✅ [AFILIACIÓN] Al día - Planilla del mes en curso encontrada`);
+    }
+
+    // ========================================================================
+    // 6. VERIFICAR ACTAS COPASST Y COMITÉ DE CONVIVENCIA
     // ========================================================================
     const actasPath = path.join(rootPath, '1. Recursos');
     
@@ -1603,6 +1735,29 @@ async function getDashboardAlertas(rootPath, companyName) {
     dashboard_data.overall_status = 'ok';
   }
 
+  // LOG FINAL: Resumen de KPIs de Recursos
+  sendLog(`[DASHBOARD] ✅ KPIs Recursos: capacitaciones_alertas=${dashboard_data.kpis.capacitaciones_alertas}, recursos_alerts=${dashboard_data.kpis.recursos_alerts}`, 'INFO');
+
+  // LOG DE DEPURACIÓN: Resumen completo de alertas
+  console.log(`[DASHBOARD] 📊 ========= RESUMEN DE ALERTAS GENERADAS =========`);
+  console.log(`[DASHBOARD] 📊 Empresa: ${companyName}`);
+  console.log(`[DASHBOARD] 📊 Total alertas: ${dashboard_data.tasks.length}`);
+  console.log(`[DASHBOARD] 📊 Recursos alerts: ${dashboard_data.kpis.recursos_alerts}`);
+  console.log(`[DASHBOARD] 📊 Gestión salud alerts: ${dashboard_data.kpis.gestion_salud_alerts}`);
+  console.log(`[DASHBOARD] 📊 Estado general: ${dashboard_data.overall_status}`);
+  
+  if (dashboard_data.tasks.length > 0) {
+    console.log(`[DASHBOARD] 📊 --- DETALLE DE TAREAS ---`);
+    dashboard_data.tasks.forEach((task, index) => {
+      console.log(`[DASHBOARD] 📊 [${index + 1}] ${task.priority.toUpperCase()}: ${task.title}`);
+      console.log(`[DASHBOARD] 📊     Módulo: ${task.module} | Submódulo: ${task.submodule}`);
+      console.log(`[DASHBOARD] 📊     Descripción: ${task.desc}`);
+    });
+  } else {
+    console.log(`[DASHBOARD] 📊 ✅ SIN ALERTAS - Todo en orden`);
+  }
+  console.log(`[DASHBOARD] 📊 ================================================`);
+
   return dashboard_data;
 }
 
@@ -1660,15 +1815,16 @@ async function obtenerCapacitacionesDetalladas(basePath) {
 
       const nombre = row[1];
       if (!nombre || typeof nombre !== 'string' || nombre.includes('Nombre de la capacitación')) continue;
-      if (nombre.toLowerCase().includes('total')) break;
+      if (nombre.toLowerCase().trim() === 'total') break;
 
       // Obtener fecha
       let fecha = null;
       const fechaVal = row[3];
       if (fechaVal) {
-        if (typeof fechaVal === 'number') {
-          const dateCode = xlsx.SSF.parse_date_code(fechaVal);
-          fecha = new Date(dateCode.y, dateCode.m - 1, dateCode.d);
+        // Usar la misma fórmula de conversión que el renderer para evitar errores de timezone
+        if (typeof fechaVal === 'number' && fechaVal >= 1) {
+          const utcDate = new Date((fechaVal - 25569) * 86400 * 1000);
+          fecha = new Date(utcDate.getUTCFullYear(), utcDate.getUTCMonth(), utcDate.getUTCDate());
         } else if (fechaVal instanceof Date) {
           fecha = fechaVal;
         } else if (typeof fechaVal === 'string') {
@@ -1687,6 +1843,11 @@ async function obtenerCapacitacionesDetalladas(basePath) {
 
       // Obtener tema
       const tema = row[1] || '';
+
+      // Log de depuración para verificar conversión de fechas
+      if (fechaVal && typeof fechaVal === 'number') {
+        sendLog(`[DASHBOARD] 🔍 Fecha raw (Excel): ${fechaVal}, Fecha convertida: ${fecha ? fecha.toISOString().split('T')[0] : 'null'}`, 'INFO');
+      }
 
       // Calcular si está vencida o próxima
       // IMPORTANTE: Solo marcar como vencida si TIENE fecha y está en el pasado y no se realizó
@@ -1723,7 +1884,13 @@ async function obtenerCapacitacionesDetalladas(basePath) {
   } catch (e) {
     console.error(`[DASHBOARD] Error obteniendo capacitaciones: ${e.message}`);
   }
-  
+
+  // LOG DE AUDITORÍA: Conteo final para debugging
+  const realizadas = capacitaciones.filter(c => c.realizada).length;
+  const pendientes = capacitaciones.filter(c => !c.realizada).length;
+  const vencidas = capacitaciones.filter(c => c.vencida).length;
+  sendLog(`[DASHBOARD] 📊 Capacitaciones procesadas: ${capacitaciones.length} total (${realizadas} realizadas, ${pendientes} pendientes, ${vencidas} vencidas)`, 'INFO');
+
   return capacitaciones;
 }
 
@@ -8086,7 +8253,7 @@ async function calculateCapacitacionesStats(basePath) {
         // Columna B (1): Nombre
         const nombre = row[1];
         if (!nombre || typeof nombre !== 'string' || nombre.includes('Nombre de la capacitación')) continue;
-        if (nombre.toLowerCase().includes('total')) break;
+        if (nombre.toLowerCase().trim() === 'total') break;
 
         stats.totalCapacitaciones++;
         stats.programadas++;
@@ -8310,6 +8477,110 @@ async function calculateEppsStats(basePath) {
 }
 
 /**
+ * Calcula estadísticas de Afiliación al SSSI
+ * Verifica si existe planilla de afiliación del mes en curso
+ * @param {string} basePath - Ruta raíz de la empresa
+ * @param {string} companyName - Nombre de la empresa
+ * @returns {Promise<Object>} Stats de afiliación
+ */
+async function calculateAfiliacionStats(basePath, companyName) {
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth(); // 0-11
+  const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                      'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  const currentMonthName = monthNames[currentMonth];
+
+  const stats = {
+    totalPlanillas: 0,
+    planillaMesEnCurso: false,
+    ultimoMesRegistrado: null,
+    estado: 'ok', // 'ok', 'warning', 'danger'
+    alertas: []
+  };
+
+  try {
+    if (!basePath) return stats;
+
+    const recursosPath = path.join(basePath, '1. Recursos');
+    const targetPath = path.join(recursosPath, '1.1.4 Afiliación al SSSI');
+
+    if (!fs.existsSync(targetPath)) {
+      sendLog(`[Afiliación] Carpeta no encontrada: ${targetPath}`, 'WARN');
+      return stats;
+    }
+
+    // Buscar archivos de planillas (PDF o Excel)
+    const files = await fsp.readdir(targetPath);
+    const planillas = files.filter(f =>
+      !f.startsWith('~$') &&
+      (f.endsWith('.pdf') || f.endsWith('.xlsx') || f.endsWith('.xls')) &&
+      f.toLowerCase().includes('planilla')
+    );
+
+    stats.totalPlanillas = planillas.length;
+    sendLog(`[Afiliación] Total planillas encontradas: ${planillas.length}`, 'INFO');
+
+    // Verificar si existe planilla del mes en curso
+    let planillaEncontrada = false;
+    let ultimoMes = null;
+    let ultimoMesIndex = -1;
+
+    planillas.forEach(f => {
+      const fileName = f.toLowerCase();
+      sendLog(`[Afiliación] Analizando archivo: ${f}`, 'DEBUG');
+
+      // Buscar patrones de mes en el nombre del archivo
+      const monthMatch = fileName.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/);
+      if (monthMatch) {
+        const mesEncontrado = monthMatch[1];
+        const monthIndex = monthNames.indexOf(mesEncontrado);
+
+        sendLog(`[Afiliación] Archivo: ${f}, Mes encontrado: ${mesEncontrado}`, 'DEBUG');
+
+        // Verificar si es el mes en curso
+        if (mesEncontrado === currentMonthName) {
+          planillaEncontrada = true;
+          sendLog(`[Afiliación] ✅ Planilla del mes en curso encontrada: ${f}`, 'INFO');
+        }
+
+        // Track del último mes encontrado
+        if (monthIndex > ultimoMesIndex) {
+          ultimoMes = mesEncontrado;
+          ultimoMesIndex = monthIndex;
+        }
+      }
+    });
+
+    stats.planillaMesEnCurso = planillaEncontrada;
+    stats.ultimoMesRegistrado = ultimoMes;
+
+    sendLog(`[Afiliación] Planilla mes en curso (${currentMonthName}): ${planillaEncontrada ? 'Sí' : 'No'}`, 'INFO');
+    sendLog(`[Afiliación] Último mes registrado: ${ultimoMes || 'N/A'}`, 'INFO');
+
+    // Determinar estado y alertas
+    if (!planillaEncontrada) {
+      stats.estado = 'danger';
+      const alerta = `No se encontró planilla de ${currentMonthName} ${currentYear}`;
+      stats.alertas.push(alerta);
+      sendLog(`[Afiliación] ⚠️ ALERTA: ${alerta}`, 'WARN');
+
+      if (ultimoMes) {
+        const alertaExtra = `Última planilla registrada: ${ultimoMes}`;
+        stats.alertas.push(alertaExtra);
+        sendLog(`[Afiliación] ℹ️ Info: ${alertaExtra}`, 'INFO');
+      }
+    } else {
+      sendLog(`[Afiliación] ✅ Afiliación al día`, 'INFO');
+    }
+
+  } catch (error) {
+    sendLog(`[Afiliación] Error: ${error.message}`, 'ERROR');
+  }
+
+  return stats;
+}
+
+/**
  * Calcula estadísticas del Presupuesto
  * @param {string} basePath - Ruta raíz de la empresa
  * @param {string} companyName - Nombre de la empresa
@@ -8435,51 +8706,114 @@ async function calculatePresupuestoStats(basePath, companyName) {
 
     // Leer Excel
     const workbook = xlsx.readFile(path.join(targetPath, budgetFile));
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
     
+    // Buscar la hoja "PRESUPUESTO" o similar (igual que readPresupuestoData)
+    let sheetName = workbook.SheetNames.find(s => 
+      s.toUpperCase().includes('PRESUPUESTO') || s.toUpperCase().includes('PRESUP')
+    );
+    if (!sheetName) {
+      sheetName = workbook.SheetNames[0]; // Fallback a primera hoja
+    }
+    sendLog(`[Presupuesto] Hoja seleccionada: ${sheetName}`, 'INFO');
+    
+    const worksheet = workbook.Sheets[sheetName];
+
     if (!worksheet) return stats;
 
     // Convertir a JSON
     const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
-    
-    // Buscar fila de "TOTAL AÑO" para obtener totales
-    let totalRow = null;
+
+    // Función para parsear valores monetarios (igual que recursos-home.js)
+    const parseMoney = (value) => {
+      if (!value) return 0;
+      if (typeof value === 'number') return value;
+      if (typeof value === 'object' && value.value !== undefined) return value.value;
+      if (typeof value === 'string') {
+        // Limpiar formato: "$ 13,407,464" -> 13407464
+        const clean = value.toString().replace(/\$/g, '').replace(/\s/g, '').replace(/,/g, '');
+        return parseFloat(clean) || 0;
+      }
+      return 0;
+    };
+
+    // ESTRATEGIA: Sumar TODAS las filas individuales (igual que calculateBudgetSummary en recursos-home.js)
+    // NO usar la fila "TOTAL AÑO" porque puede estar desactualizada
+    let totalAsignado = 0;
+    let totalEjecutado = 0;
+    const ejecucionMensual = new Array(12).fill(0);
+    const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    let filasProcesadas = 0;
+
+    sendLog(`[Presupuesto] Iniciando procesamiento de ${data.length} filas`, 'INFO');
+
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
-      if (row && row.some(cell => 
-        cell && typeof cell === 'string' && 
-        cell.includes('TOTAL AÑO')
-      )) {
-        totalRow = row;
+      if (!row || row.length < 2) continue;
+
+      const firstCell = row[0]?.toString() || '';
+      const detalleCell = row[2]?.toString() || '';
+
+      // Saltar filas de encabezado (contienen 'ITEM' o '#')
+      if (firstCell.toUpperCase().includes('ITEM') ||
+          firstCell === '#') {
+        continue;
+      }
+
+      // Detectar fila 'TOTAL AÑO' en la columna de detalle para detener la lectura
+      // Esto alinea la lógica con readPresupuestoData
+      if (detalleCell.toUpperCase().includes('TOTAL')) {
+        sendLog(`[Presupuesto] Detectada fila TOTAL en fila ${i}, deteniendo lectura`, 'INFO');
         break;
+      }
+
+      // Columna D (índice 3) = Asignación, Columna E (índice 4) = Ejecutado acumulado
+      const asignacion = parseMoney(row[3]);
+      const ejecutado = parseMoney(row[4]);
+
+      if (asignacion > 0 || ejecutado > 0) {
+        totalAsignado += asignacion;
+        totalEjecutado += ejecutado;
+        filasProcesadas++;
+
+        // Log detallado de cada fila válida
+        const detalle = row[2] || 'Sin detalle';
+        sendLog(`[Presupuesto] Fila ${i}: "${detalle.substring(0, 50)}..." - Asignado: $${(asignacion/1000000).toFixed(2)}M, Ejecutado: $${(ejecutado/1000000).toFixed(2)}M`, 'INFO');
+
+        // Sumar ejecución mensual (columnas de meses)
+        months.forEach((m, idx) => {
+          const monthVal = parseMoney(row[idx + 6]);
+          if (monthVal > 0) {
+            ejecucionMensual[idx] += monthVal;
+          }
+        });
       }
     }
 
-    if (totalRow) {
-      // Función para parsear valores monetarios
-      const parseMoney = (value) => {
-        if (!value) return 0;
-        if (typeof value === 'number') return value;
-        if (typeof value === 'string') {
-          // Limpiar formato: "$ 13,407,464" -> 13407464
-          const clean = value
-            .replace(/\$/g, '')
-            .replace(/\s/g, '')
-            .replace(/,/g, '');
-          return parseFloat(clean) || 0;
-        }
-        return 0;
-      };
+    sendLog(`[Presupuesto] Filas procesadas: ${filasProcesadas}`, 'INFO');
+    sendLog(`[Presupuesto] TOTAL ASIGNADO: $${(totalAsignado/1000000).toFixed(2)}M ($${totalAsignado.toLocaleString()})`, 'INFO');
+    sendLog(`[Presupuesto] TOTAL EJECUTADO: $${(totalEjecutado/1000000).toFixed(2)}M ($${totalEjecutado.toLocaleString()})`, 'INFO');
 
-      // Columnas: D=asignacion, E=ejecutado_acumulado
-      stats.totalAsignado = parseMoney(totalRow[3]); // Columna D
-      stats.totalEjecutado = parseMoney(totalRow[4]); // Columna E
+    // Asignar stats
+    stats.totalAsignado = totalAsignado;
+    stats.totalEjecutado = totalEjecutado;
 
-      if (stats.totalAsignado > 0) {
-        stats.porcentajeEjecucion = Math.round((stats.totalEjecutado / stats.totalAsignado) * 100);
-        stats.saldoDisponible = stats.totalAsignado - stats.totalEjecutado;
-      }
+    if (stats.totalAsignado > 0) {
+      stats.porcentajeEjecucion = Math.round((stats.totalEjecutado / stats.totalAsignado) * 100);
+      stats.saldoDisponible = stats.totalAsignado - stats.totalEjecutado;
+      
+      sendLog(`[Presupuesto] PORCENTAJE EJECUCIÓN: ${stats.porcentajeEjecucion}%`, 'INFO');
+      sendLog(`[Presupuesto] SALDO DISPONIBLE: $${(stats.saldoDisponible/1000000).toFixed(2)}M ($${stats.saldoDisponible.toLocaleString()})`, 'INFO');
+    }
 
+    // Calcular ejecución acumulada para desviación
+    const cumulativeExecution = [];
+    let cumE = 0;
+    for (let i = 0; i < 12; i++) {
+      cumE += ejecucionMensual[i];
+      stats.ejecucionMensual.ejecutada[i] = cumE;
+    }
+
+    if (totalAsignado > 0) {
       // Determinar estado según ejecución
       if (stats.porcentajeEjecucion > 100) {
         stats.estado = 'danger';
@@ -8488,29 +8822,28 @@ async function calculatePresupuestoStats(basePath, companyName) {
         // Sub-ejecución crítica después de junio
         stats.estado = 'warning';
         stats.alertas.push(`Sub-ejecución crítica (${stats.porcentajeEjecucion}%)`);
+      } else if (stats.porcentajeEjecucion < 20) {
+        // Alerta temprana de baja ejecución (cualquier mes)
+        stats.alertas.push(`Baja ejecución temprana (${stats.porcentajeEjecucion}%)`);
       }
 
-      // Calcular ejecución mensual (columnas G-R = índices 6-17)
-      const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
+      // Detectar sobre-ejecución mensual
+      const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
                           'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+      const promedioMensual = totalAsignado / 12;
       
       for (let m = 0; m < 12; m++) {
-        const monthlyValue = parseMoney(totalRow[6 + m]); // Columnas G-R
-        stats.ejecucionMensual.ejecutada[m] = monthlyValue;
-        
-        // Detectar sobre-ejecución mensual
-        if (monthlyValue > (stats.totalAsignado / 12) * 1.2) {
+        if (ejecucionMensual[m] > promedioMensual * 1.2) {
           stats.mesesConSobreEjecucion.push(monthNames[m]);
         }
       }
 
       // Calcular desviación significativa
-      const promedioMensualEsperado = stats.totalAsignado / 12;
       const totalEjecutadoHastaFecha = stats.ejecucionMensual.ejecutada
         .slice(0, currentMonth + 1)
         .reduce((sum, val) => sum + val, 0);
-      const esperadoHastaFecha = promedioMensualEsperado * (currentMonth + 1);
-      
+      const esperadoHastaFecha = promedioMensual * (currentMonth + 1);
+
       if (esperadoHastaFecha > 0) {
         const desviacion = Math.abs(totalEjecutadoHastaFecha - esperadoHastaFecha) / esperadoHastaFecha;
         if (desviacion > 0.3) { // 30% de desviación
@@ -8543,22 +8876,25 @@ ipcMain.handle('get-recursos-stats', async (event, companyName) => {
             stats: {
                 inducciones: { totalTrabajadores: 0, totalInducciones: 0, completadas: 0, pendientes: 0, porcentajeCompletado: 0, mensual: new Array(12).fill(0) },
                 capacitaciones: { totalCapacitaciones: 0, programadas: 0, realizadas: 0, porcentajeCumplimiento: 0, mensual: { programadas: new Array(12).fill(0), realizadas: new Array(12).fill(0) } },
-                epps: { totalEPPs: 0, entregados: 0, pendientes: 0, stockActual: 0 }
+                epps: { totalEPPs: 0, entregados: 0, pendientes: 0, stockActual: 0 },
+                afiliacion: { totalPlanillas: 0, planillaMesEnCurso: false, ultimoMesRegistrado: null, estado: 'ok', alertas: [] }
             }
         };
     }
 
     // Ejecutar cálculos en paralelo
-    const [capacitaciones, inducciones, epps] = await Promise.all([
+    const [capacitaciones, inducciones, epps, afiliacion] = await Promise.all([
         calculateCapacitacionesStats(rootPath),
-        calculateInduccionesStats(rootPath, companyName),  // ← AGREGADO: pasar companyName
-        calculateEppsStats(rootPath)
+        calculateInduccionesStats(rootPath, companyName),
+        calculateEppsStats(rootPath),
+        calculateAfiliacionStats(rootPath, companyName)  // ← NUEVO: Afiliación SSSI
     ]);
 
     const stats = {
       inducciones,
       capacitaciones,
-      epps
+      epps,
+      afiliacion
     };
 
     sendLog(`[MAIN] Estadísticas calculadas: ${JSON.stringify(stats)}`, 'DEBUG');

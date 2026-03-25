@@ -505,6 +505,9 @@ class RecursosHome {
 
         widgetsContainer.appendChild(this.createEPPWidget());
 
+        // Widget de Afiliación SSSI
+        widgetsContainer.appendChild(this.createAfiliacionWidget());
+
         // Widget de Presupuesto (MODERNIZADO)
         const budgetWidget = await this.createBudgetWidget();
         widgetsContainer.appendChild(budgetWidget);
@@ -577,7 +580,8 @@ class RecursosHome {
             this.resourceStats = {
                 inducciones: { totalTrabajadores: 0, totalInducciones: 0, completadas: 0, pendientes: 0, porcentajeCompletado: 0, mensual: new Array(12).fill(0) },
                 capacitaciones: { totalCapacitaciones: 0, programadas: 0, realizadas: 0, porcentajeCumplimiento: 0, mensual: { programadas: new Array(12).fill(0), realizadas: new Array(12).fill(0) } },
-                epps: { totalEPPs: 0, entregados: 0, pendientes: 0, stockActual: 0 }
+                epps: { totalEPPs: 0, entregados: 0, pendientes: 0, stockActual: 0 },
+                afiliacion: { totalPlanillas: 0, planillaMesEnCurso: false, ultimoMesRegistrado: null, estado: 'ok', alertas: [] }
             };
 
             // 1. Cargar Estadísticas Generales (Backend) - Para Inducciones y EPPs (por ahora)
@@ -592,6 +596,17 @@ class RecursosHome {
             // 2. CALCULAR CAPACITACIONES (CLIENT-SIDE) - Lógica espejo del submódulo
             // Esto sobrescribe lo que venga del backend para Capacitaciones con la lógica exacta del visor
             await this.calculateCapacitacionesClientSide();
+
+            // 3. VERIFICAR AFILIACIÓN SSSI (CLIENT-SIDE) - Lógica espejo del backend
+            await this.calculateAfiliacionClientSide();
+
+            // LOG DE DEPURACIÓN: Resumen de estadísticas cargadas
+            console.log('[RESUMEN RECURSOS] 📊 Estadísticas cargadas:', {
+                inducciones: this.resourceStats.inducciones,
+                capacitaciones: this.resourceStats.capacitaciones,
+                epps: this.resourceStats.epps,
+                afiliacion: this.resourceStats.afiliacion
+            });
 
         } catch (error) {
             console.error('❌ [RecursosHome] Error al cargar estadísticas de recursos:', error);
@@ -982,6 +997,110 @@ class RecursosHome {
         console.log('📊 [RecursosHome] Capacitaciones calculadas (Cliente):', stats);
     }
 
+    // Nuevo método para verificar afiliación SSSI (Cliente-Side)
+    async calculateAfiliacionClientSide() {
+        try {
+            console.log('📊 [RecursosHome] Verificando afiliación SSSI...');
+
+            // A. Buscar ruta del submódulo
+            const submodulePathResult = await window.electronAPI.findSubmodulePath(
+                this.currentCompany, 'Recursos', '1.1.4 Afiliación al SSSI'
+            );
+
+            if (!submodulePathResult.success) {
+                console.warn('⚠️ [RecursosHome] Ruta del submódulo de afiliación no encontrada');
+                return;
+            }
+
+            const submodulePath = submodulePathResult.path;
+            console.log('📂 [RecursosHome] Ruta de afiliación:', submodulePath);
+
+            // B. Leer archivos en la carpeta
+            const filesResult = await window.electronAPI.readDirectory(submodulePath);
+            if (!filesResult.success) {
+                console.warn('⚠️ [RecursosHome] No se pudo leer directorio de afiliación');
+                return;
+            }
+
+            const allFiles = filesResult.files || [];
+            console.log(`📁 [RecursosHome] Total archivos en afiliación: ${allFiles.length}`);
+
+            // C. Filtrar solo planillas (PDF o Excel)
+            const planillas = allFiles.filter(item => {
+                const name = (item.name || item.path || '').toLowerCase();
+                const isPDF = name.endsWith('.pdf');
+                const isExcel = name.endsWith('.xlsx') || name.endsWith('.xls');
+                const notTemp = !name.startsWith('~$');
+                const hasPlanilla = name.includes('planilla');
+
+                return hasPlanilla && (isPDF || isExcel) && notTemp;
+            });
+
+            console.log(`✅ [RecursosHome] Planillas encontradas: ${planillas.length}`);
+            planillas.forEach((f, i) => {
+                const fname = f.name || (f.path ? f.path.split(/[/\\]/).pop() : 'unknown');
+                console.log(`   [${i}] 📄 ${fname}`);
+            });
+
+            // D. Verificar mes en curso
+            const currentMonth = new Date().getMonth();
+            const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                                'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+            const currentMonthName = monthNames[currentMonth];
+
+            let planillaEncontrada = false;
+            let ultimoMes = null;
+            let ultimoMesIndex = -1;
+
+            planillas.forEach(f => {
+                const name = (f.name || f.path || '').toLowerCase();
+                console.log('🔍 [RecursosHome] Analizando archivo:', name);
+
+                // Buscar patrones de mes en el nombre del archivo
+                const monthMatch = name.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/);
+                if (monthMatch) {
+                    const mesEncontrado = monthMatch[1];
+                    const monthIndex = monthNames.indexOf(mesEncontrado);
+
+                    console.log(`🔍 [RecursosHome] Archivo: ${name}, Mes encontrado: ${mesEncontrado}`);
+
+                    // Verificar si es el mes en curso
+                    if (mesEncontrado === currentMonthName) {
+                        planillaEncontrada = true;
+                        console.log(`✅ [RecursosHome] Planilla del mes en curso (${currentMonthName}) encontrada`);
+                    }
+
+                    // Track del último mes encontrado
+                    if (monthIndex > ultimoMesIndex) {
+                        ultimoMes = mesEncontrado;
+                        ultimoMesIndex = monthIndex;
+                    }
+                }
+            });
+
+            // E. Actualizar estado
+            this.resourceStats.afiliacion = {
+                totalPlanillas: planillas.length,
+                planillaMesEnCurso: planillaEncontrada,
+                ultimoMesRegistrado: ultimoMes,
+                estado: planillaEncontrada ? 'ok' : 'danger'
+            };
+
+            console.log('📊 [RecursosHome] Afiliación SSSI:', this.resourceStats.afiliacion);
+            console.log(`[AFILIACIÓN WIDGET] 📊 Datos para renderizar:`, {
+                totalPlanillas: this.resourceStats.afiliacion.totalPlanillas,
+                planillaMesEnCurso: this.resourceStats.afiliacion.planillaMesEnCurso,
+                ultimoMesRegistrado: this.resourceStats.afiliacion.ultimoMesRegistrado,
+                estado: this.resourceStats.afiliacion.estado,
+                mesActual: monthNames[currentMonth],
+                alertaActiva: !planillaEncontrada
+            });
+
+        } catch (error) {
+            console.error('❌ [RecursosHome] Error calculando afiliación:', error);
+        }
+    }
+
     // Nuevo método para crear widget de inducciones con datos reales
     createInductionWidget() {
         const stats = this.resourceStats?.inducciones || { 
@@ -1126,6 +1245,65 @@ class RecursosHome {
             <div class="widget-value">${value}</div>
             <div class="widget-description">${desc}</div>
         `;
+        return w;
+    }
+
+    // Nuevo método para crear widget de Afiliación SSSI
+    createAfiliacionWidget() {
+        const stats = this.resourceStats?.afiliacion || {
+            totalPlanillas: 0,
+            planillaMesEnCurso: false,
+            ultimoMesRegistrado: null,
+            estado: 'ok'
+        };
+
+        const currentYear = new Date().getFullYear();
+        const currentMonth = new Date().getMonth();
+        const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                            'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+        const currentMonthName = monthNames[currentMonth];
+
+        // Determinar color y estado
+        const alDia = stats.planillaMesEnCurso;
+        let colorVar = alDia ? 'var(--k-success)' : 'var(--k-danger)';
+        let colorClass = alDia ? 'bg-success' : 'bg-danger';
+        let statusText = alDia ? 'Al día' : 'Pendiente';
+
+        // LOG DE DEPURACIÓN: Datos del widget de afiliación
+        console.log(`[AFILIACIÓN WIDGET] 🎨 Renderizando widget:`, {
+            totalPlanillas: stats.totalPlanillas,
+            planillaMesEnCurso: stats.planillaMesEnCurso,
+            ultimoMesRegistrado: stats.ultimoMesRegistrado,
+            mesActual: currentMonthName,
+            estado: stats.estado,
+            colorUsado: colorVar,
+            statusText: statusText,
+            alertaActiva: !alDia
+        });
+
+        const w = document.createElement('div');
+        w.className = 'widget k-budget-card';
+
+        w.innerHTML = `
+            <div class="kb-header">
+                <span class="kb-title">Afiliación SSSI ${currentYear}</span>
+                <span class="kb-badge ${colorClass}">${statusText}</span>
+            </div>
+
+            <div class="kb-amount">${stats.totalPlanillas} planilla${stats.totalPlanillas !== 1 ? 's' : ''}</div>
+
+            <div class="kb-footer">
+                <div>
+                    <div class="kb-label">Mes actual</div>
+                    <div class="kb-value" style="color: ${colorVar}">${currentMonthName}</div>
+                </div>
+                <div style="text-align: right;">
+                    <div class="kb-label">Último registro</div>
+                    <div class="kb-value">${stats.ultimoMesRegistrado || 'N/A'}</div>
+                </div>
+            </div>
+        `;
+
         return w;
     }
 

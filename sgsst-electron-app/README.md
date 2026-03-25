@@ -1,7 +1,7 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.91
-**Última actualización:** 22 de marzo de 2026
+**Versión:** 0.1.92
+**Última actualización:** 25 de marzo de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
 ---
@@ -40,6 +40,9 @@
 - ✅ **Autenticación de Usuarios** 🆕: Login obligatorio por sesión con control de acceso
 - ✅ **Roles por Empresa** 🆕: Asignación de perfiles por empresa (incluye Recursos Humanos)
 - ✅ **Base de Datos Local (SQLite)** 🆕: Persistencia de usuarios, roles, sesiones y asignaciones
+- ✅ **Alerta de Afiliación SSSI** 🆕: Detección automática de planillas faltantes del mes en curso
+- ✅ **Dashboard con Filtros por Módulo** 🆕: Panel lateral interactivo con resaltado de módulo activo
+- ✅ **Sidebar Inteligente** 🆕: Limpieza automática de estado activo al cambiar de empresa/módulo
 
 ---
 
@@ -272,7 +275,7 @@ npm run docs:watch     # Vigilar cambios y regenerar
 | 1.1.1  | Responsable del SG        | `responsable-sg-logic.js`, `viewer.js`, `view.html` |
 | 1.1.2  | Roles y Responsabilidades | `roles-responsabilidades-logic.js`, `viewer.js`     |
 | 1.1.3  | Asignación de Recursos    | `presupuesto-logic.js`, `presupuesto-gestion.html`  |
-| 1.1.4  | Afiliación al SSSI        | `afiliacion-logic.js`, `viewer.js`                  |
+| 1.1.4  | Afiliación al SSSI 🆕     | `afiliacion-logic.js`, `viewer.js` - **Detección automática de planillas faltantes** |
 | 1.1.5  | Trabajo de Alto Riesgo    | `trabajo-alto-riesgo-logic.js`, `viewer.js`         |
 | 1.1.6  | Conformación de Copasst   | `copasst-logic.js`, `viewer.js`                     |
 | 1.1.7  | Capacitación al Copasst   | `capacitacion-copasst-logic.js`, `viewer.js`        |
@@ -280,6 +283,55 @@ npm run docs:watch     # Vigilar cambios y regenerar
 | 1.2.1  | Programa de Capacitación  | `capacitaciones-logic.js`, `capacitaciones-viewer.js`, `capacitaciones-portal-logic.js` 🆕, `cap-home.html` 🆕, `cap-home.js` 🆕 |
 | 1.2.2  | Inducción y Reinducción   | `inducciones-logic.js`, `viewer.js`                 |
 | 1.2.3  | Curso Virtual 50 Horas    | `curso-virtual-logic.js`, `viewer.js`               |
+
+### 🆕 Módulo 1.1.4 - Afiliación al SSSI (v0.1.92)
+
+**Descripción:** Sistema de detección automática de planillas de afiliación al SSSI faltantes del mes en curso.
+
+**Archivos Principales:**
+- `afiliacion-logic.js` - Lógica del componente viewer
+- `afiliacion-viewer.js` - Wrapper del componente viewer
+- `afiliacion-view.html` - Vista del explorador de archivos
+- `afiliacion-view.css` - Estilos del viewer
+
+**Características Implementadas:**
+- ✅ **Detección Automática**: Busca archivos PDF/XLSX con "planilla" en el nombre
+- ✅ **Validación por Mes**: Compara mes actual vs mes en nombre del archivo
+- ✅ **Alerta en Dashboard**: Muestra alerta crítica si no hay planilla del mes en curso
+- ✅ **Widget en Recursos**: Muestra estado "Al día" o "Pendiente" con último mes registrado
+- ✅ **Logs de Depuración**: Registra detalladamente archivos encontrados y estado
+
+**Funcionamiento:**
+```javascript
+// Backend (main.js)
+calculateAfiliacionStats() {
+  // 1. Buscar carpeta 1.1.4 Afiliación al SSSI
+  // 2. Filtrar archivos con "planilla" en nombre
+  // 3. Extraer mes del nombre (ej: "planilla_marzo_2026.pdf")
+  // 4. Comparar con mes actual
+  // 5. Generar alerta si no coincide
+}
+
+// Frontend (recursos-home.js)
+calculateAfiliacionClientSide() {
+  // 1. Leer archivos en carpeta
+  // 2. Filtrar planillas
+  // 3. Detectar mes más reciente
+  // 4. Actualizar widget con estado
+}
+```
+
+**Alertas Generadas:**
+| Estado | Mensaje | Prioridad |
+|--------|---------|-----------|
+| Sin planilla del mes | "No se encontró planilla de [mes] [año]" | Crítica |
+| Planilla encontrada | "Afiliación SSSI: Al día" | Informativo |
+
+**Widget en Recursos:**
+- Muestra total de planillas registradas
+- Indica mes actual y último mes registrado
+- Badge verde "Al día" o rojo "Pendiente"
+- Diseño consistente con widget de presupuesto
 
 ### 🆕 Módulo 1.2.1 - Programa de Capacitaciones (Actualizado v0.1.71)
 
