@@ -505,6 +505,9 @@ class RecursosHome {
 
         widgetsContainer.appendChild(this.createCopasstWidget());  // ← NUEVO: Actas COPASST
 
+        // Widget de Comité de Convivencia
+        widgetsContainer.appendChild(this.createComiteConvivenciaWidget());
+
         // Widget de Afiliación SSSI
         widgetsContainer.appendChild(this.createAfiliacionWidget());
 
@@ -581,10 +584,12 @@ class RecursosHome {
                 inducciones: { totalTrabajadores: 0, totalInducciones: 0, completadas: 0, pendientes: 0, porcentajeCompletado: 0, mensual: new Array(12).fill(0) },
                 capacitaciones: { totalCapacitaciones: 0, programadas: 0, realizadas: 0, porcentajeCumplimiento: 0, mensual: { programadas: new Array(12).fill(0), realizadas: new Array(12).fill(0) } },
                 epps: { totalEPPs: 0, entregados: 0, pendientes: 0, stockActual: 0 },
+                copasst: { totalActas: 0, actaMesEnCurso: false, ultimoMesRegistrado: null, actasAnio: 0, estado: 'ok', alertas: [] },
+                comite_convivencia: { totalActas: 0, actaMesEnCurso: false, ultimoMesRegistrado: null, actasAnio: 0, estado: 'ok', alertas: [] },
                 afiliacion: { totalPlanillas: 0, planillaMesEnCurso: false, ultimoMesRegistrado: null, estado: 'ok', alertas: [] }
             };
 
-            // 1. Cargar Estadísticas Generales (Backend) - Para Inducciones y EPPs (por ahora)
+            // 1. Cargar Estadísticas Generales (Backend) - Para Inducciones, EPPs, COPASST y Comité de Convivencia
             if (window.electronAPI && window.electronAPI.getRecursosStats) {
                 const result = await window.electronAPI.getRecursosStats(this.currentCompany);
                 if (result.success) {
@@ -605,6 +610,8 @@ class RecursosHome {
                 inducciones: this.resourceStats.inducciones,
                 capacitaciones: this.resourceStats.capacitaciones,
                 epps: this.resourceStats.epps,
+                copasst: this.resourceStats.copasst,
+                comite_convivencia: this.resourceStats.comite_convivencia,
                 afiliacion: this.resourceStats.afiliacion
             });
 
@@ -1103,43 +1110,74 @@ class RecursosHome {
 
     // Nuevo método para crear widget de inducciones con datos reales
     createInductionWidget() {
-        const stats = this.resourceStats?.inducciones || { 
-            totalTrabajadores: 0, 
-            totalInducciones: 0, 
-            completadas: 0, 
-            pendientes: 0, 
-            porcentajeCompletado: 0 
+        const stats = this.resourceStats?.inducciones || {
+            totalTrabajadores: 0,
+            totalInducciones: 0,
+            completadas: 0,
+            pendientes: 0,
+            porcentajeCompletado: 0,
+            ultimoMesRegistrado: null
         };
+
+        const currentYear = new Date().getFullYear();
+        const currentMonth = new Date().getMonth();
+        const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                            'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+        const currentMonthName = monthNames[currentMonth];
 
         // Usar totalTrabajadores como denominador (o fallback a totalInducciones si es 0)
         const totalTrabajadores = stats.totalTrabajadores || stats.totalInducciones;
-        const completadas = stats.completadas;
-        const pendientes = stats.pendientes || Math.max(0, totalTrabajadores - completadas);
-        const porcentaje = stats.porcentajeCompletado || 0;
+        const completadas = stats.completadas || 0;
+        const porcentajeProgreso = totalTrabajadores > 0 
+            ? Math.min((completadas / totalTrabajadores) * 100, 100) 
+            : 0;
 
-        const title = 'Inducciones';
-        const value = `${completadas} / ${totalTrabajadores}`;
-
-        let desc = '';
-        
-        // Manejar caso especial: no hay trabajadores configurados
-        if (totalTrabajadores === 0) {
-            desc = '⚠ Configure N° trabajadores en Ajustes';
-        } else if (porcentaje >= 90) {
-            desc = `✔ Cumplimiento óptimo (${pendientes} pendientes)`;
-        } else if (porcentaje >= 50) {
-            desc = `⚠ Refuerzo necesario (${pendientes} pendientes)`;
-        } else {
-            desc = `❌ Crítico: ${pendientes} trabajadores sin inducción`;
+        // Determinar color (semáforo)
+        let colorVar = 'var(--k-success)';
+        let colorClass = 'bg-success';
+        if (porcentajeProgreso < 50) {
+            colorVar = 'var(--k-danger)';
+            colorClass = 'bg-danger';
+        } else if (porcentajeProgreso < 80) {
+            colorVar = 'var(--k-warning)';
+            colorClass = 'bg-warning';
         }
 
         const w = document.createElement('div');
-        w.className = 'widget';
+        w.className = 'widget k-budget-card';
+
         w.innerHTML = `
-            <h4>${title}</h4>
-            <div class="widget-value">${value}</div>
-            <div class="widget-description">${desc}</div>
+            <div class="kb-header">
+                <span class="kb-title">Inducciones ${currentYear}</span>
+                <span class="kb-badge ${colorClass}">${Math.round(porcentajeProgreso)}%</span>
+            </div>
+
+            <div class="kb-amount" style="font-size: 1.4rem;">${completadas} / ${totalTrabajadores}</div>
+
+            <div class="kb-progress-track">
+                <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};"></div>
+            </div>
+
+            <div class="kb-footer">
+                <div>
+                    <div class="kb-label">Mes actual</div>
+                    <div class="kb-value" style="color: ${colorVar}">${currentMonthName}</div>
+                </div>
+                <div style="text-align: right;">
+                    <div class="kb-label">Último registro</div>
+                    <div class="kb-value">${stats.ultimoMesRegistrado || 'N/A'}</div>
+                </div>
+            </div>
         `;
+
+        // Animación de barra (después de insertar en DOM)
+        setTimeout(() => {
+            const bar = w.querySelector('.kb-progress-bar');
+            if (bar) {
+                bar.style.width = `${porcentajeProgreso}%`;
+            }
+        }, 100);
+
         return w;
     }
 
@@ -1230,7 +1268,7 @@ class RecursosHome {
 
     // Nuevo método para crear widget de Actas COPASST (similar a Afiliación)
     createCopasstWidget() {
-        const stats = this.resourceStats?.copasst || { 
+        const stats = this.resourceStats?.copasst || {
             totalActas: 0,
             actaMesEnCurso: false,
             ultimoMesRegistrado: null,
@@ -1251,6 +1289,11 @@ class RecursosHome {
         let colorClass = alDia ? 'bg-success' : 'bg-danger';
         let statusText = alDia ? 'Al día' : 'Pendiente';
 
+        // Calcular progreso anual (12 reuniones esperadas por año)
+        const reunionesEsperadas = 12;
+        const reunionesRealizadas = stats.actasAnio || 0;
+        const porcentajeProgreso = Math.min((reunionesRealizadas / reunionesEsperadas) * 100, 100);
+
         const w = document.createElement('div');
         w.className = 'widget k-budget-card';
 
@@ -1260,7 +1303,11 @@ class RecursosHome {
                 <span class="kb-badge ${colorClass}">${statusText}</span>
             </div>
 
-            <div class="kb-amount">${stats.totalActas} acta${stats.totalActas !== 1 ? 's' : ''}</div>
+            <div class="kb-amount" style="font-size: 1.4rem;">${reunionesRealizadas} / ${reunionesEsperadas}</div>
+
+            <div class="kb-progress-track">
+                <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};"></div>
+            </div>
 
             <div class="kb-footer">
                 <div>
@@ -1274,6 +1321,80 @@ class RecursosHome {
             </div>
         `;
 
+        // Animación de barra (después de insertar en DOM)
+        setTimeout(() => {
+            const bar = w.querySelector('.kb-progress-bar');
+            if (bar) {
+                bar.style.width = `${porcentajeProgreso}%`;
+            }
+        }, 100);
+
+        return w;
+    }
+
+    // Nuevo método para crear widget de Actas Comité de Convivencia (gemelo de COPASST)
+    createComiteConvivenciaWidget() {
+        const stats = this.resourceStats?.comite_convivencia || {
+            totalActas: 0,
+            actaMesEnCurso: false,
+            ultimoMesRegistrado: null,
+            actasAnio: 0,
+            estado: 'ok',
+            alertas: []
+        };
+
+        const currentYear = new Date().getFullYear();
+        const currentMonth = new Date().getMonth();
+        const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                            'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+        const currentMonthName = monthNames[currentMonth];
+
+        // Determinar color y estado
+        const alDia = stats.actaMesEnCurso;
+        let colorVar = alDia ? 'var(--k-success)' : 'var(--k-danger)';
+        let colorClass = alDia ? 'bg-success' : 'bg-danger';
+        let statusText = alDia ? 'Al día' : 'Pendiente';
+
+        // Calcular progreso anual (12 reuniones esperadas por año)
+        const reunionesEsperadas = 12;
+        const reunionesRealizadas = stats.actasAnio || 0;
+        const porcentajeProgreso = Math.min((reunionesRealizadas / reunionesEsperadas) * 100, 100);
+
+        const w = document.createElement('div');
+        w.className = 'widget k-budget-card';
+
+        w.innerHTML = `
+            <div class="kb-header">
+                <span class="kb-title">Actas Comité Convivencia ${currentYear}</span>
+                <span class="kb-badge ${colorClass}">${statusText}</span>
+            </div>
+
+            <div class="kb-amount" style="font-size: 1.4rem;">${reunionesRealizadas} / ${reunionesEsperadas}</div>
+
+            <div class="kb-progress-track">
+                <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};"></div>
+            </div>
+
+            <div class="kb-footer">
+                <div>
+                    <div class="kb-label">Mes actual</div>
+                    <div class="kb-value" style="color: ${colorVar}">${currentMonthName}</div>
+                </div>
+                <div style="text-align: right;">
+                    <div class="kb-label">Último registro</div>
+                    <div class="kb-value">${stats.ultimoMesRegistrado || 'N/A'}</div>
+                </div>
+            </div>
+        `;
+
+        // Animación de barra (después de insertar en DOM)
+        setTimeout(() => {
+            const bar = w.querySelector('.kb-progress-bar');
+            if (bar) {
+                bar.style.width = `${porcentajeProgreso}%`;
+            }
+        }, 100);
+
         return w;
     }
 
@@ -1282,6 +1403,7 @@ class RecursosHome {
         const stats = this.resourceStats?.afiliacion || {
             totalPlanillas: 0,
             planillaMesEnCurso: false,
+            planillasAnio: 0,
             ultimoMesRegistrado: null,
             estado: 'ok'
         };
@@ -1298,9 +1420,15 @@ class RecursosHome {
         let colorClass = alDia ? 'bg-success' : 'bg-danger';
         let statusText = alDia ? 'Al día' : 'Pendiente';
 
+        // Calcular progreso anual (12 planillas esperadas por año)
+        const planillasEsperadas = 12;
+        const planillasRealizadas = stats.planillasAnio || 0;
+        const porcentajeProgreso = Math.min((planillasRealizadas / planillasEsperadas) * 100, 100);
+
         // LOG DE DEPURACIÓN: Datos del widget de afiliación
         console.log(`[AFILIACIÓN WIDGET] 🎨 Renderizando widget:`, {
             totalPlanillas: stats.totalPlanillas,
+            planillasAnio: stats.planillasAnio,
             planillaMesEnCurso: stats.planillaMesEnCurso,
             ultimoMesRegistrado: stats.ultimoMesRegistrado,
             mesActual: currentMonthName,
@@ -1319,7 +1447,11 @@ class RecursosHome {
                 <span class="kb-badge ${colorClass}">${statusText}</span>
             </div>
 
-            <div class="kb-amount">${stats.totalPlanillas} planilla${stats.totalPlanillas !== 1 ? 's' : ''}</div>
+            <div class="kb-amount" style="font-size: 1.4rem;">${planillasRealizadas} / ${planillasEsperadas}</div>
+
+            <div class="kb-progress-track">
+                <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};"></div>
+            </div>
 
             <div class="kb-footer">
                 <div>
@@ -1332,6 +1464,14 @@ class RecursosHome {
                 </div>
             </div>
         `;
+
+        // Animación de barra (después de insertar en DOM)
+        setTimeout(() => {
+            const bar = w.querySelector('.kb-progress-bar');
+            if (bar) {
+                bar.style.width = `${porcentajeProgreso}%`;
+            }
+        }, 100);
 
         return w;
     }

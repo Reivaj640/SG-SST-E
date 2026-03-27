@@ -8851,7 +8851,8 @@ async function calculateInduccionesStats(basePath, companyName) {
     completadas: 0,              // Inducciones completadas (año actual)
     pendientes: 0,               // ← CAMBIA: Ahora es employees - completadas
     porcentajeCompletado: 0,     // ← CAMBIA: (completadas / employees) * 100
-    mensual: new Array(12).fill(0)
+    mensual: new Array(12).fill(0),
+    ultimoMesRegistrado: null    // ← NUEVO: Último mes con inducción completada
   };
   try {
     // ========================================================================
@@ -8891,6 +8892,10 @@ async function calculateInduccionesStats(basePath, companyName) {
         f.toLowerCase().includes('act-fo-046')
     );
 
+    // Track del último mes registrado
+    let ultimoMesIndex = -1;
+    let ultimoMesRegistrado = null;
+
     for (const file of excelFiles) {
         try {
             const wb = xlsx.readFile(path.join(targetPath, file));
@@ -8928,10 +8933,29 @@ async function calculateInduccionesStats(basePath, companyName) {
                     stats.totalInducciones++;
                     stats.completadas++;
                     if (rowDate) stats.mensual[rowDate.getMonth()]++;
+
+                    // Track del último mes encontrado (considerando año + mes)
+                    if (rowDate) {
+                        const monthIndex = rowDate.getMonth();
+                        const fileYear = rowDate.getFullYear();
+                        const fechaInduccion = new Date(fileYear, monthIndex);
+                        
+                        // Comparar con la última fecha registrada
+                        if (!ultimoMesRegistrado || fechaInduccion > ultimoMesRegistrado.date) {
+                            const mesCorto = rowDate.toLocaleString('es-ES', { month: 'short' }); // "feb", "mar", etc.
+                            ultimoMesRegistrado = {
+                                date: fechaInduccion,
+                                display: `${mesCorto} ${fileYear}`
+                            };
+                        }
+                    }
                 }
             }
         } catch (err) { continue; }
     }
+
+    // Asignar último mes registrado
+    stats.ultimoMesRegistrado = ultimoMesRegistrado ? ultimoMesRegistrado.display : null;
 
     // ========================================================================
     // 2. CALCULAR PENDIENTES Y PORCENTAJE REAL BASADO EN TRABAJADORES
@@ -8955,7 +8979,7 @@ async function calculateInduccionesStats(basePath, companyName) {
         stats.porcentajeCompletado = stats.totalInducciones > 0 ? 100 : 0;
     }
 
-    sendLog(`[DEBUG] calculateInduccionesStats - Completadas: ${stats.completadas}, Pendientes: ${stats.pendientes}, Porcentaje: ${stats.porcentajeCompletado}%`, 'DEBUG');
+    sendLog(`[DEBUG] calculateInduccionesStats - Completadas: ${stats.completadas}, Pendientes: ${stats.pendientes}, Porcentaje: ${stats.porcentajeCompletado}%, Último: ${stats.ultimoMesRegistrado || 'N/A'}`, 'DEBUG');
 
   } catch (e) {
     sendLog(`Error calculando inducciones: ${e.message}`, 'WARN');
@@ -9041,7 +9065,7 @@ async function calculateCopasstStats(basePath, currentYear) {
     // Buscar carpetas de años (COPASST 2024, COPASST 2025, etc.)
     const yearFolders = await fsp.readdir(copasstPath);
     let allActas = [];
-    let ultimoMesIndex = -1;
+    let ultimaFechaRegistro = null; // { date: Date, display: "dic 2024" }
 
     for (const folder of yearFolders) {
       if (!folder.startsWith('COPASST')) continue;
@@ -9091,10 +9115,12 @@ async function calculateCopasstStats(basePath, currentYear) {
             sendLog(`[COPASST] ✅ Acta del mes en curso encontrada: ${file}`, 'INFO');
           }
 
-          // Track del último mes encontrado
-          if (monthIndex > ultimoMesIndex) {
-            stats.ultimoMesRegistrado = mesEncontrado;
-            ultimoMesIndex = monthIndex;
+          // Track del último mes encontrado (considerando año + mes)
+          const fechaActa = new Date(folderYear, monthIndex);
+          if (!ultimaFechaRegistro || fechaActa > ultimaFechaRegistro.date) {
+            const mesCorto = mesEncontrado.substring(0, 3); // "dic", "feb", etc.
+            stats.ultimoMesRegistrado = `${mesCorto} ${folderYear}`;
+            ultimaFechaRegistro = { date: fechaActa, display: stats.ultimoMesRegistrado };
           }
         }
       }
@@ -9134,6 +9160,139 @@ async function calculateCopasstStats(basePath, currentYear) {
 }
 
 /**
+ * Calcula estadísticas de Actas de Reunión Comité de Convivencia
+ * Similar a calculateCopasstStats - Detecta actas del mes en curso
+ * @param {string} basePath - Ruta raíz de la empresa
+ * @param {number} currentYear - Año actual
+ * @returns {Promise<Object>} Stats de actas Comité de Convivencia
+ */
+async function calculateConvivenciaStats(basePath, currentYear) {
+  const currentMonth = new Date().getMonth(); // 0-11
+  const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                      'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  const currentMonthName = monthNames[currentMonth];
+
+  const stats = {
+    totalActas: 0,
+    actaMesEnCurso: false,
+    ultimoMesRegistrado: null,
+    actasAnio: 0,
+    estado: 'ok', // 'ok', 'warning', 'danger'
+    alertas: []
+  };
+
+  try {
+    if (!basePath) return stats;
+
+    const recursosPath = path.join(basePath, '1. Recursos');
+    
+    // Buscar ambas variaciones del nombre de la carpeta
+    const convivenciaPath1 = path.join(recursosPath, '1.1.8 Comité de Convivencia');
+    const convivenciaPath2 = path.join(recursosPath, '1.1.8 Conformación de Comite de Convivencia');
+    const convivenciaPath = fs.existsSync(convivenciaPath1) ? convivenciaPath1 : convivenciaPath2;
+
+    if (!fs.existsSync(convivenciaPath)) {
+      sendLog(`[COMITÉ CONVIVENCIA] Carpeta no encontrada: ${convivenciaPath}`, 'WARN');
+      return stats;
+    }
+
+    // Buscar carpetas de años (CONVIVENCIA 2024, CONVIVENCIA 2025, etc.)
+    const yearFolders = await fsp.readdir(convivenciaPath);
+    let allActas = [];
+    let ultimaFechaRegistro = null; // { date: Date, display: "dic 2024" }
+
+    for (const folder of yearFolders) {
+      if (!folder.startsWith('CONVIVENCIA')) continue;
+
+      const folderPath = path.join(convivenciaPath, folder);
+      if (!fs.statSync(folderPath).isDirectory()) continue;
+
+      // Extraer año del nombre de la carpeta
+      const yearMatch = folder.match(/(\d{4})/);
+      if (!yearMatch) continue;
+
+      const folderYear = parseInt(yearMatch[1]);
+      const files = await fsp.readdir(folderPath);
+
+      // Buscar archivos de actas (Excel o PDF)
+      const actasFiles = files.filter(f =>
+        !f.startsWith('~$') &&
+        (f.endsWith('.xlsx') || f.endsWith('.xls') || f.endsWith('.pdf')) &&
+        f.toLowerCase().includes('acta')
+      );
+
+      sendLog(`[COMITÉ CONVIVENCIA] Carpeta ${folder}: ${actasFiles.length} actas encontradas`, 'INFO');
+
+      for (const file of actasFiles) {
+        const fileName = file.toLowerCase();
+        sendLog(`[COMITÉ CONVIVENCIA] Analizando archivo: ${file}`, 'DEBUG');
+
+        // Buscar patrones de mes en el nombre del archivo
+        const monthMatch = fileName.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/);
+        if (monthMatch) {
+          const mesEncontrado = monthMatch[1];
+          const monthIndex = monthNames.indexOf(mesEncontrado);
+
+          sendLog(`[COMITÉ CONVIVENCIA] Archivo: ${file}, Mes encontrado: ${mesEncontrado}`, 'DEBUG');
+
+          allActas.push({
+            year: folderYear,
+            month: mesEncontrado,
+            monthNumber: monthIndex + 1,
+            file: file
+          });
+
+          // Verificar si es el mes en curso
+          if (mesEncontrado === currentMonthName && folderYear === currentYear) {
+            stats.actaMesEnCurso = true;
+            sendLog(`[COMITÉ CONVIVENCIA] ✅ Acta del mes en curso encontrada: ${file}`, 'INFO');
+          }
+
+          // Track del último mes encontrado (considerando año + mes)
+          const fechaActa = new Date(folderYear, monthIndex);
+          if (!ultimaFechaRegistro || fechaActa > ultimaFechaRegistro.date) {
+            const mesCorto = mesEncontrado.substring(0, 3); // "dic", "feb", etc.
+            stats.ultimoMesRegistrado = `${mesCorto} ${folderYear}`;
+            ultimaFechaRegistro = { date: fechaActa, display: stats.ultimoMesRegistrado };
+          }
+        }
+      }
+    }
+
+    stats.totalActas = allActas.length;
+    sendLog(`[COMITÉ CONVIVENCIA] Total actas encontradas: ${allActas.length}`, 'INFO');
+
+    // Actas del año actual
+    const actasCurrentYear = allActas.filter(a => a.year === currentYear);
+    stats.actasAnio = actasCurrentYear.length;
+
+    // Determinar estado y alertas
+    if (!stats.actaMesEnCurso) {
+      stats.estado = 'danger';
+      const alerta = `No se encontró acta de ${currentMonthName} ${currentYear}`;
+      stats.alertas.push(alerta);
+      sendLog(`[COMITÉ CONVIVENCIA] ⚠️ ALERTA: ${alerta}`, 'WARN');
+
+      if (stats.ultimoMesRegistrado) {
+        const alertaExtra = `Última acta registrada: ${stats.ultimoMesRegistrado}`;
+        stats.alertas.push(alertaExtra);
+        sendLog(`[COMITÉ CONVIVENCIA] ℹ️ Info: ${alertaExtra}`, 'INFO');
+      }
+    } else {
+      sendLog(`[COMITÉ CONVIVENCIA] ✅ Actas Comité de Convivencia al día`, 'INFO');
+    }
+
+    sendLog(`[COMITÉ CONVIVENCIA] Acta mes en curso (${currentMonthName}): ${stats.actaMesEnCurso ? 'Sí' : 'No'}`, 'INFO');
+    sendLog(`[COMITÉ CONVIVENCIA] Último mes registrado: ${stats.ultimoMesRegistrado || 'N/A'}`, 'INFO');
+
+  } catch (e) {
+    sendLog(`[COMITÉ CONVIVENCIA] Error: ${e.message}`, 'ERROR');
+  }
+
+  return stats;
+}
+
+/**
  * Calcula estadísticas de Afiliación al SSSI
  * Verifica si existe planilla de afiliación del mes en curso
  * @param {string} basePath - Ruta raíz de la empresa
@@ -9150,6 +9309,7 @@ async function calculateAfiliacionStats(basePath, companyName) {
   const stats = {
     totalPlanillas: 0,
     planillaMesEnCurso: false,
+    planillasAnio: 0,       // ← NUEVO: Planillas del año actual
     ultimoMesRegistrado: null,
     estado: 'ok', // 'ok', 'warning', 'danger'
     alertas: []
@@ -9179,8 +9339,8 @@ async function calculateAfiliacionStats(basePath, companyName) {
 
     // Verificar si existe planilla del mes en curso
     let planillaEncontrada = false;
-    let ultimoMes = null;
-    let ultimoMesIndex = -1;
+    let ultimaFechaRegistro = null; // { date: Date, display: "dic 2024" }
+    let planillasCurrentYear = 0;
 
     planillas.forEach(f => {
       const fileName = f.toLowerCase();
@@ -9200,19 +9360,31 @@ async function calculateAfiliacionStats(basePath, companyName) {
           sendLog(`[Afiliación] ✅ Planilla del mes en curso encontrada: ${f}`, 'INFO');
         }
 
-        // Track del último mes encontrado
-        if (monthIndex > ultimoMesIndex) {
-          ultimoMes = mesEncontrado;
-          ultimoMesIndex = monthIndex;
+        // Track del último mes encontrado (considerando año + mes)
+        // Extraer año del nombre del archivo o usar año actual por defecto
+        const yearMatch = f.match(/(20\d{2})/);
+        const fileYear = yearMatch ? parseInt(yearMatch[1]) : currentYear;
+        
+        const fechaPlanilla = new Date(fileYear, monthIndex);
+        if (!ultimaFechaRegistro || fechaPlanilla > ultimaFechaRegistro.date) {
+          const mesCorto = mesEncontrado.substring(0, 3); // "dic", "feb", etc.
+          stats.ultimoMesRegistrado = `${mesCorto} ${fileYear}`;
+          ultimaFechaRegistro = { date: fechaPlanilla, display: stats.ultimoMesRegistrado };
+        }
+
+        // Contar planillas del año actual
+        if (fileYear === currentYear) {
+          planillasCurrentYear++;
         }
       }
     });
 
     stats.planillaMesEnCurso = planillaEncontrada;
-    stats.ultimoMesRegistrado = ultimoMes;
+    stats.planillasAnio = planillasCurrentYear; // ← NUEVO: Planillas del año actual
 
     sendLog(`[Afiliación] Planilla mes en curso (${currentMonthName}): ${planillaEncontrada ? 'Sí' : 'No'}`, 'INFO');
-    sendLog(`[Afiliación] Último mes registrado: ${ultimoMes || 'N/A'}`, 'INFO');
+    sendLog(`[Afiliación] Último mes registrado: ${stats.ultimoMesRegistrado || 'N/A'}`, 'INFO');
+    sendLog(`[Afiliación] Planillas año ${currentYear}: ${planillasCurrentYear}`, 'INFO');
 
     // Determinar estado y alertas
     if (!planillaEncontrada) {
@@ -9221,8 +9393,8 @@ async function calculateAfiliacionStats(basePath, companyName) {
       stats.alertas.push(alerta);
       sendLog(`[Afiliación] ⚠️ ALERTA: ${alerta}`, 'WARN');
 
-      if (ultimoMes) {
-        const alertaExtra = `Última planilla registrada: ${ultimoMes}`;
+      if (stats.ultimoMesRegistrado) {
+        const alertaExtra = `Última planilla registrada: ${stats.ultimoMesRegistrado}`;
         stats.alertas.push(alertaExtra);
         sendLog(`[Afiliación] ℹ️ Info: ${alertaExtra}`, 'INFO');
       }
@@ -9541,11 +9713,12 @@ ipcMain.handle('get-recursos-stats', async (event, companyName) => {
 
     // Ejecutar cálculos en paralelo
     const currentYear = new Date().getFullYear();
-    const [capacitaciones, inducciones, epps, copasst, afiliacion] = await Promise.all([
+    const [capacitaciones, inducciones, epps, copasst, convivencia, afiliacion] = await Promise.all([
         calculateCapacitacionesStats(rootPath),
         calculateInduccionesStats(rootPath, companyName),
         calculateEppsStats(rootPath),
-        calculateCopasstStats(rootPath, currentYear),  // ← NUEVO: Actas COPASST
+        calculateCopasstStats(rootPath, currentYear),
+        calculateConvivenciaStats(rootPath, currentYear),  // ← NUEVO: Comité de Convivencia
         calculateAfiliacionStats(rootPath, companyName)
     ]);
 
@@ -9553,7 +9726,8 @@ ipcMain.handle('get-recursos-stats', async (event, companyName) => {
       inducciones,
       capacitaciones,
       epps,
-      copasst,  // ← NUEVO: Actas COPASST
+      copasst,
+      comite_convivencia: convivencia,  // ← NUEVO: Comité de Convivencia
       afiliacion
     };
 
