@@ -1,7 +1,7 @@
 # K+AIR - Contexto del Proyecto
 
 **Última actualización:** 25 de marzo de 2026
-**Versión actual:** 0.1.92
+**Versión actual:** 0.1.93
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 
 ---
@@ -290,6 +290,108 @@ npx electron-builder --win --publish=always
 **Tiempos estimados (v0.1.83):**
 - Build: 8-12 minutos
 - Tamaño installer: ~450 MB
+
+---
+
+## 🆕 Cambios Recientes (v0.1.93 - 25 de marzo de 2026)
+
+### 1. Visualizadores Modernizados (9 submódulos)
+
+**Descripción:** Sistema unificado de gestión documental con funciones modernas replicadas en 9 visualizadores.
+
+**Submódulos Actualizados:**
+| Código | Submódulo | Funciones |
+|--------|-----------|-----------|
+| 1.1.1 | Responsable SG | Drag&Drop, Context Menu, Toast, Confirm Modal |
+| 1.1.2 | Roles y Responsabilidades | Drag&Drop, Context Menu, Toast, Confirm Modal |
+| 1.1.4 | Afiliación al SSSI | Drag&Drop, Context Menu, Toast, Confirm Modal |
+| 1.1.5 | Trabajo de Alto Riesgo | Drag&Drop, Context Menu, Toast, Confirm Modal |
+| 1.1.6 | Conformación de Copasst | Drag&Drop, Context Menu, Toast, Confirm Modal |
+| 1.1.7 | Capacitación al Copasst | Drag&Drop, Context Menu, Toast, Confirm Modal |
+| 1.1.8 | Comité de Convivencia | Drag&Drop, Context Menu, Toast, Confirm Modal |
+| 1.2.3 | Curso Virtual 50 Horas | Drag&Drop, Context Menu, Toast, Confirm Modal |
+| 1.2.4 | Manual SST Proveedores | Drag&Drop, Context Menu, Toast, Confirm Modal |
+
+**Funciones Implementadas:**
+
+1. **Drag & Drop de Archivos**
+   - Overlay visual con ícono animado bounce
+   - Subida automática de archivos soltados
+   - Manejo de múltiples archivos simultáneos
+   - Feedback con notificaciones toast
+
+2. **Menú Contextual (Clic Derecho)**
+   - Menú flotante con opciones: Abrir archivo, Eliminar archivo
+   - Posicionamiento inteligente (no sale de pantalla)
+   - Cierre con clic fuera o tecla Escape
+
+3. **Modal de Confirmación Moderno**
+   - Diseño centrado con animación slideUp
+   - Header amarillo con ícono de advertencia
+   - Nombre del archivo en caja destacada
+   - Botones Cancelar / Eliminar estilizados
+
+4. **Notificaciones Toast Modernas**
+   - 4 tipos: success, error, warning, info
+   - Iconos FontAwesome por tipo
+   - Auto-eliminación con animación fade-out (300ms)
+   - Contenedor en esquina superior derecha
+
+5. **Abrir Archivo con Aplicación Predeterminada**
+   - Opción en menú contextual
+   - Usa `electronAPI.open-file`
+   - Manejo de errores específico (EPERM, ENOENT, EACCES)
+
+**Archivos Modificados por Submódulo:**
+
+| Archivo | Líneas agregadas | Funciones |
+|---------|-----------------|-----------|
+| `[submodulo]-view.html` | ~40 | contextMenu, confirmModal, kToastContainer |
+| `[submodulo]-view.css` | ~280 | Estilos para modales, toast, drag&drop |
+| `[submodulo]-viewer.js` | ~450 | Todas las funciones modernas |
+
+**Funciones JavaScript Agregadas:**
+
+```javascript
+// Drag & Drop
+- setupDragAndDrop()
+- setupFolderDragAndDrop(folderElement, folderPath)
+- preventDefaults(e)
+- handleDragOver(e)
+- uploadFile(file, folderPath)
+- fileToBase64(file)
+
+// Context Menu
+- showContextMenu(x, y, doc)
+- hideContextMenu()
+- deleteDocument()
+- setupContextMenu()
+- openFile()
+
+// Toast Notifications
+- showToast(message, type, duration)
+
+// Confirm Modal
+- showConfirmModal(fileName, callback)
+- hideConfirmModal()
+- acceptConfirm()
+- cancelConfirm()
+- setupConfirmModal()
+```
+
+**Funciones Actualizadas:**
+
+| Función | Cambio |
+|---------|--------|
+| `setupEventListeners()` | Ahora llama a `setupDragAndDrop()` y `setupContextMenu()` |
+| `renderFolders()` | Agrega clase 'folder' y llama a `setupFolderDragAndDrop()` |
+| `renderDocuments()` | Agrega evento 'contextmenu' para clic derecho |
+
+**Impacto:**
+- **UX:** Mejora significativa en usabilidad y consistencia entre submódulos
+- **Backend:** Sin cambios (mismos contratos IPC)
+- **Temas:** Compatible con claro, oscuro (system), oscuro (legacy)
+- **Consistencia:** 9 visualizadores con misma UX/UI
 
 ---
 

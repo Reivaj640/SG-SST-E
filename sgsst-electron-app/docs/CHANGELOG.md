@@ -5,6 +5,107 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.93] - 2026-03-25
+
+### Added
+- **🎨 Visualizadores Modernizados (9 submódulos)** 🆕
+  - **Drag & Drop de Archivos** - Overlay visual con ícono animado, subida automática
+  - **Menú Contextual (Clic Derecho)** - Abrir archivo, Eliminar archivo
+  - **Modal de Confirmación Moderno** - Diseño centrado con animación slideUp
+  - **Notificaciones Toast Modernas** - 4 tipos (success, error, warning, info)
+  - **Abrir Archivo con App Predeterminada** - Usa electronAPI.open-file
+
+### Changed
+- **Submódulos actualizados (9):**
+  - `1.1.1 Responsable del SG` - viewer modernizado
+  - `1.1.2 Roles y Responsabilidades` - viewer modernizado
+  - `1.1.4 Afiliación al SSSI` - viewer modernizado
+  - `1.1.5 Trabajo de Alto Riesgo` - viewer modernizado
+  - `1.1.6 Conformación de Copasst` - viewer modernizado
+  - `1.1.7 Capacitación al Copasst` - viewer modernizado
+  - `1.1.8 Comité de Convivencia` - viewer modernizado
+  - `1.2.3 Curso Virtual 50 Horas` - viewer modernizado
+  - `1.2.4 Manual SST para Proveedores` - viewer modernizado
+
+- **Archivos modificados por submódulo:**
+  - `[submodulo]-view.html` - ~40 líneas (contextMenu, confirmModal, kToastContainer)
+  - `[submodulo]-view.css` - ~280 líneas (estilos para modales, toast, drag&drop)
+  - `[submodulo]-viewer.js` - ~450 líneas (funciones modernas)
+
+### Technical Details
+- **Funciones JavaScript agregadas:**
+  - `setupDragAndDrop()`, `setupFolderDragAndDrop()` - Drag & Drop
+  - `showContextMenu()`, `hideContextMenu()`, `deleteDocument()` - Menú contextual
+  - `showToast()` - Notificaciones toast
+  - `showConfirmModal()`, `acceptConfirm()`, `cancelConfirm()` - Modal confirmación
+  - `openFile()` - Abrir con app predeterminada
+
+- **Funciones actualizadas:**
+  - `setupEventListeners()` - Ahora llama a setupDragAndDrop y setupContextMenu
+  - `renderFolders()` - Agrega clase 'folder' y configura drag&drop
+  - `renderDocuments()` - Agrega evento contextmenu para clic derecho
+
+### Impacto
+- **UX:** Mejora significativa en usabilidad y consistencia entre submódulos
+- **Backend:** Sin cambios (mismos contratos IPC)
+- **Temas:** Compatible con claro, oscuro (system), oscuro (legacy)
+- **Consistencia:** 9 visualizadores con misma UX/UI
+
+### Breaking Changes
+- **Ninguno** - Funcionalidad puramente aditiva, contratos sin cambios
+
+---
+
+## [0.1.92] - 2026-03-25
+
+### Added
+- **📊 Alerta de Afiliación SSSI** 🆕
+  - Detección automática de planillas faltantes del mes en curso
+  - Widget en Recursos con estado "Al día" o "Pendiente"
+  - Alerta crítica en dashboard si no hay planilla del mes
+
+- **🎯 Dashboard con Filtros por Módulo** 🆕
+  - Panel lateral "MÓDULOS DEL SISTEMA" interactivo
+  - Resaltado azul del módulo seleccionado
+  - Click en módulo filtra tareas del dashboard
+
+- **🧹 Sidebar Inteligente** 🆕
+  - Limpieza automática de estado activo al cambiar empresa/módulo
+  - Sin botones resaltados permanentemente
+
+### Changed
+- **main.js** - Funciones agregadas:
+  - `calculateAfiliacionStats()` - Calcula estadísticas de afiliación
+  - `get-recursos-stats` API - Integrada con afiliación
+  - `getDashboardAlertas()` - Alerta de afiliación agregada
+  - Logs de depuración para todas las alertas
+
+- **modules/recursos/recursos-home.js** - Funciones agregadas:
+  - `calculateAfiliacionClientSide()` - Verifica afiliación (cliente)
+  - `createAfiliacionWidget()` - Widget visual de afiliación
+  - `loadResourceStats()` - Actualizada con afiliación
+
+- **renderer.js** - Funciones actualizadas:
+  - `filterDashboardTasksByModule()` - Ahora actualiza UI de módulos
+  - `updateModuleSelection()` - Nueva función para resaltado
+  - `clearFilter()` - Limpia selección de módulo
+
+### Technical Details
+- **Archivos modificados:**
+  - `main.js` - ~150 líneas (calculateAfiliacionStats, logs)
+  - `recursos-home.js` - ~150 líneas (afiliación widget)
+  - `renderer.js` - ~50 líneas (filtro de módulos)
+
+### Impacto
+- **UX:** Alertas más precisas y dashboard más intuitivo
+- **Backend:** Nuevos contratos para afiliación
+- **Frontend:** Widget consistente con presupuesto
+
+### Breaking Changes
+- **Ninguno** - Funcionalidad aditiva
+
+---
+
 ## [0.1.91] - 2026-03-22
 
 ### Added

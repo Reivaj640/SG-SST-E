@@ -1665,20 +1665,25 @@ async function getDashboardAlertas(rootPath, companyName) {
     // 6. VERIFICAR ACTAS COPASST Y COMITÉ DE CONVIVENCIA
     // ========================================================================
     const actasPath = path.join(rootPath, '1. Recursos');
-    
-    // Verificar COPASST
+    const currentYear = new Date().getFullYear();
+
+    // ------------------------------------------------------------------------
+    // 6.1 VERIFICAR COPASST
+    // ------------------------------------------------------------------------
     const copasstPath = path.join(actasPath, '1.1.6 Conformación de Copasst');
+    
     if (fs.existsSync(copasstPath)) {
-      const archivos = fs.readdirSync(copasstPath);
-      const actaConst = archivos.some(f => 
-        f.toLowerCase().includes('acta') && 
-        (f.toLowerCase().includes('constitutiva') || f.toLowerCase().includes('constitucion'))
-      );
+      // 6.1.1 Verificar período vigente (elección cada 2 años)
+      const constitucionPath = path.join(copasstPath, 'Constitución');
+      const periodoCOPASST = verifyCommitteePeriod(constitucionPath, 'COPASST');
       
-      if (!actaConst) {
+      console.log(`[DASHBOARD] 🔍 [COPASST] Período verificado:`, periodoCOPASST);
+      
+      if (!periodoCOPASST.yearUltima) {
+        // No se encontró acta de elección/constitución
         dashboard_data.tasks.push({
-          title: "COPASST: Sin Acta Constitutiva",
-          desc: "No se encontró el acta constitutiva de COPASST. Requisito normativo obligatorio.",
+          title: "COPASST: Sin Acta de Elección/Constitución",
+          desc: "No se encontró acta de elección o constitución de COPASST. Requisito normativo obligatorio.",
           priority: "critical",
           module: "copasst",
           icon: "fas fa-users",
@@ -1686,32 +1691,200 @@ async function getDashboardAlertas(rootPath, companyName) {
         });
         dashboard_data.module_status.recursos = "danger";
         dashboard_data.kpis.recursos_alerts += 1;
-      }
-    }
-    
-    // Verificar Comité de Convivencia
-    const convivenciaPath = path.join(actasPath, '1.1.8 Comité de Convivencia');
-    if (fs.existsSync(convivenciaPath)) {
-      const archivos = fs.readdirSync(convivenciaPath);
-      const actaConst = archivos.some(f => 
-        f.toLowerCase().includes('acta') && 
-        (f.toLowerCase().includes('constitutiva') || f.toLowerCase().includes('constitucion'))
-      );
-      
-      if (!actaConst) {
+        
+        console.log(`[DASHBOARD] 📋 [COPASST] Alerta crítica: Sin acta de elección`);
+      } else if (!periodoCOPASST.vigente) {
+        // Período vencido (más de 2 años)
         dashboard_data.tasks.push({
-          title: "Comité de Convivencia: Sin Acta Constitutiva",
-          desc: "No se encontró el acta constitutiva del Comité. Requisito normativo obligatorio.",
+          title: `COPASST: Período vencido (${periodoCOPASST.yearUltima}-${periodoCOPASST.yearUltima + 2})`,
+          desc: `Última elección: ${periodoCOPASST.yearUltima}. Período máximo: 2 años. Próxima elección requerida: Antes de diciembre ${periodoCOPASST.yearUltima + 2}`,
           priority: "critical",
-          module: "comite_convivencia",
-          icon: "fas fa-handshake",
-          submodule: "1.1.8 Comité de Convivencia"
+          module: "copasst",
+          icon: "fas fa-users",
+          submodule: "1.1.6 Conformación de Copasst"
         });
         dashboard_data.module_status.recursos = "danger";
         dashboard_data.kpis.recursos_alerts += 1;
+        
+        console.log(`[DASHBOARD] 📋 [COPASST] Alerta crítica: Período vencido`);
+      } else if (periodoCOPASST.porVencer) {
+        // Período por vencer (alerta temprana)
+        dashboard_data.tasks.push({
+          title: `COPASST: Período por vencer (${periodoCOPASST.yearUltima}-${periodoCOPASST.yearUltima + 2})`,
+          desc: `Última elección: ${periodoCOPASST.yearUltima}. Renovación requerida antes de diciembre ${periodoCOPASST.yearUltima + 2}`,
+          priority: "warning",
+          module: "copasst",
+          icon: "fas fa-users",
+          submodule: "1.1.6 Conformación de Copasst"
+        });
+        dashboard_data.kpis.recursos_alerts += 1;
+
+        console.log(`[DASHBOARD] 📋 [COPASST] Alerta warning: Período por vencer`);
+      } else {
+        // Período vigente - Agregar alerta informativa
+        dashboard_data.tasks.push({
+          title: `COPASST: Constitución al día (Período ${periodoCOPASST.yearUltima}-${periodoCOPASST.yearUltima + 2})`,
+          desc: `Última elección: ${periodoCOPASST.yearUltima}. Próxima renovación: Diciembre ${periodoCOPASST.yearUltima + 2}.`,
+          priority: "info",
+          module: "copasst",
+          icon: "fas fa-check-circle",
+          submodule: "1.1.6 Conformación de Copasst"
+        });
+        dashboard_data.kpis.recursos_alerts += 1;
+        console.log(`[DASHBOARD] ✅ [COPASST] Período vigente (${periodoCOPASST.yearUltima}-${periodoCOPASST.yearUltima + 2})`);
       }
+      
+      // 6.1.2 Verificar reuniones mensuales (SIEMPRE, independientemente del período)
+      const reunionesCOPASST = verifyCOPASSTMeetings(copasstPath, currentYear);
+      console.log(`[DASHBOARD] 🔍 [COPASST] Reuniones verificadas:`, reunionesCOPASST);
+
+      if (!reunionesCOPASST.cumple && reunionesCOPASST.mesesFaltantes.length > 0) {
+        const mesesFaltantesStr = reunionesCOPASST.mesesFaltantes.join(', ');
+        dashboard_data.tasks.push({
+          title: `COPASST: Sin reunión desde ${reunionesCOPASST.ultimoMes || 'Enero'} ${currentYear}`,
+          desc: `Última acta registrada: ${reunionesCOPASST.ultimoMes || 'Ninguna'} ${currentYear}. Mes actual: ${numberToMonth(currentMonth)} ${currentYear}. Requisito: Reuniones mensuales. Meses sin acta: ${mesesFaltantesStr}`,
+          priority: "critical",
+          module: "copasst",
+          icon: "fas fa-calendar-times",
+          submodule: "1.1.6 Conformación de Copasst"
+        });
+        dashboard_data.module_status.recursos = "danger";
+        dashboard_data.kpis.recursos_alerts += 1;
+
+        console.log(`[DASHBOARD] 📋 [COPASST] Alerta crítica: Sin reunión mensual`);
+      } else if (!reunionesCOPASST.cumple && reunionesCOPASST.ultimoMesNumero === 0) {
+        // No hay ninguna acta registrada en el año
+        dashboard_data.tasks.push({
+          title: `COPASST: Sin reuniones registradas en ${currentYear}`,
+          desc: `No se encontró ninguna acta de reunión registrada en ${currentYear}. Requisito: Reuniones mensuales.`,
+          priority: "critical",
+          module: "copasst",
+          icon: "fas fa-calendar-times",
+          submodule: "1.1.6 Conformación de Copasst"
+        });
+        dashboard_data.module_status.recursos = "danger";
+        dashboard_data.kpis.recursos_alerts += 1;
+
+        console.log(`[DASHBOARD] 📋 [COPASST] Alerta crítica: Sin reuniones en el año`);
+      } else {
+        console.log(`[DASHBOARD] ✅ [COPASST] Reuniones al día: ${reunionesCOPASST.message}`);
+      }
+    } else {
+      console.log(`[DASHBOARD] ⚠️ [COPASST] Carpeta NO existe: ${copasstPath}`);
     }
-    
+
+    // ------------------------------------------------------------------------
+    // 6.2 VERIFICAR COMITÉ DE CONVIVENCIA
+    // ------------------------------------------------------------------------
+    // NOTA: Se verifican ambas variaciones del nombre para mayor resiliencia
+    const convivenciaPath1 = path.join(actasPath, '1.1.8 Comité de Convivencia');
+    const convivenciaPath2 = path.join(actasPath, '1.1.8 Conformación de Comite de Convivencia');
+    const convivenciaPath = fs.existsSync(convivenciaPath1) ? convivenciaPath1 : convivenciaPath2;
+    console.log(`[DASHBOARD] 🔍 [COMITÉ CONVIVENCIA] Verificando ruta: ${convivenciaPath}`);
+
+    if (fs.existsSync(convivenciaPath)) {
+      console.log(`[DASHBOARD] ✅ [COMITÉ CONVIVENCIA] Carpeta encontrada`);
+      
+      // 6.2.1 Verificar período vigente (elección cada 2 años)
+      const constitucionPath = path.join(convivenciaPath, 'Constitución');
+      const periodoConvivencia = verifyCommitteePeriod(constitucionPath, 'COMITÉ CONVIVENCIA');
+      
+      console.log(`[DASHBOARD] 🔍 [COMITÉ CONVIVENCIA] Período verificado:`, periodoConvivencia);
+      
+      if (!periodoConvivencia.yearUltima) {
+        // No se encontró acta de elección/constitución
+        dashboard_data.tasks.push({
+          title: "Comité: Sin Acta de Elección/Constitución",
+          desc: "No se encontró acta de elección o constitución del Comité. Requisito normativo obligatorio.",
+          priority: "critical",
+          module: "comite_convivencia",
+          icon: "fas fa-handshake",
+          submodule: "1.1.8 Conformación de Comite de Convivencia"
+        });
+        dashboard_data.module_status.recursos = "danger";
+        dashboard_data.kpis.recursos_alerts += 1;
+        
+        console.log(`[DASHBOARD] 📋 [COMITÉ CONVIVENCIA] Alerta crítica: Sin acta de elección`);
+      } else if (!periodoConvivencia.vigente) {
+        // Período vencido (más de 2 años)
+        dashboard_data.tasks.push({
+          title: `Comité: Período vencido (${periodoConvivencia.yearUltima}-${periodoConvivencia.yearUltima + 2})`,
+          desc: `Última elección: ${periodoConvivencia.yearUltima}. Período máximo: 2 años. Próxima elección requerida: Antes de diciembre ${periodoConvivencia.yearUltima + 2}`,
+          priority: "critical",
+          module: "comite_convivencia",
+          icon: "fas fa-handshake",
+          submodule: "1.1.8 Conformación de Comite de Convivencia"
+        });
+        dashboard_data.module_status.recursos = "danger";
+        dashboard_data.kpis.recursos_alerts += 1;
+        
+        console.log(`[DASHBOARD] 📋 [COMITÉ CONVIVENCIA] Alerta crítica: Período vencido`);
+      } else if (periodoConvivencia.porVencer) {
+        // Período por vencer (alerta temprana)
+        dashboard_data.tasks.push({
+          title: `Comité: Período por vencer (${periodoConvivencia.yearUltima}-${periodoConvivencia.yearUltima + 2})`,
+          desc: `Última elección: ${periodoConvivencia.yearUltima}. Renovación requerida antes de diciembre ${periodoConvivencia.yearUltima + 2}`,
+          priority: "warning",
+          module: "comite_convivencia",
+          icon: "fas fa-handshake",
+          submodule: "1.1.8 Conformación de Comite de Convivencia"
+        });
+        dashboard_data.kpis.recursos_alerts += 1;
+
+        console.log(`[DASHBOARD] 📋 [COMITÉ CONVIVENCIA] Alerta warning: Período por vencer`);
+      } else {
+        // Constitución vigente - Agregar alerta informativa
+        dashboard_data.tasks.push({
+          title: `Comité: Constitución al día (Período ${periodoConvivencia.yearUltima}-${periodoConvivencia.yearUltima + 2})`,
+          desc: `Última elección: ${periodoConvivencia.yearUltima}. Próxima renovación: Diciembre ${periodoConvivencia.yearUltima + 2}.`,
+          priority: "info",
+          module: "comite_convivencia",
+          icon: "fas fa-check-circle",
+          submodule: "1.1.8 Conformación de Comite de Convivencia"
+        });
+        dashboard_data.kpis.recursos_alerts += 1;
+        console.log(`[DASHBOARD] ✅ [COMITÉ CONVIVENCIA] Período vigente (${periodoConvivencia.yearUltima}-${periodoConvivencia.yearUltima + 2})`);
+      }
+
+      // 6.2.2 Verificar reuniones mensuales (SIEMPRE, independientemente del período)
+      const reunionesConvivencia = verifyConvivenciaMeetings(convivenciaPath, currentYear);
+      console.log(`[DASHBOARD] 🔍 [COMITÉ CONVIVENCIA] Reuniones verificadas:`, reunionesConvivencia);
+
+      if (!reunionesConvivencia.cumple && reunionesConvivencia.mesesFaltantes.length > 0) {
+        const mesesFaltantesStr = reunionesConvivencia.mesesFaltantes.join(', ');
+        dashboard_data.tasks.push({
+          title: `Comité: Sin reunión desde ${reunionesConvivencia.ultimoMes || 'Ninguna'} ${reunionesConvivencia.ultimoMesYear || currentYear}`,
+          desc: `Última acta registrada: ${reunionesConvivencia.ultimoMes || 'Ninguna'} ${reunionesConvivencia.ultimoMesYear || currentYear - 1}. Mes actual: ${numberToMonth(currentMonth)} ${currentYear}. Requisito: Reuniones mensuales. Meses sin acta: ${mesesFaltantesStr}`,
+          priority: "critical",
+          module: "comite_convivencia",
+          icon: "fas fa-calendar-times",
+          submodule: "1.1.8 Conformación de Comite de Convivencia"
+        });
+        dashboard_data.module_status.recursos = "danger";
+        dashboard_data.kpis.recursos_alerts += 1;
+
+        console.log(`[DASHBOARD] 📋 [COMITÉ CONVIVENCIA] Alerta crítica: Sin reunión mensual`);
+      } else if (!reunionesConvivencia.cumple && reunionesConvivencia.ultimoMesNumero === 0) {
+        // No hay ninguna acta registrada en el año
+        dashboard_data.tasks.push({
+          title: `Comité: Sin reuniones registradas en ${currentYear}`,
+          desc: `No se encontró ninguna acta de reunión registrada en ${currentYear}. Requisito: Reuniones mensuales.`,
+          priority: "critical",
+          module: "comite_convivencia",
+          icon: "fas fa-calendar-times",
+          submodule: "1.1.8 Conformación de Comite de Convivencia"
+        });
+        dashboard_data.module_status.recursos = "danger";
+        dashboard_data.kpis.recursos_alerts += 1;
+
+        console.log(`[DASHBOARD] 📋 [COMITÉ CONVIVENCIA] Alerta crítica: Sin reuniones en el año`);
+      } else {
+        console.log(`[DASHBOARD] ✅ [COMITÉ CONVIVENCIA] Reuniones al día: ${reunionesConvivencia.message}`);
+      }
+    } else {
+      console.log(`[DASHBOARD] ⚠️ [COMITÉ CONVIVENCIA] Carpeta NO existe: ${convivenciaPath}`);
+    }
+
   } catch (error) {
     console.error(`[DASHBOARD ALERTAS] Error calculando alertas: ${error.message}`);
     sendLog(`[DASHBOARD ALERTAS] Error: ${error.message}`, 'ERROR');
@@ -8175,6 +8348,362 @@ async function getCompanyRootPath(companyName) {
     console.error('Error obteniendo ruta empresa:', e);
     return null;
   }
+}
+
+// ============================================================================
+// FUNCIONES AUXILIARES PARA VERIFICACIÓN DE COPASST Y COMITÉ DE CONVIVENCIA
+// ============================================================================
+
+/**
+ * Extrae el año más reciente desde nombres de archivos en una carpeta
+ * @param {string} folderPath - Ruta de la carpeta a escanear
+ * @param {string[]} filePatterns - Patrones de búsqueda (ej: ['ACTA DE CONSTITUCIÓN', 'ACTA DE ESCRUTINIO'])
+ * @returns {number|null} - Año encontrado o null si no hay archivos
+ */
+function extractLatestYearFromFiles(folderPath, filePatterns) {
+  try {
+    if (!fs.existsSync(folderPath)) return null;
+    
+    const archivos = fs.readdirSync(folderPath);
+    const years = [];
+    
+    for (const archivo of archivos) {
+      const upperName = archivo.toUpperCase();
+      // Verificar si coincide con algún patrón
+      const matchesPattern = filePatterns.some(pattern => 
+        upperName.includes(pattern.toUpperCase())
+      );
+      
+      if (matchesPattern) {
+        // Extraer año del nombre (ej: "ACTA 2022" o "CONSTITUCIÓN 2 .doc" -> 2022)
+        const yearMatch = archivo.match(/(20\d{2}|202\d)/);
+        if (yearMatch) {
+          years.push(parseInt(yearMatch[1]));
+        }
+      }
+    }
+    
+    return years.length > 0 ? Math.max(...years) : null;
+  } catch (e) {
+    console.error(`Error extrayendo año desde ${folderPath}:`, e.message);
+    return null;
+  }
+}
+
+/**
+ * Extrae el mes desde un nombre de archivo de acta
+ * @param {string} fileName - Nombre del archivo
+ * @returns {string|null} - Nombre del mes en español o null
+ */
+function extractMonthFromFileName(fileName) {
+  const months = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ];
+  
+  const upperName = fileName.toUpperCase();
+  for (const month of months) {
+    if (upperName.includes(month.toUpperCase())) {
+      return month;
+    }
+  }
+  return null;
+}
+
+/**
+ * Obtiene las actas encontradas en una carpeta de año específico
+ * @param {string} folderPath - Ruta de la carpeta (ej: COPASST 2025)
+ * @returns {Array<{fileName: string, month: string}>} - Lista de actas con mes
+ */
+function getActasInYearFolder(folderPath) {
+  const result = [];
+  try {
+    if (!fs.existsSync(folderPath)) return result;
+
+    const archivos = fs.readdirSync(folderPath);
+    for (const archivo of archivos) {
+      if (archivo.startsWith('~$')) continue; // Saltar archivos temporales
+
+      const month = extractMonthFromFileName(archivo);
+      if (month) {
+        result.push({ fileName: archivo, month: month });
+      }
+    }
+  } catch (e) {
+    console.error(`Error leyendo actas en ${folderPath}:`, e.message);
+  }
+  return result;
+}
+
+/**
+ * Convierte nombre de mes a número (1-12)
+ * @param {string} monthName - "Enero", "Febrero", etc.
+ * @returns {number} - 1, 2, 3...12
+ */
+function monthToNumber(monthName) {
+  const months = {
+    'Enero': 1, 'Febrero': 2, 'Marzo': 3, 'Abril': 4,
+    'Mayo': 5, 'Junio': 6, 'Julio': 7, 'Agosto': 8,
+    'Septiembre': 9, 'Octubre': 10, 'Noviembre': 11, 'Diciembre': 12
+  };
+  return months[monthName] || 0;
+}
+
+/**
+ * Convierte número de mes a nombre
+ * @param {number} monthNumber - 1, 2, 3...12
+ * @returns {string} - "Enero", "Febrero", etc.
+ */
+function numberToMonth(monthNumber) {
+  const months = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ];
+  return months[monthNumber - 1] || '';
+}
+
+/**
+ * Obtiene actas con fecha de modificación para verificar registro real
+ * @param {string} folderPath - Ruta de la carpeta (ej: COPASST 2025)
+ * @returns {Array<{fileName: string, month: string, monthNumber: number, modified: Date}>}
+ */
+function getActasWithModificationDate(folderPath) {
+  const result = [];
+  try {
+    if (!fs.existsSync(folderPath)) return result;
+
+    const archivos = fs.readdirSync(folderPath);
+    for (const archivo of archivos) {
+      if (archivo.startsWith('~$')) continue; // Saltar archivos temporales
+
+      const month = extractMonthFromFileName(archivo);
+      if (month) {
+        const filePath = path.join(folderPath, archivo);
+        const stats = fs.statSync(filePath);
+        result.push({
+          fileName: archivo,
+          month: month,
+          monthNumber: monthToNumber(month),
+          modified: stats.mtime
+        });
+      }
+    }
+  } catch (e) {
+    console.error(`Error leyendo actas con fecha en ${folderPath}:`, e.message);
+  }
+  return result;
+}
+
+/**
+ * Obtiene actas por nombre de archivo (sin considerar fecha de modificación)
+ * @param {string} folderPath - Ruta de la carpeta (ej: COPASST 2025)
+ * @returns {Array<{fileName: string, month: string, monthNumber: number}>}
+ */
+function getActasByFileName(folderPath) {
+  const result = [];
+  try {
+    if (!fs.existsSync(folderPath)) return result;
+
+    const archivos = fs.readdirSync(folderPath);
+    for (const archivo of archivos) {
+      if (archivo.startsWith('~$')) continue; // Saltar archivos temporales
+
+      const month = extractMonthFromFileName(archivo);
+      if (month) {
+        result.push({
+          fileName: archivo,
+          month: month,
+          monthNumber: monthToNumber(month)
+        });
+      }
+    }
+  } catch (e) {
+    console.error(`Error leyendo actas por nombre en ${folderPath}:`, e.message);
+  }
+  return result;
+}
+
+/**
+ * Verifica el período vigente de un comité (COPASST o Convivencia)
+ * @param {string} constitucionPath - Ruta de la carpeta Constitución
+ * @param {string} committeeName - Nombre para logs ('COPASST' o 'COMITÉ CONVIVENCIA')
+ * @returns {{vigente: boolean, yearUltima: number|null, anosTranscurridos: number, porVencer: boolean}}
+ */
+function verifyCommitteePeriod(constitucionPath, committeeName) {
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1; // 1-12
+
+  // Buscar actas de elección/constitución más recientes
+  const filePatterns = [
+    'ACTA DE ESCRUTINIO',
+    'ACTA DE VOTACION',
+    'ACTA DE CONSTITUCIÓN',
+    'ACTA DE CONSTITUCION'
+  ];
+
+  const latestYear = extractLatestYearFromFiles(constitucionPath, filePatterns);
+
+  if (!latestYear) {
+    return {
+      vigente: false,
+      yearUltima: null,
+      anosTranscurridos: 999,
+      porVencer: false,
+      message: `No se encontró acta de elección/constitución de ${committeeName}`
+    };
+  }
+
+  const endYear = latestYear + 2;  // El período termina en diciembre de endYear
+  const endMonth = 12;  // Diciembre
+  
+  // Vigente si: año actual < endYear O (año actual == endYear Y mes <= diciembre)
+  const vigente = (currentYear < endYear) || 
+                  (currentYear === endYear && currentMonth <= endMonth);
+  
+  const anosTranscurridos = currentYear - latestYear;
+  
+  // Por vencer: alerta temprana cuando faltan 3 meses o menos para terminar el período
+  const mesesRestantes = (endYear - currentYear) * 12 + (endMonth - currentMonth);
+  const porVencer = mesesRestantes <= 3 && mesesRestantes > 0;
+
+  return {
+    vigente,
+    yearUltima: latestYear,
+    anosTranscurridos,
+    porVencer,
+    message: `Período ${latestYear}-${latestYear + 2}`
+  };
+}
+
+/**
+ * Verifica reuniones mensuales de COPASST usando nombre de archivo
+ * @param {string} basePath - Ruta base (1.1.6 Conformación de Copasst)
+ * @param {number} year - Año a verificar
+ * @returns {{cumple: boolean, ultimoMes: string|null, ultimoMesNumero: number, mesesFaltantes: string[], message: string}}
+ */
+function verifyCOPASSTMeetings(basePath, year) {
+  const currentDate = new Date();
+  const currentMonth = currentDate.getMonth() + 1; // 1-12
+  const currentYear = currentDate.getFullYear();
+
+  // Buscar carpetas del año actual y año anterior
+  const yearFolder = path.join(basePath, `COPASST ${year}`);
+  const prevYearFolder = path.join(basePath, `COPASST ${year - 1}`);
+
+  // Obtener actas por nombre de archivo (NO por fecha de modificación)
+  const actasYear = getActasByFileName(yearFolder);
+  const actasPrevYear = getActasByFileName(prevYearFolder);
+
+  // Combinar todas las actas encontradas y ordenar por año y mes
+  const allActas = [
+    ...actasPrevYear.map(a => ({ ...a, year: year - 1 })),
+    ...actasYear.map(a => ({ ...a, year: year }))
+  ];
+
+  // Ordenar por año y luego por mes (descendente para obtener el último primero)
+  allActas.sort((a, b) => {
+    if (a.year !== b.year) return b.year - a.year;
+    return b.monthNumber - a.monthNumber;
+  });
+
+  // Obtener último mes registrado
+  const ultimoActa = allActas[0];
+  const ultimoMesRegistrado = ultimoActa?.monthNumber || 0;
+  const ultimoMesNombre = ultimoActa?.month || null;
+  const ultimoMesYear = ultimoActa?.year || year - 1;
+
+  // Calcular meses faltantes desde el último registrado hasta el mes actual
+  let mesesFaltantes = [];
+  
+  if (ultimoMesYear === year - 1) {
+    // El último acta es del año anterior, faltan todos los meses de Enero hasta el mes actual
+    for (let m = 1; m <= currentMonth; m++) {
+      mesesFaltantes.push(numberToMonth(m));
+    }
+  } else {
+    // El último acta es del año actual, faltan desde el mes siguiente hasta el mes actual
+    for (let m = ultimoMesRegistrado + 1; m <= currentMonth; m++) {
+      mesesFaltantes.push(numberToMonth(m));
+    }
+  }
+
+  const cumple = mesesFaltantes.length === 0;
+
+  return {
+    cumple,
+    ultimoMes: ultimoMesNombre,
+    ultimoMesNumero: ultimoMesRegistrado,
+    mesesFaltantes,
+    message: cumple
+      ? `Reuniones al día (última: ${ultimoMesNombre} ${ultimoMesYear})`
+      : `Sin reunión desde ${ultimoMesNombre || 'Ninguna'} ${ultimoMesYear}`
+  };
+}
+
+/**
+ * Verifica reuniones mensuales del Comité de Convivencia usando nombre de archivo
+ * @param {string} basePath - Ruta base (1.1.8 Conformación de Comite de Convivencia)
+ * @param {number} year - Año a verificar
+ * @returns {{cumple: boolean, ultimoMes: string|null, ultimoMesNumero: number, mesesFaltantes: string[], ultimoMesYear: number, message: string}}
+ */
+function verifyConvivenciaMeetings(basePath, year) {
+  const currentDate = new Date();
+  const currentMonth = currentDate.getMonth() + 1; // 1-12
+  const currentYear = currentDate.getFullYear();
+
+  // Buscar carpetas del año actual y año anterior
+  const yearFolder = path.join(basePath, `CONVIVENCIA ${year}`);
+  const prevYearFolder = path.join(basePath, `CONVIVENCIA ${year - 1}`);
+
+  // Obtener actas por nombre de archivo (NO por fecha de modificación)
+  const actasYear = getActasByFileName(yearFolder);
+  const actasPrevYear = getActasByFileName(prevYearFolder);
+
+  // Combinar todas las actas encontradas y ordenar por año y mes
+  const allActas = [
+    ...actasPrevYear.map(a => ({ ...a, year: year - 1 })),
+    ...actasYear.map(a => ({ ...a, year: year }))
+  ];
+
+  // Ordenar por año y luego por mes (descendente para obtener el último primero)
+  allActas.sort((a, b) => {
+    if (a.year !== b.year) return b.year - a.year;
+    return b.monthNumber - a.monthNumber;
+  });
+
+  // Obtener último mes registrado
+  const ultimoActa = allActas[0];
+  const ultimoMesRegistrado = ultimoActa?.monthNumber || 0;
+  const ultimoMesNombre = ultimoActa?.month || null;
+  const ultimoMesYear = ultimoActa?.year || year - 1;
+
+  // Calcular meses faltantes desde el último registrado hasta el mes actual
+  let mesesFaltantes = [];
+  
+  if (ultimoMesYear === year - 1) {
+    // El último acta es del año anterior, faltan todos los meses de Enero hasta el mes actual
+    for (let m = 1; m <= currentMonth; m++) {
+      mesesFaltantes.push(numberToMonth(m));
+    }
+  } else {
+    // El último acta es del año actual, faltan desde el mes siguiente hasta el mes actual
+    for (let m = ultimoMesRegistrado + 1; m <= currentMonth; m++) {
+      mesesFaltantes.push(numberToMonth(m));
+    }
+  }
+
+  const cumple = mesesFaltantes.length === 0;
+
+  return {
+    cumple,
+    ultimoMes: ultimoMesNombre,
+    ultimoMesNumero: ultimoMesRegistrado,
+    mesesFaltantes,
+    ultimoMesYear,
+    message: cumple
+      ? `Reuniones al día (última: ${ultimoMesNombre} ${ultimoMesYear})`
+      : `Sin reunión desde ${ultimoMesNombre || 'Ninguna'} ${ultimoMesYear}`
+  };
 }
 
 async function calculateCapacitacionesStats(basePath) {

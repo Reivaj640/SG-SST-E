@@ -1,6 +1,6 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.92
+**Versión:** 0.1.93
 **Última actualización:** 25 de marzo de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
@@ -43,6 +43,7 @@
 - ✅ **Alerta de Afiliación SSSI** 🆕: Detección automática de planillas faltantes del mes en curso
 - ✅ **Dashboard con Filtros por Módulo** 🆕: Panel lateral interactivo con resaltado de módulo activo
 - ✅ **Sidebar Inteligente** 🆕: Limpieza automática de estado activo al cambiar de empresa/módulo
+- ✅ **Visualizadores Modernizados (9 submódulos)** 🆕: Drag&Drop, menú contextual, toast, modal confirmación
 
 ---
 
@@ -283,6 +284,112 @@ npm run docs:watch     # Vigilar cambios y regenerar
 | 1.2.1  | Programa de Capacitación  | `capacitaciones-logic.js`, `capacitaciones-viewer.js`, `capacitaciones-portal-logic.js` 🆕, `cap-home.html` 🆕, `cap-home.js` 🆕 |
 | 1.2.2  | Inducción y Reinducción   | `inducciones-logic.js`, `viewer.js`                 |
 | 1.2.3  | Curso Virtual 50 Horas    | `curso-virtual-logic.js`, `viewer.js`               |
+| 1.2.4  | Manual SST Proveedores    | `manual-proveedores-logic.js`, `viewer.js` 🆕       |
+
+### 🆕 Visualizadores Modernizados (v0.1.93)
+
+**Descripción:** Sistema unificado de gestión documental con funciones modernas replicadas en 9 submódulos.
+
+**Submódulos Actualizados:**
+| Código | Submódulo | Funciones Implementadas |
+|--------|-----------|------------------------|
+| 1.1.1 | Responsable SG | ✅ Drag&Drop, ✅ Context Menu, ✅ Toast, ✅ Confirm Modal |
+| 1.1.2 | Roles y Responsabilidades | ✅ Drag&Drop, ✅ Context Menu, ✅ Toast, ✅ Confirm Modal |
+| 1.1.4 | Afiliación al SSSI | ✅ Drag&Drop, ✅ Context Menu, ✅ Toast, ✅ Confirm Modal |
+| 1.1.5 | Trabajo de Alto Riesgo | ✅ Drag&Drop, ✅ Context Menu, ✅ Toast, ✅ Confirm Modal |
+| 1.1.6 | Conformación de Copasst | ✅ Drag&Drop, ✅ Context Menu, ✅ Toast, ✅ Confirm Modal |
+| 1.1.7 | Capacitación al Copasst | ✅ Drag&Drop, ✅ Context Menu, ✅ Toast, ✅ Confirm Modal |
+| 1.1.8 | Comité de Convivencia | ✅ Drag&Drop, ✅ Context Menu, ✅ Toast, ✅ Confirm Modal |
+| 1.2.3 | Curso Virtual 50 Horas | ✅ Drag&Drop, ✅ Context Menu, ✅ Toast, ✅ Confirm Modal |
+| 1.2.4 | Manual SST Proveedores | ✅ Drag&Drop, ✅ Context Menu, ✅ Toast, ✅ Confirm Modal |
+
+**Funciones Implementadas:**
+
+1. **Drag & Drop de Archivos** 🆕
+   - Overlay visual con ícono animado bounce
+   - Subida automática de archivos soltados
+   - Manejo de múltiples archivos simultáneos
+   - Feedback con notificaciones toast
+
+2. **Menú Contextual (Clic Derecho)** 🆕
+   - Menú flotante con opciones:
+     - 📂 Abrir archivo
+     - 🗑️ Eliminar archivo
+   - Posicionamiento inteligente (no sale de pantalla)
+   - Cierre con clic fuera o tecla Escape
+
+3. **Modal de Confirmación Moderno** 🆕
+   - Diseño centrado con animación slideUp
+   - Header amarillo con ícono de advertencia
+   - Nombre del archivo en caja destacada
+   - Botones Cancelar / Eliminar estilizados
+
+4. **Notificaciones Toast Modernas** 🆕
+   - 4 tipos: success, error, warning, info
+   - Iconos FontAwesome por tipo
+   - Auto-eliminación con animación fade-out (300ms)
+   - Contenedor en esquina superior derecha
+
+5. **Abrir Archivo con Aplicación Predeterminada** 🆕
+   - Opción en menú contextual
+   - Usa `electronAPI.open-file`
+   - Manejo de errores específico (EPERM, ENOENT, EACCES)
+
+**Archivos Modificados por Submódulo:**
+
+| Archivo | Líneas agregadas | Funciones |
+|---------|-----------------|-----------|
+| `[submodulo]-view.html` | ~40 | contextMenu, confirmModal, kToastContainer |
+| `[submodulo]-view.css` | ~280 | Estilos para modales, toast, drag&drop |
+| `[submodulo]-viewer.js` | ~450 | Todas las funciones modernas |
+
+**Funciones JavaScript Agregadas:**
+
+```javascript
+// Drag & Drop
+- setupDragAndDrop()
+- setupFolderDragAndDrop(folderElement, folderPath)
+- preventDefaults(e)
+- handleDragOver(e)
+- uploadFile(file, folderPath)
+- fileToBase64(file)
+
+// Context Menu
+- showContextMenu(x, y, doc)
+- hideContextMenu()
+- deleteDocument()
+- setupContextMenu()
+- openFile()
+
+// Toast Notifications
+- showToast(message, type, duration)
+
+// Confirm Modal
+- showConfirmModal(fileName, callback)
+- hideConfirmModal()
+- acceptConfirm()
+- cancelConfirm()
+- setupConfirmModal()
+```
+
+**Funciones Actualizadas:**
+
+| Función | Cambio |
+|---------|--------|
+| `setupEventListeners()` | Ahora llama a `setupDragAndDrop()` y `setupContextMenu()` |
+| `renderFolders()` | Agrega clase 'folder' y llama a `setupFolderDragAndDrop()` |
+| `renderDocuments()` | Agrega evento 'contextmenu' para clic derecho |
+
+**Validación Esperada:**
+
+| Acción | Resultado esperado |
+|--------|-------------------|
+| Arrastrar archivo → carpeta | Overlay aparece, archivo se sube, toast success |
+| Clic derecho en archivo | Menú contextual con "Abrir" y "Eliminar" |
+| Click en "Eliminar" | Modal moderno con nombre del archivo |
+| Click en "Cancelar" | Modal se cierra sin acción |
+| Click en "Eliminar" (modal) | Archivo eliminado, toast success, lista recargada |
+| Click en "Abrir archivo" | Archivo se abre con aplicación predeterminada |
 
 ### 🆕 Módulo 1.1.4 - Afiliación al SSSI (v0.1.92)
 

@@ -3,7 +3,288 @@ import pandas as pd
 import json
 import sys
 import os
+import re
 from datetime import datetime, timedelta
+
+
+# ============================================================================
+# FUNCIONES AUXILIARES PARA VERIFICACIÓN DE COPASST Y COMITÉ DE CONVIVENCIA
+# ============================================================================
+
+def extract_latest_year_from_files(folder_path, file_patterns):
+    """
+    Extrae el año más reciente desde nombres de archivos en una carpeta
+    """
+    try:
+        if not os.path.exists(folder_path):
+            return None
+        
+        archivos = os.listdir(folder_path)
+        years = []
+        
+        for archivo in archivos:
+            upper_name = archivo.upper()
+            matches_pattern = any(pattern.upper() in upper_name for pattern in file_patterns)
+            
+            if matches_pattern:
+                year_match = re.search(r'(20\d{2}|202\d)', archivo)
+                if year_match:
+                    years.append(int(year_match.group(1)))
+        
+        return max(years) if years else None
+    except Exception as e:
+        print(f"Error extrayendo año desde {folder_path}: {e}", file=sys.stderr)
+        return None
+
+
+def extract_month_from_file_name(file_name):
+    """
+    Extrae el mes desde un nombre de archivo de acta
+    """
+    months = [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ]
+    
+    upper_name = file_name.upper()
+    for month in months:
+        if month.upper() in upper_name:
+            return month
+    return None
+
+
+def get_actas_in_year_folder(folder_path):
+    """
+    Obtiene las actas encontradas en una carpeta de año específico
+    """
+    result = []
+    try:
+        if not os.path.exists(folder_path):
+            return result
+
+        archivos = os.listdir(folder_path)
+        for archivo in archivos:
+            if archivo.startswith('~$'):
+                continue
+
+            month = extract_month_from_file_name(archivo)
+            if month:
+                result.append({'file_name': archivo, 'month': month})
+    except Exception as e:
+        print(f"Error leyendo actas en {folder_path}: {e}", file=sys.stderr)
+    return result
+
+
+def month_to_number(month_name):
+    """
+    Convierte nombre de mes a número (1-12)
+    """
+    months = {
+        'Enero': 1, 'Febrero': 2, 'Marzo': 3, 'Abril': 4,
+        'Mayo': 5, 'Junio': 6, 'Julio': 7, 'Agosto': 8,
+        'Septiembre': 9, 'Octubre': 10, 'Noviembre': 11, 'Diciembre': 12
+    }
+    return months.get(month_name, 0)
+
+
+def number_to_month(month_number):
+    """
+    Convierte número de mes a nombre
+    """
+    months = [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ]
+    return months[month_number - 1] if 1 <= month_number <= 12 else ''
+
+
+def get_actas_with_modification_date(folder_path):
+    """
+    Obtiene actas con fecha de modificación para verificar registro real
+    """
+    result = []
+    try:
+        if not os.path.exists(folder_path):
+            return result
+
+        archivos = os.listdir(folder_path)
+        for archivo in archivos:
+            if archivo.startswith('~$'):
+                continue
+
+            month = extract_month_from_file_name(archivo)
+            if month:
+                file_path = os.path.join(folder_path, archivo)
+                modified_time = os.path.getmtime(file_path)
+                modified_date = datetime.fromtimestamp(modified_time)
+                result.append({
+                    'file_name': archivo,
+                    'month': month,
+                    'month_number': month_to_number(month),
+                    'modified': modified_date
+                })
+    except Exception as e:
+        print(f"Error leyendo actas con fecha en {folder_path}: {e}", file=sys.stderr)
+    return result
+
+
+def get_actas_by_file_name(folder_path):
+    """
+    Obtiene actas por nombre de archivo (sin considerar fecha de modificación)
+    """
+    result = []
+    try:
+        if not os.path.exists(folder_path):
+            return result
+
+        archivos = os.listdir(folder_path)
+        for archivo in archivos:
+            if archivo.startswith('~$'):
+                continue
+
+            month = extract_month_from_file_name(archivo)
+            if month:
+                result.append({
+                    'file_name': archivo,
+                    'month': month,
+                    'month_number': month_to_number(month)
+                })
+    except Exception as e:
+        print(f"Error leyendo actas por nombre en {folder_path}: {e}", file=sys.stderr)
+    return result
+
+
+def verify_committee_period(constitucion_path, committee_name):
+    """
+    Verifica el período vigente de un comité (COPASST o Convivencia)
+    """
+    current_year = datetime.now().year
+    current_month = datetime.now().month
+
+    file_patterns = [
+        'ACTA DE ESCRUTINIO',
+        'ACTA DE VOTACION',
+        'ACTA DE CONSTITUCIÓN',
+        'ACTA DE CONSTITUCION'
+    ]
+
+    latest_year = extract_latest_year_from_files(constitucion_path, file_patterns)
+
+    if not latest_year:
+        return {
+            'vigente': False,
+            'year_ultima': None,
+            'anos_transcurridos': 999,
+            'por_vencer': False,
+            'message': f'No se encontró acta de elección/constitución de {committee_name}'
+        }
+
+    end_year = latest_year + 2  # El período termina en diciembre de end_year
+    end_month = 12  # Diciembre
+    
+    # Vigente si: año actual < end_year O (año actual == end_year Y mes <= diciembre)
+    vigente = (current_year < end_year) or (current_year == end_year and current_month <= end_month)
+    
+    anos_transcurridos = current_year - latest_year
+    
+    # Por vencer: alerta temprana cuando faltan 3 meses o menos para terminar el período
+    meses_restantes = (end_year - current_year) * 12 + (end_month - current_month)
+    por_vencer = 0 < meses_restantes <= 3
+
+    return {
+        'vigente': vigente,
+        'year_ultima': latest_year,
+        'anos_transcurridos': anos_transcurridos,
+        'por_vencer': por_vencer,
+        'message': f'Período {latest_year}-{latest_year + 2}'
+    }
+
+
+def verify_copasst_meetings(base_path, year):
+    """
+    Verifica reuniones mensuales de COPASST usando nombre de archivo
+    """
+    current_date = datetime.now()
+    current_month = current_date.month  # 1-12
+    current_year = current_date.year
+
+    # Buscar carpetas del año actual y año anterior
+    year_folder = os.path.join(base_path, f"COPASST {year}")
+    prev_year_folder = os.path.join(base_path, f"COPASST {year - 1}")
+
+    # Obtener actas por nombre de archivo (NO por fecha de modificación)
+    actas_year = get_actas_by_file_name(year_folder)
+    actas_prev_year = get_actas_by_file_name(prev_year_folder)
+
+    # Combinar todas las actas encontradas y ordenar por año y mes
+    all_actas = [
+        {**a, 'year': year - 1} for a in actas_prev_year
+    ] + [
+        {**a, 'year': year} for a in actas_year
+    ]
+
+    # Ordenar por año y luego por mes (descendente para obtener el último primero)
+    all_actas.sort(key=lambda a: (a['year'], a['month_number']), reverse=True)
+
+    # Obtener último mes registrado
+    ultimo_acta = all_actas[0] if all_actas else None
+    ultimo_mes_registrado = ultimo_acta['month_number'] if ultimo_acta else 0
+    ultimo_mes_nombre = ultimo_acta['month'] if ultimo_acta else None
+    ultimo_mes_year = ultimo_acta['year'] if ultimo_acta else year - 1
+
+    # Calcular meses faltantes desde el último registrado hasta el mes actual
+    meses_faltantes = []
+    
+    if ultimo_mes_year == year - 1:
+        # El último acta es del año anterior, faltan todos los meses de Enero hasta el mes actual
+        for m in range(1, current_month + 1):
+            meses_faltantes.append(number_to_month(m))
+    else:
+        # El último acta es del año actual, faltan desde el mes siguiente hasta el mes actual
+        for m in range(ultimo_mes_registrado + 1, current_month + 1):
+            meses_faltantes.append(number_to_month(m))
+
+    cumple = len(meses_faltantes) == 0
+
+    return {
+        'cumple': cumple,
+        'ultimo_mes': ultimo_mes_nombre,
+        'ultimo_mes_numero': ultimo_mes_registrado,
+        'meses_faltantes': meses_faltantes,
+        'message': f"Reuniones al día (última: {ultimo_mes_nombre} {ultimo_mes_year})" if cumple else f"Sin reunión desde {ultimo_mes_nombre or 'Ninguna'} {ultimo_mes_year}"
+    }
+
+
+def verify_convivencia_meetings(base_path, year):
+    """
+    Verifica reuniones mensuales del Comité de Convivencia
+    """
+    current_month = datetime.now().month
+    last_complete_month = current_month - 1 if current_month > 1 else 12
+    
+    month_names = [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ]
+    
+    year_folder = os.path.join(base_path, f"CONVIVENCIA {year}")
+    actas = get_actas_in_year_folder(year_folder)
+    months_found = [a['month'] for a in actas]
+    
+    last_month_name = month_names[last_complete_month - 1]
+    tiene_ultimo_mes = last_month_name in months_found
+    
+    meses_sin_acta = [month_names[i] for i in range(last_complete_month) if month_names[i] not in months_found]
+    
+    cumple = tiene_ultimo_mes and len(meses_sin_acta) == 0
+    
+    return {
+        'cumple': cumple,
+        'ultimo_mes': last_month_name if tiene_ultimo_mes else None,
+        'meses_sin_acta': meses_sin_acta,
+        'message': f"Reuniones al día (última: {last_month_name} {year})" if cumple else f"Sin reunión desde {meses_sin_acta[0] if meses_sin_acta else last_month_name}"
+    }
+
 
 def scan_company(company_path):
     """
@@ -342,55 +623,144 @@ def scan_company(company_path):
     # ---------------------------------------------------------
     # 6. VERIFICAR ACTAS COPASST Y COMITÉ DE CONVIVENCIA
     # ---------------------------------------------------------
-    # Verificar existencia de actas constitutivas en carpetas
-    actas_copasst_path = os.path.join(company_path, "1.1.6 Conformación de Copasst")
-    actas_convivencia_path = os.path.join(company_path, "1.1.8 Comité de Convivencia")
+    actas_path = os.path.join(company_path, "1. Recursos")
+    current_year = datetime.now().year
 
-    # Verificar COPASST
+    # 6.1 VERIFICAR COPASST
+    actas_copasst_path = os.path.join(actas_path, "1.1.6 Conformación de Copasst")
+    
     if os.path.exists(actas_copasst_path):
-        try:
-            archivos_copasst = os.listdir(actas_copasst_path)
-            acta_constitutiva = any(
-                'acta' in f.lower() and ('constitutiva' in f.lower() or 'constitucion' in f.lower())
-                for f in archivos_copasst
-            )
+        # 6.1.1 Verificar período vigente (elección cada 2 años)
+        constitucion_path = os.path.join(actas_copasst_path, "Constitución")
+        periodo_copasst = verify_committee_period(constitucion_path, "COPASST")
+        
+        print(f"[DASHBOARD] 🔍 [COPASST] Período verificado: {periodo_copasst}", file=sys.stderr)
+        
+        if not periodo_copasst['year_ultima']:
+            dashboard_data['tasks'].append({
+                "title": "COPASST: Sin Acta de Elección/Constitución",
+                "desc": "No se encontró acta de elección o constitución de COPASST. Requisito normativo obligatorio.",
+                "priority": "critical",
+                "module": "copasst",
+                "icon": "fas fa-users",
+                "submodule": "1.1.6 Conformación de Copasst"
+            })
+            dashboard_data['module_status']['recursos'] = "danger"
+            dashboard_data['kpis']['recursos_alerts'] += 1
+        elif not periodo_copasst['vigente']:
+            dashboard_data['tasks'].append({
+                "title": f"COPASST: Período vencido ({periodo_copasst['year_ultima']}-{periodo_copasst['year_ultima'] + 2})",
+                "desc": f"Última elección: {periodo_copasst['year_ultima']}. Período máximo: 2 años. Próxima elección requerida: Antes de diciembre {periodo_copasst['year_ultima'] + 2}",
+                "priority": "critical",
+                "module": "copasst",
+                "icon": "fas fa-users",
+                "submodule": "1.1.6 Conformación de Copasst"
+            })
+            dashboard_data['module_status']['recursos'] = "danger"
+            dashboard_data['kpis']['recursos_alerts'] += 1
+        elif periodo_copasst['por_vencer']:
+            dashboard_data['tasks'].append({
+                "title": f"COPASST: Período por vencer ({periodo_copasst['year_ultima']}-{periodo_copasst['year_ultima'] + 2})",
+                "desc": f"Última elección: {periodo_copasst['year_ultima']}. Renovación requerida antes de diciembre {periodo_copasst['year_ultima'] + 2}",
+                "priority": "warning",
+                "module": "copasst",
+                "icon": "fas fa-users",
+                "submodule": "1.1.6 Conformación de Copasst"
+            })
+            dashboard_data['kpis']['recursos_alerts'] += 1
 
-            if not acta_constitutiva:
-                dashboard_data['tasks'].append({
-                    "title": "COPASST: Sin Acta Constitutiva",
-                    "desc": "No se encontró el acta constitutiva de COPASST. Requisito normativo obligatorio.",
-                    "priority": "critical",
-                    "module": "copasst",
-                    "icon": "fas fa-users",
-                    "submodule": "1.1.6 Conformación de Copasst"
-                })
-                dashboard_data['module_status']['recursos'] = "danger"
-                dashboard_data['kpis']['recursos_alerts'] += 1
-        except Exception as e:
-            print(f"Error verificando COPASST: {e}", file=sys.stderr)
+        # 6.1.2 Verificar reuniones mensuales (SIEMPRE, independientemente del período)
+        reuniones_copasst = verify_copasst_meetings(actas_copasst_path, current_year)
+        print(f"[DASHBOARD] 🔍 [COPASST] Reuniones verificadas: {reuniones_copasst}", file=sys.stderr)
 
-    # Verificar Comité de Convivencia
+        if not reuniones_copasst['cumple'] and len(reuniones_copasst['meses_faltantes']) > 0:
+            meses_faltantes_str = ', '.join(reuniones_copasst['meses_faltantes'])
+            ultimo_mes = reuniones_copasst['ultimo_mes'] or 'Enero'
+            dashboard_data['tasks'].append({
+                "title": f"COPASST: Sin reunión desde {ultimo_mes} {current_year}",
+                "desc": f"Última acta registrada: {ultimo_mes} {current_year}. Mes actual: {number_to_month(current_month)} {current_year}. Requisito: Reuniones mensuales. Meses sin acta: {meses_faltantes_str}",
+                "priority": "critical",
+                "module": "copasst",
+                "icon": "fas fa-calendar-times",
+                "submodule": "1.1.6 Conformación de Copasst"
+            })
+            dashboard_data['module_status']['recursos'] = "danger"
+            dashboard_data['kpis']['recursos_alerts'] += 1
+        elif not reuniones_copasst['cumple'] and reuniones_copasst['ultimo_mes_numero'] == 0:
+            # No hay ninguna acta registrada en el año
+            dashboard_data['tasks'].append({
+                "title": f"COPASST: Sin reuniones registradas en {current_year}",
+                "desc": f"No se encontró ninguna acta de reunión registrada en {current_year}. Requisito: Reuniones mensuales.",
+                "priority": "critical",
+                "module": "copasst",
+                "icon": "fas fa-calendar-times",
+                "submodule": "1.1.6 Conformación de Copasst"
+            })
+            dashboard_data['module_status']['recursos'] = "danger"
+            dashboard_data['kpis']['recursos_alerts'] += 1
+
+    # 6.2 VERIFICAR COMITÉ DE CONVIVENCIA
+    actas_convivencia_path1 = os.path.join(actas_path, "1.1.8 Comité de Convivencia")
+    actas_convivencia_path2 = os.path.join(actas_path, "1.1.8 Conformación de Comite de Convivencia")
+    actas_convivencia_path = actas_convivencia_path1 if os.path.exists(actas_convivencia_path1) else actas_convivencia_path2
+    
     if os.path.exists(actas_convivencia_path):
-        try:
-            archivos_convivencia = os.listdir(actas_convivencia_path)
-            acta_constitutiva = any(
-                'acta' in f.lower() and ('constitutiva' in f.lower() or 'constitucion' in f.lower())
-                for f in archivos_convivencia
-            )
-
-            if not acta_constitutiva:
+        # 6.2.1 Verificar período vigente (elección cada 2 años)
+        constitucion_path = os.path.join(actas_convivencia_path, "Constitución")
+        periodo_convivencia = verify_committee_period(constitucion_path, "COMITÉ CONVIVENCIA")
+        
+        print(f"[DASHBOARD] 🔍 [COMITÉ CONVIVENCIA] Período verificado: {periodo_convivencia}", file=sys.stderr)
+        
+        if not periodo_convivencia['year_ultima']:
+            dashboard_data['tasks'].append({
+                "title": "Comité: Sin Acta de Elección/Constitución",
+                "desc": "No se encontró acta de elección o constitución del Comité. Requisito normativo obligatorio.",
+                "priority": "critical",
+                "module": "comite_convivencia",
+                "icon": "fas fa-handshake",
+                "submodule": "1.1.8 Conformación de Comite de Convivencia"
+            })
+            dashboard_data['module_status']['recursos'] = "danger"
+            dashboard_data['kpis']['recursos_alerts'] += 1
+        elif not periodo_convivencia['vigente']:
+            dashboard_data['tasks'].append({
+                "title": f"Comité: Período vencido ({periodo_convivencia['year_ultima']}-{periodo_convivencia['year_ultima'] + 2})",
+                "desc": f"Última elección: {periodo_convivencia['year_ultima']}. Período máximo: 2 años. Próxima elección requerida: Antes de diciembre {periodo_convivencia['year_ultima'] + 2}",
+                "priority": "critical",
+                "module": "comite_convivencia",
+                "icon": "fas fa-handshake",
+                "submodule": "1.1.8 Conformación de Comite de Convivencia"
+            })
+            dashboard_data['module_status']['recursos'] = "danger"
+            dashboard_data['kpis']['recursos_alerts'] += 1
+        elif periodo_convivencia['por_vencer']:
+            dashboard_data['tasks'].append({
+                "title": f"Comité: Período por vencer ({periodo_convivencia['year_ultima']}-{periodo_convivencia['year_ultima'] + 2})",
+                "desc": f"Última elección: {periodo_convivencia['year_ultima']}. Renovación requerida antes de diciembre {periodo_convivencia['year_ultima'] + 2}",
+                "priority": "warning",
+                "module": "comite_convivencia",
+                "icon": "fas fa-handshake",
+                "submodule": "1.1.8 Conformación de Comite de Convivencia"
+            })
+            dashboard_data['kpis']['recursos_alerts'] += 1
+        
+        # 6.2.2 Verificar reuniones mensuales (solo si el período está vigente)
+        if periodo_convivencia['vigente']:
+            reuniones_convivencia = verify_convivencia_meetings(actas_convivencia_path, current_year)
+            print(f"[DASHBOARD] 🔍 [COMITÉ CONVIVENCIA] Reuniones verificadas: {reuniones_convivencia}", file=sys.stderr)
+            
+            if not reuniones_convivencia['cumple'] and len(reuniones_convivencia['meses_sin_acta']) > 0:
+                primer_mes_sin_acta = reuniones_convivencia['meses_sin_acta'][0]
                 dashboard_data['tasks'].append({
-                    "title": "Comité de Convivencia: Sin Acta Constitutiva",
-                    "desc": "No se encontró el acta constitutiva del Comité. Requisito normativo obligatorio.",
+                    "title": f"Comité: Sin reunión desde {primer_mes_sin_acta} {current_year}",
+                    "desc": f"No se encontró acta de reunión mensual. Requisito: Mínimo 1 reunión mensual. Meses sin acta: {', '.join(reuniones_convivencia['meses_sin_acta'])}",
                     "priority": "critical",
                     "module": "comite_convivencia",
-                    "icon": "fas fa-handshake",
-                    "submodule": "1.1.8 Comité de Convivencia"
+                    "icon": "fas fa-calendar-times",
+                    "submodule": "1.1.8 Conformación de Comite de Convivencia"
                 })
                 dashboard_data['module_status']['recursos'] = "danger"
                 dashboard_data['kpis']['recursos_alerts'] += 1
-        except Exception as e:
-            print(f"Error verificando Comité de Convivencia: {e}", file=sys.stderr)
 
     # ---------------------------------------------------------
     # ORDENAR TAREAS POR PRIORIDAD
