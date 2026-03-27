@@ -503,7 +503,7 @@ class RecursosHome {
         const trainingWidget = this.createTrainingWidget();
         widgetsContainer.appendChild(trainingWidget);
 
-        widgetsContainer.appendChild(this.createEPPWidget());
+        widgetsContainer.appendChild(this.createCopasstWidget());  // ← NUEVO: Actas COPASST
 
         // Widget de Afiliación SSSI
         widgetsContainer.appendChild(this.createAfiliacionWidget());
@@ -1228,23 +1228,52 @@ class RecursosHome {
         return w;
     }
 
-    // Nuevo método para crear widget de EPPs con datos reales
-    createEPPWidget() {
-        const stats = this.resourceStats?.epps || { totalEPPs: 0, entregados: 0, pendientes: 0, stockActual: 0 };
+    // Nuevo método para crear widget de Actas COPASST (similar a Afiliación)
+    createCopasstWidget() {
+        const stats = this.resourceStats?.copasst || { 
+            totalActas: 0,
+            actaMesEnCurso: false,
+            ultimoMesRegistrado: null,
+            actasAnio: 0,
+            estado: 'ok',
+            alertas: []
+        };
 
-        const title = 'EPPs Entregados';
-        const value = stats.entregados;
-        const desc = stats.stockActual > 0
-            ? `Stock actual: ${stats.stockActual}`
-            : 'Sin datos';
+        const currentYear = new Date().getFullYear();
+        const currentMonth = new Date().getMonth();
+        const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                            'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+        const currentMonthName = monthNames[currentMonth];
+
+        // Determinar color y estado
+        const alDia = stats.actaMesEnCurso;
+        let colorVar = alDia ? 'var(--k-success)' : 'var(--k-danger)';
+        let colorClass = alDia ? 'bg-success' : 'bg-danger';
+        let statusText = alDia ? 'Al día' : 'Pendiente';
 
         const w = document.createElement('div');
-        w.className = 'widget';
+        w.className = 'widget k-budget-card';
+
         w.innerHTML = `
-            <h4>${title}</h4>
-            <div class="widget-value">${value}</div>
-            <div class="widget-description">${desc}</div>
+            <div class="kb-header">
+                <span class="kb-title">Actas COPASST ${currentYear}</span>
+                <span class="kb-badge ${colorClass}">${statusText}</span>
+            </div>
+
+            <div class="kb-amount">${stats.totalActas} acta${stats.totalActas !== 1 ? 's' : ''}</div>
+
+            <div class="kb-footer">
+                <div>
+                    <div class="kb-label">Mes actual</div>
+                    <div class="kb-value" style="color: ${colorVar}">${currentMonthName}</div>
+                </div>
+                <div style="text-align: right;">
+                    <div class="kb-label">Último registro</div>
+                    <div class="kb-value">${stats.ultimoMesRegistrado || 'N/A'}</div>
+                </div>
+            </div>
         `;
+
         return w;
     }
 

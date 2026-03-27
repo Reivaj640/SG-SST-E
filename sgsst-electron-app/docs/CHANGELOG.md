@@ -5,6 +5,84 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.94] - 2026-03-26
+
+### Added
+- **📊 Widget de Actas COPASST parametrizado** 🆕
+  - Detección automática de actas de reunión del mes en curso
+  - Widget en Recursos con estado "Al día" o "Pendiente" (similar a Afiliación SSSI)
+  - Alertas críticas si no hay acta del mes actual
+  - Muestra total de actas y último mes registrado
+
+- **🔧 Scrollbars personalizados (grises)** 🆕
+  - Scrollbars grises (#c1c9d0) en toda la aplicación
+  - Hover: gris medio (#adb5bd), Active: gris oscuro (#6c757d)
+  - Funcionales en tamaño mínimo de ventana (1024x650)
+  - Scroll activado en dashboard (módulos y tareas)
+
+- **📈 Alertas de Comité de Convivencia (2 alertas)** 🆕
+  - Alerta informativa: "Constitución al día" cuando el período está vigente
+  - Alerta crítica: "Sin reunión desde [Mes]" cuando faltan actas mensuales
+  - Verificación de reuniones mensuales (similar a COPASST)
+
+- **📈 Alertas de COPASST mejoradas** 🆕
+  - Alerta informativa: "Constitución al día" cuando el período está vigente
+  - Alerta crítica: "Sin reunión desde [Mes]" cuando faltan actas mensuales
+  - Detección por nombre de archivo (NO por fecha de modificación)
+
+### Changed
+- **main.js** - Funciones agregadas/modificadas:
+  - `calculateCopasstStats()` - Nueva lógica tipo afiliación (detecta mes en curso)
+  - `verifyCommitteePeriod()` - Ahora retorna período vigente correctamente (2 años)
+  - `verifyCOPASSTMeetings()` - Usa `getActasByFileName()` en lugar de fecha de modificación
+  - `verifyConvivenciaMeetings()` - Nueva función para verificar reuniones mensuales
+  - `getActasByFileName()` - Nueva función auxiliar (extrae mes del nombre de archivo)
+
+- **recursos-home.js** - Métodos modificados:
+  - `createCopasstWidget()` - Ahora usa diseño tipo tarjeta (similar a Afiliación)
+  - Muestra badge "Al día" o "Pendiente" según corresponda
+  - Widget de EPPs eliminado (reemplazado por Actas COPASST)
+
+- **styles.css** - Scrollbars personalizados:
+  - `::-webkit-scrollbar` - Ancho 8px, fondo #f8f9fa, thumb #c1c9d0
+  - `[data-module-list]`, `#tasks-container` - Scroll forzado en tamaño mínimo
+  - `max-height: calc(100vh - 200px)` - Para activar scroll en dashboard
+
+### Technical Details
+- **Estructura de datos `calculateCopasstStats()`:**
+  ```javascript
+  {
+    totalActas: 0,
+    actaMesEnCurso: false,
+    ultimoMesRegistrado: null,
+    actasAnio: 0,
+    estado: 'danger',  // 'ok', 'warning', 'danger'
+    alertas: []
+  }
+  ```
+
+- **Búsqueda de archivos:**
+  - Filtra: `*acta*copasst*.xlsx`
+  - Extrae mes del nombre: `(enero|febrero|...|diciembre)`
+  - Busca en carpetas: `COPASST {year}/`
+
+- **Lógica de período vigente:**
+  - Período = 2 años (ej: 2024-2026)
+  - Vigente hasta diciembre del año `latestYear + 2`
+  - Alerta temprana cuando faltan ≤3 meses para vencer
+
+### Impacto
+- **UX:** Widget de Actas COPASST consistente con Afiliación SSSI
+- **Dashboard:** 2 alertas por comité (constitución + reuniones)
+- **Visual:** Scrollbars grises armonizan con diseño de la app
+- **Funcionalidad:** Scroll activado en tamaño mínimo de ventana
+
+### Breaking Changes
+- **Widget de EPPs eliminado** - Reemplazado por Widget de Actas COPASST
+- **Cambio de estructura** - `calculateCopasstStats()` ahora retorna formato tipo afiliación
+
+---
+
 ## [0.1.93] - 2026-03-25
 
 ### Added

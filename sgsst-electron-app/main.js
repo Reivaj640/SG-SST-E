@@ -9006,6 +9006,134 @@ async function calculateEppsStats(basePath) {
 }
 
 /**
+ * Calcula estadísticas de Actas de Reunión COPASST
+ * Similar a calculateAfiliacionStats - Detecta actas del mes en curso
+ * @param {string} basePath - Ruta raíz de la empresa
+ * @param {number} currentYear - Año actual
+ * @returns {Promise<Object>} Stats de actas COPASST
+ */
+async function calculateCopasstStats(basePath, currentYear) {
+  const currentMonth = new Date().getMonth(); // 0-11
+  const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                      'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  const currentMonthName = monthNames[currentMonth];
+
+  const stats = {
+    totalActas: 0,
+    actaMesEnCurso: false,
+    ultimoMesRegistrado: null,
+    actasAnio: 0,
+    estado: 'ok', // 'ok', 'warning', 'danger'
+    alertas: []
+  };
+
+  try {
+    if (!basePath) return stats;
+
+    const recursosPath = path.join(basePath, '1. Recursos');
+    const copasstPath = path.join(recursosPath, '1.1.6 Conformación de Copasst');
+
+    if (!fs.existsSync(copasstPath)) {
+      sendLog(`[COPASST] Carpeta no encontrada: ${copasstPath}`, 'WARN');
+      return stats;
+    }
+
+    // Buscar carpetas de años (COPASST 2024, COPASST 2025, etc.)
+    const yearFolders = await fsp.readdir(copasstPath);
+    let allActas = [];
+    let ultimoMesIndex = -1;
+
+    for (const folder of yearFolders) {
+      if (!folder.startsWith('COPASST')) continue;
+
+      const folderPath = path.join(copasstPath, folder);
+      if (!fs.statSync(folderPath).isDirectory()) continue;
+
+      // Extraer año del nombre de la carpeta
+      const yearMatch = folder.match(/(\d{4})/);
+      if (!yearMatch) continue;
+
+      const folderYear = parseInt(yearMatch[1]);
+      const files = await fsp.readdir(folderPath);
+
+      // Buscar archivos de actas (Excel)
+      const actasFiles = files.filter(f =>
+        !f.startsWith('~$') &&
+        f.endsWith('.xlsx') &&
+        f.toLowerCase().includes('acta') &&
+        f.toLowerCase().includes('copasst')
+      );
+
+      sendLog(`[COPASST] Carpeta ${folder}: ${actasFiles.length} actas encontradas`, 'INFO');
+
+      for (const file of actasFiles) {
+        const fileName = file.toLowerCase();
+        sendLog(`[COPASST] Analizando archivo: ${file}`, 'DEBUG');
+
+        // Buscar patrones de mes en el nombre del archivo
+        const monthMatch = fileName.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/);
+        if (monthMatch) {
+          const mesEncontrado = monthMatch[1];
+          const monthIndex = monthNames.indexOf(mesEncontrado);
+
+          sendLog(`[COPASST] Archivo: ${file}, Mes encontrado: ${mesEncontrado}`, 'DEBUG');
+
+          allActas.push({
+            year: folderYear,
+            month: mesEncontrado,
+            monthNumber: monthIndex + 1,
+            file: file
+          });
+
+          // Verificar si es el mes en curso
+          if (mesEncontrado === currentMonthName && folderYear === currentYear) {
+            stats.actaMesEnCurso = true;
+            sendLog(`[COPASST] ✅ Acta del mes en curso encontrada: ${file}`, 'INFO');
+          }
+
+          // Track del último mes encontrado
+          if (monthIndex > ultimoMesIndex) {
+            stats.ultimoMesRegistrado = mesEncontrado;
+            ultimoMesIndex = monthIndex;
+          }
+        }
+      }
+    }
+
+    stats.totalActas = allActas.length;
+    sendLog(`[COPASST] Total actas encontradas: ${allActas.length}`, 'INFO');
+
+    // Actas del año actual
+    const actasCurrentYear = allActas.filter(a => a.year === currentYear);
+    stats.actasAnio = actasCurrentYear.length;
+
+    // Determinar estado y alertas
+    if (!stats.actaMesEnCurso) {
+      stats.estado = 'danger';
+      const alerta = `No se encontró acta de ${currentMonthName} ${currentYear}`;
+      stats.alertas.push(alerta);
+      sendLog(`[COPASST] ⚠️ ALERTA: ${alerta}`, 'WARN');
+
+      if (stats.ultimoMesRegistrado) {
+        const alertaExtra = `Última acta registrada: ${stats.ultimoMesRegistrado}`;
+        stats.alertas.push(alertaExtra);
+        sendLog(`[COPASST] ℹ️ Info: ${alertaExtra}`, 'INFO');
+      }
+    } else {
+      sendLog(`[COPASST] ✅ Actas COPASST al día`, 'INFO');
+    }
+
+    sendLog(`[COPASST] Acta mes en curso (${currentMonthName}): ${stats.actaMesEnCurso ? 'Sí' : 'No'}`, 'INFO');
+    sendLog(`[COPASST] Último mes registrado: ${stats.ultimoMesRegistrado || 'N/A'}`, 'INFO');
+
+  } catch (e) {
+    sendLog(`[COPASST] Error: ${e.message}`, 'ERROR');
+  }
+
+  return stats;
+}
+
+/**
  * Calcula estadísticas de Afiliación al SSSI
  * Verifica si existe planilla de afiliación del mes en curso
  * @param {string} basePath - Ruta raíz de la empresa
@@ -9412,17 +9540,20 @@ ipcMain.handle('get-recursos-stats', async (event, companyName) => {
     }
 
     // Ejecutar cálculos en paralelo
-    const [capacitaciones, inducciones, epps, afiliacion] = await Promise.all([
+    const currentYear = new Date().getFullYear();
+    const [capacitaciones, inducciones, epps, copasst, afiliacion] = await Promise.all([
         calculateCapacitacionesStats(rootPath),
         calculateInduccionesStats(rootPath, companyName),
         calculateEppsStats(rootPath),
-        calculateAfiliacionStats(rootPath, companyName)  // ← NUEVO: Afiliación SSSI
+        calculateCopasstStats(rootPath, currentYear),  // ← NUEVO: Actas COPASST
+        calculateAfiliacionStats(rootPath, companyName)
     ]);
 
     const stats = {
       inducciones,
       capacitaciones,
       epps,
+      copasst,  // ← NUEVO: Actas COPASST
       afiliacion
     };
 

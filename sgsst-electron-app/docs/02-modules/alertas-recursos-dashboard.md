@@ -90,128 +90,179 @@ Equipos programados para esta semana. Verificar disponibilidad y agendar entrega
 
 ---
 
-### 3. Verificación de Actas Constitutivas
+### 3. Verificación de Período y Reuniones de Comités
 
-#### COPASST (1.1.6)
+#### COPASST (1.1.6) - **🆕 Actualizado v0.1.94**
 
-**Carpeta escaneada:** `1.1.6 Conformación de Copasst/`
+**Carpetas escaneadas:** 
+- `1.1.6 Conformación de Copasst/Constitución/` (actas de elección)
+- `1.1.6 Conformación de Copasst/COPASST {year}/` (actas de reunión)
 
-| Condición | Mensaje | Prioridad |
-|-----------|---------|-----------|
-| Sin acta constitutiva | `COPASST: Sin Acta Constitutiva` | critical |
-
-**Criterio de validación:**
-- Busca archivos que contengan: `acta` AND (`constitutiva` OR `constitucion`)
-
-**Ejemplo de mensaje:**
-```
-COPASST: Sin Acta Constitutiva
-No se encontró el acta constitutiva de COPASST. Requisito normativo obligatorio.
-```
-
-#### Comité de Convivencia (1.1.8)
-
-**Carpeta escaneada:** `1.1.8 Comité de Convivencia/`
+**Verificación de Período:**
 
 | Condición | Mensaje | Prioridad |
 |-----------|---------|-----------|
-| Sin acta constitutiva | `Comité de Convivencia: Sin Acta Constitutiva` | critical |
+| Sin acta de elección | `COPASST: Sin Acta de Elección/Constitución` | critical |
+| Período vencido (>2 años) | `COPASST: Período vencido (YYYY-YYYY)` | critical |
+| Período por vencer (≤3 meses) | `COPASST: Período por vencer (YYYY-YYYY)` | warning |
+| Período vigente | `COPASST: Constitución al día (Período YYYY-YYYY)` | info |
 
-**Criterio de validación:**
-- Busca archivos que contengan: `acta` AND (`constitutiva` OR `constitucion`)
+**Criterio de validación (período):**
+- Busca archivos que contengan: `acta` AND (`constitutiva` OR `constitucion` OR `escrutinio` OR `votacion`)
+- Período = 2 años (ej: 2024-2026)
+- Vigente hasta diciembre del año `latestYear + 2`
 
-**Ejemplo de mensaje:**
+**Verificación de Reuniones:**
+
+| Condición | Mensaje | Prioridad |
+|-----------|---------|-----------|
+| Sin reunión mensual | `COPASST: Sin reunión desde [Mes] [Año]` | critical |
+| Sin reuniones en el año | `COPASST: Sin reuniones registradas en [Año]` | critical |
+
+**Criterio de validación (reuniones):**
+- Busca archivos: `*acta*copasst*.xlsx` en carpetas `COPASST {year}/`
+- Extrae mes del nombre: `(enero|febrero|...|diciembre)`
+- Frecuencia esperada: **Mensual**
+
+**Ejemplo de mensajes:**
 ```
-Comité de Convivencia: Sin Acta Constitutiva
-No se encontró el acta constitutiva del Comité. Requisito normativo obligatorio.
+INFO: COPASST: Constitución al día (Período 2024-2026)
+Descripción: Última elección: 2024. Próxima renovación: Diciembre 2026.
+
+CRITICAL: COPASST: Sin reunión desde Febrero 2026
+Descripción: Última acta registrada: Febrero 2026. 
+             Mes actual: Marzo 2026. 
+             Requisito: Reuniones mensuales. 
+             Meses sin acta: Marzo
+```
+
+---
+
+#### Comité de Convivencia (1.1.8) - **🆕 Actualizado v0.1.94**
+
+**Carpetas escaneadas:** 
+- `1.1.8 Conformación de Comite de Convivencia/Constitución/` (actas de elección)
+- `1.1.8 Conformación de Comite de Convivencia/CONVIVENCIA {year}/` (actas de reunión)
+
+**Verificación de Período:**
+
+| Condición | Mensaje | Prioridad |
+|-----------|---------|-----------|
+| Sin acta de elección | `Comité: Sin Acta de Elección/Constitución` | critical |
+| Período vencido (>2 años) | `Comité: Período vencido (YYYY-YYYY)` | critical |
+| Período por vencer (≤3 meses) | `Comité: Período por vencer (YYYY-YYYY)` | warning |
+| Período vigente | `Comité: Constitución al día (Período YYYY-YYYY)` | info |
+
+**Criterio de validación (período):**
+- Busca archivos que contengan: `acta` AND (`constitutiva` OR `constitucion` OR `escrutinio` OR `votacion`)
+- Período = 2 años (ej: 2024-2026)
+- Vigente hasta diciembre del año `latestYear + 2`
+
+**Verificación de Reuniones:**
+
+| Condición | Mensaje | Prioridad |
+|-----------|---------|-----------|
+| Sin reunión mensual | `Comité: Sin reunión desde [Mes] [Año]` | critical |
+| Sin reuniones en el año | `Comité: Sin reuniones registradas en [Año]` | critical |
+
+**Criterio de validación (reuniones):**
+- Busca archivos: `*acta*convivencia*.xlsx` en carpetas `CONVIVENCIA {year}/`
+- Extrae mes del nombre: `(enero|febrero|...|diciembre)`
+- Frecuencia esperada: **Mensual**
+
+**Ejemplo de mensajes:**
+```
+INFO: Comité: Constitución al día (Período 2024-2026)
+Descripción: Última elección: 2024. Próxima renovación: Diciembre 2026.
+
+CRITICAL: Comité: Sin reunión desde Enero 2026
+Descripción: Última acta registrada: Enero 2026. 
+             Mes actual: Marzo 2026. 
+             Requisito: Reuniones mensuales. 
+             Meses sin acta: Febrero, Marzo
 ```
 
 ---
 
 ## 🔧 Implementación Técnica
 
-### Backend (Python)
+### Backend (JavaScript - main.js)
 
-**Archivo:** `Portear/python-embed/python-scripts/dashboard_scanner.py`
+**Funciones agregadas (v0.1.94):**
 
-#### Estructura de Datos Devuelta
+```javascript
+// Calcula estadísticas de Actas COPASST (similar a Afiliación)
+async function calculateCopasstStats(basePath, currentYear) {
+  // Retorna:
+  return {
+    totalActas: 0,
+    actaMesEnCurso: false,      // ¿Existe acta del mes actual?
+    ultimoMesRegistrado: null,  // Último mes encontrado
+    actasAnio: 0,
+    estado: 'danger',           // 'ok', 'warning', 'danger'
+    alertas: []
+  };
+}
 
-```json
-{
-  "kpis": {
-    "accidents_month": 0,
-    "pric_active": 0,
-    "overdue_docs": 5,
-    "compliance": 45.2,
-    "recursos_alerts": 8
-  },
-  "tasks": [
-    {
-      "title": "5 Capacitaciones Vencidas (2 COPASST, 1 Comité, 2 Inducciones)",
-      "desc": "Sesiones programadas sin ejecutar o sin registrar. Cumplimiento actual: 45.2%",
-      "priority": "critical",
-      "module": "capacitaciones",
-      "icon": "fas fa-chalkboard-teacher",
-      "submodule": "1.2.1 Programa de Capacitación"
-    }
-  ],
-  "module_status": {
-    "recursos": "danger"
-  },
-  "recursos_detail": {
-    "capacitaciones_vencidas": {
-      "total": 5,
-      "copasst": 2,
-      "comite_convivencia": 1,
-      "inducciones": 2,
-      "curso_50_horas": 0,
-      "otros": 0
-    },
-    "capacitaciones_proximas": {
-      "total": 3,
-      "en_7_dias": 3,
-      "en_15_dias": 0
-    },
-    "epp_por_entregar": 8,
-    "cumplimiento_porcentaje": 45.2
-  }
+// Verifica período vigente de comité (COPASST o Convivencia)
+function verifyCommitteePeriod(constitucionPath, committeeName) {
+  // Retorna:
+  return {
+    vigente: true,              // ¿Período vigente?
+    yearUltima: 2024,           // Año de última elección
+    anosTranscurridos: 2,
+    porVencer: false,           // ¿Alerta temprana?
+    message: 'Período 2024-2026'
+  };
+}
+
+// Verifica reuniones mensuales (usa nombre de archivo, NO fecha de modificación)
+function verifyCOPASSTMeetings(basePath, year) {
+  function verifyConvivenciaMeetings(basePath, year) {
+  // Retorna:
+  return {
+    cumple: false,
+    ultimoMes: 'Febrero',
+    ultimoMesNumero: 2,
+    mesesFaltantes: ['Marzo'],
+    ultimoMesYear: 2026,
+    message: 'Sin reunión desde Febrero 2026'
+  };
+}
+
+// Extrae mes desde nombre de archivo
+function getActasByFileName(folderPath) {
+  // Filtra: *acta*copasst*.xlsx o *acta*convivencia*.xlsx
+  // Extrae: (enero|febrero|...|diciembre) del nombre
+  // Retorna: [{ fileName, month, monthNumber }]
 }
 ```
 
-### Frontend (JavaScript)
+### Frontend (JavaScript - recursos-home.js)
 
-**Archivo:** `renderer.js`
-
-#### Función `updateModuleBadges()`
-
-Muestra el badge del módulo de Recursos con el número real de alertas:
+**Widget de Actas COPASST (v0.1.94):**
 
 ```javascript
-// Antes: "OK", "Pendiente", "Alerta"
-// Ahora: "3 Alertas", "5 Alertas", etc.
+createCopasstWidget() {
+  const stats = this.resourceStats?.copasst || { 
+    totalActas: 0,
+    actaMesEnCurso: false,
+    ultimoMesRegistrado: null,
+    estado: 'ok',
+    alertas: []
+  };
 
-function updateModuleBadges(moduleStatus, recursosAlerts = 0) {
-  for (const [moduleName, status] of Object.entries(moduleStatus)) {
-    const badgeEl = document.getElementById(`module-badge-${moduleName}`);
-    if (badgeEl) {
-      if (moduleName === 'recursos' && recursosAlerts > 0) {
-        badgeEl.textContent = `${recursosAlerts} Alertas`;
-        // Colores según severidad
-      }
-    }
-  }
+  // Diseño tipo tarjeta (similar a Afiliación SSSI)
+  const alDia = stats.actaMesEnCurso;
+  const colorVar = alDia ? 'var(--k-success)' : 'var(--k-danger)';
+  const statusText = alDia ? 'Al día' : 'Pendiente';
+
+  // Widget muestra:
+  // - Título: "Actas COPASST {year}"
+  // - Badge: "Al día" o "Pendiente"
+  // - Cantidad: "{N} actas"
+  // - Mes actual y último registro
 }
-```
-
-#### Función `renderTasks()`
-
-Muestra tareas con ícono y submódulo:
-
-```javascript
-// Nueva estructura visual:
-// [Ícono] [TAG PRIORIDAD] [TAG SUBMÓDULO]
-//         [Título de la tarea]
-//         [Descripción]
 ```
 
 ---
@@ -221,23 +272,34 @@ Muestra tareas con ícono y submódulo:
 | Estado | Condición | Badge | Color |
 |--------|-----------|-------|-------|
 | **OK** | 0 alertas | `OK` | Verde (#166534) |
-| **Warning** | 1-5 alertas O cumplimiento 50-89% | `{N} Alertas` | Naranja (#c2410c) |
-| **Danger** | >5 alertas O cumplimiento <50% O sin actas | `{N} Alertas` | Rojo (#b91c1c) |
+| **Warning** | 1-5 alertas O cumplimiento 50-89% O período por vencer | `{N} Alertas` | Naranja (#c2410c) |
+| **Danger** | >5 alertas O cumplimiento <50% O sin actas O período vencido | `{N} Alertas` | Rojo (#b91c1c) |
 
 ---
 
 ## 🧪 Pruebas
 
-### Escenarios de Prueba
+### Escenarios de Prueba - COPASST
 
 | # | Escenario | Resultado Esperado |
 |---|-----------|-------------------|
-| 1 | 0 capacitaciones vencidas, 0 EPP | Badge: "OK" |
-| 2 | 3 capacitaciones vencidas | Badge: "3 Alertas" (Naranja) |
-| 3 | 10 capacitaciones vencidas | Badge: "10 Alertas" (Rojo) |
-| 4 | Cumplimiento 45% | Badge: "X Alertas" (Rojo) + Tarea crítica |
-| 5 | Sin acta COPASST | Tarea crítica + Badge Rojo |
-| 6 | 5 EPP próximos (7 días) | Tarea informativa + Badge Naranja |
+| 1 | Última elección: 2024, hoy: Marzo 2026 | INFO: "Constitución al día (Período 2024-2026)" |
+| 2 | Última elección: 2022, hoy: Marzo 2026 | CRITICAL: "Período vencido (2022-2024)" |
+| 3 | Última acta: Febrero 2026, hoy: Marzo 2026 | CRITICAL: "Sin reunión desde Febrero 2026" |
+| 4 | Última acta: Marzo 2026, hoy: Marzo 2026 | ✅ Sin alerta de reuniones |
+| 5 | Sin actas de elección | CRITICAL: "Sin Acta de Elección/Constitución" |
+
+### Escenarios de Prueba - Comité de Convivencia
+
+| # | Escenario | Resultado Esperado |
+|---|-----------|-------------------|
+| 1 | Última elección: 2024, hoy: Marzo 2026 | INFO: "Constitución al día (Período 2024-2026)" |
+| 2 | Última elección: 2022, hoy: Marzo 2026 | CRITICAL: "Período vencido (2022-2024)" |
+| 3 | Última acta: Enero 2026, hoy: Marzo 2026 | CRITICAL: "Sin reunión desde Enero 2026" |
+| 4 | Última acta: Marzo 2026, hoy: Marzo 2026 | ✅ Sin alerta de reuniones |
+| 5 | Sin actas de elección | CRITICAL: "Sin Acta de Elección/Constitución" |
+
+---
 
 ### Comandos de Prueba
 
