@@ -4400,3 +4400,81 @@ select.form-control {
     opacity: 1 !important;
   }
 }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   SCROLLBARS PERSONALIZADOS - K+AIR Standard (GRIS/BLANCO)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+/* Chrome, Edge, Safari - Scrollbar vertical y horizontal (Global GRIS) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+/* Fondo del track */
+::-webkit-scrollbar-track {
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+/* Barra desplazable (thumb) - Global GRIS */
+::-webkit-scrollbar-thumb {
+  background: #c1c9d0;
+  border-radius: 4px;
+  transition: background 0.2s ease-in-out;
+}
+
+/* Barra desplazable al pasar el mouse - Global */
+::-webkit-scrollbar-thumb:hover {
+  background: #adb5bd;
+}
+
+/* Barra desplazable al hacer click - Global */
+::-webkit-scrollbar-thumb:active {
+  background: #6c757d;
+}
+
+/* Firefox - Scrollbar personalizado (Global GRIS) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c1c9d0 #f8f9fa;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   DASHBOARD - Scroll en tamaño mínimo
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+/* Paneles del dashboard - Altura máxima para activar scroll */
+/* Cálculo: 100vh - Header (70px) - KPIs (80px) - Padding/Gaps (50px) = 100vh - 200px */
+aside:has([data-module-list]),
+aside:has([data-module-list]) > [data-module-list],
+#tasks-container {
+  max-height: calc(100vh - 200px);
+  overflow: hidden;
+}
+
+/* Fallback para navegadores sin :has() - Usar selectores directos */
+[data-module-list] {
+  max-height: calc(100vh - 200px);
+  overflow-y: auto !important;
+  min-height: 0 !important;
+}
+
+#tasks-container {
+  max-height: calc(100vh - 200px);
+  overflow-y: auto !important;
+  min-height: 0 !important;
+}
+
+/* Contenedores principales (fuera del dashboard) */
+.module-content-area,
+.submodule-content,
+.sidebar-content,
+.main-canvas {
+  overflow-y: auto;
+}
+
+/* Scroll suave para todos los elementos con overflow */
+html {
+  scroll-behavior: smooth;
+}
