@@ -1,121 +1,811 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>K+AIR | Objetivos y Metas SST</title>
-    <link rel="stylesheet" href="./objetivos-sst-view.css">
+    <title>K+AIR | Objetivos y Metas SST - Política Vinculada</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
-        /* Estilos adicionales para garantizar la apariencia correcta */
+        /* ═══════════════════════════════════════════════════════════════════════════
+           VARIABLES CSS - SISTEMA VISUAL K+AIR
+           ═══════════════════════════════════════════════════════════════════════════ */
         :root {
-            --primary: #174ea6;
-            --primary-hover: #185abd;
-            --success: #28a745;
-            --warning: #ffc107;
-            --danger: #dc3545;
-            --info: #17a2b8;
-
-            --bg-body: #f8f9fa;
-            --bg-card: #ffffff;
-            --border-color: #dee2e6;
-
-            --font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            --text-dark: #212529;
-            --text-muted: #6c757d;
-
-            --radius: 0.375rem;
-            --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-            --shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+            --k-primary: #174ea6;
+            --k-primary-hover: #185abd;
+            --k-primary-light: rgba(23, 78, 166, 0.1);
+            --k-success: #28a745;
+            --k-success-light: rgba(40, 167, 69, 0.1);
+            --k-warning: #ffc107;
+            --k-warning-light: rgba(255, 193, 7, 0.1);
+            --k-danger: #dc3545;
+            --k-danger-light: rgba(220, 53, 69, 0.1);
+            --k-info: #17a2b8;
+            --k-info-light: rgba(23, 162, 184, 0.1);
+            
+            /* Colores por principio */
+            --k-p1: #dc3545;
+            --k-p1-light: rgba(220, 53, 69, 0.08);
+            --k-p2: #28a745;
+            --k-p2-light: rgba(40, 167, 69, 0.08);
+            --k-p3: #6f42c1;
+            --k-p3-light: rgba(111, 66, 193, 0.08);
+            --k-p4: #fd7e14;
+            --k-p4-light: rgba(253, 126, 20, 0.08);
+            
+            --k-bg-app: #f8f9fa;
+            --k-bg-card: #ffffff;
+            --k-bg-hover: #f1f3f5;
+            --k-border: #dee2e6;
+            --k-border-light: #e9ecef;
+            --k-text-main: #212529;
+            --k-text-secondary: #495057;
+            --k-text-muted: #6c757d;
+            --k-font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+            --k-font-mono: 'SF Mono', 'Consolas', monospace;
+            --k-radius-sm: 0.25rem;
+            --k-radius-md: 0.375rem;
+            --k-radius-lg: 0.5rem;
+            --k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
+            --k-shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.08);
+            --k-header-height: 64px;
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--k-font-family);
+            font-size: 0.9rem;
+            line-height: 1.5;
+            color: var(--k-text-main);
+            background-color: var(--k-bg-app);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           HEADER
+           ═══════════════════════════════════════════════════════════════════════════ */
+        .k-module-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 1.5rem;
+            height: var(--k-header-height);
+            background: var(--k-bg-card);
+            border-bottom: 1px solid var(--k-border);
+            box-shadow: var(--k-shadow-sm);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        .k-header-left { display: flex; align-items: center; gap: 1rem; }
+        .k-back-btn {
+            width: 36px; height: 36px;
+            border: 1px solid var(--k-border);
+            border-radius: var(--k-radius-md);
+            background: var(--k-bg-card);
+            color: var(--k-text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .k-back-btn:hover { background: var(--k-primary-light); color: var(--k-primary); }
+        .k-header-title-group { display: flex; flex-direction: column; gap: 0.1rem; }
+        .k-header-main-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--k-text-main);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .k-header-main-title i { color: var(--k-primary); }
+        .k-header-breadcrumb { display: flex; align-items: center; gap: 0.3rem; font-size: 0.7rem; color: var(--k-text-muted); }
+        .k-breadcrumb-item.active { color: var(--k-primary); font-weight: 500; }
+        .k-header-right { display: flex; align-items: center; gap: 0.75rem; }
+
+        .k-sync-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.3rem 0.6rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            border-radius: 2rem;
+        }
+        .k-sync-synced { background: var(--k-success-light); color: var(--k-success); }
+        .k-sync-pending { background: var(--k-warning-light); color: #856404; }
+
+        .k-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            padding: 0.5rem 1rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            border: none;
+            border-radius: var(--k-radius-md);
+            cursor: pointer;
+        }
+        .k-btn-primary { background: var(--k-primary); color: white; }
+        .k-btn-primary:hover { background: var(--k-primary-hover); }
+        .k-btn-success { background: var(--k-success); color: white; }
+        .k-btn-sm { padding: 0.35rem 0.75rem; font-size: 0.7rem; }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           MAIN CONTENT
+           ═══════════════════════════════════════════════════════════════════════════ */
+        .k-main-content {
+            flex: 1;
+            padding: 1.25rem;
+            max-width: 1800px;
+            margin: 0 auto;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        /* Stats Row */
+        .k-stats-row {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 0.75rem;
+        }
+        .k-stat-card {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            padding: 0.65rem 0.85rem;
+            background: var(--k-bg-card);
+            border: 1px solid var(--k-border);
+            border-radius: var(--k-radius-lg);
+            box-shadow: var(--k-shadow-sm);
+        }
+        .k-stat-icon {
+            width: 36px; height: 36px;
+            border-radius: var(--k-radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+        }
+        .k-stat-primary { background: var(--k-primary-light); color: var(--k-primary); }
+        .k-stat-success { background: var(--k-success-light); color: var(--k-success); }
+        .k-stat-danger { background: var(--k-danger-light); color: var(--k-danger); }
+        .k-stat-warning { background: var(--k-warning-light); color: #856404; }
+        .k-stat-info { background: var(--k-info-light); color: var(--k-info); }
+        .k-stat-value { font-size: 1.1rem; font-weight: 700; color: var(--k-text-main); }
+        .k-stat-label { font-size: 0.6rem; color: var(--k-text-muted); text-transform: uppercase; }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           LEYENDA DE COLORES (VINCULACIÓN)
+           ═══════════════════════════════════════════════════════════════════════════ */
+        .k-legend-bar {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+            padding: 0.5rem 0.85rem;
+            background: var(--k-bg-card);
+            border: 1px solid var(--k-border);
+            border-radius: var(--k-radius-md);
+            font-size: 0.7rem;
+        }
+        .k-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            color: var(--k-text-muted);
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .k-legend-item:hover { opacity: 0.7; }
+        .k-legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+        .k-legend-hint {
+            margin-left: auto;
+            color: var(--k-text-muted);
+            font-style: italic;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           SPLIT LAYOUT (IZQUIERDA: POLÍTICA | DERECHA: OBJETIVOS)
+           ═══════════════════════════════════════════════════════════════════════════ */
+        
+        .k-split-layout {
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 1.25rem;
+            flex: 1;
+            min-height: 0;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           COLUMNA IZQUIERDA: POLÍTICA (AMPLIADA)
+           ═══════════════════════════════════════════════════════════════════════════ */
+        
+        .k-policy-column {
+            display: flex;
+            flex-direction: column;
+            background: var(--k-bg-card);
+            border: 1px solid var(--k-border);
+            border-radius: var(--k-radius-lg);
+            box-shadow: var(--k-shadow-sm);
+            overflow: hidden;
+            height: 100%;
+        }
+
+        .k-column-header {
+            padding: 0.85rem 1rem;
+            background: var(--k-bg-app);
+            border-bottom: 1px solid var(--k-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .k-column-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--k-text-main);
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .k-column-title i { color: var(--k-primary); }
+        .k-source-tag {
+            font-size: 0.6rem;
+            padding: 0.15rem 0.4rem;
+            background: var(--k-bg-hover);
+            border-radius: var(--k-radius-sm);
+            color: var(--k-text-muted);
+        }
+
+        /* Contenedor de principios - SIN SCROLL, OCUPA TODO EL ESPACIO */
+        .k-policy-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Bloques de principio - OCUPAN ESPACIO PROPORCIONALMENTE */
+        .k-principle-block {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--k-border-light);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .k-principle-block:last-child {
+            border-bottom: none;
+        }
+
+        .k-principle-block::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            transition: width 0.2s ease;
+        }
+
+        .k-principle-block:hover::before {
+            width: 6px;
+        }
+
+        .k-principle-block.k-p1 { background: var(--k-p1-light); }
+        .k-principle-block.k-p1::before { background: var(--k-p1); }
+        .k-principle-block.k-p2 { background: var(--k-p2-light); }
+        .k-principle-block.k-p2::before { background: var(--k-p2); }
+        .k-principle-block.k-p3 { background: var(--k-p3-light); }
+        .k-principle-block.k-p3::before { background: var(--k-p3); }
+        .k-principle-block.k-p4 { background: var(--k-p4-light); }
+        .k-principle-block.k-p4::before { background: var(--k-p4); }
+
+        .k-principle-block:hover {
+            filter: brightness(0.97);
+        }
+
+        .k-principle-block.k-active {
+            filter: brightness(0.92);
+        }
+
+        /* Header del principio */
+        .k-principle-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.4rem;
+        }
+
+        .k-principle-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.6rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .k-p1 .k-principle-badge { color: var(--k-p1); }
+        .k-p2 .k-principle-badge { color: var(--k-p2); }
+        .k-p3 .k-principle-badge { color: var(--k-p3); }
+        .k-p4 .k-principle-badge { color: var(--k-p4); }
+
+        .k-principle-count {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.2rem;
+            font-size: 0.6rem;
+            color: var(--k-text-muted);
+            background: rgba(255,255,255,0.5);
+            padding: 0.1rem 0.35rem;
+            border-radius: 1rem;
+        }
+
+        /* Título y texto del principio */
+        .k-principle-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--k-text-main);
+            line-height: 1.3;
+            margin-bottom: 0.25rem;
+        }
+
+        .k-principle-text {
+            font-size: 0.68rem;
+            color: var(--k-text-secondary);
+            line-height: 1.4;
+            flex: 1;
+        }
+
+        /* Objetivos vinculados al principio */
+        .k-principle-objectives {
+            margin-top: 0.4rem;
+            padding-top: 0.4rem;
+            border-top: 1px dashed var(--k-border);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.25rem;
+        }
+
+        .k-objective-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.2rem;
+            padding: 0.12rem 0.4rem;
+            background: white;
+            border-radius: 1rem;
+            font-size: 0.6rem;
+            font-weight: 500;
+        }
+
+        .k-p1 .k-objective-tag { border: 1px solid var(--k-p1); color: var(--k-p1); }
+        .k-p2 .k-objective-tag { border: 1px solid var(--k-p2); color: var(--k-p2); }
+        .k-p3 .k-objective-tag { border: 1px solid var(--k-p3); color: var(--k-p3); }
+        .k-p4 .k-objective-tag { border: 1px solid var(--k-p4); color: var(--k-p4); }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           COLUMNA DERECHA: OBJETIVOS E INDICADORES
+           ═══════════════════════════════════════════════════════════════════════════ */
+        
+        .k-objectives-column {
+            display: flex;
+            flex-direction: column;
+            background: var(--k-bg-card);
+            border: 1px solid var(--k-border);
+            border-radius: var(--k-radius-lg);
+            box-shadow: var(--k-shadow-sm);
+            overflow: hidden;
+            height: 100%;
+        }
+
+        .k-table-container {
+            flex: 1;
+            overflow: auto;
+        }
+
+        .k-data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .k-data-table th {
+            padding: 0.6rem 0.75rem;
+            text-align: left;
+            font-size: 0.6rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--k-text-muted);
+            background: var(--k-bg-app);
+            border-bottom: 2px solid var(--k-border);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .k-data-table td {
+            padding: 0.45rem 0.75rem;
+            border-bottom: 1px solid var(--k-border-light);
+            vertical-align: middle;
+            font-size: 0.75rem;
+        }
+
+        /* Fila de objetivo */
+        .k-objective-row {
+            transition: all 0.15s ease;
+            border-left: 4px solid transparent;
+        }
+
+        .k-objective-row:hover {
+            background: var(--row-bg);
+        }
+
+        .k-objective-row.k-row-p1 {
+            --row-bg: var(--k-p1-light);
+            border-left-color: var(--k-p1);
+        }
+        .k-objective-row.k-row-p2 {
+            --row-bg: var(--k-p2-light);
+            border-left-color: var(--k-p2);
+        }
+        .k-objective-row.k-row-p3 {
+            --row-bg: var(--k-p3-light);
+            border-left-color: var(--k-p3);
+        }
+        .k-objective-row.k-row-p4 {
+            --row-bg: var(--k-p4-light);
+            border-left-color: var(--k-p4);
+        }
+
+        /* Fila de indicador secundario */
+        .k-indicator-row td:first-child {
+            padding-left: 1.75rem;
+        }
+
+        .k-indent-marker {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.6rem;
+            color: var(--k-text-muted);
+        }
+
+        /* Celdas */
+        .k-cell-objective {
+            font-weight: 600;
+            color: var(--k-text-main);
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
+        }
+
+        .k-cell-principle-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.15rem;
+            font-size: 0.55rem;
+            font-weight: 600;
+            padding: 0.08rem 0.3rem;
+            border-radius: 1rem;
+            width: fit-content;
+            margin-bottom: 0.15rem;
+        }
+
+        .k-row-p1 .k-cell-principle-tag { background: var(--k-p1); color: white; }
+        .k-row-p2 .k-cell-principle-tag { background: var(--k-p2); color: white; }
+        .k-row-p3 .k-cell-principle-tag { background: var(--k-p3); color: white; }
+        .k-row-p4 .k-cell-principle-tag { background: var(--k-p4); color: white; }
+
+        .k-cell-indicator {
+            color: var(--k-text-secondary);
+        }
+
+        .k-cell-formula {
+            font-family: var(--k-font-mono);
+            font-size: 0.65rem;
+            color: var(--k-text-muted);
+            background: var(--k-bg-app);
+            padding: 0.1rem 0.3rem;
+            border-radius: var(--k-radius-sm);
+            display: inline-block;
+            max-width: 160px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .k-cell-goal {
+            font-weight: 700;
+            color: var(--k-primary);
+            font-size: 0.8rem;
+        }
+
+        .k-cell-frequency {
+            display: inline-flex;
+            padding: 0.12rem 0.4rem;
+            background: var(--k-info-light);
+            color: var(--k-info);
+            border-radius: 2rem;
+            font-size: 0.6rem;
+            font-weight: 500;
+        }
+
+        .k-cell-responsible {
+            color: var(--k-text-secondary);
+            font-size: 0.7rem;
+        }
+
+        .k-col-actions { text-align: center; width: 40px; }
+
+        .k-btn-icon {
+            width: 24px; height: 24px;
             padding: 0;
+            border-radius: var(--k-radius-sm);
+            background: transparent;
+            border: none;
+            color: var(--k-text-muted);
+            cursor: pointer;
+        }
+        .k-btn-icon:hover { background: var(--k-bg-hover); color: var(--k-primary); }
+
+        /* Toast */
+        .k-toast-container { position: fixed; bottom: 1rem; right: 1rem; z-index: 2000; }
+        .k-toast {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.65rem 1rem;
+            background: var(--k-text-main);
+            color: white;
+            border-radius: var(--k-radius-md);
+            font-size: 0.8rem;
+            margin-top: 0.35rem;
+            animation: k-toast-in 0.3s ease;
+        }
+        @keyframes k-toast-in { from { opacity: 0; transform: translateX(100%); } }
+        .k-toast.k-toast-success { background: var(--k-success); }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           TEMAS (DARK / DARK-LEGACY)
+           ═══════════════════════════════════════════════════════════════════════════ */
+        [data-theme="dark"] body {
+            --k-primary: #4da6ff;
+            --k-primary-light: rgba(77, 166, 255, 0.15);
+            --k-success: #5cb85c;
+            --k-success-light: rgba(92, 184, 92, 0.15);
+            --k-warning: #f0ad4e;
+            --k-warning-light: rgba(240, 173, 78, 0.15);
+            --k-danger: #d9534f;
+            --k-danger-light: rgba(217, 83, 79, 0.15);
+            --k-info: #5bc0de;
+            --k-info-light: rgba(91, 192, 222, 0.15);
+            --k-p1: #ff6b6b;
+            --k-p1-light: rgba(255, 107, 107, 0.1);
+            --k-p2: #69db7c;
+            --k-p2-light: rgba(105, 219, 124, 0.1);
+            --k-p3: #b197fc;
+            --k-p3-light: rgba(177, 151, 252, 0.1);
+            --k-p4: #ffa94d;
+            --k-p4-light: rgba(255, 169, 77, 0.1);
+            --k-bg-app: #1a202c;
+            --k-bg-card: #2d3748;
+            --k-bg-hover: #3a4556;
+            --k-border: #4a5568;
+            --k-text-main: #e9ecef;
+            --k-text-secondary: #cbd5e0;
+            --k-text-muted: #a0aec0;
+        }
+
+        [data-theme="dark-legacy"] body {
+            --k-primary: #9e9e9e;
+            --k-primary-light: rgba(158, 158, 158, 0.15);
+            --k-success: #4caf50;
+            --k-success-light: rgba(76, 175, 80, 0.15);
+            --k-warning: #ff9800;
+            --k-warning-light: rgba(255, 152, 0, 0.15);
+            --k-danger: #f44336;
+            --k-danger-light: rgba(244, 67, 54, 0.15);
+            --k-info: #00bcd4;
+            --k-info-light: rgba(0, 188, 212, 0.15);
+            --k-p1: #ef5350;
+            --k-p1-light: rgba(239, 83, 80, 0.1);
+            --k-p2: #66bb6a;
+            --k-p2-light: rgba(102, 187, 106, 0.1);
+            --k-p3: #ab47bc;
+            --k-p3-light: rgba(171, 71, 188, 0.1);
+            --k-p4: #ff9800;
+            --k-p4-light: rgba(255, 152, 0, 0.1);
+            --k-bg-app: #121212;
+            --k-bg-card: #1e1e1e;
+            --k-bg-hover: #2d2d2d;
+            --k-border: #404040;
+            --k-text-main: #e0e0e0;
+            --k-text-secondary: #b0b0b0;
+            --k-text-muted: #8a8a8a;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           RESPONSIVE
+           ═══════════════════════════════════════════════════════════════════════════ */
+        @media (max-width: 1400px) {
+            .k-split-layout { grid-template-columns: 340px 1fr; }
+        }
+        @media (max-width: 1200px) {
+            .k-stats-row { grid-template-columns: repeat(3, 1fr); }
+            .k-split-layout { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 768px) {
+            .k-module-header { flex-direction: column; height: auto; padding: 0.5rem 1rem; gap: 0.5rem; }
+            .k-header-left, .k-header-right { width: 100%; justify-content: space-between; }
+            .k-stats-row { grid-template-columns: repeat(2, 1fr); }
+            .k-main-content { padding: 0.75rem; }
         }
     </style>
 </head>
-<body class="objetivos-sst-container">
+<body>
 
-    <!-- Header Global -->
-    <header class="objetivos-sst-header">
-        <div class="header-top" style="display: flex; justify-content: space-between; align-items: center; max-width: 1600px; margin: 0 auto; padding: 0 2rem;">
-            <div>
-                <div class="objetivos-sst-main-title">Objetivos y Metas del SG-SST</div>
-                <div class="objetivos-sst-breadcrumb">Gestión Integral / 2.2.1 Objetivos y Metas</div>
+    <!-- Header -->
+    <header class="k-module-header">
+        <div class="k-header-left">
+            <button class="k-back-btn" onclick="backToModule()"><i class="bi bi-arrow-left"></i></button>
+            <div class="k-header-title-group">
+                <div class="k-header-main-title">
+                    <i class="bi bi-bullseye"></i>
+                    Objetivos y Metas del SG-SST
+                </div>
+                <div class="k-header-breadcrumb">
+                    <span>Gestión Integral</span>
+                    <i class="bi bi-chevron-right"></i>
+                    <span class="k-breadcrumb-item active">2.2.1 Objetivos y Metas</span>
+                </div>
             </div>
-
-            <div class="header-actions">
-                <span id="syncStatus" class="objetivos-sync-badge synced">Sincronizado con Excel</span>
-                <button class="excel-sync-btn" onclick="syncToExcel()" style="padding: 0.5rem 1rem; background: var(--primary); color: white; border: none; border-radius: var(--radius); cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 0.5rem;">
-                    <span>📥</span> Actualizar Archivo Excel
-                </button>
-            </div>
+        </div>
+        <div class="k-header-right">
+            <span id="syncStatus" class="k-sync-badge k-sync-synced">
+                <i class="bi bi-check-circle-fill"></i>
+                Sincronizado
+            </span>
+            <button class="k-btn k-btn-primary" onclick="syncToExcel()">
+                <i class="bi bi-cloud-arrow-up"></i>
+                <span>Actualizar Excel</span>
+            </button>
         </div>
     </header>
 
-    <main class="objetivos-sst-content">
+    <!-- Main Content -->
+    <main class="k-main-content">
 
-        <!-- LAYOUT DIVIDIDO: Política (Izq) + Tabla (Der) -->
-        <div class="objetivos-split-layout">
+        <!-- Stats Row -->
+        <div class="k-stats-row">
+            <div class="k-stat-card">
+                <div class="k-stat-icon k-stat-primary"><i class="bi bi-bullseye"></i></div>
+                <div>
+                    <div class="k-stat-value" id="stat-objectives">6</div>
+                    <div class="k-stat-label">Objetivos</div>
+                </div>
+            </div>
+            <div class="k-stat-card">
+                <div class="k-stat-icon k-stat-success"><i class="bi bi-list-check"></i></div>
+                <div>
+                    <div class="k-stat-value" id="stat-indicators">11</div>
+                    <div class="k-stat-label">Indicadores</div>
+                </div>
+            </div>
+            <div class="k-stat-card">
+                <div class="k-stat-icon k-stat-danger"><i class="bi bi-shield-check"></i></div>
+                <div>
+                    <div class="k-stat-value">5</div>
+                    <div class="k-stat-label">Seguridad</div>
+                </div>
+            </div>
+            <div class="k-stat-card">
+                <div class="k-stat-icon k-stat-warning"><i class="bi bi-clock"></i></div>
+                <div>
+                    <div class="k-stat-value">Mensual</div>
+                    <div class="k-stat-label">Frecuencia</div>
+                </div>
+            </div>
+            <div class="k-stat-card">
+                <div class="k-stat-icon k-stat-info"><i class="bi bi-file-earmark-excel"></i></div>
+                <div>
+                    <div class="k-stat-value" style="font-size: 0.7rem;">GI-FO-044</div>
+                    <div class="k-stat-label">Archivo</div>
+                </div>
+            </div>
+        </div>
 
-            <!-- COLUMNA IZQUIERDA: POLÍTICA INTEGRAL -->
-            <div class="objetivos-section-card">
-                <div class="objetivos-card-header">
-                    <div class="objetivos-card-title">📜 Política Integral</div>
-                    <button class="objetivos-btn-icon" title="Info" onclick="alert('Este texto corresponde a la celda principal de la hoja GI-FO-044')">ℹ️</button>
+        <!-- Leyenda -->
+        <div class="k-legend-bar">
+            <div class="k-legend-item" onclick="highlightPrinciple(1)">
+                <div class="k-legend-dot" style="background: var(--k-p1);"></div>
+                <span>Prevención</span>
+            </div>
+            <div class="k-legend-item" onclick="highlightPrinciple(2)">
+                <div class="k-legend-dot" style="background: var(--k-p2);"></div>
+                <span>Requisitos Legales</span>
+            </div>
+            <div class="k-legend-item" onclick="highlightPrinciple(3)">
+                <div class="k-legend-dot" style="background: var(--k-p3);"></div>
+                <span>Satisfacción Cliente</span>
+            </div>
+            <div class="k-legend-item" onclick="highlightPrinciple(4)">
+                <div class="k-legend-dot" style="background: var(--k-p4);"></div>
+                <span>Recursos y Mejora</span>
+            </div>
+            <span class="k-legend-hint">Clic para resaltar objetivos relacionados</span>
+        </div>
+
+        <!-- SPLIT LAYOUT: POLÍTICA (IZQ) | OBJETIVOS (DER) -->
+        <div class="k-split-layout">
+
+            <!-- COLUMNA IZQUIERDA: POLÍTICA -->
+            <div class="k-policy-column">
+                <div class="k-column-header">
+                    <div class="k-column-title">
+                        <i class="bi bi-file-text"></i>
+                        Política Integral SST
+                    </div>
+                    <span class="k-source-tag">GI-FO-044</span>
                 </div>
-                <div class="objetivos-policy-container">
-                    <label style="display:block; margin-bottom:0.5rem; font-weight:600; font-size:0.85rem; color:var(--text-muted);">Texto de la Política (Extraído de Excel)</label>
-                    <textarea id="policyText" class="objetivos-policy-editor" onchange="markPending()">TEMPOACTIVA S.A.S., ha establecido la elaboración y ejecución del Sistema de Gestión de la Seguridad y Salud en el trabajo SG-SST, y adopta como políticas propias el fomento de las normas de medicina preventiva y del trabajo, higiene y seguridad industrial, encaminadas a mantener el más alto grado de salud y bienestar físico y mental del trabajador, identificando los riesgos derivados de las condiciones laborales; Con el fin de prevenir cualquier tipo de daños a la propiedad e impacto socio ambiental a su entorno, enfocada en el mejoramiento continuo, para lo cual ha adoptado los siguientes principios:
-                • Prevenir lesiones, enfermedades laborales, contaminación, daños a la propiedad de la empresa y del cliente e impactos socio- ambientales; a partir de la identificación de peligros, control de actos y condiciones inseguras.
-                • Promover la satisfacción de las necesidades y los requisitos del cliente así como los legales y reglamentarios en materia de calidad, seguridad, salud en el trabajo, medio ambiente y otros aplicables para la organización.
-                • Proyectar la calidad total de sus servicios, mantener y fortalecer una relación mutuamente beneficiosa con el cliente a fin de satisfacer sus necesidades y exceder sus expectativas.
-                • Proporcionar y Facilitar los recursos financieros así como el personal competente, confiable, calificado, motivado y comprometido con el fortalecimiento de la empresa que nos permitan lograr las metas y los objetivos propuestos para alcanzar el mejoramiento continuo y el liderazgo a nivel nacional e internacional en el sector. Léase, Impleméntese y Cúmplase.</textarea>
-                </div>
-                <div style="text-align: right; margin-top: 1rem; font-size: 0.8rem; color: var(--text-muted);">
-                    Fuente: GI-FO-044 / Celda A2
+                <div class="k-policy-body" id="policyBody">
+                    <!-- Renderizado por JS -->
                 </div>
             </div>
 
-            <!-- COLUMNA DERECHA: TABLA DE OBJETIVOS -->
-            <div class="objetivos-section-card">
-                <div class="objetivos-card-header">
-                    <div class="objetivos-card-title">🎯 Objetivos Estratégicos e Indicadores</div>
-                    <button class="objetivos-btn-icon" title="Agregar Objetivo" onclick="addNewObjective()">➕</button>
+            <!-- COLUMNA DERECHA: OBJETIVOS E INDICADORES -->
+            <div class="k-objectives-column">
+                <div class="k-column-header">
+                    <div class="k-column-title">
+                        <i class="bi bi-diagram-3"></i>
+                        Objetivos e Indicadores
+                    </div>
+                    <button class="k-btn k-btn-success k-btn-sm" onclick="addNewObjective()">
+                        <i class="bi bi-plus-lg"></i>
+                        Agregar
+                    </button>
                 </div>
-
-                <div class="objetivos-table-wrapper">
-                    <table class="objetivos-k-table" id="objectivesTable">
+                <div class="k-table-container">
+                    <table class="k-data-table">
                         <thead>
                             <tr>
-                                <th style="width: 30%">Objetivo Estratégico</th>
-                                <th style="width: 20%">Indicador de Gestión</th>
-                                <th style="width: 15%">Fórmula</th>
-                                <th style="width: 10%">Meta</th>
+                                <th style="width: 24%">Objetivo Estratégico</th>
+                                <th style="width: 20%">Indicador</th>
+                                <th style="width: 18%">Fórmula</th>
+                                <th style="width: 8%">Meta</th>
                                 <th style="width: 10%">Frecuencia</th>
-                                <th style="width: 10%">Responsable</th>
-                                <th style="width: 5%"></th>
+                                <th style="width: 14%">Responsable</th>
+                                <th class="k-col-actions"></th>
                             </tr>
                         </thead>
-                        <tbody id="tableBody">
-                            <!-- Renderizado JS -->
+                        <tbody id="objectivesBody">
+                            <!-- Renderizado por JS -->
                         </tbody>
                     </table>
                 </div>
-                <div style="margin-top: 1rem; font-size: 0.85rem; color: var(--text-muted);">
-                    * Haga clic en el icono ✏️ para editar cualquier celda. Los cambios se actualizarán en el archivo Excel al pulsar "Actualizar Archivo Excel".
-                </div>
             </div>
 
-        </div> <!-- Fin Split Layout -->
-
+        </div>
     </main>
 
-    <div id="toast" class="objetivos-toast">Archivo Excel actualizado exitosamente</div>
+    <!-- Toast Container -->
+    <div class="k-toast-container" id="toastContainer"></div>
 
-    <script src="../../../node_modules/exceljs/dist/exceljs.min.js"></script>
-    <script src="./objetivos-sst-viewer.js?v=fixed_cache_2"></script>
-
+    <script src="./objetivos-sst-viewer.js"></script>
 </body>
 </html>

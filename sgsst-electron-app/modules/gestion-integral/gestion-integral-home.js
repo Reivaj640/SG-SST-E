@@ -440,21 +440,22 @@ class GestionIntegralHome {
             
             .chart-legend {
                 flex: 1;
-                display: flex;
-                flex-direction: column;
-                gap: 1rem;
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                gap: 0.75rem;
             }
             
             .legend-item {
                 display: flex;
                 align-items: center;
-                gap: 1rem;
-                padding: 1rem 1.25rem;
+                gap: 0.75rem;
+                padding: 0.75rem 1rem;
                 background: var(--k-bg-app);
                 border-radius: var(--k-radius-md);
                 border: 1px solid var(--k-border);
                 transition: all 0.2s ease;
                 cursor: pointer;
+                min-width: 0;  /* Prevenir desbordamiento */
             }
             
             .legend-item:hover {
@@ -464,8 +465,8 @@ class GestionIntegralHome {
             }
             
             .legend-dot {
-                width: 14px;
-                height: 14px;
+                width: 12px;
+                height: 12px;
                 border-radius: 50%;
                 flex-shrink: 0;
                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -473,26 +474,34 @@ class GestionIntegralHome {
             
             .legend-info {
                 flex: 1;
+                min-width: 0;  /* Permitir text truncation */
             }
             
             .legend-title {
-                font-size: 0.85rem;
+                font-size: 0.75rem;
                 font-weight: 600;
                 color: var(--k-text-main);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
             }
             
             .legend-description {
-                font-size: 0.75rem;
+                font-size: 0.65rem;
                 color: var(--k-text-muted);
-                margin-top: 0.2rem;
+                margin-top: 0;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
             }
             
             .legend-value {
-                font-size: 1.25rem;
+                font-size: 1rem;
                 font-weight: 700;
                 color: var(--k-text-main);
                 text-align: right;
-                min-width: 40px;
+                min-width: 30px;
+                flex-shrink: 0;
             }
 
             /* Responsive para la gráfica */
@@ -509,7 +518,21 @@ class GestionIntegralHome {
                 max-width: 100%;
             }
             
-            @media (max-width: 1200px) {
+            @media (max-width: 992px) {
+                .chart-content {
+                    gap: 1.5rem;
+                }
+                
+                .chart-legend {
+                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                }
+                
+                .legend-item {
+                    padding: 0.6rem 0.85rem;
+                }
+            }
+            
+            @media (max-width: 768px) {
                 .chart-content {
                     flex-direction: column;
                     align-items: center;
@@ -517,10 +540,9 @@ class GestionIntegralHome {
 
                 .chart-legend {
                     width: 100%;
+                    grid-template-columns: 1fr;  /* 1 columna en móvil */
                 }
-            }
-
-            @media (max-width: 768px) {
+                
                 .chart-stats {
                     grid-template-columns: 1fr;
                 }
@@ -528,17 +550,17 @@ class GestionIntegralHome {
                 .donut-percentage {
                     font-size: 2rem;
                 }
-                
+
                 .chart-container {
                     min-height: auto;
                 }
-                
+
                 .chart-header {
                     flex-direction: column;
                     gap: 1rem;
                     align-items: flex-start;
                 }
-                
+
                 .chart-badge {
                     align-self: flex-start;
                 }

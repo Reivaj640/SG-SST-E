@@ -1,5 +1,5 @@
 // objetivos-sst-viewer.js
-// Componente para el submódulo "2.2.1 Objetivos SST"
+// Componente para el submódulo "2.2.1 Objetivos SST" - Versión con Política Vinculada
 
 class ObjetivosSSTViewer {
     constructor() {
@@ -8,12 +8,13 @@ class ObjetivosSSTViewer {
         this.submoduleName = null;
         this.excelFilePath = null;
         this.policyText = '';
-        this.objectivesData = [];
+        this.policyData = [];  // Nueva estructura: principios con objetivos
         this.isDataLoaded = false;
-        
+        this.activePrinciple = null;
+
         // Obtener parámetros de la URL
         this.extractParamsFromURL();
-        
+
         // Inicializar la interfaz
         this.init();
     }
@@ -23,20 +24,23 @@ class ObjetivosSSTViewer {
         this.companyName = urlParams.get('company');
         this.moduleName = urlParams.get('module');
         this.submoduleName = urlParams.get('submodule');
-        
-        console.log(`[objetivos-sst-viewer.js] Parámetros recibidos - Empresa: ${this.companyName}, Módulo: ${this.moduleName}, Submódulo: ${this.submoduleName}`);
+
+        console.log('[objetivos-sst-viewer.js] Parámetros recibidos:', {
+            company: this.companyName,
+            module: this.moduleName,
+            submodule: this.submoduleName
+        });
     }
 
     async init() {
         try {
-            // Esperar a que el DOM esté completamente cargado
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', () => this.loadData());
             } else {
                 await this.loadData();
             }
         } catch (error) {
-            console.error('[objetivos-sst-viewer.js] Error inicializando el componente:', error);
+            console.error('[objetivos-sst-viewer.js] Error inicializando:', error);
             this.showError('Error inicializando el componente de Objetivos SST');
         }
     }
@@ -44,24 +48,24 @@ class ObjetivosSSTViewer {
     async loadData() {
         try {
             console.log('[objetivos-sst-viewer.js] Iniciando carga de datos...');
-            
-            // Solicitar la ruta del archivo Excel al backend
+
+            // Solicitar la ruta del archivo Excel
             const excelPathResponse = await this.requestExcelPath();
             if (!excelPathResponse.success) {
                 throw new Error(excelPathResponse.error || 'No se pudo obtener la ruta del archivo Excel');
             }
-            
+
             this.excelFilePath = excelPathResponse.filePath;
             console.log('[objetivos-sst-viewer.js] Ruta del archivo Excel:', this.excelFilePath);
-            
+
             // Cargar datos del archivo Excel
             const data = await this.loadExcelData();
             this.policyText = data.policyText || '';
-            this.objectivesData = data.objectivesData || [];
-            
+            this.policyData = this.transformDataToPolicyStructure(data.objectivesData || []);
+
             // Actualizar la interfaz con los datos cargados
             this.updateUIWithData();
-            
+
             this.isDataLoaded = true;
             console.log('[objetivos-sst-viewer.js] Datos cargados exitosamente');
         } catch (error) {
@@ -70,21 +74,78 @@ class ObjetivosSSTViewer {
         }
     }
 
+    /**
+     * Transforma datos planos del Excel a estructura de principios
+     */
+    transformDataToPolicyStructure(objectivesData) {
+        // Estructura base de principios SST
+        const policyStructure = [
+            {
+                id: 1,
+                principle: "Prevención",
+                title: "Prevenir lesiones, enfermedades laborales y daños",
+                text: "A partir de la identificación de peligros y control de actos inseguros.",
+                cssClass: "k-p1",
+                objectives: []
+            },
+            {
+                id: 2,
+                principle: "Requisitos Legales",
+                title: "Promover satisfacción de requisitos legales",
+                text: "Cumplir requisitos en calidad, seguridad, salud y medio ambiente.",
+                cssClass: "k-p2",
+                objectives: []
+            },
+            {
+                id: 3,
+                principle: "Satisfacción Cliente",
+                title: "Proyectar calidad total y satisfacción del cliente",
+                text: "Mantener relación mutuamente beneficiosa con el cliente.",
+                cssClass: "k-p3",
+                objectives: []
+            },
+            {
+                id: 4,
+                principle: "Recursos y Mejora",
+                title: "Proporcionar recursos y personal competente",
+                text: "Recursos financieros y personal calificado para mejora continua.",
+                cssClass: "k-p4",
+                objectives: []
+            }
+        ];
+
+        // Agrupar objetivos por principio (asignación simplificada)
+        objectivesData.forEach((obj, index) => {
+            // Asignar cíclicamente a los 4 principios
+            const principleIndex = index % 4;
+            policyStructure[principleIndex].objectives.push({
+                objective: obj.objective || 'Objetivo sin nombre',
+                indicators: [{
+                    indicator: obj.indicator || 'Indicador',
+                    formula: obj.formula || '',
+                    goal: obj.goal || '0',
+                    frequency: obj.frequency || 'Mensual',
+                    responsible: obj.responsible || 'Coordinador SST'
+                }]
+            });
+        });
+
+        return policyStructure;
+    }
+
     async requestExcelPath() {
         return new Promise((resolve) => {
             const requestId = `get-excel-path-${Date.now()}`;
-            
-            // Escuchar la respuesta
+
             const handleMessage = (event) => {
                 if (event.data && event.data.action === 'get-excel-path-response' && event.data.requestId === requestId) {
                     window.removeEventListener('message', handleMessage);
                     resolve(event.data);
                 }
             };
-            
+
             window.addEventListener('message', handleMessage);
-            
-            // Enviar solicitud al componente padre
+
             window.parent.postMessage({
                 action: 'get-excel-path-request',
                 requestId: requestId,
@@ -100,12 +161,11 @@ class ObjetivosSSTViewer {
     async loadExcelData() {
         return new Promise((resolve, reject) => {
             const requestId = `load-excel-data-${Date.now()}`;
-            
-            // Escuchar la respuesta
+
             const handleMessage = (event) => {
                 if (event.data && event.data.action === 'load-excel-data-response' && event.data.requestId === requestId) {
                     window.removeEventListener('message', handleMessage);
-                    
+
                     if (event.data.success) {
                         resolve(event.data.data);
                     } else {
@@ -113,10 +173,9 @@ class ObjetivosSSTViewer {
                     }
                 }
             };
-            
+
             window.addEventListener('message', handleMessage);
-            
-            // Enviar solicitud al componente padre
+
             window.parent.postMessage({
                 action: 'load-excel-data-request',
                 requestId: requestId,
@@ -128,151 +187,216 @@ class ObjetivosSSTViewer {
     }
 
     updateUIWithData() {
-        // Actualizar el campo de texto de la política
-        const policyTextArea = document.getElementById('policyText');
-        if (policyTextArea) {
-            policyTextArea.value = this.policyText;
-        }
-        
-        // Renderizar la tabla de objetivos
+        // Actualizar estadísticas
+        this.updateStats();
+
+        // Renderizar política
+        this.renderPolicy();
+
+        // Renderizar tabla de objetivos
         this.renderTable();
     }
 
-    renderTable() {
-        const tbody = document.getElementById('tableBody');
-        if (!tbody) return;
-        
-        tbody.innerHTML = '';
+    updateStats() {
+        const totalObjectives = this.policyData.reduce((sum, p) => sum + p.objectives.length, 0);
+        const totalIndicators = this.policyData.reduce((sum, p) => {
+            return sum + p.objectives.reduce((s, o) => s + o.indicators.length, 0);
+        }, 0);
 
-        this.objectivesData.forEach((item, index) => {
-            const tr = document.createElement('tr');
-            tr.id = `row-${item.id}`;
-            
-            tr.innerHTML = `
-                <td>
-                    <span class="objetivos-display-field">${item.objective || ''}</span>
-                    <input type="text" class="objetivos-editable-field" value="${item.objective || ''}" onchange="objetivosSSTViewer.markPending()">
-                </td>
-                <td>
-                    <span class="objetivos-display-field">${item.indicator || ''}</span>
-                    <input type="text" class="objetivos-editable-field" value="${item.indicator || ''}" onchange="objetivosSSTViewer.markPending()">
-                </td>
-                <td>
-                    <span class="objetivos-display-field" style="font-family: monospace; font-size: 0.85rem; color: var(--text-muted);">${item.formula || ''}</span>
-                    <input type="text" class="objetivos-editable-field" value="${item.formula || ''}" onchange="objetivosSSTViewer.markPending()">
-                </td>
-                <td>
-                    <span class="objetivos-display-field" style="font-weight:bold; color:var(--primary);">${item.goal || ''}</span>
-                    <input type="text" class="objetivos-editable-field" value="${item.goal || ''}" onchange="objetivosSSTViewer.markPending()">
-                </td>
-                <td>
-                    <span class="objetivos-display-field">${item.frequency || ''}</span>
-                    <select class="objetivos-editable-field" onchange="objetivosSSTViewer.markPending()">
-                        <option ${item.frequency === 'Mensual' ? 'selected' : ''}>Mensual</option>
-                        <option ${item.frequency === 'Anual' ? 'selected' : ''}>Anual</option>
-                        <option ${item.frequency === 'Bimensual' ? 'selected' : ''}>Bimensual</option>
-                        <option ${item.frequency === 'Semestral' ? 'selected' : ''}>Semestral</option>
-                    </select>
-                </td>
-                <td>
-                    <span class="objetivos-display-field">${item.responsible || ''}</span>
-                    <input type="text" class="objetivos-editable-field" value="${item.responsible || ''}" onchange="objetivosSSTViewer.markPending()">
-                </td>
-                <td style="text-align: center;">
-                    <button class="objetivos-btn-icon" onclick="objetivosSSTViewer.toggleEdit(${item.id})" title="Editar Fila">✏️</button>
-                    <button class="objetivos-btn-icon delete" onclick="objetivosSSTViewer.deleteRow(${item.id})" title="Eliminar">🗑️</button>
-                </td>
+        document.getElementById('stat-objectives').textContent = totalObjectives;
+        document.getElementById('stat-indicators').textContent = totalIndicators;
+    }
+
+    renderPolicy() {
+        const container = document.getElementById('policyBody');
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        this.policyData.forEach(p => {
+            const totalIndicators = p.objectives.reduce((s, o) => s + o.indicators.length, 0);
+
+            const block = document.createElement('div');
+            block.className = `k-principle-block ${p.cssClass}`;
+            block.dataset.pid = p.id;
+            block.onclick = () => this.highlightPrinciple(p.id);
+
+            block.innerHTML = `
+                <div class="k-principle-header">
+                    <span class="k-principle-badge">
+                        <i class="bi bi-${this.getIcon(p.principle)}"></i>
+                        ${p.principle}
+                    </span>
+                    <span class="k-principle-count">
+                        <i class="bi bi-list-check"></i>
+                        ${totalIndicators} indicadores
+                    </span>
+                </div>
+                <div class="k-principle-title">${p.title}</div>
+                <div class="k-principle-text">${p.text}</div>
+                <div class="k-principle-objectives">
+                    ${p.objectives.map(o => `
+                        <span class="k-objective-tag">
+                            <i class="bi bi-arrow-return-right"></i>
+                            ${o.indicators.length} indic.
+                        </span>
+                    `).join('')}
+                </div>
             `;
-            tbody.appendChild(tr);
+
+            container.appendChild(block);
         });
     }
 
-    toggleEdit(id) {
-        const row = document.getElementById(`row-${id}`);
-        const isEditing = row.classList.contains('tr-editing');
-        
-        if (isEditing) {
-            row.classList.remove('tr-editing');
-            this.updateDataFromRow(id);
-            this.showToast("Cambios guardados localmente");
-        } else {
-            row.classList.add('tr-editing');
-        }
+    renderTable() {
+        const tbody = document.getElementById('objectivesBody');
+        if (!tbody) return;
+
+        tbody.innerHTML = '';
+
+        this.policyData.forEach(p => {
+            p.objectives.forEach(obj => {
+                obj.indicators.forEach((ind, idx) => {
+                    const tr = document.createElement('tr');
+                    tr.className = `k-objective-row k-row-p${p.id}`;
+                    if (idx > 0) tr.classList.add('k-indicator-row');
+                    tr.dataset.pid = p.id;
+
+                    if (idx === 0) {
+                        tr.innerHTML = `
+                            <td>
+                                <div class="k-cell-objective">
+                                    <span class="k-cell-principle-tag">${p.principle}</span>
+                                    ${obj.objective}
+                                    ${obj.indicators.length > 1 ? `<span style="font-size:0.6rem;color:var(--k-text-muted)">(${obj.indicators.length} indicadores)</span>` : ''}
+                                </div>
+                            </td>
+                            <td><span class="k-cell-indicator">${ind.indicator}</span></td>
+                            <td><span class="k-cell-formula" title="${ind.formula}">${ind.formula}</span></td>
+                            <td><span class="k-cell-goal">${ind.goal}</span></td>
+                            <td><span class="k-cell-frequency">${ind.frequency}</span></td>
+                            <td><span class="k-cell-responsible">${ind.responsible}</span></td>
+                            <td class="k-col-actions">
+                                <button class="k-btn-icon" onclick="editRow(${p.id}, '${obj.objective}')"><i class="bi bi-pencil"></i></button>
+                            </td>
+                        `;
+                    } else {
+                        tr.innerHTML = `
+                            <td>
+                                <div class="k-indent-marker">
+                                    <i class="bi bi-arrow-return-right"></i>
+                                    ${idx + 1} de ${obj.indicators.length}
+                                </div>
+                            </td>
+                            <td><span class="k-cell-indicator">${ind.indicator}</span></td>
+                            <td><span class="k-cell-formula" title="${ind.formula}">${ind.formula}</span></td>
+                            <td><span class="k-cell-goal">${ind.goal}</span></td>
+                            <td><span class="k-cell-frequency">${ind.frequency}</span></td>
+                            <td><span class="k-cell-responsible">${ind.responsible}</span></td>
+                            <td class="k-col-actions">
+                                <button class="k-btn-icon" onclick="editRow(${p.id}, '${obj.objective}')"><i class="bi bi-pencil"></i></button>
+                            </td>
+                        `;
+                    }
+
+                    tbody.appendChild(tr);
+                });
+            });
+        });
     }
 
-    updateDataFromRow(id) {
-        const row = document.getElementById(`row-${id}`);
-        const inputs = row.querySelectorAll('.objetivos-editable-field');
-        const itemIndex = this.objectivesData.findIndex(i => i.id === id);
-        
-        if (itemIndex > -1 && inputs.length >= 6) {
-            this.objectivesData[itemIndex].objective = inputs[0].value;
-            this.objectivesData[itemIndex].indicator = inputs[1].value;
-            this.objectivesData[itemIndex].formula = inputs[2].value;
-            this.objectivesData[itemIndex].goal = inputs[3].value;
-            this.objectivesData[itemIndex].frequency = inputs[4].value;
-            this.objectivesData[itemIndex].responsible = inputs[5].value;
-            
-            // Actualizar también los campos de visualización
-            row.querySelector('td:nth-child(1) .objetivos-display-field').textContent = this.objectivesData[itemIndex].objective;
-            row.querySelector('td:nth-child(2) .objetivos-display-field').textContent = this.objectivesData[itemIndex].indicator;
-            row.querySelector('td:nth-child(3) .objetivos-display-field').textContent = this.objectivesData[itemIndex].formula;
-            row.querySelector('td:nth-child(4) .objetivos-display-field').textContent = this.objectivesData[itemIndex].goal;
-            row.querySelector('td:nth-child(5) .objetivos-display-field').textContent = this.objectivesData[itemIndex].frequency;
-            row.querySelector('td:nth-child(6) .objetivos-display-field').textContent = this.objectivesData[itemIndex].responsible;
-        }
+    getIcon(principle) {
+        const icons = {
+            'Prevención': 'shield-check',
+            'Requisitos Legales': 'clipboard-check',
+            'Satisfacción Cliente': 'people',
+            'Recursos y Mejora': 'gear'
+        };
+        return icons[principle] || 'circle';
     }
 
-    markPending() {
-        const badge = document.getElementById('syncStatus');
-        if (badge) {
-            badge.className = 'objetivos-sync-badge pending';
-            badge.textContent = 'Cambios pendientes de sincronizar';
+    highlightPrinciple(pid) {
+        if (this.activePrinciple === pid) {
+            this.activePrinciple = null;
+            document.querySelectorAll('.k-principle-block').forEach(el => {
+                el.style.opacity = '1';
+                el.classList.remove('k-active');
+            });
+            document.querySelectorAll('.k-objective-row').forEach(el => {
+                el.style.opacity = '1';
+            });
+            return;
         }
+
+        this.activePrinciple = pid;
+
+        document.querySelectorAll('.k-principle-block').forEach(el => {
+            if (parseInt(el.dataset.pid) === pid) {
+                el.style.opacity = '1';
+                el.classList.add('k-active');
+            } else {
+                el.style.opacity = '0.35';
+                el.classList.remove('k-active');
+            }
+        });
+
+        document.querySelectorAll('.k-objective-row').forEach(el => {
+            el.style.opacity = parseInt(el.dataset.pid) === pid ? '1' : '0.25';
+        });
+
+        const principle = this.policyData.find(p => p.id === pid);
+        this.showToast(`${principle.principle} destacado`);
     }
 
     async syncToExcel() {
         if (!this.isDataLoaded) {
-            this.showError('Aún no se han cargado los datos. Espere un momento e intente nuevamente.');
+            this.showError('Aún no se han cargado los datos. Espere un momento.');
             return;
         }
-        
-        const policyText = document.getElementById('policyText').value;
+
         const badge = document.getElementById('syncStatus');
-        const btn = document.querySelector('.excel-sync-btn');
-        
-        if (!btn) {
-            console.error('[objetivos-sst-viewer.js] Botón de sincronización no encontrado');
-            return;
-        }
-        
+        const btn = document.querySelector('.k-btn-primary');
+
         const originalText = btn.innerHTML;
         btn.innerHTML = '<span>⏳</span> Procesando...';
         btn.disabled = true;
 
         try {
-            // Actualizar el texto de la política
-            this.policyText = policyText;
-            
-            // Enviar solicitud de guardado al backend
+            // Convertir estructura de principios a datos planos para Excel
+            const flatData = [];
+            this.policyData.forEach(p => {
+                p.objectives.forEach(obj => {
+                    obj.indicators.forEach(ind => {
+                        flatData.push({
+                            objective: obj.objective,
+                            indicator: ind.indicator,
+                            formula: ind.formula,
+                            goal: ind.goal,
+                            frequency: ind.frequency,
+                            responsible: ind.responsible
+                        });
+                    });
+                });
+            });
+
+            // Enviar solicitud de guardado
             const saveResponse = await this.saveExcelData({
                 policyText: this.policyText,
-                objectivesData: this.objectivesData
+                objectivesData: flatData
             });
-            
+
             if (saveResponse.success) {
                 if (badge) {
-                    badge.className = 'objetivos-sync-badge synced';
-                    badge.textContent = 'Sincronizado con Excel';
+                    badge.className = 'k-sync-badge k-sync-synced';
+                    badge.innerHTML = '<i class="bi bi-check-circle-fill"></i> Sincronizado';
                 }
-                
                 this.showToast('Archivo Excel actualizado exitosamente');
             } else {
                 throw new Error(saveResponse.error || 'Error desconocido al guardar');
             }
         } catch (error) {
-            console.error('[objetivos-sst-viewer.js] Error al sincronizar con Excel:', error);
-            this.showError(`Error al actualizar el archivo Excel: ${error.message}`);
+            console.error('[objetivos-sst-viewer.js] Error al sincronizar:', error);
+            this.showError(`Error al actualizar Excel: ${error.message}`);
         } finally {
             btn.innerHTML = originalText;
             btn.disabled = false;
@@ -282,18 +406,16 @@ class ObjetivosSSTViewer {
     async saveExcelData(data) {
         return new Promise((resolve) => {
             const requestId = `save-excel-data-${Date.now()}`;
-            
-            // Escuchar la respuesta
+
             const handleMessage = (event) => {
                 if (event.data && event.data.action === 'save-excel-data-response' && event.data.requestId === requestId) {
                     window.removeEventListener('message', handleMessage);
                     resolve(event.data);
                 }
             };
-            
+
             window.addEventListener('message', handleMessage);
-            
-            // Enviar solicitud al componente padre
+
             window.parent.postMessage({
                 action: 'save-excel-data-request',
                 requestId: requestId,
@@ -306,81 +428,95 @@ class ObjetivosSSTViewer {
     }
 
     addNewObjective() {
-        const newId = this.objectivesData.length > 0 
-            ? Math.max(...this.objectivesData.map(item => item.id)) + 1 
-            : 1;
-            
+        // Agregar al último principio por defecto
+        const lastPrinciple = this.policyData[this.policyData.length - 1];
+        
         const newItem = {
-            id: newId,
             objective: "Nuevo Objetivo...",
-            indicator: "Nuevo Indicador",
-            formula: "Fórmula",
-            goal: "0",
-            frequency: "Mensual",
-            responsible: "Coordinador SST"
+            indicators: [{
+                indicator: "Nuevo Indicador",
+                formula: "Fórmula",
+                goal: "0",
+                frequency: "Mensual",
+                responsible: "Coordinador SST"
+            }]
         };
-        
-        this.objectivesData.push(newItem);
+
+        lastPrinciple.objectives.push(newItem);
         this.renderTable();
-        
-        // Activar edición para la nueva fila después de que se haya renderizado
-        setTimeout(() => this.toggleEdit(newId), 100);
+        this.renderPolicy();
+        this.updateStats();
         this.markPending();
     }
 
-    deleteRow(id) {
-        if (confirm("¿Está seguro de eliminar este objetivo del archivo Excel?")) {
-            this.objectivesData = this.objectivesData.filter(i => i.id !== id);
-            this.renderTable();
-            this.markPending();
+    markPending() {
+        const badge = document.getElementById('syncStatus');
+        if (badge) {
+            badge.className = 'k-sync-badge k-sync-pending';
+            badge.innerHTML = '<i class="bi bi-clock"></i> Cambios pendientes';
         }
     }
 
     showToast(message) {
-        const toast = document.getElementById('toast');
-        if (toast) {
-            toast.textContent = message;
-            toast.className = 'show success';
-            setTimeout(() => {
-                toast.className = toast.className.replace('show', '');
-            }, 3000);
-        }
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = 'k-toast k-toast-success';
+        toast.innerHTML = `<i class="bi bi-check-circle-fill"></i><span>${message}</span>`;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 2500);
     }
 
     showError(message) {
-        const toast = document.getElementById('toast');
-        if (toast) {
-            toast.textContent = message;
-            toast.className = 'show';
-            setTimeout(() => {
-                toast.className = toast.className.replace('show', '');
-            }, 5000);
-        }
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = 'k-toast';
+        toast.innerHTML = `<i class="bi bi-exclamation-circle-fill"></i><span>${message}</span>`;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 5000);
         console.error('[objetivos-sst-viewer.js] Error:', message);
     }
 }
 
-// Inicializar el componente cuando se cargue el script
+// ═══════════════════════════════════════════════════════════════════════════
+// FUNCIONES GLOBALES
+// ═══════════════════════════════════════════════════════════════════════════
+
 let objetivosSSTViewer;
+
 document.addEventListener('DOMContentLoaded', () => {
     objetivosSSTViewer = new ObjetivosSSTViewer();
 });
 
-// Funciones globales para ser llamadas desde el HTML
 function syncToExcel() {
-    if (objetivosSSTViewer) {
-        objetivosSSTViewer.syncToExcel();
-    }
+    if (objetivosSSTViewer) objetivosSSTViewer.syncToExcel();
 }
 
 function addNewObjective() {
-    if (objetivosSSTViewer) {
-        objetivosSSTViewer.addNewObjective();
-    }
+    if (objetivosSSTViewer) objetivosSSTViewer.addNewObjective();
 }
 
-function markPending() {
-    if (objetivosSSTViewer) {
-        objetivosSSTViewer.markPending();
-    }
+function highlightPrinciple(pid) {
+    if (objetivosSSTViewer) objetivosSSTViewer.highlightPrinciple(pid);
+}
+
+function editRow(pid, objective) {
+    // Función placeholder para edición
+    console.log('Editar:', pid, objective);
+    showToast('Función de edición en desarrollo');
+}
+
+function showToast(message) {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = 'k-toast k-toast-success';
+    toast.innerHTML = `<i class="bi bi-check-circle-fill"></i><span>${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 2500);
+}
+
+function backToModule() {
+    // Enviar mensaje al padre para volver al módulo
+    window.parent.postMessage({
+        action: 'backToModule'
+    }, '*');
 }
