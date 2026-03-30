@@ -183,6 +183,109 @@ class GestionIntegralHome {
                 color: var(--k-text-muted);
             }
 
+            /* =========================================
+               2. COMPONENTES K+AIR (Budget Card Style)
+               Para widgets de Plan de Trabajo y otros
+               ========================================= */
+
+            /* Budget Card Base */
+            .k-budget-card {
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+            }
+
+            /* Header del Widget */
+            .kb-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 0.5rem;
+            }
+
+            .kb-title {
+                font-size: 0.65rem;
+                font-weight: 600;
+                color: var(--k-text-muted);
+                text-transform: uppercase;
+            }
+
+            .kb-badge {
+                font-size: 0.7rem;
+                font-weight: 700;
+                padding: 0.15rem 0.5rem;
+                border-radius: 1rem;
+                color: white;
+            }
+
+            /* Valor Principal */
+            .kb-amount {
+                font-size: 1.4rem;
+                font-weight: 700;
+                color: var(--k-text-main);
+                margin-bottom: 0.75rem;
+            }
+
+            /* Barra de Progreso */
+            .kb-progress-track {
+                width: 100%;
+                height: 10px;
+                background-color: #e9ecef;
+                border-radius: 5px;
+                overflow: hidden;
+                margin-bottom: 0.5rem;
+                position: relative;
+            }
+
+            .kb-progress-bar {
+                height: 100%;
+                width: 0%;
+                border-radius: 5px;
+                background-color: var(--k-success);
+                transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1), 
+                            background-color 0.3s;
+                position: relative;
+            }
+
+            /* Footer del Widget */
+            .kb-footer {
+                display: flex;
+                justify-content: space-between;
+                font-size: 0.6rem;
+                margin-top: auto;
+                padding-top: 0.5rem;
+                border-top: 1px solid var(--k-border);
+            }
+
+            .kb-label {
+                color: var(--k-text-muted);
+                font-weight: 500;
+                font-size: 0.6rem;
+            }
+
+            .kb-value {
+                font-weight: 600;
+            }
+
+            .kb-exec {
+                color: var(--k-success);
+            }
+
+            .kb-rem {
+                color: var(--k-primary);
+            }
+
+            /* Badge Colors */
+            .bg-success {
+                background-color: var(--k-success) !important;
+            }
+            .bg-warning {
+                background-color: var(--k-warning) !important;
+            }
+            .bg-danger {
+                background-color: var(--k-danger) !important;
+            }
+
             /* Secciones de Gráficos y Listas */
             .chart-container {
                 background: var(--k-bg-card);
@@ -330,12 +433,20 @@ class GestionIntegralHome {
         // Obtener datos reales o usar valores por defecto
         const politica = this.gestionIntegralStats?.politica || { estado: 'No disponible', actualizada: false };
         const objetivos = this.gestionIntegralStats?.objetivos || { total: 0, cumplidos: 0, porcentaje: 0 };
-        const plan_trabajo = this.gestionIntegralStats?.plan_trabajo || { tareas_pendientes: 0, tareas_realizadas: 0, total: 0 };
+        const plan_trabajo = this.gestionIntegralStats?.plan_trabajo || { 
+            totalActividades: 0, 
+            actividadesEjecutadas: 0, 
+            actividadesPendientes: 0,
+            actividadesProgramadas: 0,
+            porcentajeAvance: 0,
+            ultimoMesRegistrado: null,
+            estado: 'warning'
+        };
         const rendicion = this.gestionIntegralStats?.rendicion_cuentas || { actas_realizadas: 0 };
 
         const widget1 = this.createWidget('Política SST', politica.estado, politica.actualizada ? '✅ Al día' : '⚠️ Por actualizar');
         const widget2 = this.createWidget('Objetivos SST', `${objetivos.cumplidos}/${objetivos.total}`, `📊 ${objetivos.porcentaje}% cumplimiento`);
-        const widget3 = this.createWidget('Plan de Trabajo', `${plan_trabajo.tareas_pendientes} pendientes`, `✓ ${plan_trabajo.tareas_realizadas} realizadas`);
+        const widget3 = this.createPlanTrabajoWidget(plan_trabajo);  // ← NUEVO: Widget moderno
         const widget4 = this.createWidget('Rendición de Cuentas', `${rendicion.actas_realizadas} actas`, rendicion.actas_realizadas > 0 ? '✅ Realizadas' : '⚠️ Sin actas');
 
         widgetsContainer.appendChild(widget1);
@@ -387,7 +498,62 @@ class GestionIntegralHome {
         `;
         return widget;
     }
-    
+
+    // Nuevo método para crear widget de Plan de Trabajo (estilo K+AIR Budget Card)
+    createPlanTrabajoWidget(stats) {
+        const currentYear = new Date().getFullYear();
+
+        // Determinar color (semáforo)
+        let colorVar = 'var(--k-success)';
+        let colorClass = 'bg-success';
+        if (stats.porcentajeAvance < 50) {
+            colorVar = 'var(--k-danger)';
+            colorClass = 'bg-danger';
+        } else if (stats.porcentajeAvance < 80) {
+            colorVar = 'var(--k-warning)';
+            colorClass = 'bg-warning';
+        }
+
+        const w = document.createElement('div');
+        w.className = 'widget k-budget-card';
+
+        w.innerHTML = `
+            <div class="kb-header">
+                <span class="kb-title">Plan de Trabajo ${currentYear}</span>
+                <span class="kb-badge ${colorClass}">${stats.porcentajeAvance}%</span>
+            </div>
+
+            <div class="kb-amount" style="font-size: 1.4rem;">
+                ${stats.actividadesEjecutadas} / ${stats.actividadesProgramadas}
+            </div>
+
+            <div class="kb-progress-track">
+                <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};"></div>
+            </div>
+
+            <div class="kb-footer">
+                <div>
+                    <div class="kb-label">Ejecutadas</div>
+                    <div class="kb-value kb-exec" style="color: var(--k-success);">${stats.actividadesEjecutadas}</div>
+                </div>
+                <div style="text-align: right;">
+                    <div class="kb-label">Pendientes</div>
+                    <div class="kb-value kb-rem" style="color: var(--k-text-muted);">${stats.actividadesPendientes}</div>
+                </div>
+            </div>
+        `;
+
+        // Animación de barra (después de insertar en DOM)
+        setTimeout(() => {
+            const bar = w.querySelector('.kb-progress-bar');
+            if (bar) {
+                bar.style.width = `${stats.porcentajeAvance}%`;
+            }
+        }, 100);
+
+        return w;
+    }
+
     renderSubmoduleItem(name) {
         // Generar datos simulados para el submódulo
         const lastAccess = this.getRandomLastAccess();

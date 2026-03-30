@@ -2853,6 +2853,234 @@ ipcMain.handle('process-excel-data', async (event, { buffer, company, period }) 
   }
 });
 
+// Handler para actualizar estados P/C en el Plan de Trabajo
+// Usa ExcelJS para preservar la estructura y formato original del archivo
+// Similar a update-capacitaciones-excel pero solo actualiza columnas específicas
+ipcMain.handle('update-plan-trabajo-excel', async (event, { filePath, periodsData, period }) => {
+  try {
+    sendLog(`[UPDATE-PLAN][MAIN] === INICIO ACTUALIZACIÓN PLAN DE TRABAJO ===`, 'INFO');
+    sendLog(`[UPDATE-PLAN][MAIN] Archivo: ${filePath}`, 'INFO');
+    sendLog(`[UPDATE-PLAN][MAIN] Período: ${period}`, 'INFO');
+    sendLog(`[UPDATE-PLAN][DEBUG] periodsData keys: ${Object.keys(periodsData).join(', ')}`, 'DEBUG');
+
+    const data = periodsData[period];
+    sendLog(`[UPDATE-PLAN][DEBUG] data para período ${period}: ${data ? data.length : 'undefined'} actividades`, 'DEBUG');
+
+    if (!data || !Array.isArray(data)) {
+      sendLog(`[UPDATE-PLAN][ERROR] No hay datos para el período ${period}`, 'ERROR');
+      return { success: false, error: 'No hay datos para el período especificado' };
+    }
+
+    // Validar que el archivo existe
+    try {
+      await fsp.access(filePath);
+    } catch (accessError) {
+      sendLog(`[UPDATE-PLAN][ERROR] Archivo no encontrado: ${filePath}`, 'ERROR');
+      return { success: false, error: 'Archivo no encontrado' };
+    }
+
+    // === USAR ExcelJS PARA PRESERVAR FORMATO ===
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+
+    // === BUSCAR HOJA CORRECTA CON VALIDACIÓN ROBUSTA ===
+    let worksheet = null;
+    let sheetName = null;
+
+    // Prioridad 1: Buscar por nombre exacto "PLAN DE TRABAJO ANUAL" (sin año)
+    worksheet = workbook.getWorksheet('PLAN DE TRABAJO ANUAL');
+    if (worksheet) {
+      sheetName = worksheet.name;
+      sendLog(`[UPDATE-PLAN][INFO] Hoja encontrada por nombre exacto: ${sheetName}`, 'INFO');
+    }
+
+    // Prioridad 2: Buscar por nombre con año (formato alternativo)
+    if (!worksheet) {
+      worksheet = workbook.getWorksheet(`PLAN DE TRABAJO ANUAL ${period}`);
+      if (worksheet) {
+        sheetName = worksheet.name;
+        sendLog(`[UPDATE-PLAN][INFO] Hoja encontrada por nombre con año: ${sheetName}`, 'INFO');
+      }
+    }
+
+    // Prioridad 3: Buscar por patrón que contenga "PLAN DE TRABAJO"
+    if (!worksheet) {
+      const foundByPattern = workbook.worksheets.find(ws =>
+        ws && ws.name && ws.name.toUpperCase().includes('PLAN DE TRABAJO')
+      );
+      if (foundByPattern) {
+        worksheet = foundByPattern;
+        sheetName = worksheet.name;
+        sendLog(`[UPDATE-PLAN][WARN] Hoja encontrada por patrón: ${sheetName}`, 'WARN');
+      }
+    }
+
+    // Prioridad 4: Buscar hojas alternativas comunes
+    if (!worksheet) {
+      const alternativeNames = ['CRONOGRAMA', 'ACTIVIDADES', 'PLAN ANUAL', 'PROGRAMA'];
+      for (const altName of alternativeNames) {
+        const found = workbook.getWorksheet(altName);
+        if (found) {
+          worksheet = found;
+          sheetName = found.name;
+          sendLog(`[UPDATE-PLAN][WARN] Hoja encontrada por nombre alternativo: ${sheetName}`, 'WARN');
+          break;
+        }
+      }
+    }
+
+    // Prioridad 5: Usar primera hoja disponible como fallback
+    if (!worksheet && workbook.worksheets.length > 0) {
+      worksheet = workbook.worksheets[0];
+      sheetName = worksheet.name;
+      sendLog(`[UPDATE-PLAN][WARN] Usando primera hoja disponible: ${sheetName}`, 'WARN');
+    }
+
+    // === VALIDACIÓN CRÍTICA: worksheet debe existir ===
+    if (!worksheet) {
+      sendLog(`[UPDATE-PLAN][ERROR] No se encontró ninguna hoja válida en el archivo`, 'ERROR');
+      sendLog(`[UPDATE-PLAN][DEBUG] Hojas disponibles en el archivo: ${workbook.worksheets.map(ws => ws.name).join(', ')}`, 'DEBUG');
+      return {
+        success: false,
+        error: 'No se encontró la hoja del Plan de Trabajo. Verifique que el archivo tenga una hoja llamada "PLAN DE TRABAJO ANUAL" o similar.'
+      };
+    }
+
+    sendLog(`[UPDATE-PLAN][MAIN] Hoja seleccionada: "${sheetName}"`, 'INFO');
+    sendLog(`[UPDATE-PLAN][MAIN] Filas totales en la hoja: ${worksheet.rowCount}`, 'INFO');
+
+    // === CONFIGURACIÓN DE ESCRITURA ===
+    // Encabezados están en fila 8, actividades empiezan en fila 9
+    // Columnas: A=N°, B=ACTIVIDAD, C=RESPONSABLE, D-O=ENE-DIC, P=% AVANCE, Q=ESTADO, R=OBSERVACIONES
+    const START_ROW = 9; // Fila 9 es donde empiezan las actividades (índice 1-based)
+
+    // Filtrar solo actividades de nivel 4 (actividades reales, no headers ni subtítulos)
+    const actividades = data.filter(item =>
+      item &&
+      item.type === 'activity' &&
+      item.level === 4 &&
+      item.name // Validar que tenga nombre
+    );
+    sendLog(`[UPDATE-PLAN][DEBUG] Actividades de nivel 4 a actualizar: ${actividades.length}`, 'DEBUG');
+
+    // Contador de actualizaciones exitosas
+    let updatedCount = 0;
+    let notFoundCount = 0;
+
+    // === ACTUALIZAR FILA POR FILA ===
+    actividades.forEach((actividad, index) => {
+      // Validar que la actividad tenga la estructura esperada
+      if (!actividad || !actividad.name || !Array.isArray(actividad.months)) {
+        sendLog(`[UPDATE-PLAN][WARN] Actividad ${index} sin estructura válida, saltando`, 'WARN');
+        return;
+      }
+
+      let targetRow = null;
+      let foundRowIndex = -1;
+
+      // Estrategia 1: Buscar por índice relativo (asumiendo que el orden se mantiene)
+      const expectedRowIndex = START_ROW + index;
+      if (expectedRowIndex <= worksheet.rowCount) {
+        const row = worksheet.getRow(expectedRowIndex);
+        const excelActividad = row.getCell(2).value; // Columna B = ACTIVIDAD
+
+        // Verificar coincidencia parcial del nombre (primeros 20 caracteres)
+        if (excelActividad) {
+          const excelActStr = excelActividad.toString().substring(0, 30).toLowerCase();
+          const actNameStr = actividad.name.toString().substring(0, 30).toLowerCase();
+
+          if (excelActStr && actNameStr && (excelActStr.includes(actNameStr) || actNameStr.includes(excelActStr))) {
+            targetRow = row;
+            foundRowIndex = expectedRowIndex;
+            sendLog(`[UPDATE-PLAN][DEBUG] Fila ${expectedRowIndex}: Coincidencia por índice`, 'DEBUG');
+          }
+        }
+      }
+
+      // Estrategia 2: Búsqueda lineal si no se encontró por índice
+      if (!targetRow) {
+        sendLog(`[UPDATE-PLAN][DEBUG] Buscando actividad "${actividad.name.substring(0, 40)}..." en toda la hoja`, 'DEBUG');
+
+        for (let searchRow = START_ROW; searchRow <= worksheet.rowCount; searchRow++) {
+          const searchRowObj = worksheet.getRow(searchRow);
+          const searchActividad = searchRowObj.getCell(2).value;
+
+          if (searchActividad) {
+            const searchActStr = searchActividad.toString().toLowerCase();
+            const actNameStr = actividad.name.toString().toLowerCase();
+
+            // Búsqueda por coincidencia parcial (al menos 20 caracteres)
+            if (searchActStr.length >= 20 && actNameStr.length >= 20) {
+              if (searchActStr.includes(actNameStr.substring(0, 20)) ||
+                  actNameStr.includes(searchActStr.substring(0, 20))) {
+                targetRow = searchRowObj;
+                foundRowIndex = searchRow;
+                sendLog(`[UPDATE-PLAN][DEBUG] Actividad encontrada en fila ${searchRow}`, 'DEBUG');
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      // Si no se encontró la actividad, registrar y continuar
+      if (!targetRow) {
+        notFoundCount++;
+        sendLog(`[UPDATE-PLAN][WARN] Actividad no encontrada: "${actividad.name.substring(0, 50)}..."`, 'WARN');
+        return;
+      }
+
+      // === ACTUALIZAR SOLO COLUMNAS ESPECÍFICAS (D-O, P, Q) ===
+      // Columnas D-O (ENE-DIC) con P/C - SOLO si hay valor
+      const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                     'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+      meses.forEach((mes, idx) => {
+        const colIndex = idx + 4; // Columna D = 4 (1-based)
+        const valor = actividad.months && actividad.months[idx] ? actividad.months[idx] : null;
+
+        // Solo escribir si hay valor (P o C)
+        if (valor && (valor === 'P' || valor === 'C')) {
+          targetRow.getCell(colIndex).value = valor;
+        }
+      });
+
+      // ⚠️ NO actualizar columna P (% AVANCE) ni Q (ESTADO)
+      // El archivo Excel original tiene fórmulas compartidas en estas columnas
+      // que ExcelJS no puede preservar. Las fórmulas originales calcularán
+      // automáticamente los valores basándose en las columnas D-O (meses).
+
+      updatedCount++;
+      const completadas = actividad.months ? actividad.months.filter(m => m === 'C').length : 0;
+      const programadas = actividad.months ? actividad.months.filter(m => m === 'P').length : 0;
+      sendLog(`[UPDATE-PLAN][DEBUG] Fila ${foundRowIndex}: Actualizado - ${completadas}C/${programadas}P (Fórmulas originales calculan % y Estado)`, 'DEBUG');
+    });
+
+    sendLog(`[UPDATE-PLAN][MAIN] === RESUMEN DE ACTUALIZACIÓN ===`, 'INFO');
+    sendLog(`[UPDATE-PLAN][MAIN] Total actividades procesadas: ${actividades.length}`, 'INFO');
+    sendLog(`[UPDATE-PLAN][MAIN] Actualizadas exitosamente: ${updatedCount}`, 'INFO');
+    sendLog(`[UPDATE-PLAN][MAIN] No encontradas: ${notFoundCount}`, 'INFO');
+
+    // === GUARDAR ARCHIVO CON ExcelJS (PRESERVA FORMATO) ===
+    await workbook.xlsx.writeFile(filePath);
+
+    sendLog(`[UPDATE-PLAN][MAIN] ✅ Archivo guardado exitosamente en: ${filePath}`, 'INFO');
+
+    return {
+      success: true,
+      message: 'Archivo guardado exitosamente',
+      updatedCount: updatedCount,
+      notFoundCount: notFoundCount
+    };
+
+  } catch (error) {
+    sendLog(`[UPDATE-PLAN][ERROR] Error al actualizar Plan de Trabajo: ${error.message}`, 'ERROR');
+    sendLog(`[UPDATE-PLAN][ERROR] Stack: ${error.stack}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
 // Handler para obtener las hojas de un archivo de capacitaciones
 ipcMain.handle('get-capacitaciones-sheets', async (event, filePath) => {
   try {
@@ -9760,11 +9988,13 @@ ipcMain.handle('get-gestion-integral-stats', async (event, companyName) => {
         };
     }
 
+    const currentYear = new Date().getFullYear();
+
     // Calcular estadísticas en paralelo
     const [politica, objetivos, plan_trabajo, rendicion] = await Promise.all([
         calculatePoliticaStats(rootPath),
         calculateObjetivosStats(rootPath),
-        calculatePlanTrabajoStats(rootPath),
+        calculatePlanTrabajoStats(rootPath, currentYear),
         calculateRendicionCuentasStats(rootPath)
     ]);
 
@@ -9936,98 +10166,298 @@ async function calculateObjetivosStats(basePath) {
 }
 
 /**
- * Calcular estadísticas de Plan de Trabajo
+ * Calcular estadísticas de Plan de Trabajo Anual
+ * Replica la lógica de process-excel-data (handler del módulo Plan de Trabajo)
+ * @param {string} basePath - Ruta raíz de la empresa
+ * @param {number} currentYear - Año actual
+ * @returns {Promise<Object>} Stats de plan de trabajo
  */
-async function calculatePlanTrabajoStats(basePath) {
+async function calculatePlanTrabajoStats(basePath, currentYear) {
   const stats = {
-    tareas_pendientes: 0,
-    tareas_realizadas: 0,
-    total: 0,
-    vencidas: 0
+    totalActividades: 0,
+    actividadesEjecutadas: 0,
+    actividadesPendientes: 0,
+    actividadesProgramadas: 197,
+    porcentajeAvance: 0,
+    ultimoMesRegistrado: null,
+    estado: 'warning'
   };
 
+  const mesesNombres = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
   try {
-    // Intentar múltiples nombres de carpeta (priorizar nombre corto)
+    sendLog(`[Plan Trabajo] Iniciando cálculo para año ${currentYear}`, 'INFO');
+
+    // 1. Buscar carpeta de Gestión Integral
     const posiblesNombres = [
-        '2. Gestión Integral',        // Nombre corto (primero)
-        '2. Gestion Integral',        // Sin tilde
-        '2. Gestión Integral del SG-SST'  // Nombre completo
+        '2. Gestión Integral',
+        '2. Gestion Integral',
+        '2. Gestión Integral del SG-SST'
     ];
 
     let gestionIntegralPath = null;
     for (const nombre of posiblesNombres) {
         const pathIntento = path.join(basePath, nombre);
+        sendLog(`[Plan Trabajo] Buscando Gestión Integral en: ${pathIntento}`, 'DEBUG');
         if (fs.existsSync(pathIntento)) {
             gestionIntegralPath = pathIntento;
+            sendLog(`[Plan Trabajo] ✅ Gestión Integral encontrada: ${gestionIntegralPath}`, 'INFO');
             break;
         }
     }
 
     if (!gestionIntegralPath) {
+        sendLog(`[Plan Trabajo] ❌ Carpeta Gestión Integral no encontrada`, 'WARN');
         return stats;
     }
 
-    const planPath = path.join(gestionIntegralPath, '2.4 Plan de Trabajo');
-    const planPathAlt = path.join(gestionIntegralPath, '2.4 Plan de Trabajo Anual');
+    // 2. Buscar carpeta Plan de Trabajo (MÚLTIPLES VARIACIONES)
+    const posiblesNombresPlan = [
+        '2.4.1 Plan de Trabajo Anual',
+        '2.4 Plan de Trabajo Anual',
+        '2.4.1 Plan de Trabajo',
+        '2.4 Plan de Trabajo',
+        'Plan de Trabajo Anual'
+    ];
 
-    const rutaFinal = fs.existsSync(planPath) ? planPath : planPathAlt;
+    let planPath = null;
+    for (const nombre of posiblesNombresPlan) {
+        const pathIntento = path.join(gestionIntegralPath, nombre);
+        sendLog(`[Plan Trabajo] Buscando Plan de Trabajo en: ${pathIntento}`, 'DEBUG');
+        if (fs.existsSync(pathIntento)) {
+            planPath = pathIntento;
+            sendLog(`[Plan Trabajo] ✅ Carpeta encontrada: ${planPath}`, 'INFO');
+            break;
+        }
+    }
 
-    if (!fs.existsSync(rutaFinal)) {
+    if (!planPath) {
+        sendLog(`[Plan Trabajo] ❌ Carpeta Plan de Trabajo no encontrada en ninguna variación`, 'WARN');
+        // Listar subcarpetas disponibles para debug
+        try {
+            const subs = await fsp.readdir(gestionIntegralPath);
+            sendLog(`[Plan Trabajo] Subcarpetas disponibles: ${subs.join(', ')}`, 'DEBUG');
+        } catch (e) {
+            // Ignorar error al listar
+        }
         return stats;
     }
 
-    const files = await fsp.readdir(rutaFinal);
-    const planFiles = files.filter(f => 
-        (f.endsWith('.xlsx') || f.endsWith('.xls')) && !f.startsWith('~$')
+    // 3. Buscar archivo del año
+    const files = await fsp.readdir(planPath);
+    sendLog(`[Plan Trabajo] Archivos en carpeta: ${files.join(', ')}`, 'DEBUG');
+    
+    const planFile = files.find(f =>
+        f.includes('PLAN DE TRABAJO ANUAL') &&
+        f.includes(currentYear.toString()) &&
+        (f.endsWith('.xlsx') || f.endsWith('.xls')) &&
+        !f.startsWith('~$')
     );
 
-    if (planFiles.length > 0) {
-        const filePath = path.join(rutaFinal, planFiles[0]);
-        const workbook = xlsx.readFile(filePath);
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
+    if (!planFile) {
+        sendLog(`[Plan Trabajo] ❌ No se encontró archivo para el año ${currentYear}`, 'WARN');
+        return stats;
+    }
 
-        const today = new Date();
+    const filePath = path.join(planPath, planFile);
+    sendLog(`[Plan Trabajo] ✅ Archivo encontrado: ${planFile}`, 'INFO');
 
-        for (let i = 1; i < data.length; i++) {
-            const row = data[i];
-            if (!row || row.length < 2) continue;
+    // 3. Leer Excel
+    const workbook = xlsx.readFile(filePath);
+    
+    // 4. Buscar hoja correcta (misma lógica que process-excel-data)
+    let worksheet = null;
+    let targetSheetName = "";
+    const priorityNames = ['PLAN DE TRABAJO', 'CRONOGRAMA', 'MATRIZ', 'ACTIVIDADES', 'PLAN ANUAL'];
+    
+    for (const sheetName of workbook.SheetNames) {
+        const normalizedName = sheetName.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        if (priorityNames.some(p => normalizedName.includes(p))) {
+            if (normalizedName.includes(currentYear.toString())) {
+                targetSheetName = sheetName;
+                break;
+            }
+            if (!targetSheetName) targetSheetName = sheetName;
+        }
+    }
+    
+    if (!targetSheetName) targetSheetName = workbook.SheetNames[0];
+    worksheet = workbook.Sheets[targetSheetName];
+    
+    sendLog(`[Plan Trabajo] Hoja seleccionada: "${targetSheetName}"`, 'INFO');
 
-            const actividad = row[1];
-            if (!actividad || typeof actividad !== 'string') continue;
-            if (actividad.toLowerCase().includes('total') || actividad.toLowerCase().includes('actividad')) continue;
+    // 5. Leer como matriz
+    const rawData = xlsx.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+    sendLog(`[Plan Trabajo] Total filas: ${rawData.length}`, 'DEBUG');
 
-            stats.total++;
+    // 6. BUSCAR FILA DE ENCABEZADOS (misma lógica que process-excel-data)
+    let headerRowIndex = -1;
+    let columnMap = {};
 
-            // Verificar estado
-            const estado = (row[5] || row[6] || '').toString().toLowerCase();
-            const fechaStr = row[3] || row[4]; // Columna de fecha
+    const normalize = (str) => {
+        if (!str) return "";
+        return str.toString().toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    };
 
-            if (estado.includes('realizado') || estado.includes('completado') || estado === 'si') {
-                stats.tareas_realizadas++;
-            } else {
-                stats.tareas_pendientes++;
+    for (let i = 0; i < Math.min(15, rawData.length); i++) {
+        const row = rawData[i];
+        if (!Array.isArray(row)) continue;
 
-                // Verificar si está vencida
-                if (fechaStr) {
-                    let fecha;
-                    if (typeof fechaStr === 'number') {
-                        const dateCode = xlsx.SSF.parse_date_code(fechaStr);
-                        fecha = new Date(dateCode.y, dateCode.m - 1, dateCode.d);
-                    } else {
-                        fecha = new Date(fechaStr);
-                    }
+        let monthCount = 0;
+        let hasActividades = false;
+        let hasResponsable = false;
 
-                    if (fecha < today) {
-                        stats.vencidas++;
+        row.forEach(cell => {
+            const val = normalize(cell);
+            if (['ene', 'feb', 'mar', 'abr', 'may', 'jun'].every(m => val.includes(m))) {
+                monthCount = 6;
+            }
+            if (val.includes('actividad') || val.includes('actividades')) {
+                hasActividades = true;
+            }
+            if (val.includes('responsable')) {
+                hasResponsable = true;
+            }
+        });
+
+        if (monthCount >= 6 && (hasActividades || hasResponsable)) {
+            headerRowIndex = i;
+            sendLog(`[Plan Trabajo] Encabezados en fila ${i + 1}`, 'INFO');
+
+            row.forEach((cell, colIndex) => {
+                const val = normalize(cell);
+                if (val === 'n°' || val === 'n' || val === '#' || val === 'numero') {
+                    columnMap['numero'] = colIndex;
+                } else if (val.includes('actividad')) {
+                    columnMap['actividad'] = colIndex;
+                } else if (val.includes('responsable')) {
+                    columnMap['responsable'] = colIndex;
+                } else if (val === 'ene' || val === 'enero') columnMap['enero'] = colIndex;
+                else if (val === 'feb' || val === 'febrero') columnMap['febrero'] = colIndex;
+                else if (val === 'mar' || val === 'marzo') columnMap['marzo'] = colIndex;
+                else if (val === 'abr' || val === 'abril') columnMap['abril'] = colIndex;
+                else if (val === 'may' || val === 'mayo') columnMap['mayo'] = colIndex;
+                else if (val === 'jun' || val === 'junio') columnMap['junio'] = colIndex;
+                else if (val === 'jul' || val === 'julio') columnMap['julio'] = colIndex;
+                else if (val === 'ago' || val === 'agosto') columnMap['agosto'] = colIndex;
+                else if (val === 'sep' || val === 'set' || val === 'septiembre') columnMap['septiembre'] = colIndex;
+                else if (val === 'oct' || val === 'octubre') columnMap['octubre'] = colIndex;
+                else if (val === 'nov' || val === 'noviembre') columnMap['noviembre'] = colIndex;
+                else if (val === 'dic' || val === 'diciembre') columnMap['diciembre'] = colIndex;
+                else if (val.includes('avance') || val.includes('%')) columnMap['avance'] = colIndex;
+                else if (val.includes('estado')) columnMap['estado'] = colIndex;
+            });
+            break;
+        }
+    }
+
+    // Fallback
+    if (headerRowIndex === -1) {
+        headerRowIndex = 7;
+        columnMap = {
+            'numero': 0, 'actividad': 1, 'responsable': 2,
+            'enero': 3, 'febrero': 4, 'marzo': 5, 'abril': 6,
+            'mayo': 7, 'junio': 8, 'julio': 9, 'agosto': 10,
+            'septiembre': 11, 'octubre': 12, 'noviembre': 13, 'diciembre': 14,
+            'avance': 15, 'estado': 16
+        };
+        sendLog(`[Plan Trabajo] Usando fallback: encabezados en fila 8`, 'WARN');
+    }
+
+    sendLog(`[Plan Trabajo] ColumnMap: ${JSON.stringify(columnMap)}`, 'DEBUG');
+
+    // 7. PROCESAR FILAS - Replicar lógica de process-excel-data
+    const nivel1Keywords = [
+        'MEDICINA PREVENTIVA', 'SEGURIDAD INDUSTRIAL', 'HIGIENE INDUSTRIAL',
+        'SALUD PÚBLICA', 'BIENESTAR', 'VERIFICACION', 'VERIFICACIÓN', 'INTEGRAL'
+    ];
+    const nivel2Keywords = [
+        'SVE', 'DESORDEN', 'MUSCULO', 'ESQUELÉTICO', 'ERGONOMÍA',
+        'ENFERMEDAD', 'SALUD MENTAL', 'ESTRÉS', 'RIESGO', 'BIOMECÁNICO'
+    ];
+    const nivel3Keywords = ['PLANEAR', 'HACER', 'VERIFICAR', 'ACTUAR', 'PHVA'];
+
+    let ultimoMesIndex = -1;
+
+    for (let i = headerRowIndex + 1; i < rawData.length; i++) {
+        const row = rawData[i];
+        const actividad = String(row[columnMap['actividad'] || 1] || '').trim();
+
+        // Saltar filas vacías o totales
+        if (!actividad || actividad.length < 2) continue;
+        if (actividad.toLowerCase().includes('total') ||
+            actividad.toLowerCase().includes('velocímetro') ||
+            actividad.toLowerCase().includes('velocimetro')) continue;
+
+        // Determinar nivel jerárquico
+        let level = 4;
+        const normalizedAct = actividad.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const colA = String(row[columnMap['numero'] || 0] || '').trim();
+        const normalizedColA = colA.toUpperCase().trim();
+
+        // PRIORIDAD 1: Si ColA es número → Nivel 4 (actividad)
+        if (colA !== '' && colA !== 'undefined' && !isNaN(parseFloat(colA.replace(',', '.')))) {
+            level = 4;
+        }
+        // PRIORIDAD 2: Marcadores T1, T2, T3
+        else if (normalizedColA === 'T1') level = 1;
+        else if (normalizedColA === 'T2') level = 2;
+        else if (normalizedColA === 'T3') level = 3;
+        // PRIORIDAD 3: Keywords
+        else if (nivel1Keywords.some(k => normalizedAct.includes(k))) level = 1;
+        else if (nivel2Keywords.some(k => normalizedAct.includes(k))) level = 2;
+        else if (nivel3Keywords.some(k => normalizedAct === k || normalizedAct.startsWith(k))) level = 3;
+        // Fallback
+        else level = 2;
+
+        // 8. CONTAR SOLO ACTIVIDADES (Nivel 4)
+        if (level !== 4) continue;
+
+        stats.totalActividades++;
+
+        // 9. Verificar si está ejecutada (tiene "C" en algún mes)
+        let tieneCompletado = false;
+        const mesesCols = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                          'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+        for (let mIndex = 0; mIndex < 12; mIndex++) {
+            const mesCol = columnMap[mesesCols[mIndex]];
+            if (mesCol !== undefined && row[mesCol] !== undefined) {
+                const mesValor = String(row[mesCol]).trim().toLowerCase();
+                if (mesValor === 'c') {
+                    tieneCompletado = true;
+                    // Track último mes
+                    if (mIndex > ultimoMesIndex) {
+                        ultimoMesIndex = mIndex;
+                        stats.ultimoMesRegistrado = `${mesesNombres[mIndex].substring(0, 3)} ${currentYear}`;
                     }
                 }
             }
         }
+
+        if (tieneCompletado) {
+            stats.actividadesEjecutadas++;
+        }
     }
+
+    // 10. Calcular pendientes y porcentaje
+    stats.actividadesPendientes = stats.totalActividades - stats.actividadesEjecutadas;
+
+    if (stats.actividadesProgramadas > 0 && stats.totalActividades > 0) {
+        stats.porcentajeAvance = Math.round((stats.actividadesEjecutadas / stats.totalActividades) * 100);
+    }
+
+    // 11. Determinar estado
+    if (stats.porcentajeAvance >= 80) stats.estado = 'ok';
+    else if (stats.porcentajeAvance >= 50) stats.estado = 'warning';
+    else stats.estado = 'danger';
+
+    sendLog(`[Plan Trabajo] Total: ${stats.totalActividades}, Ejecutadas: ${stats.actividadesEjecutadas}, Avance: ${stats.porcentajeAvance}%`, 'INFO');
+    sendLog(`[Plan Trabajo] Último registro: ${stats.ultimoMesRegistrado || 'N/A'}`, 'INFO');
+
   } catch (error) {
-    sendLog(`[MAIN] Error calculando plan de trabajo stats: ${error.message}`, 'WARN');
+    sendLog(`[Plan Trabajo] Error: ${error.message}`, 'ERROR');
   }
 
   return stats;

@@ -681,7 +681,7 @@ function selectActivity(id) {
     });
 }
 
-function toggleMonthStatus(actId, monthIdx) {
+async function toggleMonthStatus(actId, monthIdx) {
     const idx = periodsData[currentPeriod].findIndex(i => i.id === actId);
     if(idx === -1) return;
 
@@ -692,6 +692,27 @@ function toggleMonthStatus(actId, monthIdx) {
     else newVal = '';
 
     periodsData[currentPeriod][idx].months[monthIdx] = newVal;
+
+    // GUARDAR CAMBIOS EN EL ARCHIVO EXCEL
+    try {
+        console.log('[toggleMonthStatus] Guardando cambios en Excel...');
+
+        const result = await callParentAPI('update-plan-trabajo-excel', {
+            filePath: `${currentSubmodulePath}/GI-FO-045 PLAN DE TRABAJO ANUAL ${currentPeriod} SST.xlsx`,
+            periodsData: periodsData,
+            period: currentPeriod
+        });
+
+        if (result.success) {
+            console.log(`[toggleMonthStatus] ✅ Cambios guardados: ${result.updatedCount} celdas actualizadas`);
+        } else {
+            console.error(`[toggleMonthStatus] ❌ Error al guardar: ${result.error}`);
+            alert('Error al guardar los cambios. Intente nuevamente.');
+        }
+    } catch (error) {
+        console.error('[toggleMonthStatus] Error al guardar:', error);
+    }
+
     selectActivity(actId);
     updateKPIs();
 }

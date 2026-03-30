@@ -92,6 +92,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readExcelFile: (filePath) => ipcRenderer.invoke('read-excel-file', filePath),
   saveProveedoresExcelData: (filePath, data) => ipcRenderer.invoke('save-proveedores-excel-data', filePath, data),
   processExcelData: (payload) => ipcRenderer.invoke('process-excel-data', payload),
+  updatePlanTrabajoExcel: (payload) => ipcRenderer.invoke('update-plan-trabajo-excel', payload),
 
   // --- Gestión de Archivos de Proveedores (Evidencias) ---
   createProviderFolder: (basePath, folderName) => ipcRenderer.invoke('create-provider-folder', basePath, folderName),
