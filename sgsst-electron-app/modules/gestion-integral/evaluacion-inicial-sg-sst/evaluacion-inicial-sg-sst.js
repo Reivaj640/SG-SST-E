@@ -40,63 +40,63 @@ class EvaluacionInicialSgSst {
         mainLayout.className = 'k-module-layout';
 
         mainLayout.innerHTML = `
-            <!-- 1. HEADER DEL MÓDULO (Patrón Estándar K+AIR) -->
+            <!-- 1. HEADER DEL MÓDULO (Patrón K+AIR: blanco, sticky) -->
             <header class="k-module-header">
-                <div class="k-header-top">
-                    <div class="k-title-group">
-                        <button class="k-btn-back" id="btn-back-eval" title="Volver al panel principal">
-                            <i class="bi bi-arrow-left"></i>
-                        </button>
-                        <div class="k-title-text">
-                            <h2 class="k-main-title">Evaluación Inicial del SG-SST</h2>
-                            <span class="k-breadcrumb">Gestión Integral / 2.3.1 Evaluación Inicial</span>
+                <div class="k-header-left">
+                    <button class="k-btn-back" id="btn-back-eval" title="Volver al panel principal">
+                        <i class="bi bi-arrow-left"></i>
+                    </button>
+                    <div class="k-header-title-group">
+                        <div class="k-header-main-title">
+                            <i class="bi bi-clipboard-pulse"></i>
+                            Evaluación Inicial del SG-SST
+                        </div>
+                        <div class="k-breadcrumb">
+                            <span>Gestión Integral</span>
+                            <span>/</span>
+                            <span class="k-bc-active">2.3.1 Evaluación Inicial</span>
                         </div>
                     </div>
                 </div>
-
-                <!-- 2. NAVEGACIÓN (Tabs) -->
-                <nav class="k-module-nav">
-                    <button class="k-nav-item active" data-tab="dashboard" onclick="window.currentEvaluacionInstance.switchTab('dashboard')">
-                        <i class="bi bi-speedometer2"></i> Dashboard
+                <div class="k-header-right">
+                    <select class="k-select-sm" id="sourceSelect" onchange="window.currentEvaluacionInstance.updateSource()">
+                        <option value="ministerio">🏛️ Ministerio de Trabajo</option>
+                        <option value="arl">🛡️ Informe ARL</option>
+                    </select>
+                    <button class="k-btn k-btn-sm k-btn-outline" id="btn-change-pdf" onclick="window.currentEvaluacionInstance.showPdfSelectorModal()" title="Cambiar archivo PDF">
+                        <i class="bi bi-file-earmark-pdf"></i> Cambiar Archivo
                     </button>
-                    <button class="k-nav-item" data-tab="hallazgos" onclick="window.currentEvaluacionInstance.switchTab('hallazgos')">
-                        <i class="bi bi-list-check"></i> Hallazgos
-                    </button>
-                    <button class="k-nav-item" data-tab="actions" onclick="window.currentEvaluacionInstance.switchTab('actions')">
-                        <i class="bi bi-clipboard-check"></i> Planes de Acción
-                    </button>
-                    <button class="k-nav-item" data-tab="history" onclick="window.currentEvaluacionInstance.switchTab('history')">
-                        <i class="bi bi-clock-history"></i> Historial
-                    </button>
-                </nav>
-            </header>
-
-            <!-- 3. CONTENIDO SCROLLABLE -->
-            <div class="k-module-content">
-
-                <!-- Panel de Control Interno -->
-                <div class="k-toolbar">
-                    <div class="k-toolbar-group">
-                        <label class="k-label-muted">Fuente de Datos:</label>
-                        <select class="k-select-sm" id="sourceSelect" onchange="window.currentEvaluacionInstance.updateSource()">
-                            <option value="ministerio">🏛️ Ministerio de Trabajo (Estándares Mínimos)</option>
-                            <option value="arl">🛡️ Informe ARL</option>
-                        </select>
-                        <button class="k-btn k-btn-sm k-btn-outline" id="btn-change-pdf" onclick="window.currentEvaluacionInstance.showPdfSelectorModal()" title="Cambiar archivo PDF">
-                            <i class="bi bi-file-earmark-pdf"></i> Cambiar Archivo
-                        </button>
-                    </div>
                     <div id="loading-indicator" class="k-loading-badge" style="display:none;">
                         <span class="spinner-border spinner-border-sm"></span> Procesando...
                     </div>
                 </div>
+            </header>
+
+            <!-- 2. BARRA DE TABS (separada del header) -->
+            <div class="k-tab-bar">
+                <button class="k-nav-item active" data-tab="dashboard" onclick="window.currentEvaluacionInstance.switchTab('dashboard')">
+                    <i class="bi bi-speedometer2"></i> Dashboard
+                </button>
+                <button class="k-nav-item" data-tab="hallazgos" onclick="window.currentEvaluacionInstance.switchTab('hallazgos')">
+                    <i class="bi bi-list-check"></i> Hallazgos
+                </button>
+                <button class="k-nav-item" data-tab="actions" onclick="window.currentEvaluacionInstance.switchTab('actions')">
+                    <i class="bi bi-clipboard-check"></i> Planes de Acción
+                </button>
+                <button class="k-nav-item" data-tab="history" onclick="window.currentEvaluacionInstance.switchTab('history')">
+                    <i class="bi bi-clock-history"></i> Historial
+                </button>
+            </div>
+
+            <!-- 3. CONTENIDO SCROLLABLE -->
+            <div class="k-module-content">
 
                 <!-- VISTA: DASHBOARD -->
                 <section id="view-dashboard" class="k-view active">
 
                     <!-- KPIs Principales -->
                     <div class="k-grid-metrics">
-                        <div class="k-card k-card-metric">
+                        <div class="k-card k-card-metric k-card-metric-primary">
                             <div class="k-metric-header">
                                 <span>CUMPLIMIENTO</span>
                                 <i class="bi bi-pie-chart-fill text-primary"></i>
@@ -110,7 +110,7 @@ class EvaluacionInicialSgSst {
                             </div>
                         </div>
 
-                        <div class="k-card k-card-metric">
+                        <div class="k-card k-card-metric k-card-metric-danger">
                             <div class="k-metric-header">
                                 <span>HALLAZGOS CRÍTICOS</span>
                                 <i class="bi bi-exclamation-triangle-fill text-danger"></i>
@@ -124,7 +124,7 @@ class EvaluacionInicialSgSst {
                             </div>
                         </div>
 
-                        <div class="k-card k-card-metric">
+                        <div class="k-card k-card-metric k-card-metric-warning">
                             <div class="k-metric-header">
                                 <span>PLANES PENDIENTES</span>
                                 <i class="bi bi-hourglass-split text-warning"></i>
@@ -167,16 +167,18 @@ class EvaluacionInicialSgSst {
 
                     <!-- Tarjeta de Fuente -->
                     <div class="k-card k-card-source">
-                        <div class="k-source-info">
-                            <div class="k-source-icon"><i class="bi bi-file-earmark-pdf"></i></div>
-                            <div>
-                                <h4 id="source-title">Esperando archivo fuente...</h4>
-                                <p id="source-meta">El sistema buscará automáticamente informes en la carpeta.</p>
+                        <div class="k-card-body">
+                            <div class="k-source-info">
+                                <div class="k-source-icon"><i class="bi bi-file-earmark-pdf"></i></div>
+                                <div>
+                                    <h4 id="source-title">Esperando archivo fuente...</h4>
+                                    <p id="source-meta">El sistema buscará automáticamente informes en la carpeta.</p>
+                                </div>
                             </div>
+                            <button class="k-btn k-btn-outline" id="btn-view-pdf" style="display:none;">
+                                <i class="bi bi-eye"></i> Ver Documento
+                            </button>
                         </div>
-                        <button class="k-btn k-btn-outline" id="btn-view-pdf" style="display:none;">
-                            <i class="bi bi-eye"></i> Ver Documento
-                        </button>
                     </div>
                 </section>
 

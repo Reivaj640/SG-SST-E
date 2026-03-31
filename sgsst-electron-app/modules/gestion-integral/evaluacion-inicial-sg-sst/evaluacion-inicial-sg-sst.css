@@ -60,108 +60,126 @@
     overflow: hidden;
 }
 
-/* Header del módulo */
+/* ── HEADER DEL MÓDULO (patrón K+AIR: blanco, sticky) ── */
 .k-module-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    padding: 1.5rem 2rem;
-    color: white;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.k-header-top {
+    background: var(--bg-card);
+    height: 64px;
+    padding: 0 1.5rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    flex-shrink: 0;
 }
 
-.k-title-group {
+.k-header-left {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.75rem;
 }
 
+.k-header-right {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+/* Botón volver — cuadrado sutil */
 .k-btn-back {
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
-    color: white;
-    padding: 0.5rem 1rem;
-    border-radius: 8px;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--border);
+    border-radius: 0.375rem;
+    background: var(--bg-card);
+    color: var(--text-muted);
     cursor: pointer;
-    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
 }
 
 .k-btn-back:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: translateX(-3px);
+    background: rgba(23, 78, 166, 0.08);
+    color: var(--primary);
+    border-color: var(--primary);
 }
 
-.k-title-text h2 {
-    margin: 0;
-    font-size: 1.5rem;
+/* Grupo título + breadcrumb */
+.k-header-title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.k-header-main-title {
+    font-size: 1.05rem;
     font-weight: 600;
+    color: var(--text-dark);
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    line-height: 1.2;
+}
+
+.k-header-main-title i {
+    color: var(--primary);
+    font-size: 1.1rem;
 }
 
 .k-breadcrumb {
-    font-size: 0.875rem;
-    opacity: 0.9;
-}
-
-.k-header-actions {
-    display: flex;
-    gap: 1rem;
-}
-
-.k-context-selector {
+    font-size: 0.7rem;
+    color: var(--text-muted);
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    background: rgba(255, 255, 255, 0.15);
-    padding: 0.5rem 1rem;
-    border-radius: 8px;
+    gap: 0.3rem;
 }
 
-.k-context-selector select {
-    background: transparent;
-    border: none;
-    color: white;
-    font-size: 0.9rem;
-    cursor: pointer;
+.k-breadcrumb .k-bc-active {
+    color: var(--primary);
+    font-weight: 500;
 }
 
-.k-context-selector select option {
-    background: white;
-    color: var(--text-dark);
-}
-
-/* Navegación (Tabs) */
-.k-module-nav {
+/* ── BARRA DE TABS (separada del header) ── */
+.k-tab-bar {
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    padding: 0 1.5rem;
     display: flex;
-    gap: 0.5rem;
-    margin-top: 1rem;
+    gap: 0;
+    flex-shrink: 0;
 }
 
 .k-nav-item {
-    background: rgba(255, 255, 255, 0.1);
+    background: transparent;
     border: none;
-    color: white;
-    padding: 0.75rem 1.5rem;
-    border-radius: 8px;
+    border-bottom: 3px solid transparent;
+    color: var(--text-muted);
+    padding: 0.75rem 1.25rem;
     cursor: pointer;
-    transition: all 0.3s ease;
-    font-size: 0.9rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    font-family: 'Segoe UI', Roboto, sans-serif;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.45rem;
+    transition: color 0.15s, border-color 0.15s;
+    margin-bottom: -1px;
 }
 
 .k-nav-item:hover {
-    background: rgba(255, 255, 255, 0.2);
+    color: var(--primary);
 }
 
 .k-nav-item.active {
-    background: white;
     color: var(--primary);
+    border-bottom-color: var(--primary);
     font-weight: 600;
 }
 
@@ -255,8 +273,20 @@
 }
 
 .k-card-metric {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+    background: var(--bg-card);
+    border-left: 4px solid var(--primary);
+}
+
+.k-card-metric-primary {
+    border-left-color: var(--primary);
+}
+
+.k-card-metric-danger {
+    border-left-color: var(--danger);
+}
+
+.k-card-metric-warning {
+    border-left-color: var(--warning);
 }
 
 .k-metric-header {
@@ -264,8 +294,11 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 1rem;
-    font-size: 0.875rem;
-    opacity: 0.9;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-muted);
 }
 
 .k-metric-body {
@@ -281,7 +314,7 @@
 
 .k-trend {
     font-size: 0.875rem;
-    opacity: 0.8;
+    color: var(--text-muted);
 }
 
 .k-mini-chart {
@@ -290,13 +323,15 @@
 }
 
 .k-card-source {
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    background: var(--bg-card);
+    border-left: 4px solid var(--info);
 }
 
 .k-source-info {
     display: flex;
     align-items: center;
     gap: 1rem;
+    padding: 1.5rem;
 }
 
 .k-source-icon {
@@ -942,6 +977,46 @@
     color: var(--text-muted);
 }
 
+/* Input de búsqueda en tablas */
+.k-input-search {
+    padding: 0.5rem 0.875rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-family: 'Segoe UI', Roboto, sans-serif;
+    color: var(--text-dark);
+    width: 220px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.k-input-search:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.1);
+}
+
+/* Empty state para vistas sin datos */
+.k-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    text-align: center;
+    color: var(--text-muted);
+    gap: 1rem;
+}
+
+.k-empty-state i {
+    font-size: 3rem;
+    color: #ced4da;
+}
+
+.k-empty-state p {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
 .k-list-group {
     display: flex;
     flex-direction: column;
@@ -965,19 +1040,19 @@
 
 .pdf-viewer-container {
     margin: 20px 0;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-md);
+    border: 1px solid var(--border);
+    border-radius: 8px;
     overflow: hidden;
-    box-shadow: var(--box-shadow);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     flex-grow: 1;
     display: flex;
     flex-direction: column;
 }
 
 .pdf-viewer-header {
-    background-color: var(--light-color);
+    background-color: #f8f9fa;
     padding: 10px 15px;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -986,8 +1061,8 @@
 .pdf-viewer-title {
     margin: 0;
     font-size: 1rem;
-    font-weight: var(--font-weight-bold);
-    color: var(--heading-color);
+    font-weight: 600;
+    color: var(--text-dark);
 }
 
 .pdf-controls {
@@ -1007,18 +1082,18 @@
 
 .action-plans-container {
     margin-top: 25px;
-    background-color: var(--widget-bg-color);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-md);
+    background-color: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
     padding: 20px;
-    box-shadow: var(--box-shadow);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .action-plans-header {
     margin-bottom: 15px;
     font-size: 1.1rem;
-    font-weight: var(--font-weight-bold);
-    color: var(--heading-color);
+    font-weight: 600;
+    color: var(--text-dark);
 }
 
 .add-action-plan-btn {
@@ -1042,8 +1117,8 @@
 }
 
 .data-table th {
-    background-color: var(--dark-color);
-    color: var(--white-color);
+    background-color: var(--primary);
+    color: #ffffff;
     position: sticky;
     top: 0;
     z-index: 10;
@@ -1054,18 +1129,18 @@
 }
 
 .status-completed {
-    color: var(--success-color);
-    font-weight: var(--font-weight-bold);
+    color: var(--success);
+    font-weight: 600;
 }
 
 .status-in-progress {
-    color: var(--warning-color);
-    font-weight: var(--font-weight-bold);
+    color: var(--warning);
+    font-weight: 600;
 }
 
 .status-pending {
-    color: var(--danger-color);
-    font-weight: var(--font-weight-bold);
+    color: var(--danger);
+    font-weight: 600;
 }
 
 .action-buttons {
