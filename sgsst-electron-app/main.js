@@ -4236,12 +4236,13 @@ ipcMain.handle('load-objetivos-excel-data', async (event, filePath) => {
       if (row && row[1]) {
         objectivesData.push({
           id: objectivesData.length + 1,
-          objective: row[1] ? row[1].toString() : '',
-          indicator: row[2] ? row[2].toString() : '',
-          formula: row[3] ? row[3].toString() : '',
-          goal: row[4] ? row[4].toString() : '',
-          frequency: row[5] ? row[5].toString() : '',
-          responsible: row[6] ? row[6].toString() : ''
+          objective:   row[1] ? row[1].toString() : '',
+          indicator:   row[2] ? row[2].toString() : '',
+          formula:     row[3] ? row[3].toString() : '',
+          goal:        row[4] ? row[4].toString() : '',
+          frequency:   row[5] ? row[5].toString() : '',
+          responsible: row[6] ? row[6].toString() : '',
+          principleId: row[7] ? parseInt(row[7]) || null : null  // Col H: principio asignado (1-4), null = auto-detectar
         });
       }
     }
@@ -4293,10 +4294,10 @@ ipcMain.handle('save-objetivos-excel-data', async (event, filePath, data) => {
     const dataRows = data.objectivesData || [];
 
     // Limpiar filas anteriores (eliminar datos pero mantener encabezados y estructura)
-    // Limpiamos columnas 2 a 7 (B a G) desde la fila 7 hacia abajo
+    // Limpiamos columnas 2 a 8 (B a H) desde la fila 7 hacia abajo
     for (let i = startIndex; i < startIndex + 100; i++) { // Limpiar hasta 100 filas potenciales
       const row = worksheet.getRow(i);
-      for (let col = 2; col <= 7; col++) {
+      for (let col = 2; col <= 8; col++) {
           row.getCell(col).value = null;
       }
     }
@@ -4304,12 +4305,13 @@ ipcMain.handle('save-objetivos-excel-data', async (event, filePath, data) => {
     // Escribir los nuevos datos
     dataRows.forEach((obj, index) => {
       const row = worksheet.getRow(startIndex + index);
-      row.getCell(2).value = obj.objective || '';   // Col B
-      row.getCell(3).value = obj.indicator || '';   // Col C
-      row.getCell(4).value = obj.formula || '';     // Col D
-      row.getCell(5).value = obj.goal || '';        // Col E
-      row.getCell(6).value = obj.frequency || '';   // Col F
-      row.getCell(7).value = obj.responsible || ''; // Col G
+      row.getCell(2).value = obj.objective   || '';  // Col B
+      row.getCell(3).value = obj.indicator   || '';  // Col C
+      row.getCell(4).value = obj.formula     || '';  // Col D
+      row.getCell(5).value = obj.goal        || '';  // Col E
+      row.getCell(6).value = obj.frequency   || '';  // Col F
+      row.getCell(7).value = obj.responsible || '';  // Col G
+      row.getCell(8).value = (obj.principleId != null) ? obj.principleId : ''; // Col H: principleId (1-4)
     });
 
     // Guardar el archivo
