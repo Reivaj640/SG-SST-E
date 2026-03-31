@@ -4217,37 +4217,54 @@ ipcMain.handle('load-objetivos-excel-data', async (event, filePath) => {
     }
 
     // Extraer los objetivos
-    // Según instrucciones: Titulos en fila 5 (índice 4). Datos inician desde fila 6 o 7.
-    // Asumiremos que los datos inician en la fila 7 (índice 6) porque la fila 6 suele ser la política o espacio.
-    // Mapeo solicitado:
-    // Objetivos (B) -> 1
-    // Indicadores (C) -> 2
-    // Formula (D) -> 3
-    // Meta (E) -> 4
-    // Frecuencia (F) -> 5
-    // Responsable (G) -> 6
+    // ESTRUCTURA DEL EXCEL:
+    // - Fila 5 (índice 4): Encabezados de columnas
+    // - Fila 6 (índice 5): Primer fila de datos
+    // Mapeo de columnas:
+    // B (índice 1): Objetivos estratégicos
+    // C (índice 2): Indicadores de gestión
+    // D (índice 3): Fórmula
+    // E (índice 4): Meta
+    // F (índice 5): Frecuencia
+    // G (índice 6): Responsable
+    // H (índice 7): Principle ID (1-4)
 
-    const startIndex = 6; // Fila 7 (índice 6)
+    const startIndex = 5; // Fila 6 (índice 5) - DONDE COMIENZAN LOS DATOS
     const objectivesData = [];
+
+    sendLog(`[MAIN][Objetivos] Iniciando lectura desde fila 6 (índice ${startIndex})`, 'INFO');
+    sendLog(`[MAIN][Objetivos] Total de filas en el Excel: ${jsonData.length}`, 'INFO');
 
     for (let i = startIndex; i < jsonData.length; i++) {
       const row = jsonData[i];
+      
+      // Debug: mostrar las primeras 3 filas encontradas
+      if (i < startIndex + 3) {
+        sendLog(`[MAIN][Objetivos] Fila ${i + 1}: ${JSON.stringify(row)}`, 'DEBUG');
+      }
+      
       // Verificar si existe el objetivo en la columna B (índice 1)
       if (row && row[1]) {
-        objectivesData.push({
-          id: objectivesData.length + 1,
-          objective:   row[1] ? row[1].toString() : '',
-          indicator:   row[2] ? row[2].toString() : '',
-          formula:     row[3] ? row[3].toString() : '',
-          goal:        row[4] ? row[4].toString() : '',
-          frequency:   row[5] ? row[5].toString() : '',
-          responsible: row[6] ? row[6].toString() : '',
-          principleId: row[7] ? parseInt(row[7]) || null : null  // Col H: principio asignado (1-4), null = auto-detectar
-        });
+        const objectiveValue = row[1] ? row[1].toString() : '';
+        
+        // Solo agregar si el objetivo no está vacío
+        if (objectiveValue.trim() !== '') {
+          objectivesData.push({
+            id: objectivesData.length + 1,
+            objective:   objectiveValue,
+            indicator:   row[2] ? row[2].toString() : '',
+            formula:     row[3] ? row[3].toString() : '',
+            goal:        row[4] ? row[4].toString() : '',
+            frequency:   row[5] ? row[5].toString() : '',
+            responsible: row[6] ? row[6].toString() : '',
+            principleId: row[7] ? parseInt(row[7]) || null : null  // Col H: principio asignado (1-4), null = auto-detectar
+          });
+          sendLog(`[MAIN][Objetivos] Fila ${i + 1}: Objetivo encontrado: "${objectiveValue.substring(0, 50)}..."`, 'INFO');
+        }
       }
     }
 
-    sendLog(`[MAIN] Datos de objetivos cargados: ${objectivesData.length} registros`, 'INFO');
+    sendLog(`[MAIN][Objetivos] Total de objetivos leídos: ${objectivesData.length} registros`, 'INFO');
 
     return {
       success: true,
@@ -4265,14 +4282,18 @@ ipcMain.handle('load-objetivos-excel-data', async (event, filePath) => {
 // Handler para guardar datos en el archivo Excel de objetivos
 ipcMain.handle('save-objetivos-excel-data', async (event, filePath, data) => {
   try {
-    sendLog(`[MAIN] Guardando datos en archivo Excel de objetivos: ${filePath}`, 'INFO');
+    sendLog(`[MAIN][Objetivos][GUARDADO] === INICIO DEL GUARDADO ===`, 'INFO');
+    sendLog(`[MAIN][Objetivos][GUARDADO] Archivo: ${filePath}`, 'INFO');
+    
+    const dataRows = data.objectivesData || [];
+    sendLog(`[MAIN][Objetivos][GUARDADO] Datos a guardar: ${dataRows.length} registros`, 'INFO');
 
     // Verificar que el archivo existe
     try {
       await fsp.access(filePath, fs.constants.R_OK);
-      sendLog(`[MAIN] Archivo Excel accesible para escritura: ${filePath}`, 'DEBUG');
+      sendLog(`[MAIN][Objetivos][GUARDADO] Archivo Excel accesible para escritura`, 'DEBUG');
     } catch (accessError) {
-      sendLog(`[MAIN] Error de acceso al archivo Excel ${filePath}: ${accessError.message}`, 'ERROR');
+      sendLog(`[MAIN][Objetivos][GUARDADO] Error de acceso al archivo: ${accessError.message}`, 'ERROR');
       return { success: false, error: `El archivo no es accesible o no existe: ${filePath}. Error: ${accessError.message}` };
     }
 
@@ -4282,46 +4303,90 @@ ipcMain.handle('save-objetivos-excel-data', async (event, filePath, data) => {
 
     // Obtener la primera hoja
     const worksheet = workbook.getWorksheet(1);
+    sendLog(`[MAIN][Objetivos][GUARDADO] Hoja obtenida: ${worksheet.name}`, 'INFO');
+    sendLog(`[MAIN][Objetivos][GUARDADO] Total de filas actuales: ${worksheet.rowCount}`, 'INFO');
 
     // Actualizar la política en la celda A6
     if (data.policyText) {
       worksheet.getCell('A6').value = data.policyText;
+      sendLog(`[MAIN][Objetivos][GUARDADO] Política actualizada en celda A6`, 'DEBUG');
     }
 
-    // Actualizar los objetivos
-    // Iniciar escritura desde la fila 7 (índice 7 en ExcelJS que es 1-based)
-    const startIndex = 7;
-    const dataRows = data.objectivesData || [];
+    // ESTRUCTURA DEL EXCEL:
+    // - Fila 5 (índice 5 en ExcelJS 1-based): Encabezados de columnas
+    // - Fila 6 (índice 6 en ExcelJS 1-based): PRIMER FILA DE DATOS
+    // Mapeo de columnas:
+    // B (col 2): Objetivos estratégicos
+    // C (col 3): Indicadores de gestión
+    // D (col 4): Fórmula
+    // E (col 5): Meta
+    // F (col 6): Frecuencia
+    // G (col 7): Responsable
+    // H (col 8): Principle ID (1-4)
 
-    // Limpiar filas anteriores (eliminar datos pero mantener encabezados y estructura)
-    // Limpiamos columnas 2 a 8 (B a H) desde la fila 7 hacia abajo
-    for (let i = startIndex; i < startIndex + 100; i++) { // Limpiar hasta 100 filas potenciales
+    const startIndex = 6; // Fila 6 en ExcelJS (1-based) - DONDE COMIENZAN LOS DATOS
+    sendLog(`[MAIN][Objetivos][GUARDADO] Iniciando escritura desde fila ${startIndex}`, 'INFO');
+
+    // ESTRATEGIA DE LIMPIEZA SEGURA:
+    // 1. NO limpiar 100 filas indiscriminadamente
+    // 2. Solo limpiar las filas necesarias basadas en datos existentes y nuevos
+    // 3. Preservar formato, solo cambiar valores
+    
+    const currentRowCount = worksheet.rowCount;
+    const newEndRow = startIndex + dataRows.length - 1;
+    const rowsToClear = Math.max(0, currentRowCount - startIndex + 1);
+    
+    sendLog(`[MAIN][Objetivos][GUARDADO] Filas actuales: ${currentRowCount}, Nuevas filas necesarias: ${newEndRow}`, 'DEBUG');
+    sendLog(`[MAIN][Objetivos][GUARDADO] Limpiando ${rowsToClear} filas existentes (desde fila ${startIndex} hasta ${currentRowCount})`, 'DEBUG');
+
+    // Limpiar solo las filas existentes desde startIndex hasta el final
+    // Esto preserva el formato y solo elimina valores antiguos
+    for (let i = startIndex; i <= currentRowCount; i++) {
       const row = worksheet.getRow(i);
       for (let col = 2; col <= 8; col++) {
-          row.getCell(col).value = null;
+        const cell = row.getCell(col);
+        // Solo limpiar si hay un valor previo
+        if (cell.value !== null && cell.value !== '') {
+          cell.value = null;
+        }
       }
     }
 
-    // Escribir los nuevos datos
+    sendLog(`[MAIN][Objetivos][GUARDADO] Escribiendo ${dataRows.length} nuevos registros...`, 'INFO');
+
+    // Escribir los nuevos datos comenzando desde fila 6
     dataRows.forEach((obj, index) => {
-      const row = worksheet.getRow(startIndex + index);
-      row.getCell(2).value = obj.objective   || '';  // Col B
-      row.getCell(3).value = obj.indicator   || '';  // Col C
-      row.getCell(4).value = obj.formula     || '';  // Col D
-      row.getCell(5).value = obj.goal        || '';  // Col E
-      row.getCell(6).value = obj.frequency   || '';  // Col F
-      row.getCell(7).value = obj.responsible || '';  // Col G
-      row.getCell(8).value = (obj.principleId != null) ? obj.principleId : ''; // Col H: principleId (1-4)
+      const rowNum = startIndex + index;
+      const row = worksheet.getRow(rowNum);
+      
+      row.getCell(2).value = obj.objective   || '';  // Col B: Objetivo
+      row.getCell(3).value = obj.indicator   || '';  // Col C: Indicador
+      row.getCell(4).value = obj.formula     || '';  // Col D: Fórmula
+      row.getCell(5).value = obj.goal        || '';  // Col E: Meta
+      row.getCell(6).value = obj.frequency   || '';  // Col F: Frecuencia
+      row.getCell(7).value = obj.responsible || '';  // Col G: Responsable
+      row.getCell(8).value = (obj.principleId != null) ? obj.principleId : ''; // Col H: principleId
+      
+      // Log de las primeras 3 filas escritas
+      if (index < 3) {
+        sendLog(`[MAIN][Objetivos][GUARDADO] Fila ${rowNum}: "${obj.objective?.substring(0, 40) || ''}..." - Principle: ${obj.principleId || 'auto'}`, 'DEBUG');
+      }
     });
+
+    if (dataRows.length > 3) {
+      sendLog(`[MAIN][Objetivos][GUARDADO] ... y ${dataRows.length - 3} registros adicionales`, 'DEBUG');
+    }
 
     // Guardar el archivo
     await workbook.xlsx.writeFile(filePath);
 
-    sendLog(`[MAIN] Datos de objetivos guardados exitosamente en: ${filePath}`, 'INFO');
+    sendLog(`[MAIN][Objetivos][GUARDADO] === GUARDADO COMPLETADO EXITOSAMENTE ===`, 'INFO');
+    sendLog(`[MAIN][Objetivos][GUARDADO] Archivo guardado: ${filePath}`, 'INFO');
+    sendLog(`[MAIN][Objetivos][GUARDADO] Total de registros guardados: ${dataRows.length}`, 'INFO');
 
     return { success: true };
   } catch (error) {
-    sendLog(`[MAIN] Error guardando datos en archivo Excel de objetivos: ${error.message}`, 'ERROR');
+    sendLog(`[MAIN][Objetivos][GUARDADO] ERROR: ${error.message}`, 'ERROR');
     return { success: false, error: error.message };
   }
 });

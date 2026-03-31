@@ -1040,6 +1040,142 @@
         </div>
     </div>
 
+    <!-- Modal de Edición de Indicador -->
+    <div class="k-modal-backdrop hidden" id="editModalBackdrop">
+        <div class="k-modal" id="editModal">
+            <div class="k-modal-header accent-p1" id="editModalHeader">
+                <div class="k-modal-header-left">
+                    <div class="k-modal-icon icon-p1" id="editModalIcon">
+                        <i class="bi bi-clipboard-data"></i>
+                    </div>
+                    <div>
+                        <div class="k-modal-title">Editar Indicador</div>
+                        <div class="k-modal-subtitle" id="editModalSubtitle">
+                            Indicador 1 de 1
+                        </div>
+                    </div>
+                </div>
+                <button class="k-modal-close" onclick="closeEditModal()">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="k-modal-body">
+                <div class="k-form-section">
+                    <div class="k-form-section-label">
+                        <i class="bi bi-bullseye"></i>
+                        Objetivo Estratégico
+                    </div>
+                    <div class="k-form-group">
+                        <label class="k-form-label">
+                            Texto del objetivo <span class="k-required">*</span>
+                        </label>
+                        <textarea 
+                            class="k-form-control" 
+                            id="editObjective" 
+                            placeholder="Ej: Reducir la accidentalidad laboral en un 50% durante el año 2024..."
+                        ></textarea>
+                        <div class="k-form-hint" id="editObjectiveHint">
+                            <i class="bi bi-info-circle"></i>
+                            <span>Descripción que identifica este objetivo estratégico.</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <hr class="k-form-divider">
+                
+                <div class="k-form-section">
+                    <div class="k-form-section-label">
+                        <i class="bi bi-list-check"></i>
+                        Detalles del Indicador
+                    </div>
+                    
+                    <div class="k-form-group">
+                        <label class="k-form-label">
+                            Indicador <span class="k-required">*</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            class="k-form-control" 
+                            id="editIndicator" 
+                            placeholder="Ej: Tasa de accidentalidad"
+                        >
+                    </div>
+                    
+                    <div class="k-form-row">
+                        <div class="k-form-group">
+                            <label class="k-form-label">
+                                Fórmula <span class="k-required">*</span>
+                            </label>
+                            <input 
+                                type="text" 
+                                class="k-form-control k-mono" 
+                                id="editFormula" 
+                                placeholder="(N° accidentes / Horas hombre trabajadas) × 1.000.000"
+                            >
+                        </div>
+                        
+                        <div class="k-form-group">
+                            <label class="k-form-label">
+                                Meta <span class="k-required">*</span>
+                            </label>
+                            <input 
+                                type="text" 
+                                class="k-form-control" 
+                                id="editGoal" 
+                                placeholder="Ej: < 2.0"
+                            >
+                        </div>
+                    </div>
+                    
+                    <div class="k-form-row">
+                        <div class="k-form-group">
+                            <label class="k-form-label">
+                                Frecuencia <span class="k-required">*</span>
+                            </label>
+                            <select class="k-form-control" id="editFrequency">
+                                <option value="Diaria">Diaria</option>
+                                <option value="Semanal">Semanal</option>
+                                <option value="Quincenal">Quincenal</option>
+                                <option value="Mensual" selected>Mensual</option>
+                                <option value="Trimestral">Trimestral</option>
+                                <option value="Semestral">Semestral</option>
+                                <option value="Anual">Anual</option>
+                            </select>
+                        </div>
+                        
+                        <div class="k-form-group">
+                            <label class="k-form-label">
+                                Responsable <span class="k-required">*</span>
+                            </label>
+                            <input 
+                                type="text" 
+                                class="k-form-control" 
+                                id="editResponsible" 
+                                placeholder="Nombre del responsable"
+                            >
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="k-modal-footer">
+                <div class="k-modal-footer-meta" id="editModalMeta">
+                    <i class="bi bi-shuffle"></i>
+                    Principio auto-detectado · Prevención
+                </div>
+                <div class="k-modal-footer-actions">
+                    <button class="k-btn k-btn-sm" onclick="closeEditModal()">
+                        Cancelar
+                    </button>
+                    <button class="k-btn k-btn-primary" onclick="saveEditModal()">
+                        <i class="bi bi-save"></i>
+                        Guardar Cambios
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="./objetivos-sst-viewer.js"></script>
 </body>
 </html>

@@ -12,8 +12,16 @@ class ObjetivosSSTComponent {
     }
 
     render() {
+        console.log('[objetivos-sst-logic.js][render] Iniciando renderizado del componente Objetivos SST');
+        console.log('[objetivos-sst-logic.js][render] companyName:', this.companyName);
+        console.log('[objetivos-sst-logic.js][render] moduleName:', this.moduleName);
+        console.log('[objetivos-sst-logic.js][render] submoduleName:', this.submoduleName);
+        
         this.container.innerHTML = ''; // Limpiar el contenedor
+        
+        // Registrar listener ANTES de crear el iframe
         window.addEventListener('message', this.handleIframeMessage);
+        console.log('[objetivos-sst-logic.js][render] Listener de mensajes registrado');
 
         const iframe = document.createElement('iframe');
         iframe.style.width = '100%';
@@ -23,8 +31,11 @@ class ObjetivosSSTComponent {
         // Pasar parámetros a la nueva interfaz a través de la URL
         const viewerUrl = `modules/gestion-integral/objetivos-sst/objetivos-sst-view.html?company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
         iframe.src = viewerUrl;
+        
+        console.log('[objetivos-sst-logic.js][render] Iframe creado con src:', viewerUrl);
 
         this.container.appendChild(iframe);
+        console.log('[objetivos-sst-logic.js][render] Iframe agregado al DOM');
     }
 
     handleIframeMessage(event) {
@@ -33,24 +44,30 @@ class ObjetivosSSTComponent {
             return; // Ignorar mensajes sin acción definida
         }
 
+        console.log(`[objetivos-sst-logic.js][handleIframeMessage] Mensaje recibido del iframe:`, event.data);
+
         switch (event.data.action) {
             case 'backToModule':
+                console.log('[objetivos-sst-logic.js][handleIframeMessage] Acción: backToModule');
                 if (this.onBackToModuleHome) {
                     this.onBackToModuleHome();
                 }
                 break;
             case 'get-excel-path-request':
+                console.log('[objetivos-sst-logic.js][handleIframeMessage] Acción: get-excel-path-request');
                 this.handleGetExcelPathRequest(event);
                 break;
             case 'load-excel-data-request':
+                console.log('[objetivos-sst-logic.js][handleIframeMessage] Acción: load-excel-data-request');
                 this.handleLoadExcelDataRequest(event);
                 break;
             case 'save-excel-data-request':
+                console.log('[objetivos-sst-logic.js][handleIframeMessage] Acción: save-excel-data-request');
                 this.handleSaveExcelDataRequest(event);
                 break;
             // Puedes añadir más casos para otras funcionalidades si es necesario
             default:
-                console.warn('Mensaje de iframe no reconocido:', event.data.action);
+                console.warn('[objetivos-sst-logic.js][handleIframeMessage] Mensaje no reconocido:', event.data.action);
                 break;
         }
     }
@@ -153,9 +170,11 @@ class ObjetivosSSTComponent {
     }
 
     destroy() {
+        console.log('[objetivos-sst-logic.js][destroy] Limpiando listener de mensajes');
         // Limpiar el event listener cuando el componente se destruye
         window.removeEventListener('message', this.handleIframeMessage);
         this.container.innerHTML = '';
+        console.log('[objetivos-sst-logic.js][destroy] Componente destruido');
     }
 }
 

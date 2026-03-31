@@ -103,9 +103,23 @@ class ObjetivosSSTViewer {
             this.policyText  = data.policyText || '';
             this.groups      = this.buildGroups(data.objectivesData || []);
 
-            this.updateUIWithData();
-            this.isDataLoaded = true;
-            console.log('[objetivos-sst-viewer.js] Datos cargados. Grupos:', this.groups.length);
+            console.log('[objetivos-sst-viewer.js] Datos procesados, esperando DOM para renderizar...');
+            
+            // Esperar a que el DOM esté listo antes de renderizar
+            if (document.readyState === 'loading') {
+                console.log('[objetivos-sst-viewer.js] DOM aún cargando, esperando evento DOMContentLoaded...');
+                document.addEventListener('DOMContentLoaded', () => {
+                    console.log('[objetivos-sst-viewer.js] DOMContentLoaded disparado, renderizando...');
+                    this.updateUIWithData();
+                    this.isDataLoaded = true;
+                    console.log('[objetivos-sst-viewer.js] Datos cargados. Grupos:', this.groups.length);
+                });
+            } else {
+                console.log('[objetivos-sst-viewer.js] DOM ya está listo, renderizando inmediatamente...');
+                this.updateUIWithData();
+                this.isDataLoaded = true;
+                console.log('[objetivos-sst-viewer.js] Datos cargados. Grupos:', this.groups.length);
+            }
         } catch (error) {
             console.error('[objetivos-sst-viewer.js] Error cargando datos:', error);
             this.showError(`Error cargando datos: ${error.message}`);
@@ -253,9 +267,40 @@ class ObjetivosSSTViewer {
     // ═══════════════════════════════════════════════════════════════════════════
 
     updateUIWithData() {
+        console.log('[objetivos-sst-viewer.js][updateUIWithData] Iniciando actualización de UI...');
+        
+        // Verificar que el DOM esté listo antes de renderizar
+        const policyBody = document.getElementById('policyBody');
+        const objectivesBody = document.getElementById('objectivesBody');
+        
+        console.log('[objetivos-sst-viewer.js][updateUIWithData] policyBody existe:', !!policyBody);
+        console.log('[objetivos-sst-viewer.js][updateUIWithData] objectivesBody existe:', !!objectivesBody);
+        
+        if (!policyBody || !objectivesBody) {
+            console.error('[objetivos-sst-viewer.js][updateUIWithData] ERROR: Elementos del DOM no encontrados. Reintentando en 500ms...');
+            // Reintentar una vez después de 500ms
+            setTimeout(() => {
+                const policyBodyRetry = document.getElementById('policyBody');
+                const objectivesBodyRetry = document.getElementById('objectivesBody');
+                
+                if (!policyBodyRetry || !objectivesBodyRetry) {
+                    console.error('[objetivos-sst-viewer.js][updateUIWithData] ERROR: Elementos del DOM siguen sin existir después del reintento');
+                    this.showError('Error: No se pudo renderizar la interfaz. Por favor recarga la página.');
+                    return;
+                }
+                
+                console.log('[objetivos-sst-viewer.js][updateUIWithData] Reintento exitoso, elementos encontrados');
+                this.updateStats();
+                this.renderPolicy();
+                this.renderTable();
+            }, 500);
+            return;
+        }
+        
         this.updateStats();
         this.renderPolicy();
         this.renderTable();
+        console.log('[objetivos-sst-viewer.js][updateUIWithData] Actualización de UI completada');
     }
 
     updateStats() {
@@ -272,7 +317,15 @@ class ObjetivosSSTViewer {
 
     renderPolicy() {
         const container = document.getElementById('policyBody');
-        if (!container) return;
+        console.log('[objetivos-sst-viewer.js][renderPolicy] policyBody encontrado:', !!container);
+        console.log('[objetivos-sst-viewer.js][renderPolicy] Grupos a renderizar:', this.groups.length);
+        console.log('[objetivos-sst-viewer.js][renderPolicy] Policy data:', this.getPolicyData());
+        
+        if (!container) {
+            console.error('[objetivos-sst-viewer.js][renderPolicy] ERROR: policyBody no encontrado en el DOM');
+            return;
+        }
+        
         container.innerHTML = '';
 
         this.getPolicyData().forEach(p => {
@@ -315,6 +368,8 @@ class ObjetivosSSTViewer {
             `;
             container.appendChild(block);
         });
+        
+        console.log('[objetivos-sst-viewer.js][renderPolicy] Renderizado completado. Bloques creados:', this.getPolicyData().length);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -323,7 +378,14 @@ class ObjetivosSSTViewer {
 
     renderTable() {
         const tbody = document.getElementById('objectivesBody');
-        if (!tbody) return;
+        console.log('[objetivos-sst-viewer.js][renderTable] objectivesBody encontrado:', !!tbody);
+        console.log('[objetivos-sst-viewer.js][renderTable] Grupos a renderizar:', this.groups.length);
+        
+        if (!tbody) {
+            console.error('[objetivos-sst-viewer.js][renderTable] ERROR: objectivesBody no encontrado en el DOM');
+            return;
+        }
+        
         tbody.innerHTML = '';
 
         this.groups.forEach((group, groupIdx) => {
@@ -331,6 +393,8 @@ class ObjetivosSSTViewer {
             const isAuto    = group.principleSource === 'auto';
             const confClass = `k-conf-${group.confidence}`;
             const confLabel = { high: 'Alta', medium: 'Media', low: 'Baja' }[group.confidence];
+
+            console.log(`[objetivos-sst-viewer.js][renderTable] Renderizando grupo ${groupIdx}:`, group.objective);
 
             group.indicators.forEach((ind, idx) => {
                 const tr = document.createElement('tr');
@@ -401,6 +465,8 @@ class ObjetivosSSTViewer {
                 tbody.appendChild(tr);
             });
         });
+        
+        console.log('[objetivos-sst-viewer.js][renderTable] Renderizado completado. Filas creadas:', tbody.querySelectorAll('tr').length);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -550,9 +616,22 @@ class ObjetivosSSTViewer {
     // ═══════════════════════════════════════════════════════════════════════════
 
     openEditModal(groupIdx, indicatorIdx) {
+        // Validar parámetros
+        if (groupIdx === null || groupIdx === undefined || !this.groups[groupIdx]) {
+            console.warn('[objetivos-sst-viewer.js] Índice de grupo inválido para edición');
+            this.showError('No se puede editar: grupo inválido');
+            return;
+        }
+        
+        if (indicatorIdx === null || indicatorIdx === undefined || !this.groups[groupIdx].indicators[indicatorIdx]) {
+            console.warn('[objetivos-sst-viewer.js] Índice de indicador inválido para edición');
+            this.showError('No se puede editar: indicador inválido');
+            return;
+        }
+
         const group = this.groups[groupIdx];
         const ind   = group.indicators[indicatorIdx];
-        const p     = PRINCIPLES_META.find(x => x.id === group.principleId);
+        const p     = PRINCIPLES_META.find(x => x.id === group.principleId) || PRINCIPLES_META[3]; // default a Recursos y Mejora
 
         this.editModalState = { groupIdx, indicatorIdx };
 
@@ -567,12 +646,6 @@ class ObjetivosSSTViewer {
 
         const subtitle = el('editModalSubtitle');
         if (subtitle) subtitle.textContent = `Indicador ${indicatorIdx + 1} de ${group.indicators.length}`;
-
-        const pill = el('editModalPill');
-        if (pill) {
-            pill.className = `k-modal-principle-pill pill-p${p.id}`;
-            pill.innerHTML = `<i class="bi bi-${p.icon}"></i> ${p.principle}`;
-        }
 
         // Rellenar campos
         if (el('editObjective'))   el('editObjective').value   = group.objective;
@@ -610,66 +683,95 @@ class ObjetivosSSTViewer {
 
         // Mostrar modal
         const backdrop = el('editModalBackdrop');
-        if (backdrop) backdrop.classList.remove('hidden');
-        setTimeout(() => el('editObjective')?.focus(), 80);
+        if (backdrop) {
+            backdrop.classList.remove('hidden');
+            setTimeout(() => el('editObjective')?.focus(), 80);
+        } else {
+            console.error('[objetivos-sst-viewer.js] No se encontró el backdrop del modal de edición');
+            this.showError('Error al abrir el modal de edición');
+        }
     }
 
     closeEditModal() {
-        const backdrop = document.getElementById('editModalBackdrop');
-        if (backdrop) backdrop.classList.add('hidden');
-        this.editModalState = { groupIdx: null, indicatorIdx: null };
+        try {
+            const backdrop = document.getElementById('editModalBackdrop');
+            if (backdrop) {
+                backdrop.classList.add('hidden');
+            } else {
+                console.warn('[objetivos-sst-viewer.js] No se encontró el backdrop del modal al cerrar');
+            }
+            this.editModalState = { groupIdx: null, indicatorIdx: null };
+        } catch (error) {
+            console.error('[objetivos-sst-viewer.js] Error al cerrar el modal de edición:', error);
+            this.showError(`Error al cerrar el modal: ${error.message}`);
+        }
     }
 
     saveEditModal() {
-        const { groupIdx, indicatorIdx } = this.editModalState;
-        if (groupIdx === null) return;
-
-        const group = this.groups[groupIdx];
-        const ind   = group.indicators[indicatorIdx];
-        const el    = (id) => document.getElementById(id);
-
-        const newObjective   = el('editObjective')?.value.trim()   || '';
-        const newIndicator   = el('editIndicator')?.value.trim()   || '';
-        const newFormula     = el('editFormula')?.value.trim()     || '';
-        const newGoal        = el('editGoal')?.value.trim()        || '';
-        const newFrequency   = el('editFrequency')?.value          || 'Mensual';
-        const newResponsible = el('editResponsible')?.value.trim() || '';
-
-        if (!newObjective || !newIndicator || !newGoal) {
-            this.showError('Objetivo, indicador y meta son obligatorios.');
-            return;
-        }
-
-        // Si cambió el objetivo y el principio es auto, re-detectar
-        const objectiveChanged = newObjective !== group.objective;
-        if (objectiveChanged) {
-            group.objective = newObjective;
-            if (group.principleSource === 'auto') {
-                const detection      = this.autoDetectPrinciple(newObjective);
-                group.principleId    = detection.principleId;
-                group.confidence     = detection.confidence;
-                group.matchedWords   = detection.matchedWords;
-                group.autoDetectedId = detection.principleId;
+        try {
+            const { groupIdx, indicatorIdx } = this.editModalState;
+            if (groupIdx === null || groupIdx === undefined) {
+                console.warn('[objetivos-sst-viewer.js] No hay un grupo seleccionado para editar');
+                this.showError('No se puede guardar: no hay un grupo seleccionado');
+                return;
             }
+
+            if (!this.groups[groupIdx]) {
+                console.warn('[objetivos-sst-viewer.js] Grupo no encontrado para el índice:', groupIdx);
+                this.showError('No se puede guardar: grupo no encontrado');
+                return;
+            }
+
+            const group = this.groups[groupIdx];
+            const ind   = group.indicators[indicatorIdx];
+            const el    = (id) => document.getElementById(id);
+
+            const newObjective   = el('editObjective')?.value.trim()   || '';
+            const newIndicator   = el('editIndicator')?.value.trim()   || '';
+            const newFormula     = el('editFormula')?.value.trim()     || '';
+            const newGoal        = el('editGoal')?.value.trim()        || '';
+            const newFrequency   = el('editFrequency')?.value          || 'Mensual';
+            const newResponsible = el('editResponsible')?.value.trim() || '';
+
+            if (!newObjective || !newIndicator || !newGoal) {
+                this.showError('Objetivo, indicador y meta son obligatorios.');
+                return;
+            }
+
+            // Si cambió el objetivo y el principio es auto, re-detectar
+            const objectiveChanged = newObjective !== group.objective;
+            if (objectiveChanged) {
+                group.objective = newObjective;
+                if (group.principleSource === 'auto') {
+                    const detection      = this.autoDetectPrinciple(newObjective);
+                    group.principleId    = detection.principleId;
+                    group.confidence     = detection.confidence;
+                    group.matchedWords   = detection.matchedWords;
+                    group.autoDetectedId = detection.principleId;
+                }
+            }
+
+            // Actualizar indicador
+            ind.indicator   = newIndicator;
+            ind.formula     = newFormula;
+            ind.goal        = newGoal;
+            ind.frequency   = newFrequency;
+            ind.responsible = newResponsible;
+
+            this.closeEditModal();
+            this.renderTable();
+            this.renderPolicy();
+            this.updateStats();
+            this.autoSave();  // ← auto-guardar inmediatamente
+
+            this.showToast(objectiveChanged
+                ? 'Objetivo e indicador actualizados.'
+                : `Indicador "${newIndicator}" actualizado.`
+            );
+        } catch (error) {
+            console.error('[objetivos-sst-viewer.js] Error al guardar el modal de edición:', error);
+            this.showError(`Error al guardar: ${error.message}`);
         }
-
-        // Actualizar indicador
-        ind.indicator   = newIndicator;
-        ind.formula     = newFormula;
-        ind.goal        = newGoal;
-        ind.frequency   = newFrequency;
-        ind.responsible = newResponsible;
-
-        this.closeEditModal();
-        this.renderTable();
-        this.renderPolicy();
-        this.updateStats();
-        this.autoSave();  // ← auto-guardar inmediatamente
-
-        this.showToast(objectiveChanged
-            ? 'Objetivo e indicador actualizados.'
-            : `Indicador "${newIndicator}" actualizado.`
-        );
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -746,15 +848,22 @@ class ObjetivosSSTViewer {
     // ═══════════════════════════════════════════════════════════════════════════
 
     async requestExcelPath() {
+        console.log('[objetivos-sst-viewer.js][requestExcelPath] Iniciando solicitud de ruta Excel...');
         return new Promise((resolve) => {
             const requestId = `get-excel-path-${Date.now()}`;
+            console.log('[objetivos-sst-viewer.js][requestExcelPath] Request ID:', requestId);
+            
             const handleMessage = (event) => {
+                console.log('[objetivos-sst-viewer.js][requestExcelPath] Mensaje recibido:', event.data?.action);
                 if (event.data?.action === 'get-excel-path-response' && event.data.requestId === requestId) {
                     window.removeEventListener('message', handleMessage);
+                    console.log('[objetivos-sst-viewer.js][requestExcelPath] Respuesta recibida:', event.data);
                     resolve(event.data);
                 }
             };
             window.addEventListener('message', handleMessage);
+            
+            console.log('[objetivos-sst-viewer.js][requestExcelPath] Enviando postMessage al padre...');
             window.parent.postMessage({
                 action: 'get-excel-path-request', requestId,
                 payload: { company: this.companyName, module: this.moduleName, submodule: this.submoduleName }
@@ -763,16 +872,23 @@ class ObjetivosSSTViewer {
     }
 
     async loadExcelData() {
+        console.log('[objetivos-sst-viewer.js][loadExcelData] Iniciando carga de datos Excel...');
         return new Promise((resolve, reject) => {
             const requestId = `load-excel-data-${Date.now()}`;
+            console.log('[objetivos-sst-viewer.js][loadExcelData] Request ID:', requestId);
+            
             const handleMessage = (event) => {
+                console.log('[objetivos-sst-viewer.js][loadExcelData] Mensaje recibido:', event.data?.action);
                 if (event.data?.action === 'load-excel-data-response' && event.data.requestId === requestId) {
                     window.removeEventListener('message', handleMessage);
+                    console.log('[objetivos-sst-viewer.js][loadExcelData] Respuesta recibida, success:', event.data.success);
                     if (event.data.success) resolve(event.data.data);
                     else reject(new Error(event.data.error || 'Error al cargar datos'));
                 }
             };
             window.addEventListener('message', handleMessage);
+            
+            console.log('[objetivos-sst-viewer.js][loadExcelData] Enviando postMessage al padre...', this.excelFilePath);
             window.parent.postMessage({
                 action: 'load-excel-data-request', requestId,
                 payload: { filePath: this.excelFilePath }
@@ -862,11 +978,18 @@ function handleGlobalError(error, context) {
 // ESC cierra modal o popover
 document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || !objetivosSSTViewer) return;
-    const backdrop = document.getElementById('editModalBackdrop');
-    if (backdrop && !backdrop.classList.contains('hidden')) {
-        objetivosSSTViewer.closeEditModal();
-    } else {
-        objetivosSSTViewer.closePopover();
+    try {
+        const backdrop = document.getElementById('editModalBackdrop');
+        if (backdrop && !backdrop.classList.contains('hidden')) {
+            objetivosSSTViewer.closeEditModal();
+        } else {
+            objetivosSSTViewer.closePopover();
+        }
+    } catch (error) {
+        console.error('[objetivos-sst-viewer.js] Error al cerrar con ESC:', error);
+        if (objetivosSSTViewer) {
+            objetivosSSTViewer.showError(`Error al cerrar con ESC: ${error.message}`);
+        }
     }
 });
 
