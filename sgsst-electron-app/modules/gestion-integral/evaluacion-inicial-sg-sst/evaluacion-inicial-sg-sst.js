@@ -37,7 +37,7 @@ class EvaluacionInicialSgSst {
         this.container.classList.add('k-module-container'); // Clase contenedora estándar
 
         const mainLayout = document.createElement('div');
-        mainLayout.className = 'k-module-layout';
+        mainLayout.className = 'k-module-layout ev-inicial-sgsst';
 
         mainLayout.innerHTML = `
             <!-- 1. HEADER DEL MÓDULO (Patrón K+AIR: blanco, sticky) -->
