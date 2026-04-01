@@ -334,12 +334,13 @@ class EvaluacionInicialSgSst {
         }
     }
 
-    async loadRealFiles() {
+    async loadRealFiles(forceShowModal = false) {
         try {
             console.log('[EvaluacionInicialSgSst] Cargando archivos desde:', this.submodulePath);
+            console.log('[EvaluacionInicialSgSst] forceShowModal:', forceShowModal);
             const filesResult = await window.electronAPI.readDirectory(this.submodulePath);
             console.log('[EvaluacionInicialSgSst] Resultado readDirectory:', filesResult);
-            
+
             if (!filesResult.success) throw new Error('Error de lectura');
 
             let allFiles = [...(filesResult.files || [])];
@@ -358,7 +359,7 @@ class EvaluacionInicialSgSst {
                         allFiles = allFiles.concat(subResult.files);
                         console.log('[EvaluacionInicialSgSst] Archivos agregados desde', sub, ':', subResult.files.length);
                     }
-                } catch (e) { 
+                } catch (e) {
                     console.log('[EvaluacionInicialSgSst] Subcarpeta no existe o error:', sub, e.message);
                 }
             }
@@ -374,7 +375,12 @@ class EvaluacionInicialSgSst {
             // Si hay múltiples PDFs, mostrar selector
             if (pdfFiles.length > 1) {
                 console.log('[EvaluacionInicialSgSst] Mostrando selector de PDFs');
-                this.showPdfSelector(pdfFiles);
+                if (forceShowModal) {
+                    // Forzar mostrar el modal incluso si ya hay uno cerrado
+                    this.showPdfSelectorModalWithFiles(pdfFiles);
+                } else {
+                    this.showPdfSelector(pdfFiles);
+                }
             } else if (pdfFiles.length === 1) {
                 // Si solo hay uno, procesarlo directamente
                 console.log('[EvaluacionInicialSgSst] Procesando único PDF encontrado');
@@ -388,11 +394,19 @@ class EvaluacionInicialSgSst {
                 if (metaEl) metaEl.textContent = `Archivo detectado en: ...${reportPdf.path.slice(-30)}`;
                 if (btnView) btnView.style.display = 'inline-flex';
 
+                // Si se forzó el modal pero solo hay 1 PDF, mostrar mensaje y procesar
+                if (forceShowModal) {
+                    this.showToast('Solo hay 1 PDF disponible. Procesando...', 'info');
+                }
                 await this.processPdfData(reportPdf.path);
             } else {
                 console.warn('[EvaluacionInicialSgSst] No se encontraron archivos PDF');
                 document.getElementById('source-title').textContent = "No se encontró informe estándar";
                 document.getElementById('source-meta').textContent = "Por favor cargue un archivo PDF de evaluación (0312).";
+                
+                if (forceShowModal) {
+                    this.showToast('No se encontraron archivos PDF en la carpeta.', 'warning');
+                }
             }
 
         } catch (e) {
@@ -402,18 +416,21 @@ class EvaluacionInicialSgSst {
     }
 
     showPdfSelector(pdfFiles) {
+        console.log('[EvaluacionInicialSgSst] showPdfSelector() - Iniciando con', pdfFiles.length, 'PDFs');
+        
         // Crear un modal estilo Copasst para seleccionar el PDF
         const modal = document.createElement('div');
         modal.className = 'k-file-selector-modal';
-  
+        console.log('[EvaluacionInicialSgSst] showPdfSelector() - Modal creado:', modal);
+
         // Agrupar PDFs por tipo
         const ministerioPdfs = pdfFiles.filter(f => f.path.toLowerCase().includes('ministerio'));
         const arlPdfs = pdfFiles.filter(f => f.path.toLowerCase().includes('arl'));
-        const otherPdfs = pdfFiles.filter(f => 
-            !f.path.toLowerCase().includes('ministerio') && 
+        const otherPdfs = pdfFiles.filter(f =>
+            !f.path.toLowerCase().includes('ministerio') &&
             !f.path.toLowerCase().includes('arl')
         );
-  
+
         let modalContent = `
             <div class="k-file-selector-content">
                 <div class="k-file-selector-header">
@@ -499,9 +516,12 @@ class EvaluacionInicialSgSst {
                 </div>
             </div>
         `;
-  
+
         modal.innerHTML = modalContent;
+        console.log('[EvaluacionInicialSgSst] showPdfSelector() - Contenido HTML asignado');
+        console.log('[EvaluacionInicialSgSst] showPdfSelector() - Adjuntando modal al document.body');
         document.body.appendChild(modal);
+        console.log('[EvaluacionInicialSgSst] showPdfSelector() - Modal adjuntado exitosamente');
         
         // Guardar referencia a los PDFs para usar en navigateToFolder
         this.pdfFilesCache = {
@@ -836,10 +856,22 @@ class EvaluacionInicialSgSst {
     }
     
     showPdfSelectorModal() {
-        console.log('[EvaluacionInicialSgSst] Abriendo modal de selección de PDFs');
+        console.log('[EvaluacionInicialSgSst] Abriendo modal de selección de PDFs (forzando)');
         
-        // Cargar archivos nuevamente y mostrar el modal
-        this.loadRealFiles();
+        // Cerrar cualquier modal existente primero
+        const existingModal = document.querySelector('.k-file-selector-modal');
+        if (existingModal) {
+            console.log('[EvaluacionInicialSgSst] Cerrando modal existente');
+            existingModal.remove();
+        }
+        
+        // Cargar archivos y forzar mostrar el modal
+        this.loadRealFiles(true);
+    }
+
+    showPdfSelectorModalWithFiles(pdfFiles) {
+        console.log('[EvaluacionInicialSgSst] Mostrando modal con', pdfFiles.length, 'PDFs');
+        this.showPdfSelector(pdfFiles);
     }
     
     // --- FUNCIONES PARA PLANES DE ACCIÓN ---
