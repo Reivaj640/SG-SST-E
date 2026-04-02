@@ -823,9 +823,9 @@ class GestionIntegralHome {
         // Obtener datos reales o usar valores por defecto
         const politica = this.gestionIntegralStats?.politica || { estado: 'No disponible', actualizada: false };
         const objetivos = this.gestionIntegralStats?.objetivos || { total: 0, cumplidos: 0, porcentaje: 0 };
-        const plan_trabajo = this.gestionIntegralStats?.plan_trabajo || { 
-            totalActividades: 0, 
-            actividadesEjecutadas: 0, 
+        const plan_trabajo = this.gestionIntegralStats?.plan_trabajo || {
+            totalActividades: 0,
+            actividadesEjecutadas: 0,
             actividadesPendientes: 0,
             actividadesProgramadas: 0,
             porcentajeAvance: 0,
@@ -833,16 +833,49 @@ class GestionIntegralHome {
             estado: 'warning'
         };
         const rendicion = this.gestionIntegralStats?.rendicion_cuentas || { actas_realizadas: 0 };
+        // Estructura completa de evaluación inicial con las 3 fuentes de datos
+        const evaluacion_inicial = this.gestionIntegralStats?.evaluacion_inicial || {
+            disponible: false,
+            combinado: {
+                cumplimiento: 0,
+                hallazgosCriticos: 0,
+                hallazgosParciales: 0,
+                hallazgosCumplidos: 0,
+                totalHallazgos: 0
+            },
+            ministerio: {
+                disponible: false,
+                cumplimiento: 0,
+                hallazgosCriticos: 0,
+                hallazgosParciales: 0,
+                hallazgosCumplidos: 0,
+                totalHallazgos: 0,
+                ultimoInforme: null
+            },
+            arl: {
+                disponible: false,
+                cumplimiento: 0,
+                hallazgosCriticos: 0,
+                hallazgosParciales: 0,
+                hallazgosCumplidos: 0,
+                totalHallazgos: 0,
+                ultimoInforme: null
+            }
+        };
+
+        console.log('[GestionIntegralHome] Datos Evaluación Inicial:', evaluacion_inicial);
 
         const widget1 = this.createWidget('Política SST', politica.estado, politica.actualizada ? '✅ Al día' : '⚠️ Por actualizar');
         const widget2 = this.createWidget('Objetivos SST', `${objetivos.cumplidos}/${objetivos.total}`, `📊 ${objetivos.porcentaje}% cumplimiento`);
         const widget3 = this.createPlanTrabajoWidget(plan_trabajo);  // ← NUEVO: Widget moderno
-        const widget4 = this.createWidget('Rendición de Cuentas', `${rendicion.actas_realizadas} actas`, rendicion.actas_realizadas > 0 ? '✅ Realizadas' : '⚠️ Sin actas');
+        const widget4 = this.createEvaluacionInicialWidget(evaluacion_inicial);  // ← NUEVO: Widget Evaluación Inicial
+        const widget5 = this.createWidget('Rendición de Cuentas', `${rendicion.actas_realizadas} actas`, rendicion.actas_realizadas > 0 ? '✅ Realizadas' : '⚠️ Sin actas');
 
         widgetsContainer.appendChild(widget1);
         widgetsContainer.appendChild(widget2);
         widgetsContainer.appendChild(widget3);
         widgetsContainer.appendChild(widget4);
+        widgetsContainer.appendChild(widget5);
 
         container.appendChild(widgetsContainer);
 
@@ -933,6 +966,151 @@ class GestionIntegralHome {
         }, 100);
 
         return w;
+    }
+
+    /**
+     * Crea widget de Evaluación Inicial del SG-SST (estilo K+AIR Metric Card)
+     * @param {Object} stats - Estadísticas completas: { combinado, ministerio, arl }
+     */
+    createEvaluacionInicialWidget(stats) {
+        console.log('[EvaluacionWidget] Datos recibidos:', stats);
+        
+        // Estado del filtro (por defecto 'combinado')
+        if (!this.evaluacionFilter) {
+            this.evaluacionFilter = 'combinado';
+        }
+
+        // Obtener datos según el filtro activo
+        const data = stats[this.evaluacionFilter] || stats.combinado || {
+            disponible: false,
+            cumplimiento: 0,
+            hallazgosCriticos: 0,
+            totalHallazgos: 0
+        };
+
+        console.log('[EvaluacionWidget] Filtro:', this.evaluacionFilter, 'Datos a mostrar:', data);
+
+        const disponible = data.disponible || false;
+        const cumplimiento = data.cumplimiento || 0;
+        const hallazgosCriticos = data.hallazgosCriticos || 0;
+        const totalHallazgos = data.totalHallazgos || 0;
+
+        // Determinar color según cumplimiento
+        let colorVar = 'var(--k-danger)';
+        let colorClass = 'bg-danger';
+        let estadoText = 'Crítico';
+        let estadoIcon = '🔴';
+
+        if (cumplimiento >= 80) {
+            colorVar = 'var(--k-success)';
+            colorClass = 'bg-success';
+            estadoText = 'Satisfactorio';
+            estadoIcon = '🟢';
+        } else if (cumplimiento >= 50) {
+            colorVar = 'var(--k-warning)';
+            colorClass = 'bg-warning';
+            estadoText = 'Mejorable';
+            estadoIcon = '🟡';
+        }
+
+        const w = document.createElement('div');
+        w.className = 'widget k-budget-card';
+        w.id = 'evaluacion-inicial-widget';
+
+        // Función para actualizar el filtro
+        const updateFilter = (newFilter) => {
+            this.evaluacionFilter = newFilter;
+            // Re-renderizar el widget
+            const container = w.parentElement;
+            if (container) {
+                const newWidget = this.createEvaluacionInicialWidget(stats);
+                container.replaceChild(newWidget, w);
+            }
+        };
+
+        w.innerHTML = `
+            <div class="kb-header">
+                <span class="kb-title">📋 Evaluación Inicial</span>
+                <span class="kb-badge ${colorClass}">${cumplimiento}%</span>
+            </div>
+
+            <div class="eval-filter-group" style="display: flex; gap: 4px; margin-top: 8px;">
+                <button class="eval-filter-btn ${this.evaluacionFilter === 'combinado' ? 'active' : ''}" 
+                        onclick="window.currentGestionIntegralHome.updateEvaluacionFilter('combinado')"
+                        style="flex: 1; padding: 4px 8px; font-size: 0.7rem; border: 1px solid var(--k-border); border-radius: 4px; background: ${this.evaluacionFilter === 'combinado' ? 'var(--k-primary)' : 'var(--k-bg-card)'}; color: ${this.evaluacionFilter === 'combinado' ? 'white' : 'var(--k-text-muted)'}; cursor: pointer;">
+                    Todo
+                </button>
+                <button class="eval-filter-btn ${this.evaluacionFilter === 'ministerio' ? 'active' : ''}" 
+                        onclick="window.currentGestionIntegralHome.updateEvaluacionFilter('ministerio')"
+                        style="flex: 1; padding: 4px 8px; font-size: 0.7rem; border: 1px solid var(--k-border); border-radius: 4px; background: ${this.evaluacionFilter === 'ministerio' ? 'var(--k-primary)' : 'var(--k-bg-card)'}; color: ${this.evaluacionFilter === 'ministerio' ? 'white' : 'var(--k-text-muted)'}; cursor: pointer;">
+                    🏛️ Min
+                </button>
+                <button class="eval-filter-btn ${this.evaluacionFilter === 'arl' ? 'active' : ''}" 
+                        onclick="window.currentGestionIntegralHome.updateEvaluacionFilter('arl')"
+                        style="flex: 1; padding: 4px 8px; font-size: 0.7rem; border: 1px solid var(--k-border); border-radius: 4px; background: ${this.evaluacionFilter === 'arl' ? 'var(--k-primary)' : 'var(--k-bg-card)'}; color: ${this.evaluacionFilter === 'arl' ? 'white' : 'var(--k-text-muted)'}; cursor: pointer;">
+                    🛡️ ARL
+                </button>
+            </div>
+
+            <div class="kb-amount" style="font-size: 1.4rem; margin-top: 12px;">
+                ${estadoIcon} ${estadoText}
+            </div>
+
+            <div class="kb-progress-track">
+                <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};"></div>
+            </div>
+
+            <div class="kb-footer">
+                <div>
+                    <div class="kb-label">No Cumple</div>
+                    <div class="kb-value" style="color: var(--k-danger);">${hallazgosCriticos}</div>
+                </div>
+                <div style="text-align: right;">
+                    <div class="kb-label">Total Estándares</div>
+                    <div class="kb-value">${totalHallazgos}</div>
+                </div>
+            </div>
+        `;
+
+        // Animación de barra
+        setTimeout(() => {
+            const bar = w.querySelector('.kb-progress-bar');
+            if (bar) {
+                bar.style.width = `${cumplimiento}%`;
+            }
+        }, 100);
+
+        return w;
+    }
+
+    /**
+     * Actualiza el filtro de Evaluación Inicial y re-renderiza el widget
+     */
+    updateEvaluacionFilter(newFilter) {
+        console.log('[GestionIntegralHome] Actualizando filtro Evaluación Inicial:', newFilter);
+        this.evaluacionFilter = newFilter;
+        
+        // Re-renderizar el área principal con los nuevos datos
+        const container = document.querySelector('.gestion-integral-home .widgets-container');
+        if (container && this.gestionIntegralStats) {
+            // Eliminar widget actual
+            const oldWidget = document.getElementById('evaluacion-inicial-widget');
+            if (oldWidget) {
+                oldWidget.remove();
+            }
+            
+            // Crear nuevo widget con el filtro actualizado
+            const evaluacionStats = this.gestionIntegralStats.evaluacion_inicial || {};
+            const newWidget = this.createEvaluacionInicialWidget(evaluacionStats);
+            
+            // Insertar en la posición correcta (después del widget de Plan de Trabajo)
+            const planTrabajoWidget = container.children[2];
+            if (planTrabajoWidget) {
+                container.insertBefore(newWidget, planTrabajoWidget.nextSibling);
+            } else {
+                container.appendChild(newWidget);
+            }
+        }
     }
 
     /**

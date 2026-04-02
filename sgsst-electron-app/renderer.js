@@ -3260,6 +3260,7 @@ function showModuleHome(container, moduleName) { // 'container' ya es el <div cl
     if (moduleName === "Gestión Integral") {
         if (window.GestionIntegralHome) {
             const gestionIntegralHome = new window.GestionIntegralHome(moduleContentContainer, moduleName, submodules);
+            window.currentGestionIntegralHome = gestionIntegralHome; // Referencia global para filtros
             gestionIntegralHome.render();
         } else {
             console.error('GestionIntegralHome component not found');

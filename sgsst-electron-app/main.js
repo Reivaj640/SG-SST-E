@@ -10050,26 +10050,29 @@ ipcMain.handle('get-gestion-integral-stats', async (event, companyName) => {
                 politica: { actualizada: false, fecha: null, estado: 'No disponible' },
                 objetivos: { total: 0, cumplidos: 0, porcentaje: 0 },
                 plan_trabajo: { tareas_pendientes: 0, tareas_realizadas: 0, total: 0 },
-                rendicion_cuentas: { actas_realizadas: 0, proxima_fecha: null }
+                rendicion_cuentas: { actas_realizadas: 0, proxima_fecha: null },
+                evaluacion_inicial: { disponible: false, cumplimiento: 0, hallazgosCriticos: 0 }
             }
         };
     }
 
     const currentYear = new Date().getFullYear();
 
-    // Calcular estadísticas en paralelo
-    const [politica, objetivos, plan_trabajo, rendicion] = await Promise.all([
+    // Calcular estadísticas en paralelo (incluyendo evaluación inicial)
+    const [politica, objetivos, plan_trabajo, rendicion, evaluacion_inicial] = await Promise.all([
         calculatePoliticaStats(rootPath),
         calculateObjetivosStats(rootPath),
         calculatePlanTrabajoStats(rootPath, currentYear),
-        calculateRendicionCuentasStats(rootPath)
+        calculateRendicionCuentasStats(rootPath),
+        calculateEvaluacionInicialStats(rootPath)
     ]);
 
     const stats = {
         politica,
         objetivos,
         plan_trabajo,
-        rendicion_cuentas: rendicion
+        rendicion_cuentas: rendicion,
+        evaluacion_inicial
     };
 
     sendLog(`[MAIN] Estadísticas Gestión Integral calculadas: ${JSON.stringify(stats)}`, 'DEBUG');
@@ -10591,6 +10594,215 @@ async function calculateRendicionCuentasStats(basePath) {
     }
   } catch (error) {
     sendLog(`[MAIN] Error calculando rendición de cuentas stats: ${error.message}`, 'WARN');
+  }
+
+  return stats;
+}
+
+/**
+ * Calcular estadísticas de Evaluación Inicial del SG-SST
+ * Procesa los PDFs más recientes de Ministerio y ARL (sin filtro estricto por año)
+ * @param {string} basePath - Ruta raíz de la empresa
+ * @returns {Promise<Object>} Stats de evaluación inicial separados por fuente
+ */
+async function calculateEvaluacionInicialStats(basePath) {
+  const stats = {
+    disponible: false,
+    combinado: {
+      cumplimiento: 0,
+      hallazgosCriticos: 0,
+      hallazgosParciales: 0,
+      hallazgosCumplidos: 0,
+      totalHallazgos: 0
+    },
+    ministerio: {
+      disponible: false,
+      cumplimiento: 0,
+      hallazgosCriticos: 0,
+      hallazgosParciales: 0,
+      hallazgosCumplidos: 0,
+      totalHallazgos: 0,
+      ultimoInforme: null,
+      fechaProcesamiento: null
+    },
+    arl: {
+      disponible: false,
+      cumplimiento: 0,
+      hallazgosCriticos: 0,
+      hallazgosParciales: 0,
+      hallazgosCumplidos: 0,
+      totalHallazgos: 0,
+      ultimoInforme: null,
+      fechaProcesamiento: null
+    }
+  };
+
+  try {
+    // Intentar múltiples nombres de carpeta (priorizar nombre corto)
+    const posiblesNombres = [
+        '2. Gestión Integral',        // Nombre corto (primero)
+        '2. Gestion Integral',        // Sin tilde
+        '2. Gestión Integral del SG-SST'  // Nombre completo
+    ];
+
+    let gestionIntegralPath = null;
+    for (const nombre of posiblesNombres) {
+        const pathIntento = path.join(basePath, nombre);
+        if (fs.existsSync(pathIntento)) {
+            gestionIntegralPath = pathIntento;
+            break;
+        }
+    }
+
+    if (!gestionIntegralPath) {
+        return stats;
+    }
+
+    const evaluacionPath = path.join(gestionIntegralPath, '2.3.1 Evaluación inicial del SG-SST');
+    const evaluacionPathAlt = path.join(gestionIntegralPath, '2.3.1 Evaluacion inicial del SG-SST');
+
+    const rutaFinal = fs.existsSync(evaluacionPath) ? evaluacionPath : evaluacionPathAlt;
+
+    if (!fs.existsSync(rutaFinal)) {
+        return stats;
+    }
+
+    // Buscar PDFs en la carpeta principal y subcarpetas
+    const subfolders = ['', 'Diagnostico Ministerio', 'Diagnostico ARL', 'SGSST'];
+    let allPdfFiles = [];
+
+    for (const sub of subfolders) {
+        const subPath = sub ? path.join(rutaFinal, sub) : rutaFinal;
+        if (fs.existsSync(subPath)) {
+            const files = await fsp.readdir(subPath);
+            const pdfFiles = files.filter(f => f.toLowerCase().endsWith('.pdf'));
+            allPdfFiles = allPdfFiles.concat(pdfFiles.map(f => ({
+                name: f,
+                path: path.join(subPath, f),
+                folder: sub || 'raíz'
+            })));
+        }
+    }
+
+    if (allPdfFiles.length === 0) {
+        return stats;
+    }
+
+    // Separar por fuente (sin filtro por año)
+    const ministerioPdfs = allPdfFiles.filter(f => 
+        f.folder.toLowerCase().includes('ministerio') || 
+        f.name.toLowerCase().includes('ministerio') ||
+        f.name.toLowerCase().includes('resultados calificacion')
+    );
+    
+    // Para ARL: priorizar informes reales (Informe Res 0312) sobre certificaciones
+    const arlInformes = allPdfFiles.filter(f => 
+        f.folder.toLowerCase().includes('arl') || 
+        f.name.toLowerCase().includes('informe res 0312') ||
+        f.name.toLowerCase().includes('informe arl')
+    );
+    const arlCertificaciones = allPdfFiles.filter(f => 
+        f.name.toLowerCase().includes('certificacion') && 
+        f.name.toLowerCase().includes('arl')
+    );
+    
+    // Usar informes primero, si no hay usar certificaciones
+    const arlPdfs = arlInformes.length > 0 ? arlInformes : arlCertificaciones;
+
+    sendLog(`[Evaluacion] PDFs encontrados: ministerio=${ministerioPdfs.length}, arl=${arlPdfs.length} (informes=${arlInformes.length}, certificaciones=${arlCertificaciones.length})`, 'INFO');
+
+    // Función auxiliar para procesar un PDF
+    const procesarPdf = async (pdfInfo, fuente) => {
+        if (!pdfInfo || pdfInfo.length === 0) return null;
+        
+        // Ordenar por fecha (más reciente primero)
+        const sorted = await Promise.all(
+            pdfInfo.map(async (f) => {
+                try {
+                    const fileStats = await fsp.stat(f.path);
+                    return { ...f, mtime: fileStats.mtime };
+                } catch (e) {
+                    return { ...f, mtime: new Date(0) };
+                }
+            })
+        );
+        sorted.sort((a, b) => b.mtime - a.mtime);
+        
+        const latest = sorted[0];
+        sendLog(`[Evaluacion] Procesando ${fuente}: ${latest.name}`, 'INFO');
+        
+        const EvaluacionPdfParser = require('./utils/evaluacionPdfParser');
+        const parser = new EvaluacionPdfParser();
+        const result = await parser.parsePdf(latest.path, fuente);
+        
+        if (result.success && result.metrics) {
+            return {
+                disponible: true,
+                cumplimiento: result.metrics.cumplimiento || 0,
+                hallazgosCriticos: result.metrics.noCumplidos || 0,
+                hallazgosParciales: result.metrics.parcial || 0,
+                hallazgosCumplidos: result.metrics.cumplidos || 0,
+                totalHallazgos: result.metrics.totalItems || 0,
+                ultimoInforme: latest.name,
+                fechaProcesamiento: latest.mtime
+            };
+        }
+        return null;
+    };
+
+    // Procesar Ministerio
+    if (ministerioPdfs.length > 0) {
+        const ministerioStats = await procesarPdf(ministerioPdfs, 'ministerio');
+        if (ministerioStats) {
+            stats.ministerio = ministerioStats;
+        }
+    }
+
+    // Procesar ARL
+    if (arlPdfs.length > 0) {
+        const arlStats = await procesarPdf(arlPdfs, 'arl');
+        if (arlStats) {
+            stats.arl = arlStats;
+        }
+    }
+
+    // Calcular combinados (suma de ambos)
+    if (stats.ministerio.disponible || stats.arl.disponible) {
+        stats.disponible = true;
+        
+        // Si solo hay uno, usar sus datos como combinado
+        if (!stats.ministerio.disponible && stats.arl.disponible) {
+            stats.combinado = {
+                cumplimiento: stats.arl.cumplimiento,
+                hallazgosCriticos: stats.arl.hallazgosCriticos,
+                hallazgosParciales: stats.arl.hallazgosParciales,
+                hallazgosCumplidos: stats.arl.hallazgosCumplidos,
+                totalHallazgos: stats.arl.totalHallazgos
+            };
+        } else if (stats.ministerio.disponible && !stats.arl.disponible) {
+            stats.combinado = {
+                cumplimiento: stats.ministerio.cumplimiento,
+                hallazgosCriticos: stats.ministerio.hallazgosCriticos,
+                hallazgosParciales: stats.ministerio.hallazgosParciales,
+                hallazgosCumplidos: stats.ministerio.hallazgosCumplidos,
+                totalHallazgos: stats.ministerio.totalHallazgos
+            };
+        } else {
+            // Ambos disponibles - promediar cumplimiento, sumar hallazgos
+            stats.combinado = {
+                cumplimiento: Math.round((stats.ministerio.cumplimiento + stats.arl.cumplimiento) / 2),
+                hallazgosCriticos: stats.ministerio.hallazgosCriticos + stats.arl.hallazgosCriticos,
+                hallazgosParciales: stats.ministerio.hallazgosParciales + stats.arl.hallazgosParciales,
+                hallazgosCumplidos: stats.ministerio.hallazgosCumplidos + stats.arl.hallazgosCumplidos,
+                totalHallazgos: stats.ministerio.totalHallazgos + stats.arl.totalHallazgos
+            };
+        }
+    }
+
+    sendLog(`[Evaluacion] Stats calculados: combinado=${stats.combinado.cumplimiento}%, min=${stats.ministerio.cumplimiento}%, arl=${stats.arl.cumplimiento}%`, 'INFO');
+
+  } catch (error) {
+    sendLog(`[MAIN] Error calculando evaluación inicial stats: ${error.message}`, 'WARN');
   }
 
   return stats;
