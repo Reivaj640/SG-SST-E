@@ -187,7 +187,7 @@ class InvestigacionAccidentesComponent {
         this.container.innerHTML = '';
 
         const iframe = document.createElement('iframe');
-        iframe.src = './modules/gestion-salud/investigacion-accidentes/investigaciones-view.html';
+        iframe.src = `./modules/gestion-salud/investigacion-accidentes/investigaciones-view.html?company=${encodeURIComponent(this.currentCompany)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
         iframe.style.width = '100%';
         iframe.style.height = '100%';
         iframe.style.border = 'none';

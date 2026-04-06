@@ -188,6 +188,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   generateAccidentReport: (combinedData) =>
     ipcRenderer.invoke('investigacion-accidentes-generate-accident-report', combinedData),
   saveTempPdfFile: (filename, data) => ipcRenderer.invoke('investigacion-accidentes-save-temp-pdf-file', filename, data),
+
+  // --- Investigación de Accidentes (Gestión) ---
+  getInvestigacionStats: (companyName) => ipcRenderer.invoke('investigacion-accidentes-get-stats', { companyName }),
+  listInvestigations: (companyName, filter) => ipcRenderer.invoke('investigacion-accidentes-list-investigations', { companyName, filter }),
+  getInvestigationDetail: (companyName, investigationName) => ipcRenderer.invoke('investigacion-accidentes-get-investigation-detail', { companyName, investigationName }),
+
   readAusentismoData: (companyName) =>
     ipcRenderer.invoke('get-ausentismo-data', companyName),
   getPriSeguimientoData: (companyName) =>

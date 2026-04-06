@@ -2,6 +2,7 @@ const { ipcMain, dialog, app } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fsp = require('fs').promises;
+const fs = require('fs');
 const { promisify } = require('util');
 const { execFile } = require('child_process');
 const http = require('http');
@@ -854,6 +855,742 @@ async function initializeLlmServer() {
         return false;
     }
 }
+
+// ============================================================================
+// INVESTIGACIÓN MANAGEMENT HANDLERS
+// Gestión de investigaciones: listar, contar, detalle (no confundir con los
+// handlers de análisis IA que ya existen arriba)
+// ============================================================================
+
+/**
+ * Helper: encuentra la ruta del submódulo de investigación para una empresa.
+ * Reutiliza la misma lógica de mapeo que get-document-folders en main.js.
+ */
+async function _findInvestigacionSubmodulePath(companyName) {
+    const configPath = path.join(app.getPath('userData'), 'config.json');
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+
+    if (!config.companyPaths || !config.companyPaths[companyName]) {
+        throw new Error(`No se encontró configuración para la empresa: ${companyName}`);
+    }
+
+    const actualCompanyStructure = config.companyPaths[companyName]?.structure?.structure;
+    if (!actualCompanyStructure) {
+        throw new Error(`La estructura de directorios para la empresa '${companyName}' es inválida o no está mapeada.`);
+    }
+
+    // DEBUG: Imprimir estructura mapeada
+    sendLog(`[INV-PATH-DEBUG] Estructura raíz: name="${actualCompanyStructure.name}", path="${actualCompanyStructure.path}"`, 'INFO');
+    sendLog(`[INV-PATH-DEBUG] Subdirectorios en raíz: [${Object.keys(actualCompanyStructure.subdirectories || {}).join(', ')}]`, 'INFO');
+
+    // Buscar la carpeta que contenga el código "3.2.2" (Investigación de Accidentes)
+    // NOTA: Los nodos NO tienen mappedPath, solo tienen name, path y subdirectories
+    function searchInStructure(node, targetCode) {
+        if (!node) return null;
+
+        // Buscar por nombre del nodo
+        if (node.name && node.name.includes(targetCode)) {
+            // Construir la ruta completa
+            return node.path || null;
+        }
+
+        if (node.subdirectories) {
+            for (const childName of Object.keys(node.subdirectories)) {
+                const child = node.subdirectories[childName];
+                if (child.name && child.name.includes(targetCode)) {
+                    return child.path || null;
+                }
+                const found = searchInStructure(child, targetCode);
+                if (found) return found;
+            }
+        }
+        return null;
+    }
+
+    const submodulePath = searchInStructure(actualCompanyStructure, '3.2.2');
+    if (!submodulePath) {
+        sendLog(`[INV-PATH-DEBUG] Búsqueda fallida: No se encontró ningún nodo con "3.2.2" en el nombre`, 'ERROR');
+        throw new Error(`No se pudo encontrar la ruta del submódulo 3.2.2 para la empresa '${companyName}'.`);
+    }
+    sendLog(`[INV-PATH-DEBUG] Ruta encontrada: ${submodulePath}`, 'INFO');
+    return submodulePath;
+}
+
+/**
+ * Helper: determina si un nombre de carpeta corresponde a un patrón de año
+ * (ej: "AT 2024", "2024", "Año 2025", etc.)
+ */
+function _isYearFolder(name) {
+    // Busca un año de 4 dígitos que empiece con 19 o 20
+    return /\b(19|20)\d{2}\b/.test(name);
+}
+
+/**
+ * Helper: determina si un nombre de carpeta corresponde a un patrón de mes
+ * (ej: "1. Enero", "2. Febrero", "01-Enero", etc.)
+ */
+function _isMonthFolder(name) {
+    const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                        'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    const lowerName = name.toLowerCase();
+    return monthNames.some(m => lowerName.includes(m));
+}
+
+/**
+ * Helper: determina si un archivo es un documento de investigación de accidente,
+ * independientemente del esquema de nombre usado (FURAT, InformeATE, GI-FO-020, etc.)
+ */
+function _isInvestigationFile(filename) {
+    const upper = filename.toUpperCase();
+    const lower = filename.toLowerCase();
+    const isDoc = lower.endsWith('.pdf') || lower.endsWith('.docx');
+    if (!isDoc) return false;
+    return (
+        upper.includes('FURAT')          ||
+        upper.includes('INFORMEATE')     ||
+        upper.includes('INFORMEAT ')     ||
+        upper.includes('GI-FO-020')      ||
+        upper.includes('INVESTIGACION')
+    );
+}
+
+/**
+ * Helper: extrae el nombre de la persona desde el nombre del archivo.
+ * Soporta patrones: "InformeATE-Maria Ferrer", "GI-FO-020 INVESTIGACION Cristian Alvarez",
+ * "Jose Fernando Lopez - 5-5", "Ramiro Romero Fierro".
+ */
+function _extractPersonName(filename) {
+    const noExt = filename.replace(/\.[^.]+$/, '');
+    // "InformeATE-Maria Ferrer" o "InformeATE Maria Ferrer"
+    let m = noExt.match(/InformeATE?[-\s]+(.+)/i);
+    if (m) return m[1].trim();
+    // "GI-FO-020 INVESTIGACION Cristian Alvarez"
+    m = noExt.match(/GI-FO-020\s+INVESTIGACION\s+(.+)/i);
+    if (m) return m[1].trim();
+    // "Jose Fernando Lopez - 5-5" (nombre + fecha separada por " - ")
+    m = noExt.match(/^(.+?)\s*-\s*\d.*$/);
+    if (m) return m[1].trim();
+    // Fallback: nombre de archivo completo sin extensión
+    return noExt.trim();
+}
+
+/**
+ * Helper: descubre investigaciones dentro de una ruta base, soportando:
+ *  - Estructura plana: <basePath>/<investigación>/FURAT.pdf
+ *  - Estructura año/mes: <basePath>/<año>/<mes>/<investigación>/FURAT.pdf
+ *  - Estructura con carpetas intermedias: <basePath>/Investigaciones/2. Accidentes/<año>/<mes>/...
+ *
+ * Retorna un array de objetos con:
+ *  { name, relativePath, fullPath, isFolder, hasFurat }
+ */
+async function _discoverInvestigations(basePath) {
+    const investigations = [];
+
+    /**
+     * Determina si un nombre corresponde a una carpeta intermedia conocida
+     * (no es una investigación ni un año ni un mes)
+     */
+    function isIntermediateFolder(name) {
+        const intermediates = ['investigaciones', '1. eventos', '2. accidentes',
+                               '3. incidentes menores', '4. procedimientos'];
+        return intermediates.some(i => name.toLowerCase().includes(i));
+    }
+
+    /**
+     * Procesa una carpeta que potencialmente contiene investigaciones.
+     * Si tiene FURAT directo → es investigación.
+     * Si tiene subcarpetas → verificar recursivamente.
+     */
+    async function processFolder(folderPath, relativeFrom) {
+        let items;
+        try {
+            items = await fsp.readdir(folderPath, { withFileTypes: true });
+        } catch (err) { return; }
+
+        // Verificar si esta carpeta es una investigación válida (tiene FURAT)
+        const hasFurat = items.some(item =>
+            item.isFile() && item.name.toUpperCase().includes('FURAT') && item.name.toLowerCase().endsWith('.pdf')
+        );
+
+        if (hasFurat) {
+            const folderName = path.basename(folderPath);
+            const relativePath = path.relative(relativeFrom, folderPath);
+            sendLog(`[INV-DISCOVER] ✅ Investigación encontrada: ${relativePath}`, 'INFO');
+            investigations.push({
+                name: folderName,
+                relativePath,
+                fullPath: folderPath,
+                isFolder: true,
+                hasFurat: true
+            });
+            return; // No descendemos más, ya es una investigación
+        }
+
+        const relPath = path.relative(relativeFrom, folderPath);
+        const dirCount = items.filter(i => i.isDirectory()).length;
+        const fileCount = items.filter(i => i.isFile()).length;
+        sendLog(`[INV-DISCOVER] 📂 Explorando: ${relPath || '(raíz)'} → ${dirCount} carpetas, ${fileCount} archivos`, 'INFO');
+
+        // Si no tiene FURAT, explorar subcarpetas
+        for (const item of items) {
+            if (!item.isDirectory()) continue;
+            const itemPath = path.join(folderPath, item.name);
+
+            if (isIntermediateFolder(item.name)) {
+                // Carpeta intermedia: descender automáticamente
+                sendLog(`[INV-DISCOVER]   ↳ Carpeta intermedia: ${item.name}`, 'INFO');
+                await processFolder(itemPath, relativeFrom);
+            } else if (_isYearFolder(item.name)) {
+                // Carpeta de año: buscar meses e investigaciones dentro
+                sendLog(`[INV-DISCOVER]   ↳ Carpeta de año: ${item.name}`, 'INFO');
+                await processYearFolder(itemPath, folderPath, relativeFrom);
+            } else if (_isMonthFolder(item.name)) {
+                // Carpeta de mes: buscar investigaciones dentro
+                sendLog(`[INV-DISCOVER]   ↳ Carpeta de mes: ${item.name}`, 'INFO');
+                await processMonthFolder(itemPath, folderPath, relativeFrom);
+            } else {
+                // Carpeta genérica: verificar si es investigación o contenedor
+                await processFolder(itemPath, relativeFrom);
+            }
+        }
+    }
+
+    /**
+     * Procesa una carpeta de año (AT 2024, 2024, etc.)
+     */
+    async function processYearFolder(yearPath, basePath, relativeFrom) {
+        let yearItems;
+        try {
+            yearItems = await fsp.readdir(yearPath, { withFileTypes: true });
+        } catch (err) { return; }
+
+        const monthFolders = yearItems.filter(item => item.isDirectory() && _isMonthFolder(item.name));
+
+        if (monthFolders.length > 0) {
+            // Estructura Año > Mes > Investigación
+            for (const monthItem of monthFolders) {
+                await processMonthFolder(path.join(yearPath, monthItem.name), basePath, relativeFrom);
+            }
+        } else {
+            // Año sin meses nombrados: buscar investigaciones directas
+            for (const subItem of yearItems) {
+                if (!subItem.isDirectory()) {
+                    if (subItem.name.toLowerCase().endsWith('.pdf') && subItem.name.toUpperCase().includes('FURAT')) {
+                        const relativePath = path.relative(relativeFrom, path.join(yearPath, subItem.name));
+                        investigations.push({
+                            name: subItem.name,
+                            relativePath,
+                            fullPath: path.join(yearPath, subItem.name),
+                            isFolder: false,
+                            hasFurat: true
+                        });
+                    }
+                    continue;
+                }
+                await processFolder(path.join(yearPath, subItem.name), relativeFrom);
+            }
+        }
+    }
+
+    /**
+     * Procesa una carpeta de mes (1. Enero, Enero, etc.)
+     */
+    async function processMonthFolder(monthPath, basePath, relativeFrom) {
+        let monthItems;
+        try {
+            monthItems = await fsp.readdir(monthPath, { withFileTypes: true });
+        } catch (err) { return; }
+
+        const relMonth = path.relative(relativeFrom, monthPath);
+        const dirs = monthItems.filter(i => i.isDirectory()).map(i => i.name);
+        const files = monthItems.filter(i => i.isFile()).map(i => i.name);
+        sendLog(`[INV-DISCOVER]   📋 Contenido de mes "${relMonth}": carpetas=[${dirs.join(', ')}], archivos=[${files.join(', ')}]`, 'INFO');
+
+        for (const subItem of monthItems) {
+            const subItemPath = path.join(monthPath, subItem.name);
+            if (subItem.isDirectory()) {
+                // Verificar si es una investigación (tiene FURAT)
+                let folderFiles;
+                try {
+                    folderFiles = await fsp.readdir(subItemPath, { withFileTypes: true });
+                } catch (err) { continue; }
+
+                const subFileNames = folderFiles.filter(f => f.isFile()).map(f => f.name);
+                sendLog(`[INV-DISCOVER]     🔍 Revisando carpeta "${subItem.name}": archivos=[${subFileNames.join(', ')}]`, 'INFO');
+
+                const hasFurat = folderFiles.some(f =>
+                    f.isFile() && f.name.toUpperCase().includes('FURAT') && f.name.toLowerCase().endsWith('.pdf')
+                );
+
+                if (hasFurat) {
+                    const relativePath = path.relative(relativeFrom, subItemPath);
+                    sendLog(`[INV-DISCOVER]     ✅ ¡FURAT encontrado en: ${relativePath}`, 'INFO');
+                    investigations.push({
+                        name: subItem.name,
+                        relativePath,
+                        fullPath: subItemPath,
+                        isFolder: true,
+                        hasFurat: true
+                    });
+                }
+            }
+        }
+
+        // Agrupar archivos sueltos de investigación por persona
+        const looseInvFiles = monthItems.filter(i => i.isFile() && _isInvestigationFile(i.name));
+        if (looseInvFiles.length > 0) {
+            const byPerson = new Map();
+            for (const f of looseInvFiles) {
+                const personName = _extractPersonName(f.name);
+                const key = personName.toLowerCase().replace(/\s+/g, '_');
+                if (!byPerson.has(key)) {
+                    byPerson.set(key, { personName, files: [], hasFurat: false, hasInforme: false });
+                }
+                const entry = byPerson.get(key);
+                entry.files.push(f.name);
+                if (f.name.toUpperCase().includes('FURAT')) entry.hasFurat = true;
+                if (f.name.toUpperCase().includes('GI-FO-020') ||
+                    f.name.toUpperCase().includes('INFORMEATE') ||
+                    f.name.toUpperCase().includes('INFORMEAT ') ||
+                    f.name.toLowerCase().includes('informe')) {
+                    entry.hasInforme = true;
+                }
+            }
+            for (const [, entry] of byPerson) {
+                const relativePath = path.relative(relativeFrom, monthPath);
+                sendLog(`[INV-DISCOVER]   ✅ Investigación encontrada (archivos sueltos): ${entry.personName}`, 'INFO');
+                investigations.push({
+                    name: entry.personName,
+                    relativePath,
+                    fullPath: monthPath,
+                    isFolder: false,
+                    hasFurat: entry.hasFurat,
+                    _filesInMonth: entry.files,
+                    _hasInforme: entry.hasInforme
+                });
+            }
+        }
+    }
+
+    // Iniciar el descubrimiento desde la raíz
+    await processFolder(basePath, basePath);
+
+    return investigations;
+}
+
+/**
+ * Helper: analiza el contenido de una carpeta de investigación y determina
+ * su estado (pendiente, en_curso, completada).
+ *
+ * Criterios:
+ * - PENDIENTE: solo contiene archivos FURAT (PDFs con "FURAT" en el nombre)
+ * - EN_CURSO: contiene FURAT + archivos intermedios (evidencias, notas) pero NO informe final
+ * - COMPLETADA: contiene un archivo con "Informe_Investigacion" o "informe" en el nombre
+ */
+function _analyzeInvestigationState(folderName, files) {
+    const hasFurat = files.some(f =>
+        f.name.toUpperCase().includes('FURAT') && f.name.toLowerCase().endsWith('.pdf')
+    );
+    const hasInforme = files.some(f =>
+        f.name.toLowerCase().includes('informe_investigacion') ||
+        f.name.toLowerCase().includes('informe de investigacion') ||
+        f.name.toLowerCase().includes('informe_accidente')      ||
+        f.name.toUpperCase().includes('INFORMEATE')             ||
+        f.name.toUpperCase().includes('INFORMEAT ')
+    );
+
+    if (!hasFurat && !hasInforme) {
+        return { estado: 'pendiente', tipo: 'carpeta', reason: 'Sin FURAT ni informe' };
+    }
+
+    if (hasFurat && hasInforme) {
+        return { estado: 'completada', tipo: 'carpeta', reason: 'Con informe final' };
+    }
+
+    if (hasFurat && !hasInforme) {
+        return { estado: 'pendiente', tipo: 'carpeta', reason: 'FURAT sin informe' };
+    }
+
+    return { estado: 'pendiente', tipo: 'carpeta', reason: 'Estado desconocido' };
+}
+
+/**
+ * IPC Handler: investigacion-accidentes-get-stats
+ * Cuenta investigaciones pendientes y completadas en la carpeta del submódulo.
+ *
+ * Input: { companyName: string }
+ * Output: { success: true, data: { pendientes: N, completadas: N, total: N } }
+ */
+ipcMain.handle('investigacion-accidentes-get-stats', async (event, { companyName }) => {
+    try {
+        sendLog(`[INV-STATS] Solicitud de estadísticas para: ${companyName}`, 'INFO');
+
+        if (!companyName) {
+            return { success: false, error: { code: 'MISSING_COMPANY', message: 'Nombre de empresa requerido' } };
+        }
+
+        const submodulePath = await _findInvestigacionSubmodulePath(companyName);
+
+        if (!fs.existsSync(submodulePath)) {
+            sendLog(`[INV-STATS] La ruta del submódulo no existe: ${submodulePath}`, 'WARN');
+            return { success: true, data: { pendientes: 0, completadas: 0, total: 0 } };
+        }
+
+        // Usar el mismo descubrimiento que el list handler para consistencia
+        const discovered = await _discoverInvestigations(submodulePath);
+        let pendientes = 0;
+        let completadas = 0;
+
+        for (const inv of discovered) {
+            if (!inv.isFolder) {
+                if (inv._hasInforme) completadas++;
+                else pendientes++;
+                continue;
+            }
+            try {
+                const folderFiles = await fsp.readdir(inv.fullPath, { withFileTypes: true });
+                const fileInfos = folderFiles
+                    .filter(f => f.isFile())
+                    .map(f => ({ name: f.name, path: path.join(inv.fullPath, f.name) }));
+                const state = _analyzeInvestigationState(inv.name, fileInfos);
+                if (state.estado === 'completada') {
+                    completadas++;
+                } else {
+                    pendientes++;
+                }
+            } catch (err) {
+                pendientes++;
+            }
+        }
+
+        const total = pendientes + completadas;
+        const result = {
+            success: true,
+            data: {
+                pendientes,
+                completadas,
+                total
+            }
+        };
+
+        sendLog(`[INV-STATS] Estadísticas para ${companyName}: ${pendientes} pendientes, ${completadas} completadas, ${total} total`, 'INFO');
+        return result;
+
+    } catch (error) {
+        sendLog(`[INV-STATS] Error: ${error.message}`, 'ERROR');
+        return { success: false, error: { code: 'STATS_ERROR', message: error.message } };
+    }
+});
+
+/**
+ * IPC Handler: investigacion-accidentes-list-investigations
+ * Lista todas las investigaciones con su estado, metadata y archivos.
+ * Soporta estructura plana y estructura Año > Mes > Investigación.
+ *
+ * Input: { companyName: string, filter?: 'todas' | 'pendiente' | 'completada' }
+ * Output: { success: true, data: [ { id, nombre, estado, fecha, archivos: [] } ] }
+ */
+ipcMain.handle('investigacion-accidentes-list-investigations', async (event, { companyName, filter }) => {
+    try {
+        sendLog(`[INV-LIST] Solicitud de lista para: ${companyName}, filtro: ${filter || 'todas'}`, 'INFO');
+
+        if (!companyName) {
+            return { success: false, error: { code: 'MISSING_COMPANY', message: 'Nombre de empresa requerido' } };
+        }
+
+        const submodulePath = await _findInvestigacionSubmodulePath(companyName);
+
+        if (!fs.existsSync(submodulePath)) {
+            sendLog(`[INV-LIST] La ruta del submódulo no existe: ${submodulePath}`, 'WARN');
+            return { success: true, data: [] };
+        }
+
+        // Usar descubrimiento inteligente (detecta año/mes o estructura plana)
+        const discovered = await _discoverInvestigations(submodulePath);
+        const investigations = [];
+
+        for (const inv of discovered) {
+            // Aplicar filtro si existe
+            if (filter && filter !== 'todas') {
+                // Para filtrar necesitamos analizar el estado
+                if (inv.isFolder) {
+                    const folderFiles = await fsp.readdir(inv.fullPath, { withFileTypes: true });
+                    const fileInfos = folderFiles
+                        .filter(f => f.isFile())
+                        .map(f => {
+                            const filePath = path.join(inv.fullPath, f.name);
+                            const stats = fs.statSync(filePath);
+                            return {
+                                name: f.name,
+                                path: filePath,
+                                extension: path.extname(f.name).substring(1),
+                                size: stats.size,
+                                modified: stats.mtime.toISOString()
+                            };
+                        });
+                    const state = _analyzeInvestigationState(inv.name, fileInfos);
+                    if (state.estado !== filter) continue;
+
+                    const folderStats = fs.statSync(inv.fullPath);
+                    investigations.push({
+                        id: `inv-${inv.name.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}`,
+                        nombre: inv.name,
+                        estado: state.estado,
+                        tipo: 'carpeta',
+                        fecha: folderStats.mtime.toISOString(),
+                        totalArchivos: fileInfos.length,
+                        archivos: fileInfos,
+                        relativePath: inv.relativePath
+                    });
+                } else {
+                    const invEstado = inv._hasInforme ? 'completada' : 'pendiente';
+                    if (filter !== 'todas' && filter !== invEstado) continue;
+                    const folderStats = fs.statSync(inv.fullPath);
+                    const archivos = (inv._filesInMonth || [inv.name]).map(fname => {
+                        const fp = path.join(inv.fullPath, fname);
+                        try {
+                            const s = fs.statSync(fp);
+                            return { name: fname, path: fp, extension: path.extname(fname).substring(1), size: s.size, modified: s.mtime.toISOString() };
+                        } catch (_) {
+                            return { name: fname, path: fp, extension: path.extname(fname).substring(1), size: 0, modified: folderStats.mtime.toISOString() };
+                        }
+                    });
+                    investigations.push({
+                        id: `inv-${inv.name.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}`,
+                        nombre: inv.name,
+                        estado: invEstado,
+                        tipo: 'archivo',
+                        fecha: folderStats.mtime.toISOString(),
+                        totalArchivos: archivos.length,
+                        archivos,
+                        relativePath: inv.relativePath
+                    });
+                }
+            } else {
+                // Sin filtro, construir entrada completa
+                if (inv.isFolder) {
+                    const folderFiles = await fsp.readdir(inv.fullPath, { withFileTypes: true });
+                    const fileInfos = folderFiles
+                        .filter(f => f.isFile())
+                        .map(f => {
+                            const filePath = path.join(inv.fullPath, f.name);
+                            const stats = fs.statSync(filePath);
+                            return {
+                                name: f.name,
+                                path: filePath,
+                                extension: path.extname(f.name).substring(1),
+                                size: stats.size,
+                                modified: stats.mtime.toISOString()
+                            };
+                        });
+                    const state = _analyzeInvestigationState(inv.name, fileInfos);
+                    const folderStats = fs.statSync(inv.fullPath);
+
+                    investigations.push({
+                        id: `inv-${inv.name.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}`,
+                        nombre: inv.name,
+                        estado: state.estado,
+                        tipo: 'carpeta',
+                        fecha: folderStats.mtime.toISOString(),
+                        totalArchivos: fileInfos.length,
+                        archivos: fileInfos,
+                        relativePath: inv.relativePath
+                    });
+                } else {
+                    const invEstado = inv._hasInforme ? 'completada' : 'pendiente';
+                    const folderStats = fs.statSync(inv.fullPath);
+                    const archivos = (inv._filesInMonth || [inv.name]).map(fname => {
+                        const fp = path.join(inv.fullPath, fname);
+                        try {
+                            const s = fs.statSync(fp);
+                            return { name: fname, path: fp, extension: path.extname(fname).substring(1), size: s.size, modified: s.mtime.toISOString() };
+                        } catch (_) {
+                            return { name: fname, path: fp, extension: path.extname(fname).substring(1), size: 0, modified: folderStats.mtime.toISOString() };
+                        }
+                    });
+                    investigations.push({
+                        id: `inv-${inv.name.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}`,
+                        nombre: inv.name,
+                        estado: invEstado,
+                        tipo: 'archivo',
+                        fecha: folderStats.mtime.toISOString(),
+                        totalArchivos: archivos.length,
+                        archivos,
+                        relativePath: inv.relativePath
+                    });
+                }
+            }
+        }
+
+        // Ordenar por fecha más reciente primero
+        investigations.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+        sendLog(`[INV-LIST] ${investigations.length} investigaciones encontradas`, 'INFO');
+        return { success: true, data: investigations };
+
+    } catch (error) {
+        sendLog(`[INV-LIST] Error: ${error.message}`, 'ERROR');
+        return { success: false, error: { code: 'LIST_ERROR', message: error.message } };
+    }
+});
+
+/**
+ * IPC Handler: investigacion-accidentes-get-investigation-detail
+ * Obtiene el detalle completo de una investigación específica.
+ * Soporta investigationName como nombre directo o relativePath (año/mes/nombre).
+ *
+ * Input: { companyName: string, investigationName: string }
+ *        investigationName puede ser: "AT 2024", "AT 2024/1. Enero/NombreInv", o solo "NombreInv"
+ * Output: { success: true, data: { id, nombre, estado, fecha, archivos: [], informePath?: string } }
+ */
+ipcMain.handle('investigacion-accidentes-get-investigation-detail', async (event, { companyName, investigationName }) => {
+    try {
+        sendLog(`[INV-DETAIL] Solicitud de detalle para: ${companyName}, investigación: ${investigationName}`, 'INFO');
+
+        if (!companyName || !investigationName) {
+            return { success: false, error: { code: 'MISSING_PARAMS', message: 'Nombre de empresa e investigación requeridos' } };
+        }
+
+        const submodulePath = await _findInvestigacionSubmodulePath(companyName);
+
+        if (!fs.existsSync(submodulePath)) {
+            return { success: false, error: { code: 'PATH_NOT_FOUND', message: `Ruta del submódulo no encontrada para ${companyName}` } };
+        }
+
+        // Intentar resolver la ruta de la investigación
+        let investigationPath = null;
+        let investigationNameOnly = null;
+        let isFolder = false;
+
+        // Estrategia 1: Si investigationName contiene separadores de ruta, es un relativePath
+        if (investigationName.includes('/') || investigationName.includes('\\')) {
+            const fullPath = path.join(submodulePath, investigationName);
+            if (fs.existsSync(fullPath)) {
+                const stat = fs.statSync(fullPath);
+                investigationPath = fullPath;
+                isFolder = stat.isDirectory();
+                investigationNameOnly = path.basename(investigationName);
+            }
+        }
+
+        // Estrategia 2: Intentar como nombre directo en la raíz del submódulo
+        if (!investigationPath) {
+            const folderCandidate = path.join(submodulePath, investigationName);
+            if (fs.existsSync(folderCandidate)) {
+                const stat = fs.statSync(folderCandidate);
+                if (stat.isDirectory()) {
+                    investigationPath = folderCandidate;
+                    isFolder = true;
+                    investigationNameOnly = investigationName;
+                } else if (stat.isFile() && investigationName.toLowerCase().endsWith('.pdf')) {
+                    investigationPath = folderCandidate;
+                    isFolder = false;
+                    investigationNameOnly = investigationName;
+                }
+            }
+        }
+
+        // Estrategia 3: Usar descubrimiento recursivo para buscar por nombre
+        if (!investigationPath) {
+            const discovered = await _discoverInvestigations(submodulePath);
+            const searchTerm = investigationName.toLowerCase();
+
+            // Buscar por coincidencia exacta o parcial en el nombre
+            const match = discovered.find(d =>
+                d.name.toLowerCase() === searchTerm || d.name.toLowerCase().includes(searchTerm)
+            );
+
+            if (match) {
+                investigationPath = match.fullPath;
+                isFolder = match.isFolder;
+                investigationNameOnly = match.name;
+            }
+        }
+
+        // Estrategia 4: Búsqueda fuzzy en la raíz (fallback legacy)
+        if (!investigationPath) {
+            const items = await fsp.readdir(submodulePath, { withFileTypes: true });
+            const searchTerm = investigationName.toLowerCase();
+
+            for (const item of items) {
+                if (item.name.toLowerCase().includes(searchTerm)) {
+                    investigationPath = path.join(submodulePath, item.name);
+                    isFolder = item.isDirectory();
+                    investigationNameOnly = item.name;
+                    break;
+                }
+            }
+        }
+
+        if (!investigationPath) {
+            return { success: false, error: { code: 'INVESTIGATION_NOT_FOUND', message: `No se encontró la investigación: ${investigationName}` } };
+        }
+
+        let archivos = [];
+        let state;
+        let modifiedDate;
+
+        if (isFolder) {
+            const folderFiles = await fsp.readdir(investigationPath, { withFileTypes: true });
+            archivos = folderFiles
+                .filter(f => f.isFile())
+                .map(f => {
+                    const filePath = path.join(investigationPath, f.name);
+                    const stats = fs.statSync(filePath);
+                    return {
+                        name: f.name,
+                        path: filePath,
+                        extension: path.extname(f.name).substring(1),
+                        size: stats.size,
+                        modified: stats.mtime.toISOString()
+                    };
+                });
+
+            const folderStats = fs.statSync(investigationPath);
+            modifiedDate = folderStats.mtime.toISOString();
+            state = _analyzeInvestigationState(investigationNameOnly, archivos);
+        } else {
+            const fileStats = fs.statSync(investigationPath);
+            modifiedDate = fileStats.mtime.toISOString();
+            archivos = [{
+                name: path.basename(investigationPath),
+                path: investigationPath,
+                extension: 'pdf',
+                size: fileStats.size,
+                modified: fileStats.mtime.toISOString()
+            }];
+            state = { estado: 'pendiente', tipo: 'archivo' };
+        }
+
+        // Buscar informe
+        const informe = archivos.find(f =>
+            f.name.toLowerCase().includes('informe_investigacion') ||
+            f.name.toLowerCase().includes('informe de investigacion')
+        );
+
+        const result = {
+            success: true,
+            data: {
+                id: `inv-${investigationNameOnly.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}`,
+                nombre: investigationNameOnly,
+                estado: state.estado,
+                tipo: isFolder ? 'carpeta' : 'archivo',
+                fecha: modifiedDate,
+                totalArchivos: archivos.length,
+                archivos,
+                informePath: informe ? informe.path : null
+            }
+        };
+
+        sendLog(`[INV-DETAIL] Detalle obtenido para: ${investigationNameOnly}`, 'INFO');
+        return result;
+
+    } catch (error) {
+        sendLog(`[INV-DETAIL] Error: ${error.message}`, 'ERROR');
+        return { success: false, error: { code: 'DETAIL_ERROR', message: error.message } };
+    }
+});
 
 // Exportar funciones para inicialización desde el exterior
 module.exports = {

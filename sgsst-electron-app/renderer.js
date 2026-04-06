@@ -1050,6 +1050,61 @@ document.addEventListener('DOMContentLoaded', async () => {
                   apiCallArgs = [payload];
                   responseType = 'investigacion-accidentes-generate-accident-report-request-response';
                   break;
+              case 'investigacion-accidentes-get-stats-request':
+                  // Manejar solicitud de estadísticas de investigaciones
+                  apiCallFunction = window.electronAPI.getInvestigacionStats;
+                  apiCallArgs = [payload.companyName];
+                  responseType = 'investigacion-accidentes-get-stats-response';
+                  break;
+              case 'investigacion-accidentes-list-investigations-request':
+                  // Manejar solicitud de lista de investigaciones
+                  apiCallFunction = window.electronAPI.listInvestigations;
+                  apiCallArgs = [payload.companyName, payload.filter];
+                  responseType = 'investigacion-accidentes-list-investigations-response';
+                  break;
+              case 'investigacion-accidentes-get-investigation-detail-request':
+                  // Manejar solicitud de detalle de investigación
+                  apiCallFunction = window.electronAPI.getInvestigationDetail;
+                  apiCallArgs = [payload.companyName, payload.investigationName];
+                  responseType = 'investigacion-accidentes-get-investigation-detail-response';
+                  break;
+              case 'get-investigacion-stats-request':
+                  // Portal home solicita estadísticas de investigaciones
+                  // Extraer companyName de la URL del iframe (query param ?company=)
+                  try {
+                      const portalUrl = targetWindow.location ? targetWindow.location.href : '';
+                      const urlMatch = portalUrl.match(/[?&]company=([^&]+)/);
+                      const portalCompany = urlMatch ? decodeURIComponent(urlMatch[1]) : '';
+
+                      if (!portalCompany) {
+                          targetWindow.postMessage({
+                              type: responseType,
+                              payload: { pendientes: 0, completadas: 0, total: 0 },
+                              requestId: requestId
+                          }, '*');
+                          return;
+                      }
+
+                      // Llamar al handler y unwrap del resultado
+                      const statsResult = await window.electronAPI.getInvestigacionStats(portalCompany);
+                      const statsData = (statsResult && statsResult.data) ? statsResult.data : { pendientes: 0, completadas: 0, total: 0 };
+
+                      targetWindow.postMessage({
+                          type: 'get-investigacion-stats-response',
+                          payload: statsData,
+                          requestId: requestId
+                      }, '*');
+                      return; // Ya enviamos la respuesta manualmente
+                  } catch (e) {
+                      console.error('[RENDERER] Error en get-investigacion-stats:', e);
+                      targetWindow.postMessage({
+                          type: 'get-investigacion-stats-response',
+                          payload: { pendientes: 0, completadas: 0, total: 0 },
+                          requestId: requestId
+                      }, '*');
+                      return;
+                  }
+                  break;
               case 'iframe-debug-log':
                   // Logs de debug del iframe
                   const { message, data } = payload || {};
