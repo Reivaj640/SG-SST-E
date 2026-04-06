@@ -1344,7 +1344,7 @@ ipcMain.handle('investigacion-accidentes-list-investigations', async (event, { c
                         relativePath: inv.relativePath
                     });
                 } else {
-                    const invEstado = inv._hasInforme ? 'completada' : 'pendiente';
+                    const invEstado = (inv.hasFurat && inv._hasInforme) ? 'completada' : 'pendiente';
                     if (filter !== 'todas' && filter !== invEstado) continue;
                     const folderStats = fs.statSync(inv.fullPath);
                     const archivos = (inv._filesInMonth || [inv.name]).map(fname => {
@@ -1398,7 +1398,7 @@ ipcMain.handle('investigacion-accidentes-list-investigations', async (event, { c
                         relativePath: inv.relativePath
                     });
                 } else {
-                    const invEstado = inv._hasInforme ? 'completada' : 'pendiente';
+                    const invEstado = (inv.hasFurat && inv._hasInforme) ? 'completada' : 'pendiente';
                     const folderStats = fs.statSync(inv.fullPath);
                     const archivos = (inv._filesInMonth || [inv.name]).map(fname => {
                         const fp = path.join(inv.fullPath, fname);

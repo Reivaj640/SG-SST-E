@@ -169,51 +169,93 @@
             return;
         }
 
-        var html = '';
-        items.forEach(function(inv, index) {
-            var isPendiente = inv.estado === 'pendiente';
-            var tipoClass = inv.tipo === 'carpeta' ? 'carpeta' : 'archivo';
-            var tipoIcon = inv.tipo === 'carpeta' ? 'fa-folder' : 'fa-file-pdf';
-            var statusClass = isPendiente ? 'pendiente' : 'completada';
-            var statusIcon = isPendiente ? 'fa-clock' : 'fa-check-circle';
-            var statusText = isPendiente ? 'Pendiente' : 'Completada';
-            var fecha = inv.fecha ? formatDate(inv.fecha) : 'N/A';
-            var totalArchivos = inv.totalArchivos || (inv.archivos ? inv.archivos.length : 0);
-            var delay = (index * 0.05).toFixed(2);
+        // Agrupar por año (el backend entrega ordenado por fecha desc, el orden se preserva)
+        var yearMap = new Map();
+        items.forEach(function(inv) {
+            var d = inv.fecha ? new Date(inv.fecha) : null;
+            var year = (d && !isNaN(d.getFullYear())) ? d.getFullYear() : 'Sin fecha';
+            if (!yearMap.has(year)) yearMap.set(year, []);
+            yearMap.get(year).push(inv);
+        });
 
-            html += '<div class="inv-card" data-id="' + escapeHtml(inv.id) + '" style="animation-delay: ' + delay + 's">';
-            html += '  <div class="inv-card-header" onclick="window._toggleCard(this)">';
-            html += '    <div class="inv-card-type-icon ' + tipoClass + '">';
-            html += '      <i class="fas ' + tipoIcon + '"></i>';
-            html += '    </div>';
-            html += '    <div class="inv-card-info">';
-            html += '      <div class="inv-card-name" title="' + escapeHtml(inv.nombre) + '">' + escapeHtml(inv.nombre) + '</div>';
-            html += '      <div class="inv-card-meta">';
-            html += '        <span><i class="fas fa-calendar-alt"></i> ' + fecha + '</span>';
-            html += '        <span><i class="fas fa-file-alt"></i> ' + totalArchivos + ' archivo' + (totalArchivos !== 1 ? 's' : '') + '</span>';
-            html += '      </div>';
-            html += '    </div>';
-            html += '    <div class="inv-card-status ' + statusClass + '">';
-            html += '      <i class="fas ' + statusIcon + '"></i> ' + statusText;
-            html += '    </div>';
-            html += '    <i class="fas fa-chevron-right inv-card-chevron"></i>';
-            html += '  </div>';
-            html += '  <div class="inv-card-details">';
-            html += '    <div class="inv-files-title">Archivos</div>';
-            html += renderFileList(inv.archivos || [], isPendiente);
-            html += '    <div class="inv-card-actions">';
-            if (isPendiente) {
-                html += '      <button class="inv-btn inv-btn-primary inv-btn-sm" onclick="event.stopPropagation(); window._startInvestigation(\'' + escapeHtml(inv.nombre) + '\')">';
-                html += '        <i class="fas fa-search-plus"></i> Iniciar Investigación';
-                html += '      </button>';
-            } else {
-                html += '      <span style="font-size: 0.8125rem; color: var(--inv-text-muted); display: flex; align-items: center; gap: 0.375rem;">';
-                html += '        <i class="fas fa-check-circle" style="color: var(--inv-success);"></i> Investigación completada';
-                html += '      </span>';
+        // Ordenar años descendente; 'Sin fecha' siempre al final
+        var years = Array.from(yearMap.keys()).sort(function(a, b) {
+            if (a === 'Sin fecha') return 1;
+            if (b === 'Sin fecha') return -1;
+            return b - a;
+        });
+
+        // Con búsqueda activa, expandir todos los grupos para mostrar resultados
+        var expandAll = !!searchQuery;
+
+        var html = '';
+        years.forEach(function(year, yearIndex) {
+            var yearItems = yearMap.get(year);
+            var pendientes = yearItems.filter(function(i) { return i.estado === 'pendiente'; }).length;
+            var isCollapsed = !expandAll && yearIndex > 0;
+
+            html += '<div class="inv-year-group' + (isCollapsed ? ' collapsed' : '') + '">';
+            html += '  <div class="inv-year-header" onclick="window._toggleYearGroup(this)">';
+            html += '    <div class="inv-year-header-left">';
+            html += '      <i class="fas fa-calendar inv-year-icon"></i>';
+            html += '      <span class="inv-year-label">' + escapeHtml(String(year)) + '</span>';
+            html += '      <span class="inv-year-count-badge">' + yearItems.length + ' investigaci' + (yearItems.length !== 1 ? 'ones' : 'ón') + '</span>';
+            if (pendientes > 0) {
+                html += '      <span class="inv-year-pending-badge"><i class="fas fa-clock"></i> ' + pendientes + ' pendiente' + (pendientes !== 1 ? 's' : '') + '</span>';
             }
             html += '    </div>';
+            html += '    <i class="fas fa-chevron-down inv-year-chevron"></i>';
             html += '  </div>';
-            html += '</div>';
+            html += '  <div class="inv-year-content">';
+
+            yearItems.forEach(function(inv, index) {
+                var isPendiente = inv.estado === 'pendiente';
+                var tipoClass = inv.tipo === 'carpeta' ? 'carpeta' : 'archivo';
+                var tipoIcon = inv.tipo === 'carpeta' ? 'fa-folder' : 'fa-file-pdf';
+                var statusClass = isPendiente ? 'pendiente' : 'completada';
+                var statusIcon = isPendiente ? 'fa-clock' : 'fa-check-circle';
+                var statusText = isPendiente ? 'Pendiente' : 'Completada';
+                var fecha = inv.fecha ? formatDate(inv.fecha) : 'N/A';
+                var totalArchivos = inv.totalArchivos || (inv.archivos ? inv.archivos.length : 0);
+                var delay = (index * 0.05).toFixed(2);
+
+                html += '<div class="inv-card" data-id="' + escapeHtml(inv.id) + '" style="animation-delay: ' + delay + 's">';
+                html += '  <div class="inv-card-header" onclick="window._toggleCard(this)">';
+                html += '    <div class="inv-card-type-icon ' + tipoClass + '">';
+                html += '      <i class="fas ' + tipoIcon + '"></i>';
+                html += '    </div>';
+                html += '    <div class="inv-card-info">';
+                html += '      <div class="inv-card-name" title="' + escapeHtml(inv.nombre) + '">' + escapeHtml(inv.nombre) + '</div>';
+                html += '      <div class="inv-card-meta">';
+                html += '        <span><i class="fas fa-calendar-alt"></i> ' + fecha + '</span>';
+                html += '        <span><i class="fas fa-file-alt"></i> ' + totalArchivos + ' archivo' + (totalArchivos !== 1 ? 's' : '') + '</span>';
+                html += '      </div>';
+                html += '    </div>';
+                html += '    <div class="inv-card-status ' + statusClass + '">';
+                html += '      <i class="fas ' + statusIcon + '"></i> ' + statusText;
+                html += '    </div>';
+                html += '    <i class="fas fa-chevron-right inv-card-chevron"></i>';
+                html += '  </div>';
+                html += '  <div class="inv-card-details">';
+                html += '    <div class="inv-files-title">Archivos</div>';
+                html += renderFileList(inv.archivos || [], isPendiente);
+                html += '    <div class="inv-card-actions">';
+                if (isPendiente) {
+                    html += '      <button class="inv-btn inv-btn-primary inv-btn-sm" onclick="event.stopPropagation(); window._startInvestigation(\'' + escapeHtml(inv.nombre) + '\')">';
+                    html += '        <i class="fas fa-search-plus"></i> Iniciar Investigación';
+                    html += '      </button>';
+                } else {
+                    html += '      <span style="font-size: 0.8125rem; color: var(--inv-text-muted); display: flex; align-items: center; gap: 0.375rem;">';
+                    html += '        <i class="fas fa-check-circle" style="color: var(--inv-success);"></i> Investigación completada';
+                    html += '      </span>';
+                }
+                html += '    </div>';
+                html += '  </div>';
+                html += '</div>';
+            });
+
+            html += '  </div>'; // .inv-year-content
+            html += '</div>';   // .inv-year-group
         });
 
         container.innerHTML = html;
@@ -365,6 +407,12 @@
         var card = headerEl.closest('.inv-card');
         if (!card) return;
         card.classList.toggle('expanded');
+    };
+
+    window._toggleYearGroup = function(headerEl) {
+        var group = headerEl.closest('.inv-year-group');
+        if (!group) return;
+        group.classList.toggle('collapsed');
     };
 
     window._previewFile = async function(filePath, fileName, extension) {
