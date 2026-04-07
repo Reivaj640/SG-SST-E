@@ -29,7 +29,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const urlParams = new URLSearchParams(window.location.search);
     const urlCompany = urlParams.get('company');
     const currentEmpresa = urlCompany || window.currentCompany || 'TEMPOACTIVA';
+    const urlNombre = urlParams.get('nombre') || '';
+    const urlFuratPath = urlParams.get('furatPath') || '';
     console.log('[INVESTIGACION-ACCIDENTES-MAIN] Empresa detectada:', currentEmpresa, '(URL:', urlCompany, ', window:', window.currentCompany, ')');
+    if (urlNombre) console.log('[INVESTIGACION-ACCIDENTES-MAIN] Caso desde listado:', urlNombre);
+    if (urlFuratPath) console.log('[INVESTIGACION-ACCIDENTES-MAIN] FURAT pre-cargado:', urlFuratPath);
 
     // Configurar la empresa actual si está disponible
     if (currentEmpresa && companyNameElement) {
@@ -1046,6 +1050,34 @@ document.addEventListener('DOMContentLoaded', function() {
         const sizes = ['Bytes', 'KB', 'MB', 'GB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // ── Auto-carga desde "Iniciar Investigación" en el listado ──────────────
+    // Si se llegó aquí desde investigaciones-viewer.js con un caso y/o FURAT
+    // pre-seleccionado, pre-poblar el formulario y disparar el procesamiento.
+    if (urlFuratPath) {
+        const autoFilename = urlFuratPath.split('\\').pop().split('/').pop();
+        selectedPdfPath = urlFuratPath;
+        if (selectedFileName) selectedFileName.textContent = autoFilename;
+        if (selectedFileInfo) selectedFileInfo.classList.remove('hidden');
+        if (dropZone) dropZone.classList.add('has-file');
+        if (processBtn) processBtn.disabled = false;
+        updateStepStatus(1, 'completed');
+        showToast(
+            urlNombre ? ('Investigación: ' + urlNombre) : 'FURAT cargado',
+            'Procesando: ' + autoFilename,
+            'info'
+        );
+        processPdfFile(urlFuratPath).catch(function(err) {
+            console.error('[INVESTIGACION-ACCIDENTES-MAIN] Error al auto-cargar FURAT:', err);
+            showToast('Error', 'No se pudo procesar el FURAT: ' + err.message, 'error');
+        });
+    } else if (urlNombre) {
+        showToast(
+            'Caso: ' + urlNombre,
+            'Selecciona o arrastra el FURAT PDF para continuar.',
+            'info'
+        );
     }
 
     console.log('[INVESTIGACION-ACCIDENTES-MAIN] Inicialización completada');

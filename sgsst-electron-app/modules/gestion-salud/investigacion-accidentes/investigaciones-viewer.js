@@ -243,7 +243,21 @@
                 html += renderFileList(inv.archivos || [], isPendiente);
                 html += '    <div class="inv-card-actions">';
                 if (isPendiente) {
-                    html += '      <button class="inv-btn inv-btn-primary inv-btn-sm" onclick="event.stopPropagation(); window._startInvestigation(\'' + escapeHtml(inv.nombre) + '\')">';
+                    // Prioridad 1: archivo cuyo nombre incluye "FURAT" y es PDF
+                    var furatFile = (inv.archivos || []).find(function(f) {
+                        return f.name.toUpperCase().includes('FURAT') && (f.extension || '').toLowerCase() === 'pdf';
+                    });
+                    // Prioridad 2: cualquier PDF en la investigación (casos donde el FURAT tiene otro nombre)
+                    if (!furatFile) {
+                        furatFile = (inv.archivos || []).find(function(f) {
+                            return (f.extension || '').toLowerCase() === 'pdf';
+                        });
+                    }
+                    var furatPath = furatFile ? furatFile.path : '';
+                    html += '      <button class="inv-btn inv-btn-primary inv-btn-sm"'
+                          + ' data-invnombre="' + escapeHtml(inv.nombre) + '"'
+                          + ' data-furatpath="' + escapeHtml(furatPath) + '"'
+                          + ' onclick="event.stopPropagation(); window._startInvestigation(this.dataset.invnombre, this.dataset.furatpath)">';
                     html += '        <i class="fas fa-search-plus"></i> Iniciar Investigación';
                     html += '      </button>';
                 } else {
@@ -280,7 +294,12 @@
             if (size) html += '  <span class="inv-file-size">' + size + '</span>';
             if (isReport) html += '  <span class="inv-report-badge"><i class="fas fa-check-circle"></i> Informe</span>';
             html += '  <div class="inv-file-actions">';
-            html += '    <button class="inv-file-action-btn" onclick="event.stopPropagation(); window._previewFile(\'' + escapeHtml(file.path) + '\', \'' + escapeHtml(file.name) + '\', \'' + escapeHtml(file.extension) + '\')" title="Previsualizar">';
+            html += '    <button class="inv-file-action-btn"'
+                  + ' data-filepath="' + escapeHtml(file.path) + '"'
+                  + ' data-filename="' + escapeHtml(file.name) + '"'
+                  + ' data-ext="' + escapeHtml(file.extension || '') + '"'
+                  + ' onclick="event.stopPropagation(); window._previewFile(this.dataset.filepath, this.dataset.filename, this.dataset.ext)"'
+                  + ' title="Previsualizar">';
             html += '      <i class="fas fa-eye"></i>';
             html += '    </button>';
             html += '  </div>';
@@ -452,11 +471,12 @@
         }
     };
 
-    window._startInvestigation = function(invName) {
-        // Notificar al padre que quiere iniciar investigación
-        showToast('Iniciar investigación', 'Abriendo formulario para: ' + invName, 'info');
-        // En una versión futura, esto navegaría al formulario de investigación
-        // con el nombre del FURAT precargado.
+    window._startInvestigation = function(invNombre, furatPath) {
+        window.parent.postMessage({
+            type: 'iniciar-investigacion-desde-viewer',
+            investigacionNombre: invNombre || '',
+            furatPath: furatPath || ''
+        }, '*');
     };
 
     // ─── Upload de FURAT ────────────────────────────────────────────────
