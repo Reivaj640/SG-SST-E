@@ -172,8 +172,10 @@
         // Agrupar por año (el backend entrega ordenado por fecha desc, el orden se preserva)
         var yearMap = new Map();
         items.forEach(function(inv) {
-            var d = inv.fecha ? new Date(inv.fecha) : null;
-            var year = (d && !isNaN(d.getFullYear())) ? d.getFullYear() : 'Sin fecha';
+            var year = inv.año ? inv.año : (function() {
+                var d = inv.fecha ? new Date(inv.fecha) : null;
+                return (d && !isNaN(d.getFullYear())) ? d.getFullYear() : 'Sin fecha';
+            }());
             if (!yearMap.has(year)) yearMap.set(year, []);
             yearMap.get(year).push(inv);
         });

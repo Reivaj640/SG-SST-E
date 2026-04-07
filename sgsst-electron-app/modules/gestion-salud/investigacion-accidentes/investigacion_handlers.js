@@ -927,6 +927,20 @@ function _isYearFolder(name) {
 }
 
 /**
+ * Helper: extrae el año del relativePath buscando el segmento "AT YYYY" o "YYYY".
+ * Ej: "Investigaciones/2. Accidentes/AT 2023/7. Julio/Cristian Alvarez" → 2023
+ * Retorna el año como número, o null si no se encuentra.
+ */
+function _extractYearFromPath(relativePath) {
+    const parts = relativePath.replace(/\\/g, '/').split('/');
+    for (const part of parts) {
+        const m = part.match(/\b((?:19|20)\d{2})\b/);
+        if (m) return parseInt(m[1], 10);
+    }
+    return null;
+}
+
+/**
  * Helper: determina si un nombre de carpeta corresponde a un patrón de mes
  * (ej: "1. Enero", "2. Febrero", "01-Enero", etc.)
  */
@@ -1339,6 +1353,7 @@ ipcMain.handle('investigacion-accidentes-list-investigations', async (event, { c
                         estado: state.estado,
                         tipo: 'carpeta',
                         fecha: folderStats.mtime.toISOString(),
+                        año: _extractYearFromPath(inv.relativePath),
                         totalArchivos: fileInfos.length,
                         archivos: fileInfos,
                         relativePath: inv.relativePath
@@ -1362,6 +1377,7 @@ ipcMain.handle('investigacion-accidentes-list-investigations', async (event, { c
                         estado: invEstado,
                         tipo: 'archivo',
                         fecha: folderStats.mtime.toISOString(),
+                        año: _extractYearFromPath(inv.relativePath),
                         totalArchivos: archivos.length,
                         archivos,
                         relativePath: inv.relativePath
@@ -1393,6 +1409,7 @@ ipcMain.handle('investigacion-accidentes-list-investigations', async (event, { c
                         estado: state.estado,
                         tipo: 'carpeta',
                         fecha: folderStats.mtime.toISOString(),
+                        año: _extractYearFromPath(inv.relativePath),
                         totalArchivos: fileInfos.length,
                         archivos: fileInfos,
                         relativePath: inv.relativePath
@@ -1415,6 +1432,7 @@ ipcMain.handle('investigacion-accidentes-list-investigations', async (event, { c
                         estado: invEstado,
                         tipo: 'archivo',
                         fecha: folderStats.mtime.toISOString(),
+                        año: _extractYearFromPath(inv.relativePath),
                         totalArchivos: archivos.length,
                         archivos,
                         relativePath: inv.relativePath
