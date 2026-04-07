@@ -134,7 +134,7 @@ const SUBMODULE_PERMISSION_MAP_UI = new Map([
   ['2.2.1 objetivos sst', 'gestion-integral.objetivos'],
   ['2.3.1 evaluacion inicial del sg-sst', 'gestion-integral.plan-trabajo'],
   ['2.4.1 plan de trabajo anual', 'gestion-integral.plan-trabajo'],
-  ['2.5.1 archivo y retencion documental del sg-sst', 'gestion-integral.plan-trabajo'],
+  ['2.5.1 archivo y retencion documental del sg-sst', 'gestion-integral.archivo-retencion'],
   ['2.6.1 rendicion de cuentas', 'gestion-integral.rendicion'],
   ['2.7.1 matriz de requisitos legales', 'gestion-integral.plan-trabajo'],
   ['2.8.1 mecanismos de comunicaciones', 'gestion-integral.plan-trabajo'],
@@ -1139,12 +1139,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                       return; // No responder a mensajes de respuesta para evitar bucles
                   }
 
-                  console.warn(`RENDERER: Unknown message type received from source: ${type}`);
-                  targetWindow.postMessage({
-                      type: responseType,
-                      payload: { success: false, error: `Unknown request type: ${type}` },
-                      requestId: requestId
-                  }, '*');
+                  // Mensaje no reconocido — ignorar silenciosamente.
+                  // Puede ser manejado por un componente wrapper (ej: ArchivoRetencionComponent, PoliticaComponent).
+                  console.warn(`RENDERER: Unknown message type, ignorando: ${type}`);
                   return;
           }
 
@@ -3722,6 +3719,21 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         planTrabajoComponent.render();
       } else {
         console.error('❌ PlanTrabajoComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
+    } else if (submoduleName === "2.5.1 Archivo y retención documental del SG-SST") {
+      if (window.ArchivoRetencionComponent) {
+        const archivoRetencionComponent = new window.ArchivoRetencionComponent(
+          submoduleContentDiv,
+          currentCompany,
+          moduleName,
+          submoduleName,
+          safeBackToModuleCallback
+        );
+        archivoRetencionComponent.render();
+      } else {
+        console.error('❌ ArchivoRetencionComponent no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 

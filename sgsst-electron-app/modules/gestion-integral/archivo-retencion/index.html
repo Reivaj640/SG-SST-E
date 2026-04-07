@@ -1,0 +1,2282 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>K+AIR SG-SST — Archivo y Retención Documental</title>
+  <style>
+    /* ═══════════════════════════════════════════════════════════
+       K+AIR SG-SST — Archivo y Retención Documental
+       Scoped CSS — prefix: .kair-ar-
+       ═══════════════════════════════════════════════════════════ */
+
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --kair-primary: #174ea6;
+      --kair-primary-hover: #185abd;
+      --kair-success: #28a745;
+      --kair-warning: #ffc107;
+      --kair-danger: #dc3545;
+      --kair-bg: #f8f9fa;
+      --kair-card: #ffffff;
+      --kair-border: #dee2e6;
+      --kair-radius: 0.375rem;
+      --kair-font: 'Segoe UI', 'Roboto', sans-serif;
+      --kair-shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+      --kair-shadow-lg: 0 10px 25px rgba(0,0,0,.12), 0 4px 10px rgba(0,0,0,.08);
+      --kair-transition: all .2s ease;
+    }
+
+    body.kair-ar-body {
+      font-family: var(--kair-font);
+      background: var(--kair-bg);
+      color: #212529;
+      font-size: 14px;
+      line-height: 1.5;
+      min-width: 1024px;
+      overflow-x: auto;
+    }
+
+    /* ── Header Bar ──────────────────────────────────────────── */
+    .kair-ar-header {
+      background: var(--kair-primary);
+      color: #fff;
+      padding: 0 24px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,.18);
+    }
+
+    .kair-ar-header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .kair-ar-header-logo svg {
+      width: 28px;
+      height: 28px;
+      flex-shrink: 0;
+    }
+
+    .kair-ar-header-breadcrumb {
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: .3px;
+      opacity: .95;
+    }
+
+    .kair-ar-header-breadcrumb span {
+      opacity: .6;
+    }
+
+    .kair-ar-header-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* ── Buttons ─────────────────────────────────────────────── */
+    .kair-ar-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 16px;
+      border: none;
+      border-radius: var(--kair-radius);
+      font-family: var(--kair-font);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--kair-transition);
+      white-space: nowrap;
+      line-height: 1.4;
+    }
+
+    .kair-ar-btn svg {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+
+    .kair-ar-btn-light {
+      background: rgba(255,255,255,.15);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.25);
+    }
+
+    .kair-ar-btn-light:hover {
+      background: rgba(255,255,255,.25);
+    }
+
+    .kair-ar-btn-primary {
+      background: var(--kair-primary);
+      color: #fff;
+      border: 1px solid var(--kair-primary);
+    }
+
+    .kair-ar-btn-primary:hover {
+      background: var(--kair-primary-hover);
+    }
+
+    .kair-ar-btn-success {
+      background: var(--kair-success);
+      color: #fff;
+      border: 1px solid var(--kair-success);
+    }
+
+    .kair-ar-btn-success:hover:not(:disabled) {
+      background: #218838;
+    }
+
+    .kair-ar-btn-success:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+
+    /* ── Celdas editables inline ──────────────────────────── */
+    .kair-ar-cell-editable {
+      cursor: text;
+      border-radius: 4px;
+      padding: 2px 4px;
+      outline: none;
+      min-width: 4ch;
+    }
+    .kair-ar-cell-editable:hover {
+      background: rgba(23, 78, 166, 0.06);
+    }
+    .kair-ar-cell-editable:focus {
+      background: #eef2ff;
+      box-shadow: inset 0 0 0 2px #174ea6;
+    }
+    tr.kair-ar-row-dirty > td {
+      background: #fffbea !important;
+    }
+
+    .kair-ar-btn-danger {
+      background: var(--kair-danger);
+      color: #fff;
+      border: 1px solid var(--kair-danger);
+    }
+
+    .kair-ar-btn-danger:hover {
+      background: #c82333;
+    }
+
+    .kair-ar-btn-outline {
+      background: var(--kair-card);
+      color: #495057;
+      border: 1px solid var(--kair-border);
+    }
+
+    .kair-ar-btn-outline:hover {
+      background: #e9ecef;
+    }
+
+    .kair-ar-btn-sm {
+      padding: 4px 10px;
+      font-size: 12px;
+    }
+
+    .kair-ar-btn-icon {
+      padding: 6px 8px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      border-radius: var(--kair-radius);
+      transition: var(--kair-transition);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .kair-ar-btn-icon svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .kair-ar-btn-icon-edit {
+      color: var(--kair-primary);
+    }
+
+    .kair-ar-btn-icon-edit:hover {
+      background: rgba(23,78,166,.1);
+    }
+
+    .kair-ar-btn-icon-delete {
+      color: var(--kair-danger);
+    }
+
+    .kair-ar-btn-icon-delete:hover {
+      background: rgba(220,53,69,.1);
+    }
+
+    /* ── Main Content ────────────────────────────────────────── */
+    .kair-ar-main {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 20px 24px 40px;
+    }
+
+    /* ── Title Section ───────────────────────────────────────── */
+    .kair-ar-title-section {
+      margin-bottom: 20px;
+    }
+
+    .kair-ar-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #212529;
+      margin-bottom: 4px;
+    }
+
+    .kair-ar-subtitle {
+      font-size: 13px;
+      color: #6c757d;
+      font-weight: 400;
+    }
+
+    /* ── Stats Cards ─────────────────────────────────────────── */
+    .kair-ar-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .kair-ar-stat-card {
+      background: var(--kair-card);
+      border: 1px solid var(--kair-border);
+      border-radius: var(--kair-radius);
+      padding: 16px 20px;
+      box-shadow: var(--kair-shadow);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      transition: var(--kair-transition);
+    }
+
+    .kair-ar-stat-card:hover {
+      box-shadow: var(--kair-shadow-lg);
+      transform: translateY(-1px);
+    }
+
+    .kair-ar-stat-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: var(--kair-radius);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .kair-ar-stat-icon svg {
+      width: 22px;
+      height: 22px;
+    }
+
+    .kair-ar-stat-icon-primary {
+      background: rgba(23,78,166,.1);
+      color: var(--kair-primary);
+    }
+
+    .kair-ar-stat-icon-blue {
+      background: rgba(23,78,166,.1);
+      color: var(--kair-primary);
+    }
+
+    .kair-ar-stat-icon-green {
+      background: rgba(40,167,69,.1);
+      color: var(--kair-success);
+    }
+
+    .kair-ar-stat-icon-gray {
+      background: rgba(108,117,125,.1);
+      color: #6c757d;
+    }
+
+    .kair-ar-stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: #212529;
+      line-height: 1.2;
+    }
+
+    .kair-ar-stat-label {
+      font-size: 12px;
+      color: #6c757d;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+    }
+
+    /* ── Filters Bar ─────────────────────────────────────────── */
+    .kair-ar-filters {
+      background: var(--kair-card);
+      border: 1px solid var(--kair-border);
+      border-radius: var(--kair-radius);
+      padding: 14px 18px;
+      margin-bottom: 16px;
+      box-shadow: var(--kair-shadow);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .kair-ar-input-group {
+      position: relative;
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .kair-ar-input-group svg {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 16px;
+      height: 16px;
+      color: #6c757d;
+      pointer-events: none;
+    }
+
+    .kair-ar-input {
+      width: 100%;
+      padding: 8px 12px 8px 34px;
+      border: 1px solid var(--kair-border);
+      border-radius: var(--kair-radius);
+      font-family: var(--kair-font);
+      font-size: 13px;
+      color: #212529;
+      background: #fff;
+      transition: var(--kair-transition);
+      outline: none;
+    }
+
+    .kair-ar-input:focus {
+      border-color: var(--kair-primary);
+      box-shadow: 0 0 0 3px rgba(23,78,166,.12);
+    }
+
+    .kair-ar-input::placeholder {
+      color: #adb5bd;
+    }
+
+    .kair-ar-select {
+      padding: 8px 32px 8px 12px;
+      border: 1px solid var(--kair-border);
+      border-radius: var(--kair-radius);
+      font-family: var(--kair-font);
+      font-size: 13px;
+      color: #212529;
+      background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='%236c757d' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 10px center;
+      appearance: none;
+      cursor: pointer;
+      transition: var(--kair-transition);
+      outline: none;
+      min-width: 140px;
+    }
+
+    .kair-ar-select:focus {
+      border-color: var(--kair-primary);
+      box-shadow: 0 0 0 3px rgba(23,78,166,.12);
+    }
+
+    /* ── Table Container ─────────────────────────────────────── */
+    .kair-ar-table-container {
+      background: var(--kair-card);
+      border: 1px solid var(--kair-border);
+      border-radius: var(--kair-radius);
+      box-shadow: var(--kair-shadow);
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .kair-ar-table-scroll {
+      overflow-x: auto;
+      max-height: 65vh;
+      overflow-y: auto;
+    }
+
+    .kair-ar-table-scroll::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    .kair-ar-table-scroll::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 4px;
+    }
+
+    .kair-ar-table-scroll::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 4px;
+    }
+
+    .kair-ar-table-scroll::-webkit-scrollbar-thumb:hover {
+      background: #a1a1a1;
+    }
+
+    /* ── Table ───────────────────────────────────────────────── */
+    .kair-ar-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1200px;
+    }
+
+    .kair-ar-table thead {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .kair-ar-table thead th {
+      background: #f8f9fa;
+      border-bottom: 2px solid var(--kair-border);
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: #495057;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    .kair-ar-table thead th.kair-ar-sortable {
+      cursor: pointer;
+      transition: var(--kair-transition);
+    }
+
+    .kair-ar-table thead th.kair-ar-sortable:hover {
+      background: #e9ecef;
+      color: var(--kair-primary);
+    }
+
+    .kair-ar-table thead th.kair-ar-sort-asc,
+    .kair-ar-table thead th.kair-ar-sort-desc {
+      background: #e3e8ef;
+      color: var(--kair-primary);
+    }
+
+    .kair-ar-sort-icon {
+      display: inline-block;
+      margin-left: 4px;
+      vertical-align: middle;
+      opacity: .4;
+    }
+
+    .kair-ar-sort-active .kair-ar-sort-icon {
+      opacity: 1;
+      color: var(--kair-primary);
+    }
+
+    .kair-ar-table tbody tr {
+      border-bottom: 1px solid #f1f3f5;
+      transition: var(--kair-transition);
+      cursor: pointer;
+    }
+
+    .kair-ar-table tbody tr:hover {
+      background: #f1f7ff;
+    }
+
+    .kair-ar-table tbody tr.kair-ar-row-expanded {
+      background: #eef5ff;
+    }
+
+    .kair-ar-table tbody td {
+      padding: 9px 14px;
+      font-size: 13px;
+      color: #212529;
+      vertical-align: middle;
+    }
+
+    /* Column styles */
+    .kair-ar-col-num {
+      font-weight: 700;
+      color: var(--kair-primary);
+      font-size: 13px;
+      width: 50px;
+      text-align: center;
+    }
+
+    .kair-ar-col-desc {
+      max-width: 260px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .kair-ar-col-code {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12px;
+      background: #f1f3f5;
+      padding: 2px 8px;
+      border-radius: 3px;
+      white-space: nowrap;
+    }
+
+    .kair-ar-col-rev {
+      text-align: center;
+      width: 60px;
+    }
+
+    .kair-ar-col-date {
+      white-space: nowrap;
+      font-size: 12px;
+      color: #495057;
+      width: 120px;
+    }
+
+    .kair-ar-col-almacenamiento {
+      max-width: 160px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 12px;
+    }
+
+    .kair-ar-col-acciones {
+      width: 80px;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    /* ── Badges ──────────────────────────────────────────────── */
+    .kair-ar-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .2px;
+      white-space: nowrap;
+      line-height: 1.5;
+    }
+
+    .kair-ar-badge-doc {
+      background: rgba(23,78,166,.12);
+      color: var(--kair-primary);
+    }
+
+    .kair-ar-badge-reg {
+      background: rgba(40,167,69,.12);
+      color: var(--kair-success);
+    }
+
+    .kair-ar-badge-int {
+      background: transparent;
+      color: #495057;
+      border: 1px solid var(--kair-border);
+    }
+
+    .kair-ar-badge-ext {
+      background: transparent;
+      color: #495057;
+      border: 1px solid var(--kair-border);
+    }
+
+    .kair-ar-badge-ret-indefinido {
+      background: rgba(255,193,7,.15);
+      color: #856404;
+      border: 1px solid rgba(255,193,7,.3);
+    }
+
+    .kair-ar-badge-ret-na {
+      background: transparent;
+      color: #6c757d;
+      border: 1px solid var(--kair-border);
+    }
+
+    .kair-ar-badge-ret-normal {
+      background: rgba(40,167,69,.12);
+      color: var(--kair-success);
+    }
+
+    .kair-ar-badge-disp-muerto {
+      background: #e9ecef;
+      color: #6c757d;
+    }
+
+    .kair-ar-badge-disp-obsoleto {
+      background: rgba(220,53,69,.12);
+      color: var(--kair-danger);
+    }
+
+    .kair-ar-badge-disp-na {
+      background: transparent;
+      color: #6c757d;
+      border: 1px solid var(--kair-border);
+    }
+
+    .kair-ar-badge-disp-normal {
+      background: rgba(40,167,69,.12);
+      color: var(--kair-success);
+    }
+
+    /* ── Expanded Row ────────────────────────────────────────── */
+    .kair-ar-expanded-row td {
+      padding: 0 14px;
+      background: #f6f9ff;
+      border-bottom: 1px solid #dce4f0;
+    }
+
+    .kair-ar-expanded-content {
+      padding: 16px 0;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px 24px;
+    }
+
+    .kair-ar-expanded-field {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .kair-ar-expanded-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      color: #6c757d;
+    }
+
+    .kair-ar-expanded-value {
+      font-size: 13px;
+      color: #212529;
+      word-break: break-word;
+    }
+
+    /* ── Pagination ──────────────────────────────────────────── */
+    .kair-ar-pagination {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 18px;
+      border-top: 1px solid var(--kair-border);
+      background: #fafbfc;
+      border-radius: 0 0 var(--kair-radius) var(--kair-radius);
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .kair-ar-pagination-info {
+      font-size: 13px;
+      color: #6c757d;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .kair-ar-pagination-select {
+      padding: 4px 8px;
+      border: 1px solid var(--kair-border);
+      border-radius: var(--kair-radius);
+      font-family: var(--kair-font);
+      font-size: 13px;
+      color: #495057;
+      background: #fff;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .kair-ar-pagination-buttons {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .kair-ar-page-btn {
+      min-width: 34px;
+      height: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--kair-border);
+      border-radius: var(--kair-radius);
+      background: #fff;
+      color: #495057;
+      font-family: var(--kair-font);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--kair-transition);
+      padding: 0 8px;
+    }
+
+    .kair-ar-page-btn:hover:not(:disabled) {
+      background: #e9ecef;
+      border-color: #adb5bd;
+    }
+
+    .kair-ar-page-btn:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
+    .kair-ar-page-btn.kair-ar-page-active {
+      background: var(--kair-primary);
+      color: #fff;
+      border-color: var(--kair-primary);
+    }
+
+    .kair-ar-page-btn svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* ── Modal Overlay ────────────────────────────────────────── */
+    .kair-ar-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity .25s ease, visibility .25s ease;
+    }
+
+    .kair-ar-modal-overlay.kair-ar-modal-open {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .kair-ar-modal {
+      background: var(--kair-card);
+      border-radius: 8px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.2);
+      width: 580px;
+      max-width: 95vw;
+      max-height: 90vh;
+      overflow-y: auto;
+      transform: translateY(20px) scale(.97);
+      transition: transform .25s ease;
+    }
+
+    .kair-ar-modal-overlay.kair-ar-modal-open .kair-ar-modal {
+      transform: translateY(0) scale(1);
+    }
+
+    .kair-ar-modal::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .kair-ar-modal::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 3px;
+    }
+
+    .kair-ar-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--kair-border);
+    }
+
+    .kair-ar-modal-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: #212529;
+    }
+
+    .kair-ar-modal-close {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      border-radius: var(--kair-radius);
+      transition: var(--kair-transition);
+      color: #6c757d;
+    }
+
+    .kair-ar-modal-close:hover {
+      background: #f1f3f5;
+      color: #212529;
+    }
+
+    .kair-ar-modal-close svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .kair-ar-modal-body {
+      padding: 20px 24px;
+    }
+
+    .kair-ar-modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      padding: 16px 24px;
+      border-top: 1px solid var(--kair-border);
+      background: #fafbfc;
+      border-radius: 0 0 8px 8px;
+    }
+
+    /* ── Form Fields ─────────────────────────────────────────── */
+    .kair-ar-form-group {
+      margin-bottom: 16px;
+    }
+
+    .kair-ar-form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      color: #495057;
+      margin-bottom: 6px;
+    }
+
+    .kair-ar-form-label .kair-ar-required {
+      color: var(--kair-danger);
+      margin-left: 2px;
+    }
+
+    .kair-ar-form-input {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--kair-border);
+      border-radius: var(--kair-radius);
+      font-family: var(--kair-font);
+      font-size: 13px;
+      color: #212529;
+      background: #fff;
+      transition: var(--kair-transition);
+      outline: none;
+    }
+
+    .kair-ar-form-input:focus {
+      border-color: var(--kair-primary);
+      box-shadow: 0 0 0 3px rgba(23,78,166,.12);
+    }
+
+    .kair-ar-form-input.kair-ar-input-error {
+      border-color: var(--kair-danger);
+      box-shadow: 0 0 0 3px rgba(220,53,69,.1);
+    }
+
+    .kair-ar-form-error {
+      font-size: 11px;
+      color: var(--kair-danger);
+      margin-top: 4px;
+      display: none;
+    }
+
+    .kair-ar-form-error.kair-ar-visible {
+      display: block;
+    }
+
+    /* Checkboxes */
+    .kair-ar-checkbox-group {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .kair-ar-checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      color: #495057;
+      user-select: none;
+    }
+
+    .kair-ar-checkbox-item input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--kair-primary);
+      cursor: pointer;
+    }
+
+    /* ── Confirm Dialog ──────────────────────────────────────── */
+    .kair-ar-confirm-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 1100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity .25s ease, visibility .25s ease;
+    }
+
+    .kair-ar-confirm-overlay.kair-ar-modal-open {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .kair-ar-confirm-box {
+      background: var(--kair-card);
+      border-radius: 8px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.2);
+      width: 400px;
+      max-width: 90vw;
+      padding: 24px;
+      text-align: center;
+      transform: translateY(20px) scale(.97);
+      transition: transform .25s ease;
+    }
+
+    .kair-ar-confirm-overlay.kair-ar-modal-open .kair-ar-confirm-box {
+      transform: translateY(0) scale(1);
+    }
+
+    .kair-ar-confirm-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: rgba(220,53,69,.1);
+      color: var(--kair-danger);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+    }
+
+    .kair-ar-confirm-icon svg {
+      width: 28px;
+      height: 28px;
+    }
+
+    .kair-ar-confirm-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: #212529;
+      margin-bottom: 8px;
+    }
+
+    .kair-ar-confirm-message {
+      font-size: 13px;
+      color: #6c757d;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+
+    .kair-ar-confirm-actions {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    /* ── Toast Notification ──────────────────────────────────── */
+    .kair-ar-toast-container {
+      position: fixed;
+      top: 64px;
+      right: 20px;
+      z-index: 2000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .kair-ar-toast {
+      background: var(--kair-card);
+      border: 1px solid var(--kair-border);
+      border-radius: var(--kair-radius);
+      box-shadow: var(--kair-shadow-lg);
+      padding: 12px 20px;
+      font-size: 13px;
+      color: #212529;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 280px;
+      max-width: 420px;
+      animation: kairArSlideIn .3s ease;
+    }
+
+    .kair-ar-toast.kair-ar-toast-success {
+      border-left: 4px solid var(--kair-success);
+    }
+
+    .kair-ar-toast.kair-ar-toast-error {
+      border-left: 4px solid var(--kair-danger);
+    }
+
+    .kair-ar-toast.kair-ar-toast-info {
+      border-left: 4px solid var(--kair-primary);
+    }
+
+    .kair-ar-toast.kair-ar-toast-exit {
+      animation: kairArSlideOut .3s ease forwards;
+    }
+
+    @keyframes kairArSlideIn {
+      from { opacity: 0; transform: translateX(40px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes kairArSlideOut {
+      from { opacity: 1; transform: translateX(0); }
+      to { opacity: 0; transform: translateX(40px); }
+    }
+
+    /* ── Loading Spinner ─────────────────────────────────────── */
+    .kair-ar-loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+      color: #6c757d;
+      gap: 12px;
+    }
+
+    .kair-ar-spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid #e9ecef;
+      border-top-color: var(--kair-primary);
+      border-radius: 50%;
+      animation: kairArSpin .7s linear infinite;
+    }
+
+    @keyframes kairArSpin {
+      to { transform: rotate(360deg); }
+    }
+
+    .kair-ar-loading-text {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    /* ── Empty State ─────────────────────────────────────────── */
+    .kair-ar-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+      color: #adb5bd;
+      gap: 12px;
+    }
+
+    .kair-ar-empty svg {
+      width: 48px;
+      height: 48px;
+      opacity: .5;
+    }
+
+    .kair-ar-empty-text {
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    /* ── Form row (2 columns) ────────────────────────────────── */
+    .kair-ar-form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0 16px;
+    }
+
+    /* ── No results ──────────────────────────────────────────── */
+    .kair-ar-no-results {
+      text-align: center;
+      padding: 40px 20px;
+      color: #adb5bd;
+    }
+  </style>
+</head>
+<body class="kair-ar-body">
+
+  <!-- ═══════════════════════════════════════════════════════════
+       HEADER BAR
+       ═══════════════════════════════════════════════════════════ -->
+  <header class="kair-ar-header">
+    <div class="kair-ar-header-left">
+      <button class="kair-ar-btn kair-ar-btn-light" id="btnVolver" title="Volver al módulo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+        Volver
+      </button>
+      <div class="kair-ar-header-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+      </div>
+      <div class="kair-ar-header-breadcrumb">
+        K+AIR — SG-SST <span>›</span> Módulo 2 <span>›</span> Submódulo 2.5.1
+      </div>
+    </div>
+    <div class="kair-ar-header-actions">
+      <button class="kair-ar-btn kair-ar-btn-success" id="btnGuardar"
+              style="display:none" title="Guardar todos los cambios en el Excel">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+          <polyline points="17 21 17 13 7 13 7 21"/>
+          <polyline points="7 3 7 8 15 8"/>
+        </svg>
+        Guardar Cambios
+      </button>
+      <button class="kair-ar-btn kair-ar-btn-light" id="btnExportar" title="Exportar CSV">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Exportar CSV
+      </button>
+      <button class="kair-ar-btn kair-ar-btn-light" id="btnActualizar" title="Actualizar datos">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"/>
+          <polyline points="1 20 1 14 7 14"/>
+          <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+        </svg>
+        Actualizar
+      </button>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       MAIN CONTENT
+       ═══════════════════════════════════════════════════════════ -->
+  <main class="kair-ar-main">
+
+    <section class="kair-ar-title-section">
+      <h1 class="kair-ar-title">Listado Maestro de Control de Documentos y Registros</h1>
+      <p class="kair-ar-subtitle">GI-FO-010 | Rev. 02 — Marzo 26 del 2025</p>
+    </section>
+
+    <section class="kair-ar-stats" id="statsContainer">
+      <div class="kair-ar-stat-card">
+        <div class="kair-ar-stat-icon kair-ar-stat-icon-primary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+            <polyline points="10 9 9 9 8 9"/>
+          </svg>
+        </div>
+        <div>
+          <div class="kair-ar-stat-value" id="statTotal">0</div>
+          <div class="kair-ar-stat-label">Total</div>
+        </div>
+      </div>
+      <div class="kair-ar-stat-card">
+        <div class="kair-ar-stat-icon kair-ar-stat-icon-blue">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+        </div>
+        <div>
+          <div class="kair-ar-stat-value" id="statDocumentos">0</div>
+          <div class="kair-ar-stat-label">Documentos</div>
+        </div>
+      </div>
+      <div class="kair-ar-stat-card">
+        <div class="kair-ar-stat-icon kair-ar-stat-icon-green">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <line x1="9" y1="3" x2="9" y2="21"/>
+            <line x1="3" y1="9" x2="21" y2="9"/>
+          </svg>
+        </div>
+        <div>
+          <div class="kair-ar-stat-value" id="statRegistros">0</div>
+          <div class="kair-ar-stat-label">Registros</div>
+        </div>
+      </div>
+      <div class="kair-ar-stat-card">
+        <div class="kair-ar-stat-icon kair-ar-stat-icon-gray">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+          </svg>
+        </div>
+        <div>
+          <div class="kair-ar-stat-value" id="statMuerto">0</div>
+          <div class="kair-ar-stat-label">Archivo Muerto</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="kair-ar-filters">
+      <div class="kair-ar-input-group">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input type="text" class="kair-ar-input" id="inputSearch" placeholder="Buscar por descripción, código...">
+      </div>
+      <select class="kair-ar-select" id="selectHoja">
+        <option value="">Todas las hojas</option>
+      </select>
+      <button class="kair-ar-btn kair-ar-btn-primary" id="btnBuscar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        Buscar
+      </button>
+      <button class="kair-ar-btn kair-ar-btn-success" id="btnNuevo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"/>
+          <line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Nuevo
+      </button>
+    </section>
+
+    <div class="kair-ar-table-container">
+      <div class="kair-ar-table-scroll" id="tableScroll">
+        <table class="kair-ar-table" id="mainTable">
+          <thead>
+            <tr>
+              <th class="kair-ar-col-num">#</th>
+              <th class="kair-ar-sortable" data-sort="descripcion">
+                Descripción
+                <span class="kair-ar-sort-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                    <polyline points="7 15 12 20 17 15"/>
+                    <polyline points="7 9 12 4 17 9"/>
+                  </svg>
+                </span>
+              </th>
+              <th class="kair-ar-sortable" data-sort="codigo">
+                Código
+                <span class="kair-ar-sort-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                    <polyline points="7 15 12 20 17 15"/>
+                    <polyline points="7 9 12 4 17 9"/>
+                  </svg>
+                </span>
+              </th>
+              <th class="kair-ar-col-rev">Rev.</th>
+              <th>Tipo</th>
+              <th class="kair-ar-sortable kair-ar-col-date" data-sort="fechaCreacion">
+                F. Creación
+                <span class="kair-ar-sort-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                    <polyline points="7 15 12 20 17 15"/>
+                    <polyline points="7 9 12 4 17 9"/>
+                  </svg>
+                </span>
+              </th>
+              <th class="kair-ar-sortable kair-ar-col-date" data-sort="fechaActualizacion">
+                F. Actualización
+                <span class="kair-ar-sort-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                    <polyline points="7 15 12 20 17 15"/>
+                    <polyline points="7 9 12 4 17 9"/>
+                  </svg>
+                </span>
+              </th>
+              <th>Almacenamiento</th>
+              <th>Retención</th>
+              <th>Disposición</th>
+              <th class="kair-ar-col-acciones">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+          </tbody>
+        </table>
+        <div class="kair-ar-loading" id="loadingState">
+          <div class="kair-ar-spinner"></div>
+          <div class="kair-ar-loading-text">Cargando documentos...</div>
+        </div>
+        <div class="kair-ar-empty" id="emptyState" style="display:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          <div class="kair-ar-empty-text">No se encontraron documentos</div>
+        </div>
+        <div class="kair-ar-no-results" id="noResults" style="display:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="40" height="40" style="margin-bottom:8px;opacity:.5;">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            <line x1="8" y1="11" x2="14" y2="11"/>
+          </svg>
+          <div>No se encontraron resultados para la búsqueda</div>
+        </div>
+      </div>
+
+      <div class="kair-ar-pagination" id="paginationBar" style="display:none;">
+        <div class="kair-ar-pagination-info">
+          Mostrar
+          <select class="kair-ar-pagination-select" id="selectPageSize">
+            <option value="25">25</option>
+            <option value="50" selected>50</option>
+            <option value="100">100</option>
+          </select>
+          de <strong id="totalRecords">0</strong> registros
+        </div>
+        <div class="kair-ar-pagination-buttons" id="paginationButtons">
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       MODAL — Crear / Editar Documento
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="kair-ar-modal-overlay" id="modalOverlay">
+    <div class="kair-ar-modal">
+      <div class="kair-ar-modal-header">
+        <h2 class="kair-ar-modal-title" id="modalTitle">Nuevo Documento</h2>
+        <button class="kair-ar-modal-close" id="modalClose" title="Cerrar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="kair-ar-modal-body">
+        <form id="modalForm" novalidate>
+          <input type="hidden" id="formIndex" value="-1">
+
+          <div class="kair-ar-form-group">
+            <label class="kair-ar-form-label" for="formDescripcion">
+              Descripción <span class="kair-ar-required">*</span>
+            </label>
+            <input type="text" class="kair-ar-form-input" id="formDescripcion" required placeholder="Descripción del documento o registro">
+            <div class="kair-ar-form-error" id="errorDescripcion">La descripción es obligatoria</div>
+          </div>
+
+          <div class="kair-ar-form-row">
+            <div class="kair-ar-form-group">
+              <label class="kair-ar-form-label" for="formCodigo">Código</label>
+              <input type="text" class="kair-ar-form-input" id="formCodigo" placeholder="Ej: GI-FO-010">
+            </div>
+            <div class="kair-ar-form-group">
+              <label class="kair-ar-form-label" for="formRevision">Revisión N°</label>
+              <input type="text" class="kair-ar-form-input" id="formRevision" placeholder="Ej: 02">
+            </div>
+          </div>
+
+          <div class="kair-ar-form-group">
+            <label class="kair-ar-form-label">Tipo</label>
+            <div class="kair-ar-checkbox-group">
+              <label class="kair-ar-checkbox-item">
+                <input type="checkbox" id="formTipoDoc" value="Documento"> Documento
+              </label>
+              <label class="kair-ar-checkbox-item">
+                <input type="checkbox" id="formTipoReg" value="Registro"> Registro
+              </label>
+              <label class="kair-ar-checkbox-item">
+                <input type="checkbox" id="formTipoInt" value="Interno"> Interno
+              </label>
+              <label class="kair-ar-checkbox-item">
+                <input type="checkbox" id="formTipoExt" value="Externo"> Externo
+              </label>
+            </div>
+          </div>
+
+          <div class="kair-ar-form-row">
+            <div class="kair-ar-form-group">
+              <label class="kair-ar-form-label" for="formFechaCreacion">Fecha Creación</label>
+              <input type="text" class="kair-ar-form-input" id="formFechaCreacion" placeholder="Ej: 26/03/2025">
+            </div>
+            <div class="kair-ar-form-group">
+              <label class="kair-ar-form-label" for="formFechaActualizacion">Fecha Actualización</label>
+              <input type="text" class="kair-ar-form-input" id="formFechaActualizacion" placeholder="Ej: 26/03/2025">
+            </div>
+          </div>
+
+          <div class="kair-ar-form-row">
+            <div class="kair-ar-form-group">
+              <label class="kair-ar-form-label" for="formAlmacenamiento">Almacenamiento</label>
+              <input type="text" class="kair-ar-form-input" id="formAlmacenamiento" placeholder="Ej: Carpeta física / Digital">
+            </div>
+            <div class="kair-ar-form-group">
+              <label class="kair-ar-form-label" for="formRetencion">Retención</label>
+              <input type="text" class="kair-ar-form-input" id="formRetencion" placeholder="Ej: 5 años / Indefinido">
+            </div>
+          </div>
+
+          <div class="kair-ar-form-group">
+            <label class="kair-ar-form-label" for="formDisposicion">Disposición Final</label>
+            <input type="text" class="kair-ar-form-input" id="formDisposicion" placeholder="Ej: Muerto / Obsoleto / N/A">
+          </div>
+        </form>
+      </div>
+      <div class="kair-ar-modal-footer">
+        <button class="kair-ar-btn kair-ar-btn-outline" id="modalCancel">Cancelar</button>
+        <button class="kair-ar-btn kair-ar-btn-primary" id="modalSave">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+            <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+            <polyline points="17 21 17 13 7 13 7 21"/>
+            <polyline points="7 3 7 8 15 8"/>
+          </svg>
+          Guardar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       CONFIRM DIALOG
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="kair-ar-confirm-overlay" id="confirmOverlay">
+    <div class="kair-ar-confirm-box">
+      <div class="kair-ar-confirm-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+      </div>
+      <div class="kair-ar-confirm-title" id="confirmTitle">¿Eliminar documento?</div>
+      <div class="kair-ar-confirm-message" id="confirmMessage">
+        Esta acción no se puede deshacer. El documento será eliminado permanentemente.
+      </div>
+      <div class="kair-ar-confirm-actions">
+        <button class="kair-ar-btn kair-ar-btn-outline" id="confirmCancel">Cancelar</button>
+        <button class="kair-ar-btn kair-ar-btn-danger" id="confirmOk">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="kair-ar-toast-container" id="toastContainer"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       JAVASCRIPT
+       ═══════════════════════════════════════════════════════════ -->
+  <script>
+    (function() {
+      'use strict';
+
+      // ── State ────────────────────────────────────────────────
+      let documentos = [];
+      let filteredDocs = [];
+      let currentPage = 1;
+      let pageSize = 50;
+      let sortColumn = null;
+      let sortDirection = 'asc';
+      let expandedRow = -1;
+      let editingIndex = -1;
+      let confirmCallback = null;
+      let hojas = [];
+      let companyName = '';
+      let isDirty = false;
+
+      // ── API Bridge (postMessage → wrapper component) ────────
+      function callParentAPI(type, payload) {
+        return new Promise((resolve, reject) => {
+          const requestId = `req-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+          const handler = (event) => {
+            if (event.data?.type !== `${type}-response` || event.data?.requestId !== requestId) {
+              return;
+            }
+            window.removeEventListener('message', handler);
+            if (event.data.payload?.success) {
+              resolve(event.data.payload);
+            } else {
+              reject(new Error(event.data.payload?.error?.message || event.data.payload?.error || 'Error desconocido'));
+            }
+          };
+
+          window.addEventListener('message', handler);
+
+          try {
+            window.parent.postMessage({ type: `${type}-request`, payload, requestId }, '*');
+          } catch (e) {
+            window.removeEventListener('message', handler);
+            reject(e);
+          }
+        });
+      }
+
+      // ── DOM References ───────────────────────────────────────
+      const $ = (sel) => document.querySelector(sel);
+      const $$ = (sel) => document.querySelectorAll(sel);
+
+      const DOM = {
+        loadingState: $('#loadingState'),
+        emptyState: $('#emptyState'),
+        noResults: $('#noResults'),
+        tableBody: $('#tableBody'),
+        tableScroll: $('#tableScroll'),
+        paginationBar: $('#paginationBar'),
+        paginationButtons: $('#paginationButtons'),
+        totalRecords: $('#totalRecords'),
+        selectPageSize: $('#selectPageSize'),
+        inputSearch: $('#inputSearch'),
+        selectHoja: $('#selectHoja'),
+        statTotal: $('#statTotal'),
+        statDocumentos: $('#statDocumentos'),
+        statRegistros: $('#statRegistros'),
+        statMuerto: $('#statMuerto'),
+        modalOverlay: $('#modalOverlay'),
+        modalTitle: $('#modalTitle'),
+        confirmOverlay: $('#confirmOverlay'),
+        toastContainer: $('#toastContainer'),
+        btnGuardar: $('#btnGuardar'),
+      };
+
+      function markDirty() {
+        isDirty = true;
+        DOM.btnGuardar.style.display = '';
+      }
+
+      function clearDirty() {
+        isDirty = false;
+        DOM.btnGuardar.style.display = 'none';
+        document.querySelectorAll('tr.kair-ar-row-dirty')
+                .forEach(function(tr) { tr.classList.remove('kair-ar-row-dirty'); });
+      }
+
+      // ── Toast Notifications ──────────────────────────────────
+      function showToast(message, type = 'info') {
+        const toast = document.createElement('div');
+        toast.className = 'kair-ar-toast kair-ar-toast-' + type;
+        toast.textContent = message;
+        DOM.toastContainer.appendChild(toast);
+        setTimeout(() => {
+          toast.classList.add('kair-ar-toast-exit');
+          setTimeout(() => toast.remove(), 300);
+        }, 3500);
+      }
+
+      // ── Stats ────────────────────────────────────────────────
+      function updateStats() {
+        const total = documentos.length;
+        const docs = documentos.filter(d => {
+          const t = (d.tipo || '').toLowerCase();
+          return t.includes('documento');
+        }).length;
+        const regs = documentos.filter(d => {
+          const t = (d.tipo || '').toLowerCase();
+          return t.includes('registro');
+        }).length;
+        const muertos = documentos.filter(d => {
+          const disp = (d.disposicionFinal || d.disposicion || '').toLowerCase();
+          return disp.includes('muerto');
+        }).length;
+
+        DOM.statTotal.textContent = total;
+        DOM.statDocumentos.textContent = docs;
+        DOM.statRegistros.textContent = regs;
+        DOM.statMuerto.textContent = muertos;
+      }
+
+      // ── Hojas (Sheets) Population ────────────────────────────
+      function populateHojas() {
+        const hojaSet = new Set();
+        documentos.forEach(d => {
+          if (d.hoja) hojaSet.add(d.hoja);
+        });
+        hojas = Array.from(hojaSet).sort();
+        DOM.selectHoja.innerHTML = '<option value="">Todas las hojas</option>';
+        hojas.forEach(h => {
+          const opt = document.createElement('option');
+          opt.value = h;
+          opt.textContent = h;
+          DOM.selectHoja.appendChild(opt);
+        });
+      }
+
+      // ── Search / Filter ──────────────────────────────────────
+      function applyFilters() {
+        const searchTerm = DOM.inputSearch.value.trim().toLowerCase();
+        const selectedHoja = DOM.selectHoja.value;
+
+        filteredDocs = documentos.filter(doc => {
+          if (selectedHoja && doc.hoja !== selectedHoja) return false;
+          if (searchTerm) {
+            const searchable = [
+              doc.descripcion, doc.codigo, doc.revision, doc.tipo,
+              doc.fechaCreacion, doc.fechaActualizacion,
+              doc.almacenamiento, doc.retencion,
+              doc.disposicionFinal, doc.disposicion, doc.hoja
+            ].filter(Boolean).join(' ').toLowerCase();
+            return searchable.includes(searchTerm);
+          }
+          return true;
+        });
+
+        if (sortColumn) {
+          filteredDocs.sort((a, b) => {
+            let valA = a[sortColumn] || '';
+            let valB = b[sortColumn] || '';
+            if (typeof valA === 'string') valA = valA.toLowerCase();
+            if (typeof valB === 'string') valB = valB.toLowerCase();
+            if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+            if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+            return 0;
+          });
+        }
+
+        currentPage = 1;
+        expandedRow = -1;
+        renderTable();
+      }
+
+      // ── Render Table ─────────────────────────────────────────
+      function renderTable() {
+        const total = filteredDocs.length;
+        const totalPages = Math.max(1, Math.ceil(total / pageSize));
+        if (currentPage > totalPages) currentPage = totalPages;
+
+        const start = (currentPage - 1) * pageSize;
+        const end = Math.min(start + pageSize, total);
+        const pageDocs = filteredDocs.slice(start, end);
+
+        DOM.loadingState.style.display = 'none';
+        if (documentos.length === 0) {
+          DOM.emptyState.style.display = 'flex';
+          DOM.noResults.style.display = 'none';
+          DOM.tableBody.innerHTML = '';
+          DOM.paginationBar.style.display = 'none';
+          return;
+        }
+        DOM.emptyState.style.display = 'none';
+        if (total === 0) {
+          DOM.noResults.style.display = 'block';
+          DOM.tableBody.innerHTML = '';
+          DOM.paginationBar.style.display = 'none';
+          return;
+        }
+        DOM.noResults.style.display = 'none';
+
+        let html = '';
+        pageDocs.forEach((doc, i) => {
+          const globalIndex = documentos.indexOf(doc);
+          const num = start + i + 1;
+          const isExpanded = expandedRow === globalIndex;
+          html += buildRow(doc, num, globalIndex, isExpanded);
+        });
+        DOM.tableBody.innerHTML = html;
+
+        DOM.totalRecords.textContent = total;
+        DOM.paginationBar.style.display = 'flex';
+        renderPagination(totalPages);
+      }
+
+      function buildRow(doc, num, globalIndex, isExpanded) {
+        const desc = escapeHtml(doc.descripcion || '');
+        const code = escapeHtml(doc.codigo || '');
+        const rev = escapeHtml(doc.revision || '');
+        const tipo = doc.tipo || '';
+        const fc = escapeHtml(doc.fechaCreacion || doc.fecha_creacion || '');
+        const fa = escapeHtml(doc.fechaActualizacion || doc.fecha_actualizacion || '');
+        const alm = escapeHtml(doc.almacenamiento || '');
+        const ret = doc.retencion || '';
+        const disp = doc.disposicionFinal || doc.disposicion || '';
+
+        const tipoBadges = buildTipoBadges(tipo);
+        const retBadge = buildRetBadge(ret);
+        const dispBadge = buildDispBadge(disp);
+
+        let html = '';
+        html += '<tr data-index="' + globalIndex + '" class="' + (isExpanded ? 'kair-ar-row-expanded' : '') + '">';
+        html += '<td class="kair-ar-col-num">' + num + '</td>';
+        html += '<td class="kair-ar-col-desc kair-ar-cell-editable" contenteditable="true" data-field="descripcion" title="' + desc + '">' + desc + '</td>';
+        html += '<td class="kair-ar-cell-editable" contenteditable="true" data-field="codigo"><span class="kair-ar-col-code">' + code + '</span></td>';
+        html += '<td class="kair-ar-col-rev kair-ar-cell-editable" contenteditable="true" data-field="revision">' + rev + '</td>';
+        html += '<td>' + tipoBadges + '</td>';
+        html += '<td class="kair-ar-col-date">' + fc + '</td>';
+        html += '<td class="kair-ar-col-date">' + fa + '</td>';
+        html += '<td class="kair-ar-col-almacenamiento kair-ar-cell-editable" contenteditable="true" data-field="almacenamiento" title="' + alm + '">' + alm + '</td>';
+        html += '<td>' + retBadge + '</td>';
+        html += '<td>' + dispBadge + '</td>';
+        html += '<td class="kair-ar-col-acciones">';
+        html += '<button class="kair-ar-btn-icon kair-ar-btn-icon-edit" title="Editar" data-action="edit" data-index="' + globalIndex + '">';
+        html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+        html += '</button>';
+        html += '<button class="kair-ar-btn-icon kair-ar-btn-icon-delete" title="Eliminar" data-action="delete" data-index="' + globalIndex + '">';
+        html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
+        html += '</button>';
+        html += '</td>';
+        html += '</tr>';
+
+        if (isExpanded) {
+          html += '<tr class="kair-ar-expanded-row"><td colspan="11">';
+          html += '<div class="kair-ar-expanded-content">';
+          html += expandedField('Descripción', desc);
+          html += expandedField('Código', code);
+          html += expandedField('Revisión', rev);
+          html += expandedField('Tipo', tipo);
+          html += expandedField('Fecha Creación', fc);
+          html += expandedField('Fecha Actualización', fa);
+          html += expandedField('Almacenamiento', alm);
+          html += expandedField('Retención', ret);
+          html += expandedField('Disposición Final', disp);
+          if (doc.hoja) html += expandedField('Hoja', escapeHtml(doc.hoja));
+          html += '</div></td></tr>';
+        }
+
+        return html;
+      }
+
+      function expandedField(label, value) {
+        return '<div class="kair-ar-expanded-field"><span class="kair-ar-expanded-label">' + label + '</span><span class="kair-ar-expanded-value">' + (value || '—') + '</span></div>';
+      }
+
+      // ── Badge Builders ───────────────────────────────────────
+      function buildTipoBadges(tipo) {
+        const parts = tipo.split(/[,;\/]+/).map(s => s.trim()).filter(Boolean);
+        let html = '';
+        parts.forEach(p => {
+          const lower = p.toLowerCase();
+          if (lower.includes('doc')) {
+            html += '<span class="kair-ar-badge kair-ar-badge-doc">Doc</span> ';
+          } else if (lower.includes('reg')) {
+            html += '<span class="kair-ar-badge kair-ar-badge-reg">Reg</span> ';
+          } else if (lower.includes('int')) {
+            html += '<span class="kair-ar-badge kair-ar-badge-int">Int.</span> ';
+          } else if (lower.includes('ext')) {
+            html += '<span class="kair-ar-badge kair-ar-badge-ext">Ext.</span> ';
+          } else {
+            html += '<span class="kair-ar-badge" style="background:#e9ecef;color:#495057;">' + escapeHtml(p) + '</span> ';
+          }
+        });
+        return html || '<span style="color:#adb5bd;">—</span>';
+      }
+
+      function buildRetBadge(ret) {
+        if (!ret) return '<span style="color:#adb5bd;">—</span>';
+        const lower = ret.toLowerCase().trim();
+        if (lower.includes('indefinido')) {
+          return '<span class="kair-ar-badge kair-ar-badge-ret-indefinido">Indefinido</span>';
+        }
+        if (lower === 'n/a' || lower === 'na' || lower === 'no aplica') {
+          return '<span class="kair-ar-badge kair-ar-badge-ret-na">N/A</span>';
+        }
+        return '<span class="kair-ar-badge kair-ar-badge-ret-normal">' + escapeHtml(ret) + '</span>';
+      }
+
+      function buildDispBadge(disp) {
+        if (!disp) return '<span style="color:#adb5bd;">—</span>';
+        const lower = disp.toLowerCase().trim();
+        if (lower.includes('muerto')) {
+          return '<span class="kair-ar-badge kair-ar-badge-disp-muerto">Muerto</span>';
+        }
+        if (lower.includes('obsoleto')) {
+          return '<span class="kair-ar-badge kair-ar-badge-disp-obsoleto">Obsoleto</span>';
+        }
+        if (lower === 'n/a' || lower === 'na' || lower === 'no aplica') {
+          return '<span class="kair-ar-badge kair-ar-badge-disp-na">N/A</span>';
+        }
+        return '<span class="kair-ar-badge kair-ar-badge-disp-normal">' + escapeHtml(disp) + '</span>';
+      }
+
+      // ── Pagination ───────────────────────────────────────────
+      function renderPagination(totalPages) {
+        let html = '';
+        html += '<button class="kair-ar-page-btn" data-page="first" title="Primera"' + (currentPage === 1 ? ' disabled' : '') + '>';
+        html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg>';
+        html += '</button>';
+        html += '<button class="kair-ar-page-btn" data-page="prev" title="Anterior"' + (currentPage === 1 ? ' disabled' : '') + '>';
+        html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
+        html += '</button>';
+
+        let startPage = Math.max(1, currentPage - 2);
+        let endPage = Math.min(totalPages, startPage + 4);
+        if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+
+        for (let p = startPage; p <= endPage; p++) {
+          const active = p === currentPage ? ' kair-ar-page-active' : '';
+          html += '<button class="kair-ar-page-btn' + active + '" data-page="' + p + '">' + p + '</button>';
+        }
+
+        html += '<button class="kair-ar-page-btn" data-page="next" title="Siguiente"' + (currentPage === totalPages ? ' disabled' : '') + '>';
+        html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+        html += '</button>';
+        html += '<button class="kair-ar-page-btn" data-page="last" title="Última"' + (currentPage === totalPages ? ' disabled' : '') + '>';
+        html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>';
+        html += '</button>';
+
+        DOM.paginationButtons.innerHTML = html;
+      }
+
+      function handlePagination(e) {
+        const btn = e.target.closest('[data-page]');
+        if (!btn || btn.disabled) return;
+        const val = btn.getAttribute('data-page');
+        const totalPages = Math.max(1, Math.ceil(filteredDocs.length / pageSize));
+
+        if (val === 'first') currentPage = 1;
+        else if (val === 'prev') currentPage = Math.max(1, currentPage - 1);
+        else if (val === 'next') currentPage = Math.min(totalPages, currentPage + 1);
+        else if (val === 'last') currentPage = totalPages;
+        else currentPage = parseInt(val, 10);
+
+        expandedRow = -1;
+        renderTable();
+        DOM.tableScroll.scrollTop = 0;
+      }
+
+      // ── Sorting ──────────────────────────────────────────────
+      function handleSort(e) {
+        const th = e.target.closest('th.kair-ar-sortable');
+        if (!th) return;
+        const col = th.getAttribute('data-sort');
+
+        if (sortColumn === col) {
+          sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+          sortColumn = col;
+          sortDirection = 'asc';
+        }
+
+        $$('.kair-ar-sortable').forEach(h => {
+          h.classList.remove('kair-ar-sort-asc', 'kair-ar-sort-desc', 'kair-ar-sort-active');
+        });
+        th.classList.add('kair-ar-sort-active');
+        th.classList.add(sortDirection === 'asc' ? 'kair-ar-sort-asc' : 'kair-ar-sort-desc');
+
+        applyFilters();
+      }
+
+      // ── Row Click (Expand/Collapse) ──────────────────────────
+      function handleRowClick(e) {
+        if (e.target.closest('[data-action]')) return;
+        const tr = e.target.closest('tbody tr[data-index]');
+        if (!tr) return;
+        const idx = parseInt(tr.getAttribute('data-index'), 10);
+        expandedRow = expandedRow === idx ? -1 : idx;
+        renderTable();
+      }
+
+      // ── Action Buttons (Edit / Delete) ───────────────────────
+      function handleActionClick(e) {
+        const btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        e.stopPropagation();
+        const action = btn.getAttribute('data-action');
+        const index = parseInt(btn.getAttribute('data-index'), 10);
+        if (action === 'edit') openEditModal(index);
+        else if (action === 'delete') openConfirmDelete(index);
+      }
+
+      // ── Modal ────────────────────────────────────────────────
+      function openModal() {
+        DOM.modalOverlay.classList.add('kair-ar-modal-open');
+        document.body.style.overflow = 'hidden';
+      }
+
+      function closeModal() {
+        DOM.modalOverlay.classList.remove('kair-ar-modal-open');
+        document.body.style.overflow = '';
+        resetForm();
+      }
+
+      function openNewModal() {
+        editingIndex = -1;
+        DOM.modalTitle.textContent = 'Nuevo Documento';
+        resetForm();
+        openModal();
+        setTimeout(() => $('#formDescripcion').focus(), 300);
+      }
+
+      function openEditModal(index) {
+        editingIndex = index;
+        DOM.modalTitle.textContent = 'Editar Documento';
+        const doc = documentos[index];
+        if (!doc) return;
+
+        $('#formIndex').value = index;
+        $('#formDescripcion').value = doc.descripcion || '';
+        $('#formCodigo').value = doc.codigo || '';
+        $('#formRevision').value = doc.revision || '';
+        $('#formFechaCreacion').value = doc.fechaCreacion || doc.fecha_creacion || '';
+        $('#formFechaActualizacion').value = doc.fechaActualizacion || doc.fecha_actualizacion || '';
+        $('#formAlmacenamiento').value = doc.almacenamiento || '';
+        $('#formRetencion').value = doc.retencion || '';
+        $('#formDisposicion').value = doc.disposicionFinal || doc.disposicion || '';
+
+        const tipo = (doc.tipo || '').toLowerCase();
+        $('#formTipoDoc').checked = tipo.includes('documento');
+        $('#formTipoReg').checked = tipo.includes('registro');
+        $('#formTipoInt').checked = tipo.includes('interno');
+        $('#formTipoExt').checked = tipo.includes('externo');
+
+        openModal();
+      }
+
+      function resetForm() {
+        $('#modalForm').reset();
+        $('#formIndex').value = '-1';
+        $('#formDescripcion').classList.remove('kair-ar-input-error');
+        $('#errorDescripcion').classList.remove('kair-ar-visible');
+      }
+
+      async function saveModal() {
+        const desc = $('#formDescripcion').value.trim();
+
+        if (!desc) {
+          $('#formDescripcion').classList.add('kair-ar-input-error');
+          $('#errorDescripcion').classList.add('kair-ar-visible');
+          $('#formDescripcion').focus();
+          return;
+        }
+
+        const tipos = [];
+        if ($('#formTipoDoc').checked) tipos.push('Documento');
+        if ($('#formTipoReg').checked) tipos.push('Registro');
+        if ($('#formTipoInt').checked) tipos.push('Interno');
+        if ($('#formTipoExt').checked) tipos.push('Externo');
+
+        const data = {
+          descripcion: desc,
+          codigo: $('#formCodigo').value.trim(),
+          revision: $('#formRevision').value.trim(),
+          tipo: tipos.join(', '),
+          fechaCreacion: $('#formFechaCreacion').value.trim(),
+          fechaActualizacion: $('#formFechaActualizacion').value.trim(),
+          almacenamiento: $('#formAlmacenamiento').value.trim(),
+          retencion: $('#formRetencion').value.trim(),
+          disposicionFinal: $('#formDisposicion').value.trim(),
+        };
+
+        try {
+          if (editingIndex >= 0) {
+            const original = documentos[editingIndex];
+            const payload = { numero: original.numero, ...data };
+            const result = await callParentAPI('actualizar', payload);
+            if (result.success) {
+              documentos[editingIndex] = { ...original, ...data };
+              clearDirty();
+              showToast('Documento actualizado correctamente', 'success');
+            } else {
+              throw new Error(result.error?.message || result.error || 'Error al actualizar');
+            }
+          } else {
+            const result = await callParentAPI('crear', data);
+            if (result.success) {
+              documentos.push({ ...data, numero: result.data?.numero || documentos.length + 1 });
+              clearDirty();
+              showToast('Documento creado correctamente', 'success');
+            } else {
+              throw new Error(result.error?.message || result.error || 'Error al crear');
+            }
+          }
+
+          closeModal();
+          updateStats();
+          applyFilters();
+        } catch (err) {
+          console.error('Error guardando documento:', err);
+          showToast('Error al guardar: ' + err.message, 'error');
+        }
+      }
+
+      // ── Confirm Dialog ───────────────────────────────────────
+      function openConfirm(title, message, callback) {
+        $('#confirmTitle').textContent = title;
+        $('#confirmMessage').textContent = message;
+        confirmCallback = callback;
+        DOM.confirmOverlay.classList.add('kair-ar-modal-open');
+      }
+
+      function closeConfirm() {
+        DOM.confirmOverlay.classList.remove('kair-ar-modal-open');
+        confirmCallback = null;
+      }
+
+      async function openConfirmDelete(index) {
+        const doc = documentos[index];
+        const name = doc ? doc.descripcion || doc.codigo || 'este documento' : 'este documento';
+        openConfirm(
+          '¿Eliminar documento?',
+          'Se eliminará "' + name + '" permanentmente. Esta acción no se puede deshacer.',
+          async () => {
+            try {
+              const numero = doc.numero;
+              const result = await callParentAPI('eliminar', { numero });
+              if (result.success) {
+                documentos.splice(index, 1);
+                expandedRow = -1;
+                clearDirty();
+                updateStats();
+                applyFilters();
+                showToast('Documento eliminado', 'success');
+              } else {
+                throw new Error(result.error?.message || result.error || 'Error al eliminar');
+              }
+            } catch (err) {
+              console.error('Error eliminando:', err);
+              showToast('Error al eliminar: ' + err.message, 'error');
+            }
+          }
+        );
+      }
+
+      // ── CSV Export ───────────────────────────────────────────
+      function exportCSV() {
+        if (filteredDocs.length === 0) {
+          showToast('No hay datos para exportar', 'error');
+          return;
+        }
+
+        const headers = [
+          '#', 'Descripción', 'Código', 'Revisión', 'Tipo',
+          'Fecha Creación', 'Fecha Actualización', 'Almacenamiento',
+          'Retención', 'Disposición Final'
+        ];
+
+        const rows = filteredDocs.map((doc, i) => {
+          return [
+            i + 1,
+            csvEscape(doc.descripcion || ''),
+            csvEscape(doc.codigo || ''),
+            csvEscape(doc.revision || ''),
+            csvEscape(doc.tipo || ''),
+            csvEscape(doc.fechaCreacion || doc.fecha_creacion || ''),
+            csvEscape(doc.fechaActualizacion || doc.fecha_actualizacion || ''),
+            csvEscape(doc.almacenamiento || ''),
+            csvEscape(doc.retencion || ''),
+            csvEscape(doc.disposicionFinal || doc.disposicion || '')
+          ].join(',');
+        });
+
+        const csvContent = '\uFEFF' + headers.join(',') + '\n' + rows.join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'archivo-retencion-' + new Date().toISOString().slice(0, 10) + '.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        showToast('CSV exportado exitosamente', 'success');
+      }
+
+      function csvEscape(str) {
+        if (/[,"\n\r]/.test(str)) {
+          return '"' + str.replace(/"/g, '""') + '"';
+        }
+        return str;
+      }
+
+      // ── Utilities ────────────────────────────────────────────
+      function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
+      // ── Data Loading ─────────────────────────────────────────
+      async function loadData() {
+        DOM.loadingState.style.display = 'flex';
+        DOM.emptyState.style.display = 'none';
+        DOM.noResults.style.display = 'none';
+        DOM.paginationBar.style.display = 'none';
+        DOM.tableBody.innerHTML = '';
+
+        try {
+          const result = await callParentAPI('leer-todos', {});
+          if (result.success && Array.isArray(result.data)) {
+            documentos = result.data;
+          } else if (Array.isArray(result)) {
+            documentos = result;
+          } else {
+            documentos = [];
+          }
+        } catch (err) {
+          console.error('Error cargando datos:', err);
+          // Fallback demo data
+          documentos = generateDemoData();
+          showToast('Modo demo: no se pudo conectar con el backend. ' + err.message, 'info');
+        }
+
+        updateStats();
+        populateHojas();
+        applyFilters();
+      }
+
+      async function refreshData() {
+        showToast('Actualizando datos...', 'info');
+        await loadData();
+        showToast('Datos actualizados', 'success');
+      }
+
+      // ── Demo Data (fallback) ─────────────────────────────────
+      function generateDemoData() {
+        return [
+          { descripcion: 'Política de Seguridad y Salud en el Trabajo', codigo: 'SG-SST-P-001', revision: '03', tipo: 'Documento, Interno', fechaCreacion: '15/01/2024', fechaActualizacion: '26/03/2025', almacenamiento: 'Carpeta SG-SST / Oficina SST', retencion: 'Indefinido', disposicionFinal: 'N/A', hoja: 'Documentos' },
+          { descripcion: 'Manual de Seguridad y Salud en el Trabajo', codigo: 'SG-SST-M-001', revision: '02', tipo: 'Documento, Interno', fechaCreacion: '10/02/2024', fechaActualizacion: '15/02/2025', almacenamiento: 'Carpeta SG-SST / Oficina SST', retencion: 'Indefinido', disposicionFinal: 'N/A', hoja: 'Documentos' },
+          { descripcion: 'Procedimiento de Identificación de Peligros', codigo: 'SG-SST-P-002', revision: '01', tipo: 'Documento, Interno', fechaCreacion: '20/03/2024', fechaActualizacion: '20/03/2024', almacenamiento: 'Carpeta SG-SST', retencion: '5 años', disposicionFinal: 'Obsoleto', hoja: 'Documentos' },
+          { descripcion: 'Matriz de Riesgos Peligros', codigo: 'SG-SST-R-001', revision: '04', tipo: 'Registro, Interno', fechaCreacion: '05/04/2024', fechaActualizacion: '10/01/2025', almacenamiento: 'Carpeta Evaluación / Digital', retencion: '5 años', disposicionFinal: 'N/A', hoja: 'Registros' },
+          { descripcion: 'Acta de Comité de Seguridad y Salud', codigo: 'SG-SST-R-002', revision: '06', tipo: 'Registro, Interno', fechaCreacion: '20/01/2025', fechaActualizacion: '20/03/2025', almacenamiento: 'Carpeta Comité / Digital', retencion: '10 años', disposicionFinal: 'Muerto', hoja: 'Registros' },
+          { descripcion: 'Plan de Trabajo Anual SST', codigo: 'SG-SST-P-003', revision: '02', tipo: 'Documento, Interno', fechaCreacion: '10/01/2025', fechaActualizacion: '01/03/2025', almacenamiento: 'Carpeta SG-SST', retencion: '5 años', disposicionFinal: 'Obsoleto', hoja: 'Documentos' },
+          { descripcion: 'Evaluación Médica Ocupacional', codigo: 'SG-SST-R-003', revision: '01', tipo: 'Registro, Interno', fechaCreacion: '15/02/2025', fechaActualizacion: '15/02/2025', almacenamiento: 'Carpeta Médica / Confidencial', retencion: '20 años', disposicionFinal: 'N/A', hoja: 'Registros' },
+          { descripcion: 'Resolución 0312 de 2019 — Ministerio de Trabajo', codigo: 'EXT-MT-0312', revision: '—', tipo: 'Documento, Externo', fechaCreacion: '22/01/2019', fechaActualizacion: '22/01/2019', almacenamiento: 'Legislación / Biblioteca SST', retencion: 'Indefinido', disposicionFinal: 'N/A', hoja: 'Documentos' },
+          { descripcion: 'Decreto 1072 de 2015 — Decreto Único Reglamentario SST', codigo: 'EXT-D-1072', revision: '—', tipo: 'Documento, Externo', fechaCreacion: '26/05/2015', fechaActualizacion: '26/05/2015', almacenamiento: 'Legislación / Biblioteca SST', retencion: 'Indefinido', disposicionFinal: 'N/A', hoja: 'Documentos' },
+          { descripcion: 'Investigación de Incidente / Accidente', codigo: 'SG-SST-R-004', revision: '01', tipo: 'Registro, Interno', fechaCreacion: '05/03/2025', fechaActualizacion: '05/03/2025', almacenamiento: 'Carpeta Investigaciones', retencion: '10 años', disposicionFinal: 'Muerto', hoja: 'Registros' },
+          { descripcion: 'Inducción y Reinducción SST', codigo: 'SG-SST-R-005', revision: '02', tipo: 'Registro, Interno', fechaCreacion: '12/01/2025', fechaActualizacion: '25/02/2025', almacenamiento: 'Talento Humano / Carpeta SST', retencion: 'Mientras dure la relación laboral', disposicionFinal: 'N/A', hoja: 'Registros' },
+          { descripcion: 'Autoevaluación del SG-SST', codigo: 'SG-SST-R-006', revision: '01', tipo: 'Registro, Interno', fechaCreacion: '01/12/2024', fechaActualizacion: '01/12/2024', almacenamiento: 'Carpeta Mejora Continua', retencion: '5 años', disposicionFinal: 'N/A', hoja: 'Registros' },
+          { descripcion: 'Programa de Vigilancia Epidemiológica', codigo: 'SG-SST-P-004', revision: '01', tipo: 'Documento, Interno', fechaCreacion: '18/06/2024', fechaActualizacion: '18/06/2024', almacenamiento: 'Carpeta Epidemiología', retencion: 'Indefinido', disposicionFinal: 'N/A', hoja: 'Documentos' },
+          { descripcion: 'Plan de Emergencias', codigo: 'SG-SST-P-005', revision: '03', tipo: 'Documento, Interno', fechaCreacion: '01/04/2024', fechaActualizacion: '28/02/2025', almacenamiento: 'Carpeta Emergencias / Digital', retencion: 'Indefinido', disposicionFinal: 'N/A', hoja: 'Documentos' },
+          { descripcion: 'Formato de Inspección Planeada', codigo: 'SG-SST-F-001', revision: '02', tipo: 'Registro, Interno', fechaCreacion: '10/03/2025', fechaActualizacion: '20/03/2025', almacenamiento: 'Carpeta Inspecciones / Digital', retencion: '3 años', disposicionFinal: 'Obsoleto', hoja: 'Registros' },
+        ];
+      }
+
+      // ── Event Bindings ───────────────────────────────────────
+      function bindEvents() {
+        $('#btnVolver').addEventListener('click', () => {
+          window.parent.postMessage({ type: 'back-to-module-request' }, '*');
+        });
+        $('#btnExportar').addEventListener('click', exportCSV);
+        $('#btnActualizar').addEventListener('click', refreshData);
+
+        // Edición inline — actualiza documentos[] y marca dirty al salir de la celda
+        DOM.tableBody.addEventListener('blur', function(event) {
+          var td = event.target;
+          if (!td || td.getAttribute('contenteditable') !== 'true') return;
+          var tr = td.closest('tr[data-index]');
+          if (!tr) return;
+          var idx = parseInt(tr.getAttribute('data-index'), 10);
+          var field = td.getAttribute('data-field');
+          if (isNaN(idx) || !field || !documentos[idx]) return;
+          var newValue = td.textContent.trim();
+          if (documentos[idx][field] !== newValue) {
+            documentos[idx][field] = newValue;
+            tr.classList.add('kair-ar-row-dirty');
+            markDirty();
+          }
+        }, true); // useCapture porque blur no burbujea
+
+        // Guardar todos los cambios inline en el Excel
+        DOM.btnGuardar.addEventListener('click', async function() {
+          DOM.btnGuardar.disabled = true;
+          DOM.btnGuardar.textContent = 'Guardando...';
+          try {
+            await callParentAPI('guardar', documentos);
+            clearDirty();
+            showToast('Cambios guardados correctamente en el Excel', 'success');
+          } catch (err) {
+            console.error('[AR] Error al guardar:', err);
+            showToast('Error al guardar: ' + err.message, 'error');
+          } finally {
+            DOM.btnGuardar.disabled = false;
+            DOM.btnGuardar.innerHTML =
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"'
+              + ' stroke="currentColor" stroke-width="2"'
+              + ' stroke-linecap="round" stroke-linejoin="round">'
+              + '<path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>'
+              + '<polyline points="17 21 17 13 7 13 7 21"/>'
+              + '<polyline points="7 3 7 8 15 8"/></svg>'
+              + ' Guardar Cambios';
+          }
+        });
+
+        $('#btnBuscar').addEventListener('click', applyFilters);
+        DOM.inputSearch.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') applyFilters();
+        });
+        DOM.inputSearch.addEventListener('input', () => {
+          clearTimeout(DOM.inputSearch._debounce);
+          DOM.inputSearch._debounce = setTimeout(applyFilters, 300);
+        });
+        DOM.selectHoja.addEventListener('change', applyFilters);
+
+        DOM.selectPageSize.addEventListener('change', (e) => {
+          pageSize = parseInt(e.target.value, 10);
+          currentPage = 1;
+          renderTable();
+        });
+
+        DOM.paginationButtons.addEventListener('click', handlePagination);
+        $('#mainTable').querySelector('thead').addEventListener('click', handleSort);
+
+        DOM.tableBody.addEventListener('click', (e) => {
+          handleActionClick(e);
+          handleRowClick(e);
+        });
+
+        $('#btnNuevo').addEventListener('click', openNewModal);
+        $('#modalClose').addEventListener('click', closeModal);
+        $('#modalCancel').addEventListener('click', closeModal);
+        $('#modalSave').addEventListener('click', saveModal);
+        DOM.modalOverlay.addEventListener('click', (e) => {
+          if (e.target === DOM.modalOverlay) closeModal();
+        });
+
+        $('#confirmCancel').addEventListener('click', closeConfirm);
+        $('#confirmOk').addEventListener('click', () => {
+          if (typeof confirmCallback === 'function') confirmCallback();
+          closeConfirm();
+        });
+        DOM.confirmOverlay.addEventListener('click', (e) => {
+          if (e.target === DOM.confirmOverlay) closeConfirm();
+        });
+
+        $('#formDescripcion').addEventListener('input', () => {
+          $('#formDescripcion').classList.remove('kair-ar-input-error');
+          $('#errorDescripcion').classList.remove('kair-ar-visible');
+        });
+
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            if (DOM.confirmOverlay.classList.contains('kair-ar-modal-open')) {
+              closeConfirm();
+            } else if (DOM.modalOverlay.classList.contains('kair-ar-modal-open')) {
+              closeModal();
+            }
+          }
+          if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+            e.preventDefault();
+            if (!DOM.modalOverlay.classList.contains('kair-ar-modal-open')) {
+              openNewModal();
+            }
+          }
+          if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+            e.preventDefault();
+            DOM.inputSearch.focus();
+            DOM.inputSearch.select();
+          }
+        });
+      }
+
+      // ── Initialize ───────────────────────────────────────────
+      function init() {
+        const params = new URLSearchParams(window.location.search);
+        companyName = params.get('company') || '';
+
+        bindEvents();
+        loadData();
+
+        window.parent.postMessage({ type: 'iframe-ready' }, '*');
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+      } else {
+        init();
+      }
+
+    })();
+  </script>
+</body>
+</html>

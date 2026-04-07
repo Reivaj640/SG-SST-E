@@ -70,29 +70,29 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function setupListeners() {
-    const backBtn = document.getElementById('backToModuleBtn');
-    if (backBtn) {
-        backBtn.onclick = () => window.parent.postMessage({ type: 'back-to-module-request' }, '*');
+    const backToModuleBtn = document.getElementById('backToModuleBtn');
+    if (backToModuleBtn) {
+        backToModuleBtn.onclick = () => window.parent.postMessage({ type: 'back-to-module-request' }, '*');
     }
-    
+
     const navUpBtn = document.getElementById('navUpBtn');
     if (navUpBtn) navUpBtn.onclick = goUp;
-    
+
     const closeDocBtn = document.getElementById('closeDocBtn');
     if (closeDocBtn) closeDocBtn.onclick = closeDocument;
-    
+
     const downloadBtn = document.getElementById('downloadBtn');
     if (downloadBtn) downloadBtn.onclick = downloadCurrentFile;
-    
+
     const editModeBtn = document.getElementById('editModeBtn');
     if (editModeBtn) editModeBtn.onclick = enableEditMode;
-    
+
     const zoomInBtn = document.getElementById('zoomInBtn');
     if (zoomInBtn) zoomInBtn.onclick = () => adjustZoom(10);
-    
+
     const zoomOutBtn = document.getElementById('zoomOutBtn');
     if (zoomOutBtn) zoomOutBtn.onclick = () => adjustZoom(-10);
-    
+
     console.log('[IFRAME] Listeners configurados');
 }
 

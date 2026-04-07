@@ -239,6 +239,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // --- Evaluación Inicial SG-SST ---
   processEvaluacionPdf: (pdfPath, sourceType) => ipcRenderer.invoke('process-evaluacion-pdf', pdfPath, sourceType),
 
+  // --- Archivo y Retención Documental (Submódulo 2.5.1) ---
+  archivoRetencion: {
+    getExcelPath: (companyName) => ipcRenderer.invoke('archivo-retencion:get-excel-path', companyName),
+    leerTodos: (companyName) => ipcRenderer.invoke('archivo-retencion:leer-todos', companyName),
+    guardar: (companyName, documentos) => ipcRenderer.invoke('archivo-retencion:guardar', companyName, documentos),
+    crear: (companyName, documento) => ipcRenderer.invoke('archivo-retencion:crear', companyName, documento),
+    actualizar: (companyName, documento) => ipcRenderer.invoke('archivo-retencion:actualizar', companyName, documento),
+    eliminar: (companyName, numero) => ipcRenderer.invoke('archivo-retencion:eliminar', companyName, { numero }),
+  },
+
   // --- Eventos IPC ---
   send: (channel, data) => ipcRenderer.send(channel, data),
   onIpcMessage: (channel, listener) => {

@@ -113,6 +113,27 @@
         .nav-back-btn:hover:not(:disabled) { background: var(--bg-body); }
         .nav-back-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+        .btn-back-module {
+            width: 100%;
+            padding: 0.6rem 1rem;
+            border: 1px solid var(--primary);
+            background: var(--primary-light);
+            color: var(--primary);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+            margin-top: 0.5rem;
+        }
+        .btn-back-module:hover {
+            background: var(--primary);
+            color: white;
+        }
+
         .file-list-container {
             flex: 1;
             overflow-y: auto;
@@ -332,6 +353,9 @@
             <div class="sidebar-nav">
                 <button class="nav-back-btn" id="navUpBtn" disabled>
                     <i class="fas fa-arrow-up"></i> Subir un nivel
+                </button>
+                <button class="btn-back-module" id="backToModuleBtn">
+                    <i class="fas fa-arrow-left"></i> Volver al módulo
                 </button>
             </div>
 

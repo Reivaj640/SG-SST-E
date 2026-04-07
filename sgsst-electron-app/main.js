@@ -19,6 +19,9 @@ const crypto = require('crypto');
 // Importar handlers de investigación de accidentes
 require('./modules/gestion-salud/investigacion-accidentes/investigacion_handlers.js');
 
+// Importar handlers de Archivo y Retención Documental (Submódulo 2.5.1)
+const { registerArchivoRetencionHandlers } = require('./modules/gestion-integral/archivo-retencion/archivo-retencion-main');
+
 // Capturar promesas no manejadas globalmente
 process.on('unhandledRejection', (reason, promise) => {
   const errorMessage = `
@@ -6112,6 +6115,14 @@ app.whenReady().then(() => {
   // Solo crear ventana si no ha sido creada antes
   if (!isWindowCreated) {
     createWindow();
+  }
+
+  // Registrar handlers de Archivo y Retención Documental (Submódulo 2.5.1)
+  try {
+    registerArchivoRetencionHandlers(app);
+    sendLog('[MAIN] Handlers de Archivo y Retención Documental (2.5.1) registrados correctamente', 'INFO');
+  } catch (err) {
+    sendLog(`[MAIN] Error registrando handlers de Archivo Retención: ${err.message}`, 'ERROR');
   }
 
   // Iniciar la búsqueda de actualizaciones una vez que la app esté lista
