@@ -427,8 +427,130 @@ async function escribirExcel(filePath, documentos) {
 }
 
 // ---------------------------------------------------------------------------
+// Stats para widget del dashboard
+// ---------------------------------------------------------------------------
+
+/**
+ * Calcula estadísticas del listado maestro para el widget de gestión documental.
+ * @param {string} companyName
+ * @param {Electron.App} appInstance
+ * @returns {Promise<object>}
+ */
+async function calcularStats(companyName, appInstance) {
+  try {
+    const filePath = await resolverRutaExcel(appInstance, companyName);
+    const documentos = await leerExcelCompleto(filePath);
+
+    if (!documentos || documentos.length === 0) {
+      return {
+        success: false,
+        error: { code: 'SIN_DATOS', message: 'No hay documentos en el listado maestro.' }
+      };
+    }
+
+    const total = documentos.length;
+    const currentYear = new Date().getFullYear();
+
+    // Clasificación por tipo
+    let tipoDocCount = 0, tipoRegCount = 0, tipoIntCount = 0, tipoExtCount = 0;
+
+    // Clasificación por disposición
+    let vigentesCount = 0, obsoletosCount = 0, muertosCount = 0, naCount = 0;
+
+    // Actualizaciones por año
+    const actualizacionesPorAnio = {};
+
+    // Sin actualizar en +2 años
+    let sinActualizar2Anios = 0;
+
+    // Distribución por retención
+    const distribucionRetencion = {};
+
+    for (const doc of documentos) {
+      // Tipos
+      if (doc.tipoDoc) tipoDocCount++;
+      if (doc.tipoReg) tipoRegCount++;
+      if (doc.tipoInterno) tipoIntCount++;
+      if (doc.tipoExterno) tipoExtCount++;
+
+      // Disposición
+      const disp = (doc.disposicion || '').toLowerCase();
+      if (disp === 'obsoleto') obsoletosCount++;
+      else if (disp.includes('muerto')) muertosCount++;
+      else if (disp === 'n/a' || disp === '') vigentesCount++;
+      else vigentesCount++; // otros = vigentes
+
+      // Año de última actualización
+      if (doc.fechaActualizacion) {
+        const yearMatch = doc.fechaActualizacion.match(/\b(20\d{2})\b/);
+        if (yearMatch) {
+          const year = parseInt(yearMatch[1]);
+          actualizacionesPorAnio[year] = (actualizacionesPorAnio[year] || 0) + 1;
+
+          // Sin actualizar en +2 años
+          if (year < currentYear - 2) {
+            sinActualizar2Anios++;
+          }
+        } else {
+          sinActualizar2Anios++;
+        }
+      } else {
+        sinActualizar2Anios++;
+      }
+
+      // Retención
+      const ret = doc.retencion || 'No especificado';
+      distribucionRetencion[ret] = (distribucionRetencion[ret] || 0) + 1;
+    }
+
+    const noVigentes = obsoletosCount + muertosCount;
+    const porcentajeVigencia = total > 0 ? Math.round(((total - noVigentes) / total) * 100) : 0;
+
+    // Estado semáforo
+    let estado = 'ok';
+    if (porcentajeVigencia < 50) estado = 'danger';
+    else if (porcentajeVigencia < 80) estado = 'warning';
+
+    return {
+      success: true,
+      data: {
+        total,
+        tipoDoc: tipoDocCount,
+        tipoReg: tipoRegCount,
+        tipoInterno: tipoIntCount,
+        tipoExterno: tipoExtCount,
+        vigentes: total - noVigentes,
+        obsoletos: obsoletosCount,
+        muertos: muertosCount,
+        noAplica: naCount,
+        porcentajeVigencia,
+        estado,
+        sinActualizar2Anios,
+        distribucionRetencion,
+        actualizacionesPorAnio,
+        ultimoMesRegistrado: currentYear.toString()
+      }
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: { code: err.code || 'STATS_ERROR', message: err.message }
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // IPC Handler Registrations
 // ---------------------------------------------------------------------------
+
+/**
+ * Handler: archivo-retencion:get-stats
+ */
+function registrarGetStats(appInstance) {
+  ipcMain.handle('archivo-retencion:get-stats', async (_event, companyName) => {
+    return calcularStats(companyName, appInstance);
+  });
+}
 
 /**
  * Handler: archivo-retencion:get-excel-path
@@ -705,6 +827,7 @@ function registerArchivoRetencionHandlers(appInstance) {
     );
   }
 
+  registrarGetStats(appInstance);
   registrarGetExcelPath(appInstance);
   registrarLeerTodos(appInstance);
   registrarGuardar(appInstance);
@@ -717,5 +840,6 @@ module.exports = {
   registerArchivoRetencionHandlers,
   leerExcelCompleto,
   escribirExcel,
+  calcularStats,
   resolverRutaExcel,
 };

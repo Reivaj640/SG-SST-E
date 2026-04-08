@@ -113,6 +113,10 @@ class ArchivoRetencionComponent {
         this.handleEliminar(payload, requestId);
         break;
 
+      case 'get-archivo-retencion-stats-request':
+        this.handleGetStats(payload, requestId);
+        break;
+
       case 'back-to-module-request':
         if (this.onBackToModuleHome) {
           this.onBackToModuleHome();
@@ -215,6 +219,42 @@ class ArchivoRetencionComponent {
     } catch (error) {
       this.sendResponse('eliminar', requestId, { success: false, error: error.message });
     }
+  }
+
+  async handleGetStats(payload, requestId) {
+    try {
+      if (window.electronAPI && window.electronAPI.archivoRetencion) {
+        const result = await window.electronAPI.archivoRetencion.getStats(this.companyName);
+        this.sendResponse('get-archivo-retencion-stats', requestId, result);
+      } else {
+        throw new Error('electronAPI.archivoRetencion no disponible');
+      }
+    } catch (error) {
+      this.sendResponse('get-archivo-retencion-stats', requestId, { success: false, error: error.message });
+    }
+  }
+
+  /**
+   * Abre el dashboard de métricas de gestión documental
+   */
+  openDashboard() {
+    this.container.innerHTML = '';
+
+    // Botón volver
+    const backBtn = document.createElement('button');
+    backBtn.className = 'btn btn-back';
+    backBtn.innerHTML = '&#8592; Volver';
+    backBtn.style.cssText = 'margin-bottom:1rem;cursor:pointer;padding:0.5rem 1rem;border:1px solid var(--k-border);border-radius:var(--k-radius-md);background:var(--k-bg-card);color:var(--k-text-dark);';
+    backBtn.addEventListener('click', () => {
+      if (this.onBackToModuleHome) this.onBackToModuleHome();
+    });
+    this.container.appendChild(backBtn);
+
+    // Iframe del dashboard
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'width:100%;height:calc(100vh - 60px);border:none;';
+    iframe.src = `modules/gestion-integral/archivo-retencion/archivo-retencion-dashboard.html?company=${encodeURIComponent(this.companyName)}`;
+    this.container.appendChild(iframe);
   }
 
   // ── Destrucción ─────────────────────────────────────────────────────────

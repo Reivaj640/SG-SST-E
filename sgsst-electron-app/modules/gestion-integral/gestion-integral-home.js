@@ -815,7 +815,7 @@ class GestionIntegralHome {
         }
     }
 
-    renderMainArea(container) {
+    async renderMainArea(container) {
         // Widgets con contadores específicos para Gestión Integral (USANDO DATOS REALES)
         const widgetsContainer = document.createElement('div');
         widgetsContainer.className = 'widgets-container';
@@ -876,6 +876,24 @@ class GestionIntegralHome {
         widgetsContainer.appendChild(widget3);
         widgetsContainer.appendChild(widget4);
         widgetsContainer.appendChild(widget5);
+
+        // Widget de Archivo y Retención Documental (2.5.1)
+        try {
+            if (window.electronAPI?.archivoRetencion?.getStats) {
+                const statsResult = await window.electronAPI.archivoRetencion.getStats(this.currentCompany);
+                if (statsResult?.success && statsResult?.data) {
+                    const widget6 = this.createArchivoRetencionWidget(statsResult.data);
+                    widget6.style.cursor = 'pointer';
+                    widget6.title = 'Ver dashboard de gestión documental';
+                    widget6.addEventListener('click', () => {
+                        this.openArchivoRetencionDashboard();
+                    });
+                    widgetsContainer.appendChild(widget6);
+                }
+            }
+        } catch (err) {
+            console.warn('⚠️ [GestionIntegralHome] No se pudieron cargar stats de archivo retención:', err.message);
+        }
 
         container.appendChild(widgetsContainer);
 
@@ -966,6 +984,99 @@ class GestionIntegralHome {
         }, 100);
 
         return w;
+    }
+
+    // Widget de Archivo y Retención Documental (estilo K+AIR Budget Card)
+    createArchivoRetencionWidget(stats) {
+        // Determinar color (semáforo por vigencia)
+        let colorVar = 'var(--k-success)';
+        let colorClass = 'bg-success';
+        if (stats.porcentajeVigencia < 50) {
+            colorVar = 'var(--k-danger)';
+            colorClass = 'bg-danger';
+        } else if (stats.porcentajeVigencia < 80) {
+            colorVar = 'var(--k-warning)';
+            colorClass = 'bg-warning';
+        }
+
+        const w = document.createElement('div');
+        w.className = 'widget k-budget-card';
+
+        w.innerHTML = `
+            <div class="kb-header">
+                <span class="kb-title">📁 Gestión Documental</span>
+                <span class="kb-badge ${colorClass}">${stats.porcentajeVigencia}%</span>
+            </div>
+
+            <div class="kb-amount" style="font-size: 1.4rem;">
+                ${stats.vigentes} / ${stats.total}
+            </div>
+
+            <div class="kb-progress-track">
+                <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};"></div>
+            </div>
+
+            <div class="kb-footer">
+                <div>
+                    <div class="kb-label">Vigentes</div>
+                    <div class="kb-value" style="color: var(--k-success);">${stats.vigentes}</div>
+                </div>
+                <div style="text-align: right;">
+                    <div class="kb-label">Obsoletos</div>
+                    <div class="kb-value" style="color: var(--k-text-muted);">${stats.obsoletos}</div>
+                </div>
+            </div>
+        `;
+
+        // Animación de barra
+        setTimeout(() => {
+            const bar = w.querySelector('.kb-progress-bar');
+            if (bar) {
+                bar.style.width = `${stats.porcentajeVigencia}%`;
+            }
+        }, 100);
+
+        return w;
+    }
+
+    /**
+     * Abre el dashboard de Archivo y Retención Documental
+     */
+    async openArchivoRetencionDashboard() {
+        // Buscar el contenedor principal del módulo en el DOM
+        const mainContent = document.querySelector('.module-content, .submodule-content, #module-home-page');
+        if (!mainContent) {
+            console.error('[AR] No se encontró contenedor para el dashboard');
+            return;
+        }
+
+        // Limpiar y cargar directamente el componente de archivo retención
+        // que luego abrirá el dashboard
+        if (window.ArchivoRetencionComponent && window.archivoRetencionInstance) {
+            window.archivoRetencionInstance.openDashboard();
+        } else {
+            // Si no hay instancia, crear una nueva
+            const tempContainer = document.createElement('div');
+            tempContainer.style.cssText = 'width:100%;height:100%;';
+
+            // Reemplazar el contenido actual del panel
+            const parent = mainContent.closest('.content-area, .main-content') || mainContent;
+            parent.innerHTML = '';
+            parent.appendChild(tempContainer);
+
+            const comp = new window.ArchivoRetencionComponent(
+                tempContainer,
+                this.currentCompany,
+                'Gestión Integral',
+                '2.5.1 Archivo y retención documental del SG-SST',
+                () => this.container.dispatchEvent(new CustomEvent('back-to-module'))
+            );
+            window.archivoRetencionInstance = comp;
+            comp.render();
+
+            // Abrir dashboard después de que el iframe esté listo
+            setTimeout(() => comp.openDashboard(), 300);
+        }
     }
 
     /**

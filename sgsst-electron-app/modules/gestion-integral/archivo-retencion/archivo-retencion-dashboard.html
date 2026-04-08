@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard — Gestión Documental</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        /* ── Variables (mismo sistema visual oficial K+AIR) ── */
+        :root {
+            --primary: #174ea6;
+            --primary-hover: #185abd;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --info: #17a2b8;
+            --text-dark: #212529;
+            --text-muted: #6c757d;
+            --bg-app: #f8f9fa;
+            --bg-card: #ffffff;
+            --border: #dee2e6;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+            --radius-md: 0.5rem;
+            --radius-lg: 0.75rem;
+            --font: 'Segoe UI', Roboto, sans-serif;
+        }
+
+        [data-theme="dark"] {
+            --primary: #5a8fd4;
+            --primary-hover: #7aa8e3;
+            --text-dark: #f0f0f0;
+            --text-muted: #adb5bd;
+            --bg-app: #1a1d21;
+            --bg-card: #242830;
+            --border: #3d4250;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg-app);
+            color: var(--text-dark);
+            padding: 1.5rem;
+        }
+
+        /* ── Page Header ── */
+        .page-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+        }
+        .page-header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        .page-header p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* ── KPI Grid ── */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        @media (max-width: 900px) {
+            .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        .kpi-card {
+            background: var(--bg-card);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+            padding: 1.25rem;
+            border-left: 4px solid var(--primary);
+        }
+        .kpi-card.kpi-success { border-left-color: var(--success); }
+        .kpi-card.kpi-warning { border-left-color: var(--warning); }
+        .kpi-card.kpi-danger { border-left-color: var(--danger); }
+
+        .kpi-label {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.25rem;
+        }
+        .kpi-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+        .kpi-sub {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        /* ── Charts Grid ── */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        @media (max-width: 900px) {
+            .charts-grid { grid-template-columns: 1fr; }
+        }
+
+        .chart-card {
+            background: var(--bg-card);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+            padding: 1.25rem;
+        }
+        .chart-card-wide {
+            grid-column: span 2;
+        }
+        @media (max-width: 900px) {
+            .chart-card-wide { grid-column: span 1; }
+        }
+
+        .chart-card h3 {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text-dark);
+        }
+        .chart-card canvas {
+            max-height: 280px;
+        }
+
+        /* ── Loading ── */
+        .loading-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 4rem 1rem;
+            color: var(--text-muted);
+        }
+        .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 1rem;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-header">
+        <div>
+            <h1>📊 Dashboard — Gestión Documental</h1>
+            <p>Submódulo 2.5.1 · Archivo y Retención Documental del SG-SST</p>
+        </div>
+    </div>
+
+    <div id="loading-state" class="loading-state">
+        <div class="spinner"></div>
+        <span>Cargando datos del listado maestro...</span>
+    </div>
+
+    <div id="dashboard-content" style="display:none;">
+        <!-- KPI Cards -->
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-label">Total Documentos</div>
+                <div class="kpi-value" id="kpi-total">—</div>
+                <div class="kpi-sub">Registrados en el listado maestro</div>
+            </div>
+            <div class="kpi-card kpi-success">
+                <div class="kpi-label">% Vigentes</div>
+                <div class="kpi-value" id="kpi-vigencia">—</div>
+                <div class="kpi-sub" id="kpi-vigentes-sub">Documentos activos</div>
+            </div>
+            <div class="kpi-card kpi-warning">
+                <div class="kpi-label">Externos</div>
+                <div class="kpi-value" id="kpi-externos">—</div>
+                <div class="kpi-sub">Normativa y leyes aplicables</div>
+            </div>
+            <div class="kpi-card kpi-danger">
+                <div class="kpi-label">Obsoletos</div>
+                <div class="kpi-value" id="kpi-obsoletos">—</div>
+                <div class="kpi-sub" id="kpi-sin-actualizar">Sin actualizar en +2 años</div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h3>📄 Documentos vs Registros</h3>
+                <canvas id="chartTipo"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>🏢 Interno vs Externo</h3>
+                <canvas id="chartOrigen"></canvas>
+            </div>
+            <div class="chart-card chart-card-wide">
+                <h3>📋 Estado de Disposición Final</h3>
+                <canvas id="chartDisposicion"></canvas>
+            </div>
+            <div class="chart-card chart-card-wide">
+                <h3>📅 Actualizaciones por Año</h3>
+                <canvas id="chartAnual"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script src="archivo-retencion-dashboard.js"></script>
+</body>
+</html>

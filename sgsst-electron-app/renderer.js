@@ -3731,6 +3731,7 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
           submoduleName,
           safeBackToModuleCallback
         );
+        window.archivoRetencionInstance = archivoRetencionComponent; // ← referencia global
         archivoRetencionComponent.render();
       } else {
         console.error('❌ ArchivoRetencionComponent no encontrado');

@@ -241,6 +241,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // --- Archivo y Retención Documental (Submódulo 2.5.1) ---
   archivoRetencion: {
+    getStats: (companyName) => ipcRenderer.invoke('archivo-retencion:get-stats', companyName),
     getExcelPath: (companyName) => ipcRenderer.invoke('archivo-retencion:get-excel-path', companyName),
     leerTodos: (companyName) => ipcRenderer.invoke('archivo-retencion:leer-todos', companyName),
     guardar: (companyName, documentos) => ipcRenderer.invoke('archivo-retencion:guardar', companyName, documentos),
