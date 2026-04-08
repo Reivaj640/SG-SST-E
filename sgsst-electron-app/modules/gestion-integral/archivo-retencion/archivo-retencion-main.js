@@ -23,7 +23,7 @@
  */
 
 const { ipcMain } = require('electron');
-const XLSX = require('xlsx');
+const ExcelJS = require('exceljs');
 const path = require('path');
 const fs = require('fs');
 const fsp = require('fs').promises;
@@ -85,10 +85,6 @@ function aCadena(value) {
 function aBooleano(value) {
   const str = aCadena(value).toUpperCase();
   return str === 'X';
-}
-
-function booleanoACelda(value) {
-  return value === true ? 'X' : '';
 }
 
 function construirError(code, message) {
@@ -216,56 +212,100 @@ async function resolverRutaExcel(appInstance, companyName) {
 }
 
 // ---------------------------------------------------------------------------
-// Helper – leerExcelCompleto(filePath)
+// Helper – leerExcelCompleto(filePath)  —  ExcelJS
 // ---------------------------------------------------------------------------
 
-function leerExcelCompleto(filePath) {
+async function leerExcelCompleto(filePath) {
   if (!fs.existsSync(filePath)) {
     throw Object.assign(new Error(`Archivo no encontrado: ${filePath}`), {
       code: 'FILE_NOT_FOUND',
     });
   }
 
-  const workbook = XLSX.readFile(filePath, { cellDates: true });
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.readFile(filePath);
+
+  const worksheet = workbook.getWorksheet(MAIN_SHEET_NAME);
+  if (!worksheet) {
+    throw Object.assign(
+      new Error(`Hoja "${MAIN_SHEET_NAME}" no encontrada en el archivo.`),
+      { code: 'SHEET_NOT_FOUND' }
+    );
+  }
+
   const documentos = [];
 
-  // --- Main sheet (única hoja de datos) ---
-  const mainSheet = workbook.Sheets[MAIN_SHEET_NAME];
-  if (mainSheet) {
-    const mainRange = XLSX.utils.decode_range(mainSheet['!ref'] || 'A1');
+  // MAIN_DATA_START_ROW es 0-indexed (6 → fila 7 en Excel UI)
+  // ExcelJS usa 1-indexed, así que empezamos en MAIN_DATA_START_ROW + 1
+  const startRow1 = MAIN_DATA_START_ROW + 1; // 7
 
-    for (let r = MAIN_DATA_START_ROW; r <= mainRange.e.r; r++) {
-      const row = {};
+  worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+    if (rowNumber < startRow1) return;
 
-      for (const [field, colIdx] of Object.entries(MAIN_COLUMNS)) {
-        const cellAddress = XLSX.utils.encode_cell({ r, c: colIdx });
-        const cell = mainSheet[cellAddress];
+    // Columnas: A=1 (ignored), B=2 … M=13
+    const getVal = (colIdx) => {
+      const cell = row.getCell(colIdx);
+      if (!cell || cell.value === null || cell.value === undefined) return '';
 
-        if (BOOLEAN_FIELDS.includes(field)) {
-          row[field] = cell ? aBooleano(cell.v) : false;
-        } else {
-          row[field] = cell ? aCadena(cell.v) : '';
+      // ExcelJS puede devolver objetos { richText }, { formula }, etc.
+      if (typeof cell.value === 'object') {
+        if (cell.value.richText) {
+          return cell.value.richText.map(r => r.text).join('').trim();
         }
+        if (cell.value.result !== undefined) return String(cell.value.result).trim();
+        if (cell.value.text !== undefined) return String(cell.value.text).trim();
+        return String(cell.value).trim();
       }
 
-      // Saltar filas vacías
-      if (!row.descripcion || row.descripcion.trim() === '') continue;
+      // Manejo de fechas
+      if (cell.value instanceof Date) {
+        const day = String(cell.value.getDate()).padStart(2, '0');
+        const month = String(cell.value.getMonth() + 1).padStart(2, '0');
+        const year = cell.value.getFullYear();
+        return `${day}/${month}/${year}`;
+      }
 
-      // Auto-generar número secuencial (columna A se ignora)
-      row.numero = documentos.length + 1;
-      row.hojaOrigen = MAIN_SHEET_NAME;
-      documentos.push(row);
-    }
-  }
+      return String(cell.value).trim();
+    };
+
+    const descripcion = getVal(MAIN_COLUMNS.descripcion + 1); // +1 porque ExcelJS es 1-indexed
+    if (!descripcion || descripcion.trim() === '') return; // saltar filas vacías
+
+    const doc = {
+      numero: documentos.length + 1,
+      descripcion: descripcion,
+      codigo: getVal(MAIN_COLUMNS.codigo + 1),
+      revision: getVal(MAIN_COLUMNS.revision + 1),
+      tipoDoc: aBooleano(getVal(MAIN_COLUMNS.tipoDoc + 1)),
+      tipoReg: aBooleano(getVal(MAIN_COLUMNS.tipoReg + 1)),
+      tipoInterno: aBooleano(getVal(MAIN_COLUMNS.tipoInterno + 1)),
+      tipoExterno: aBooleano(getVal(MAIN_COLUMNS.tipoExterno + 1)),
+      fechaCreacion: getVal(MAIN_COLUMNS.fechaCreacion + 1),
+      fechaActualizacion: getVal(MAIN_COLUMNS.fechaActualizacion + 1),
+      almacenamiento: getVal(MAIN_COLUMNS.almacenamiento + 1),
+      retencion: getVal(MAIN_COLUMNS.retencion + 1),
+      disposicion: getVal(MAIN_COLUMNS.disposicion + 1),
+      hojaOrigen: MAIN_SHEET_NAME,
+    };
+
+    documentos.push(doc);
+  });
 
   return documentos;
 }
 
 // ---------------------------------------------------------------------------
-// Helper – escribirExcel(filePath, documentos)
+// Helper – escribirExcel(filePath, documentos)  —  ExcelJS
+// ---------------------------------------------------------------------------
+// Estrategia "capacitaciones-style":
+//  1. Lee el workbook con ExcelJS (preserva estilos, merges, fórmulas)
+//  2. Detecta filas de estructura (fórmulas, totales) y NO las toca
+//  3. Limpia solo las celdas de datos (B-M) en el rango de datos
+//  4. Escribe los nuevos valores fila por fila
+//  5. writeFile al final
 // ---------------------------------------------------------------------------
 
-function escribirExcel(filePath, documentos) {
+async function escribirExcel(filePath, documentos) {
   if (!fs.existsSync(filePath)) {
     throw Object.assign(new Error(`Archivo no encontrado: ${filePath}`), {
       code: 'FILE_NOT_FOUND',
@@ -277,93 +317,111 @@ function escribirExcel(filePath, documentos) {
   const backupPath = `${filePath}.bak-${timestamp}`;
   fs.copyFileSync(filePath, backupPath);
 
-  // Leer el workbook completo preservando estilos, formatos, merges, etc.
-  // cellStyles:true y sheetStubs:true aseguran que XLSX conserve el máximo
-  // de metadatos posible al releer el archivo.
-  const workbook = XLSX.readFile(filePath, { cellStyles: true, sheetStubs: true });
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.readFile(filePath);
 
-  const mainSheet = workbook.Sheets[MAIN_SHEET_NAME];
-  if (!mainSheet) {
+  const worksheet = workbook.getWorksheet(MAIN_SHEET_NAME);
+  if (!worksheet) {
     throw Object.assign(
       new Error(`Hoja "${MAIN_SHEET_NAME}" no encontrada en el archivo.`),
       { code: 'SHEET_NOT_FOUND' }
     );
   }
 
-  // ── Edición QUIRÚRGICA celda por celda ─────────────────────────────────────
-  // Solo se tocan las columnas B-M (índices 1-12) en las filas de datos
-  // (MAIN_DATA_START_ROW en adelante). Nada fuera de ese rango se modifica.
+  // ── Detectar fila de estructura (NO tocar) ────────────────────────────────
+  // Buscamos filas que contengan "Total", "SUMA", fórmulas u otros marcadores
+  // de estructura que NO deben ser sobrescritos.
+  let estructuraStartRow = -1; // 1-indexed: si se encuentra, es el límite
 
-  // Columnas de datos que se pueden sobrescribir (B=1 … M=12)
-  const COLUMNAS_DATOS = [
-    'descripcion',        // col B = 1
-    'codigo',             // col C = 2
-    'revision',           // col D = 3
-    'tipoDoc',            // col E = 4  (boolean → 'X' / '')
-    'tipoReg',            // col F = 5
-    'tipoInterno',        // col G = 6
-    'tipoExterno',        // col H = 7
-    'fechaCreacion',      // col I = 8
-    'fechaActualizacion', // col J = 9
-    'almacenamiento',     // col K = 10
-    'retencion',          // col L = 11
-    'disposicion',        // col M = 12
+  const lastRow = worksheet.rowCount;
+  const dataStartRow1 = MAIN_DATA_START_ROW + 1; // 7 (1-indexed)
+
+  for (let r = dataStartRow1; r <= lastRow; r++) {
+    const row = worksheet.getRow(r);
+    if (!row || row.cellCount === 0) continue;
+
+    const cellB = row.getCell(2); // columna B = descripción
+    const val = cellB && cellB.value ? String(cellB.value).toLowerCase() : '';
+
+    // Marcadores de filas de estructura que NO deben tocarse
+    if (
+      val.includes('total') ||
+      val.includes('suma') ||
+      val.includes('resumen') ||
+      val.includes('observacion') ||
+      val.includes('nota') ||
+      val.includes('firma') ||
+      val.includes('elaborado') ||
+      val.includes('revisado') ||
+      val.includes('aprobado')
+    ) {
+      estructuraStartRow = r;
+      break;
+    }
+
+    // También detectar fórmulas en la columna B (indica fila calculada)
+    if (cellB.value && typeof cellB.value === 'object' && cellB.value.formula) {
+      estructuraStartRow = r;
+      break;
+    }
+  }
+
+  // ── Determinar el límite de limpieza ───────────────────────────────────────
+  // Si hay estructura, limpiamos hasta ANTES de ella.
+  // Si no, limpiamos hasta el final de datos actuales.
+  const cleanLimitRow = estructuraStartRow > 0 ? estructuraStartRow - 1 : lastRow;
+
+  // ── Limpiar solo celdas de datos (columnas B=2 … M=13) ────────────────────
+  for (let r = dataStartRow1; r <= Math.min(cleanLimitRow, lastRow); r++) {
+    const row = worksheet.getRow(r);
+    if (!row) continue;
+    // Limpiar columnas B(2) a M(13) — columnas A(1) se preserva
+    for (let c = 2; c <= 13; c++) {
+      const cell = row.getCell(c);
+      if (cell) {
+        cell.value = null;
+      }
+    }
+  }
+
+  // ── Escribir nuevos datos ─────────────────────────────────────────────────
+  // Columnas de datos mapeadas a índices 1-indexed de ExcelJS:
+  const COLUMNAS_MAP = [
+    { field: 'descripcion',   col: 2  },  // B
+    { field: 'codigo',        col: 3  },  // C
+    { field: 'revision',      col: 4  },  // D
+    { field: 'tipoDoc',       col: 5, boolean: true },  // E
+    { field: 'tipoReg',       col: 6, boolean: true },  // F
+    { field: 'tipoInterno',   col: 7, boolean: true },  // G
+    { field: 'tipoExterno',   col: 8, boolean: true },  // H
+    { field: 'fechaCreacion', col: 9  },  // I
+    { field: 'fechaActualizacion', col: 10 },  // J
+    { field: 'almacenamiento',col: 11 },  // K
+    { field: 'retencion',     col: 12 },  // L
+    { field: 'disposicion',   col: 13 },  // M
   ];
 
-  // Determinar el rango actual de la hoja para poder borrarlo/ajustarlo
-  const rangoActual = mainSheet['!ref']
-    ? XLSX.utils.decode_range(mainSheet['!ref'])
-    : { s: { r: 0, c: 0 }, e: { r: MAIN_DATA_START_ROW, c: 12 } };
-
-  // Borrar SOLO las filas de datos anteriores (B-M desde MAIN_DATA_START_ROW)
-  // de forma que filas sobrantes (si se eliminaron documentos) queden vacías.
-  const filaFinAnterior = rangoActual.e.r;
-  for (let r = MAIN_DATA_START_ROW; r <= filaFinAnterior; r++) {
-    for (let c = 1; c <= 12; c++) {
-      const addr = XLSX.utils.encode_cell({ r, c });
-      if (mainSheet[addr]) {
-        // Conservar el objeto celda pero vaciar su valor
-        mainSheet[addr] = { t: 's', v: '', w: '' };
-      }
-    }
-  }
-
-  // Escribir los nuevos valores en las filas de datos
   for (let i = 0; i < documentos.length; i++) {
     const doc = documentos[i];
-    const rowIdx = MAIN_DATA_START_ROW + i;
+    const rowIndex = dataStartRow1 + i;
+    const row = worksheet.getRow(rowIndex);
 
-    // Columna A (índice 0): número secuencial — también se actualiza para consistencia
-    const addrA = XLSX.utils.encode_cell({ r: rowIdx, c: 0 });
-    mainSheet[addrA] = { t: 'n', v: i + 1 };
+    // Columna A: número secuencial
+    row.getCell(1).value = i + 1;
 
-    for (const field of COLUMNAS_DATOS) {
-      const colIdx = MAIN_COLUMNS[field];
-      const addr = XLSX.utils.encode_cell({ r: rowIdx, c: colIdx });
+    for (const mapping of COLUMNAS_MAP) {
+      let value = doc[mapping.field] ?? '';
 
-      if (BOOLEAN_FIELDS.includes(field)) {
-        const val = booleanoACelda(doc[field]);
-        mainSheet[addr] = { t: 's', v: val, w: val };
-      } else {
-        const val = doc[field] ?? '';
-        mainSheet[addr] = { t: 's', v: String(val), w: String(val) };
+      if (mapping.boolean) {
+        value = value === true ? 'X' : '';
       }
+
+      row.getCell(mapping.col).value = value;
     }
   }
 
-  // Actualizar el rango (!ref) para reflejar las filas escritas
-  const nuevaFilaFin = Math.max(
-    filaFinAnterior,
-    MAIN_DATA_START_ROW + documentos.length - 1
-  );
-  mainSheet['!ref'] = XLSX.utils.encode_range({
-    s: { r: 0, c: 0 },
-    e: { r: nuevaFilaFin, c: rangoActual.e.c },
-  });
-
-  // Persistir — se usa bookSST:false para no romper cadenas compartidas
-  // y cellStyles:true para que XLSX intente conservar los estilos leídos.
-  XLSX.writeFile(workbook, filePath, { cellStyles: true, bookSST: false });
+  // ── Persistir ──────────────────────────────────────────────────────────────
+  await workbook.xlsx.writeFile(filePath);
 
   return documentos.length;
 }
@@ -397,7 +455,7 @@ function registrarLeerTodos(appInstance) {
   ipcMain.handle('archivo-retencion:leer-todos', async (_event, companyName) => {
     try {
       const filePath = await resolverRutaExcel(appInstance, companyName);
-      const documentos = leerExcelCompleto(filePath);
+      const documentos = await leerExcelCompleto(filePath);
       return construirExito(documentos);
     } catch (err) {
       return construirError(
@@ -421,8 +479,11 @@ function registrarGuardar(appInstance) {
         );
       }
 
+      // Normalizar tipos en todos los documentos (acepta string o booleanos)
+      const documentosNormalizados = documentos.map(normalizarTipos);
+
       const filePath = await resolverRutaExcel(appInstance, companyName);
-      const registrosGuardados = escribirExcel(filePath, documentos);
+      const registrosGuardados = await escribirExcel(filePath, documentosNormalizados);
       return construirExito({ registrosGuardados });
     } catch (err) {
       return construirError(
@@ -431,6 +492,36 @@ function registrarGuardar(appInstance) {
       );
     }
   });
+}
+
+/**
+ * Helper – parsea el campo combinado `tipo` (ej: "Documento, Interno")
+ * en los 4 campos booleanos individuales del modelo.
+ * Si el documento ya tiene los campos booleanos, los usa directamente.
+ *
+ * @param {object} doc - Documento entrante
+ * @returns {object} - El mismo doc con los campos booleanos establecidos
+ */
+function normalizarTipos(doc) {
+  const result = { ...doc };
+
+  // Si ya viene con campos booleanos individuales, usarlos tal cual
+  if ('tipoDoc' in result || 'tipoReg' in result || 'tipoInterno' in result || 'tipoExterno' in result) {
+    result.tipoDoc = !!result.tipoDoc;
+    result.tipoReg = !!result.tipoReg;
+    result.tipoInterno = !!result.tipoInterno;
+    result.tipoExterno = !!result.tipoExterno;
+    return result;
+  }
+
+  // Si viene con campo combinado `tipo` (string), parsearlo
+  const tipoStr = (result.tipo || '').toLowerCase();
+  result.tipoDoc = tipoStr.includes('documento');
+  result.tipoReg = tipoStr.includes('registro');
+  result.tipoInterno = tipoStr.includes('interno');
+  result.tipoExterno = tipoStr.includes('externo');
+
+  return result;
 }
 
 /**
@@ -447,32 +538,35 @@ function registrarCrear(appInstance) {
       }
 
       const filePath = await resolverRutaExcel(appInstance, companyName);
-      const existentes = leerExcelCompleto(filePath);
+      const existentes = await leerExcelCompleto(filePath);
 
       const maxNumero = existentes.reduce((max, doc) => {
         return doc.numero > max ? doc.numero : max;
       }, 0);
       const nuevoNumero = maxNumero + 1;
 
+      // Normalizar tipos (acepta tanto string combinado como booleanos)
+      const normalizado = normalizarTipos(nuevoDocumento);
+
       const documentoCompleto = {
         numero: nuevoNumero,
-        descripcion: nuevoDocumento.descripcion ?? '',
-        codigo: nuevoDocumento.codigo ?? '',
-        revision: nuevoDocumento.revision ?? '',
-        tipoDoc: !!nuevoDocumento.tipoDoc,
-        tipoReg: !!nuevoDocumento.tipoReg,
-        tipoInterno: !!nuevoDocumento.tipoInterno,
-        tipoExterno: !!nuevoDocumento.tipoExterno,
-        fechaCreacion: nuevoDocumento.fechaCreacion ?? '',
-        fechaActualizacion: nuevoDocumento.fechaActualizacion ?? '',
-        almacenamiento: nuevoDocumento.almacenamiento ?? '',
-        retencion: nuevoDocumento.retencion ?? '',
-        disposicion: nuevoDocumento.disposicion ?? '',
+        descripcion: normalizado.descripcion ?? '',
+        codigo: normalizado.codigo ?? '',
+        revision: normalizado.revision ?? '',
+        tipoDoc: normalizado.tipoDoc,
+        tipoReg: normalizado.tipoReg,
+        tipoInterno: normalizado.tipoInterno,
+        tipoExterno: normalizado.tipoExterno,
+        fechaCreacion: normalizado.fechaCreacion ?? '',
+        fechaActualizacion: normalizado.fechaActualizacion ?? '',
+        almacenamiento: normalizado.almacenamiento ?? '',
+        retencion: normalizado.retencion ?? '',
+        disposicion: normalizado.disposicion ?? '',
         hojaOrigen: MAIN_SHEET_NAME,
       };
 
       existentes.push(documentoCompleto);
-      escribirExcel(filePath, existentes);
+      await escribirExcel(filePath, existentes);
 
       return construirExito(documentoCompleto);
     } catch (err) {
@@ -501,7 +595,7 @@ function registrarActualizar(appInstance) {
 
         const filePath = await resolverRutaExcel(appInstance, companyName);
         const { numero, ...campos } = cambios;
-        const existentes = leerExcelCompleto(filePath);
+        const existentes = await leerExcelCompleto(filePath);
 
         const idx = existentes.findIndex((d) => d.numero === numero);
         if (idx === -1) {
@@ -518,6 +612,16 @@ function registrarActualizar(appInstance) {
           'almacenamiento', 'retencion', 'disposicion',
         ];
 
+        // Si viene `tipo` como string combinado, parsearlo en booleanos
+        if ('tipo' in campos) {
+          const normalizado = normalizarTipos({ tipo: campos.tipo });
+          existentes[idx].tipoDoc = normalizado.tipoDoc;
+          existentes[idx].tipoReg = normalizado.tipoReg;
+          existentes[idx].tipoInterno = normalizado.tipoInterno;
+          existentes[idx].tipoExterno = normalizado.tipoExterno;
+        }
+
+        // Aplicar campos individuales permitidos
         for (const campo of camposPermitidos) {
           if (campo in campos) {
             if (BOOLEAN_FIELDS.includes(campo)) {
@@ -528,7 +632,7 @@ function registrarActualizar(appInstance) {
           }
         }
 
-        escribirExcel(filePath, existentes);
+        await escribirExcel(filePath, existentes);
 
         return construirExito(existentes[idx]);
       } catch (err) {
@@ -555,7 +659,7 @@ function registrarEliminar(appInstance) {
       }
 
       const filePath = await resolverRutaExcel(appInstance, companyName);
-      const existentes = leerExcelCompleto(filePath);
+      const existentes = await leerExcelCompleto(filePath);
 
       const idx = existentes.findIndex((d) => d.numero === numero);
       if (idx === -1) {
@@ -572,7 +676,7 @@ function registrarEliminar(appInstance) {
         doc.numero = i + 1;
       });
 
-      escribirExcel(filePath, existentes);
+      await escribirExcel(filePath, existentes);
 
       return construirExito({ eliminado: true, numero });
     } catch (err) {
