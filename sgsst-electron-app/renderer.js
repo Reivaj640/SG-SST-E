@@ -3765,6 +3765,21 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 
+    } else if (submoduleName === "2.11.1 Gestión del Cambio") {
+      if (window.GestionDelCambioComponent) {
+        const gestionCambioComponent = new window.GestionDelCambioComponent(
+          submoduleContentDiv,
+          currentCompany,
+          moduleName,
+          submoduleName,
+          safeBackToModuleCallback
+        );
+        gestionCambioComponent.render();
+      } else {
+        console.error('❌ GestionDelCambioComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
     } else if (submoduleName === "3.1.1 Descripción Sociodemografica y diagnostico de condiciones de salud") {
       if (window.SociodemograficaComponent) {
         const sociodemograficaComponent = new window.SociodemograficaComponent(

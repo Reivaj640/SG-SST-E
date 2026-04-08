@@ -10871,6 +10871,454 @@ ipcMain.handle('process-evaluacion-pdf', async (event, pdfPath, sourceType) => {
   }
 });
 
+// ============================================================================
+// GESTIÓN DEL CAMBIO (2.11.1) — IPC Handlers
+// ============================================================================
+
+/**
+ * Obtiene la ruta del archivo Excel de Gestión del Cambio para una empresa.
+ * Navega la estructura mapeada del repositorio de la empresa (patrón obtenerRutaAusentismo).
+ * Solo crea directorio como último recurso si la estructura no está mapeada.
+ */
+async function obtenerRutaGestionCambio(companyName) {
+  try {
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+
+    const normalizedName = companyName.toLowerCase().trim();
+    const companyKey = Object.keys(config.companyPaths || {}).find(
+      k => k.toLowerCase().trim() === normalizedName
+    );
+    const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+
+    if (!companyConfig) {
+      console.error(`[GestionCambio] No se encontró configuración para empresa: ${companyName}`);
+      return null;
+    }
+
+    // Helper: normalizar string para comparación flexible (ignora tildes, mayúsculas, espacios extra)
+    const norm = (s) => String(s).toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ').trim();
+
+    // Búsqueda flexible: el key puede contener prefijos numéricos como "2. Gestión Integral"
+    function findDirFlexible(subdirs, target) {
+      if (!subdirs) return null;
+      const tgt = norm(target);
+      for (const [key, value] of Object.entries(subdirs)) {
+        const k = norm(key);
+        // Coincidencia exacta, o el key contiene el target, o el target coincide con la parte sin prefijo numérico
+        const kSinPrefijo = k.replace(/^\d+[\s.]+/, '');
+        if (k === tgt || k.includes(tgt) || kSinPrefijo === tgt) return value;
+      }
+      return null;
+    }
+
+    // Intentar navegar la estructura mapeada del repositorio
+    const rootStructure = companyConfig.structure?.structure;
+    if (rootStructure?.subdirectories) {
+      // Buscar carpeta "Gestión Integral" en el nivel raíz
+      const gestionIntegral = findDirFlexible(rootStructure.subdirectories, 'Gestion Integral');
+
+      if (gestionIntegral) {
+        // Buscar subcarpeta "Gestión del Cambio" dentro de Gestión Integral
+        const gcDir = findDirFlexible(gestionIntegral.subdirectories, 'Gestion del Cambio');
+
+        // Usar la subcarpeta si existe, si no usar Gestión Integral directamente
+        const targetDir = gcDir || gestionIntegral;
+        if (targetDir.path) {
+          const excelPath = path.join(targetDir.path, 'GI-FO-059_GestionDelCambio.xlsx');
+          console.log(`[GestionCambio] Ruta en repositorio: ${excelPath}`);
+          return excelPath;
+        }
+      }
+    }
+
+    // Fallback: usar raíz de la empresa + "Gestión Integral" (sin crear subcarpeta "2.11.1")
+    const root = companyConfig.root || companyConfig.ruta_base;
+    if (!root) {
+      console.error(`[GestionCambio] No se encontró ruta raíz para empresa: ${companyName}`);
+      return null;
+    }
+
+    const fallbackDir = path.join(root, 'Gestión Integral');
+    await fsp.mkdir(fallbackDir, { recursive: true });
+    console.warn(`[GestionCambio] Carpeta Gestión Integral no encontrada en estructura. Usando fallback: ${fallbackDir}`);
+    return path.join(fallbackDir, 'GI-FO-059_GestionDelCambio.xlsx');
+
+  } catch (err) {
+    console.error('[GestionCambio] Error obteniendo ruta:', err);
+    return null;
+  }
+}
+
+/**
+ * Re-aplica los keys de columna al worksheet después de leer un archivo xlsx.
+ * ExcelJS no persiste los column keys en el archivo — solo existen en memoria
+ * cuando se crean con ws.columns. Sin esto, row.getCell('id') falla.
+ */
+function applyGestionCambioColumnKeys(worksheet) {
+  if (!worksheet) return;
+  const keys = [
+    'id','fecha','areaEjecutora','areaUsuaria','responsable','cargo',
+    'descripcion','justificacion','tipoCambio','nivelRiesgo','estado',
+    'riesgoAntes','riesgoDespues','introducePeligros','modificaRiesgos',
+    'fechaEjecucion','controlesImplementados','controlesEficaces',
+    'fechaCierre','jsonFull',
+  ];
+  keys.forEach((key, i) => {
+    const col = worksheet.getColumn(i + 1);
+    if (col) col.key = key;
+  });
+}
+
+/**
+ * Asegura que el archivo Excel exista con la estructura correcta.
+ */
+async function ensureGestionCambioExcel(filePath) {
+  if (fs.existsSync(filePath)) return;
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'K+AIR SG-SST';
+  workbook.lastModifiedBy = 'K+AIR SG-SST';
+
+  // Hoja principal de cambios
+  const ws = workbook.addWorksheet('Cambios', {
+    properties: { tabColor: { argb: '174EA6' } }
+  });
+
+  ws.columns = [
+    { header: 'ID', key: 'id', width: 20 },
+    { header: 'Fecha', key: 'fecha', width: 14 },
+    { header: 'Área Ejecutora', key: 'areaEjecutora', width: 20 },
+    { header: 'Área Usuaria', key: 'areaUsuaria', width: 20 },
+    { header: 'Responsable', key: 'responsable', width: 25 },
+    { header: 'Cargo', key: 'cargo', width: 20 },
+    { header: 'Descripción', key: 'descripcion', width: 40 },
+    { header: 'Justificación', key: 'justificacion', width: 40 },
+    { header: 'Tipo de Cambio', key: 'tipoCambio', width: 30 },
+    { header: 'Nivel de Riesgo', key: 'nivelRiesgo', width: 15 },
+    { header: 'Estado', key: 'estado', width: 15 },
+    { header: 'Riesgo Antes', key: 'riesgoAntes', width: 15 },
+    { header: 'Riesgo Después', key: 'riesgoDespues', width: 15 },
+    { header: 'Introduce Peligros', key: 'introducePeligros', width: 15 },
+    { header: 'Modifica Riesgos', key: 'modificaRiesgos', width: 15 },
+    { header: 'Fecha Ejecución', key: 'fechaEjecucion', width: 14 },
+    { header: 'Controles Implementados', key: 'controlesImplementados', width: 15 },
+    { header: 'Controles Eficaces', key: 'controlesEficaces', width: 15 },
+    { header: 'Fecha Cierre', key: 'fechaCierre', width: 14 },
+    { header: 'Datos Completos (JSON)', key: 'jsonFull', width: 50 },
+  ];
+
+  // Estilo de header
+  ws.getRow(1).eachCell((cell) => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '174EA6' } };
+    cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 10 };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+  });
+
+  await workbook.xlsx.writeFile(filePath);
+  console.log(`[GestionCambio] Archivo Excel creado: ${filePath}`);
+}
+
+/**
+ * Carga todos los cambios del archivo Excel.
+ */
+ipcMain.handle('gestion-cambio-load-data', async (event, companyName) => {
+  try {
+    const filePath = await obtenerRutaGestionCambio(companyName);
+    if (!filePath) {
+      return { success: false, error: { code: 'COMPANY_NOT_FOUND', message: 'Empresa no encontrada' } };
+    }
+
+    await ensureGestionCambioExcel(filePath);
+
+    if (!fs.existsSync(filePath)) {
+      return { success: true, data: { changes: [], metrics: { pending: 0, highRisk: 0, active: 0, month: 0 } } };
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+    const worksheet = workbook.getWorksheet('Cambios');
+
+    if (!worksheet || worksheet.rowCount <= 1) {
+      return { success: true, data: { changes: [], metrics: { pending: 0, highRisk: 0, active: 0, month: 0 } } };
+    }
+
+    // ExcelJS no persiste los keys de columna en el archivo xlsx —
+    // hay que re-aplicarlos después de leer para que getCell(key) funcione.
+    applyGestionCambioColumnKeys(worksheet);
+
+    const changes = [];
+    worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      if (rowNumber === 1) return; // Saltar header
+
+      const rowData = {
+        id: row.getCell('id').value,
+        fecha: row.getCell('fecha').value,
+        areaEjecutora: row.getCell('areaEjecutora').value,
+        areaUsuaria: row.getCell('areaUsuaria').value,
+        responsable: row.getCell('responsable').value,
+        cargo: row.getCell('cargo').value,
+        descripcion: row.getCell('descripcion').value,
+        justificacion: row.getCell('justificacion').value,
+        tipoCambio: row.getCell('tipoCambio').value,
+        nivelRiesgo: row.getCell('nivelRiesgo').value,
+        estado: row.getCell('estado').value,
+        riesgoAntes: row.getCell('riesgoAntes').value,
+        riesgoDespues: row.getCell('riesgoDespues').value,
+        introducePeligros: row.getCell('introducePeligros').value,
+        modificaRiesgos: row.getCell('modificaRiesgos').value,
+        fechaEjecucion: row.getCell('fechaEjecucion').value,
+        controlesImplementados: row.getCell('controlesImplementados').value,
+        controlesEficaces: row.getCell('controlesEficaces').value,
+        fechaCierre: row.getCell('fechaCierre').value,
+      };
+
+      // Intentar leer JSON completo si existe
+      const jsonFull = row.getCell('jsonFull').value;
+      if (jsonFull && typeof jsonFull === 'string') {
+        try {
+          Object.assign(rowData, JSON.parse(jsonFull));
+        } catch (e) { /* ignorar */ }
+      }
+
+      // Normalizar fecha
+      if (rowData.fecha instanceof Date) {
+        rowData.fecha = rowData.fecha.toISOString().split('T')[0];
+      }
+
+      // Parsear tipoCambio si es string
+      if (typeof rowData.tipoCambio === 'string') {
+        try {
+          rowData.tipoCambio = JSON.parse(rowData.tipoCambio);
+        } catch (e) {
+          rowData.tipoCambio = [rowData.tipoCambio];
+        }
+      }
+
+      changes.push(rowData);
+    });
+
+    return { success: true, data: { changes } };
+  } catch (err) {
+    console.error('[GestionCambio] Error al cargar datos:', err);
+    return { success: false, error: { code: 'LOAD_ERROR', message: err.message } };
+  }
+});
+
+/**
+ * Guarda o actualiza un cambio en el archivo Excel.
+ */
+ipcMain.handle('gestion-cambio-save-data', async (event, companyName, changeData) => {
+  try {
+    const filePath = await obtenerRutaGestionCambio(companyName);
+    if (!filePath) {
+      return { success: false, error: { code: 'COMPANY_NOT_FOUND', message: 'Empresa no encontrada' } };
+    }
+
+    await ensureGestionCambioExcel(filePath);
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+    const worksheet = workbook.getWorksheet('Cambios');
+
+    // Re-aplicar keys de columna (ExcelJS no los persiste en xlsx)
+    applyGestionCambioColumnKeys(worksheet);
+
+    // Serializar datos complejos como JSON
+    const jsonFull = JSON.stringify(changeData);
+    const tipoCambioStr = Array.isArray(changeData.tipoCambio)
+      ? JSON.stringify(changeData.tipoCambio)
+      : (changeData.tipoCambio || '');
+
+    const rowValues = {
+      id: changeData.id,
+      fecha: changeData.fecha,
+      areaEjecutora: changeData.areaEjecutora,
+      areaUsuaria: changeData.areaUsuaria,
+      responsable: changeData.responsable,
+      cargo: changeData.cargo,
+      descripcion: changeData.descripcion,
+      justificacion: changeData.justificacion,
+      tipoCambio: tipoCambioStr,
+      nivelRiesgo: changeData.nivelRiesgo,
+      estado: changeData.estado,
+      riesgoAntes: changeData.riesgoAntes,
+      riesgoDespues: changeData.riesgoDespues,
+      introducePeligros: changeData.introducePeligros ? 'SI' : 'NO',
+      modificaRiesgos: changeData.modificaRiesgos ? 'SI' : 'NO',
+      fechaEjecucion: changeData.fechaEjecucion,
+      controlesImplementados: changeData.controlesImplementados,
+      controlesEficaces: changeData.controlesEficaces,
+      fechaCierre: changeData.fechaCierre,
+      jsonFull: jsonFull,
+    };
+
+    // Buscar si ya existe (por ID) para actualizar
+    let existingRow = null;
+    worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      if (rowNumber === 1) return; // saltar cabecera
+      if (row.getCell('id').value === changeData.id) {
+        existingRow = row;
+      }
+    });
+
+    if (existingRow) {
+      // Actualizar fila existente usando los keys de columna
+      Object.keys(rowValues).forEach((key) => {
+        existingRow.getCell(key).value = rowValues[key];
+      });
+      console.log(`[GestionCambio] Cambio actualizado: ${changeData.id}`);
+    } else {
+      // Agregar nueva fila
+      worksheet.addRow(rowValues);
+      console.log(`[GestionCambio] Nuevo cambio agregado: ${changeData.id}`);
+    }
+
+    await workbook.xlsx.writeFile(filePath);
+
+    return { success: true, data: { id: changeData.id } };
+  } catch (err) {
+    console.error('[GestionCambio] Error al guardar:', err);
+    return { success: false, error: { code: 'SAVE_ERROR', message: err.message } };
+  }
+});
+
+/**
+ * Genera el siguiente ID consecutivo CHG-YYYY-XXX.
+ */
+ipcMain.handle('gestion-cambio-generate-id', async (event, companyName) => {
+  try {
+    const filePath = await obtenerRutaGestionCambio(companyName);
+    if (!filePath) {
+      return { success: false, error: { code: 'COMPANY_NOT_FOUND', message: 'Empresa no encontrada' } };
+    }
+
+    await ensureGestionCambioExcel(filePath);
+
+    const year = new Date().getFullYear();
+    let maxNum = 0;
+
+    if (fs.existsSync(filePath)) {
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.readFile(filePath);
+      const worksheet = workbook.getWorksheet('Cambios');
+
+      // Re-aplicar keys de columna (ExcelJS no los persiste en xlsx)
+      applyGestionCambioColumnKeys(worksheet);
+
+      worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+        if (rowNumber === 1) return;
+        const id = row.getCell('id').value;
+        if (id && typeof id === 'string') {
+          // Formato CHG-YYYY-XXX
+          const match = id.match(/CHG-(\d{4})-(\d+)/);
+          if (match && parseInt(match[1]) === year) {
+            const num = parseInt(match[2]);
+            if (num > maxNum) maxNum = num;
+          }
+        }
+      });
+    }
+
+    const nextId = `CHG-${year}-${String(maxNum + 1).padStart(3, '0')}`;
+    return { success: true, data: { id: nextId } };
+  } catch (err) {
+    console.error('[GestionCambio] Error al generar ID:', err);
+    const year = new Date().getFullYear();
+    return { success: true, data: { id: `CHG-${year}-001` } };
+  }
+});
+
+/**
+ * Actualiza el estado de un cambio (máquina de estados con transiciones validadas).
+ * Solo permite transiciones definidas en VALID_TRANSITIONS.
+ */
+ipcMain.handle('gestion-cambio-update-estado', async (event, companyName, changeId, nuevoEstado, extraData = {}) => {
+  const VALID_TRANSITIONS = {
+    'Solicitud':     ['En Evaluación'],
+    'Pendiente':     ['En Evaluación'],
+    'En Evaluación': ['Aprobado', 'No Aprobado'],
+    'Aprobado':      ['En Ejecución'],
+    'En Ejecución':  ['Cerrado'],
+  };
+
+  try {
+    const filePath = await obtenerRutaGestionCambio(companyName);
+    if (!filePath) {
+      return { success: false, error: { code: 'COMPANY_NOT_FOUND', message: 'Empresa no encontrada' } };
+    }
+
+    if (!fs.existsSync(filePath)) {
+      return { success: false, error: { code: 'NOT_FOUND', message: 'Archivo de datos no encontrado' } };
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+    const worksheet = workbook.getWorksheet('Cambios');
+    applyGestionCambioColumnKeys(worksheet);
+
+    // Buscar la fila por ID
+    let targetRow = null;
+    let currentEstado = null;
+    worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      if (rowNumber === 1) return;
+      if (row.getCell('id').value === changeId) {
+        targetRow = row;
+        currentEstado = String(row.getCell('estado').value || '');
+      }
+    });
+
+    if (!targetRow) {
+      return { success: false, error: { code: 'NOT_FOUND', message: `Cambio "${changeId}" no encontrado` } };
+    }
+
+    // Validar transición permitida
+    const allowed = VALID_TRANSITIONS[currentEstado] || [];
+    if (!allowed.includes(nuevoEstado)) {
+      return {
+        success: false,
+        error: {
+          code: 'INVALID_TRANSITION',
+          message: `No se puede cambiar de "${currentEstado}" a "${nuevoEstado}"`,
+        },
+      };
+    }
+
+    // Actualizar campo estado
+    targetRow.getCell('estado').value = nuevoEstado;
+
+    // Campos adicionales opcionales según el estado destino
+    if (nuevoEstado === 'En Ejecución' && extraData.fechaEjecucion) {
+      targetRow.getCell('fechaEjecucion').value = extraData.fechaEjecucion;
+    }
+    if (nuevoEstado === 'Cerrado' && extraData.fechaCierre) {
+      targetRow.getCell('fechaCierre').value = extraData.fechaCierre;
+    }
+
+    // Actualizar jsonFull para mantener consistencia con el estado nuevo
+    const jsonCell = targetRow.getCell('jsonFull');
+    if (jsonCell.value) {
+      try {
+        const parsed = JSON.parse(String(jsonCell.value));
+        parsed.estado = nuevoEstado;
+        Object.assign(parsed, extraData);
+        jsonCell.value = JSON.stringify(parsed);
+      } catch (e) { /* ignorar si no es JSON válido */ }
+    }
+
+    await workbook.xlsx.writeFile(filePath);
+    console.log(`[GestionCambio] Transición exitosa: ${changeId} → "${currentEstado}" → "${nuevoEstado}"`);
+
+    return { success: true, data: { id: changeId, estado: nuevoEstado, estadoAnterior: currentEstado } };
+
+  } catch (err) {
+    console.error('[GestionCambio] Error al actualizar estado:', err);
+    return { success: false, error: { code: 'UPDATE_ERROR', message: err.message } };
+  }
+});
+
 // --- HANDLERS ONLYOFFICE CON JWT ---
 
 // Handler para generar configuración del editor OnlyOffice con JWT
