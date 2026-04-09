@@ -94,6 +94,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   processExcelData: (payload) => ipcRenderer.invoke('process-excel-data', payload),
   updatePlanTrabajoExcel: (payload) => ipcRenderer.invoke('update-plan-trabajo-excel', payload),
 
+  // --- Módulo 2.10.1 Evaluación y Selección de Proveedores y Contratistas ---
+  getAsociadosES: () => ipcRenderer.invoke('get-asociados-es'),
+  saveAsociadosES: (data) => ipcRenderer.invoke('save-asociados-es', data),
+  getEvaluacionesES: () => ipcRenderer.invoke('get-evaluaciones-es'),
+  saveEvaluacionesES: (data) => ipcRenderer.invoke('save-evaluaciones-es', data),
+  getReevaluacionesES: () => ipcRenderer.invoke('get-reevaluaciones-es'),
+  saveReevaluacionesES: (data) => ipcRenderer.invoke('save-reevaluaciones-es', data),
+  getNoConformidadesES: () => ipcRenderer.invoke('get-noconformidades-es'),
+  saveNoConformidadesES: (data) => ipcRenderer.invoke('save-noconformidades-es', data),
+
   // --- Gestión de Archivos de Proveedores (Evidencias) ---
   createProviderFolder: (basePath, folderName) => ipcRenderer.invoke('create-provider-folder', basePath, folderName),
   copyFileToProviderFolder: (sourcePath, destFolderPath, fileName) => ipcRenderer.invoke('copy-file-to-provider-folder', sourcePath, destFolderPath, fileName),

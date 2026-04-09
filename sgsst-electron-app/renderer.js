@@ -47,7 +47,7 @@ const ALL_SUBMODULES = {
     "2.7.1 Matriz de requisitos legales",
     "2.8.1 Mecanismos de comunicaciones",
     "2.9.1 Identificación y evaluación para la adquisición de bienes y servicios",
-    "2.10.1 Evaluación y seleción de proveedores y contratistas",
+    "2.10.1 Evaluación y selección de proveedores y contratistas",
     "2.11.1 Gestión del Cambio",
     "2.12.1 Equipos y Herramientas",
     "2.13.1 Elementos de Protección Personal",
@@ -3762,6 +3762,18 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
       );
       if (!window.EvaluacionProveedores) {
         console.error('❌ EvaluacionProveedores no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
+    } else if (submoduleName === "2.10.1 Evaluación y selección de proveedores y contratistas") {
+      createComponentSafely(window.EvaluacionSeleccionComponent,
+        submoduleContentDiv,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback
+      );
+      if (!window.EvaluacionSeleccionComponent) {
+        console.error('❌ EvaluacionSeleccionComponent no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 

@@ -11617,6 +11617,47 @@ async function startLlmServer() {
     }
 }
 
+// ==========================================================================
+// Módulo 2.10.1 — Evaluación y Selección de Proveedores y Contratistas
+// Handlers IPC para persistencia JSON de datos del módulo
+// ==========================================================================
+
+function getESDataDir() {
+  // Usar el directorio de datos de la app para almacenar datos del módulo 2.10.1
+  const dataDir = path.join(app.getPath('userData'), 'evaluacion-seleccion-data');
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+  return dataDir;
+}
+
+function readESFile(filename) {
+  try {
+    const filePath = path.join(getESDataDir(), filename);
+    if (fs.existsSync(filePath)) {
+      const content = fs.readFileSync(filePath, 'utf8');
+      return JSON.parse(content);
+    }
+  } catch (e) { console.error('[2.10.1] Error leyendo ' + filename + ':', e); }
+  return [];
+}
+
+function writeESFile(filename, data) {
+  try {
+    const filePath = path.join(getESDataDir(), filename);
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+  } catch (e) { console.error('[2.10.1] Error escribiendo ' + filename + ':', e); }
+}
+
+ipcMain.handle('get-asociados-es', async () => readESFile('asociados.json'));
+ipcMain.handle('save-asociados-es', async (event, data) => writeESFile('asociados.json', data));
+ipcMain.handle('get-evaluaciones-es', async () => readESFile('evaluaciones.json'));
+ipcMain.handle('save-evaluaciones-es', async (event, data) => writeESFile('evaluaciones.json', data));
+ipcMain.handle('get-reevaluaciones-es', async () => readESFile('reevaluaciones.json'));
+ipcMain.handle('save-reevaluaciones-es', async (event, data) => writeESFile('reevaluaciones.json', data));
+ipcMain.handle('get-noconformidades-es', async () => readESFile('noconformidades.json'));
+ipcMain.handle('save-noconformidades-es', async (event, data) => writeESFile('noconformidades.json', data));
+
 // Iniciar el servidor OnlyOffice al iniciar la aplicación
 app.whenReady().then(() => {
     createWindow();
