@@ -11898,6 +11898,349 @@ ipcMain.handle('obtener-empresas-con-bd-personal', async () => {
   }
 });
 
+// ==========================================================================
+// Handler: Estadísticas de Ausentismo (para widget en home de Gestión de la Salud)
+// ==========================================================================
+ipcMain.handle('get-ausentismo-stats', async (event, companyName, mode) => {
+  try {
+    console.log(`[AUS-STATS] Recibido: empresa="${companyName}", mode="${mode}"`);
+
+    const ausentismoFiles = {
+      "TEMPOACTIVA": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\1. Tempoactiva Est SAS\\3. Gestión de la Salud\\3.3.6 Medición del ausentismo por causa médica\\GI-FO-076 AUSENTISMO POR ARL Y EPS 2024.xlsx",
+      "TEMPOSUM": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\2. Temposum Est SAS\\3. Gestión de la Salud\\3.3.6 Medición del ausentismo por causa médica\\3 AUSENTISMO POR ARL Y EPS (TEMPOSUM) 2024.XLSX",
+      "ASEPLUS": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\3. Aseplus\\3. Gestión de la Salud\\3.3.6 Medición del ausentismo por causa médica\\PI-FO-076 AUSENTISMO POR ARL Y EPS (ASEPLUS).XLSX",
+      "ASEL": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\19. Asel S.A.S\\3. Gestión de la Salud\\3.3.6 Medición del ausentismo por causa médica\\A-FR-31 Ausentismo Laboral.xlsx"
+    };
+
+    const filePath = ausentismoFiles[companyName.toUpperCase()];
+    console.log(`[AUS-STATS] Key: "${companyName.toUpperCase()}", filePath: "${filePath}"`);
+
+    if (!filePath || !fs.existsSync(filePath)) {
+      console.log(`[AUS-STATS] Archivo NO encontrado. exists: ${fs.existsSync(filePath || '')}`);
+      return { success: false, error: 'Archivo de ausentismo no encontrado para esta empresa.' };
+    }
+    const workbook = xlsx.readFile(filePath);
+    console.log(`[AUS-STATS] Archivo encontrado, hojas: ${workbook.SheetNames.join(', ')}`);
+
+    // Buscar la hoja con datos reales (no Dashboard, no CIE-10, etc.)
+    const companyNameLower = companyName.toLowerCase();
+    let sheetName = workbook.SheetNames.find(s =>
+      s.toLowerCase().includes(companyNameLower) && !s.toLowerCase().includes('cie') && !s.toLowerCase().includes('rips')
+    );
+    if (!sheetName) {
+      // Fallback: buscar hoja con año actual
+      const yearStr = new Date().getFullYear();
+      sheetName = workbook.SheetNames.find(s => s.includes(String(yearStr)));
+    }
+    if (!sheetName) {
+      // Fallback final: primera hoja con >100 filas
+      for (const s of workbook.SheetNames) {
+        const ws = workbook.Sheets[s];
+        const r = xlsx.utils.sheet_to_json(ws, { defval: '' });
+        if (r.length > 100) { sheetName = s; break; }
+      }
+    }
+    if (!sheetName) sheetName = workbook.SheetNames[0];
+
+    console.log(`[AUS-STATS] Hoja seleccionada: "${sheetName}"`);
+
+    const worksheet = workbook.Sheets[sheetName];
+
+    // Leer con header:1 (arrays) para localizar la fila de encabezados correcta.
+    // El Excel GI-FO-076 tiene filas de título/metadata antes de los headers reales.
+    const rawData = xlsx.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+    console.log(`[AUS-STATS] Filas leídas: ${rawData.length}`);
+
+    // Buscar la fila de encabezados (la que contenga "MES" y "AÑO")
+    let headerRowIdx = -1;
+    let colMes = -1;
+    let colAnio = -1;
+    for (let i = 0; i < Math.min(rawData.length, 15); i++) {
+      const row = rawData[i];
+      if (!Array.isArray(row)) continue;
+      const mesIdx = row.findIndex(c => String(c || '').toUpperCase().trim() === 'MES');
+      const anioIdx = row.findIndex(c => {
+        const v = String(c || '').toUpperCase().trim().replace(/\u00d1/g, 'N').replace(/\u00f1/g, 'N');
+        return v === 'ANO' || v === 'A\u00d1O';
+      });
+      if (mesIdx !== -1 && anioIdx !== -1) {
+        headerRowIdx = i;
+        colMes = mesIdx;
+        colAnio = anioIdx;
+        break;
+      }
+    }
+    // Fallback: índices fijos conocidos del formato GI-FO-076 (fila 7, col 9=MES, col 14=AÑO)
+    if (headerRowIdx === -1) { colMes = 9; colAnio = 14; headerRowIdx = 6; }
+
+    // Solo tomar filas de datos (después del header), descartando vacías
+    const dataRows = rawData.slice(headerRowIdx + 1).filter(r => Array.isArray(r) && r.length > colAnio && r[colAnio] !== '');
+    console.log(`[AUS-STATS] Filas de datos (post-header): ${dataRows.length}, colMes=${colMes}, colAnio=${colAnio}`);
+
+    const currentMonth = new Date().getMonth();
+    const monthNames = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+
+    // Detectar el año más reciente en los datos (columna AÑO)
+    let fileYear = null;
+    for (const r of dataRows) {
+      const yr = parseInt(String(r[colAnio] || '').trim());
+      if (yr >= 2010 && yr <= 2099) {
+        if (!fileYear || yr > fileYear) fileYear = yr;
+      }
+    }
+    console.log(`[AUS-STATS] Año detectado en datos: ${fileYear}`);
+
+    let totalCount = 0;
+    let monthCount = 0;
+
+    dataRows.forEach(row => {
+      const yr = parseInt(String(row[colAnio] || '').trim());
+      if (fileYear && yr === fileYear) {
+        totalCount++;
+        const mes = String(row[colMes] || '').toUpperCase().trim();
+        if (mes === monthNames[currentMonth]) monthCount++;
+      }
+    });
+
+    const displayYear = fileYear || new Date().getFullYear();
+    console.log(`[AUS-STATS] Resultado: total=${totalCount}, mesActual=${monthCount}, year=${displayYear}, mes=${monthNames[currentMonth]}`);
+
+    return {
+      success: true,
+      data: {
+        total: totalCount,
+        mesActual: monthCount,
+        year: displayYear,
+        mes: monthNames[currentMonth]
+      }
+    };
+  } catch (error) {
+    console.error('[get-ausentismo-stats] Error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// ==========================================================================
+// Handler: Estadísticas de Accidentes FURAT (para widget en home de Gestión de la Salud)
+// Cuenta archivos en estructura: .../3.2.1 Reportes de Accidentes/{año}/{mes}/
+// ==========================================================================
+ipcMain.handle('get-accidentes-stats', async (event, companyName) => {
+  try {
+    console.log(`[ACC-STATS] Recibido: empresa="${companyName}"`);
+
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+
+    if (!config.companyPaths || !config.companyPaths[companyName]) {
+      console.log(`[ACC-STATS] Sin configuración para "${companyName}"`);
+      return { success: false, error: `Sin configuración para: ${companyName}` };
+    }
+
+    const structure = config.companyPaths[companyName]?.structure?.structure;
+    if (!structure) {
+      console.log(`[ACC-STATS] Estructura no mapeada para "${companyName}"`);
+      return { success: false, error: 'Estructura de directorios no mapeada' };
+    }
+
+    const submodulePath = searchInStructure(structure, '3.2.1');
+    if (!submodulePath || !fs.existsSync(submodulePath)) {
+      console.log(`[ACC-STATS] Ruta 3.2.1 no encontrada o inexistente en disco`);
+      return { success: false, error: 'Carpeta de reportes de accidentes no encontrada' };
+    }
+
+    console.log(`[ACC-STATS] Ruta resuelta: ${submodulePath}`);
+
+    const MONTH_NAMES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const currentYear = new Date().getFullYear();
+    const currentMonthIdx = new Date().getMonth();
+
+    // Leer subcarpetas de año (nivel 1)
+    const nivel1 = await fsp.readdir(submodulePath, { withFileTypes: true });
+    const yearFolders = nivel1
+      .filter(d => d.isDirectory() && /^(20\d{2})$/.test(d.name.trim()))
+      .map(d => ({ name: d.name.trim(), path: path.join(submodulePath, d.name) }));
+
+    if (yearFolders.length === 0) {
+      console.log(`[ACC-STATS] Sin subcarpetas de año en ${submodulePath}`);
+      return { success: true, data: { totalYear: 0, mesActual: 0, year: currentYear, mes: MONTH_NAMES_ES[currentMonthIdx] } };
+    }
+
+    // Determinar año objetivo: año actual si existe, si no el más reciente disponible
+    const availableYears = yearFolders.map(f => parseInt(f.name)).sort((a, b) => b - a);
+    const targetYear = availableYears.includes(currentYear) ? currentYear : availableYears[0];
+    const targetFolder = yearFolders.find(f => f.name === String(targetYear));
+
+    console.log(`[ACC-STATS] Años disponibles: ${availableYears.join(', ')} | Año objetivo: ${targetYear}`);
+
+    const currentMonthNorm = MONTH_NAMES_ES[currentMonthIdx]
+      .toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    let totalYear = 0;
+    let mesActual = 0;
+
+    // Helper: normaliza nombre para comparar sin tildes ni mayúsculas
+    const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    // Leer contenido de la carpeta de año (nivel 2)
+    const nivel2 = await fsp.readdir(targetFolder.path, { withFileTypes: true });
+
+    for (const item of nivel2) {
+      const itemPath = path.join(targetFolder.path, item.name);
+
+      if (item.isFile()) {
+        // Archivos directamente en la carpeta de año (estructura plana: 2026/archivo.pdf)
+        totalYear++;
+        // Determinar mes por nombre de archivo
+        const fileNorm = norm(item.name);
+        if (fileNorm.includes(currentMonthNorm)) mesActual++;
+
+      } else if (item.isDirectory()) {
+        // Subcarpeta de mes (estructura: 2026/Abril/archivo.pdf)
+        try {
+          const archivos = await fsp.readdir(itemPath, { withFileTypes: true });
+          const files = archivos.filter(f => f.isFile());
+          totalYear += files.length;
+
+          const dirNorm = norm(item.name);
+          if (dirNorm === currentMonthNorm) {
+            mesActual += files.length;
+          } else {
+            // Fallback: buscar mes en nombre de archivo dentro de la subcarpeta
+            files.forEach(f => {
+              if (norm(f.name).includes(currentMonthNorm)) mesActual++;
+            });
+          }
+        } catch (err) {
+          console.warn(`[ACC-STATS] No se pudo leer ${itemPath}: ${err.message}`);
+        }
+      }
+    }
+
+    console.log(`[ACC-STATS] Resultado: totalYear=${totalYear}, mesActual=${mesActual}, year=${targetYear}, mes=${MONTH_NAMES_ES[currentMonthIdx]}`);
+
+    return {
+      success: true,
+      data: {
+        totalYear,
+        mesActual,
+        year: targetYear,
+        mes: MONTH_NAMES_ES[currentMonthIdx]
+      }
+    };
+  } catch (error) {
+    console.error('[get-accidentes-stats] Error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// ==========================================================================
+// Handler: Estadísticas de Exámenes Médicos (para widget en home de Gestión de la Salud)
+// Cuenta archivos en estructura: .../3.1.4 Evaluaciones médicas/{año}/{mes}/
+// ==========================================================================
+ipcMain.handle('get-examenes-stats', async (event, companyName) => {
+  try {
+    console.log(`[EXAM-STATS] Recibido: empresa="${companyName}"`);
+
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+
+    if (!config.companyPaths || !config.companyPaths[companyName]) {
+      console.log(`[EXAM-STATS] Sin configuración para "${companyName}"`);
+      return { success: false, error: `Sin configuración para: ${companyName}` };
+    }
+
+    const structure = config.companyPaths[companyName]?.structure?.structure;
+    if (!structure) {
+      console.log(`[EXAM-STATS] Estructura no mapeada para "${companyName}"`);
+      return { success: false, error: 'Estructura de directorios no mapeada' };
+    }
+
+    const submodulePath = searchInStructure(structure, '3.1.4');
+    if (!submodulePath || !fs.existsSync(submodulePath)) {
+      console.log(`[EXAM-STATS] Ruta 3.1.4 no encontrada o inexistente en disco`);
+      return { success: false, error: 'Carpeta de evaluaciones médicas no encontrada' };
+    }
+
+    console.log(`[EXAM-STATS] Ruta resuelta: ${submodulePath}`);
+
+    const MONTH_NAMES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const currentYear = new Date().getFullYear();
+    const currentMonthIdx = new Date().getMonth();
+    const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const currentMonthNorm = norm(MONTH_NAMES_ES[currentMonthIdx]);
+
+    // Leer subcarpetas de año (nivel 1)
+    const nivel1 = await fsp.readdir(submodulePath, { withFileTypes: true });
+    const yearFolders = nivel1
+      .filter(d => d.isDirectory() && /^(20\d{2})$/.test(d.name.trim()))
+      .map(d => ({ name: d.name.trim(), path: path.join(submodulePath, d.name) }));
+
+    if (yearFolders.length === 0) {
+      console.log(`[EXAM-STATS] Sin subcarpetas de año en ${submodulePath}`);
+      return { success: true, data: { totalYear: 0, mesActual: 0, year: currentYear, mes: MONTH_NAMES_ES[currentMonthIdx] } };
+    }
+
+    // Determinar año objetivo: año actual si existe, si no el más reciente disponible
+    const availableYears = yearFolders.map(f => parseInt(f.name)).sort((a, b) => b - a);
+    const targetYear = availableYears.includes(currentYear) ? currentYear : availableYears[0];
+    const targetFolder = yearFolders.find(f => f.name === String(targetYear));
+
+    console.log(`[EXAM-STATS] Años disponibles: ${availableYears.join(', ')} | Año objetivo: ${targetYear}`);
+
+    let totalYear = 0;
+    let mesActual = 0;
+
+    // Leer contenido de la carpeta de año (nivel 2): archivos directos + subcarpetas de mes o tipo
+    const nivel2 = await fsp.readdir(targetFolder.path, { withFileTypes: true });
+
+    for (const item of nivel2) {
+      const itemPath = path.join(targetFolder.path, item.name);
+
+      if (item.isFile()) {
+        // Archivos directamente en carpeta de año
+        totalYear++;
+        if (norm(item.name).includes(currentMonthNorm)) mesActual++;
+
+      } else if (item.isDirectory()) {
+        // Subcarpeta (puede ser mes o tipo: Ingreso, Periódico, Retiro)
+        try {
+          const archivos = await fsp.readdir(itemPath, { withFileTypes: true });
+          const files = archivos.filter(f => f.isFile());
+          totalYear += files.length;
+
+          const dirNorm = norm(item.name);
+          if (dirNorm === currentMonthNorm) {
+            // Subcarpeta nombrada por mes
+            mesActual += files.length;
+          } else {
+            // Subcarpeta nombrada por tipo (Ingreso, Periódico...) — buscar mes en nombre de archivo
+            files.forEach(f => {
+              if (norm(f.name).includes(currentMonthNorm)) mesActual++;
+            });
+          }
+        } catch (err) {
+          console.warn(`[EXAM-STATS] No se pudo leer ${itemPath}: ${err.message}`);
+        }
+      }
+    }
+
+    console.log(`[EXAM-STATS] Resultado: totalYear=${totalYear}, mesActual=${mesActual}, year=${targetYear}, mes=${MONTH_NAMES_ES[currentMonthIdx]}`);
+
+    return {
+      success: true,
+      data: {
+        totalYear,
+        mesActual,
+        year: targetYear,
+        mes: MONTH_NAMES_ES[currentMonthIdx]
+      }
+    };
+  } catch (error) {
+    console.error('[get-examenes-stats] Error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // Iniciar el servidor OnlyOffice al iniciar la aplicación
 app.whenReady().then(() => {
     createWindow();

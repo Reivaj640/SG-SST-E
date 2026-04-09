@@ -145,21 +145,8 @@ class GestionIntegralHome {
             /* Grid de Widgets */
             .widgets-container {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
                 gap: 1rem;
-            }
-
-            @media (max-width: 768px) {
-                .widgets-container {
-                    grid-template-columns: repeat(2, 1fr);
-                    gap: 0.75rem;
-                }
-            }
-
-            @media (max-width: 480px) {
-                .widgets-container {
-                    grid-template-columns: 1fr;
-                }
             }
 
             /* Widget Base */
@@ -1109,19 +1096,13 @@ class GestionIntegralHome {
         // Determinar color según cumplimiento
         let colorVar = 'var(--k-danger)';
         let colorClass = 'bg-danger';
-        let estadoText = 'Crítico';
-        let estadoIcon = '🔴';
 
         if (cumplimiento >= 80) {
             colorVar = 'var(--k-success)';
             colorClass = 'bg-success';
-            estadoText = 'Satisfactorio';
-            estadoIcon = '🟢';
         } else if (cumplimiento >= 50) {
             colorVar = 'var(--k-warning)';
             colorClass = 'bg-warning';
-            estadoText = 'Mejorable';
-            estadoIcon = '🟡';
         }
 
         const w = document.createElement('div');
@@ -1164,7 +1145,6 @@ class GestionIntegralHome {
             </div>
 
             <div class="kb-amount" style="font-size: 1.4rem; margin-top: 12px;">
-                ${estadoIcon} ${estadoText}
             </div>
 
             <div class="kb-progress-track">

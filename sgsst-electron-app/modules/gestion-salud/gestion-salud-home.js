@@ -293,6 +293,24 @@ class GestionSaludHome {
             }
             .btn-ingresar:hover { background-color: var(--k-primary-hover); }
 
+            /* Widget Ausentismo - Estilos budget-card */
+            .kb-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+            .kb-title { font-size: 0.65rem; font-weight: 600; color: var(--k-text-muted); text-transform: uppercase; }
+            .kb-badge { font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 1rem; color: white; }
+            .bg-success { background-color: var(--k-success) !important; }
+            .bg-warning { background-color: var(--k-warning) !important; }
+            .bg-danger { background-color: var(--k-danger) !important; }
+            .kb-amount { font-size: 1.4rem; font-weight: 700; color: var(--k-text-main); margin-bottom: 0.75rem; }
+            .kb-progress-track { width: 100%; height: 10px; background-color: #e9ecef; border-radius: 5px; overflow: hidden; margin-bottom: 0.5rem; }
+            .kb-progress-bar { height: 100%; width: 0%; border-radius: 5px; background-color: var(--k-primary); transition: width 0.8s cubic-bezier(0.4,0,0.2,1); }
+            .kb-footer { display: flex; justify-content: space-between; font-size: 0.6rem; margin-top: auto; padding-top: 0.5rem; border-top: 1px solid var(--k-border); }
+            .kb-label { color: var(--k-text-muted); font-weight: 500; font-size: 0.6rem; }
+            .kb-value { font-weight: 600; }
+            .kb-exec { color: var(--k-success); }
+            .kb-rem { color: var(--k-primary); }
+            .ausentismo-toggles { display: flex; gap: 6px; margin-top: 8px; margin-bottom: 10px; }
+            .ausentismo-toggle { flex: 1; padding: 5px 8px; font-size: 0.72rem; border: 1px solid var(--k-border); border-radius: 6px; cursor: pointer; font-weight: 500; font-family: inherit; transition: all 0.2s; }
+
             /* =========================================
                TEMA OSCURO (MODO SYSTEM/DARK)
                ========================================= */
@@ -345,17 +363,21 @@ class GestionSaludHome {
         const widgetsContainer = document.createElement('div');
         widgetsContainer.className = 'widgets-container';
 
-        const widget1 = this.createWidget('Exámenes Médicos', '128', '📅 15 pendientes');
-        const widget2 = this.createWidget('Accidentes Reportados', '3', '📉 2 menos que el mes pasado');
+        const widget1 = this.createExamenesWidget();
+        const accidentesWidget = this.createAccidentesWidget();
         const widget3 = this.createWidget('Remisiones', '7', '↗ 1 nueva hoy');
 
         // Nueva tarjeta de seguimientos médicos
         const seguimientosWidget = this.createSeguimientosWidget();
 
+        // Nueva tarjeta de ausentismo
+        const ausentismoWidget = this.createAusentismoWidget();
+
         widgetsContainer.appendChild(widget1);
-        widgetsContainer.appendChild(widget2);
+        widgetsContainer.appendChild(accidentesWidget);
         widgetsContainer.appendChild(widget3);
         widgetsContainer.appendChild(seguimientosWidget);
+        widgetsContainer.appendChild(ausentismoWidget);
 
         container.appendChild(widgetsContainer);
         
@@ -803,6 +825,364 @@ class GestionSaludHome {
     }
     
     async renderSidebarPanel(container) {
+    }
+
+    /**
+     * Widget de Ausentismo Médico con toggle Año/Mes
+     */
+    createAusentismoWidget() {
+        const widget = document.createElement('div');
+        widget.className = 'widget k-budget-card';
+        widget.id = 'ausentismo-widget';
+
+        let currentMode = 'year';
+        let cachedData = null;
+
+        widget.innerHTML = `
+            <div class="kb-header">
+                <span class="kb-title">Ausentismo Médico</span>
+                <span class="kb-badge bg-success" id="ausentismo-badge">—</span>
+            </div>
+            <div class="ausentismo-toggles">
+                <button class="ausentismo-toggle" data-mode="year" style="background:var(--k-primary);color:white;">Año</button>
+                <button class="ausentismo-toggle" data-mode="month" style="background:var(--k-bg-card);color:var(--k-text-muted);">Mes</button>
+            </div>
+            <div class="kb-amount" style="text-align:center;">
+                <span class="ausentismo-value">—</span>
+            </div>
+            <div class="ausentismo-desc" style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:8px;">
+                Registro y seguimiento de casos de ausentismo
+            </div>
+            <div class="kb-footer">
+                <div>
+                    <div class="kb-label">Total Año</div>
+                    <div class="kb-value kb-exec ausentismo-total-year">—</div>
+                </div>
+                <div style="text-align:right;">
+                    <div class="kb-label">Mes Actual</div>
+                    <div class="kb-value kb-rem ausentismo-total-month">—</div>
+                </div>
+            </div>
+        `;
+
+        async function actualizarDatos() {
+            const valueEl = widget.querySelector('.ausentismo-value');
+            const badgeEl = widget.querySelector('#ausentismo-badge');
+            const descEl = widget.querySelector('.ausentismo-desc');
+
+            valueEl.textContent = '...';
+            badgeEl.textContent = '...';
+
+            try {
+                let company = window.currentCompany || 'Tempoactiva';
+                if (!company) company = 'Tempoactiva';
+
+                const result = await window.electronAPI.getAusentismoStats(company, currentMode);
+
+                if (result && result.success) {
+                    cachedData = result.data;
+                    const totalVal = currentMode === 'year' ? cachedData.total : cachedData.mesActual;
+                    valueEl.textContent = totalVal;
+
+                    if (currentMode === 'year') {
+                        badgeEl.textContent = `${cachedData.year}`;
+                        badgeEl.className = 'kb-badge bg-success';
+                        descEl.textContent = `Incapacidades registradas en ${cachedData.year}`;
+                    } else {
+                        badgeEl.textContent = `${cachedData.mes}`;
+                        badgeEl.className = 'kb-badge bg-warning';
+                        descEl.textContent = `Incapacidades en ${cachedData.mes} ${cachedData.year}`;
+                    }
+
+                    // Actualizar footer siempre
+                    const yearEl = widget.querySelector('.ausentismo-total-year');
+                    const monthEl = widget.querySelector('.ausentismo-total-month');
+                    if (yearEl) yearEl.textContent = cachedData.total;
+                    if (monthEl) monthEl.textContent = cachedData.mesActual;
+                } else {
+                    valueEl.textContent = '0';
+                    badgeEl.textContent = '—';
+                    descEl.textContent = (result && result.error) ? result.error : 'Sin datos disponibles';
+                }
+            } catch (error) {
+                console.error('[ausentismo-widget] Error:', error);
+                valueEl.textContent = '0';
+                badgeEl.textContent = '—';
+                descEl.textContent = 'Error al cargar datos';
+            }
+        }
+
+        // Deferir configuración de toggles hasta que el widget esté en el DOM
+        setTimeout(() => {
+            const toggleBtns = widget.querySelectorAll('.ausentismo-toggle');
+            toggleBtns.forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const mode = this.getAttribute('data-mode');
+                    if (mode === currentMode) return;
+
+                    currentMode = mode;
+
+                    toggleBtns.forEach(b => {
+                        b.style.background = 'var(--k-bg-card)';
+                        b.style.color = 'var(--k-text-muted)';
+                    });
+                    this.style.background = 'var(--k-primary)';
+                    this.style.color = 'white';
+
+                    console.log(`[AUS-WIDGET] Toggle cambiado a: ${currentMode}`);
+                    actualizarDatos();
+                });
+            });
+        }, 100);
+
+        actualizarDatos();
+        return widget;
+    }
+
+    /**
+     * Widget de Exámenes Médicos con toggle Año/Mes
+     */
+    createExamenesWidget() {
+        const widget = document.createElement('div');
+        widget.className = 'widget k-budget-card';
+        widget.id = 'examenes-widget';
+
+        let currentMode = 'year';
+        let cachedData = null;
+
+        widget.innerHTML = `
+            <div class="kb-header">
+                <span class="kb-title">Exámenes Médicos</span>
+                <span class="kb-badge bg-success" id="examenes-badge">—</span>
+            </div>
+            <div class="ausentismo-toggles">
+                <button class="ausentismo-toggle exam-toggle" data-mode="year" style="background:var(--k-primary);color:white;">Año</button>
+                <button class="ausentismo-toggle exam-toggle" data-mode="month" style="background:var(--k-bg-card);color:var(--k-text-muted);">Mes</button>
+            </div>
+            <div class="kb-amount" style="text-align:center;">
+                <span class="examenes-value">—</span>
+            </div>
+            <div class="examenes-desc" style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:8px;">
+                Evaluaciones médicas ocupacionales
+            </div>
+            <div class="kb-footer">
+                <div>
+                    <div class="kb-label">Total Año</div>
+                    <div class="kb-value kb-exec examenes-total-year">—</div>
+                </div>
+                <div style="text-align:right;">
+                    <div class="kb-label">Mes Actual</div>
+                    <div class="kb-value kb-rem examenes-total-month">—</div>
+                </div>
+            </div>
+        `;
+
+        async function actualizarDatos() {
+            const valueEl = widget.querySelector('.examenes-value');
+            const badgeEl = widget.querySelector('#examenes-badge');
+            const descEl = widget.querySelector('.examenes-desc');
+
+            valueEl.textContent = '...';
+            badgeEl.textContent = '...';
+
+            try {
+                const company = window.currentCompany || 'default_company';
+                const result = await window.electronAPI.getExamenesStats(company);
+
+                if (result && result.success) {
+                    cachedData = result.data;
+                    const displayVal = currentMode === 'year' ? cachedData.totalYear : cachedData.mesActual;
+                    valueEl.textContent = displayVal;
+
+                    if (currentMode === 'year') {
+                        badgeEl.textContent = `${cachedData.year}`;
+                        badgeEl.className = 'kb-badge bg-success';
+                        descEl.textContent = `Evaluaciones médicas en ${cachedData.year}`;
+                    } else {
+                        badgeEl.textContent = `${cachedData.mes}`;
+                        badgeEl.className = 'kb-badge bg-warning';
+                        descEl.textContent = `Evaluaciones en ${cachedData.mes} ${cachedData.year}`;
+                    }
+
+                    const yearEl = widget.querySelector('.examenes-total-year');
+                    const monthEl = widget.querySelector('.examenes-total-month');
+                    if (yearEl) yearEl.textContent = cachedData.totalYear;
+                    if (monthEl) monthEl.textContent = cachedData.mesActual;
+                } else {
+                    valueEl.textContent = '0';
+                    badgeEl.textContent = '—';
+                    descEl.textContent = (result && result.error) ? result.error : 'Sin datos disponibles';
+                }
+            } catch (error) {
+                console.error('[examenes-widget] Error:', error);
+                valueEl.textContent = '0';
+                badgeEl.textContent = '—';
+                descEl.textContent = 'Error al cargar datos';
+            }
+        }
+
+        setTimeout(() => {
+            const toggleBtns = widget.querySelectorAll('.exam-toggle');
+            toggleBtns.forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const mode = this.getAttribute('data-mode');
+                    if (mode === currentMode) return;
+
+                    currentMode = mode;
+                    toggleBtns.forEach(b => {
+                        b.style.background = 'var(--k-bg-card)';
+                        b.style.color = 'var(--k-text-muted)';
+                    });
+                    this.style.background = 'var(--k-primary)';
+                    this.style.color = 'white';
+
+                    if (!cachedData) { actualizarDatos(); return; }
+
+                    const valueEl = widget.querySelector('.examenes-value');
+                    const badgeEl = widget.querySelector('#examenes-badge');
+                    const descEl = widget.querySelector('.examenes-desc');
+
+                    const displayVal = currentMode === 'year' ? cachedData.totalYear : cachedData.mesActual;
+                    valueEl.textContent = displayVal;
+
+                    if (currentMode === 'year') {
+                        badgeEl.textContent = `${cachedData.year}`;
+                        badgeEl.className = 'kb-badge bg-success';
+                        descEl.textContent = `Evaluaciones médicas en ${cachedData.year}`;
+                    } else {
+                        badgeEl.textContent = `${cachedData.mes}`;
+                        badgeEl.className = 'kb-badge bg-warning';
+                        descEl.textContent = `Evaluaciones en ${cachedData.mes} ${cachedData.year}`;
+                    }
+                });
+            });
+        }, 100);
+
+        actualizarDatos();
+        return widget;
+    }
+
+    /**
+     * Widget de Accidentes Reportados FURAT con toggle Año/Mes
+     */
+    createAccidentesWidget() {
+        const widget = document.createElement('div');
+        widget.className = 'widget k-budget-card';
+        widget.id = 'accidentes-widget';
+
+        let currentMode = 'year';
+        let cachedData = null;
+
+        widget.innerHTML = `
+            <div class="kb-header">
+                <span class="kb-title">Accidentes Reportados</span>
+                <span class="kb-badge bg-danger" id="accidentes-badge">—</span>
+            </div>
+            <div class="ausentismo-toggles">
+                <button class="ausentismo-toggle acc-toggle" data-mode="year" style="background:var(--k-primary);color:white;">Año</button>
+                <button class="ausentismo-toggle acc-toggle" data-mode="month" style="background:var(--k-bg-card);color:var(--k-text-muted);">Mes</button>
+            </div>
+            <div class="kb-amount" style="text-align:center;">
+                <span class="accidentes-value">—</span>
+            </div>
+            <div class="accidentes-desc" style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:8px;">
+                Reportes FURAT registrados
+            </div>
+            <div class="kb-footer">
+                <div>
+                    <div class="kb-label">Total Año</div>
+                    <div class="kb-value kb-exec accidentes-total-year">—</div>
+                </div>
+                <div style="text-align:right;">
+                    <div class="kb-label">Mes Actual</div>
+                    <div class="kb-value kb-rem accidentes-total-month">—</div>
+                </div>
+            </div>
+        `;
+
+        async function actualizarDatos() {
+            const valueEl = widget.querySelector('.accidentes-value');
+            const badgeEl = widget.querySelector('#accidentes-badge');
+            const descEl = widget.querySelector('.accidentes-desc');
+
+            valueEl.textContent = '...';
+            badgeEl.textContent = '...';
+
+            try {
+                const company = window.currentCompany || 'default_company';
+                const result = await window.electronAPI.getAccidentesStats(company);
+
+                if (result && result.success) {
+                    cachedData = result.data;
+                    const displayVal = currentMode === 'year' ? cachedData.totalYear : cachedData.mesActual;
+                    valueEl.textContent = displayVal;
+
+                    if (currentMode === 'year') {
+                        badgeEl.textContent = `${cachedData.year}`;
+                        badgeEl.className = 'kb-badge bg-danger';
+                        descEl.textContent = `Reportes FURAT en ${cachedData.year}`;
+                    } else {
+                        badgeEl.textContent = `${cachedData.mes}`;
+                        badgeEl.className = 'kb-badge bg-warning';
+                        descEl.textContent = `Reportes en ${cachedData.mes} ${cachedData.year}`;
+                    }
+
+                    const yearEl = widget.querySelector('.accidentes-total-year');
+                    const monthEl = widget.querySelector('.accidentes-total-month');
+                    if (yearEl) yearEl.textContent = cachedData.totalYear;
+                    if (monthEl) monthEl.textContent = cachedData.mesActual;
+                } else {
+                    valueEl.textContent = '0';
+                    badgeEl.textContent = '—';
+                    descEl.textContent = (result && result.error) ? result.error : 'Sin datos disponibles';
+                }
+            } catch (error) {
+                console.error('[accidentes-widget] Error:', error);
+                valueEl.textContent = '0';
+                badgeEl.textContent = '—';
+                descEl.textContent = 'Error al cargar datos';
+            }
+        }
+
+        setTimeout(() => {
+            const toggleBtns = widget.querySelectorAll('.acc-toggle');
+            toggleBtns.forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const mode = this.getAttribute('data-mode');
+                    if (mode === currentMode) return;
+
+                    currentMode = mode;
+                    toggleBtns.forEach(b => {
+                        b.style.background = 'var(--k-bg-card)';
+                        b.style.color = 'var(--k-text-muted)';
+                    });
+                    this.style.background = 'var(--k-primary)';
+                    this.style.color = 'white';
+
+                    if (!cachedData) { actualizarDatos(); return; }
+
+                    const valueEl = widget.querySelector('.accidentes-value');
+                    const badgeEl = widget.querySelector('#accidentes-badge');
+                    const descEl = widget.querySelector('.accidentes-desc');
+
+                    const displayVal = currentMode === 'year' ? cachedData.totalYear : cachedData.mesActual;
+                    valueEl.textContent = displayVal;
+
+                    if (currentMode === 'year') {
+                        badgeEl.textContent = `${cachedData.year}`;
+                        badgeEl.className = 'kb-badge bg-danger';
+                        descEl.textContent = `Reportes FURAT en ${cachedData.year}`;
+                    } else {
+                        badgeEl.textContent = `${cachedData.mes}`;
+                        badgeEl.className = 'kb-badge bg-warning';
+                        descEl.textContent = `Reportes en ${cachedData.mes} ${cachedData.year}`;
+                    }
+                });
+            });
+        }, 100);
+
+        actualizarDatos();
+        return widget;
     }
 }
 

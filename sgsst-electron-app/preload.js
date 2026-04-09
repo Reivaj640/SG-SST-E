@@ -225,6 +225,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   obtenerEmpresasConBDPersonal: () =>
     ipcRenderer.invoke('obtener-empresas-con-bd-personal'),
 
+  // --- Estadísticas de Ausentismo (widget home) ---
+  getAusentismoStats: (companyName, mode) =>
+    ipcRenderer.invoke('get-ausentismo-stats', companyName, mode),
+
+  // --- Estadísticas de Accidentes FURAT (widget home) ---
+  getAccidentesStats: (companyName) =>
+    ipcRenderer.invoke('get-accidentes-stats', companyName),
+
+  // --- Estadísticas de Exámenes Médicos (widget home) ---
+  getExamenesStats: (companyName) =>
+    ipcRenderer.invoke('get-examenes-stats', companyName),
+
   // --- Inducciones ---
   getInduccionesData: (companyName) => ipcRenderer.invoke('get-inducciones-data', companyName),
   syncInduccionesFromForms: (companyName) => ipcRenderer.invoke('sync-inducciones-from-forms', companyName),
