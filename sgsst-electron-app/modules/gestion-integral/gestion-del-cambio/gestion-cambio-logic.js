@@ -151,9 +151,9 @@ class GestionDelCambioComponent {
       const estado = (ch.estado || '').toLowerCase();
       const riesgo = (ch.nivelRiesgo || '').toLowerCase();
 
-      if (estado === 'pendiente' || estado === 'en evaluación') pending++;
+      if (['solicitud', 'pendiente', 'en evaluación', 'en evaluacion', 'aprobado', 'aprobada'].includes(estado)) pending++;
       if (riesgo === 'alto') highRisk++;
-      if (!['cerrado', 'cerrada', 'cancelado'].includes(estado)) active++;
+      if (!['cerrado', 'cerrada', 'cancelado', 'no aprobado'].includes(estado)) active++;
       if (ch.fecha) {
         const d = new Date(ch.fecha);
         if (d.getMonth() === month && d.getFullYear() === year) monthCount++;
@@ -242,6 +242,45 @@ class GestionDelCambioComponent {
 
   /* ── Badges ─────────────────────────────────────────── */
 
+  /* Botones de acción contextuales según el estado del cambio */
+  #actionButtons(ch) {
+    const id  = this.#esc(ch.id);
+    const est = (ch.estado || 'Solicitud').toLowerCase();
+
+    const viewBtn = `<button class="kair-gc-btn kair-gc-btn-ghost kair-gc-btn-sm" data-action="view" data-id="${id}">Ver</button>`;
+
+    if (est === 'solicitud' || est === 'pendiente') {
+      return `
+        <button class="kair-gc-btn-action" style="color:#1565c0;border-color:#1565c0;"
+          data-action="advance" data-id="${id}" data-step="1"
+          title="Completar solicitud y enviar a evaluación">Enviar a Evaluación →</button>
+        ${viewBtn}`;
+    }
+    if (est === 'en evaluación' || est === 'en evaluacion') {
+      return `
+        <button class="kair-gc-btn-action" style="color:#e65100;border-color:#e65100;"
+          data-action="advance" data-id="${id}" data-step="2"
+          title="Gestionar evaluación">Gestionar Evaluación →</button>
+        ${viewBtn}`;
+    }
+    if (est === 'aprobado' || est === 'aprobada') {
+      return `
+        <button class="kair-gc-btn-action" style="color:#2e7d32;border-color:#2e7d32;"
+          data-action="advance" data-id="${id}" data-step="3"
+          title="Iniciar ejecución del cambio">Iniciar Ejecución →</button>
+        ${viewBtn}`;
+    }
+    if (est === 'en ejecución' || est === 'en ejecucion') {
+      return `
+        <button class="kair-gc-btn-action" style="color:#6a1b9a;border-color:#6a1b9a;"
+          data-action="advance" data-id="${id}" data-step="4"
+          title="Registrar cierre del cambio">Cerrar Cambio →</button>
+        ${viewBtn}`;
+    }
+    // Cerrado / No Aprobado — solo lectura
+    return viewBtn;
+  }
+
   #riskBadge(level) {
     const l = (level || '').toLowerCase();
     if (l.includes('alto'))  return '<span class="kair-gc-badge kair-gc-badge-high">Alto</span>';
@@ -252,19 +291,23 @@ class GestionDelCambioComponent {
 
   #estadoBadge(estado) {
     const map = {
-      'pendiente':      ['pending',  'Pendiente'],
-      'en evaluación':  ['executed', 'En Evaluación'],
-      'aprobado':       ['approved', 'Aprobado'],
-      'aprobada':       ['approved', 'Aprobado'],
-      'en ejecución':   ['executed', 'En Ejecución'],
-      'en proceso':     ['executed', 'En Proceso'],
-      'cerrado':        ['closed',   'Cerrado'],
-      'cerrada':        ['closed',   'Cerrado'],
-      'cancelado':      ['closed',   'Cancelado'],
+      'solicitud':       ['--solicitud',   'Solicitud'],
+      'pendiente':       ['--solicitud',   'Solicitud'],
+      'en evaluación':   ['--evaluacion',  'En Evaluación'],
+      'en evaluacion':   ['--evaluacion',  'En Evaluación'],
+      'aprobado':        ['--aprobado',    'Aprobado'],
+      'aprobada':        ['--aprobado',    'Aprobado'],
+      'no aprobado':     ['--no-aprobado', 'No Aprobado'],
+      'en ejecución':    ['--ejecucion',   'En Ejecución'],
+      'en ejecucion':    ['--ejecucion',   'En Ejecución'],
+      'en proceso':      ['--ejecucion',   'En Proceso'],
+      'cerrado':         ['--cerrado',     'Cerrado'],
+      'cerrada':         ['--cerrado',     'Cerrado'],
+      'cancelado':       ['--cerrado',     'Cancelado'],
     };
-    const e   = (estado || 'pendiente').toLowerCase();
-    const [cls, label] = map[e] || ['pending', estado || 'Pendiente'];
-    return `<span class="kair-gc-badge kair-gc-badge-${cls}">${this.#esc(label)}</span>`;
+    const e = (estado || 'solicitud').toLowerCase();
+    const [cls, label] = map[e] || ['--solicitud', estado || 'Solicitud'];
+    return `<span class="kair-gc-badge kair-gc-badge${cls}">${this.#esc(label)}</span>`;
   }
 
   /* ── Wizard Navigation ──────────────────────────────── */
@@ -301,15 +344,45 @@ class GestionDelCambioComponent {
     });
 
     // Footer buttons
-    const prevBtn  = this.container.querySelector('#kairGcPrevBtn');
-    const nextBtn  = this.container.querySelector('#kairGcNextBtn');
-    const saveBtn  = this.container.querySelector('#kairGcSaveBtn');
-    const indicator = this.container.querySelector('#kairGcStepIndicator');
+    const prevBtn        = this.container.querySelector('#kairGcPrevBtn');
+    const nextBtn        = this.container.querySelector('#kairGcNextBtn');
+    const saveBtn        = this.container.querySelector('#kairGcSaveBtn');
+    const transitionBtn  = this.container.querySelector('#kairGcTransitionBtn');
+    const indicator      = this.container.querySelector('#kairGcStepIndicator');
 
-    if (prevBtn)   prevBtn.classList.toggle('kair-gc-hidden', step === 1);
-    if (nextBtn)   nextBtn.classList.toggle('kair-gc-hidden', step === this.totalSteps);
-    if (saveBtn)   saveBtn.classList.toggle('kair-gc-hidden', step !== this.totalSteps);
+    if (prevBtn)  prevBtn.classList.toggle('kair-gc-hidden', step === 1);
+    if (nextBtn)  nextBtn.classList.toggle('kair-gc-hidden', step === this.totalSteps);
     if (indicator) indicator.textContent = `Paso ${step} de ${this.totalSteps}`;
+
+    // Guardar y botón de transición: lógica por estado
+    const isLastStep = step === this.totalSteps;
+    const transInfo  = this.#getTransitionInfo();
+
+    // El paso "gatillo" para la transición es el paso donde el usuario
+    // debe completar información antes de avanzar:
+    //   Solicitud     → step 1  (completar identificación)
+    //   En Evaluación → step 2  (completar checklist)
+    //   Aprobado      → step 3  (completar aprobaciones)
+    //   En Ejecución  → step 4  (completar cierre)
+    const TRIGGER_STEP = {
+      'solicitud': 1, 'pendiente': 1,
+      'en evaluación': 2, 'en evaluacion': 2,
+      'aprobado': 3, 'aprobada': 3,
+      'en ejecución': 4, 'en ejecucion': 4,
+    };
+    const curEst     = (this.currentEstado || '').toLowerCase();
+    const triggerAt  = TRIGGER_STEP[curEst] ?? this.totalSteps;
+    const showTrans  = transInfo && step === triggerAt;
+
+    if (saveBtn) saveBtn.classList.toggle('kair-gc-hidden', !isLastStep || !!transInfo);
+    if (transitionBtn) {
+      if (showTrans) {
+        transitionBtn.classList.remove('kair-gc-hidden');
+        transitionBtn.textContent = transInfo.label;
+      } else {
+        transitionBtn.classList.add('kair-gc-hidden');
+      }
+    }
 
     // Scroll modal body to top on step change
     const body = this.container.querySelector('.kair-gc-modal-body');
@@ -330,7 +403,8 @@ class GestionDelCambioComponent {
     const overlay = this.container.querySelector('#kairGcModalOverlay');
     if (!overlay) return;
 
-    this.editingId = changeData?.id ?? null;
+    this.editingId     = changeData?.id ?? null;
+    this.currentEstado = changeData?.estado ?? null;
 
     const title    = this.container.querySelector('#kairGcModalTitle');
     const subtitle = this.container.querySelector('#kairGcModalSubtitle');
@@ -354,12 +428,45 @@ class GestionDelCambioComponent {
     document.body.style.overflow = 'hidden';
   }
 
+  /**
+   * Abre el modal para un cambio existente posicionando en el paso adecuado
+   * según su estado en la máquina de estados.
+   */
+  #openForChange(changeData, preferredStep = null) {
+    this.#openModal(changeData);
+
+    // Si se especificó paso, ir directo
+    if (preferredStep && preferredStep >= 1 && preferredStep <= this.totalSteps) {
+      this.#goToStep(preferredStep);
+      return;
+    }
+
+    // Mapear estado → paso de trabajo principal
+    const stepByEstado = {
+      'solicitud':      1,
+      'pendiente':      1,
+      'en evaluación':  2,
+      'en evaluacion':  2,
+      'aprobado':       3,
+      'aprobada':       3,
+      'no aprobado':    2,
+      'en ejecución':   4,
+      'en ejecucion':   4,
+      'cerrado':        4,
+      'cerrada':        4,
+    };
+    const e    = (changeData.estado || 'solicitud').toLowerCase();
+    const step = stepByEstado[e] ?? 1;
+    this.#goToStep(step);
+  }
+
   #closeModal() {
     const overlay = this.container.querySelector('#kairGcModalOverlay');
     if (!overlay) return;
     overlay.classList.remove('kair-gc-modal-active');
     document.body.style.overflow = '';
-    this.editingId = null;
+    this.editingId     = null;
+    this.currentEstado = null;
   }
 
   /* ── Form Helpers ───────────────────────────────────── */
@@ -585,7 +692,7 @@ class GestionDelCambioComponent {
       incidentes:              get('kairGcIncidents'),
       fechaCierre:             get('kairGcCloseDate'),
       conclusion:              get('kairGcConclusion'),
-      estado:                  this.editingId ? (this.changes.find(c => c.id === this.editingId)?.estado || 'Pendiente') : 'Pendiente',
+      estado:                  this.editingId ? (this.changes.find(c => c.id === this.editingId)?.estado || 'Solicitud') : 'Solicitud',
     };
   }
 
@@ -621,7 +728,7 @@ class GestionDelCambioComponent {
   #editChange(id) {
     const ch = this.changes.find(c => c.id === id);
     if (!ch) { this.#showToast('Cambio no encontrado.', 'warning'); return; }
-    this.#openModal(ch);
+    this.#openForChange(ch);
   }
 
   #viewChange(id) {
@@ -675,6 +782,153 @@ class GestionDelCambioComponent {
       t.style.cssText += 'opacity:0;transform:translateY(16px);transition:all .3s ease;';
       setTimeout(() => t.remove(), 300);
     }, 3000);
+  }
+
+  /* ── Máquina de Estados ─────────────────────────────── */
+
+  /**
+   * Retorna la información de transición disponible para el estado actual,
+   * o null si no hay transición posible (Cerrado, No Aprobado).
+   */
+  #getTransitionInfo() {
+    const TRANSITIONS = {
+      'solicitud':      { next: 'En Evaluación', label: 'Enviar a Evaluación →' },
+      'pendiente':      { next: 'En Evaluación', label: 'Enviar a Evaluación →' },
+      'en evaluación':  { next: 'Aprobado',      label: 'Aprobar y Avanzar →' },
+      'en evaluacion':  { next: 'Aprobado',      label: 'Aprobar y Avanzar →' },
+      'aprobado':       { next: 'En Ejecución',  label: 'Iniciar Ejecución →' },
+      'aprobada':       { next: 'En Ejecución',  label: 'Iniciar Ejecución →' },
+      'en ejecución':   { next: 'Cerrado',       label: 'Cerrar Cambio ✓' },
+      'en ejecucion':   { next: 'Cerrado',       label: 'Cerrar Cambio ✓' },
+    };
+    const e = (this.currentEstado || '').toLowerCase();
+    return TRANSITIONS[e] ?? null;
+  }
+
+  /**
+   * Valida que los campos mínimos estén completos para la transición destino.
+   * Retorna array de mensajes de error (vacío = válido).
+   */
+  #validateForTransition(targetEstado) {
+    const get   = id   => this.container.querySelector(`#${id}`)?.value?.trim() ?? '';
+    const radio = name => this.container.querySelector(`input[name="${name}"]:checked`)?.value ?? '';
+    const errors = [];
+
+    // Siempre requerir campos base del Paso 1
+    if (!get('kairGcChangeDate'))    errors.push('Fecha del cambio requerida');
+    if (!get('kairGcExecutingArea')) errors.push('Área Ejecutora requerida');
+    if (!get('kairGcResponsible'))   errors.push('Responsable requerido');
+    if (!get('kairGcDescription'))   errors.push('Descripción del cambio requerida');
+
+    if (targetEstado === 'Aprobado' || targetEstado === 'No Aprobado') {
+      // Verificar que todos los 13 ítems del checklist estén respondidos
+      const clItems = ['Rh1','Rh2','Rh3','Rh4','Rl1','Rl2','Rl3','Sst1','Sst2','Sst3','Sst4','Sst5','Sst6'];
+      const missing = clItems.filter(k => !radio(`kairGc${k}`));
+      if (missing.length > 0) errors.push(`Lista de chequeo incompleta (${missing.length} ítem(s) sin responder)`);
+      if (!radio('kairGcNivelRiesgo')) errors.push('Nivel de riesgo requerido');
+    }
+
+    if (targetEstado === 'En Ejecución') {
+      if (!get('kairGcApprovalSstDate') && !get('kairGcApprovalAreaDate')) {
+        errors.push('Se requiere al menos una fecha de aprobación');
+      }
+    }
+
+    if (targetEstado === 'Cerrado') {
+      if (!get('kairGcExecDate'))   errors.push('Fecha de ejecución requerida');
+      if (!get('kairGcCloseDate'))  errors.push('Fecha de cierre requerida');
+    }
+
+    return errors;
+  }
+
+  /** Maneja el clic en el botón de transición (en el footer del wizard). */
+  async #handleTransitionClick() {
+    const transInfo = this.#getTransitionInfo();
+    if (!transInfo) return;
+
+    // Para "En Evaluación → Aprobado" también ofrecer rechazar
+    const est = (this.currentEstado || '').toLowerCase();
+    if (est === 'en evaluación' || est === 'en evaluacion') {
+      await this.#promptApprovalDecision();
+      return;
+    }
+
+    await this.#transitionEstado(transInfo.next);
+  }
+
+  /**
+   * Para el estado En Evaluación muestra un diálogo inline (confirm) para
+   * elegir entre Aprobar o Rechazar.
+   */
+  async #promptApprovalDecision() {
+    const decision = window.confirm(
+      '¿Aprobar este cambio?\n\n' +
+      'Aceptar → Pasa a "Aprobado"\n' +
+      'Cancelar → Pasa a "No Aprobado"'
+    );
+    await this.#transitionEstado(decision ? 'Aprobado' : 'No Aprobado');
+  }
+
+  /**
+   * Ejecuta la transición de estado: valida, guarda datos actuales y
+   * llama al handler IPC de actualización.
+   */
+  async #transitionEstado(nuevoEstado) {
+    // 1. Guardar datos del formulario primero (para no perder ediciones)
+    const data = this.#collectFormData();
+
+    // 2. Validar campos mínimos
+    const errors = this.#validateForTransition(nuevoEstado);
+    if (errors.length > 0) {
+      this.#showToast(`Complete los campos requeridos:\n• ${errors.join('\n• ')}`, 'error');
+      // Ir al primer paso con error
+      if (errors.some(e => e.includes('Fecha del cambio') || e.includes('Área') ||
+                           e.includes('Responsable') || e.includes('Descripción'))) {
+        this.#goToStep(1);
+      } else if (errors.some(e => e.includes('checklist') || e.includes('riesgo'))) {
+        this.#goToStep(2);
+      }
+      return;
+    }
+
+    // 3. Guardar estado actual del formulario
+    try {
+      const saveResult = await window.electronAPI.saveGestionCambioData(this.companyName, data);
+      if (!saveResult.success) {
+        this.#showToast(`Error al guardar: ${saveResult.error?.message || 'Error desconocido'}`, 'error');
+        return;
+      }
+    } catch (err) {
+      this.#showToast('Error de comunicación al guardar.', 'error');
+      return;
+    }
+
+    // 4. Llamar al handler de transición de estado
+    const extraData = {};
+    if (nuevoEstado === 'Cerrado') {
+      extraData.fechaCierre    = data.fechaCierre || new Date().toISOString().split('T')[0];
+    }
+    if (nuevoEstado === 'En Ejecución') {
+      extraData.fechaEjecucion = data.fechaEjecucion || '';
+    }
+
+    try {
+      const r = await window.electronAPI.updateGestionCambioEstado(
+        this.companyName, data.id, nuevoEstado, extraData
+      );
+
+      if (r.success) {
+        this.#showToast(`Estado actualizado: "${r.data.estadoAnterior}" → "${nuevoEstado}"`, 'success');
+        this.#closeModal();
+        await this.#loadChanges();
+      } else {
+        this.#showToast(`Error al cambiar estado: ${r.error?.message || 'Error desconocido'}`, 'error');
+      }
+    } catch (err) {
+      console.error('[GestionDelCambio] transitionEstado:', err);
+      this.#showToast('Error de comunicación al actualizar estado.', 'error');
+    }
   }
 
   /* ── Utils ──────────────────────────────────────────── */
