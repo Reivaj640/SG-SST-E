@@ -1,4 +1,5 @@
-// reportes-accidentes.js - Componente para la vista de reportes de accidentes con visualizador
+// reportes-accidentes-logic.js - Componente para la vista de reportes de accidentes FURAT
+// Submódulo 3.2.1 · K+AIR · Sistema Visual Oficial
 
 class ReportesAccidentesComponent {
     constructor(container, currentCompany, moduleName, submoduleName, backToModuleCallback) {
@@ -10,27 +11,361 @@ class ReportesAccidentesComponent {
     }
 
     render() {
-        // Crear iframe para el visualizador
+        console.log('[FURAT][ReportesAccidentesComponent] Rendering...');
+
+        // Crear iframe para el visualizador FURAT
         const viewerFrame = document.createElement('iframe');
-        viewerFrame.id = 'reportes-accidentes-viewer';
+        viewerFrame.id = 'furat-viewer-frame';
         viewerFrame.style.width = '100%';
-        viewerFrame.style.height = '100vh';
+        viewerFrame.style.height = '100%';
         viewerFrame.style.border = 'none';
         viewerFrame.scrolling = 'no';
 
-        // Construir la URL con parámetros
+        // Construir la URL con parámetros de la empresa y módulo
         const viewerUrl = `./modules/gestion-salud/reportes-accidentes/reportes-accidentes-view.html?company=${encodeURIComponent(this.currentCompany)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
         viewerFrame.src = viewerUrl;
 
+        // Limpiar contenedor y agregar iframe
+        this.container.innerHTML = '';
+        this.container.style.height = '100%';
+        this.container.style.overflow = 'hidden';
         this.container.appendChild(viewerFrame);
 
         // Establecer comunicación entre frames
-        window.addEventListener('message', (event) => {
-            if (event.data.type === 'back-to-module-request') {
+        this.setupFrameCommunication(viewerFrame);
+    }
+
+    setupFrameCommunication(viewerFrame) {
+        // Escuchar mensajes del iframe
+        const messageHandler = (event) => {
+            const data = event.data;
+
+            // Manejar solicitud de regreso al módulo
+            if (data.type === 'back-to-module-request') {
+                console.log('[FURAT] Back to module requested');
                 this.backToModuleCallback();
+                return;
             }
-        });
+
+            // Router de solicitudes API desde el iframe
+            if (data.type && data.type.endsWith('-request')) {
+                this.handleAPIRequest(data, event);
+            }
+        };
+
+        window.addEventListener('message', messageHandler);
+
+        // Guardar referencia para cleanup
+        this._messageHandler = messageHandler;
+    }
+
+    async handleAPIRequest(data, event) {
+        const requestId = data.requestId;
+        const requestType = data.type.replace('-request', '');
+        const payload = data.payload;
+
+        console.log(`[FURAT] API Request: ${requestType}`, payload);
+
+        try {
+            let result;
+
+            switch (requestType) {
+                // Dashboard
+                case 'furat-get-dashboard-data':
+                    result = await this.getDashboardData(payload);
+                    break;
+
+                // Library
+                case 'furat-get-library-data':
+                    result = await this.getLibraryData(payload);
+                    break;
+
+                // Document operations (existing contracts)
+                case 'get-pdf-preview':
+                    result = await window.electronAPI.getPDFPreview(payload.filePath);
+                    break;
+
+                case 'get-excel-preview':
+                    result = await window.electronAPI.getExcelPreview(payload.filePath);
+                    break;
+
+                case 'get-word-preview':
+                    result = await window.electronAPI.getWordPreview(payload.filePath);
+                    break;
+
+                case 'download-document':
+                    result = await window.electronAPI.downloadDocument(payload);
+                    break;
+
+                case 'get-document-folders':
+                    result = await window.electronAPI.getDocumentFolders(payload);
+                    break;
+
+                default:
+                    throw new Error(`API type '${requestType}' not supported`);
+            }
+
+            // Enviar respuesta al iframe
+            event.source.postMessage({
+                type: `${requestType}-response`,
+                requestId: requestId,
+                payload: result
+            }, event.origin);
+
+        } catch (error) {
+            console.error(`[FURAT] API Error: ${requestType}`, error);
+            event.source.postMessage({
+                type: `${requestType}-response`,
+                requestId: requestId,
+                payload: {
+                    success: false,
+                    error: error.message
+                }
+            }, event.origin);
+        }
+    }
+
+    async getDashboardData(params) {
+        console.log('[FURAT] Getting dashboard data for:', params);
+
+        try {
+            // Obtener estructura de carpetas y archivos del nivel raíz
+            const folderResult = await window.electronAPI.getDocumentFolders({
+                companyName: params.companyName,
+                moduleName: params.moduleName,
+                submoduleName: params.submoduleName
+            });
+
+            if (!folderResult.success) {
+                throw new Error(folderResult.error || 'Error al obtener carpetas');
+            }
+
+            const folders = folderResult.folders || [];
+            const rootFiles = folderResult.files || [];
+            const allFiles = [...rootFiles];
+
+            // Leer archivos de cada subcarpeta
+            for (const folder of folders) {
+                try {
+                    const folderContent = await window.electronAPI.readDirectory(folder.path);
+                    if (folderContent.success) {
+                        allFiles.push(...(folderContent.files || []));
+                    }
+                } catch (err) {
+                    console.warn(`[FURAT] No se pudo leer carpeta ${folder.name}:`, err);
+                }
+            }
+
+            // Calcular estadísticas
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const currentMonth = now.getMonth() + 1;
+
+            let totalFiles = allFiles.length;
+            let currentYearFiles = 0;
+            let currentMonthFiles = 0;
+            const yearDistribution = {};
+            const availableYears = new Set();
+
+            allFiles.forEach(file => {
+                // Intentar extraer año del nombre o ruta
+                const yearMatch = (file.name || '').match(/(20\d{2})/) || (file.path || '').match(/(20\d{2})/);
+                const year = yearMatch ? parseInt(yearMatch[1]) : null;
+
+                if (year) {
+                    availableYears.add(year);
+                    yearDistribution[year] = (yearDistribution[year] || 0) + 1;
+
+                    if (year === currentYear) {
+                        currentYearFiles++;
+                        // Extraer mes del nombre
+                        const monthMatch = (file.name || file.path || '').toLowerCase().match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/);
+                        const month = monthMatch ? this.monthNameToNumber(monthMatch[1]) : null;
+                        if (month === currentMonth) {
+                            currentMonthFiles++;
+                        }
+                    }
+                }
+            });
+
+            // Generar reportes recientes (últimos 8 por fecha de modificación)
+            const recentReports = allFiles
+                .sort((a, b) => {
+                    return (b.modified || 0) - (a.modified || 0);
+                })
+                .slice(0, 8)
+                .map(file => ({
+                    name: file.name,
+                    path: file.path,
+                    date: file.modified ? new Date(file.modified).toLocaleDateString('es-ES') : ''
+                }));
+
+            return {
+                success: true,
+                stats: {
+                    total: totalFiles,
+                    currentYear: currentYearFiles,
+                    currentYearLabel: currentYear.toString(),
+                    currentMonth: currentMonthFiles,
+                    currentMonthLabel: this.getMonthName(currentMonth),
+                    folders: folders.length
+                },
+                yearDistribution: Object.keys(yearDistribution)
+                    .sort((a, b) => b - a)
+                    .map(year => ({ year, count: yearDistribution[year] })),
+                recentReports,
+                availableYears: Array.from(availableYears).sort((a, b) => b - a)
+            };
+        } catch (error) {
+            console.error('[FURAT] Error getting dashboard data:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async getLibraryData(params) {
+        console.log('[FURAT] Getting library data for:', params);
+
+        try {
+            const folderResult = await window.electronAPI.getDocumentFolders({
+                companyName: params.companyName,
+                moduleName: params.moduleName,
+                submoduleName: params.submoduleName
+            });
+
+            if (!folderResult.success) {
+                throw new Error(folderResult.error || 'Error al obtener carpetas');
+            }
+
+            const rootFolders = folderResult.folders || [];
+            const rootFiles = folderResult.files || [];
+
+            // Preparar lista de carpetas con metadata
+            const folders = rootFolders.map(f => ({
+                name: f.name,
+                path: f.path,
+                parentPath: null, // Es nivel raíz
+                count: 0 // Se calculará después
+            }));
+
+            // Procesar archivos de la raíz
+            const allFiles = [];
+            
+            // Agregar archivos del nivel raíz
+            rootFiles.forEach(f => {
+                const ext = f.extension || f.name.split('.').pop().toLowerCase();
+                allFiles.push({
+                    name: f.name,
+                    path: f.path,
+                    folderPath: null, // null = nivel raíz
+                    extension: ext,
+                    icon: this.getIconForExtension(ext),
+                    size: f.size ? this.formatFileSize(f.size) : '',
+                    date: f.modified ? new Date(f.modified).toLocaleDateString('es-ES') : '',
+                    year: this.extractYearFromName(f.name, f.path),
+                    month: this.extractMonthFromName(f.name, f.path)
+                });
+            });
+
+            // Leer archivos de cada subcarpeta usando read-directory
+            for (const folder of folders) {
+                try {
+                    const folderContent = await window.electronAPI.readDirectory(folder.path);
+
+                    if (folderContent.success) {
+                        const folderFiles = folderContent.files || [];
+                        folder.count = folderFiles.length;
+
+                        folderFiles.forEach(f => {
+                            const ext = f.extension || f.name.split('.').pop().toLowerCase();
+                            allFiles.push({
+                                name: f.name,
+                                path: f.path,
+                                folderPath: folder.path, // Asignar carpeta padre
+                                extension: ext,
+                                icon: this.getIconForExtension(ext),
+                                size: f.size ? this.formatFileSize(f.size) : '',
+                                date: f.modified ? new Date(f.modified).toLocaleDateString('es-ES') : '',
+                                year: this.extractYearFromName(f.name, f.path),
+                                month: this.extractMonthFromName(f.name, f.path)
+                            });
+                        });
+                    }
+                } catch (err) {
+                    console.warn(`[FURAT] No se pudo leer carpeta ${folder.name}:`, err);
+                }
+            }
+
+            const availableYears = [...new Set(allFiles.map(f => f.year).filter(Boolean))].sort((a, b) => b - a);
+
+            return {
+                success: true,
+                folders,
+                files: allFiles,
+                availableYears
+            };
+        } catch (error) {
+            console.error('[FURAT] Error getting library data:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    getIconForExtension(ext) {
+        const icons = {
+            'pdf': 'pdf',
+            'xls': 'excel',
+            'xlsx': 'excel',
+            'doc': 'word',
+            'docx': 'word'
+        };
+        return icons[ext.toLowerCase()] || 'default';
+    }
+
+    extractYearFromName(name, path) {
+        const match = (name || path).match(/(20\d{2})/);
+        return match ? parseInt(match[1]) : null;
+    }
+
+    extractMonthFromName(name, path) {
+        const months = {
+            'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5, 'junio': 6,
+            'julio': 7, 'agosto': 8, 'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12
+        };
+        const text = (name || path).toLowerCase();
+        for (const [monthName, monthNum] of Object.entries(months)) {
+            if (text.includes(monthName)) return monthNum;
+        }
+        return null;
+    }
+
+    monthNameToNumber(monthName) {
+        const months = {
+            'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5, 'junio': 6,
+            'julio': 7, 'agosto': 8, 'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12
+        };
+        return months[monthName.toLowerCase()] || null;
+    }
+
+    getMonthName(monthNum) {
+        const months = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+            'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+        return months[monthNum] || '';
+    }
+
+    // Cleanup cuando el componente se destruye
+    destroy() {
+        if (this._messageHandler) {
+            window.removeEventListener('message', this._messageHandler);
+        }
     }
 }
 
+// Exponer globalmente para renderer.js
 window.ReportesAccidentesComponent = ReportesAccidentesComponent;

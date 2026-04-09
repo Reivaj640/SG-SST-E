@@ -6110,6 +6110,21 @@ ipcMain.on('stop-watching-capacitaciones', () => {
   }
 });
 
+// ═══════════════════════════════════════════════════════
+// FURAT - Reportes de Accidentes (Submódulo 3.2.1)
+// Handlers IPC para dashboard y biblioteca
+// ═══════════════════════════════════════════════════════
+
+function registerFuratHandlers(appInstance) {
+  sendLog('[FURAT] Registrando handlers IPC...', 'INFO');
+
+  // No necesitamos handlers adicionales porque el logic.js
+  // usa los contracts existentes (get-document-folders, get-pdf-preview, etc.)
+  // El dashboard y biblioteca se calculan en el frontend (renderer)
+
+  sendLog('[FURAT] Handlers registrados correctamente (usa contratos existentes)', 'INFO');
+}
+
 // Manejador para la creación de la ventana principal
 app.whenReady().then(() => {
   // Solo crear ventana si no ha sido creada antes
@@ -6123,6 +6138,14 @@ app.whenReady().then(() => {
     sendLog('[MAIN] Handlers de Archivo y Retención Documental (2.5.1) registrados correctamente', 'INFO');
   } catch (err) {
     sendLog(`[MAIN] Error registrando handlers de Archivo Retención: ${err.message}`, 'ERROR');
+  }
+
+  // Registrar handlers de FURAT - Reportes de Accidentes (Submódulo 3.2.1)
+  try {
+    registerFuratHandlers(app);
+    sendLog('[MAIN] Handlers de FURAT (3.2.1) registrados correctamente', 'INFO');
+  } catch (err) {
+    sendLog(`[MAIN] Error registrando handlers de FURAT: ${err.message}`, 'ERROR');
   }
 
   // Iniciar la búsqueda de actualizaciones una vez que la app esté lista
