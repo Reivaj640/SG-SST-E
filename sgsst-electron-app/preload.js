@@ -219,6 +219,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   buscarRegistrosCedula: (cedula, companyName) =>
     ipcRenderer.invoke('buscar-registros-cedula', cedula, companyName),
 
+  // --- Consulta de Trabajadores (Módulo Ausentismo) ---
+  consultarTrabajadoresGlobal: (params) =>
+    ipcRenderer.invoke('consultar-trabajadores-global', params),
+  obtenerEmpresasConBDPersonal: () =>
+    ipcRenderer.invoke('obtener-empresas-con-bd-personal'),
+
   // --- Inducciones ---
   getInduccionesData: (companyName) => ipcRenderer.invoke('get-inducciones-data', companyName),
   syncInduccionesFromForms: (companyName) => ipcRenderer.invoke('sync-inducciones-from-forms', companyName),

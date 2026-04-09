@@ -11658,6 +11658,246 @@ ipcMain.handle('save-reevaluaciones-es', async (event, data) => writeESFile('ree
 ipcMain.handle('get-noconformidades-es', async () => readESFile('noconformidades.json'));
 ipcMain.handle('save-noconformidades-es', async (event, data) => writeESFile('noconformidades.json', data));
 
+// ==========================================================================
+// Módulo Ausentismo — Consulta Global de Trabajadores
+// Busca en las bases de datos de personal de todas las empresas
+// ==========================================================================
+
+/**
+ * Obtiene la configuración de empresas con sus rutas de BD de personal
+ */
+function getEmpresasBDPersonalConfig() {
+  // Usar las mismas rutas que el sistema de ausentismo ya tiene funcionando
+  const ausentismoRutas = {
+    "TEMPOACTIVA": "G:/Mi unidad/2. Trabajo/1. SG-SST/2. Temporales Comfa/1. Tempoactiva Est SAS/3. Gestión de la Salud/3.3.6 Medición del ausentismo por causa médica/GI-FO-076 AUSENTISMO POR ARL Y EPS 2024.xlsx",
+    "TEMPOSUM": "G:/Mi unidad/2. Trabajo/1. SG-SST/2. Temporales Comfa/2. Temposum Est SAS/3. Gestión de la Salud/3.3.6 Medición del ausentismo por causa médica/3 AUSENTISMO POR ARL Y EPS (TEMPOSUM) 2024.XLSX",
+    "ASEPLUS": "G:/Mi unidad/2. Trabajo/1. SG-SST/2. Temporales Comfa/3. Aseplus/3. Gestión de la Salud/3.3.6 Medición del ausentismo por causa médica/PI-FO-076 AUSENTISMO POR ARL Y EPS (ASEPLUS).XLSX",
+    "ASEL": "G:/Mi unidad/2. Trabajo/1. SG-SST/19. Asel S.A.S/3. Gestión de la Salud/3.3.6 Medición del ausentismo por causa médica/A-FR-31 Ausentismo Laboral.xlsx"
+  };
+
+  // Construir rutas de BD de personal basadas en la estructura conocida de cada empresa
+  const bdRutas = {
+    "TEMPOACTIVA": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\1. Tempoactiva Est SAS\\Base de Datos Personal Temporales.xlsx",
+    "TEMPOSUM": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\2. Temposum Est SAS\\Base de Datos Personal Temporales.xlsx",
+    "ASEPLUS": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\3. Aseplus\\Base de Datos Personal Temporales.xlsx",
+    "ASEL": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\19. Asel S.A.S\\Formato - Base de datos personal ASEL.xlsx"
+  };
+
+  // También intentar obtener empresas dinámicas del config
+  let companies = [];
+  try {
+    const configPath = path.join(app.getPath('userData'), 'config.json');
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      if (config.companyPaths) {
+        companies = Object.keys(config.companyPaths);
+      }
+    }
+  } catch (e) {
+    // Ignorar, usar las conocidas
+  }
+
+  // Usar solo las empresas que tienen BD de personal conocida
+  const knownEmpresas = Object.keys(bdRutas);
+  const empresasFinal = companies.length > 0
+    ? knownEmpresas.filter(e => companies.some(c => c.toUpperCase() === e))
+    : knownEmpresas;
+
+  return empresasFinal.map(nombre => {
+    const key = nombre.toUpperCase();
+    const isASEL = key === 'ASEL';
+    return {
+      nombre: nombre,
+      tipoBD: isASEL ? 'ASEL' : 'TEMPORALES',
+      rutaBD: bdRutas[key] || null
+    };
+  }).filter(e => e.rutaBD);
+}
+
+/**
+ * Lee y normaliza los datos de BD de personal de una empresa
+ */
+function leerBDPersonal(empresaData) {
+  const { nombre, tipoBD, rutaBD } = empresaData;
+
+  if (!fs.existsSync(rutaBD)) {
+    console.warn(`[consulta-trabajadores] Archivo no encontrado para ${nombre}: ${rutaBD}`);
+    return [];
+  }
+
+  try {
+    const workbook = xlsx.readFile(rutaBD);
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const rows = xlsx.utils.sheet_to_json(worksheet, { defval: '' });
+
+    if (tipoBD === 'ASEL') {
+      return rows.map(row => normalizarASEL(row, nombre));
+    } else {
+      return rows.map(row => normalizarTemporales(row, nombre));
+    }
+  } catch (error) {
+    console.error(`[consulta-trabajadores] Error leyendo ${nombre}:`, error.message);
+    return [];
+  }
+}
+
+/**
+ * Normaliza registro de BD Temporales
+ */
+function normalizarTemporales(row, empresa) {
+  return {
+    tipoBD: 'TEMPORALES',
+    empresa: empresa,
+    cedula: String(row['CEDULA'] || '').trim(),
+    nombreCompleto: String(row['Nombre Completo'] || '').trim(),
+    cargo: String(row['CARGO'] || '').trim(),
+    ubicacion: String(row['UBICACIÓN'] || row['UBICACION'] || '').trim(),
+    estado: String(row['EST. ACTUAL'] || '').trim(),
+    estActual: String(row['EST. ACTUAL'] || '').trim(),
+    eps: String(row['EPS/SURA'] || row['EPS'] || '').trim(),
+    afp: String(row['AFP'] || '').trim(),
+    porcentajeARL: String(row['% ARL'] || '').trim(),
+    salario: String(row['SALARIO'] || '').trim(),
+    fechaIngreso: row['FEC. ING.'] || null,
+    fecIng: row['FEC. ING.'] || null,
+    fechaNacimiento: row['FEC. NAC.'] || null,
+    fecNac: row['FEC. NAC.'] || null,
+    fechaRetiro: row['FEC. RETIRO'] || null,
+    fecRetiro: row['FEC. RETIRO'] || null,
+    direccion: String(row['DIRECCION'] || '').trim(),
+    telefono1: String(row['TELF 1'] || '').trim(),
+    telefono2: String(row['TELF 2'] || '').trim(),
+    celular: String(row['CELULAR'] || '').trim(),
+    correo: String(row['Correos'] || '').trim(),
+    nitEmpresaServicio: String(row['NIT DONDE PRESTA SERVICIO'] || '').trim(),
+    empresaServicio: String(row['EMPRESA DONDE PRESTA SERVICIO'] || '').trim(),
+  };
+}
+
+/**
+ * Normaliza registro de BD ASEL
+ */
+function normalizarASEL(row, empresa) {
+  let fechaNac = row['FECHA DE NACIMIENTO R'] || row['FECHA DE NACIMIENTO'] || null;
+  if (fechaNac && typeof fechaNac === 'number') {
+    const str = String(fechaNac);
+    if (str.length === 8) {
+      const anio = parseInt(str.substring(0, 4));
+      const mes = parseInt(str.substring(4, 6)) - 1;
+      const dia = parseInt(str.substring(6, 8));
+      fechaNac = new Date(anio, mes, dia);
+    }
+  }
+
+  return {
+    tipoBD: 'ASEL',
+    empresa: String(row['Empresa'] || empresa || 'ASEL').trim(),
+    cedula: String(row['CEDULA'] || '').trim(),
+    nombreCompleto: String(row['NOMBRES COMPLETOS FORMATO'] || '').trim(),
+    cargo: String(row['CARGO'] || '').trim(),
+    estado: String(row['ESTADO'] || '').trim(),
+    genero: String(row['GENERO'] || '').trim(),
+    sede: String(row['SEDE'] || '').trim(),
+    lugarTrabajo: String(row['LUGAR DE RABAJO FORMATO'] || '').trim(),
+    tipoContrato: String(row['TIPO DE CONTRATO'] || '').trim(),
+    jornadaLaboral: String(row['JORNADA LABORAL FORMATO'] || '').trim(),
+    eps: String(row['EPS'] || '').trim(),
+    fondoPension: String(row['FONDO DE PENSION'] || '').trim(),
+    fondoCesantias: String(row['FONDO DE CESANTIAS'] || '').trim(),
+    salario: String(row['SALARIO'] || '').trim(),
+    tasaRiesgo: String(row['TASA RIESGO'] || '').trim(),
+    fechaIngreso: row['FECHA DE INGRESO'] || null,
+    fecIng: row['FECHA DE INGRESO'] || null,
+    fechaNacimiento: fechaNac,
+    fecNac: fechaNac,
+    direccion: String(row['DIRECCION'] || '').trim(),
+    municipio: String(row['MUNICIPIO'] || '').trim(),
+    barrio: String(row['BARRIO'] || '').trim(),
+    celular: String(row['CELULAR'] || '').trim(),
+    correo: String(row['CORREO'] || '').trim(),
+  };
+}
+
+/**
+ * Filtra trabajadores por cédula y/o nombre
+ */
+function filtrarTrabajadores(trabajadores, cedula, nombre) {
+  const cedulaNorm = cedula.trim().toLowerCase().replace(/[.,\s]/g, '');
+  const nombreNorm = nombre.trim().toLowerCase();
+
+  return trabajadores.filter(t => {
+    if (!t.cedula && !t.nombreCompleto) return false;
+
+    const cedulaMatch = !cedulaNorm ||
+      t.cedula.toLowerCase().replace(/[.,\s]/g, '').includes(cedulaNorm) ||
+      t.cedula.toLowerCase().includes(cedulaNorm);
+
+    const nombreMatch = !nombreNorm ||
+      t.nombreCompleto.toLowerCase().includes(nombreNorm);
+
+    return cedulaMatch && nombreMatch;
+  });
+}
+
+/**
+ * Handler: Consulta global de trabajadores
+ */
+ipcMain.handle('consultar-trabajadores-global', async (event, params) => {
+  try {
+    const { cedula = '', nombre = '', empresa = 'all' } = params || {};
+
+    if (!cedula.trim() && !nombre.trim()) {
+      return {
+        success: false,
+        error: { code: 'INVALID_PARAMS', message: 'Se requiere al menos un criterio de búsqueda (cédula o nombre).' }
+      };
+    }
+
+    const empresasConfig = getEmpresasBDPersonalConfig();
+    const empresasABuscar = empresa === 'all'
+      ? empresasConfig
+      : empresasConfig.filter(e => e.nombre.toUpperCase() === empresa.toUpperCase());
+
+    const resultados = [];
+    for (const emp of empresasABuscar) {
+      const trabajadores = leerBDPersonal(emp);
+      if (!trabajadores || trabajadores.length === 0) continue;
+      const filtrados = filtrarTrabajadores(trabajadores, cedula, nombre);
+      resultados.push(...filtrados);
+    }
+
+    return {
+      success: true,
+      data: resultados,
+      meta: {
+        totalEmpresasConsultadas: empresasABuscar.length,
+        totalResultados: resultados.length
+      }
+    };
+  } catch (error) {
+    console.error('[consultar-trabajadores-global] Error:', error);
+    return {
+      success: false,
+      error: { code: 'INTERNAL_ERROR', message: error.message || 'Error interno al consultar trabajadores.' }
+    };
+  }
+});
+
+/**
+ * Handler: Obtener empresas con BD de personal
+ */
+ipcMain.handle('obtener-empresas-con-bd-personal', async () => {
+  try {
+    const empresasConfig = getEmpresasBDPersonalConfig();
+    const empresas = empresasConfig.map(e => e.nombre);
+    return { success: true, empresas: empresas };
+  } catch (error) {
+    console.error('[obtener-empresas-con-bd-personal] Error:', error);
+    return { success: false, error: { code: 'INTERNAL_ERROR', message: error.message } };
+  }
+});
+
 // Iniciar el servidor OnlyOffice al iniciar la aplicación
 app.whenReady().then(() => {
     createWindow();

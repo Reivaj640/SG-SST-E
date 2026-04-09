@@ -265,6 +265,17 @@ function loadInformePriBuilder() {
         });
 }
 
-function abrirConfiguracion() {
-    alert('Función: Configuración de Ausentismo\n\nSe abrirán las opciones de configuración del módulo de medición del ausentismo.');
+/**
+ * Abre la Consulta de Trabajadores
+ * Envía mensaje al padre para que cargue la vista de consulta
+ */
+function consultaTrabajadores() {
+    console.log('[HOME] Abriendo consulta de trabajadores...');
+
+    if (window.parent && window.parent.postMessage) {
+        window.parent.postMessage({
+            type: 'ausentismo-home-action',
+            action: 'consulta-trabajadores'
+        }, '*');
+    }
 }

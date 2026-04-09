@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K+AIR | Consulta de Trabajadores</title>
+    <link rel="stylesheet" href="../../../assets/css/font-awesome.min.css">
+    <link rel="stylesheet" href="../../../assets/css/google-fonts.css">
+    <link rel="stylesheet" href="../../../assets/css/bootstrap-icons.css">
+
+    <style>
+        /* ====================================================
+           CONSULTA TRABAJADORES - CSS AISLADO
+           Sistema Visual Oficial K+AIR
+           ==================================================== */
+        :root {
+            --ct-primary: #174ea6;
+            --ct-primary-hover: #185abd;
+            --ct-primary-light: #e8f0fe;
+            --ct-success: #28a745;
+            --ct-warning: #ffc107;
+            --ct-danger: #dc3545;
+            --ct-info: #17a2b8;
+            --ct-text-dark: #212529;
+            --ct-text-muted: #6c757d;
+            --ct-bg-body: #f0f2f5;
+            --ct-bg-card: #ffffff;
+            --ct-border: #dee2e6;
+            --ct-radius: 0.5rem;
+            --ct-shadow-lg: 0 10px 25px rgba(0,0,0,0.05);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--ct-bg-body);
+            color: var(--ct-text-dark);
+            font-size: 1rem;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .ct-portal-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+            padding-top: 1.5rem;
+            overflow-y: auto;
+        }
+
+        .ct-portal-card {
+            background: white;
+            width: 100%;
+            max-width: 1200px;
+            border-radius: var(--ct-radius);
+            box-shadow: var(--ct-shadow-lg);
+            padding: 2rem 2.5rem;
+            text-align: center;
+            animation: ct-fadeIn 0.4s ease-out;
+            margin: 0 auto;
+        }
+
+        @keyframes ct-fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .ct-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #f1f3f5;
+        }
+
+        .ct-logo {
+            font-family: 'Lexend', sans-serif;
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--ct-primary);
+        }
+
+        .ct-back-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            color: var(--ct-text-muted);
+            text-decoration: none;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+            background: #f8f9fa;
+            border: 1px solid var(--ct-border);
+        }
+
+        .ct-back-btn:hover {
+            color: var(--ct-primary);
+            background: var(--ct-primary-light);
+            border-color: var(--ct-primary);
+        }
+
+        .ct-hero-title {
+            font-family: 'Lexend', sans-serif;
+            font-size: 1.8rem;
+            color: var(--ct-text-dark);
+            margin-bottom: 0.4rem;
+        }
+
+        .ct-hero-subtitle {
+            color: var(--ct-text-muted);
+            font-size: 0.95rem;
+            margin-bottom: 1.5rem;
+            max-width: 750px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.5;
+        }
+
+        .ct-search-container {
+            background: #f8f9fa;
+            border: 1px solid var(--ct-border);
+            border-radius: var(--ct-radius);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            text-align: left;
+        }
+
+        .ct-search-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--ct-text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .ct-search-title i { color: var(--ct-primary); }
+
+        .ct-search-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+
+        .ct-search-field {
+            flex: 1;
+            min-width: 220px;
+        }
+
+        .ct-search-field label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--ct-text-muted);
+            margin-bottom: 5px;
+        }
+
+        .ct-search-field input,
+        .ct-search-field select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--ct-border);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-family: 'Roboto', sans-serif;
+            transition: all 0.2s;
+            background: #fff;
+            color: var(--ct-text-dark);
+        }
+
+        .ct-search-field input:focus,
+        .ct-search-field select:focus {
+            border-color: var(--ct-primary);
+            box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.1);
+        }
+
+        .ct-search-field input::placeholder { color: #adb5bd; }
+
+        .ct-search-actions {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        .ct-btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border: none;
+            transition: all 0.2s;
+            font-family: 'Roboto', sans-serif;
+            white-space: nowrap;
+        }
+
+        .ct-btn-primary {
+            background: var(--ct-primary);
+            color: white;
+        }
+
+        .ct-btn-primary:hover {
+            background: var(--ct-primary-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(23, 78, 166, 0.3);
+        }
+
+        .ct-btn-primary:disabled {
+            background: #93b4e8;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .ct-btn-secondary {
+            background: #f8f9fa;
+            color: var(--ct-text-dark);
+            border: 1px solid var(--ct-border);
+        }
+
+        .ct-btn-secondary:hover { background: #e2e8f0; }
+
+        .ct-filter-chips {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+
+        .ct-chip {
+            padding: 5px 14px;
+            border-radius: 20px;
+            font-size: 0.78rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid var(--ct-border);
+            background: white;
+            color: var(--ct-text-muted);
+        }
+
+        .ct-chip:hover {
+            border-color: var(--ct-primary);
+            color: var(--ct-primary);
+        }
+
+        .ct-chip.active {
+            background: var(--ct-primary);
+            color: white;
+            border-color: var(--ct-primary);
+        }
+
+        .ct-stats-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding: 0 0.25rem;
+        }
+
+        .ct-stats-text {
+            font-size: 0.85rem;
+            color: var(--ct-text-muted);
+        }
+
+        .ct-stats-text strong { color: var(--ct-primary); }
+
+        .ct-table-container {
+            background: white;
+            border: 1px solid var(--ct-border);
+            border-radius: var(--ct-radius);
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+        }
+
+        .ct-table-wrapper {
+            overflow-x: auto;
+            max-height: 55vh;
+            overflow-y: auto;
+        }
+
+        .ct-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        .ct-table thead th {
+            background: #f8f9fa;
+            padding: 12px 14px;
+            text-align: left;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--ct-text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            border-bottom: 2px solid var(--ct-border);
+            position: sticky;
+            top: 0;
+            z-index: 5;
+            white-space: nowrap;
+        }
+
+        .ct-table tbody tr {
+            transition: background 0.15s;
+            cursor: pointer;
+        }
+
+        .ct-table tbody tr:hover { background: var(--ct-primary-light); }
+
+        .ct-table tbody td {
+            padding: 10px 14px;
+            border-bottom: 1px solid #f1f3f5;
+            vertical-align: middle;
+            color: var(--ct-text-dark);
+        }
+
+        .ct-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+
+        .ct-badge-activo { background: #d4edda; color: #155724; }
+        .ct-badge-retirado { background: #f8d7da; color: #721c24; }
+        .ct-badge-empresa { background: var(--ct-primary-light); color: var(--ct-primary); }
+        .ct-badge-empresa-asel { background: #fff3cd; color: #856404; }
+
+        .ct-empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: var(--ct-text-muted);
+        }
+
+        .ct-empty-state i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.3;
+        }
+
+        .ct-empty-state p { font-size: 0.95rem; margin-top: 0.5rem; }
+        .ct-empty-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--ct-text-dark);
+        }
+
+        .ct-loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem 1rem;
+            color: var(--ct-text-muted);
+        }
+
+        .ct-loading i {
+            font-size: 2rem;
+            color: var(--ct-primary);
+            margin-bottom: 1rem;
+            animation: ct-spin 1s linear infinite;
+        }
+
+        @keyframes ct-spin { to { transform: rotate(360deg); } }
+
+        .ct-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            animation: ct-fadeIn 0.2s ease-out;
+        }
+
+        .ct-modal-overlay.active { display: flex; }
+
+        .ct-modal {
+            background: white;
+            border-radius: var(--ct-radius);
+            width: 90%;
+            max-width: 700px;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            animation: ct-slideUp 0.3s ease-out;
+        }
+
+        @keyframes ct-slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .ct-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--ct-border);
+            background: #f8f9fa;
+            border-radius: var(--ct-radius) var(--ct-radius) 0 0;
+        }
+
+        .ct-modal-header h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--ct-text-dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .ct-modal-header h3 i { color: var(--ct-primary); }
+
+        .ct-modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--ct-text-muted);
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .ct-modal-close:hover { background: #f8d7da; color: var(--ct-danger); }
+
+        .ct-modal-body { padding: 1.5rem; }
+
+        .ct-ficha-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--ct-border);
+            margin-bottom: 1rem;
+        }
+
+        .ct-ficha-avatar {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: var(--ct-primary-light);
+            color: var(--ct-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .ct-ficha-nombre {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--ct-text-dark);
+        }
+
+        .ct-ficha-cedula {
+            font-size: 0.85rem;
+            color: var(--ct-text-muted);
+            margin-top: 2px;
+        }
+
+        .ct-ficha-badges {
+            display: flex;
+            gap: 8px;
+            margin-top: 6px;
+        }
+
+        .ct-detail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1px;
+            background: var(--ct-border);
+            border: 1px solid var(--ct-border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .ct-detail-item {
+            background: white;
+            padding: 12px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .ct-detail-label {
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--ct-text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .ct-detail-value {
+            font-size: 0.9rem;
+            color: var(--ct-text-dark);
+            font-weight: 500;
+            word-break: break-word;
+        }
+
+        .ct-detail-value.empty {
+            color: #adb5bd;
+            font-style: italic;
+            font-weight: 400;
+        }
+
+        .ct-toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            background: white;
+            border-left: 4px solid var(--ct-primary);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            z-index: 2000;
+            transform: translateX(120%);
+            transition: transform 0.3s ease;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            max-width: 350px;
+        }
+
+        .ct-toast.show { transform: translateX(0); }
+        .ct-toast.toast-error { border-left-color: var(--ct-danger); }
+        .ct-toast.toast-success { border-left-color: var(--ct-success); }
+        .ct-toast.toast-warning { border-left-color: var(--ct-warning); }
+
+        @media (max-width: 768px) {
+            .ct-portal-card { padding: 1.5rem; }
+            .ct-hero-title { font-size: 1.4rem; }
+            .ct-search-row { flex-direction: column; }
+            .ct-search-field { min-width: 100%; }
+            .ct-search-actions { width: 100%; justify-content: stretch; }
+            .ct-search-actions .ct-btn { flex: 1; justify-content: center; }
+            .ct-detail-grid { grid-template-columns: 1fr; }
+            .ct-header { flex-direction: column; gap: 0.75rem; align-items: flex-start; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="ct-portal-container">
+        <div class="ct-portal-card">
+
+            <div class="ct-header">
+                <div class="ct-logo">K+<span>AIR</span></div>
+                <a class="ct-back-btn" onclick="goBackToHome()">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Volver al Menú</span>
+                </a>
+            </div>
+
+            <h1 class="ct-hero-title">Consulta de Trabajadores</h1>
+            <p class="ct-hero-subtitle">
+                Busca información de trabajadores en las bases de datos de personal de todas las empresas.
+                Consulta estado, datos de contacto, cargo y más.
+            </p>
+
+            <div class="ct-search-container">
+                <div class="ct-search-title">
+                    <i class="fas fa-search"></i>
+                    Búsqueda de Trabajadores
+                </div>
+                <div class="ct-search-row">
+                    <div class="ct-search-field">
+                        <label for="ct-cedula-input">Cédula</label>
+                        <input type="text" id="ct-cedula-input" placeholder="Ej: 1234567890" autocomplete="off">
+                    </div>
+                    <div class="ct-search-field">
+                        <label for="ct-nombre-input">Nombre Completo</label>
+                        <input type="text" id="ct-nombre-input" placeholder="Ej: Juan Pérez" autocomplete="off">
+                    </div>
+                    <div class="ct-search-actions">
+                        <button class="ct-btn ct-btn-primary" id="ct-search-btn" onclick="ejecutarBusqueda()">
+                            <i class="fas fa-search"></i> Buscar
+                        </button>
+                        <button class="ct-btn ct-btn-secondary" onclick="limpiarBusqueda()">
+                            <i class="fas fa-eraser"></i> Limpiar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ct-stats-bar" id="ct-stats-bar" style="display: none;">
+                <div class="ct-stats-text">
+                    Se encontraron <strong id="ct-results-count">0</strong> resultados
+                </div>
+                <div class="ct-stats-text" id="ct-search-time"></div>
+            </div>
+
+            <div class="ct-table-container" id="ct-table-container">
+                <div class="ct-empty-state">
+                    <i class="fas fa-user-search"></i>
+                    <div class="ct-empty-title">Ingresa un criterio de búsqueda</div>
+                    <p>Busca por cédula, nombre o filtra por empresa para consultar la información de los trabajadores.</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="ct-modal-overlay" id="ct-detail-modal">
+        <div class="ct-modal">
+            <div class="ct-modal-header">
+                <h3><i class="fas fa-id-card"></i> Detalle del Trabajador</h3>
+                <button class="ct-modal-close" onclick="cerrarModal()">&times;</button>
+            </div>
+            <div class="ct-modal-body" id="ct-detail-body"></div>
+        </div>
+    </div>
+
+    <div class="ct-toast" id="ct-toast">
+        <i class="fas fa-info-circle"></i>
+        <span id="ct-toast-message"></span>
+    </div>
+
+    <script src="consulta-trabajadores.js"></script>
+</body>
+</html>

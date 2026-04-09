@@ -49,6 +49,9 @@ class MedicionAusentismoComponent {
             case 'ver-estadisticas':
                 this.renderEstadisticasView(this.container);
                 break;
+            case 'consulta-trabajadores':
+                this.renderConsultaTrabajadoresView(this.container);
+                break;
             default:
                 this.renderMainView(this.container);
         }
@@ -97,6 +100,10 @@ class MedicionAusentismoComponent {
                         break;
                     case 'ver-estadisticas':
                         this.currentView = 'ver-estadisticas';
+                        this.render();
+                        break;
+                    case 'consulta-trabajadores':
+                        this.currentView = 'consulta-trabajadores';
                         this.render();
                         break;
                 }
@@ -6934,6 +6941,117 @@ class MedicionAusentismoComponent {
             console.error('Error al guardar cambios:', error);
             alert(`Error al guardar cambios: ${error.message}`);
         }
+    }
+
+    // =====================================================
+    // NUEVA VISTA: Consulta de Trabajadores
+    // Renderiza un iframe con la interfaz de consulta
+    // Usa postMessage como proxy porque el iframe no tiene
+    // acceso directo a electronAPI (contextIsolation: true)
+    // =====================================================
+    renderConsultaTrabajadoresView(container) {
+        container.style.padding = '0';
+        container.style.overflow = 'hidden';
+
+        const iframe = document.createElement('iframe');
+        iframe.src = 'modules/gestion-salud/ausentismo/consulta-trabajadores.html';
+        iframe.style.cssText = 'width: 100%; height: 100%; border: none; display: block;';
+
+        const self = this;
+
+        const handleConsultaMessage = async (event) => {
+            if (event.source !== iframe.contentWindow) return;
+            const data = event.data;
+
+            if (data.type === 'back-to-module-request') {
+                this.currentView = 'main';
+                this.render();
+            }
+
+            // Proxy: el iframe pide empresas → el padre consulta electronAPI
+            if (data.type === 'ct-empresas-request') {
+                try {
+                    if (window.electronAPI && typeof window.electronAPI.obtenerEmpresasConBDPersonal === 'function') {
+                        const result = await window.electronAPI.obtenerEmpresasConBDPersonal();
+                        iframe.contentWindow.postMessage({
+                            type: 'ct-empresas-response',
+                            success: result && result.success,
+                            empresas: result ? result.empresas : ['Tempoactiva', 'Temposum', 'Aseplus', 'ASEL']
+                        }, '*');
+                    } else {
+                        iframe.contentWindow.postMessage({
+                            type: 'ct-empresas-response',
+                            success: true,
+                            empresas: ['Tempoactiva', 'Temposum', 'Aseplus', 'ASEL']
+                        }, '*');
+                    }
+                } catch (error) {
+                    console.error('[consulta-trabajadores] Error obteniendo empresas:', error);
+                    iframe.contentWindow.postMessage({
+                        type: 'ct-empresas-response',
+                        success: true,
+                        empresas: ['Tempoactiva', 'Temposum', 'Aseplus', 'ASEL']
+                    }, '*');
+                }
+            }
+
+            // Proxy: el iframe pide búsqueda → el padre consulta electronAPI
+            if (data.type === 'ct-search-request') {
+                try {
+                    if (window.electronAPI && typeof window.electronAPI.consultarTrabajadoresGlobal === 'function') {
+                        const result = await window.electronAPI.consultarTrabajadoresGlobal({
+                            cedula: data.cedula || '',
+                            nombre: data.nombre || '',
+                            empresa: data.empresa || 'all'
+                        });
+                        iframe.contentWindow.postMessage({
+                            type: 'ct-search-response',
+                            success: result && result.success,
+                            data: result && result.success ? (result.data || []) : [],
+                            error: result && !result.success ? result.error : null,
+                            elapsed: data.elapsed || 0
+                        }, '*');
+                    } else {
+                        iframe.contentWindow.postMessage({
+                            type: 'ct-search-response',
+                            success: false,
+                            data: [],
+                            error: { message: 'consultarTrabajadoresGlobal no disponible en electronAPI.' }
+                        }, '*');
+                    }
+                } catch (error) {
+                    console.error('[consulta-trabajadores] Error en búsqueda:', error);
+                    iframe.contentWindow.postMessage({
+                        type: 'ct-search-response',
+                        success: false,
+                        data: [],
+                        error: { message: 'Error de conexión: ' + error.message }
+                    }, '*');
+                }
+            }
+        };
+
+        window.addEventListener('message', handleConsultaMessage);
+
+        if (this.iframeMessageCleanup) {
+            this.iframeMessageCleanup();
+        }
+        this.iframeMessageCleanup = () => {
+            window.removeEventListener('message', handleConsultaMessage);
+        };
+
+        iframe.onload = () => {
+            try {
+                iframe.contentWindow.postMessage({
+                    type: 'SET_COMPANY_CONTEXT',
+                    company: this.currentCompany
+                }, '*');
+            } catch (error) {
+                console.error('[consulta-trabajadores] Error al enviar contexto al iframe:', error);
+            }
+        };
+
+        container.appendChild(iframe);
     }
 
     createHeader(titleText, onBack) {
