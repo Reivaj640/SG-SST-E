@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EMO - Evaluaciones Médicas Ocupacionales</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="evaluaciones-medicas-view.css">
+</head>
+<body>
+    <div class="em-app">
+
+        <!-- HEADER -->
+        <header class="em-header">
+            <div class="em-header__left">
+                <div class="em-header__logo">
+                    <i class="fas fa-stethoscope"></i>
+                    <div>
+                        <h1>EMO</h1>
+                        <span>Evaluaciones Médicas Ocupacionales</span>
+                    </div>
+                </div>
+            </div>
+            <div class="em-header__actions">
+                <button class="em-btn em-btn--ghost" id="backBtn" title="Volver al módulo">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Volver</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- TABS -->
+        <nav class="em-tabs">
+            <button class="em-tab em-tab--active" data-view="dashboard">
+                <i class="fas fa-chart-pie"></i>
+                <span>Resumen</span>
+            </button>
+            <button class="em-tab" data-view="library">
+                <i class="fas fa-folder-open"></i>
+                <span>Biblioteca</span>
+            </button>
+            <button class="em-tab" data-view="viewer" id="tabViewer" style="display:none;">
+                <i class="fas fa-file-medical"></i>
+                <span>Visor de Evaluación</span>
+            </button>
+        </nav>
+
+        <!-- MAIN -->
+        <main class="em-main">
+
+            <!-- DASHBOARD -->
+            <section class="em-view em-view--active" id="viewDashboard">
+                <div class="em-dashboard">
+                    <div class="em-stats-grid">
+                        <div class="em-stat-card em-stat-card--primary">
+                            <div class="em-stat-card__icon"><i class="fas fa-file-medical"></i></div>
+                            <div class="em-stat-card__content">
+                                <span class="em-stat-card__value" id="statTotal">—</span>
+                                <span class="em-stat-card__label">Total Evaluaciones</span>
+                            </div>
+                        </div>
+                        <div class="em-stat-card em-stat-card--year">
+                            <div class="em-stat-card__icon"><i class="fas fa-calendar-alt"></i></div>
+                            <div class="em-stat-card__content">
+                                <span class="em-stat-card__value" id="statCurrentYear">—</span>
+                                <span class="em-stat-card__label" id="statYearLabel">Este Año</span>
+                            </div>
+                        </div>
+                        <div class="em-stat-card em-stat-card--month">
+                            <div class="em-stat-card__icon"><i class="fas fa-calendar-day"></i></div>
+                            <div class="em-stat-card__content">
+                                <span class="em-stat-card__value" id="statCurrentMonth">—</span>
+                                <span class="em-stat-card__label" id="statMonthLabel">Este Mes</span>
+                            </div>
+                        </div>
+                        <div class="em-stat-card em-stat-card--info">
+                            <div class="em-stat-card__icon"><i class="fas fa-folder"></i></div>
+                            <div class="em-stat-card__content">
+                                <span class="em-stat-card__value" id="statFolders">—</span>
+                                <span class="em-stat-card__label">Carpetas</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="em-dashboard__sections">
+                        <div class="em-dashboard__section em-dashboard__section--wide">
+                            <div class="em-card">
+                                <div class="em-card__header">
+                                    <h3><i class="fas fa-bar-chart"></i> Distribución por Año</h3>
+                                </div>
+                                <div class="em-card__body">
+                                    <div class="em-year-bars" id="yearBars">
+                                        <div class="em-empty-state">
+                                            <i class="fas fa-chart-bar"></i>
+                                            <p>Cargando distribución por año...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="em-dashboard__section">
+                            <div class="em-card">
+                                <div class="em-card__header">
+                                    <h3><i class="fas fa-clock"></i> Últimas Evaluaciones</h3>
+                                </div>
+                                <div class="em-card__body">
+                                    <div class="em-recent-list" id="recentReports">
+                                        <div class="em-empty-state">
+                                            <i class="fas fa-inbox"></i>
+                                            <p>Cargando evaluaciones recientes...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- LIBRARY -->
+            <section class="em-view" id="viewLibrary">
+                <div class="em-library">
+                    <div class="em-library__toolbar">
+                        <div class="em-library__search">
+                            <div class="em-search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="searchInput" placeholder="Buscar evaluación por nombre..." autocomplete="off">
+                                <button class="em-search-box__clear" id="searchClear" style="display:none;">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="em-library__filters">
+                            <div class="em-filter-group">
+                                <label for="filterYear"><i class="fas fa-calendar"></i> Año</label>
+                                <select id="filterYear"><option value="">Todos</option></select>
+                            </div>
+                            <div class="em-filter-group">
+                                <label for="filterMonth"><i class="fas fa-calendar-day"></i> Mes</label>
+                                <select id="filterMonth">
+                                    <option value="">Todos</option>
+                                    <option value="1">Enero</option><option value="2">Febrero</option>
+                                    <option value="3">Marzo</option><option value="4">Abril</option>
+                                    <option value="5">Mayo</option><option value="6">Junio</option>
+                                    <option value="7">Julio</option><option value="8">Agosto</option>
+                                    <option value="9">Septiembre</option><option value="10">Octubre</option>
+                                    <option value="11">Noviembre</option><option value="12">Diciembre</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="em-library__breadcrumb" id="breadcrumb">
+                        <button class="em-breadcrumb__root active" data-path="">
+                            <i class="fas fa-home"></i>
+                            <span>Todas las Evaluaciones</span>
+                        </button>
+                    </div>
+
+                    <div class="em-library__content">
+                        <div class="em-folders-section" id="foldersSection" style="display:none;">
+                            <h4 class="em-section-title" id="foldersSectionTitle">
+                                <i class="fas fa-folder"></i>
+                                <span>Carpetas</span>
+                            </h4>
+                            <div class="em-folders-grid" id="folderList"></div>
+                        </div>
+
+                        <div class="em-documents-section">
+                            <div class="em-section-title-row">
+                                <h4 class="em-section-title" id="docsSectionTitle">
+                                    <i class="fas fa-file-medical"></i>
+                                    <span>Evaluaciones</span>
+                                    <span class="em-badge" id="docsCount" style="display:none;">0</span>
+                                </h4>
+                                <div class="em-section-actions">
+                                    <button class="em-btn em-btn--sm em-btn--ghost" id="viewGridBtn" title="Vista cuadrícula">
+                                        <i class="fas fa-th-large"></i>
+                                    </button>
+                                    <button class="em-btn em-btn--sm em-btn--ghost" id="viewListBtn" title="Vista lista">
+                                        <i class="fas fa-list"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="documentList" class="em-docs-grid">
+                                <div class="em-empty-state em-empty-state--large">
+                                    <i class="fas fa-folder-open"></i>
+                                    <h3>Selecciona una carpeta</h3>
+                                    <p>Explora las carpetas para ver las evaluaciones médicas almacenadas</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEWER -->
+            <section class="em-view" id="viewViewer">
+                <div class="em-viewer">
+                    <div class="em-viewer__toolbar">
+                        <div class="em-viewer__doc-info">
+                            <button class="em-btn em-btn--ghost em-btn--sm" id="viewerBackBtn" title="Volver a biblioteca">
+                                <i class="fas fa-arrow-left"></i>
+                            </button>
+                            <div class="em-viewer__doc-title" id="documentTitle">
+                                <i class="fas fa-file-medical"></i>
+                                <span>Selecciona una evaluación</span>
+                            </div>
+                        </div>
+                        <div class="em-viewer__controls">
+                            <div class="em-viewer__control-group">
+                                <label for="zoomLevel">Zoom:</label>
+                                <select id="zoomLevel">
+                                    <option value="auto">Auto</option>
+                                    <option value="page-width">Ancho de página</option>
+                                    <option value="page-height">Alto de página</option>
+                                    <option value="50%">50%</option><option value="75%">75%</option>
+                                    <option value="100%">100%</option><option value="125%">125%</option>
+                                    <option value="150%">150%</option><option value="200%">200%</option>
+                                </select>
+                            </div>
+                            <div class="em-viewer__control-group">
+                                <label for="pageOrientation">Orientación:</label>
+                                <select id="pageOrientation">
+                                    <option value="vertical">Vertical</option>
+                                    <option value="horizontal">Horizontal</option>
+                                </select>
+                            </div>
+                            <div class="em-viewer__action-buttons">
+                                <button class="em-btn em-btn--sm em-btn--primary" id="downloadBtn" title="Descargar documento">
+                                    <i class="fas fa-download"></i>
+                                    <span>Descargar</span>
+                                </button>
+                                <button class="em-btn em-btn--sm em-btn--outline" id="printBtn" title="Imprimir documento">
+                                    <i class="fas fa-print"></i>
+                                    <span>Imprimir</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="em-viewer__container">
+                        <div class="em-loading" id="loadingDiv">
+                            <div class="em-spinner"></div>
+                            <p>Cargando evaluación...</p>
+                        </div>
+                        <div id="viewerContainer" style="display: none;"></div>
+                        <div class="em-viewer__empty" id="viewerEmpty">
+                            <div class="em-viewer__empty-icon">
+                                <i class="fas fa-file-medical"></i>
+                            </div>
+                            <h3>Vista previa de la evaluación</h3>
+                            <p>Selecciona un certificado de aptitud médica de la biblioteca para visualizarlo aquí</p>
+                            <button class="em-btn em-btn--action" id="goToLibraryBtn">
+                                <i class="fas fa-folder-open"></i>
+                                Ir a Biblioteca
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- NOTIFICATION -->
+        <div class="em-notification" id="notification">
+            <i class="em-notification__icon fas fa-check-circle"></i>
+            <div class="em-notification__message">Operación completada con éxito</div>
+        </div>
+
+        <!-- PREVIEW MODAL -->
+        <div id="previewModal" class="em-preview-modal hidden">
+            <div class="em-preview-modal__overlay" id="previewOverlay"></div>
+            <div class="em-preview-modal__content">
+                <div class="em-preview-modal__header">
+                    <div class="em-preview-modal__title">
+                        <i class="fas fa-file-medical" id="previewTitleIcon"></i>
+                        <span id="previewTitle">Previsualización</span>
+                    </div>
+                    <div class="em-preview-modal__actions">
+                        <button class="em-btn em-btn--sm em-btn--ghost" id="previewDownloadBtn" title="Descargar documento">
+                            <i class="fas fa-download"></i>
+                        </button>
+                        <button class="em-preview-modal__close" id="closePreviewBtn" aria-label="Cerrar">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="em-preview-modal__body" id="previewBody"></div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .em-preview-modal { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; }
+        .em-preview-modal.hidden { display: none; }
+        .em-preview-modal__overlay { position: absolute; inset: 0; background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
+        .em-preview-modal__content {
+            position: relative; z-index: 1; display: flex; flex-direction: column;
+            width: 90vw; height: 88vh; max-width: 1120px;
+            background: var(--em-bg-card); border-radius: var(--em-radius-lg);
+            box-shadow: 0 24px 60px rgba(0,0,0,.35); overflow: hidden;
+        }
+        .em-preview-modal__header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 18px; border-bottom: 1px solid var(--em-border);
+            flex-shrink: 0; background: var(--em-bg-card);
+        }
+        .em-preview-modal__title {
+            display: flex; align-items: center; gap: 10px;
+            font-size: .9rem; font-weight: 500; color: var(--em-text-primary);
+            overflow: hidden; min-width: 0;
+        }
+        .em-preview-modal__title span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .em-preview-modal__actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+        .em-preview-modal__close {
+            width: 30px; height: 30px; border: none; border-radius: 50%;
+            background: transparent; cursor: pointer; color: var(--em-text-secondary);
+            display: flex; align-items: center; justify-content: center; font-size: .9rem;
+            transition: background .15s, color .15s;
+        }
+        .em-preview-modal__close:hover { background: var(--em-danger-light, #fce8e8); color: var(--em-danger, #dc3545); }
+        .em-preview-modal__body {
+            flex: 1; overflow: hidden; display: flex;
+            flex-direction: column; align-items: center; justify-content: center;
+        }
+        .em-preview-modal__body iframe { width: 100%; height: 100%; border: none; }
+        .em-preview-modal__error { text-align: center; padding: 2.5rem 2rem; }
+        .em-preview-modal__error-icon { font-size: 2.5rem; margin-bottom: 1rem; }
+        .em-preview-modal__error h3 { margin: 0 0 .5rem; font-size: 1.1rem; color: var(--em-text-primary); }
+        .em-preview-modal__error p { font-size: .875rem; color: var(--em-text-secondary); max-width: 460px; margin: .25rem auto; }
+        .em-preview-modal__error-cmd {
+            background: var(--em-bg-app); border: 1px solid var(--em-border);
+            border-radius: 6px; padding: 8px 16px; font-family: monospace; font-size: .85rem;
+            color: var(--em-text-primary); display: inline-block; margin: 8px 0;
+        }
+    </style>
+
+    <script src="evaluaciones-medicas-viewer.js"></script>
+</body>
+</html>

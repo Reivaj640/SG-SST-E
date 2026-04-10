@@ -4789,6 +4789,81 @@ ipcMain.handle('list-provider-files', async (event, folderPath) => {
   }
 });
 
+// =============================================================================
+// HANDLERS PARA DIAGNÓSTICO Y REPARACIÓN DE WORD COM
+// =============================================================================
+
+// Handler para diagnóstico de Word COM
+ipcMain.handle('diagnose-word-com', async (event) => {
+  sendLog(`[MAIN][diagnose-word-com] Ejecutando diagnóstico de Word COM`, 'INFO');
+  
+  try {
+    const pythonPath = await getPython();
+    const diagnoseScript = getPythonScriptPath('diagnose_word_com.py');
+    
+    if (!fs.existsSync(diagnoseScript)) {
+      sendLog(`[MAIN][diagnose-word-com] Script de diagnóstico no encontrado: ${diagnoseScript}`, 'ERROR');
+      return { success: false, error: `Script no encontrado: ${diagnoseScript}` };
+    }
+    
+    const { stdout, stderr } = await execFilePromise(pythonPath, [diagnoseScript]);
+    
+    if (stderr) {
+      sendLog(`[MAIN][diagnose-word-com] Diagnóstico stderr: ${stderr}`, 'WARN');
+    }
+    
+    try {
+      const result = JSON.parse(stdout);
+      sendLog(`[MAIN][diagnose-word-com] Diagnóstico completado`, 'INFO');
+      return { success: true, data: result };
+    } catch (parseError) {
+      sendLog(`[MAIN][diagnose-word-com] Error parseando resultado: ${parseError.message}`, 'ERROR');
+      return { success: false, error: 'Error parseando diagnóstico', raw: stdout };
+    }
+  } catch (error) {
+    sendLog(`[MAIN][diagnose-word-com] Error ejecutando diagnóstico: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// Handler para reparación de Word COM
+ipcMain.handle('repair-word-com', async (event) => {
+  sendLog(`[MAIN][repair-word-com] Iniciando reparación de Word COM`, 'INFO');
+  
+  try {
+    const pythonPath = await getPython();
+    const repairScript = getPythonScriptPath('repair_word_com.py');
+    
+    if (!fs.existsSync(repairScript)) {
+      sendLog(`[MAIN][repair-word-com] Script de reparación no encontrado: ${repairScript}`, 'ERROR');
+      return { success: false, error: `Script no encontrado: ${repairScript}` };
+    }
+    
+    sendLog(`[MAIN][repair-word-com] Ejecutando script de reparación...`, 'INFO');
+    const { stdout, stderr } = await execFilePromise(pythonPath, [repairScript], { timeout: 180000 });
+    
+    if (stderr) {
+      sendLog(`[MAIN][repair-word-com] Reparación stderr: ${stderr}`, 'WARN');
+    }
+    
+    try {
+      const result = JSON.parse(stdout);
+      sendLog(`[MAIN][repair-word-com] Reparación completada. Éxito: ${result.final_com_working}`, 'INFO');
+      return { success: true, data: result };
+    } catch (parseError) {
+      sendLog(`[MAIN][repair-word-com] Error parseando resultado: ${parseError.message}`, 'ERROR');
+      return { success: false, error: 'Error parseando resultado de reparación', raw: stdout };
+    }
+  } catch (error) {
+    sendLog(`[MAIN][repair-word-com] Error ejecutando reparación: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// =============================================================================
+// HANDLERS PARA VISUALIZACIÓN DE DOCUMENTOS WORD
+// =============================================================================
+
 ipcMain.handle('get-word-preview', async (event, rawFilePath) => {
   sendLog(`[MAIN][get-word-preview] Solicitud recibida para filePath: ${rawFilePath}`, 'INFO');
   

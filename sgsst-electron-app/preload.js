@@ -148,6 +148,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   uploadDocument: (payload) => ipcRenderer.invoke('upload-document', payload),
   deleteDocument: (filePath) => ipcRenderer.invoke('delete-document', filePath),
   openFile: (filePath) => ipcRenderer.invoke('open-file', filePath),
+  
+  // --- Diagnóstico y reparación de Word COM ---
+  diagnoseWordCom: () => ipcRenderer.invoke('diagnose-word-com'),
+  repairWordCom: () => ipcRenderer.invoke('repair-word-com'),
 
   // --- Edición de documentos ---
   getEditableContent: (payload) => ipcRenderer.invoke('get-editable-content', payload),

@@ -38,6 +38,9 @@ class ReportesAccidentesComponent {
     setupFrameCommunication(viewerFrame) {
         // Escuchar mensajes del iframe
         const messageHandler = (event) => {
+            // Solo procesar mensajes del propio iframe FURAT
+            if (event.source !== viewerFrame.contentWindow) return;
+
             const data = event.data;
 
             // Manejar solicitud de regreso al módulo
@@ -99,6 +102,10 @@ class ReportesAccidentesComponent {
 
                 case 'get-document-folders':
                     result = await window.electronAPI.getDocumentFolders(payload);
+                    break;
+
+                case 'open-path':
+                    result = await window.electronAPI.openPath(payload);
                     break;
 
                 default:
