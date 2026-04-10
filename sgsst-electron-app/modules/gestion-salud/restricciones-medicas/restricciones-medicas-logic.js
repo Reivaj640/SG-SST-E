@@ -16,7 +16,37 @@ class RestriccionesMedicasComponent {
         this.pathHistory = [];
     }
 
-    render() {
+    async render() {
+        this.container.innerHTML = '';
+
+        // Exponer this para que el portal HTML pueda acceder al componente
+        window.restriccionesMedicasPortalComponent = this;
+
+        // Cargar el HTML del portal moderno
+        try {
+            const response = await fetch('./modules/gestion-salud/restricciones-medicas/restricciones-medicas-home.html');
+            if (!response.ok) throw new Error('No se pudo cargar el portal');
+            const html = await response.text();
+
+            // Inyectar HTML en el contenedor
+            this.container.innerHTML = html;
+
+            // Cargar el JS del portal dinámicamente
+            const script = document.createElement('script');
+            script.src = './modules/gestion-salud/restricciones-medicas/restricciones-medicas-home.js';
+            script.onload = () => {
+                // Portal listo, funciones de navegación disponibles
+            };
+            document.head.appendChild(script);
+        } catch (error) {
+            console.error('[RM] Error cargando portal:', error);
+            // Fallback al método anterior si falla el fetch
+            this._renderFallbackCards();
+        }
+    }
+
+    // Fallback por si el fetch del HTML falla (método anterior)
+    _renderFallbackCards() {
         this.container.innerHTML = '';
         const backButton = this.createBackButton('&#8592; Volver al Módulo', this.onBackToModuleHome);
         this.container.appendChild(backButton);
