@@ -1,4 +1,5 @@
-// evaluaciones-medicas.js - Componente para el submódulo "3.1.4 Evaluaciones médicas"
+// evaluaciones-medicas-logic.js — Submódulo 3.1.4 Evaluaciones Médicas
+// Portal de bienvenida moderno (patrón Plan de Trabajo)
 
 class EvaluacionesMedicasComponent {
     constructor(container, companyName, moduleName, submoduleName, onBackToModuleHome) {
@@ -8,10 +9,88 @@ class EvaluacionesMedicasComponent {
         this.submoduleName = submoduleName;
         this.onBackToModuleHome = onBackToModuleHome;
         this.allFiles = [];
-        this.submodulePath = null; // Almacenará la ruta base del submódulo 3.1.4
+        this.submodulePath = null;
     }
 
-    render() {
+    async render() {
+        this.container.innerHTML = '';
+        await this.loadPortalHome();
+    }
+
+    async loadPortalHome() {
+        const portalContainer = document.createElement('div');
+        portalContainer.id = 'em-portal-container';
+        portalContainer.style.cssText = 'width:100%;height:100%;';
+        this.container.appendChild(portalContainer);
+
+        try {
+            const response = await fetch('./modules/gestion-salud/evaluaciones-medicas/evaluaciones-medicas-home.html');
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+            const html = await response.text();
+            portalContainer.innerHTML = html;
+            this.initPortalJS();
+        } catch (error) {
+            console.error('[EvaluacionesMedicasComponent] Error cargando portal:', error);
+            this.renderLegacyDesign();
+        }
+    }
+
+    initPortalJS() {
+        // Exponer la instancia para que evaluaciones-medicas-home.js pueda llamar métodos
+        window.evaluacionesMedicasPortalContainer = document.getElementById('em-portal-container');
+        window.evaluacionesMedicasPortalComponent = this;
+
+        // Evitar cargar el script duplicado si ya existe
+        const existingScript = document.querySelector('script[data-em-home]');
+        if (existingScript) existingScript.remove();
+
+        const script = document.createElement('script');
+        script.setAttribute('data-em-home', 'true');
+        script.src = './modules/gestion-salud/evaluaciones-medicas/evaluaciones-medicas-home.js';
+        script.onerror = () => {
+            console.error('[EvaluacionesMedicasComponent] Error cargando evaluaciones-medicas-home.js');
+            this.renderLegacyDesign();
+        };
+        document.body.appendChild(script);
+    }
+
+    // ─── VISOR DE DOCUMENTOS (intocable) ────────────────────────────────────
+
+    showNewDocumentViewer() {
+        this.container.innerHTML = '';
+
+        const iframe = document.createElement('iframe');
+        iframe.style.width = '100%';
+        iframe.style.height = '100vh';
+        iframe.style.border = 'none';
+
+        const viewerUrl = `./modules/gestion-salud/evaluaciones-medicas/evaluaciones-view.html?company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
+        iframe.src = viewerUrl;
+
+        const header = document.createElement('div');
+        header.className = 'submodule-header';
+        header.style.cssText = 'display:flex;align-items:center;padding:10px;background:#f8f9fa;border-bottom:1px solid #dee2e6;margin-bottom:0;';
+
+        const backButton = document.createElement('button');
+        backButton.className = 'btn btn-back';
+        backButton.innerHTML = '&#8592; Volver';
+        backButton.style.marginRight = '10px';
+        backButton.addEventListener('click', () => this.render());
+        header.appendChild(backButton);
+
+        const title = document.createElement('h3');
+        title.textContent = 'Ver Evaluaciones Médicas';
+        title.style.cssText = 'flex-grow:1;text-align:center;margin:0;font-size:1rem;';
+        header.appendChild(title);
+
+        this.container.appendChild(header);
+        this.container.appendChild(iframe);
+    }
+
+    // ─── DISEÑO LEGACY (fallback si falla el portal) ────────────────────────
+
+    renderLegacyDesign() {
         this.container.innerHTML = '';
 
         const backButton = document.createElement('button');
@@ -29,83 +108,36 @@ class EvaluacionesMedicasComponent {
         const cardsContainer = document.createElement('div');
         cardsContainer.className = 'module-cards';
 
-        const card1 = this.createModuleCard(
+        cardsContainer.appendChild(this.createModuleCard(
             'Ver Evaluaciones Realizadas',
             'Visualizar, buscar y previsualizar certificados de aptitud médica.',
             () => this.showNewDocumentViewer()
-        );
-        cardsContainer.appendChild(card1);
-
-        const card2 = this.createModuleCard(
+        ));
+        cardsContainer.appendChild(this.createModuleCard(
             'Registrar Nueva Evaluación',
             'Cargar un nuevo certificado o examen médico al sistema.',
             () => this.showPlaceholder('Registrar Nueva Evaluación')
-        );
-        cardsContainer.appendChild(card2);
-
-        const card3 = this.createModuleCard(
+        ));
+        cardsContainer.appendChild(this.createModuleCard(
             'Estadísticas de Aptitud',
             'Ver estadísticas sobre los resultados de las evaluaciones.',
             () => this.showPlaceholder('Estadísticas de Aptitud')
-        );
-        cardsContainer.appendChild(card3);
-
-        const card4 = this.createModuleCard(
+        ));
+        cardsContainer.appendChild(this.createModuleCard(
             'Próxima Función',
             'Una nueva funcionalidad estará disponible aquí pronto.',
             () => this.showPlaceholder('Próxima Función')
-        );
-        cardsContainer.appendChild(card4);
+        ));
 
         this.container.appendChild(cardsContainer);
     }
 
-    showNewDocumentViewer() {
-        this.container.innerHTML = '';
-
-        // Crear iframe para el nuevo visualizador de documentos
-        const iframe = document.createElement('iframe');
-        iframe.style.width = '100%';
-        iframe.style.height = '100vh';
-        iframe.style.border = 'none';
-
-        // Pasar parámetros a la nueva interfaz a través de la URL
-        const viewerUrl = `./modules/gestion-salud/evaluaciones-medicas/evaluaciones-view.html?company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
-        iframe.src = viewerUrl;
-
-        // Crear un contenedor superior con botón de volver
-        const header = document.createElement('div');
-        header.className = 'submodule-header';
-        header.style.display = 'flex';
-        header.style.alignItems = 'center';
-        header.style.padding = '10px';
-        header.style.backgroundColor = '#f8f9fa';
-        header.style.borderBottom = '1px solid #dee2e6';
-        header.style.marginBottom = '20px';
-
-        const backButton = document.createElement('button');
-        backButton.className = 'btn btn-back';
-        backButton.innerHTML = '&#8592; Volver';
-        backButton.style.marginRight = '10px';
-        backButton.addEventListener('click', () => this.render());
-        header.appendChild(backButton);
-
-        const title = document.createElement('h3');
-        title.textContent = 'Ver Evaluaciones Médicas';
-        title.style.flexGrow = '1';
-        title.style.textAlign = 'center';
-        title.style.margin = '0';
-        header.appendChild(title);
-
-        this.container.appendChild(header);
-        this.container.appendChild(iframe);
-    }
+    // ─── UTILIDADES (intocables) ─────────────────────────────────────────────
 
     async loadInitialFiles() {
         const resultsCol = document.getElementById('search-results-col');
         resultsCol.innerHTML = '<p>Buscando carpeta de evaluaciones...</p>';
         try {
-            // 1. Encontrar la ruta del submódulo padre "3.1.4"
             if (!this.submodulePath) {
                 const result = await window.electronAPI.findSubmodulePath(this.companyName, this.moduleName, this.submoduleName);
                 if (result.success) {
@@ -115,11 +147,8 @@ class EvaluacionesMedicasComponent {
                     return;
                 }
             }
-
-            // 2. Usar la nueva función recursiva para encontrar todos los archivos dentro de esa ruta
             this.allFiles = await window.electronAPI.findFilesRecursively(this.submodulePath);
-            this.filterAndDisplayFiles(''); // Mostrar todos los archivos encontrados
-
+            this.filterAndDisplayFiles('');
         } catch (error) {
             resultsCol.innerHTML = `<p>Error al cargar archivos: ${error.message}</p>`;
         }
@@ -179,12 +208,12 @@ class EvaluacionesMedicasComponent {
         const fileExtension = fileName.split('.').pop();
 
         if (fileExtension === 'pdf') {
-            previewCol.innerHTML = `<iframe src="${filePath}" width="100%" height="100%" style="border: none;" data-file-path="${filePath}"></iframe>`;
+            previewCol.innerHTML = `<iframe src="${filePath}" width="100%" height="100%" style="border:none;" data-file-path="${filePath}"></iframe>`;
         } else if (fileExtension === 'docx') {
-            previewCol.innerHTML = `<div style="text-align: center; padding: 40px;"><p>Convirtiendo documento de Word a PDF para previsualización...</p></div>`;
+            previewCol.innerHTML = `<div style="text-align:center;padding:40px;"><p>Convirtiendo documento de Word a PDF para previsualización...</p></div>`;
             window.electronAPI.convertDocxToPdf(filePath).then(result => {
                 if (result.success) {
-                    previewCol.innerHTML = `<iframe src="${result.pdfPath}" width="100%" height="100%" style="border: none;" data-file-path="${result.pdfPath}"></iframe>`;
+                    previewCol.innerHTML = `<iframe src="${result.pdfPath}" width="100%" height="100%" style="border:none;" data-file-path="${result.pdfPath}"></iframe>`;
                 } else {
                     previewCol.innerHTML = `<div class="preview-error" data-file-path="${filePath}"><h3>Error en la Previsualización</h3><p>No se pudo convertir el archivo <strong>${fileName}</strong>.</p><p>Error: ${result.error}</p><button class="btn btn-primary">Abrir con aplicación externa</button></div>`;
                     previewCol.querySelector('button').addEventListener('click', () => this.openDocument(filePath));
