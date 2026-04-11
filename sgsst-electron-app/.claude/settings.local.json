@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(\"/c/Users/jrf20/AppData/Roaming/Claude/claude-code/2.1.92/claude.exe\" --help)",
+      "Bash(\"/c/Users/jrf20/AppData/Roaming/Claude/claude-code/2.1.92/claude.exe\" plugin:*)"
     ]
   }
 }
