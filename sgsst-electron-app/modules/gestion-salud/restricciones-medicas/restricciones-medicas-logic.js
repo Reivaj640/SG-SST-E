@@ -221,28 +221,19 @@ class RestriccionesMedicasComponent {
 
     showEnviarRemisionPage() {
         this.container.innerHTML = '';
-        this.extractedData = null;
-        this.lastGeneratedDoc = null;
+        var self = this;
 
-        const header = this.createHeader('Enviar Nueva Remisión', () => this.render());
-        this.container.appendChild(header);
+        self._messageHandler = function(e) { self.handleIframeMessage(e); };
+        window.addEventListener('message', self._messageHandler);
 
-        const mainDiv = document.createElement('div');
-        mainDiv.className = 'enviar-remision-container';
-
-        const leftCol = document.createElement('div');
-        leftCol.className = 'remision-col-control';
-        leftCol.appendChild(this.createFileSelectionBox());
-        leftCol.appendChild(this.createActionsBox());
-        mainDiv.appendChild(leftCol);
-
-        const rightCol = document.createElement('div');
-        rightCol.className = 'remision-col-data';
-        rightCol.appendChild(this.createDataDisplayBox());
-        rightCol.appendChild(this.createLogBox());
-        mainDiv.appendChild(rightCol);
-
-        this.container.appendChild(mainDiv);
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'width:100%;height:calc(100vh - 60px);border:none;display:block;';
+        iframe.src = `./modules/gestion-salud/restricciones-medicas/enviar-remision.html`
+                   + `?company=${encodeURIComponent(this.companyName)}`
+                   + `&module=${encodeURIComponent(this.moduleName)}`
+                   + `&submodule=${encodeURIComponent(this.submoduleName)}`;
+        self._viewerFrame = iframe;
+        this.container.appendChild(iframe);
     }
 
     createFileSelectionBox() {
@@ -861,6 +852,73 @@ RestriccionesMedicasComponent.prototype.handleIframeMessage = function(event) {
             break;
         case 'open-path-request':
             self._handleOpenPath(event, 'openPath', requestId, payload);
+            break;
+
+        // ── Enviar Remisiones ──────────────────────────────────────────
+        case 'select-pdf-file-request':
+            window.electronAPI.selectPdfFile()
+                .then(function(filePath) {
+                    event.source.postMessage({ type: 'select-pdf-file-response', requestId: requestId,
+                        payload: { success: true, filePath: filePath || null } }, '*');
+                })
+                .catch(function(e) {
+                    event.source.postMessage({ type: 'select-pdf-file-response', requestId: requestId,
+                        payload: { success: false, error: e.message } }, '*');
+                });
+            break;
+
+        case 'process-remision-pdf-request':
+            window.electronAPI.processRemisionPdf(payload && payload.filePath)
+                .then(function(r) {
+                    event.source.postMessage({ type: 'process-remision-pdf-response', requestId: requestId,
+                        payload: { success: r.success, data: r.data, error: r.error } }, '*');
+                })
+                .catch(function(e) {
+                    event.source.postMessage({ type: 'process-remision-pdf-response', requestId: requestId,
+                        payload: { success: false, error: e.message } }, '*');
+                });
+            break;
+
+        case 'generate-remision-doc-request':
+            window.electronAPI.generateRemisionDocument(payload && payload.extractedData, self.companyName)
+                .then(function(r) {
+                    event.source.postMessage({ type: 'generate-remision-doc-response', requestId: requestId,
+                        payload: { success: r.success, documentPath: r.documentPath, controlPath: r.controlPath, error: r.error } }, '*');
+                })
+                .catch(function(e) {
+                    event.source.postMessage({ type: 'generate-remision-doc-response', requestId: requestId,
+                        payload: { success: false, error: e.message } }, '*');
+                });
+            break;
+
+        case 'send-remision-whatsapp-request':
+            window.electronAPI.sendRemisionByWhatsApp(
+                    payload && payload.documentPath,
+                    payload && payload.extractedData,
+                    self.companyName)
+                .then(function(r) {
+                    event.source.postMessage({ type: 'send-remision-whatsapp-response', requestId: requestId,
+                        payload: { success: r.success, error: r.error } }, '*');
+                })
+                .catch(function(e) {
+                    event.source.postMessage({ type: 'send-remision-whatsapp-response', requestId: requestId,
+                        payload: { success: false, error: e.message } }, '*');
+                });
+            break;
+
+        case 'send-remision-email-request':
+            window.electronAPI.sendRemisionByEmail(
+                    payload && payload.documentPath,
+                    payload && payload.extractedData,
+                    self.companyName)
+                .then(function(r) {
+                    event.source.postMessage({ type: 'send-remision-email-response', requestId: requestId,
+                        payload: { success: r.success, error: r.error } }, '*');
+                })
+                .catch(function(e) {
+                    event.source.postMessage({ type: 'send-remision-email-response', requestId: requestId,
+                        payload: { success: false, error: e.message } }, '*');
+                });
             break;
     }
 };
