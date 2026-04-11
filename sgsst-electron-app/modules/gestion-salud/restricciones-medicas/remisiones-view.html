@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Remisiones Médicas Ocupacionales</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="remisiones-view.css">
+</head>
+<body>
+
+    <div class="rem-wrapper">
+
+        <!-- Header -->
+        <header class="rem-header">
+            <div class="rem-header-left">
+                <button id="backBtn" class="rem-btn rem-btn-secondary" aria-label="Volver al portal">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Volver</span>
+                </button>
+                <div class="rem-header-divider"></div>
+                <div class="rem-header-title">
+                    <h1>Remisiones Médicas</h1>
+                    <p>Consulta y visualiza los documentos de remisiones médicas</p>
+                </div>
+            </div>
+            <div class="rem-header-actions">
+                <button id="refreshBtn" class="rem-btn rem-btn-secondary" title="Actualizar lista">
+                    <i class="fas fa-sync-alt" id="refreshIcon"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Contenido principal con scroll -->
+        <div class="rem-body">
+
+            <!-- Tarjetas de estadísticas -->
+            <div class="rem-stats-row">
+                <div class="rem-stat-card rem-stat-total">
+                    <div class="rem-stat-icon">
+                        <i class="fas fa-file-medical"></i>
+                    </div>
+                    <div class="rem-stat-info">
+                        <span class="rem-stat-value" id="statTotal">0</span>
+                        <span class="rem-stat-label">Total Documentos</span>
+                    </div>
+                </div>
+                <div class="rem-stat-card rem-stat-folders">
+                    <div class="rem-stat-icon">
+                        <i class="fas fa-folder-open"></i>
+                    </div>
+                    <div class="rem-stat-info">
+                        <span class="rem-stat-value" id="statFolders">0</span>
+                        <span class="rem-stat-label">Carpetas</span>
+                    </div>
+                </div>
+                <div class="rem-stat-card rem-stat-year">
+                    <div class="rem-stat-icon">
+                        <i class="fas fa-calendar-alt"></i>
+                    </div>
+                    <div class="rem-stat-info">
+                        <span class="rem-stat-value" id="statCurrentYear">0</span>
+                        <span class="rem-stat-label" id="statYearLabel">Este Año</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filtros por tipo de archivo -->
+            <div class="rem-filters">
+                <button class="rem-filter-btn active" data-filter="todos">
+                    <i class="fas fa-list"></i> Todos
+                </button>
+                <button class="rem-filter-btn" data-filter="pdf">
+                    <i class="fas fa-file-pdf"></i> PDF
+                </button>
+                <button class="rem-filter-btn" data-filter="word">
+                    <i class="fas fa-file-word"></i> Word
+                </button>
+                <button class="rem-filter-btn" data-filter="excel">
+                    <i class="fas fa-file-excel"></i> Excel
+                </button>
+            </div>
+
+            <!-- Barra de búsqueda -->
+            <div class="rem-search-bar">
+                <i class="fas fa-search rem-search-icon"></i>
+                <input type="text" id="searchInput" placeholder="Buscar por nombre de documento..." class="rem-search-input">
+                <button id="clearSearchBtn" class="rem-search-clear hidden" title="Limpiar búsqueda">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Lista de documentos agrupados por año -->
+            <div id="documentsList" class="rem-list">
+                <!-- Se llena dinámicamente -->
+            </div>
+
+        </div>
+
+        <!-- Modal de previsualización -->
+        <div id="previewModal" class="rem-modal hidden">
+            <div class="rem-modal-overlay" id="previewOverlay"></div>
+            <div class="rem-modal-content">
+                <div class="rem-modal-header">
+                    <h3 id="previewTitle">Previsualización</h3>
+                    <button id="closePreviewBtn" class="rem-modal-close" aria-label="Cerrar">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="rem-modal-body" id="previewBody">
+                    <!-- PDF iframe o loading -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast -->
+        <div id="toast" class="rem-toast" role="alert">
+            <div id="toastIcon" class="rem-toast-icon"></div>
+            <div class="rem-toast-content">
+                <p id="toastTitle" class="rem-toast-title"></p>
+                <p id="toastMessage" class="rem-toast-message"></p>
+            </div>
+            <button id="toastClose" class="rem-toast-close" aria-label="Cerrar">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+    </div>
+
+    <script src="remisiones-viewer.js"></script>
+</body>
+</html>

@@ -821,44 +821,122 @@ style.textContent = `
 // Adjuntar estilos al documento
 document.head.appendChild(style);
 
+// ═══════════════════════════════════════════════════════════
+// BRIDGE: Escucha mensajes del iframe del viewer
+// ═══════════════════════════════════════════════════════════
+
+RestriccionesMedicasComponent.prototype.handleIframeMessage = function(event) {
+    if (!event.data || !event.data.type) return;
+    if (this._viewerFrame && event.source !== this._viewerFrame.contentWindow) return;
+    var self = this;
+    var type = event.data.type;
+    var requestId = event.data.requestId;
+    var payload = event.data.payload;
+
+    switch (type) {
+        case 'back-to-module-request':
+            if (self._messageHandler) {
+                window.removeEventListener('message', self._messageHandler);
+                self._messageHandler = null;
+            }
+            self.render();
+            break;
+        case 'get-pdf-preview-request':
+            self._handlePreview(event, 'getPDFPreview', requestId, payload);
+            break;
+        case 'get-word-preview-request':
+            self._handlePreview(event, 'getWordPreview', requestId, payload);
+            break;
+        case 'get-excel-preview-request':
+            self._handlePreview(event, 'getExcelPreview', requestId, payload);
+            break;
+        case 'get-document-folders-request':
+            self._handleFolders(event, 'getDocumentFolders', requestId, payload);
+            break;
+        case 'get-documents-in-folder-request':
+            self._handleDocsInFolder(event, 'getDocumentsInFolder', requestId, payload);
+            break;
+        case 'download-document-request':
+            self._handleDownload(event, 'downloadDocument', requestId, payload);
+            break;
+        case 'open-path-request':
+            self._handleOpenPath(event, 'openPath', requestId, payload);
+            break;
+    }
+};
+
+RestriccionesMedicasComponent.prototype._handlePreview = async function(event, apiName, requestId, payload) {
+    var filePath = payload && payload.filePath;
+    var typeKey = apiName === 'getPDFPreview'   ? 'get-pdf-preview-response'
+                : apiName === 'getWordPreview'  ? 'get-word-preview-response'
+                : apiName === 'getExcelPreview' ? 'get-excel-preview-response'
+                : apiName + '-response';
+    try {
+        var result = await window.electronAPI[apiName](filePath);
+        event.source.postMessage({ type: typeKey, requestId: requestId, payload: { success: result.success, data: result.data, error: result.error } }, '*');
+    } catch(e) {
+        event.source.postMessage({ type: typeKey, requestId: requestId, payload: { success: false, error: e.message } }, '*');
+    }
+};
+
+RestriccionesMedicasComponent.prototype._handleFolders = async function(event, apiName, requestId, payload) {
+    try {
+        var result = await window.electronAPI[apiName](payload);
+        event.source.postMessage({ type: 'get-document-folders-response', requestId: requestId, payload: { success: result.success, folders: result.folders||[], files: result.files||[], error: result.error } }, '*');
+    } catch(e) {
+        event.source.postMessage({ type: 'get-document-folders-response', requestId: requestId, payload: { success: false, error: e.message } }, '*');
+    }
+};
+
+RestriccionesMedicasComponent.prototype._handleDocsInFolder = async function(event, apiName, requestId, payload) {
+    var folderPath = typeof payload === 'string' ? payload : (payload && payload.folderPath);
+    try {
+        var result = await window.electronAPI[apiName](folderPath);
+        event.source.postMessage({ type: 'get-documents-in-folder-response', requestId: requestId, payload: { success: result.success, files: result.files||[], error: result.error } }, '*');
+    } catch(e) {
+        event.source.postMessage({ type: 'get-documents-in-folder-response', requestId: requestId, payload: { success: false, error: e.message } }, '*');
+    }
+};
+
+RestriccionesMedicasComponent.prototype._handleDownload = async function(event, apiName, requestId, payload) {
+    try {
+        var result = await window.electronAPI[apiName](payload);
+        event.source.postMessage({ type: 'download-document-response', requestId: requestId, payload: { success: result.success, fileName: result.fileName, base64Data: result.base64Data, error: result.error } }, '*');
+    } catch(e) {
+        event.source.postMessage({ type: 'download-document-response', requestId: requestId, payload: { success: false, error: e.message } }, '*');
+    }
+};
+
+RestriccionesMedicasComponent.prototype._handleOpenPath = async function(event, apiName, requestId, payload) {
+    try {
+        var result = await window.electronAPI[apiName](payload);
+        event.source.postMessage({ type: 'open-path-response', requestId: requestId, payload: { success: result.success, error: result.error } }, '*');
+    } catch(e) {
+        event.source.postMessage({ type: 'open-path-response', requestId: requestId, payload: { success: false, error: e.message } }, '*');
+    }
+};
+
+// ═══════════════════════════════════════════════════════════
 // Definir el método showNewDocumentViewer correctamente como método del prototipo
+// ═══════════════════════════════════════════════════════════
+
 RestriccionesMedicasComponent.prototype.showNewDocumentViewer = function() {
     this.container.innerHTML = '';
+    var self = this;
 
-    // Crear un contenedor superior con botón de volver
-    const header = document.createElement('div');
-    header.className = 'submodule-header';
-    header.style.display = 'flex';
-    header.style.alignItems = 'center';
-    header.style.padding = '10px';
-    header.style.backgroundColor = '#f8f9fa';
-    header.style.borderBottom = '1px solid #dee2e6';
-    header.style.marginBottom = '20px';
+    // Store named handler so removeEventListener can match the exact reference
+    self._messageHandler = function(e) { self.handleIframeMessage(e); };
+    window.addEventListener('message', self._messageHandler);
 
-    const backButton = document.createElement('button');
-    backButton.className = 'btn btn-back';
-    backButton.innerHTML = '&#8592; Volver';
-    backButton.style.marginRight = '10px';
-    backButton.addEventListener('click', () => this.render());
-    header.appendChild(backButton);
-
-    const title = document.createElement('h3');
-    title.textContent = 'Ver Remisiones Médicas';
-    title.style.flexGrow = '1';
-    title.style.textAlign = 'center';
-    title.style.margin = '0';
-    header.appendChild(title);
-
-    // Crear un iframe para el nuevo visualizador de documentos
     const iframe = document.createElement('iframe');
     iframe.style.width = '100%';
-    iframe.style.height = 'calc(100vh - 150px)'; // Ajustar altura para dejar espacio para el encabezado
+    iframe.style.height = 'calc(100vh - 60px)';
     iframe.style.border = 'none';
+    iframe.style.display = 'block';
 
-    // Pasar parámetros a la nueva interfaz a través de la URL
-    const viewerUrl = `./modules/gestion-salud/restricciones-medicas/restricciones-view.html?company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
+    const viewerUrl = `./modules/gestion-salud/restricciones-medicas/remisiones-view.html?company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
     iframe.src = viewerUrl;
+    self._viewerFrame = iframe;
 
-    this.container.appendChild(header);
     this.container.appendChild(iframe);
 };
