@@ -221,17 +221,46 @@ class RestriccionesMedicasComponent {
 
     showEnviarRemisionPage() {
         this.container.innerHTML = '';
+        // Configurar contenedor padre: ocupa el espacio disponible, no el viewport completo
+        this.container.style.display = 'flex';
+        this.container.style.flexDirection = 'column';
+        this.container.style.height = '100%';
+        this.container.style.flex = '1';
+        this.container.style.overflow = 'hidden';
         var self = this;
 
         self._messageHandler = function(e) { self.handleIframeMessage(e); };
         window.addEventListener('message', self._messageHandler);
 
         const iframe = document.createElement('iframe');
-        iframe.style.cssText = 'width:100%;height:calc(100vh - 60px);border:none;display:block;';
+        iframe.style.cssText = 'width:100%;height:100%;flex:1;border:none;display:block;';
         iframe.src = `./modules/gestion-salud/restricciones-medicas/enviar-remision.html`
                    + `?company=${encodeURIComponent(this.companyName)}`
                    + `&module=${encodeURIComponent(this.moduleName)}`
                    + `&submodule=${encodeURIComponent(this.submoduleName)}`;
+        self._viewerFrame = iframe;
+        this.container.appendChild(iframe);
+    }
+
+    showGenerarInformePage(extractedData) {
+        this.container.innerHTML = '';
+        this.container.style.display = 'flex';
+        this.container.style.flexDirection = 'column';
+        this.container.style.height = '100%';
+        this.container.style.flex = '1';
+        this.container.style.overflow = 'hidden';
+        var self = this;
+
+        self._messageHandler = function(e) { self.handleIframeMessage(e); };
+        window.addEventListener('message', self._messageHandler);
+
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'width:100%;height:100%;flex:1;border:none;display:block;';
+        iframe.src = `./modules/gestion-salud/restricciones-medicas/generar-informe-remision.html`
+                   + `?company=${encodeURIComponent(this.companyName)}`
+                   + `&module=${encodeURIComponent(this.moduleName)}`
+                   + `&submodule=${encodeURIComponent(this.submoduleName)}`
+                   + `&data=${encodeURIComponent(JSON.stringify(extractedData))}`;
         self._viewerFrame = iframe;
         this.container.appendChild(iframe);
     }
@@ -920,6 +949,41 @@ RestriccionesMedicasComponent.prototype.handleIframeMessage = function(event) {
                         payload: { success: false, error: e.message } }, '*');
                 });
             break;
+
+        // ── Generar Informe (nuevo paso intermedio) ──────────────────
+        case 'informe-data-request':
+            event.source.postMessage({ type: 'informe-data-response', requestId: requestId,
+                payload: { extractedData: self.extractedData || {} } }, '*');
+            break;
+
+        case 'back-to-verify-request':
+            if (self._messageHandler) {
+                window.removeEventListener('message', self._messageHandler);
+                self._messageHandler = null;
+            }
+            self.showEnviarRemisionPage();
+            break;
+
+        case 'continue-to-send-request':
+            if (self._messageHandler) {
+                window.removeEventListener('message', self._messageHandler);
+                self._messageHandler = null;
+            }
+            // Al continuar, se navega a la página de envío con los datos del documento generado
+            self.lastGeneratedDoc = payload && payload.documentPath;
+            self.extractedData = payload && payload.extractedData;
+            self._renderSendOnlyPage();
+            break;
+
+        case 'navigate-to-generar-informe-request':
+            if (self._messageHandler) {
+                window.removeEventListener('message', self._messageHandler);
+                self._messageHandler = null;
+            }
+            // Guardar datos extraídos y navegar a generar informe
+            self.extractedData = payload && payload.extractedData;
+            self.showGenerarInformePage(self.extractedData);
+            break;
     }
 };
 
@@ -997,4 +1061,54 @@ RestriccionesMedicasComponent.prototype.showNewDocumentViewer = function() {
     self._viewerFrame = iframe;
 
     this.container.appendChild(iframe);
+};
+
+// ═══════════════════════════════════════════════════════════
+// Página de solo envío (después de generar informe)
+// ═══════════════════════════════════════════════════════════
+
+RestriccionesMedicasComponent.prototype._renderSendOnlyPage = function() {
+    var self = this;
+    this.container.innerHTML = '';
+
+    const header = this.createHeader('Enviar Remisión Generada', function() {
+        self.render();
+    });
+    this.container.appendChild(header);
+
+    const content = document.createElement('div');
+    content.style.cssText = 'padding: 20px; max-width: 600px; margin: 0 auto;';
+    content.innerHTML = `
+        <div style="text-align: center; margin-bottom: 30px;">
+            <i class="fas fa-check-circle" style="font-size: 3rem; color: #28a745; margin-bottom: 10px;"></i>
+            <h3 style="color: #174ea6; margin-bottom: 10px;">Informe Generado Exitosamente</h3>
+            <p style="color: #718096; font-size: 0.875rem;">Seleccione cómo desea enviar el documento</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+            <button id="send-whatsapp-btn" class="btn btn-info" style="padding: 15px; font-size: 1rem;">
+                <i class="fab fa-whatsapp" style="font-size: 1.5rem;"></i><br>
+                Enviar por WhatsApp
+            </button>
+            <button id="send-email-btn" class="btn btn-info" style="padding: 15px; font-size: 1rem;">
+                <i class="fas fa-envelope" style="font-size: 1.5rem;"></i><br>
+                Enviar por Correo
+            </button>
+        </div>
+
+        <div id="send-status" style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 0.5rem; display: none;">
+            <p id="send-status-text" style="margin: 0;"></p>
+        </div>
+    `;
+
+    this.container.appendChild(content);
+
+    // Event listeners
+    document.getElementById('send-whatsapp-btn').addEventListener('click', function() {
+        self.handleSendWhatsApp();
+    });
+
+    document.getElementById('send-email-btn').addEventListener('click', function() {
+        self.handleSendEmail();
+    });
 };

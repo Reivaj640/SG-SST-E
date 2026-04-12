@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generar Informe de Remisión Médica</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="generar-informe-remision.css">
+</head>
+<body>
+
+<div class="env-wrapper">
+
+    <!-- Header con step indicator -->
+    <header class="env-header">
+        <div class="env-header-left">
+            <button id="backBtn" class="env-btn env-btn-secondary" aria-label="Volver">
+                <i class="fas fa-arrow-left"></i>
+                <span>Volver</span>
+            </button>
+            <div class="env-header-divider"></div>
+            <div class="env-header-title">
+                <h1>Generar Informe de Remisión</h1>
+                <p>Indexar datos y generar documento oficial</p>
+            </div>
+        </div>
+
+        <!-- Indicador de pasos -->
+        <div class="env-step-indicator" id="stepIndicator">
+            <div class="env-step-node done" id="stepNode1">
+                <div class="env-step-circle" id="stepCircle1"><i class="fas fa-check"></i></div>
+                <span class="env-step-label">Seleccionar PDF</span>
+            </div>
+            <div class="env-step-line done" id="stepLine1"></div>
+            <div class="env-step-node done" id="stepNode2">
+                <div class="env-step-circle" id="stepCircle2"><i class="fas fa-check"></i></div>
+                <span class="env-step-label">Verificar Datos</span>
+            </div>
+            <div class="env-step-line done" id="stepLine2"></div>
+            <div class="env-step-node active" id="stepNode3">
+                <div class="env-step-circle" id="stepCircle3">3</div>
+                <span class="env-step-label">Generar Informe</span>
+            </div>
+            <div class="env-step-line" id="stepLine3"></div>
+            <div class="env-step-node" id="stepNode4">
+                <div class="env-step-circle" id="stepCircle4">4</div>
+                <span class="env-step-label">Enviar</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Contenido scrollable -->
+    <div class="env-body">
+
+        <!-- PASO 3A: Resumen de datos indexados -->
+        <div class="env-step-card" id="step3ACard">
+            <div class="env-card-header">
+                <div class="env-card-step-badge">3A</div>
+                <span class="env-card-title">Datos Indexados para el Informe</span>
+                <span class="env-card-status pending" id="summaryStatus">Revisar</span>
+            </div>
+            <div class="env-card-body">
+                <div class="env-summary-grid" id="summaryGrid">
+                    <!-- Generado dinámicamente -->
+                </div>
+            </div>
+        </div>
+
+        <!-- PASO 3B: Vista previa del documento -->
+        <div class="env-step-card" id="step3BCard">
+            <div class="env-card-header">
+                <div class="env-card-step-badge">3B</div>
+                <span class="env-card-title">Documento a Generar</span>
+                <span class="env-card-status pending" id="docStatus">Pendiente</span>
+            </div>
+            <div class="env-card-body">
+                <div class="env-doc-preview">
+                    <div class="env-doc-icon"><i class="fas fa-file-word"></i></div>
+                    <div class="env-doc-info">
+                        <p class="env-doc-template" id="docTemplateName">Plantilla: GI-OD-007 REMISION A EPS.docx</p>
+                        <p class="env-doc-filename" id="docOutputName">Nombre del archivo se generará al confirmar</p>
+                        <p class="env-doc-control" id="docControlInfo">Se actualizará el archivo de control GI-FO-012</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PASO 3C: Acción de generar -->
+        <div class="env-step-card" id="step3CCard">
+            <div class="env-card-header">
+                <div class="env-card-step-badge">3C</div>
+                <span class="env-card-title">Generar Informe Oficial</span>
+                <span class="env-card-status pending" id="generateStatus">Pendiente</span>
+            </div>
+            <div class="env-card-body">
+                <div class="env-actions-generate">
+                    <button class="env-btn env-btn-primary env-btn-lg" id="generateBtn">
+                        <i class="fas fa-file-alt"></i>
+                        Generar Informe Oficial
+                    </button>
+                    <div class="env-processing-indicator hidden" id="processingIndicator">
+                        <div class="env-spinner"></div>
+                        <span>Generando documento y actualizando control...</span>
+                    </div>
+                    <div class="env-success-message hidden" id="successMessage">
+                        <i class="fas fa-check-circle"></i>
+                        <span>Informe generado exitosamente. Listo para enviar.</span>
+                    </div>
+                </div>
+                <div class="env-continue-section hidden" id="continueSection">
+                    <button class="env-btn env-btn-success env-btn-lg" id="continueBtn">
+                        <i class="fas fa-paper-plane"></i>
+                        Continuar al Envío
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Log de actividad -->
+        <div class="env-log-panel">
+            <div class="env-log-header">
+                <h4><i class="fas fa-terminal"></i> Registro de Actividad</h4>
+                <button class="env-log-clear" id="logClearBtn">
+                    <i class="fas fa-trash-alt"></i> Limpiar
+                </button>
+            </div>
+            <div class="env-log-entries" id="logEntries">
+                <div class="env-log-empty" id="logEmpty">
+                    <i class="fas fa-inbox"></i>
+                    <span>Sin actividad registrada</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Toast de notificaciones -->
+    <div id="toast" class="env-toast" role="alert">
+        <div id="toastIcon" class="env-toast-icon"></div>
+        <div class="env-toast-content">
+            <p id="toastTitle" class="env-toast-title"></p>
+            <p id="toastMessage" class="env-toast-message"></p>
+        </div>
+        <button id="toastClose" class="env-toast-close" aria-label="Cerrar">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+
+</div>
+
+<script src="generar-informe-remision.js"></script>
+</body>
+</html>

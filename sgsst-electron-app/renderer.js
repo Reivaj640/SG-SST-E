@@ -1132,6 +1132,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                   console.log('[RENDERER] Ver estadísticas de ausentismo solicitada');
                   // El módulo se encarga de mostrar la vista de estadísticas
                   return;
+
+              // ═══════════════════════════════════════════════════════════
+              // NOTA: Los mensajes de remisiones médicas (-request) NO deben
+              // manejarse aquí. El bridge restricciones-medicas-logic.js ya
+              // los maneja correctamente a través de su handler de postMessage.
+              // Si se agregan aquí, se duplican las respuestas.
+              // ═══════════════════════════════════════════════════════════
+
               default:
                   // Verificar si es un mensaje de respuesta (ya procesado), para evitar bucles
                   if (type.endsWith('-response')) {

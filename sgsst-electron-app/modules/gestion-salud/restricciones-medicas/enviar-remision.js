@@ -13,6 +13,7 @@
     var extractedData = {};
     var lastDocumentPath = null;
     var toastTimeout = null;
+    var currentStep = 1;
 
     // ─── Comunicación con parent (restricciones-medicas-logic.js) ────────
     function callParentAPI(type, payload) {
@@ -161,6 +162,12 @@
                 setStepDone(1);
                 logEntry('Datos extraídos correctamente. Verifica y edita si es necesario.', 'success');
                 showToast('PDF procesado', 'Datos extraídos. Revisa los campos antes de continuar.', 'success');
+
+                // Tras verificar datos, navegar a la sección de generar informe
+                logEntry('Redirigiendo a generación de informe oficial...', 'info');
+                setTimeout(function() {
+                    navigateToGenerarInforme();
+                }, 1500);
             } else {
                 var errMsg = (result && result.error) || 'No se pudieron extraer datos del PDF.';
                 logEntry('Error en extracción: ' + errMsg, 'error');
@@ -475,6 +482,14 @@
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
+    }
+
+    // ─── Navegar a generar informe ─────────────────────────────────────
+    function navigateToGenerarInforme() {
+        window.parent.postMessage({
+            type: 'navigate-to-generar-informe-request',
+            payload: { extractedData: extractedData }
+        }, '*');
     }
 
 })();

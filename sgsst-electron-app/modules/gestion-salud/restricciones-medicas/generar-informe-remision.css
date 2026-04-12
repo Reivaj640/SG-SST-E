@@ -1,5 +1,5 @@
 /* ============================================================================
-   enviar-remision.css — Enviar Remisiones Médicas (3.1.6)
+   generar-informe-remision.css — Generar Informe de Remisión Médica (3.1.6)
    Sistema Visual Oficial K+AIR — Aislado, sin dependencias globales
    ============================================================================ */
 
@@ -142,7 +142,7 @@ body {
 
 .env-step-line {
     flex: 1;
-    max-width: 80px;
+    max-width: 60px;
     height: 2px;
     background-color: var(--env-border-light);
     margin: 0 4px;
@@ -168,7 +168,6 @@ body {
 .env-step-node.done .env-step-label { color: var(--env-success); }
 
 .env-step-line.done { background-color: var(--env-success); }
-.env-step-line.active { background-color: var(--env-primary-light); }
 
 /* === BUTTONS === */
 
@@ -227,24 +226,10 @@ body {
     box-shadow: 0 4px 12px rgba(40, 167, 69, 0.25);
 }
 
-.env-btn-wa {
-    background-color: var(--env-wa);
-    color: white;
-}
-.env-btn-wa:hover:not(:disabled) {
-    background-color: var(--env-wa-hover);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3);
-}
-
-.env-btn-email {
-    background-color: var(--env-info);
-    color: white;
-}
-.env-btn-email:hover:not(:disabled) {
-    background-color: #138496;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(23, 162, 184, 0.25);
+.env-btn-lg {
+    padding: 0.875rem 2rem;
+    font-size: 1rem;
+    font-weight: 600;
 }
 
 .env-btn-full { width: 100%; }
@@ -314,11 +299,6 @@ body {
     transition: var(--env-transition);
 }
 
-.env-step-card.step-done .env-card-step-badge {
-    background-color: var(--env-success-light);
-    color: var(--env-success);
-}
-
 .env-card-title {
     font-size: 0.9375rem;
     font-weight: 600;
@@ -346,70 +326,122 @@ body {
 
 .env-card-body { padding: 1.25rem; }
 
-/* === DROP ZONE (Paso 1) === */
+/* === SUMMARY GRID (3A) === */
 
-.env-drop-zone {
-    border: 2px dashed var(--env-border);
-    border-radius: var(--env-radius-lg);
-    padding: 2.5rem 1.5rem;
-    text-align: center;
-    cursor: pointer;
-    transition: var(--env-transition);
+.env-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0.75rem;
+}
+
+.env-summary-item {
+    display: flex;
+    flex-direction: column;
+    padding: 0.625rem 0.75rem;
     background-color: var(--env-bg-body);
-    position: relative;
+    border-radius: var(--env-radius);
+    border: 1px solid var(--env-border-light);
 }
 
-.env-drop-zone:hover, .env-drop-zone.dragover {
-    border-color: var(--env-primary);
-    background-color: rgba(23, 78, 166, 0.04);
-}
-
-.env-drop-zone.has-file {
-    border-color: var(--env-success);
-    border-style: solid;
-    background-color: rgba(40, 167, 69, 0.04);
-}
-
-.env-drop-icon {
-    font-size: 2.5rem;
-    color: var(--env-primary);
-    opacity: 0.6;
-    margin-bottom: 0.75rem;
-    transition: var(--env-transition);
-}
-
-.env-drop-zone.has-file .env-drop-icon {
-    color: var(--env-success);
-    opacity: 0.8;
-}
-
-.env-drop-title {
-    font-size: 0.9375rem;
-    font-weight: 500;
-    color: var(--env-text-primary);
+.env-summary-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--env-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
     margin-bottom: 0.25rem;
 }
 
-.env-drop-subtitle {
-    font-size: 0.8125rem;
-    color: var(--env-text-muted);
-    margin-bottom: 1rem;
+.env-summary-value {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--env-text-primary);
+    word-break: break-word;
 }
 
-.env-file-path-display {
-    font-size: 0.8rem;
-    color: var(--env-success);
+.env-summary-item.critical .env-summary-value {
+    color: var(--env-primary);
+    font-weight: 600;
+}
+
+/* === DOC PREVIEW (3B) === */
+
+.env-doc-preview {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    padding: 1.25rem;
+    background-color: var(--env-bg-body);
+    border-radius: var(--env-radius);
+    border: 1px solid var(--env-border-light);
+}
+
+.env-doc-icon {
+    font-size: 2.5rem;
+    color: var(--env-primary);
+    flex-shrink: 0;
+}
+
+.env-doc-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.env-doc-template {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--env-text-secondary);
+    margin-bottom: 0.25rem;
+}
+
+.env-doc-filename {
+    font-size: 0.75rem;
+    color: var(--env-text-muted);
+    font-family: 'Consolas', 'Monaco', monospace;
+    word-break: break-all;
+    margin-bottom: 0.25rem;
+}
+
+.env-doc-control {
+    font-size: 0.6875rem;
+    color: var(--env-text-muted);
+    font-style: italic;
+}
+
+/* === ACTIONS (3C) === */
+
+.env-actions-generate {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+.env-continue-section {
+    margin-top: 1.25rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--env-border-light);
+    display: flex;
+    justify-content: center;
+}
+
+.env-success-message {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
     font-weight: 500;
+    color: var(--env-success);
+    padding: 0.75rem 1.25rem;
     background-color: var(--env-success-light);
     border-radius: var(--env-radius);
-    padding: 0.4rem 0.75rem;
-    display: inline-block;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    margin-top: 0.5rem;
+    width: 100%;
+    justify-content: center;
 }
+
+.env-success-message i { font-size: 1.125rem; }
+
+/* === PROCESSING INDICATOR === */
 
 .env-processing-indicator {
     display: flex;
@@ -432,83 +464,6 @@ body {
 }
 
 @keyframes env-spin { to { transform: rotate(360deg); } }
-
-/* === FIELDS GRID (Paso 2) === */
-
-.env-fields-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 0.625rem;
-    max-height: 260px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding-right: 0.375rem;
-}
-
-.env-field-row {
-    display: grid;
-    grid-template-columns: 190px 1fr;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.375rem 0;
-    border-bottom: 1px solid var(--env-border-light);
-}
-
-.env-field-row:last-child { border-bottom: none; }
-
-.env-field-label {
-    font-size: 0.8125rem;
-    font-weight: 600;
-    color: var(--env-text-secondary);
-    text-align: right;
-    padding-right: 0.25rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.env-field-input {
-    width: 100%;
-    padding: 0.4rem 0.65rem;
-    border: 1px solid var(--env-border);
-    border-radius: var(--env-radius);
-    font-size: 0.875rem;
-    font-family: inherit;
-    color: var(--env-text-primary);
-    background-color: var(--env-bg-card);
-    transition: var(--env-transition);
-    outline: none;
-}
-
-.env-field-input:focus {
-    border-color: var(--env-primary);
-    box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.1);
-}
-
-.env-field-input:hover { border-color: #adb5bd; }
-
-/* === ACTIONS (Paso 3) === */
-
-.env-actions-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-}
-
-.env-actions-send-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
-}
-
-.env-action-hint {
-    font-size: 0.75rem;
-    color: var(--env-text-muted);
-    margin-top: 0.25rem;
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-}
 
 /* === LOG PANEL === */
 
@@ -677,23 +632,19 @@ body {
 /* === SCROLLBAR === */
 
 .env-body::-webkit-scrollbar,
-.env-log-entries::-webkit-scrollbar,
-.env-fields-grid::-webkit-scrollbar { width: 8px; }
+.env-log-entries::-webkit-scrollbar { width: 8px; }
 
 .env-body::-webkit-scrollbar-track,
-.env-log-entries::-webkit-scrollbar-track,
-.env-fields-grid::-webkit-scrollbar-track { background: #e9ecef; }
+.env-log-entries::-webkit-scrollbar-track { background: #e9ecef; }
 
 .env-body::-webkit-scrollbar-thumb,
-.env-log-entries::-webkit-scrollbar-thumb,
-.env-fields-grid::-webkit-scrollbar-thumb {
+.env-log-entries::-webkit-scrollbar-thumb {
     background-color: #6c757d;
     border-radius: 4px;
 }
 
 .env-body::-webkit-scrollbar-thumb:hover,
-.env-log-entries::-webkit-scrollbar-thumb:hover,
-.env-fields-grid::-webkit-scrollbar-thumb:hover {
+.env-log-entries::-webkit-scrollbar-thumb:hover {
     background-color: #495057;
 }
 
@@ -701,9 +652,8 @@ body {
 
 @media (max-width: 700px) {
     .env-step-indicator { display: none; }
-    .env-field-row { grid-template-columns: 1fr; }
-    .env-field-label { text-align: left; }
-    .env-actions-send-row { grid-template-columns: 1fr; }
+    .env-summary-grid { grid-template-columns: 1fr; }
+    .env-doc-preview { flex-direction: column; text-align: center; }
     .env-body { padding: 1rem; }
 }
 

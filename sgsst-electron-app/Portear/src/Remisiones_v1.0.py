@@ -833,10 +833,80 @@ class PdfProcessor:
         logging.warning(f"No se pudo formatear la fecha: {date_str}")
         return date_str
 
-# Clase ExcelHandler para manejar archivos Excel
+## Clase ExcelHandler para manejar archivos Excel
 class ExcelHandler:
     def update_control_file(self, data, control_path):
         try:
+            control_path = Path(control_path)
+            if not control_path.exists():
+                raise FileNotFoundError(f"Archivo de control no encontrado: {control_path}")
+            
+            df = pd.read_excel(control_path, header=0)
+            header_row = 0
+            
+            # Buscar la fila donde comienzan los datos
+            for i, row in df.iterrows():
+                if pd.notna(row.iloc[0]) and str(row.iloc[0]).strip() != '':
+                    header_row = i
+                    break
+            
+            df = pd.read_excel(control_path, header=header_row)
+            
+            if 'Fecha_Atencion' in df.columns:
+                df['Fecha_Atencion'] = pd.to_datetime(df['Fecha_Atencion'], format='%Y/%m/%d', errors='coerce')
+
+            if 'Item' in df.columns and not df['Item'].isnull().all():
+                max_item = df['Item'].dropna().astype(int).max()
+                new_item = max_item + 1
+            else:
+                new_item = 1
+
+            data_id = str(data['No_Identificacion']).strip()
+            data_date = pd.to_datetime(data.get('Fecha_Atencion', datetime.now().strftime('%Y/%m/%d')), errors='coerce')
+            same_person = (df['No_Identificacion'] == data_id) & (df['Fecha_Atencion'] == data_date)
+
+            new_row_data = {'Item': new_item}
+            new_row_data.update({col: data.get(col, '') for col in Config.COLUMNAS_CONTROL if col != 'Item'})
+            new_row_data['No. Identificación'] = str(new_row_data['No. Identificación']).replace('.0', '')
+
+            if same_person.any():
+                idx = df[same_person].index[0]
+                for col, value in new_row_data.items():
+                    if col in data and data[col]:
+                        if col == 'Edad' and value:
+                            try:
+                                value = int(value)
+                            except (ValueError, TypeError):
+                                value = pd.NA
+                        elif df[col].dtype in ['int64', 'float64'] and value:
+                            try:
+                                value = pd.to_numeric(value, errors='coerce')
+                                if pd.isna(value):
+                                    value = pd.NA
+                            except (ValueError, TypeError):
+                                value = pd.NA
+                        elif df[col].dtype == 'object':
+                            value = str(value)
+                        df.loc[idx, col] = value
+                action = "actualizado"
+                row_number = idx + header_row + 2
+            else:
+                new_row = pd.Series(new_row_data)
+                df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+                row_number = len(df) + header_row + 1
+                action = f"añadido en la fila {row_number}"
+
+            with pd.ExcelWriter(control_path, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False, header=True, startrow=header_row)
+                logging.info(f"Archivo de control {action}: {control_path}")
+
+            return str(control_path)
+
+        except Exception as e:
+            logging.error(f"Error al actualizar archivo de control: {str(e)}")
+            logging.debug(traceback.format_exc())
+            raise
+       try:
             control_path = Path(control_path)
             logging.info(f"Actualizando archivo de control: {control_path}")
 
@@ -1280,10 +1350,8 @@ Correo: {remitente}"""
             self.logger.error(f"Error inesperado: {str(e)}\n{traceback.format_exc()}")
             return False
 
-# Clase principal de la aplicación
+## Clase principal de la aplicación
 class RemisionesApp(ttk.Window):
-    
-        
     def __init__(self):
         super().__init__(themename="flatly")
         self.title("Sistema de Gestión de Remisiones EPS")
@@ -1295,7 +1363,6 @@ class RemisionesApp(ttk.Window):
         self.doc_generator = DocumentGenerator()
         self.cache_manager = CacheManager()
         self.whatsapp_sender = WhatsAppSender()
-        # ELIMINADO: self.email_sender = ... 
 
         self.pdf_path = StringVar()
         self.template_path = StringVar(value=str(Config.RUTAS["TEMPOACTIVA"]["plantilla"]))
@@ -1389,15 +1456,19 @@ class RemisionesApp(ttk.Window):
                    command=self._batch_process,
                    bootstyle=WARNING).pack(padx=5, pady=3)
 
-    def _update_paths(self, event=None):
+     def _update_paths(self, event=None):
         empresa = self.empresa.get()
         if empresa in Config.RUTAS:
             rutas = Config.RUTAS[empresa]
             self.template_path.set(str(rutas["plantilla"]))
             self.output_path.set(str(rutas["remisiones"]))
             self.log_message(f"Rutas actualizadas para {empresa}")
+           rutas = Config.RUTAS[empresa]
+            self.template_path.set(str(rutas["plantilla"]))
+            self.output_path.set(str(rutas["remisiones"]))
+            self.log_message(f"Rutas actualizadas para {empresa}")
 
-    def _browse_pdf(self):
+     def _browse_pdf(self):
         file = filedialog.askopenfilename(
             title="Seleccionar PDF",
             filetypes=[("Archivos PDF", "*.pdf")]
@@ -1409,8 +1480,14 @@ class RemisionesApp(ttk.Window):
             self._clear_displayed_data()
             self.send_whatsapp_btn.config(state=DISABLED)
             self.send_email_btn.config(state=DISABLED)
+           self.cache_manager.remove_from_cache(file)
+            self.pdf_path.set(file)
+            self.log_message(f"Archivo seleccionado: {file}")
+            self._clear_displayed_data()
+            self.send_whatsapp_btn.config(state=DISABLED)
+            self.send_email_btn.config(state=DISABLED)
 
-    def _browse_template(self):
+     def _browse_template(self):
         file = filedialog.askopenfilename(
             title="Seleccionar Plantilla",
             filetypes=[("Archivos Word", "*.doc;*.docx")]
@@ -1418,13 +1495,17 @@ class RemisionesApp(ttk.Window):
         if file:
             self.template_path.set(file)
             self.log_message(f"Plantilla seleccionada: {file}")
+           self.template_path.set(file)
+            self.log_message(f"Plantilla seleccionada: {file}")
 
-    def _browse_output(self):
+     def _browse_output(self):
         folder = filedialog.askdirectory(
             title="Seleccionar Carpeta de Salida"
         )
         if folder:
             self.output_path.set(folder)
+            self.log_message(f"Carpeta de salida: {folder}")
+           self.output_path.set(folder)
             self.log_message(f"Carpeta de salida: {folder}")
 
     def _process_pdf(self):
