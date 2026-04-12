@@ -12316,6 +12316,268 @@ ipcMain.handle('get-examenes-stats', async (event, companyName) => {
   }
 });
 
+// ═══════════════════════════════════════════════════════════
+// HANDLERS IPC - REMISIONES MÉDICAS (Submódulo 3.1.6)
+// ═══════════════════════════════════════════════════════════
+
+// ── Handler: select-pdf-file ──────────────────────────────
+ipcMain.handle('select-pdf-file', async (event) => {
+  sendLog(`[REMISION-PDF] Abriendo diálogo de selección de PDF...`);
+  
+  try {
+    const result = await dialog.showOpenDialog({
+      title: 'Seleccionar PDF de Remisión Médica',
+      filters: [
+        { name: 'Archivos PDF', extensions: ['pdf'] }
+      ],
+      properties: ['openFile'],
+      buttonLabel: 'Seleccionar'
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      sendLog(`[REMISION-PDF] Selección cancelada por el usuario`);
+      return null;
+    }
+
+    const selectedPath = result.filePaths[0];
+    sendLog(`[REMISION-PDF] Archivo seleccionado: ${selectedPath}`);
+    return selectedPath;
+
+  } catch (error) {
+    sendLog(`[REMISION-PDF] Error al seleccionar archivo: ${error.message}`, 'ERROR');
+    throw error;
+  }
+});
+
+// ── Handler: process-remision-pdf ─────────────────────────
+ipcMain.handle('process-remision-pdf', async (event, pdfPath) => {
+  sendLog(`[REMISION-PDF] Procesando PDF: ${pdfPath}`);
+  
+  try {
+    // Verificar que el archivo existe
+    if (!fs.existsSync(pdfPath)) {
+      return {
+        success: false,
+        error: `El archivo PDF no existe: ${pdfPath}`
+      };
+    }
+
+    // Importar RemisionUtils para extracción de datos
+    const RemisionUtils = require('./utils/remisionUtils.js');
+    const remisionUtils = new RemisionUtils();
+
+    // Extraer texto del PDF
+    sendLog(`[REMISION-PDF] Extrayendo texto del PDF...`);
+    const text = await remisionUtils.extractTextFromPDF(pdfPath);
+    
+    // Extraer datos estructurados del texto
+    sendLog(`[REMISION-PDF] Extrayendo datos estructurados...`);
+    const extractedData = remisionUtils.extractDataFromText(text, pdfPath);
+    
+    // Validar datos críticos
+    const isValid = remisionUtils.validateCriticalData(extractedData);
+    
+    if (!isValid) {
+      sendLog(`[REMISION-PDF] Validación de datos críticos falló`, 'WARN');
+      return {
+        success: false,
+        error: 'Los datos extraídos no son válidos. Verifique el PDF.',
+        data: extractedData
+      };
+    }
+
+    sendLog(`[REMISION-PDF] Datos extraídos exitosamente: ${Object.keys(extractedData).length} campos`);
+    
+    return {
+      success: true,
+      data: extractedData
+    };
+
+  } catch (error) {
+    sendLog(`[REMISION-PDF] Error crítico al procesar PDF: ${error.message}`, 'ERROR');
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+});
+
+// ── Handler: generate-remision-document ───────────────────
+ipcMain.handle('generate-remision-document', async (event, extractedData, empresa) => {
+  sendLog(`[REMISION-DOC] Generando documento Word para empresa: ${empresa}`);
+
+  try {
+    if (!extractedData || Object.keys(extractedData).length === 0) {
+      return { success: false, error: 'No hay datos extraídos para generar el documento' };
+    }
+
+    // Forzar afiliación según empresa seleccionada (como Python)
+    const RemisionUtils = require('./utils/remisionUtils.js');
+    const remisionUtils = new RemisionUtils();
+    remisionUtils.forceAfiliacion(extractedData, empresa);
+
+    // Cargar configuración para obtener rutas
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+
+    let basePath = null;
+    if (config.companyPaths && config.companyPaths[empresa]) {
+      basePath = config.companyPaths[empresa].root || config.companyPaths[empresa].ruta_base;
+    }
+    if (!basePath) {
+      return { success: false, error: `No se encontró ruta base para la empresa "${empresa}"` };
+    }
+
+    // Buscar plantilla y directorio de salida
+    const plantillaNombre = 'GI-OD-007 REMISION A EPS.docx';
+    const templatePath = await findFileRecursive(basePath, plantillaNombre);
+
+    if (!templatePath) {
+      sendLog(`[REMISION-DOC] Plantilla no encontrada: ${plantillaNombre}`, 'WARN');
+      return { success: false, error: `Plantilla no encontrada: ${plantillaNombre}` };
+    }
+
+    // Directorio de salida: buscar o crear carpeta de remisiones
+    const remisionesDir = await findFileRecursive(basePath, '3.1.6.1. Remisiones EPS')
+                       || await findFileRecursive(basePath, '3.1.6.1 Remisiones EPS')
+                       || await findFileRecursive(basePath, 'Remisiones EPS')
+                       || path.join(basePath, 'Remisiones y Recomendaciones Médicas');
+
+    if (!fs.existsSync(remisionesDir)) {
+      sendLog(`[REMISION-DOC] Creando directorio: ${remisionesDir}`);
+      await fsp.mkdir(remisionesDir, { recursive: true });
+    }
+
+    // Buscar archivo de control
+    const controlFileName = 'GI-FO-012 CONTROL DE REMISIONES.xlsx';
+    const controlPath = await findFileRecursive(basePath, controlFileName);
+
+    sendLog(`[REMISION-DOC] Plantilla: ${templatePath}`);
+    sendLog(`[REMISION-DOC] Directorio salida: ${remisionesDir}`);
+    sendLog(`[REMISION-DOC] Control: ${controlPath || 'No encontrado'}`);
+
+    // Generar documento Word + actualizar control
+    const result = await remisionUtils.generateRemisionDocument(
+      extractedData, templatePath, remisionesDir, controlPath
+    );
+
+    if (result.success) {
+      sendLog(`[REMISION-DOC] Documento generado: ${result.documentPath}`);
+      if (result.controlPath) {
+        sendLog(`[REMISION-DOC] Control actualizado: ${result.controlPath}`);
+      }
+    } else {
+      sendLog(`[REMISION-DOC] Error: ${result.error}`, 'ERROR');
+    }
+
+    return result;
+
+  } catch (error) {
+    sendLog(`[REMISION-DOC] Error crítico al generar documento: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// ── Handler: send-remision-by-whatsapp ────────────────────
+ipcMain.handle('send-remision-by-whatsapp', async (event, docPath, extractedData, empresa) => {
+  sendLog(`[REMISION-WHATSAPP] Preparando envío para empresa: ${empresa}`);
+
+  try {
+    if (!docPath || !fs.existsSync(docPath)) {
+      return { success: false, error: 'El documento no existe o no es accesible' };
+    }
+
+    // Construir mensaje profesional (como Python)
+    const cedula = extractedData['No. Identificación'] || extractedData['Cédula'] || 'N/A';
+    const nombre = extractedData['Nombre Completo'] || extractedData['Nombre'] || 'N/A';
+    const fecha = extractedData['Fecha de Atención'] || extractedData['Fecha'] || 'N/A';
+
+    const message = `*REMISIÓN MÉDICA - SST*\n\n` +
+      `*Empresa:* ${empresa}\n` +
+      `*Trabajador:* ${nombre}\n` +
+      `*Cédula:* ${cedula}\n` +
+      `*Fecha de Atención:* ${fecha}\n\n` +
+      `Adjunto encontrará la remisión médica correspondiente.\n\n` +
+      `_Generado por Sistema SG-SST_`;
+
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://web.whatsapp.com/send?text=${encodedMessage}`;
+
+    sendLog(`[REMISION-WHATSAPP] Abriendo WhatsApp Web...`);
+    await shell.openExternal(whatsappUrl);
+
+    // Abrir carpeta contenedora del documento (como Python os.startfile)
+    const folderPath = path.dirname(docPath);
+    sendLog(`[REMISION-WHATSAPP] Abriendo carpeta: ${folderPath}`);
+    await shell.openPath(folderPath);
+
+    sendLog(`[REMISION-WHATSAPP] WhatsApp Web y carpeta abiertos exitosamente`);
+    return { success: true };
+
+  } catch (error) {
+    sendLog(`[REMISION-WHATSAPP] Error: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// ── Handler: send-remision-by-email ───────────────────────
+ipcMain.handle('send-remision-by-email', async (event, docPath, extractedData, empresa) => {
+  sendLog(`[REMISION-EMAIL] Preparando envío para empresa: ${empresa}`);
+
+  try {
+    if (!docPath || !fs.existsSync(docPath)) {
+      return { success: false, error: 'El documento no existe o no es accesible' };
+    }
+
+    const cedula = extractedData['No. Identificación'] || extractedData['Cédula'] || 'N/A';
+    const nombre = extractedData['Nombre Completo'] || extractedData['Nombre'] || 'N/A';
+    const fecha = extractedData['Fecha de Atención'] || extractedData['Fecha'] || 'N/A';
+
+    // Intentar obtener correo del destinatario desde datos extraídos
+    const emailDestino = extractedData['Correo Electrónico']
+                      || extractedData['Email']
+                      || extractedData['correo_electronico']
+                      || '';
+
+    // Construir asunto y cuerpo (plantilla profesional como Python)
+    const asunto = `Seguimiento a Recomendaciones Médicas Laborales - ${nombre} - ${fecha}`;
+    const cuerpo = `Estimado/a ${nombre},
+
+Conforme al resultado del examen médico ocupacional realizado el día ${fecha}, te compartimos la carta de remisiones médicas, en la cual se detallan recomendaciones específicas relacionadas con tu estado de salud y tu actividad laboral.
+
+📎 Adjunto encontrarás el documento oficial con las recomendaciones.
+
+Te solicitamos por favor:
+✅ Leer atentamente las recomendaciones.
+✅ Confirmar la recepción de este mensaje y del documento.
+✅ Informarnos si ya estás realizando los controles médicos indicados (si aplica).
+
+Estas recomendaciones serán tenidas en cuenta por el área de Seguridad y Salud en el Trabajo para realizar el seguimiento correspondiente.
+
+Saludos cordiales,
+Equipo ${empresa}`;
+
+    // Si hay email de destino, usar mailto con datos completos
+    if (emailDestino) {
+      const mailtoUrl = `mailto:${emailDestino}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
+      sendLog(`[REMISION-EMAIL] Abriendo cliente de correo para: ${emailDestino}`);
+      await shell.openExternal(mailtoUrl);
+    } else {
+      // Sin email: abrir correo por defecto sin destinatario
+      const mailtoUrl = `?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
+      sendLog(`[REMISION-EMAIL] Sin email de destino, abriendo cliente de correo...`);
+      await shell.openExternal(`mailto:${mailtoUrl}`);
+    }
+
+    sendLog(`[REMISION-EMAIL] Cliente de correo abierto. Adjuntar manualmente: ${path.basename(docPath)}`);
+    return { success: true };
+
+  } catch (error) {
+    sendLog(`[REMISION-EMAIL] Error: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
 // Iniciar el servidor OnlyOffice al iniciar la aplicación
 app.whenReady().then(() => {
     createWindow();
