@@ -12411,6 +12411,10 @@ ipcMain.handle('generate-remision-document', async (event, extractedData, empres
       return { success: false, error: 'No hay datos extraídos para generar el documento' };
     }
 
+    // Agregar empresa a los datos para uso posterior
+    extractedData['Afiliación'] = empresa;
+    extractedData['Empresa'] = empresa;
+
     // Forzar afiliación según empresa seleccionada (como Python)
     const RemisionUtils = require('./utils/remisionUtils.js');
     const remisionUtils = new RemisionUtils();
@@ -12478,102 +12482,116 @@ ipcMain.handle('generate-remision-document', async (event, extractedData, empres
   }
 });
 
+// ── Handler: get-contact-info ─────────────────────────────
+ipcMain.handle('get-contact-info', async (event, cedula, empresa) => {
+  try {
+    const ContactFinder = require('./utils/contactUtils');
+    const contactFinder = new ContactFinder();
+    const { telefono, email } = contactFinder.obtenerContacto(cedula, empresa);
+    
+    return { success: true, telefono, email };
+  } catch (error) {
+    sendLog(`[CONTACT-INFO] Error: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
 // ── Handler: send-remision-by-whatsapp ────────────────────
 ipcMain.handle('send-remision-by-whatsapp', async (event, docPath, extractedData, empresa) => {
-  sendLog(`[REMISION-WHATSAPP] Preparando envío para empresa: ${empresa}`);
-
   try {
+    sendLog('[REMISION-WHATSAPP] Preparando envío por WhatsApp...', 'INFO');
+
     if (!docPath || !fs.existsSync(docPath)) {
       return { success: false, error: 'El documento no existe o no es accesible' };
     }
 
-    // Construir mensaje profesional (como Python)
+    // Obtener cédula y nombre
     const cedula = extractedData['No. Identificación'] || extractedData['Cédula'] || 'N/A';
     const nombre = extractedData['Nombre Completo'] || extractedData['Nombre'] || 'N/A';
-    const fecha = extractedData['Fecha de Atención'] || extractedData['Fecha'] || 'N/A';
 
-    const message = `*REMISIÓN MÉDICA - SST*\n\n` +
-      `*Empresa:* ${empresa}\n` +
-      `*Trabajador:* ${nombre}\n` +
-      `*Cédula:* ${cedula}\n` +
-      `*Fecha de Atención:* ${fecha}\n\n` +
-      `Adjunto encontrará la remisión médica correspondiente.\n\n` +
-      `_Generado por Sistema SG-SST_`;
+    // Buscar contacto del trabajador
+    const ContactFinder = require('./utils/contactUtils');
+    const contactFinder = new ContactFinder();
+    const { telefono } = contactFinder.obtenerContacto(cedula, empresa);
 
-    const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = `https://web.whatsapp.com/send?text=${encodedMessage}`;
+    if (!telefono) {
+      sendLog(`[REMISION-WHATSAPP] Teléfono no encontrado para cédula: ${cedula}`, 'WARN');
+      return { success: false, error: `No se encontró teléfono para cédula ${cedula}` };
+    }
 
-    sendLog(`[REMISION-WHATSAPP] Abriendo WhatsApp Web...`);
-    await shell.openExternal(whatsappUrl);
+    // Construir mensaje
+    const WhatsAppSender = require('./utils/whatsappSender');
+    const whatsappSender = new WhatsAppSender();
+    const message = whatsappSender.buildRemisionMessage(extractedData);
 
-    // Abrir carpeta contenedora del documento (como Python os.startfile)
-    const folderPath = path.dirname(docPath);
-    sendLog(`[REMISION-WHATSAPP] Abriendo carpeta: ${folderPath}`);
-    await shell.openPath(folderPath);
+    // Enviar WhatsApp
+    sendLog(`[REMISION-WHATSAPP] Enviando a: ${telefono}`, 'INFO');
+    const result = whatsappSender.sendMessage({
+      phoneNumber: telefono,
+      message: message,
+      filePath: docPath
+    });
 
-    sendLog(`[REMISION-WHATSAPP] WhatsApp Web y carpeta abiertos exitosamente`);
-    return { success: true };
+    if (result.success) {
+      sendLog(`[REMISION-WHATSAPP] WhatsApp Web abierto correctamente`, 'INFO');
+      return { success: true, message: 'WhatsApp preparado correctamente' };
+    } else {
+      sendLog(`[REMISION-WHATSAPP] Error: ${result.error}`, 'ERROR');
+      return { success: false, error: result.error };
+    }
 
   } catch (error) {
-    sendLog(`[REMISION-WHATSAPP] Error: ${error.message}`, 'ERROR');
+    sendLog(`[REMISION-WHATSAPP] Error crítico: ${error.message}`, 'ERROR');
     return { success: false, error: error.message };
   }
 });
 
 // ── Handler: send-remision-by-email ───────────────────────
 ipcMain.handle('send-remision-by-email', async (event, docPath, extractedData, empresa) => {
-  sendLog(`[REMISION-EMAIL] Preparando envío para empresa: ${empresa}`);
-
   try {
+    sendLog('[REMISION-EMAIL] Preparando envío por correo...', 'INFO');
+
     if (!docPath || !fs.existsSync(docPath)) {
       return { success: false, error: 'El documento no existe o no es accesible' };
     }
 
+    // Obtener datos
     const cedula = extractedData['No. Identificación'] || extractedData['Cédula'] || 'N/A';
     const nombre = extractedData['Nombre Completo'] || extractedData['Nombre'] || 'N/A';
     const fecha = extractedData['Fecha de Atención'] || extractedData['Fecha'] || 'N/A';
 
-    // Intentar obtener correo del destinatario desde datos extraídos
-    const emailDestino = extractedData['Correo Electrónico']
-                      || extractedData['Email']
-                      || extractedData['correo_electronico']
-                      || '';
+    // Buscar contacto del trabajador
+    const ContactFinder = require('./utils/contactUtils');
+    const contactFinder = new ContactFinder();
+    const { email } = contactFinder.obtenerContacto(cedula, empresa);
 
-    // Construir asunto y cuerpo (plantilla profesional como Python)
-    const asunto = `Seguimiento a Recomendaciones Médicas Laborales - ${nombre} - ${fecha}`;
-    const cuerpo = `Estimado/a ${nombre},
-
-Conforme al resultado del examen médico ocupacional realizado el día ${fecha}, te compartimos la carta de remisiones médicas, en la cual se detallan recomendaciones específicas relacionadas con tu estado de salud y tu actividad laboral.
-
-📎 Adjunto encontrarás el documento oficial con las recomendaciones.
-
-Te solicitamos por favor:
-✅ Leer atentamente las recomendaciones.
-✅ Confirmar la recepción de este mensaje y del documento.
-✅ Informarnos si ya estás realizando los controles médicos indicados (si aplica).
-
-Estas recomendaciones serán tenidas en cuenta por el área de Seguridad y Salud en el Trabajo para realizar el seguimiento correspondiente.
-
-Saludos cordiales,
-Equipo ${empresa}`;
-
-    // Si hay email de destino, usar mailto con datos completos
-    if (emailDestino) {
-      const mailtoUrl = `mailto:${emailDestino}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
-      sendLog(`[REMISION-EMAIL] Abriendo cliente de correo para: ${emailDestino}`);
-      await shell.openExternal(mailtoUrl);
-    } else {
-      // Sin email: abrir correo por defecto sin destinatario
-      const mailtoUrl = `?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
-      sendLog(`[REMISION-EMAIL] Sin email de destino, abriendo cliente de correo...`);
-      await shell.openExternal(`mailto:${mailtoUrl}`);
+    if (!email) {
+      sendLog(`[REMISION-EMAIL] Email no encontrado para cédula: ${cedula}`, 'WARN');
+      return { success: false, error: `No se encontró email para cédula ${cedula}` };
     }
 
-    sendLog(`[REMISION-EMAIL] Cliente de correo abierto. Adjuntar manualmente: ${path.basename(docPath)}`);
-    return { success: true };
+    // Enviar correo
+    const EmailSender = require('./utils/emailSender');
+    const emailSender = new EmailSender(empresa);
+
+    sendLog(`[REMISION-EMAIL] Enviando a: ${email}`, 'INFO');
+    const result = await emailSender.enviarCorreo({
+      destinatario: email,
+      nombre: nombre,
+      fechaAtencion: fecha,
+      archivoAdjunto: docPath
+    });
+
+    if (result.success) {
+      sendLog(`[REMISION-EMAIL] Correo enviado exitosamente a ${email}`, 'INFO');
+      return { success: true, message: result.message, messageId: result.messageId };
+    } else {
+      sendLog(`[REMISION-EMAIL] Error: ${result.error}`, 'ERROR');
+      return { success: false, error: result.error };
+    }
 
   } catch (error) {
-    sendLog(`[REMISION-EMAIL] Error: ${error.message}`, 'ERROR');
+    sendLog(`[REMISION-EMAIL] Error crítico: ${error.message}`, 'ERROR');
     return { success: false, error: error.message };
   }
 });

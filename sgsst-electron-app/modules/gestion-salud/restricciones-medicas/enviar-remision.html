@@ -3,26 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enviar Remisión Médica</title>
+    <title>K+AIR | Enviar Remisión Médica</title>
+    <!-- Iconos -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <!-- Fuentes -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Estilos -->
     <link rel="stylesheet" href="enviar-remision.css">
 </head>
 <body>
 
 <div class="env-wrapper">
 
-    <!-- Header con step indicator -->
+    <!-- Header con step indicator alineado al estilo K+AIR -->
     <header class="env-header">
         <div class="env-header-left">
-            <button id="backBtn" class="env-btn env-btn-secondary" aria-label="Volver al portal">
+            <button id="backBtn" class="env-btn env-btn-secondary" aria-label="Volver">
                 <i class="fas fa-arrow-left"></i>
                 <span>Volver</span>
             </button>
             <div class="env-header-divider"></div>
             <div class="env-header-title">
-                <h1>Nueva Remisión Médica</h1>
-                <p>Procesar, generar y enviar remisiones médicas</p>
+                <h1>Nueva Remisión</h1>
+                <p>3.1.6 Gestión de la Salud</p>
             </div>
         </div>
 
@@ -30,17 +33,17 @@
         <div class="env-step-indicator" id="stepIndicator">
             <div class="env-step-node active" id="stepNode1">
                 <div class="env-step-circle" id="stepCircle1">1</div>
-                <span class="env-step-label">Seleccionar PDF</span>
+                <span class="env-step-label">PDF</span>
             </div>
             <div class="env-step-line" id="stepLine1"></div>
             <div class="env-step-node" id="stepNode2">
                 <div class="env-step-circle" id="stepCircle2">2</div>
-                <span class="env-step-label">Verificar Datos</span>
+                <span class="env-step-label">Datos</span>
             </div>
             <div class="env-step-line" id="stepLine2"></div>
             <div class="env-step-node" id="stepNode3">
                 <div class="env-step-circle" id="stepCircle3">3</div>
-                <span class="env-step-label">Generar y Enviar</span>
+                <span class="env-step-label">Enviar</span>
             </div>
         </div>
     </header>

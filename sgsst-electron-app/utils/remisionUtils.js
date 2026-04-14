@@ -599,7 +599,14 @@ class RemisionUtils {
 
     const content = await fsP.readFile(templatePath, 'binary');
     const zip     = new PizZip(content);
-    const doc     = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+    
+    // Configuración permisiva para manejar tags fragmentados en XML
+    const doc = new Docxtemplater(zip, {
+      paragraphLoop: true,
+      linebreaks: true,
+      delimiters: { start: '{{', end: '}}' },
+      nullGetter: function() { return ''; },
+    });
 
     doc.setData({
       fecha:                     new Date().toLocaleDateString('es-CO'),
@@ -613,16 +620,19 @@ class RemisionUtils {
 
     const buf = doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' });
 
-    await fsP.mkdir(outputDir, { recursive: true });
+    // Guardar en el MISMO directorio donde está la plantilla
+    const templateDir = path.dirname(templatePath);
+    await fsP.mkdir(templateDir, { recursive: true });
+    
     const fecha            = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const nombreSanitizado = (data['Nombre Completo'] || 'sin_nombre').replace(/[<>:"/\\|?*]/g, '_');
     let outputFileName     = `GI-OD-007 REMISION A EPS ${nombreSanitizado} ${fecha}.docx`;
-    let outputPath         = path.join(outputDir, outputFileName);
+    let outputPath         = path.join(templateDir, outputFileName);
     let counter            = 1;
 
     while (fs.existsSync(outputPath)) {
       outputFileName = `GI-OD-007 REMISION A EPS ${nombreSanitizado} ${fecha}_${counter}.docx`;
-      outputPath     = path.join(outputDir, outputFileName);
+      outputPath     = path.join(templateDir, outputFileName);
       counter++;
     }
 
@@ -780,10 +790,31 @@ class RemisionUtils {
         controlPath: ctrlPath || null
       };
     } catch (error) {
-      console.error(`[RemisionUtils] Error en generateRemisionDocument: ${error.message}`);
+      // Manejo mejorado de errores de docxtemplater
+      let errorMessage = error.message;
+      
+      // Si es un error de template de docxtemplater, extraer información útil
+      if (error.name === 'TemplateError' || error.message.includes('Multi error')) {
+        console.error('[RemisionUtils] Error de template detectado:');
+        console.error('  - Tipo:', error.name || 'Unknown');
+        console.error('  - Mensaje:', errorMessage);
+        
+        // Si hay propiedades de error, mostrarlas
+        if (error.properties && error.properties.errors) {
+          console.error('  - Errores detallados:');
+          error.properties.errors.forEach((err, i) => {
+            console.error(`    [${i}] ${err.message} (tag: ${err.properties?.xtag || 'N/A'})`);
+          });
+        }
+        
+        errorMessage = `Error en la plantilla: algunos tags pueden estar corruptos. 
+        Por favor, abra la plantilla en Word y guárdela como nuevo archivo para reconstruir el XML interno.`;
+      }
+      
+      console.error(`[RemisionUtils] Error en generateRemisionDocument: ${errorMessage}`);
       return {
         success: false,
-        error: error.message
+        error: errorMessage
       };
     }
   }

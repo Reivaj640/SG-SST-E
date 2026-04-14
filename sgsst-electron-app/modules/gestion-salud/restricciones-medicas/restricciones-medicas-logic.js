@@ -22,6 +22,9 @@ class RestriccionesMedicasComponent {
         // Exponer this para que el portal HTML pueda acceder al componente
         window.restriccionesMedicasPortalComponent = this;
 
+        // Cargar el CSS del modal si no está cargado
+        this._loadModalStyles();
+
         // Cargar el HTML del portal moderno
         try {
             const response = await fetch('./modules/gestion-salud/restricciones-medicas/restricciones-medicas-home.html');
@@ -42,6 +45,17 @@ class RestriccionesMedicasComponent {
             console.error('[RM] Error cargando portal:', error);
             // Fallback al método anterior si falla el fetch
             this._renderFallbackCards();
+        }
+    }
+
+    _loadModalStyles() {
+        const cssId = 'env-modal-styles';
+        if (!document.getElementById(cssId)) {
+            const link = document.createElement('link');
+            link.id = cssId;
+            link.rel = 'stylesheet';
+            link.href = './modules/gestion-salud/restricciones-medicas/env-modal.css';
+            document.head.appendChild(link);
         }
     }
 
@@ -441,7 +455,7 @@ class RestriccionesMedicasComponent {
             whatsappBtn.textContent = 'Enviando...';
             
             // Llamar al proceso de Python para enviar por WhatsApp
-            const result = await window.electronAPI.sendRemisionByWhatsApp(
+            const result = await window.electronAPI.sendRemisionByWhatsapp(
                 this.lastGeneratedDoc,
                 this.extractedData,
                 this.companyName
@@ -921,7 +935,7 @@ RestriccionesMedicasComponent.prototype.handleIframeMessage = function(event) {
             break;
 
         case 'send-remision-whatsapp-request':
-            window.electronAPI.sendRemisionByWhatsApp(
+            window.electronAPI.sendRemisionByWhatsapp(
                     payload && payload.documentPath,
                     payload && payload.extractedData,
                     self.companyName)
@@ -1064,51 +1078,258 @@ RestriccionesMedicasComponent.prototype.showNewDocumentViewer = function() {
 };
 
 // ═══════════════════════════════════════════════════════════
-// Página de solo envío (después de generar informe)
+// Página de solo envío (después de generar informe) - MODAL
 // ═══════════════════════════════════════════════════════════
 
 RestriccionesMedicasComponent.prototype._renderSendOnlyPage = function() {
     var self = this;
-    this.container.innerHTML = '';
 
-    const header = this.createHeader('Enviar Remisión Generada', function() {
-        self.render();
-    });
-    this.container.appendChild(header);
+    // Extraer datos del documento
+    var docPath = self.lastGeneratedDoc || '';
+    var docName = docPath.split(/[\\/]/).pop() || 'Documento generado';
+    var nombre = (self.extractedData && self.extractedData['Nombre Completo']) || 'N/A';
+    var cedula = (self.extractedData && self.extractedData['No. Identificación']) || 'N/A';
+    var fecha = (self.extractedData && self.extractedData['Fecha de Atención']) || 'N/A';
 
-    const content = document.createElement('div');
-    content.style.cssText = 'padding: 20px; max-width: 600px; margin: 0 auto;';
-    content.innerHTML = `
-        <div style="text-align: center; margin-bottom: 30px;">
-            <i class="fas fa-check-circle" style="font-size: 3rem; color: #28a745; margin-bottom: 10px;"></i>
-            <h3 style="color: #174ea6; margin-bottom: 10px;">Informe Generado Exitosamente</h3>
-            <p style="color: #718096; font-size: 0.875rem;">Seleccione cómo desea enviar el documento</p>
-        </div>
+    // Crear overlay del modal
+    var overlay = document.createElement('div');
+    overlay.className = 'env-modal-overlay';
+    overlay.id = 'sendModalOverlay';
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
-            <button id="send-whatsapp-btn" class="btn btn-info" style="padding: 15px; font-size: 1rem;">
-                <i class="fab fa-whatsapp" style="font-size: 1.5rem;"></i><br>
-                Enviar por WhatsApp
-            </button>
-            <button id="send-email-btn" class="btn btn-info" style="padding: 15px; font-size: 1rem;">
-                <i class="fas fa-envelope" style="font-size: 1.5rem;"></i><br>
-                Enviar por Correo
-            </button>
-        </div>
+    // Crear modal
+    var modal = document.createElement('div');
+    modal.className = 'env-modal';
+    modal.innerHTML = 
+        '<div class="env-modal-header">' +
+            '<div class="env-modal-title">' +
+                '<i class="fas fa-paper-plane" style="font-size: 1.5rem; color: var(--env-primary);"></i>' +
+                '<h2>Enviar Remisión Generada</h2>' +
+            '</div>' +
+            '<button class="env-modal-close" id="modalCloseBtn" aria-label="Cerrar">' +
+                '<i class="fas fa-times"></i>' +
+            '</button>' +
+        '</div>' +
+        '<div class="env-modal-body">' +
+            '<div class="env-success-banner">' +
+                '<i class="fas fa-check-circle"></i>' +
+                '<div class="env-success-text">' +
+                    '<h3>Informe Generado Exitosamente</h3>' +
+                    '<p>Seleccione el método de envío para el documento</p>' +
+                '</div>' +
+            '</div>' +
+            '<div class="env-doc-info-card">' +
+                '<div class="env-doc-info-row">' +
+                    '<i class="fas fa-file-word"></i>' +
+                    '<span class="env-doc-label">Documento:</span>' +
+                    '<span class="env-doc-value">' + docName + '</span>' +
+                '</div>' +
+                '<div class="env-doc-info-row">' +
+                    '<i class="fas fa-user"></i>' +
+                    '<span class="env-doc-label">Trabajador:</span>' +
+                    '<span class="env-doc-value">' + nombre + '</span>' +
+                '</div>' +
+                '<div class="env-doc-info-row">' +
+                    '<i class="fas fa-id-card"></i>' +
+                    '<span class="env-doc-label">Cédula:</span>' +
+                    '<span class="env-doc-value">' + cedula + '</span>' +
+                '</div>' +
+                '<div class="env-doc-info-row">' +
+                    '<i class="fas fa-calendar"></i>' +
+                    '<span class="env-doc-label">Fecha Atención:</span>' +
+                    '<span class="env-doc-value">' + fecha + '</span>' +
+                '</div>' +
+                '<div class="env-doc-actions" style="margin-top: 1rem; text-align: center;">' +
+                    '<button class="env-btn env-btn-secondary env-btn-sm" id="openFolderBtn" title="Abrir carpeta donde se guardó el archivo">' +
+                        '<i class="fas fa-folder-open"></i> Abrir Carpeta' +
+                    '</button>' +
+                '</div>' +
+            '</div>' +
+            '<div class="env-modal-actions">' +
+                '<button class="env-send-btn env-send-wa" id="modalWhatsappBtn">' +
+                    '<i class="fab fa-whatsapp env-send-icon" style="color: var(--env-wa);"></i>' +
+                    '<span class="env-send-label">WhatsApp</span>' +
+                    '<span class="env-send-contact" id="waContactInfo">Buscando teléfono...</span>' +
+                '</button>' +
+                '<button class="env-send-btn env-send-email" id="modalEmailBtn">' +
+                    '<i class="fas fa-envelope env-send-icon" style="color: var(--env-primary);"></i>' +
+                    '<span class="env-send-label">Correo Electrónico</span>' +
+                    '<span class="env-send-contact" id="emailContactInfo">Buscando email...</span>' +
+                '</button>' +
+            '</div>' +
+            '<div class="env-send-status" id="sendStatus">' +
+                '<i class="fas fa-spinner fa-spin"></i>' +
+                '<p id="sendStatusText">Procesando...</p>' +
+            '</div>' +
+        '</div>' +
+        '<div class="env-modal-footer">' +
+            '<p>El documento se enviará con los datos de contacto registrados en la base de datos</p>' +
+        '</div>';
 
-        <div id="send-status" style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 0.5rem; display: none;">
-            <p id="send-status-text" style="margin: 0;"></p>
-        </div>
-    `;
-
-    this.container.appendChild(content);
+    overlay.appendChild(modal);
+    this.container.appendChild(overlay);
 
     // Event listeners
-    document.getElementById('send-whatsapp-btn').addEventListener('click', function() {
-        self.handleSendWhatsApp();
+    document.getElementById('modalCloseBtn').addEventListener('click', function() {
+        self._closeSendModal();
     });
 
-    document.getElementById('send-email-btn').addEventListener('click', function() {
-        self.handleSendEmail();
+    // Cerrar al hacer clic en el overlay
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) {
+            self._closeSendModal();
+        }
     });
+
+    // Buscar contacto y actualizar botones
+    this._loadContactInfo();
+
+    // Handlers de botones de envío
+    document.getElementById('modalWhatsappBtn').addEventListener('click', function() {
+        self._handleModalWhatsApp();
+    });
+
+    document.getElementById('modalEmailBtn').addEventListener('click', function() {
+        self._handleModalEmail();
+    });
+};
+
+// Cargar información de contacto
+RestriccionesMedicasComponent.prototype._loadContactInfo = async function() {
+    var self = this;
+    var cedula = (this.extractedData && this.extractedData['No. Identificación']) || '';
+    var empresa = this.companyName || 'TEMPOACTIVA';
+
+    if (!cedula) {
+        document.getElementById('waContactInfo').textContent = 'Cédula no disponible';
+        document.getElementById('emailContactInfo').textContent = 'Cédula no disponible';
+        document.getElementById('modalWhatsappBtn').disabled = true;
+        document.getElementById('modalEmailBtn').disabled = true;
+        return;
+    }
+
+    try {
+        var result = await window.electronAPI.getContactInfo(cedula, empresa);
+        
+        if (result && result.success) {
+            var telefono = result.telefono;
+            var email = result.email;
+
+            if (telefono) {
+                document.getElementById('waContactInfo').textContent = telefono;
+                document.getElementById('modalWhatsappBtn').disabled = false;
+            } else {
+                document.getElementById('waContactInfo').textContent = 'Teléfono no encontrado';
+                document.getElementById('modalWhatsappBtn').disabled = true;
+            }
+
+            if (email) {
+                document.getElementById('emailContactInfo').textContent = email;
+                document.getElementById('modalEmailBtn').disabled = false;
+            } else {
+                document.getElementById('emailContactInfo').textContent = 'Email no encontrado';
+                document.getElementById('modalEmailBtn').disabled = true;
+            }
+        } else {
+            document.getElementById('waContactInfo').textContent = 'Contacto no encontrado';
+            document.getElementById('emailContactInfo').textContent = 'Contacto no encontrado';
+            document.getElementById('modalWhatsappBtn').disabled = true;
+            document.getElementById('modalEmailBtn').disabled = true;
+        }
+    } catch (error) {
+        console.error('[SendModal] Error cargando contacto:', error);
+        document.getElementById('waContactInfo').textContent = 'Error al buscar contacto';
+        document.getElementById('emailContactInfo').textContent = 'Error al buscar contacto';
+        document.getElementById('modalWhatsappBtn').disabled = true;
+        document.getElementById('modalEmailBtn').disabled = true;
+    }
+};
+
+// Enviar por WhatsApp desde modal
+RestriccionesMedicasComponent.prototype._handleModalWhatsApp = async function() {
+    var self = this;
+    var btn = document.getElementById('modalWhatsappBtn');
+    var statusDiv = document.getElementById('sendStatus');
+    var statusText = document.getElementById('sendStatusText');
+
+    btn.disabled = true;
+    btn.innerHTML = '<div class="env-send-spinner"></div><span class="env-send-label">Enviando...</span>';
+    statusDiv.className = 'env-send-status';
+    statusText.textContent = 'Preparando WhatsApp...';
+
+    try {
+        var result = await window.electronAPI.sendRemisionByWhatsapp(
+            this.lastGeneratedDoc,
+            this.extractedData,
+            this.companyName
+        );
+
+        if (result.success) {
+            statusDiv.className = 'env-send-status env-status-success';
+            statusText.textContent = '¡WhatsApp abierto correctamente!';
+            btn.innerHTML = '<i class="fas fa-check" style="color: white;"></i><span class="env-send-label" style="color: white;">Enviado</span>';
+            btn.style.backgroundColor = 'var(--env-wa)';
+            btn.style.borderColor = 'var(--env-wa)';
+        } else {
+            statusDiv.className = 'env-send-status env-status-error';
+            statusText.textContent = result.error || 'Error al enviar';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fab fa-whatsapp env-send-icon" style="color: var(--env-wa);"></i><span class="env-send-label">Reintentar</span>';
+        }
+    } catch (error) {
+        console.error('[SendModal] Error WhatsApp:', error);
+        statusDiv.className = 'env-send-status env-status-error';
+        statusText.textContent = 'Error: ' + error.message;
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fab fa-whatsapp env-send-icon" style="color: var(--env-wa);"></i><span class="env-send-label">Reintentar</span>';
+    }
+};
+
+// Enviar por Email desde modal
+RestriccionesMedicasComponent.prototype._handleModalEmail = async function() {
+    var self = this;
+    var btn = document.getElementById('modalEmailBtn');
+    var statusDiv = document.getElementById('sendStatus');
+    var statusText = document.getElementById('sendStatusText');
+
+    btn.disabled = true;
+    btn.innerHTML = '<div class="env-send-spinner"></div><span class="env-send-label">Enviando...</span>';
+    statusDiv.className = 'env-send-status';
+    statusText.textContent = 'Enviando correo...';
+
+    try {
+        var result = await window.electronAPI.sendRemisionByEmail(
+            this.lastGeneratedDoc,
+            this.extractedData,
+            this.companyName
+        );
+
+        if (result.success) {
+            statusDiv.className = 'env-send-status env-status-success';
+            statusText.textContent = '¡Correo enviado exitosamente!';
+            btn.innerHTML = '<i class="fas fa-check" style="color: white;"></i><span class="env-send-label" style="color: white;">Enviado</span>';
+            btn.style.backgroundColor = 'var(--env-primary)';
+            btn.style.borderColor = 'var(--env-primary)';
+        } else {
+            statusDiv.className = 'env-send-status env-status-error';
+            statusText.textContent = result.error || 'Error al enviar';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-envelope env-send-icon" style="color: var(--env-primary);"></i><span class="env-send-label">Reintentar</span>';
+        }
+    } catch (error) {
+        console.error('[SendModal] Error Email:', error);
+        statusDiv.className = 'env-send-status env-status-error';
+        statusText.textContent = 'Error: ' + error.message;
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-envelope env-send-icon" style="color: var(--env-primary);"></i><span class="env-send-label">Reintentar</span>';
+    }
+};
+
+// Cerrar modal
+RestriccionesMedicasComponent.prototype._closeSendModal = function() {
+    var overlay = document.getElementById('sendModalOverlay');
+    if (overlay) {
+        overlay.remove();
+    }
+    // Regresar a la sección de procesar remisión, no al inicio
+    this.showEnviarRemisionPage();
 };

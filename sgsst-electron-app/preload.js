@@ -176,6 +176,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('send-remision-by-email', docPath, extractedData, empresa),
   sendRemisionByWhatsapp: (docPath, extractedData, empresa) =>
     ipcRenderer.invoke('send-remision-by-whatsapp', docPath, extractedData, empresa),
+  getContactInfo: (cedula, empresa) =>
+    ipcRenderer.invoke('get-contact-info', cedula, empresa),
 
   // --- Excel ---
   getCapacitacionesSheets: (filePath) => ipcRenderer.invoke('get-capacitaciones-sheets', filePath),

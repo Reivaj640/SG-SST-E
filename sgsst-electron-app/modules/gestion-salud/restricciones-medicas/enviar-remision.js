@@ -241,11 +241,16 @@
 
         try {
             var data = collectFieldValues();
+            
+            // Agregar empresa a los datos
+            data['Afiliación'] = companyName;
+            data['Empresa'] = companyName;
+            
             logEntry('Generando documento de remisión...', 'info');
 
             var result = await callParentAPI('generate-remision-doc', {
                 extractedData: data
-            });
+            }, companyName);
 
             if (result.success) {
                 lastDocumentPath = result.documentPath;

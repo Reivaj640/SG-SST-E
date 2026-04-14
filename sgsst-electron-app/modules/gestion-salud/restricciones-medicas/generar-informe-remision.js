@@ -226,6 +226,9 @@
                 // Actualizar UI
                 btn.classList.add('hidden');
                 successMsg.classList.remove('hidden');
+                
+                // Mostrar sección de continuar (remover hidden y agregar animación)
+                continueSection.classList.remove('hidden');
                 continueSection.classList.remove('revealing');
                 continueSection.classList.add('revealing');
                 continueSection.addEventListener('animationend', function () {
