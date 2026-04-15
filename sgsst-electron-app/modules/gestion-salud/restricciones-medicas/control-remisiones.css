@@ -1,0 +1,187 @@
+/* ============================================================================
+   control-remisiones.css — Vista de Seguimiento (3.1.6)
+   Sistema Visual Oficial K+AIR
+   ============================================================================ */
+
+:root {
+    --ctrl-primary: #174ea6;
+    --ctrl-bg: #f8f9fa;
+    --ctrl-card-bg: #ffffff;
+    --ctrl-border: #dee2e6;
+    --ctrl-text: #212529;
+    --ctrl-text-muted: #6c757d;
+    --ctrl-radius: 0.375rem;
+    --ctrl-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    --ctrl-font-heading: 'Lexend', sans-serif;
+    --ctrl-font-body: 'Roboto', sans-serif;
+}
+
+/* Contenedor Principal */
+.control-remisiones-wrapper {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    height: 100%;
+    background-color: var(--ctrl-bg);
+}
+
+/* Card de la Tabla */
+.ctrl-card {
+    background-color: var(--ctrl-card-bg);
+    border-radius: var(--ctrl-radius);
+    box-shadow: var(--ctrl-shadow);
+    border: 1px solid var(--ctrl-border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    flex: 1;
+}
+
+.ctrl-card-header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--ctrl-border);
+    background-color: #fafafa;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.ctrl-card-header h4 {
+    font-family: var(--ctrl-font-heading);
+    font-size: 1rem;
+    color: var(--ctrl-primary);
+    margin: 0;
+}
+
+/* Tabla de Datos */
+.ctrl-table-container {
+    overflow: auto;
+    flex: 1;
+}
+
+.ctrl-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.875rem;
+    font-family: var(--ctrl-font-body);
+}
+
+.ctrl-table th {
+    position: sticky;
+    top: 0;
+    background-color: #f1f3f9;
+    color: var(--ctrl-primary);
+    font-family: var(--ctrl-font-heading);
+    font-weight: 600;
+    text-align: left;
+    padding: 0.75rem 1rem;
+    border-bottom: 2px solid var(--ctrl-border);
+    white-space: nowrap;
+    z-index: 5;
+}
+
+.ctrl-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--ctrl-border);
+    color: var(--ctrl-text);
+    vertical-align: middle;
+}
+
+.ctrl-table tr:hover td {
+    background-color: rgba(23, 78, 166, 0.02);
+}
+
+.ctrl-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* Estilo para Inputs dentro de la tabla */
+.ctrl-input {
+    width: 100%;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--ctrl-border);
+    border-radius: var(--ctrl-radius);
+    font-size: 0.8rem;
+    transition: all 0.2s;
+    outline: none;
+    background-color: transparent;
+}
+
+.ctrl-input:focus {
+    border-color: var(--ctrl-primary);
+    background-color: #fff;
+    box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.1);
+}
+
+/* Footer de Información */
+.ctrl-info-bar {
+    padding: 0.75rem 1.5rem;
+    background-color: #f8f9fa;
+    border-top: 1px solid var(--ctrl-border);
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--ctrl-text-muted);
+}
+
+.ctrl-info-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.ctrl-info-item i {
+    color: var(--ctrl-primary);
+}
+
+/* Estados */
+.ctrl-loading, .ctrl-empty, .ctrl-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    gap: 1rem;
+    text-align: center;
+    color: var(--ctrl-text-muted);
+}
+
+.ctrl-loading i { font-size: 2rem; color: var(--ctrl-primary); }
+.ctrl-error i { font-size: 2rem; color: #dc3545; }
+
+.ctrl-btn-retry {
+    padding: 0.5rem 1.5rem;
+    background-color: var(--ctrl-primary);
+    color: white;
+    border: none;
+    border-radius: var(--ctrl-radius);
+    cursor: pointer;
+    font-family: var(--ctrl-font-heading);
+    font-size: 0.875rem;
+    transition: background 0.2s;
+}
+
+.ctrl-btn-retry:hover {
+    background-color: #185abd;
+}
+
+/* Scrollbar Personalizado */
+.ctrl-table-container::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.ctrl-table-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.ctrl-table-container::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 4px;
+}
+
+.ctrl-table-container::-webkit-scrollbar-thumb:hover {
+    background: #bbb;
+}

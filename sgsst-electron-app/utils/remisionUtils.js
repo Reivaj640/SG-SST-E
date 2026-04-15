@@ -644,6 +644,33 @@ class RemisionUtils {
   // ACTUALIZAR CONTROL EXCEL
   // ═══════════════════════════════════════════════════════════════════════════
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // VERIFICAR ARCHIVO BLOQUEADO (Windows EBUSY)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Verifica si un archivo está bloqueado por otro proceso (ej: Excel abierto).
+   * @param {string} filePath - Ruta del archivo
+   * @returns {Promise<boolean>} - true si está bloqueado
+   */
+  async isFileLocked(filePath) {
+    const fsP = require('fs').promises;
+    try {
+      const fd = await fsP.open(filePath, 'r+');
+      await fd.close();
+      return false; // No está bloqueado
+    } catch (err) {
+      if (err.code === 'EBUSY' || err.code === 'EPERM') {
+        return true; // Está bloqueado por otro proceso
+      }
+      return false; // Otro error, asumimos que no está bloqueado
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ACTUALIZAR ARCHIVO DE CONTROL (Excel GI-FO-012)
+  // ═══════════════════════════════════════════════════════════════════════════
+
   async updateControlFile(data, controlPath) {
     const expectedColumns = [
       'Item', 'Nombre Completo', 'No. Identificación', 'Fecha Nac', 'Edad', 'Sexo',
@@ -653,7 +680,7 @@ class RemisionUtils {
       'Concepto Manipulación Alimento', 'Concepto Altura',
       'Concepto de trabajo en espacios confinados', 'Motivo de Restricción',
     ];
-    const headerRow = 6;
+    const headerRow = 0; // Encabezados en fila 1 (índice 0), datos desde fila 2
     let workbook, worksheet;
 
     if (fs.existsSync(controlPath)) {
@@ -668,36 +695,93 @@ class RemisionUtils {
       worksheet = workbook.Sheets[workbook.SheetNames[0]];
     }
 
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, { range: headerRow, defval: '' });
+    // ── Reintento con backoff para EBUSY ──
+    const maxRetries = 3;
+    let lastError = null;
 
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        if (fs.existsSync(controlPath)) {
+          // Verificar si el archivo está bloqueado (ej: Excel abierto)
+          const locked = await this.isFileLocked(controlPath);
+          if (locked) {
+            console.warn(`[RemisionUtils] Archivo bloqueado por otro proceso (intento ${attempt}/${maxRetries}): ${controlPath}`);
+            if (attempt < maxRetries) {
+              await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Backoff progresivo
+              continue;
+            }
+            throw new Error('EBUSY: El archivo de control está abierto en Excel. Cierre el archivo y vuelva a intentar.');
+          }
+
+          workbook  = XLSX.readFile(controlPath);
+          worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        } else {
+          workbook  = XLSX.utils.book_new();
+          worksheet = XLSX.utils.aoa_to_sheet([expectedColumns]);
+          XLSX.utils.book_append_sheet(workbook, worksheet, 'Control');
+          XLSX.writeFile(workbook, controlPath);
+          workbook  = XLSX.readFile(controlPath);
+          worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        }
+
+        // Éxito al leer — salir del loop de reintentos
+        break;
+
+      } catch (err) {
+        lastError = err;
+        if (err.message && err.message.includes('EBUSY')) {
+          console.warn(`[RemisionUtils] EBUSY en intento ${attempt}/${maxRetries}`);
+          if (attempt < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+            continue;
+          }
+        }
+        // Error no-EBUSY o último intento fallido — lanzar
+        throw lastError;
+      }
+    }
+
+    // Leer todos los datos existentes (desde fila 1 = encabezados)
+    const allRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+    // Construir nueva fila con los datos extraídos
     const newRow = {};
     expectedColumns.forEach(col => { newRow[col] = data[col] || ''; });
-    const items = jsonData.map(r => parseInt(r['Item'], 10)).filter(n => !isNaN(n));
+
+    // Calcular siguiente numeración de Item
+    const items = allRows.map(r => parseInt(String(r['Item']).replace(/[^\d]/g, ''), 10))
+                         .filter(n => !isNaN(n));
     newRow['Item'] = (items.length > 0 ? Math.max(...items) : 0) + 1;
 
-    const existIdx = jsonData.findIndex(r =>
+    // Verificar si ya existe un registro con la misma cédula y fecha
+    const existIdx = allRows.findIndex(r =>
       String(r['No. Identificación']).trim() === String(data['No. Identificación']).trim() &&
       String(r['Fecha de Atención']).trim()   === String(data['Fecha de Atención']).trim()
     );
-    if (existIdx !== -1) { Object.assign(jsonData[existIdx], newRow); }
-    else                 { jsonData.push(newRow); }
 
-    const originalRange    = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
-    const newData          = [];
-    for (let R = originalRange.s.r; R < headerRow; R++) {
-      const row = [];
-      for (let C = originalRange.s.c; C <= originalRange.e.c; C++) {
-        const ref = XLSX.utils.encode_cell({ c: C, r: R });
-        row.push(worksheet[ref] ? worksheet[ref].v : '');
-      }
-      newData.push(row);
+    if (existIdx !== -1) {
+      // Actualizar fila existente (preservando posición)
+      Object.assign(allRows[existIdx], newRow);
+      console.log(`[RemisionUtils] Registro actualizado (Item: ${newRow['Item']})`);
+    } else {
+      // Agregar nueva fila al final
+      allRows.push(newRow);
+      console.log(`[RemisionUtils] Nueva fila agregada (Item: ${newRow['Item']})`);
     }
-    newData.push(expectedColumns);
-    jsonData.forEach(rowObj => {
-      newData.push(expectedColumns.map(col => rowObj[col] !== undefined ? rowObj[col] : ''));
+
+    // ── Reconstruir la hoja: encabezados + datos ──
+    const newData = [expectedColumns]; // Fila 1: encabezados
+    allRows.forEach(rowObj => {
+      const row = expectedColumns.map(col => {
+        const val = rowObj[col];
+        return val !== undefined && val !== null ? String(val) : '';
+      });
+      newData.push(row);
     });
 
-    workbook.Sheets[workbook.SheetNames[0]] = XLSX.utils.aoa_to_sheet(newData);
+    // Sobrescribir la hoja con los datos reconstruidos
+    const newSheet = XLSX.utils.aoa_to_sheet(newData);
+    workbook.Sheets[workbook.SheetNames[0]] = newSheet;
     XLSX.writeFile(workbook, controlPath);
   }
 
@@ -764,8 +848,11 @@ class RemisionUtils {
       const docPath = await this.generateRemision(data, templatePath, outputDir);
       console.log(`[RemisionUtils] Documento generado: ${docPath}`);
 
-      // 2. Actualizar Excel de control
+      // 2. Actualizar Excel de control (con manejo independiente de errores)
       let ctrlPath = controlPath;
+      let controlUpdated = false;
+      let controlWarning = null;
+
       if (!ctrlPath) {
         // Buscar el archivo de control en outputDir o su padre
         const searchDir = outputDir;
@@ -778,16 +865,25 @@ class RemisionUtils {
       }
 
       if (ctrlPath && require('fs').existsSync(ctrlPath)) {
-        await this.updateControlFile(data, ctrlPath);
-        console.log(`[RemisionUtils] Control actualizado: ${ctrlPath}`);
+        try {
+          await this.updateControlFile(data, ctrlPath);
+          controlUpdated = true;
+          console.log(`[RemisionUtils] Control actualizado: ${ctrlPath}`);
+        } catch (controlError) {
+          controlWarning = `Documento generado, pero el archivo de control no se pudo actualizar: ${controlError.message}`;
+          console.warn(`[RemisionUtils] ${controlWarning}`);
+        }
       } else {
-        console.warn(`[RemisionUtils] No se encontró archivo de control. Buscando en: ${searchDir}`);
+        controlWarning = 'Archivo de control no encontrado. El documento se generó pero no se registró en el control.';
+        console.warn(`[RemisionUtils] ${controlWarning}`);
       }
 
       return {
         success: true,
         documentPath: docPath,
-        controlPath: ctrlPath || null
+        controlPath: ctrlPath || null,
+        controlUpdated: controlUpdated,
+        controlWarning: controlWarning
       };
     } catch (error) {
       // Manejo mejorado de errores de docxtemplater

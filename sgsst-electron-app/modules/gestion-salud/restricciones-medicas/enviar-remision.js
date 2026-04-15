@@ -255,8 +255,11 @@
             if (result.success) {
                 lastDocumentPath = result.documentPath;
                 logEntry('Documento generado: ' + (result.documentPath || ''), 'success');
-                if (result.controlPath) {
+                if (result.controlUpdated) {
                     logEntry('Control actualizado: ' + result.controlPath, 'info');
+                } else if (result.controlWarning) {
+                    logEntry('⚠ ADVERTENCIA: ' + result.controlWarning, 'warning');
+                    showToast('Control no actualizado', result.controlWarning, 'warning');
                 }
                 enableSendButtons();
                 setStepDone(2);

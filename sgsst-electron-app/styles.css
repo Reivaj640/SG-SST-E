@@ -1614,6 +1614,248 @@ select.form-control {
   margin-top: 15px;
 }
 
+/* ═══════════════════════════════════════════════════════════
+   CONTROL DE REMISIONES — Módulo 3.1.6.1
+   ═══════════════════════════════════════════════════════════ */
+
+.control-remisiones-wrapper {
+  background: #ffffff;
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  padding: 1.25rem;
+  margin-top: 1rem;
+}
+
+/* Info bar superior */
+.control-remisiones-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.8rem;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  color: #495057;
+}
+
+.control-remisiones-info .info-file {
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Tabla con scroll */
+.control-remisiones-table-container {
+  max-height: 65vh;
+  overflow-y: auto;
+  overflow-x: auto;
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+}
+
+.control-remisiones-table-container::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.control-remisiones-table-container::-webkit-scrollbar-track {
+  background: #f1f3f5;
+  border-radius: 4px;
+}
+
+.control-remisiones-table-container::-webkit-scrollbar-thumb {
+  background: #adb5bd;
+  border-radius: 4px;
+}
+
+.control-remisiones-table-container::-webkit-scrollbar-thumb:hover {
+  background: #868e96;
+}
+
+/* Tabla */
+table.control-remisiones-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  font-family: 'Segoe UI', Roboto, sans-serif;
+}
+
+table.control-remisiones-table thead tr {
+  background: #174ea6;
+  color: #ffffff;
+}
+
+table.control-remisiones-table thead th {
+  padding: 0.625rem 0.5rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  border-right: 1px solid rgba(255, 255, 255, 0.15);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #174ea6;
+}
+
+table.control-remisiones-table thead th:last-child {
+  border-right: none;
+}
+
+table.control-remisiones-table tbody tr {
+  border-bottom: 1px solid #e9ecef;
+  transition: background-color 0.15s ease;
+}
+
+table.control-remisiones-table tbody tr:hover {
+  background-color: #e8f0fe;
+}
+
+table.control-remisiones-table tbody tr.row-even {
+  background-color: #f8f9fa;
+}
+
+table.control-remisiones-table tbody tr.row-even:hover {
+  background-color: #e8f0fe;
+}
+
+table.control-remisiones-table tbody td {
+  padding: 0.5rem;
+  vertical-align: middle;
+  color: #212529;
+  border-right: 1px solid #f1f3f5;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+table.control-remisiones-table tbody td:last-child {
+  border-right: none;
+  min-width: 180px;
+  max-width: none;
+  white-space: normal;
+}
+
+/* Input editable en última columna */
+table.control-remisiones-table tbody td input[type="text"] {
+  width: 100%;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid #dee2e6;
+  border-radius: 0.25rem;
+  font-size: 0.8125rem;
+  font-family: inherit;
+  background: #ffffff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-sizing: border-box;
+}
+
+table.control-remisiones-table tbody td input[type="text"]:focus {
+  outline: none;
+  border-color: #174ea6;
+  box-shadow: 0 0 0 2px rgba(23, 78, 166, 0.15);
+}
+
+table.control-remisiones-table tbody td input[type="text"]::placeholder {
+  color: #adb5bd;
+  font-style: italic;
+}
+
+/* Estado vacío */
+.control-remisiones-empty {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  color: #6c757d;
+}
+
+.control-remisiones-empty i {
+  font-size: 3rem;
+  color: #ced4da;
+  margin-bottom: 1rem;
+  display: block;
+}
+
+.control-remisiones-empty h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.125rem;
+  color: #495057;
+}
+
+.control-remisiones-empty p {
+  margin: 0.25rem 0;
+  font-size: 0.875rem;
+}
+
+/* Estado de error */
+.control-remisiones-error {
+  text-align: center;
+  padding: 2.5rem 1.5rem;
+  color: #dc3545;
+}
+
+.control-remisiones-error i {
+  font-size: 2.5rem;
+  margin-bottom: 0.75rem;
+  display: block;
+}
+
+.control-remisiones-error h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.125rem;
+  color: #dc3545;
+}
+
+.control-remisiones-error p {
+  margin: 0.5rem 0 1rem;
+  font-size: 0.875rem;
+  color: #6c757d;
+}
+
+/* Mensaje de carga */
+.loading-msg {
+  text-align: center;
+  padding: 2rem;
+  color: #6c757d;
+  font-style: italic;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .control-remisiones-wrapper {
+    padding: 0.75rem;
+  }
+
+  table.control-remisiones-table {
+    font-size: 0.75rem;
+  }
+
+  table.control-remisiones-table thead th {
+    padding: 0.5rem 0.35rem;
+    font-size: 0.6875rem;
+  }
+
+  table.control-remisiones-table tbody td {
+    padding: 0.35rem;
+    max-width: 120px;
+  }
+
+  .control-remisiones-info {
+    flex-direction: column;
+    gap: 0.25rem;
+    align-items: flex-start;
+  }
+
+  .control-remisiones-info .info-file {
+    max-width: 100%;
+  }
+}
+
 /* Estilos específicos para la vista de ausentismo */
 .control-remisiones-content {
   padding: 20px;

@@ -840,18 +840,10 @@ class ExcelHandler:
             control_path = Path(control_path)
             if not control_path.exists():
                 raise FileNotFoundError(f"Archivo de control no encontrado: {control_path}")
-            
+
+            # Cargar el archivo asumiendo que los encabezados están en la Fila 1 (header=0)
             df = pd.read_excel(control_path, header=0)
-            header_row = 0
-            
-            # Buscar la fila donde comienzan los datos
-            for i, row in df.iterrows():
-                if pd.notna(row.iloc[0]) and str(row.iloc[0]).strip() != '':
-                    header_row = i
-                    break
-            
-            df = pd.read_excel(control_path, header=header_row)
-            
+
             if 'Fecha_Atencion' in df.columns:
                 df['Fecha_Atencion'] = pd.to_datetime(df['Fecha_Atencion'], format='%Y/%m/%d', errors='coerce')
 
@@ -863,6 +855,7 @@ class ExcelHandler:
 
             data_id = str(data['No_Identificacion']).strip()
             data_date = pd.to_datetime(data.get('Fecha_Atencion', datetime.now().strftime('%Y/%m/%d')), errors='coerce')
+
             same_person = (df['No_Identificacion'] == data_id) & (df['Fecha_Atencion'] == data_date)
 
             new_row_data = {'Item': new_item}

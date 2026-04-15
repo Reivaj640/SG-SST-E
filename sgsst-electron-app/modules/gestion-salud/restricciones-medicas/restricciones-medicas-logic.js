@@ -419,14 +419,24 @@ class RestriccionesMedicasComponent {
             if (result.success) {
                 this.lastGeneratedDoc = result.documentPath;
                 this.logMessage(`Documento generado exitosamente: ${result.documentPath}`);
-                this.logMessage(`Archivo de control actualizado: ${result.controlPath}`);
-                
+
+                if (result.controlUpdated) {
+                    this.logMessage(`Archivo de control actualizado: ${result.controlPath}`);
+                } else if (result.controlWarning) {
+                    this.logMessage(`⚠ ADVERTENCIA: ${result.controlWarning}`, 'warning');
+                    alert(`Documento generado exitosamente.\n\n⚠ El archivo de control no se pudo actualizar:\n${result.controlWarning}\n\nPor favor, cierre el archivo Excel y vuelva a intentar.`);
+                } else {
+                    this.logMessage(`Archivo de control actualizado: ${result.controlPath}`);
+                }
+
                 // Habilitar botones de envío
                 document.getElementById('send-whatsapp-btn').disabled = false;
                 document.getElementById('send-email-btn').disabled = false;
-                
+
                 // Mostrar mensaje de éxito
-                alert('Documento generado exitosamente.');
+                if (!result.controlWarning) {
+                    alert('Documento generado exitosamente.');
+                }
             } else {
                 this.logMessage(`Error al generar documento: ${result.error}`, 'error');
                 alert(`Error al generar documento: ${result.error}`);
@@ -581,186 +591,168 @@ class RestriccionesMedicasComponent {
 
     async _renderControlRemisionesView() {
         this.container.innerHTML = '';
+        
+        // Cargar CSS específico
+        this._loadControlStyles();
+
         const header = this.createHeader('Control de Remisiones', () => this.render());
         this.container.appendChild(header);
 
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'control-remisiones-content';
-        contentDiv.style.padding = '20px';
-        this.container.appendChild(contentDiv);
+        const wrapper = document.createElement('div');
+        wrapper.className = 'control-remisiones-wrapper';
+        this.container.appendChild(wrapper);
 
-        // Función interna para renderizar contenido (movida dentro del método)
+        // Función interna para renderizar contenido
         const renderContent = async () => {
-            this.logMessage(`Cargando datos del archivo de control para ${this.companyName}...`);
-            contentDiv.innerHTML = '<p style="text-align:center;">Cargando datos del archivo de control...</p>';
+            wrapper.innerHTML = `
+                <div class="ctrl-loading">
+                    <i class="fas fa-circle-notch fa-spin"></i>
+                    <p>Consultando archivo de control oficial...</p>
+                </div>
+            `;
 
             try {
-                this.logMessage(`Solicitando datos para empresa: ${this.companyName}`);
                 const result = await window.electronAPI.getControlRemisionesData(this.companyName);
-                // ✅ Log de depuración para ver la estructura exacta
-                this.logMessage(`Estructura del resultado: ${Object.keys(result).join(', ')}`);
-                this.logMessage(`Headers tipo: ${Array.isArray(result.headers) ? 'Array' : typeof result.headers}`);
-                this.logMessage(`Rows tipo: ${Array.isArray(result.rows) ? 'Array' : typeof result.rows}, Longitud: ${result.rows?.length ?? 'N/A'}`);
-                
-                contentDiv.innerHTML = ''; // Limpiar mensaje de "Cargando..."
+                wrapper.innerHTML = ''; // Limpiar carga
 
                 if (result.success) {
-                    // ✅ CORRECCIÓN: Verificar result.rows en lugar de result.data
                     if (result.rows && result.rows.length > 0) {
-                        this.logMessage(`Encontrados ${result.rows.length} registros. Renderizando tabla.`);
-                        // Crear contenedor con scroll
+                        // Crear Card
+                        const card = document.createElement('div');
+                        card.className = 'ctrl-card';
+                        
+                        // Header de la Card
+                        card.innerHTML = `
+                            <div class="ctrl-card-header">
+                                <h4><i class="fas fa-table"></i> Registros de Remisiones</h4>
+                                <span class="ctrl-info-item"><i class="fas fa-file-excel"></i> ${result.rows.length} registros</span>
+                            </div>
+                        `;
+
+                        // Contenedor de Tabla
                         const tableContainer = document.createElement('div');
-                        tableContainer.style.maxHeight = '70vh';
-                        tableContainer.style.overflowY = 'auto';
-                        tableContainer.style.border = '1px solid #ddd';
-                        tableContainer.style.borderRadius = '4px';
+                        tableContainer.className = 'ctrl-table-container';
 
-                        // Crear tabla
                         const table = document.createElement('table');
-                        table.className = 'data-table';
-                        table.style.width = '100%';
-                        table.style.borderCollapse = 'collapse';
+                        table.className = 'ctrl-table';
 
-                        // Crear encabezado
+                        // Encabezado de Tabla
                         const thead = document.createElement('thead');
                         const headerRow = document.createElement('tr');
-                        // ✅ CORRECCIÓN: Usar result.headers
                         if (result.headers && Array.isArray(result.headers)) {
                             result.headers.forEach(headerText => {
                                 const th = document.createElement('th');
                                 th.textContent = headerText;
-                                th.style.backgroundColor = '#f8f9fa';
-                                th.style.padding = '12px 8px';
-                                th.style.border = '1px solid #ddd';
-                                th.style.textAlign = 'left';
-                                th.style.position = 'sticky';
-                                th.style.top = '0';
                                 headerRow.appendChild(th);
                             });
                         }
                         thead.appendChild(headerRow);
                         table.appendChild(thead);
 
-                        // Crear cuerpo
+                        // Cuerpo de Tabla
                         const tbody = document.createElement('tbody');
-                        // ✅ CORRECCIÓN: Usar result.rows
                         result.rows.forEach((row, rowIndex) => {
                             const tr = document.createElement('tr');
-                            tr.style.backgroundColor = rowIndex % 2 === 0 ? '#fff' : '#f8f9fa';
-                            
-                            // Asegurarse de que row es un array
                             if (Array.isArray(row)) {
                                 row.forEach((cellData, cellIndex) => {
                                     const td = document.createElement('td');
-                                    // Si es la última columna, hacerla editable
-                                    if (cellIndex === row.length - 1) { // Última columna
+                                    
+                                    // Si es la última columna (Estado/Observación), hacerla editable con estilo moderno
+                                    if (cellIndex === row.length - 1) {
                                         const input = document.createElement('input');
                                         input.type = 'text';
+                                        input.className = 'ctrl-input';
                                         input.value = cellData != null ? cellData.toString() : '';
-                                        input.style.width = '100%';
-                                        input.style.boxSizing = 'border-box';
-                                        input.style.border = '1px solid #ccc';
-                                        input.style.padding = '4px';
-                                        input.dataset.rowIndex = rowIndex; // Guardar índice de fila
-                                        input.dataset.colIndex = cellIndex; // Guardar índice de columna
+                                        input.placeholder = 'Añadir observación...';
                                         input.addEventListener('change', (e) => {
-                                            // Cuando cambie el valor, enviar al backend para guardar
                                             this.saveCellData(rowIndex, cellIndex, e.target.value, result.filePath);
                                         });
                                         td.appendChild(input);
                                     } else {
                                         td.textContent = cellData != null ? cellData.toString() : '';
                                     }
-                                    td.style.padding = '8px';
-                                    td.style.border = '1px solid #eee';
-                                    td.style.verticalAlign = 'top';
-                                    td.style.whiteSpace = 'nowrap'; // Evita que el texto se salte a otra línea
                                     tr.appendChild(td);
                                 });
                             }
-                            
                             tbody.appendChild(tr);
                         });
                         table.appendChild(tbody);
-
                         tableContainer.appendChild(table);
-                        contentDiv.appendChild(tableContainer);
-                        
-                        // Mostrar información adicional
-                        const infoDiv = document.createElement('div');
-                        infoDiv.style.marginTop = '15px';
-                        infoDiv.style.fontSize = '14px';
-                        infoDiv.style.color = '#666';
-                        infoDiv.innerHTML = `
-                            <p><strong>Archivo:</strong> ${result.filePath}</p>
-                            <p><strong>Total de registros:</strong> ${result.rows.length}</p>
-                        `;
-                        contentDiv.appendChild(infoDiv);
-                        
-                    } else {
-                        // Si no hay filas, mostrar mensaje apropiado
-                        this.logMessage('El archivo de control de remisiones está vacío o no contiene registros.', 'WARN');
-                        contentDiv.innerHTML = `
-                            <div style="text-align:center; padding:40px; color:#666;">
-                                <h3>📋 No se encontraron datos</h3>
-                                <p>El archivo de control de remisiones está vacío o no contiene registros.</p>
-                                <button id="retry-btn" 
-                                        style="margin-top:20px; padding:10px 20px; background:#3498db; color:white; border:none; border-radius:4px; cursor:pointer;">
-                                    Reintentar
-                                </button>
+                        card.appendChild(tableContainer);
+
+                        // Footer de Información
+                        const footer = document.createElement('div');
+                        footer.className = 'ctrl-info-bar';
+                        footer.innerHTML = `
+                            <div class="ctrl-info-item">
+                                <i class="fas fa-hdd"></i>
+                                <span>Ruta: ${result.filePath}</span>
+                            </div>
+                            <div class="ctrl-info-item">
+                                <i class="fas fa-info-circle"></i>
+                                <span>La última columna es editable</span>
                             </div>
                         `;
-                        contentDiv.querySelector('#retry-btn')?.addEventListener('click', renderContent);
+                        card.appendChild(footer);
+                        wrapper.appendChild(card);
+                        
+                    } else {
+                        wrapper.innerHTML = `
+                            <div class="ctrl-empty">
+                                <i class="fas fa-folder-open" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.3;"></i>
+                                <h3>No hay datos disponibles</h3>
+                                <p>El archivo de control para ${this.companyName} está vacío.</p>
+                                <button class="ctrl-btn-retry" id="retry-btn">Reintentar</button>
+                            </div>
+                        `;
+                        wrapper.querySelector('#retry-btn')?.addEventListener('click', renderContent);
                     }
                 } else {
-                    this.logMessage(`Error al cargar el archivo: ${result.error}`, 'ERROR');
-                    // Mostrar error
-                    contentDiv.innerHTML = `
-                        <div style="text-align:center; padding:40px; color:#d32f2f;">
-                            <h3>❌ Error al cargar el archivo</h3>
+                    wrapper.innerHTML = `
+                        <div class="ctrl-error">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <h3>Error al cargar datos</h3>
                             <p>${result.error}</p>
-                            <button id="retry-btn" 
-                                    style="margin-top:20px; padding:10px 20px; background:#3498db; color:white; border:none; border-radius:4px; cursor:pointer;">
-                                Reintentar
-                            </button>
+                            <button class="ctrl-btn-retry" id="retry-btn">Intentar de nuevo</button>
                         </div>
                     `;
-                    contentDiv.querySelector('#retry-btn').addEventListener('click', renderContent);
+                    wrapper.querySelector('#retry-btn').addEventListener('click', renderContent);
                 }
             } catch (error) {
-                this.logMessage(`Error inesperado en la interfaz: ${error.message}`, 'ERROR');
-                contentDiv.innerHTML = `
-                    <div style="text-align:center; padding:40px; color:#d32f2f;">
-                        <h3>💥 Error inesperado</h3>
+                wrapper.innerHTML = `
+                    <div class="ctrl-error">
+                        <i class="fas fa-bomb"></i>
+                        <h3>Error inesperado</h3>
                         <p>${error.message}</p>
-                        <details style="margin-top:15px; text-align:left;">
-                            <summary>Detalles técnicos</summary>
-                            <pre style="background:#f5f5f5; padding:10px; border-radius:4px; font-size:12px; overflow:auto;">
-${error.stack}
-                            </pre>
-                        </details>
-                        <button id="retry-btn-critical" 
-                                style="margin-top:20px; padding:10px 20px; background:#3498db; color:white; border:none; border-radius:4px; cursor:pointer;">
-                            Reintentar
-                        </button>
+                        <button class="ctrl-btn-retry" id="retry-btn">Reiniciar vista</button>
                     </div>
                 `;
-                contentDiv.querySelector('#retry-btn-critical').addEventListener('click', renderContent);
+                wrapper.querySelector('#retry-btn').addEventListener('click', renderContent);
             }
         };
 
-        // Llamar a la función de renderizado
         await renderContent();
+    }
+
+    _loadControlStyles() {
+        const cssId = 'ctrl-remisiones-styles';
+        if (!document.getElementById(cssId)) {
+            const link = document.createElement('link');
+            link.id = cssId;
+            link.rel = 'stylesheet';
+            link.href = './modules/gestion-salud/restricciones-medicas/control-remisiones.css';
+            document.head.appendChild(link);
+        }
     }
 
     // Agrega este método a la clase RestriccionesMedicasComponent
     async saveCellData(rowIndex, colIndex, newValue, filePath) {
         try {
-            this.logMessage(`Guardando cambios en fila ${rowIndex + 1}, columna ${colIndex + 1}...`);
+            this.logMessage(`Guardando cambios en fila ${rowIndex + 2}, columna ${colIndex + 1}...`);
             const result = await window.electronAPI.updateExcelCell(
                 filePath, 
-                rowIndex + 7 + 1, // +7 por encabezados, +1 por base 1-indexed de Excel
-                colIndex + 1,     // 1-indexed para Excel
+                rowIndex + 2, // +1 por encabezado (Fila 1), +1 por base 1-indexed de Excel
+                colIndex + 1, // 1-indexed para Excel
                 newValue
             );
             
@@ -926,7 +918,7 @@ RestriccionesMedicasComponent.prototype.handleIframeMessage = function(event) {
             window.electronAPI.generateRemisionDocument(payload && payload.extractedData, self.companyName)
                 .then(function(r) {
                     event.source.postMessage({ type: 'generate-remision-doc-response', requestId: requestId,
-                        payload: { success: r.success, documentPath: r.documentPath, controlPath: r.controlPath, error: r.error } }, '*');
+                        payload: { success: r.success, documentPath: r.documentPath, controlPath: r.controlPath, controlUpdated: r.controlUpdated, controlWarning: r.controlWarning, error: r.error } }, '*');
                 })
                 .catch(function(e) {
                     event.source.postMessage({ type: 'generate-remision-doc-response', requestId: requestId,

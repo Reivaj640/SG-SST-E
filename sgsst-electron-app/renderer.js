@@ -4036,20 +4036,160 @@ function showEnviarRemisionContent(container) {
 }
 
 function showControlRemisionesContent(container) {
-  // Crear un título para esta sección
-  const title = document.createElement('h3');
-  title.textContent = 'Control de Remisiones';
-  container.appendChild(title);
+  container.innerHTML = '';
 
-  // Placeholder para la tabla de control de remisiones
-  const tablePlaceholder = document.createElement('div');
-  tablePlaceholder.className = 'control-remisiones-table';
-  tablePlaceholder.innerHTML = `
-    <p>Tabla de control de remisiones se cargará aquí.</p>
-    <p>Esta funcionalidad se conectará al backend Python para obtener los datos.</p>
-    <button class="btn">Refrescar</button>
-  `;
-  container.appendChild(tablePlaceholder);
+  // Header oficial con botón de regreso (clases del sistema visual)
+  const header = document.createElement('div');
+  header.className = 'submodule-header';
+
+  const backBtn = document.createElement('button');
+  backBtn.className = 'btn-back';
+  backBtn.textContent = '← Volver';
+  backBtn.addEventListener('click', () => {
+    currentSubmodule = null;
+    if (currentModule) showModuleContent(currentModule);
+  });
+  header.appendChild(backBtn);
+
+  const title = document.createElement('h3');
+  title.textContent = '3.1.6.1 Control de Remisiones';
+  header.appendChild(title);
+
+  container.appendChild(header);
+
+  // Contenedor principal tipo card
+  const wrapper = document.createElement('div');
+  wrapper.className = 'control-remisiones-wrapper';
+  container.appendChild(wrapper);
+
+  // Función asíncrona para cargar y renderizar datos
+  const renderContent = async () => {
+    wrapper.innerHTML = '<p class="loading-msg">Cargando datos del archivo de control...</p>';
+
+    try {
+      const result = await window.electronAPI.getControlRemisionesData(currentCompany);
+
+      wrapper.innerHTML = '';
+
+      if (!result.success) {
+        wrapper.innerHTML = `
+          <div class="control-remisiones-error">
+            <i class="fas fa-exclamation-triangle"></i>
+            <h3>Error al cargar datos</h3>
+            <p>${result.error || 'Error desconocido'}</p>
+            <button class="btn btn-primary" onclick="this.parentElement.parentElement.innerHTML='<p class=\\'loading-msg\\'>Cargando...</p>'; window._loadControlRemisiones()">Reintentar</button>
+          </div>
+        `;
+        window._loadControlRemisiones = renderContent;
+        return;
+      }
+
+      if (!result.rows || result.rows.length === 0) {
+        wrapper.innerHTML = `
+          <div class="control-remisiones-empty">
+            <i class="fas fa-inbox"></i>
+            <h3>Sin registros</h3>
+            <p>El archivo de control no contiene registros aún.</p>
+            <p style="font-size:0.85rem;color:#888;margin-top:8px;">Genera una remisión desde "Enviar Remisiones" para agregar el primer registro.</p>
+          </div>
+        `;
+        return;
+      }
+
+      // Info superior
+      const infoBar = document.createElement('div');
+      infoBar.className = 'control-remisiones-info';
+      infoBar.innerHTML = `
+        <span><i class="fas fa-database"></i> <strong>${result.rows.length}</strong> registro(s)</span>
+        <span class="info-file" title="${result.filePath}"><i class="fas fa-file-excel"></i> ${result.filePath ? result.filePath.split(/[\\/]/).pop() : ''}</span>
+      `;
+      wrapper.appendChild(infoBar);
+
+      // Tabla con scroll
+      const tableContainer = document.createElement('div');
+      tableContainer.className = 'control-remisiones-table-container';
+
+      const table = document.createElement('table');
+      table.className = 'control-remisiones-table';
+
+      // Encabezados
+      const thead = document.createElement('thead');
+      const headerRow = document.createElement('tr');
+      if (result.headers && Array.isArray(result.headers)) {
+        result.headers.forEach(h => {
+          const th = document.createElement('th');
+          th.textContent = h || '';
+          th.style.position = 'sticky';
+          th.style.top = '0';
+          headerRow.appendChild(th);
+        });
+      }
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      // Cuerpo
+      const tbody = document.createElement('tbody');
+      result.rows.forEach((row, ri) => {
+        const tr = document.createElement('tr');
+        if (ri % 2 === 0) tr.className = 'row-even';
+
+        if (Array.isArray(row)) {
+          row.forEach((cell, ci) => {
+            const td = document.createElement('td');
+            // Última columna: input editable
+            if (ci === row.length - 1) {
+              const input = document.createElement('input');
+              input.type = 'text';
+              input.value = cell != null ? String(cell) : '';
+              input.placeholder = 'Estado / Seguimiento';
+              input.dataset.rowIndex = ri;
+              input.dataset.colIndex = ci;
+              input.addEventListener('change', async (e) => {
+                try {
+                  const saveResult = await window.electronAPI.updateExcelCell(
+                    result.filePath,
+                    ri + 7 + 1,  // +7 encabezados +1 base-1 Excel
+                    ci + 1,
+                    e.target.value
+                  );
+                  if (saveResult.success) {
+                    input.style.borderColor = '#28a745';
+                    setTimeout(() => { input.style.borderColor = '#dee2e6'; }, 1500);
+                  }
+                } catch (err) {
+                  console.error('Error guardando celda:', err);
+                  input.style.borderColor = '#dc3545';
+                }
+              });
+              td.appendChild(input);
+            } else {
+              td.textContent = cell != null ? String(cell) : '';
+            }
+            tr.appendChild(td);
+          });
+        }
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+
+      tableContainer.appendChild(table);
+      wrapper.appendChild(tableContainer);
+
+    } catch (error) {
+      console.error('Error en Control de Remisiones:', error);
+      wrapper.innerHTML = `
+        <div class="control-remisiones-error">
+          <i class="fas fa-times-circle"></i>
+          <h3>Error crítico</h3>
+          <p>${error.message}</p>
+          <button class="btn btn-primary" onclick="window._loadControlRemisiones()">Reintentar</button>
+        </div>
+      `;
+      window._loadControlRemisiones = renderContent;
+    }
+  };
+
+  renderContent();
 }
 
 function showAsignacionRecursosContent(container) {

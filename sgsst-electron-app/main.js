@@ -2306,13 +2306,13 @@ ipcMain.handle('get-control-remisiones-data', async (event, companyName) => {
     const range = xlsx.utils.decode_range(worksheet['!ref']);
     sendLog(`[MAIN] Rango de datos en la hoja: ${worksheet['!ref']}`);
 
-    // Definir el rango para leer desde la fila 7 (índice 6 en base 0)
-    const startRow = 6; // Fila 7
+    // Definir el rango para leer desde la fila 1 (índice 0)
+    const startRow = 0; // Encabezados en fila 1 (índice 0)
     const endRow = range.e.r; // Última fila
 
-    // Crear un nuevo rango que comience desde la fila 7
+    // Crear un nuevo rango que comience desde la fila 1
     const newRange = {
-      s: { c: range.s.c, r: startRow }, // Comenzar desde la columna 0, fila 7
+      s: { c: range.s.c, r: startRow }, // Comenzar desde la columna 0, fila 1
       e: { c: range.e.c, r: endRow }    // Terminar en la última columna y fila
     };
 
@@ -2320,7 +2320,7 @@ ipcMain.handle('get-control-remisiones-data', async (event, companyName) => {
     const rangeStr = xlsx.utils.encode_range(newRange);
     sendLog(`[MAIN] Rango para lectura: ${rangeStr}`);
 
-    // Leer los datos desde la fila 7
+    // Leer los datos desde la fila 1
     const allData = xlsx.utils.sheet_to_json(worksheet, {
       header: 1,
       range: rangeStr
@@ -2340,9 +2340,9 @@ ipcMain.handle('get-control-remisiones-data', async (event, companyName) => {
         };
     }
 
-    // La primera fila ahora será los encabezados (fila 7 del Excel original)
-    const headers = allData[0]; // Fila 7 del Excel
-    const rows = allData.slice(1); // Filas 8 en adelante del Excel
+    // La primera fila son los encabezados (fila 1 del Excel)
+    const headers = allData[0]; // Fila 1 del Excel
+    const rows = allData.slice(1); // Filas 2 en adelante del Excel
 
     sendLog(`[MAIN] Encabezados encontrados: ${headers.length} columnas`);
     sendLog(`[MAIN] Datos de remisiones encontrados. Total filas: ${rows.length}`);
@@ -12467,8 +12467,10 @@ ipcMain.handle('generate-remision-document', async (event, extractedData, empres
 
     if (result.success) {
       sendLog(`[REMISION-DOC] Documento generado: ${result.documentPath}`);
-      if (result.controlPath) {
+      if (result.controlUpdated) {
         sendLog(`[REMISION-DOC] Control actualizado: ${result.controlPath}`);
+      } else if (result.controlWarning) {
+        sendLog(`[REMISION-DOC] ⚠ ADVERTENCIA: ${result.controlWarning}`, 'WARN');
       }
     } else {
       sendLog(`[REMISION-DOC] Error: ${result.error}`, 'ERROR');
