@@ -559,10 +559,50 @@ class RestriccionesMedicasComponent {
         }
     }
 
-    // --- Métodos de Ayuda --- 
+    // --- Métodos de Ayuda ---
 
-    createHeader(titleText, onBack) {
-        const header = document.createElement('div');
+    createModernHeader(titleText, subtitleText, onBack) {
+        const header = document.createElement('header');
+        header.className = 'rem-header';
+
+        const leftSide = document.createElement('div');
+        leftSide.className = 'rem-header-left';
+
+        const backBtn = document.createElement('button');
+        backBtn.className = 'btn btn-back';
+        backBtn.innerHTML = '<i class="fas fa-arrow-left"></i> Volver';
+        backBtn.onclick = onBack;
+        leftSide.appendChild(backBtn);
+
+        const titleGroup = document.createElement('div');
+        const h1 = document.createElement('h1');
+        h1.className = 'rem-title';
+        h1.textContent = titleText;
+        titleGroup.appendChild(h1);
+
+        if (subtitleText) {
+            const p = document.createElement('p');
+            p.className = 'rem-subtitle';
+            p.textContent = subtitleText;
+            titleGroup.appendChild(p);
+        }
+        leftSide.appendChild(titleGroup);
+        header.appendChild(leftSide);
+
+        const rightSide = document.createElement('div');
+        rightSide.className = 'rem-header-right';
+        const refreshBtn = document.createElement('button');
+        refreshBtn.className = 'rem-btn-icon';
+        refreshBtn.title = 'Actualizar';
+        refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+        // El evento de refresh se manejará según el contexto
+        rightSide.appendChild(refreshBtn);
+        header.appendChild(rightSide);
+
+        return header;
+    }
+
+    createHeader(titleText, onBack) {        const header = document.createElement('div');
         header.className = 'submodule-header';
         header.appendChild(this.createBackButton('&#8592; Volver', onBack));
         const title = document.createElement('h3');
@@ -595,7 +635,11 @@ class RestriccionesMedicasComponent {
         // Cargar CSS específico
         this._loadControlStyles();
 
-        const header = this.createHeader('Control de Remisiones', () => this.render());
+        const header = this.createModernHeader(
+            'Control de Remisiones', 
+            'Seguimiento al estado de las remisiones enviadas a las EPS',
+            () => this.render()
+        );
         this.container.appendChild(header);
 
         const wrapper = document.createElement('div');
@@ -861,9 +905,15 @@ RestriccionesMedicasComponent.prototype.handleIframeMessage = function(event) {
 
     switch (type) {
         case 'back-to-module-request':
+            console.log('[RM-BRIDGE] Regresando a la antesala del submódulo 3.1.6');
             if (self._messageHandler) {
                 window.removeEventListener('message', self._messageHandler);
                 self._messageHandler = null;
+            }
+            // Limpiar iframe antes de renderizar antesala
+            if (self._viewerFrame) {
+                self._viewerFrame.remove();
+                self._viewerFrame = null;
             }
             self.render();
             break;

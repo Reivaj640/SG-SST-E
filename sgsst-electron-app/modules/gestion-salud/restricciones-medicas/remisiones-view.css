@@ -7,27 +7,24 @@
     --rem-primary: #174ea6;
     --rem-primary-hover: #185abd;
     --rem-primary-light: #e8f0fe;
-    --rem-primary-dark: #0d3a7a;
     --rem-success: #28a745;
-    --rem-success-light: #d4edda;
     --rem-warning: #ffc107;
-    --rem-warning-light: #fff3cd;
     --rem-danger: #dc3545;
-    --rem-danger-light: #f8d7da;
     --rem-info: #17a2b8;
-    --rem-info-light: #d1ecf1;
-    --rem-text-primary: #1a1a2e;
+    --rem-text-primary: #212529;
     --rem-text-secondary: #4a5568;
-    --rem-text-muted: #718096;
-    --rem-bg-body: #f8f9fa;
+    --rem-text-muted: #6c757d;
+    --rem-bg-body: #f0f2f5;
     --rem-bg-card: #ffffff;
     --rem-border: #dee2e6;
     --rem-border-light: #e9ecef;
     --rem-radius: 0.5rem;
     --rem-radius-lg: 0.75rem;
-    --rem-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
-    --rem-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
-    --rem-shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.12);
+    --rem-shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
+    --rem-shadow-md: 0 4px 12px rgba(0,0,0,0.06);
+    --rem-shadow-lg: 0 10px 30px rgba(0,0,0,0.08);
+    --rem-font-heading: 'Lexend', sans-serif;
+    --rem-font-body: 'Roboto', sans-serif;
     --rem-transition: all 0.2s ease;
 }
 
@@ -38,10 +35,10 @@
 }
 
 body {
-    font-family: 'Roboto', 'Segoe UI', sans-serif;
+    font-family: var(--rem-font-body);
     background-color: var(--rem-bg-body);
     color: var(--rem-text-primary);
-    line-height: 1.6;
+    line-height: 1.5;
     height: 100vh;
     overflow: hidden;
 }
@@ -52,53 +49,93 @@ body {
     display: flex;
     flex-direction: column;
     height: 100vh;
-    overflow: hidden;
 }
 
-/* === HEADER === */
+/* === HEADER (Plantilla Ref: Restricciones Médicas) === */
 
 .rem-header {
-    background-color: var(--rem-bg-card);
-    border-bottom: 1px solid var(--rem-border);
-    padding: 0.75rem 1.5rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
     display: flex;
-    align-items: center;
     justify-content: space-between;
-    flex-shrink: 0;
-    box-shadow: var(--rem-shadow-sm);
-    z-index: 10;
+    align-items: center;
+    padding: 0.75rem 1.5rem;
+    background: var(--rem-bg-card);
+    border-bottom: 1px solid var(--rem-border);
+    backdrop-filter: blur(8px);
 }
 
 .rem-header-left {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 1rem;
 }
 
-.rem-header-divider {
-    width: 1px;
-    height: 1.5rem;
-    background-color: var(--rem-border);
-}
-
-.rem-header-title h1 {
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: var(--rem-primary);
-    line-height: 1.2;
-}
-
-.rem-header-title p {
-    font-size: 0.75rem;
+.rem-btn-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 1px solid var(--rem-border);
+    background: var(--rem-bg-card);
     color: var(--rem-text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    transition: var(--rem-transition);
 }
 
-.rem-header-actions {
+.rem-btn-icon:hover {
+    background: var(--rem-primary-light);
+    color: var(--rem-primary);
+    border-color: var(--rem-primary);
+}
+
+.rem-title {
+    font-family: var(--rem-font-heading);
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--rem-text-primary);
+}
+
+.rem-subtitle {
+    font-size: 0.8rem;
+    color: var(--rem-text-muted);
+    margin-top: 2px;
+}
+
+.rem-header-right {
     display: flex;
+    align-items: center;
     gap: 0.5rem;
 }
 
-/* === BUTTONS === */
+/* === BUTTONS (Legacy support for other sections) === */
+
+.btn-back {
+    background-color: var(--rem-bg-body);
+    border: 1px solid var(--rem-border);
+    color: var(--rem-text-primary);
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+    margin: 0;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: 0.375rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: inherit;
+}
+
+.btn-back:hover {
+    background-color: var(--rem-text-secondary);
+    border-color: var(--rem-text-secondary);
+    color: #ffffff;
+    text-decoration: none;
+}
 
 .rem-btn {
     display: inline-flex;
@@ -827,12 +864,12 @@ body {
 
 @media (max-width: 768px) {
     .rem-header {
-        padding: 0.625rem 1rem;
+        padding: 0.6rem 1rem;
     }
-    .rem-header-title h1 {
-        font-size: 0.95rem;
+    .rem-title {
+        font-size: 1.05rem;
     }
-    .rem-header-title p {
+    .rem-subtitle {
         display: none;
     }
     .rem-body {
