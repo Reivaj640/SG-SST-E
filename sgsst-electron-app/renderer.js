@@ -3080,8 +3080,8 @@ const MODULE_KEY_TO_BADGE_ID = {
   'recursos': 'module-badge-recursos',
   'gestion-salud': 'module-badge-gestión-de-la-salud',
   'gestion-integral': 'module-badge-gestión-integral',
-  'peligros': 'module-badge-peligros',
-  'amenazas': 'module-badge-amenazas',
+  'peligros': 'module-badge-gestión-de-peligros-y-riesgos',
+  'amenazas': 'module-badge-gestión-de-amenazas',
   'verificacion': 'module-badge-verificación',
   'mejoramiento': 'module-badge-mejoramiento'
 };

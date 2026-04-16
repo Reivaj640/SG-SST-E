@@ -243,6 +243,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getExamenesStats: (companyName) =>
     ipcRenderer.invoke('get-examenes-stats', companyName),
 
+  getRemisionesStats: (companyName) =>
+    ipcRenderer.invoke('get-remisiones-stats', companyName),
+
+  getSaludSeguimientosStats: (companyName) =>
+    ipcRenderer.invoke('get-salud-seguimientos-stats', companyName),
+
   // --- Inducciones ---
   getInduccionesData: (companyName) => ipcRenderer.invoke('get-inducciones-data', companyName),
   syncInduccionesFromForms: (companyName) => ipcRenderer.invoke('sync-inducciones-from-forms', companyName),
