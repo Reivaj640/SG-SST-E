@@ -154,7 +154,7 @@ const SUBMODULE_PERMISSION_MAP_UI = new Map([
   ['3.1.9 manejo de residuos', 'salud.sociodemografica'],
   ['3.2.1 reporte de los accidentes de trabajo', 'salud.reportes-accidentes'],
   ['3.2.2 investigacion de accidentes, indicentes y enfermedades', 'salud.investigacion-accidentes'],
-  ['3.2.3 registro y analisis estadistico de indicentes, accidentes de trabajo y enfermedades', 'salud.reportes-accidentes'],
+  ['3.2.3 registro y analisis estadistico de indicentes, accidentes de trabajo y enfermedades', 'salud.registro-estadistico'],
   ['3.3.1 frecuencia de la accidentalidad', 'salud.sociodemografica'],
   ['3.3.2 severidad de la accidentalidad', 'salud.sociodemografica'],
   ['3.3.3 proporcion de accidentes de trabajo mortales', 'salud.sociodemografica'],
@@ -3866,6 +3866,9 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
     } else if (submoduleName === "3.2.2 Investigación de Accidentes, indicentes y Enfermedades") {
       showInvestigacionAccidentesContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
 
+    } else if (submoduleName === "3.2.3 Registro y analisis estadistico de indicentes, accidentes de trabajo y enfermedades") {
+      showRegistroEstadisticoContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
+
     } else if (submoduleName === "3.3.6 Medición del ausentismo por causa médica") {
       showMedicionAusentismoContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
 
@@ -4255,6 +4258,48 @@ function showInvestigacionAccidentesContent(container, currentCompany, moduleNam
     console.error('InvestigacionAccidentesComponent no está disponible o no es una función');
     showDevelopmentMessage(container, submoduleName);
   }
+}
+
+function showRegistroEstadisticoContent(container, currentCompany, moduleName, submoduleName) {
+  container.innerHTML = '<p>Cargando registro estadístico...</p>';
+
+  const BASE = 'modules/gestion-salud/registro-estadistico/';
+
+  if (!document.querySelector(`link[href="${BASE}registro-estadistico.css"]`)) {
+    const cssLink = document.createElement('link');
+    cssLink.rel = 'stylesheet';
+    cssLink.href = BASE + 'registro-estadistico.css';
+    document.head.appendChild(cssLink);
+  }
+
+  fetch(BASE + 'registro-estadistico.html')
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.text();
+    })
+    .then(html => {
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      container.innerHTML = doc.body.innerHTML;
+
+      function loadModuleScript() {
+        const s = document.createElement('script');
+        s.src = BASE + 'registro-estadistico.js';
+        document.head.appendChild(s);
+      }
+
+      if (window.Chart) {
+        loadModuleScript();
+      } else {
+        const chartScript = document.createElement('script');
+        chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js@4';
+        chartScript.onload = loadModuleScript;
+        document.head.appendChild(chartScript);
+      }
+    })
+    .catch(error => {
+      console.error('Error al cargar registro-estadistico:', error);
+      showDevelopmentMessage(container, submoduleName);
+    });
 }
 
 function showMedicionAusentismoContent(container, currentCompany, moduleName, submoduleName) {

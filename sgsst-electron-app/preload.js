@@ -210,6 +210,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   listInvestigations: (companyName, filter) => ipcRenderer.invoke('investigacion-accidentes-list-investigations', { companyName, filter }),
   getInvestigationDetail: (companyName, investigationName) => ipcRenderer.invoke('investigacion-accidentes-get-investigation-detail', { companyName, investigationName }),
 
+  // --- Registro Estadístico (3.2.3) ---
+  registroEstadisticoCargarDatos: (companyName) =>
+    ipcRenderer.invoke('registro-estadistico:cargar-datos', { companyName }),
+
   readAusentismoData: (companyName) =>
     ipcRenderer.invoke('get-ausentismo-data', companyName),
   getPriSeguimientoData: (companyName) =>

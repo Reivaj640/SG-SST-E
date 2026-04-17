@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>K+AIR - Sección 3.2.3 Registro y Análisis Estadístico</title>
+<link rel="stylesheet" href="registro-estadistico.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head>
+<body>
+
+<div class="kair-s323" id="kairS323App">
+
+  <!-- ==================== HEADER ==================== -->
+  <header class="kair-s323-header">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    <h1>SG-SST — Registro y Análisis Estadístico de Incidentes, Accidentes y Enfermedades Laborales</h1>
+    <span class="k-company-name" id="kCompanyName"></span>
+    <span class="k-badge-section">Sección 3.2.3</span>
+  </header>
+
+  <!-- ==================== TABS ==================== -->
+  <nav class="kair-s323-tabs">
+    <button class="kair-s323-tab active" data-tab="datos">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      Vista de Datos
+      <span class="k-tab-badge" id="kTabBadgeDatos">0</span>
+    </button>
+    <button class="kair-s323-tab" data-tab="tablero">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Tablero Estadístico
+      <span class="k-tab-badge" id="kTabBadgeTablero">0</span>
+    </button>
+  </nav>
+
+  <!-- ==================== PANEL: VISTA DE DATOS ==================== -->
+  <section class="kair-s323-panel active" id="panelDatos">
+
+    <!-- Estado de carga -->
+    <div class="kair-s323-loading" id="kLoadingState">
+      <div class="k-spinner"></div>
+      <p>Cargando registros...</p>
+    </div>
+
+    <!-- Estado vacío -->
+    <div class="kair-s323-empty" id="kEmptyState" style="display:none;">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="12" y1="18" x2="12" y2="12"/>
+        <line x1="9" y1="15" x2="15" y2="15"/>
+      </svg>
+      <h3 id="kEmptyTitle">No hay registros</h3>
+      <p id="kEmptyDesc">No se encontró el archivo de Registro Estadístico en la carpeta 3.2.3 de esta empresa.</p>
+      <button class="k-btn-sample" id="kBtnLoadSample">Cargar datos de muestra</button>
+    </div>
+
+    <!-- Contenido principal (oculto hasta que carguen datos) -->
+    <div id="kDataContent" style="display:none;">
+      <!-- Toolbar -->
+      <div class="kair-s323-toolbar">
+        <div class="k-search-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="kSearchInput" placeholder="Buscar por nombre, identificación, cargo, descripción...">
+        </div>
+        <select id="kFilterAnio"><option value="">Todos los años</option></select>
+        <select id="kFilterSeveridad"><option value="">Todas las severidades</option></select>
+        <select id="kFilterEvento"><option value="">Todos los eventos</option></select>
+        <select id="kFilterCiudad"><option value="">Todas las ciudades</option></select>
+        <div class="k-action-btns">
+          <button class="k-btn-action" id="kBtnRefresh" title="Actualizar datos desde archivo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            Actualizar
+          </button>
+          <button class="k-btn-action" id="kBtnExportCsv" title="Exportar registros filtrados como CSV">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Exportar CSV
+          </button>
+        </div>
+      </div>
+      <!-- Tabla -->
+      <div class="kair-s323-table-wrap">
+        <table class="kair-s323-table" id="kDataTable">
+          <thead id="kTableHead"></thead>
+          <tbody id="kTableBody"></tbody>
+        </table>
+      </div>
+      <!-- Paginación -->
+      <div class="kair-s323-pagination" id="kPagination"></div>
+    </div>
+
+  </section>
+
+  <!-- ==================== PANEL: TABLERO ESTADÍSTICO ==================== -->
+  <section class="kair-s323-panel" id="panelTablero">
+
+    <!-- Barra de acciones del tablero -->
+    <div class="k-dash-actions">
+      <button class="k-btn-action" id="kBtnPrintDash" title="Imprimir tablero (Ctrl+P)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Imprimir Tablero
+      </button>
+    </div>
+
+    <!-- A. Filter Bar -->
+    <div class="kair-s323-dash-filter" id="kDashFilter">
+      <div class="k-filter-group">
+        <label>Desde Año</label>
+        <select id="kDashDesde"></select>
+      </div>
+      <div class="k-filter-group">
+        <label>Hasta Año</label>
+        <select id="kDashHasta"></select>
+      </div>
+      <div class="k-filter-group">
+        <label>Ciudad</label>
+        <select id="kDashCiudad"><option value="Todos">Todas</option></select>
+      </div>
+      <div class="k-filter-group">
+        <label>Tipo Evento</label>
+        <select id="kDashTipoEvento">
+          <option value="Todos">Todos</option>
+          <option value="At">Accidente de Trabajo</option>
+          <option value="Ep">Enfermedad Laboral</option>
+        </select>
+      </div>
+      <div class="k-filter-group">
+        <label>Severidad</label>
+        <select id="kDashSeveridad">
+          <option value="Todos">Todos</option>
+          <option value="Muy leve">Muy leve</option>
+          <option value="Alta inmediata">Alta inmediata</option>
+          <option value="Leve">Leve</option>
+          <option value="Severo">Severo</option>
+        </select>
+      </div>
+      <div class="k-filter-group">
+        <label>&nbsp;</label>
+        <div class="k-period-badge" id="kPeriodBadge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <span id="kPeriodText">— – —</span>
+        </div>
+      </div>
+      <div class="k-filter-group">
+        <label>&nbsp;</label>
+        <button class="k-btn-clear" id="kBtnClearFilters">Limpiar Filtros</button>
+      </div>
+    </div>
+
+    <!-- B. KPI Cards -->
+    <div class="kair-s323-kpi-grid" id="kKpiGrid"></div>
+
+    <!-- C. SG-SST Indicators -->
+    <div class="kair-s323-card">
+      <div class="kair-s323-card-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        Indicadores SG-SST (Índices de Gestión en Seguridad y Salud en el Trabajo)
+      </div>
+      <div class="kair-s323-card-body">
+        <div class="kair-s323-sgsst-grid" id="kSgsstGrid"></div>
+      </div>
+    </div>
+
+    <!-- D. Alert Panel -->
+    <div class="kair-s323-card">
+      <div class="kair-s323-card-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Panel de Alertas — Hallazgos Automáticos
+      </div>
+      <div class="kair-s323-card-body">
+        <div class="kair-s323-alert-list" id="kAlertList"></div>
+      </div>
+    </div>
+
+    <!-- E. Charts Grid -->
+    <div class="kair-s323-charts-grid" id="kChartsGrid">
+      <div class="kair-s323-card">
+        <div class="kair-s323-card-header">Eventos por Año</div>
+        <div class="kair-s323-card-body"><div class="kair-s323-chart-container"><canvas id="kChartByYear"></canvas></div></div>
+      </div>
+      <div class="kair-s323-card">
+        <div class="kair-s323-card-header">Distribución por Severidad</div>
+        <div class="kair-s323-card-body"><div class="kair-s323-chart-container"><canvas id="kChartSeveridad"></canvas></div></div>
+      </div>
+      <div class="kair-s323-card">
+        <div class="kair-s323-card-header">Distribución Mensual</div>
+        <div class="kair-s323-card-body"><div class="kair-s323-chart-container"><canvas id="kChartMensual"></canvas></div></div>
+      </div>
+      <div class="kair-s323-card">
+        <div class="kair-s323-card-header">Parte del Cuerpo Afectada</div>
+        <div class="kair-s323-card-body"><div class="kair-s323-chart-container"><canvas id="kChartParteCuerpo"></canvas></div></div>
+      </div>
+      <div class="kair-s323-card">
+        <div class="kair-s323-card-header">Mecanismo del Evento</div>
+        <div class="kair-s323-card-body"><div class="kair-s323-chart-container"><canvas id="kChartMecanismo"></canvas></div></div>
+      </div>
+      <div class="kair-s323-card">
+        <div class="kair-s323-card-header">Lugar del Evento</div>
+        <div class="kair-s323-card-body"><div class="kair-s323-chart-container"><canvas id="kChartLugar"></canvas></div></div>
+      </div>
+      <div class="kair-s323-card">
+        <div class="kair-s323-card-header">Tipo de Evento por Año</div>
+        <div class="kair-s323-card-body"><div class="kair-s323-chart-container"><canvas id="kChartTipoAnio"></canvas></div></div>
+      </div>
+      <div class="kair-s323-card">
+        <div class="kair-s323-card-header">Tipo de Lesión</div>
+        <div class="kair-s323-card-body"><div class="kair-s323-chart-container"><canvas id="kChartTipoLesion"></canvas></div></div>
+      </div>
+      <div class="kair-s323-card kair-s323-chart-full">
+        <div class="kair-s323-card-header">Severidad por Sexo</div>
+        <div class="kair-s323-card-body"><div class="kair-s323-chart-container"><canvas id="kChartSevSexo"></canvas></div></div>
+      </div>
+    </div>
+
+    <!-- F. Top 5 Tables -->
+    <div class="kair-s323-top5-grid">
+      <div class="kair-s323-card">
+        <div class="kair-s323-card-header">Top 5 Mecanismos Más Frecuentes</div>
+        <div class="kair-s323-card-body" id="kTop5Mecanismos"></div>
+      </div>
+      <div class="kair-s323-card">
+        <div class="kair-s323-card-header">Top 5 Lugares con Más Eventos</div>
+        <div class="kair-s323-card-body" id="kTop5Lugares"></div>
+      </div>
+    </div>
+
+    <!-- G. Recommendations -->
+    <div class="kair-s323-card" style="border-left: 4px solid var(--k-primary);">
+      <div class="kair-s323-card-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        Recomendaciones Generadas Automáticamente
+      </div>
+      <div class="kair-s323-card-body">
+        <ol class="kair-s323-recs-list" id="kRecsList"></ol>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ==================== MODAL: DETALLE DE REGISTRO ==================== -->
+  <div class="kair-s323-modal-backdrop" id="kModalBackdrop" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="kModalTitle">
+    <div class="kair-s323-modal">
+      <div class="kair-s323-modal-header">
+        <div class="kair-s323-modal-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <span id="kModalTitle">Detalle del Registro</span>
+        </div>
+        <button class="kair-s323-modal-close" id="kModalClose" aria-label="Cerrar">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="kair-s323-modal-body">
+        <div class="kair-s323-modal-grid" id="kModalGrid"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="registro-estadistico.js"></script>
+</body>
+</html>

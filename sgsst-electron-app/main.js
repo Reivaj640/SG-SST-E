@@ -6670,6 +6670,154 @@ ipcMain.handle('read-ausentismo-data', async (event, companyName) => {
 });
 
 // =============================================================================
+// Handler: registro-estadistico:cargar-datos (Submódulo 3.2.3)
+// =============================================================================
+ipcMain.handle('registro-estadistico:cargar-datos', async (event, { companyName }) => {
+  console.log('[REGISTRO-EST] Handler llamado para empresa:', companyName);
+  try {
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+
+    const normalizedInput = (companyName || '').toLowerCase();
+    const companyKey = Object.keys(config.companyPaths || {}).find(
+      key => key.toLowerCase() === normalizedInput
+    );
+    const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+
+    if (!companyConfig || !companyConfig.root) {
+      console.warn(`[REGISTRO-EST] Empresa "${companyName}" no encontrada`);
+      return { success: true, data: [], isEmpty: true, reason: 'COMPANY_NOT_FOUND' };
+    }
+
+    // Buscar carpeta "3. Gestión de la Salud" y dentro cualquier carpeta que empiece con "3.2.3"
+    const gestionSaludDir = path.join(companyConfig.root, '3. Gestión de la Salud');
+    let gestionEntries;
+    try {
+      gestionEntries = await fsp.readdir(gestionSaludDir);
+    } catch (err) {
+      if (err.code === 'ENOENT') return { success: true, data: [], isEmpty: true, reason: 'FOLDER_NOT_FOUND' };
+      throw err;
+    }
+
+    const registro323Folder = gestionEntries.find(f => f.startsWith('3.2.3'));
+    if (!registro323Folder) {
+      console.log('[REGISTRO-EST] Carpeta 3.2.3 no encontrada en:', gestionSaludDir);
+      return { success: true, data: [], isEmpty: true, reason: 'FOLDER_NOT_FOUND' };
+    }
+
+    const submoduleDir = path.join(gestionSaludDir, registro323Folder);
+    let entries;
+    try {
+      entries = await fsp.readdir(submoduleDir);
+    } catch (err) {
+      if (err.code === 'ENOENT') return { success: true, data: [], isEmpty: true, reason: 'FOLDER_NOT_FOUND' };
+      throw err;
+    }
+
+    const excelFile = entries.find(f => f.toLowerCase().endsWith('.xlsx') && !f.startsWith('~$'));
+    if (!excelFile) {
+      console.log('[REGISTRO-EST] No se encontró archivo .xlsx en:', submoduleDir);
+      return { success: true, data: [], isEmpty: true, reason: 'FILE_NOT_FOUND' };
+    }
+
+    const filePath = path.join(submoduleDir, excelFile);
+    console.log('[REGISTRO-EST] Leyendo:', filePath);
+
+    const XLSX = require('xlsx');
+    const wb = XLSX.readFile(filePath);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    if (!ws) return { success: true, data: [], isEmpty: true, reason: 'NO_SHEET' };
+
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    if (rows.length < 2) return { success: true, data: [], isEmpty: true, reason: 'NO_DATA' };
+
+    // Detectar fila de encabezados (buscar "Ciudad" o "Año" en primeras 10 filas)
+    let headerIdx = 0;
+    for (let i = 0; i < Math.min(10, rows.length); i++) {
+      const row = rows[i];
+      if (row.some(c => {
+        const s = String(c).trim().toLowerCase();
+        return s === 'ciudad' || s === 'año' || s === 'evento';
+      })) {
+        headerIdx = i;
+        break;
+      }
+    }
+
+    // Mapear columnas por nombre de encabezado
+    const headers = rows[headerIdx].map(h => String(h).trim().replace(/\r\n|\r|\n/g, ''));
+    const idx = (name) => headers.findIndex(h => h.toLowerCase() === name.toLowerCase());
+
+    const iCiudad      = idx('Ciudad');
+    const iAnio        = idx('Año');
+    const iFecha       = idx('Fecha del incidente');
+    const iMes         = idx('Mes');
+    const iEvento      = idx('Evento');
+    const iNombre      = idx('Nombre Completo');
+    const iSexo        = idx('Sexo');
+    const iId          = idx('Identificación');
+    const iCargo       = idx('Cargo');
+    const iTipoEvento  = idx('Tipo Evento');
+    const iSeveridad   = idx('Severidad');
+    const iEstado      = idx('Estado');
+    const iMortal      = idx('Eventos Mortales');
+    const iParteAt     = idx('Parte Afectada AT');
+    const iMecanismo   = idx('Mecanismo');
+    const iLugar       = idx('Lugar');
+    const iAgente      = idx('Agente');
+    const iTipoLesion  = idx('Tipo Lesión');
+    const iDesc        = idx('Descripción del evento');
+
+    // Convertir serial de fecha Excel a string ISO YYYY-MM-DD
+    const toISO = (v) => {
+      if (!v) return '';
+      if (typeof v === 'number') {
+        const d = XLSX.SSF.parse_date_code(Math.floor(v));
+        return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+      }
+      return String(v).trim();
+    };
+
+    const cell = (row, i) => i >= 0 ? String(row[i] ?? '').trim() : '';
+
+    const records = [];
+    for (let r = headerIdx + 1; r < rows.length; r++) {
+      const row = rows[r];
+      const anio = parseInt(cell(row, iAnio));
+      if (!anio || anio < 2000 || anio > 2099) continue;
+      records.push([
+        anio,                          // 0: anio
+        toISO(row[iFecha]),            // 1: fecha
+        cell(row, iMes),               // 2: mes
+        cell(row, iCiudad),            // 3: ciudad
+        cell(row, iEvento),            // 4: evento
+        cell(row, iNombre),            // 5: nombreCompleto
+        cell(row, iSexo),              // 6: sexo
+        cell(row, iId),                // 7: identificacion
+        cell(row, iCargo),             // 8: cargo
+        cell(row, iTipoEvento),        // 9: tipoEvento
+        cell(row, iSeveridad),         // 10: severidad
+        cell(row, iEstado),            // 11: estado
+        cell(row, iMortal),            // 12: mortal
+        cell(row, iParteAt),           // 13: parteAfectada
+        cell(row, iMecanismo),         // 14: mecanismo
+        cell(row, iLugar),             // 15: lugar
+        cell(row, iAgente),            // 16: agente
+        cell(row, iTipoLesion),        // 17: tipoLesion
+        cell(row, iDesc),              // 18: descripcion
+      ]);
+    }
+
+    console.log(`[REGISTRO-EST] Registros parseados: ${records.length} de ${filePath}`);
+    return { success: true, data: records, isEmpty: records.length === 0, file: excelFile };
+
+  } catch (error) {
+    console.error('[REGISTRO-EST] Error:', error.message);
+    return { success: false, error: { code: error.code || 'READ_ERROR', message: error.message } };
+  }
+});
+
+// =============================================================================
 // Handler: Leer datos del PRI.xlsx (hoja "Casos en seguimiento")
 // =============================================================================
 ipcMain.handle('get-pri-seguimiento-data', async (event, companyName) => {
