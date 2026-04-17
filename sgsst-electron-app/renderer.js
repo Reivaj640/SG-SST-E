@@ -1122,6 +1122,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                   // Volver al home principal
                   showHomePage();
                   return;
+              case 'back-to-module-request':
+                  // Volver al home del módulo actual (ej. Gestión de la Salud)
+                  console.log(`[RENDERER] Solicitud de regreso al módulo: ${currentModule || 'Gestión de la Salud'}`);
+                  showModuleContent(currentModule || 'Gestión de la Salud');
+                  return;
               case 'ausentismo-home-action':
                   // Acción desde home de ausentismo - ya se maneja internamente en el módulo
                   console.log('[RENDERER] Ausentismo home action recibida, procesando...');
