@@ -71,8 +71,15 @@ function ejecutarBusqueda() {
 
     // Enviar petición al padre (proxy)
     if (window.parent && window.parent.postMessage) {
+        console.log('[consulta-trabajadores] 📨 Enviando búsqueda:', { cedula, nombre, empresa: ConsultaTrabajadores.empresaActiva });
         window.parent.postMessage({
             type: 'ct-search-request',
+            payload: {
+                cedula: cedula,
+                nombre: nombre,
+                empresa: ConsultaTrabajadores.empresaActiva
+            },
+            // Fallback para versiones de renderer que no usan payload
             cedula: cedula,
             nombre: nombre,
             empresa: ConsultaTrabajadores.empresaActiva
@@ -85,13 +92,16 @@ function ejecutarBusqueda() {
  */
 function onSearchResponse(data) {
     var elapsed = Math.round(performance.now() - (ConsultaTrabajadores._searchStart || performance.now()));
+    
+    // El renderer suele envolver el resultado en 'payload'
+    var response = data.payload || data;
 
-    if (data.success) {
-        ConsultaTrabajadores.resultados = data.data || [];
+    if (response.success) {
+        ConsultaTrabajadores.resultados = response.data || [];
         renderizarResultados(ConsultaTrabajadores.resultados, elapsed);
     } else {
-        console.error('[consulta-trabajadores] Error del padre:', data.error);
-        renderizarError(data.error && data.error.message ? data.error.message : 'Error desconocido.');
+        console.error('[consulta-trabajadores] Error en respuesta:', response.error);
+        renderizarError(response.error && response.error.message ? response.error.message : 'Error desconocido.');
     }
 }
 

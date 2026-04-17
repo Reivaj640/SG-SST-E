@@ -12011,6 +12011,10 @@ function leerBDPersonal(empresaData) {
     const worksheet = workbook.Sheets[sheetName];
     const rows = xlsx.utils.sheet_to_json(worksheet, { defval: '' });
 
+    if (rows.length > 0) {
+      console.log(`[MAIN] 📊 Columnas detectadas en Excel de ${nombre}:`, Object.keys(rows[0]));
+    }
+
     if (tipoBD === 'ASEL') {
       return rows.map(row => normalizarASEL(row, nombre));
     } else {
@@ -12059,7 +12063,23 @@ function normalizarTemporales(row, empresa) {
  * Normaliza registro de BD ASEL
  */
 function normalizarASEL(row, empresa) {
-  let fechaNac = row['FECHA DE NACIMIENTO R'] || row['FECHA DE NACIMIENTO'] || null;
+  // Función para buscar una columna de forma flexible (ignora tildes, mayúsculas y espacios)
+  const getVal = (possibleNames) => {
+    for (const name of possibleNames) {
+      if (row[name] !== undefined && row[name] !== null) return String(row[name]).trim();
+      
+      // Búsqueda insensible
+      const normalizedTarget = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const foundKey = Object.keys(row).find(k => {
+        const normalizedKey = k.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        return normalizedKey === normalizedTarget || normalizedKey.includes(normalizedTarget);
+      });
+      if (foundKey) return String(row[foundKey]).trim();
+    }
+    return '';
+  };
+
+  let fechaNac = getVal(['FECHA DE NACIMIENTO R', 'FECHA DE NACIMIENTO', 'FEC NAC']);
   if (fechaNac && typeof fechaNac === 'number') {
     const str = String(fechaNac);
     if (str.length === 8) {
@@ -12072,30 +12092,28 @@ function normalizarASEL(row, empresa) {
 
   return {
     tipoBD: 'ASEL',
-    empresa: String(row['Empresa'] || empresa || 'ASEL').trim(),
-    cedula: String(row['CEDULA'] || '').trim(),
-    nombreCompleto: String(row['NOMBRES COMPLETOS FORMATO'] || '').trim(),
-    cargo: String(row['CARGO'] || '').trim(),
-    estado: String(row['ESTADO'] || '').trim(),
-    genero: String(row['GENERO'] || '').trim(),
-    sede: String(row['SEDE'] || '').trim(),
-    lugarTrabajo: String(row['LUGAR DE RABAJO FORMATO'] || '').trim(),
-    tipoContrato: String(row['TIPO DE CONTRATO'] || '').trim(),
-    jornadaLaboral: String(row['JORNADA LABORAL FORMATO'] || '').trim(),
-    eps: String(row['EPS'] || '').trim(),
-    fondoPension: String(row['FONDO DE PENSION'] || '').trim(),
-    fondoCesantias: String(row['FONDO DE CESANTIAS'] || '').trim(),
-    salario: String(row['SALARIO'] || '').trim(),
-    tasaRiesgo: String(row['TASA RIESGO'] || '').trim(),
-    fechaIngreso: row['FECHA DE INGRESO'] || null,
-    fecIng: row['FECHA DE INGRESO'] || null,
+    empresa: String(getVal(['Empresa']) || empresa || 'ASEL').trim(),
+    cedula: getVal(['CEDULA', 'DOCUMENTO', 'IDENTIFICACION']),
+    nombreCompleto: getVal(['NOMBRES COMPLETOS FORMATO', 'NOMBRE COMPLETO', 'NOMBRES Y APELLIDOS']),
+    cargo: getVal(['CARGO', 'PUESTO']),
+    estado: getVal(['ESTADO', 'EST ACTUAL']),
+    genero: getVal(['GENERO', 'SEXO']),
+    sede: getVal(['SEDE', 'UBICACION']),
+    lugarTrabajo: getVal(['LUGAR DE TRABAJO FORMATO', 'LUGAR TRABAJO']),
+    tipoContrato: getVal(['TIPO DE CONTRATO', 'CONTRATO']),
+    jornadaLaboral: getVal(['JORNADA LABORAL FORMATO', 'JORNADA']),
+    eps: getVal(['EPS']),
+    fondoPension: getVal(['FONDO DE PENSION', 'PENSION']),
+    fondoCesantias: getVal(['FONDO DE CESANTIAS', 'CESANTIAS']),
+    salario: getVal(['SALARIO']),
+    tasaRiesgo: getVal(['TASA RIESGO', 'RIESGO']),
+    fechaIngreso: getVal(['FECHA DE INGRESO', 'FEC ING']),
     fechaNacimiento: fechaNac,
-    fecNac: fechaNac,
-    direccion: String(row['DIRECCION'] || '').trim(),
-    municipio: String(row['MUNICIPIO'] || '').trim(),
-    barrio: String(row['BARRIO'] || '').trim(),
-    celular: String(row['CELULAR'] || '').trim(),
-    correo: String(row['CORREO'] || '').trim(),
+    direccion: getVal(['DIRECCION']),
+    municipio: getVal(['MUNICIPIO', 'CIUDAD']),
+    barrio: getVal(['BARRIO']),
+    celular: getVal(['CELULAR', 'TELEFONO']),
+    correo: getVal(['CORREO', 'EMAIL']),
   };
 }
 
@@ -12103,18 +12121,17 @@ function normalizarASEL(row, empresa) {
  * Filtra trabajadores por cédula y/o nombre
  */
 function filtrarTrabajadores(trabajadores, cedula, nombre) {
-  const cedulaNorm = cedula.trim().toLowerCase().replace(/[.,\s]/g, '');
-  const nombreNorm = nombre.trim().toLowerCase();
+  const cedulaNorm = String(cedula || '').trim().toLowerCase().replace(/\D/g, '');
+  const nombreNorm = String(nombre || '').trim().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
   return trabajadores.filter(t => {
-    if (!t.cedula && !t.nombreCompleto) return false;
+    const tCedula = String(t.cedula || '').trim().toLowerCase().replace(/\D/g, '');
+    const tNombre = String(t.nombreCompleto || '').trim().toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-    const cedulaMatch = !cedulaNorm ||
-      t.cedula.toLowerCase().replace(/[.,\s]/g, '').includes(cedulaNorm) ||
-      t.cedula.toLowerCase().includes(cedulaNorm);
-
-    const nombreMatch = !nombreNorm ||
-      t.nombreCompleto.toLowerCase().includes(nombreNorm);
+    const cedulaMatch = !cedulaNorm || tCedula.includes(cedulaNorm);
+    const nombreMatch = !nombreNorm || tNombre.includes(nombreNorm);
 
     return cedulaMatch && nombreMatch;
   });
@@ -12141,9 +12158,18 @@ ipcMain.handle('consultar-trabajadores-global', async (event, params) => {
 
     const resultados = [];
     for (const emp of empresasABuscar) {
+      const nombreEmp = emp.nombre || 'Empresa';
+      console.log(`[MAIN] 🔎 Buscando en BD de: ${nombreEmp}...`);
+      
       const trabajadores = leerBDPersonal(emp);
-      if (!trabajadores || trabajadores.length === 0) continue;
+      if (!trabajadores || trabajadores.length === 0) {
+        console.log(`[MAIN] ⚠️ No se encontraron trabajadores para: ${nombreEmp}`);
+        continue;
+      }
+      
+      console.log(`[MAIN] ✅ ${trabajadores.length} registros cargados para ${nombreEmp}. Filtrando por: "${cedula}" / "${nombre}"`);
       const filtrados = filtrarTrabajadores(trabajadores, cedula, nombre);
+      console.log(`[MAIN] 🎯 Coincidencias encontradas en ${nombreEmp}: ${filtrados.length}`);
       resultados.push(...filtrados);
     }
 

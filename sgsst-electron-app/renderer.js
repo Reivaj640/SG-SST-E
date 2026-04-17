@@ -1132,6 +1132,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                   console.log('[RENDERER] Ver estadísticas de ausentismo solicitada');
                   // El módulo se encarga de mostrar la vista de estadísticas
                   return;
+              case 'ct-search-request':
+                  // Solicitud de búsqueda de trabajadores (Módulo Ausentismo)
+                  apiCallFunction = window.electronAPI.consultarTrabajadoresGlobal;
+                  
+                  // Intentar obtener parámetros de payload o de la raíz del objeto
+                  const searchParams = payload || {
+                      cedula: event.data.cedula,
+                      nombre: event.data.nombre,
+                      empresa: event.data.empresa
+                  };
+                  
+                  console.log('[RENDERER] 🔍 Procesando búsqueda de trabajadores:', searchParams);
+                  apiCallArgs = [searchParams];
+                  responseType = 'ct-search-response';
+                  break;
 
               // ═══════════════════════════════════════════════════════════
               // NOTA: Los mensajes de remisiones médicas (-request) NO deben
