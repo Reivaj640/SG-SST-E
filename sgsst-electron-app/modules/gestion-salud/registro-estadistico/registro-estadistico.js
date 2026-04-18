@@ -870,6 +870,11 @@
     bindTabs();
     bindModal();
 
+    const backBtn = document.getElementById('kBtnBack');
+    if (backBtn) backBtn.addEventListener('click', () => {
+      window.parent.postMessage({ type: 'back-to-module-request' }, '*');
+    });
+
     const refreshBtn = document.getElementById('kBtnRefresh');
     if (refreshBtn) refreshBtn.addEventListener('click', () => {
       tState.search = '';

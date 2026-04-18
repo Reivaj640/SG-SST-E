@@ -53,13 +53,36 @@
   padding: 14px 24px;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   box-shadow: var(--k-shadow-md);
+}
+.kair-s323-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid rgba(255,255,255,0.24);
+  border-radius: var(--k-radius);
+  background: rgba(255,255,255,0.12);
+  color: var(--k-text-white);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--k-transition);
+  flex-shrink: 0;
+}
+.kair-s323-back-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+.kair-s323-back-btn:hover {
+  background: rgba(255,255,255,0.22);
+  transform: translateX(-1px);
 }
 .kair-s323-header h1 {
   font-size: 1.1rem;
   font-weight: 600;
   letter-spacing: 0.3px;
+  min-width: 0;
 }
 .kair-s323-header .k-badge-section {
   background: rgba(255,255,255,0.2);
@@ -356,6 +379,21 @@
 @media (max-width: 1200px) { .kair-s323-kpi-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 600px) { .kair-s323-kpi-grid { grid-template-columns: 1fr; } }
 
+@media (max-width: 720px) {
+  .kair-s323-header {
+    padding: 12px 16px;
+    align-items: flex-start;
+  }
+  .kair-s323-header .k-company-name {
+    margin-left: 0;
+    max-width: none;
+  }
+  .kair-s323-header h1 {
+    font-size: 1rem;
+    line-height: 1.35;
+  }
+}
+
 .kair-s323-kpi-card {
   background: var(--k-bg-card);
   border: 1px solid var(--k-border);
@@ -611,7 +649,6 @@
   font-size: 0.82rem;
   font-weight: 500;
   color: rgba(255,255,255,0.9);
-  margin-left: auto;
   white-space: nowrap;
   max-width: 260px;
   overflow: hidden;
