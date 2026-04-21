@@ -22,6 +22,9 @@ require('./modules/gestion-salud/investigacion-accidentes/investigacion_handlers
 // Importar handlers de Archivo y Retención Documental (Submódulo 2.5.1)
 const { registerArchivoRetencionHandlers } = require('./modules/gestion-integral/archivo-retencion/archivo-retencion-main');
 
+// Importar módulo de Frecuencia de la Accidentalidad (Submódulo 3.3.1)
+const excelBridge = require('./main/excel-bridge');
+
 // Capturar promesas no manejadas globalmente
 process.on('unhandledRejection', (reason, promise) => {
   const errorMessage = `
@@ -12889,6 +12892,211 @@ ipcMain.handle('send-remision-by-email', async (event, docPath, extractedData, e
   } catch (error) {
     sendLog(`[REMISION-EMAIL] Error crítico: ${error.message}`, 'ERROR');
     return { success: false, error: error.message };
+  }
+});
+
+// =============================================================================
+// Handler: Frecuencia de la Accidentalidad (Submódulo 3.3.1)
+// =============================================================================
+
+// Configurar rutas de archivos Excel para una empresa específica
+ipcMain.handle('frecuencia-accidentalidad:configurar-rutas', async (event, companyName) => {
+  console.log('[FrecuenciaAccidentalidad][MAIN] ===== HANDLER CALLED =====');
+  console.log('[FrecuenciaAccidentalidad][MAIN] companyName recibido:', companyName);
+  
+  try {
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+    console.log('[FrecuenciaAccidentalidad][MAIN] config cargada, companyPaths:', Object.keys(config.companyPaths || {}));
+
+    const normalizedInput = (companyName || '').toLowerCase();
+    const companyKey = Object.keys(config.companyPaths || {}).find(
+      key => key.toLowerCase() === normalizedInput
+    );
+    console.log('[FrecuenciaAccidentalidad][MAIN] companyKey encontrado:', companyKey);
+    
+    const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+    console.log('[FrecuenciaAccidentalidad][MAIN] companyConfig:', companyConfig ? 'EXISTS' : 'NULL');
+    console.log('[FrecuenciaAccidentalidad][MAIN] companyConfig.root:', companyConfig && companyConfig.root);
+    console.log('[FrecuenciaAccidentalidad][MAIN] companyConfig.structure:', companyConfig && companyConfig.structure ? 'EXISTS' : 'NULL');
+
+    if (!companyConfig || !companyConfig.root) {
+      console.log('[FrecuenciaAccidentalidad][MAIN] ERROR: Empresa no encontrada');
+      return { 
+        success: false, 
+        error: { 
+          code: 'COMPANY_NOT_FOUND', 
+          message: `Empresa "${companyName}" no encontrada` 
+        } 
+      };
+    }
+
+    if (!companyConfig.structure?.structure) {
+      console.log('[FrecuenciaAccidentalidad][MAIN] ERROR: No tiene estructura mapeada');
+      return { 
+        success: false, 
+        error: { 
+          code: 'NO_STRUCTURE', 
+          message: `Empresa "${companyName}" no tiene estructura mapeada` 
+        } 
+      };
+    }
+
+    const rootStructure = companyConfig.structure.structure;
+    console.log('[FrecuenciaAccidentalidad][MAIN] rootStructure.subdirectories:', Object.keys(rootStructure.subdirectories || {}));
+
+    // Función auxiliar: Buscar carpeta de forma flexible
+    function findDirFlexible(subdirs, target) {
+      if (!subdirs) return null;
+      
+      const normalizedTarget = target
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      for (const [key, value] of Object.entries(subdirs)) {
+        const normalizedKey = key
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        if (normalizedKey === normalizedTarget) {
+          return value;
+        }
+      }
+      return null;
+    }
+
+    // Buscar carpeta de indicadores - probar múltiples ubicaciones
+    var indicadoresPath = null;
+    
+    // Lista de ubicaciones donde puede estar el archivo
+    var ubicacionesAPrueba = [
+      { modulo: "3. Gestion de la Salud", submodulo: "3.3.1 Frecuencia de la Accidentalidad" },
+      { modulo: "3. Gestion de la Salud", submodulo: "3.2.3 Frecuencia de la Accidentalidad" },
+      { modulo: "6. Verificacion", submodulo: "6.1.1 Definicion de indicadores" },
+      { modulo: "6. Verificación", submodulo: "6.1.1 Definición de indicadores" },
+    ];
+    
+    console.log('[FrecuenciaAccidentalidad][MAIN] Probando ubicaciones para indicadores...');
+    console.log('[FrecuenciaAccidentalidad][MAIN] Subdirectorios	root:', Object.keys(rootStructure.subdirectories || {}));
+    
+    for (var i = 0; i < ubicacionesAPrueba.length; i++) {
+      var loc = ubicacionesAPrueba[i];
+      console.log('[FrecuenciaAccidentalidad][MAIN] Probando:', loc.modulo, '->', loc.submodulo);
+      
+      var modulo = findDirFlexible(rootStructure.subdirectories, loc.modulo);
+      if (modulo && modulo.subdirectories) {
+        var submodulo = findDirFlexible(modulo.subdirectories, loc.submodulo);
+        if (submodulo) {
+          indicadoresPath = submodulo;
+          console.log('[FrecuenciaAccidentalidad][MAIN] ENCONTRADO en:', loc.modulo, '->', loc.submodulo);
+          break;
+        }
+      }
+    }
+
+    if (!indicadoresPath) {
+      console.log('[FrecuenciaAccidentalidad][MAIN] ERROR: No se encontró carpeta de indicadores');
+      console.log('[FrecuenciaAccidentalidad][MAIN] Intentando buscar cualquier carpeta con "indicadores" o "frecuencia"...');
+      
+      // Búsqueda dinámica - buscar cualquier carpeta que contenga "indicadores" o similar
+      for (var key in rootStructure.subdirectories) {
+        if (key.toLowerCase().includes('indicador') || key.toLowerCase().includes('frecuencia')) {
+          indicadoresPath = rootStructure.subdirectories[key];
+          console.log('[FrecuenciaAccidentalidad][MAIN] Encontrado por búsqueda dinámica:', key);
+          break;
+        }
+      }
+    }
+
+    if (!indicadoresPath) {
+      return { 
+        success: false, 
+        error: { 
+          code: 'SUBMODULE_NOT_FOUND', 
+          message: 'No se encontró carpeta de indicadores' 
+        } 
+      };
+    }
+
+    console.log('[FrecuenciaAccidentalidad][MAIN] indicadoresPath.path:', indicadoresPath.path);
+    console.log('[FrecuenciaAccidentalidad][MAIN] Llamando a excelBridge.configurarRutasConRuta()...');
+    
+    const rutas = excelBridge.configurarRutasConRuta(indicadoresPath.path);
+    console.log('[FrecuenciaAccidentalidad][MAIN] rutas result:', rutas);
+    console.log('[FrecuenciaAccidentalidad][MAIN] rutas.indicadores:', rutas.indicadores);
+    console.log('[FrecuenciaAccidentalidad][MAIN] rutas.caracterizacion:', rutas.caracterizacion);
+    
+    return {
+      success: true,
+      data: {
+        indicadores: rutas.indicadores ? path.basename(rutas.indicadores) : null,
+        caracterizacion: rutas.caracterizacion ? path.basename(rutas.caracterizacion) : null
+      }
+    };
+  } catch (error) {
+    console.error('[FrecuenciaAccidentalidad][MAIN] EXCEPTION:', error.message);
+    console.error('[FrecuenciaAccidentalidad][MAIN] STACK:', error.stack);
+    return { 
+      success: false, 
+      error: { 
+        code: 'CONFIG_ERROR', 
+        message: error.message 
+      } 
+    };
+  }
+});
+
+// Leer indicadores desde Excel de origen
+ipcMain.handle('frecuencia-accidentalidad:leer-indicadores', async () => {
+  try {
+    return await excelBridge.leerIndicadores();
+  } catch (error) {
+    console.error('[FrecuenciaAccidentalidad] Error leyendo indicadores:', error);
+    return { 
+      success: false, 
+      error: { 
+        code: 'EXCEL_READ_ERROR', 
+        message: error.message 
+      } 
+    };
+  }
+});
+
+// Leer caracterización desde Excel de origen
+ipcMain.handle('frecuencia-accidentalidad:leer-caracterizacion', async () => {
+  try {
+    return await excelBridge.leerCaracterizacion();
+  } catch (error) {
+    console.error('[FrecuenciaAccidentalidad] Error leyendo caracterización:', error);
+    return { 
+      success: false, 
+      error: { 
+        code: 'EXCEL_READ_ERROR', 
+        message: error.message 
+      } 
+    };
+  }
+});
+
+// Escribir en Excel de origen
+ipcMain.handle('frecuencia-accidentalidad:escribir-excel', async (event, mes, campos) => {
+  try {
+    return await excelBridge.escribirEnExcel(mes, campos);
+  } catch (error) {
+    console.error('[FrecuenciaAccidentalidad] Error escribiendo en Excel:', error);
+    return { 
+      success: false, 
+      error: { 
+        code: 'EXCEL_WRITE_ERROR', 
+        message: error.message 
+      } 
+    };
   }
 });
 

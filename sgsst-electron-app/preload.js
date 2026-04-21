@@ -301,6 +301,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateGestionCambioEstado: (companyName, changeId, nuevoEstado, extraData) =>
     ipcRenderer.invoke('gestion-cambio-update-estado', companyName, changeId, nuevoEstado, extraData),
 
+  // --- Frecuencia de la Accidentalidad (3.3.1) ---
+  frecuenciaAccidentalidad: {
+    configurarRutas: (companyName) => ipcRenderer.invoke('frecuencia-accidentalidad:configurar-rutas', companyName),
+    leerIndicadores: () => ipcRenderer.invoke('frecuencia-accidentalidad:leer-indicadores'),
+    leerCaracterizacion: () => ipcRenderer.invoke('frecuencia-accidentalidad:leer-caracterizacion'),
+    escribirEnExcel: (mes, campos) => ipcRenderer.invoke('frecuencia-accidentalidad:escribir-excel', mes, campos),
+  },
+
   // --- Eventos IPC ---
   send: (channel, data) => ipcRenderer.send(channel, data),
   onIpcMessage: (channel, listener) => {

@@ -3889,6 +3889,9 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
     } else if (submoduleName === "3.2.3 Registro y analisis estadistico de indicentes, accidentes de trabajo y enfermedades") {
       showRegistroEstadisticoContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
 
+    } else if (submoduleName === "3.3.1 Frecuencia de la accidentalidad") {
+      showFrecuenciaAccidentalidadContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
+
     } else if (submoduleName === "3.3.6 Medición del ausentismo por causa médica") {
       showMedicionAusentismoContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
 
@@ -4318,6 +4321,56 @@ function showRegistroEstadisticoContent(container, currentCompany, moduleName, s
     })
     .catch(error => {
       console.error('Error al cargar registro-estadistico:', error);
+      showDevelopmentMessage(container, submoduleName);
+    });
+}
+
+function showFrecuenciaAccidentalidadContent(container, currentCompany, moduleName, submoduleName) {
+  console.log('%c[FrecuenciaAccidentalidad] ========== CARGANDO ==========', 'color: green; font-weight: bold; font-size: 14px;');
+  console.log('[FrecuenciaAccidentalidad] Empresa:', currentCompany);
+  console.log('[FrecuenciaAccidentalidad] Contenedor:', container ? 'EXISTS' : 'NULL');
+  container.innerHTML = '<p style="color: blue;">Cargando frecuencia de la accidentalidad... (v3)</p>';
+
+  const BASE = 'modules/gestion-salud/frecuencia-accidentalidad/';
+
+  // Cargar CSS si no está cargado
+  if (!document.querySelector(`link[href="${BASE}frecuencia-accidentalidad.css"]`)) {
+    const cssLink = document.createElement('link');
+    cssLink.rel = 'stylesheet';
+    cssLink.href = BASE + 'frecuencia-accidentalidad.css';
+    document.head.appendChild(cssLink);
+  }
+
+  // Cargar HTML y luego el script
+  fetch(BASE + 'frecuencia-accidentalidad.html')
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.text();
+    })
+    .then(html => {
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      container.innerHTML = doc.body.innerHTML;
+
+      // Guardar empresa seleccionada para que el módulo la use
+      localStorage.setItem('selectedCompany', currentCompany);
+
+      // Cargar el script del módulo con tag script (con cache-busting)
+      var ts = Date.now();
+      var scriptUrl = BASE + 'frecuencia-accidentalidad.js?_t=' + ts;
+      console.log('[FrecuenciaAccidentalidad] Cargando script tag:', scriptUrl);
+      
+      var s = document.createElement('script');
+      s.src = scriptUrl;
+      s.onload = function() {
+        console.log('[FrecuenciaAccidentalidad] Script cargado OK');
+      };
+      s.onerror = function(e) {
+        console.error('[FrecuenciaAccidentalidad] Error cargando script:', e);
+      };
+      document.body.appendChild(s);
+    })
+    .catch(error => {
+      console.error('[FrecuenciaAccidentalidad] Error al cargar:', error);
       showDevelopmentMessage(container, submoduleName);
     });
 }
