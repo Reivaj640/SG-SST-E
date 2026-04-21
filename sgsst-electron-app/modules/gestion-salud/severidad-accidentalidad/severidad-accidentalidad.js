@@ -239,11 +239,9 @@
     var container = getElement('chartContainer');
     if (!container) return;
 
-    // Dimensiones dinámicas basadas en el contenedor
     var containerWidth = container.offsetWidth || 800;
     var screenWidth = window.innerWidth;
 
-    // Ajustar ancho según tamaño de pantalla
     var baseWidth = screenWidth >= 2560 ? 1400 : screenWidth >= 1920 ? 1200 : 800;
     var W = Math.max(800, Math.min(containerWidth, baseWidth));
     var H = Math.max(320, Math.round(W * 0.4));
@@ -251,39 +249,52 @@
     var P = { t: 30, r: 40, b: 50, l: 60 };
     var cW = W - P.l - P.r;
     var cH = H - P.t - P.b;
-    
+
     var maxV = Math.max(meta * 3, sM.reduce(function(m, d) { return Math.max(m, d.indiceSeveridad); }, 0), 0.01);
-    
-    var pts = sM.map(function(d, i) {
-      return {
-        x: P.l + (i / Math.max(sM.length - 1, 1)) * cW,
-        y: P.t + cH - (d.indiceSeveridad / maxV) * cH,
-        label: d.mesLabel,
-        val: d.indiceSeveridad
-      };
-    });
-    
-    var metaY = P.t + cH - (meta / maxV) * cH;
-    var line = pts.map(function(p, i) { return (i === 0 ? 'M' : 'L') + ' ' + p.x + ' ' + p.y; }).join(' ');
-    var area = line + ' L ' + pts[pts.length - 1].x + ' ' + (P.t + cH) + ' L ' + pts[0].x + ' ' + (P.t + cH) + ' Z';
-    
-    var gridLines = buildGridLines(P, cH, W, maxV);
-    var chartPoints = buildChartPoints(pts, P, cH);
-    
+
+    var barWidth = cW / 12 * 0.6;
+    var gap = cW / 12;
+
     var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;font-family:var(--kair-font)">';
-    svg += '<defs><linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">';
-    svg += '<stop offset="0%" stop-color="#dc3545" stop-opacity="0.2"/>';
-    svg += '<stop offset="100%" stop-color="#dc3545" stop-opacity="0.02"/>';
-    svg += '</linearGradient></defs>';
-    svg += '<!-- Grid lines -->' + gridLines;
-    svg += '<!-- Meta line -->';
-    svg += '<line x1="' + P.l + '" y1="' + metaY + '" x2="' + (W - P.r) + '" y2="' + metaY + '" stroke="#dc3545" stroke-width="2" stroke-dasharray="8,4"/>';
-    svg += '<text x="' + (W - P.r + 5) + '" y="' + (metaY + 4) + '" fill="#dc3545" font-size="10" font-weight="600">META ' + meta + '</text>';
-    svg += '<!-- Area --><path d="' + area + '" fill="url(#chartGradient)"/>';
-    svg += '<!-- Line --><path d="' + line + '" fill="none" stroke="#dc3545" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
-    svg += '<!-- Points and labels -->' + chartPoints;
+
+    // Fondo
+    svg += '<rect x="' + P.l + '" y="' + P.t + '" width="' + cW + '" height="' + cH + '" fill="#fafbfc" rx="4"/>';
+
+    // Línea de meta
+    if (meta > 0) {
+      var targetY = P.t + cH - (meta / maxV) * cH;
+      svg += '<line x1="' + P.l + '" y1="' + targetY + '" x2="' + (W - P.r) + '" y2="' + targetY + '" stroke="#dc3545" stroke-width="1.5" stroke-dasharray="6,4"/>';
+      svg += '<text x="' + (W - P.r + 5) + '" y="' + (targetY + 4) + '" fill="#dc3545" font-size="10" font-weight="600">Meta: ' + meta + '</text>';
+    }
+
+    // Grid Y axis
+    for (var i = 0; i <= 5; i++) {
+      var y = P.t + (i / 5) * cH;
+      svg += '<line x1="' + P.l + '" y1="' + y + '" x2="' + (W - P.r) + '" y2="' + y + '" stroke="#e9ecef" stroke-width="1"/>';
+      svg += '<text x="' + (P.l - 5) + '" y="' + (y + 4) + '" fill="#adb5bd" font-size="10" text-anchor="end">' + (maxV * (5 - i) / 5).toFixed(1) + '</text>';
+    }
+
+    // Barras
+    sM.forEach(function(month, i) {
+      var x = P.l + i * gap + gap * 0.2;
+      var barHeight = (month.indiceSeveridad / maxV) * cH;
+      var y = P.t + cH - barHeight;
+      var status = month.indiceSeveridad === 0 ? '#28a745' : month.indiceSeveridad <= meta ? '#28a745' : month.indiceSeveridad <= meta * 5 ? '#ffc107' : '#dc3545';
+
+      svg += '<rect x="' + x + '" y="' + y + '" width="' + barWidth + '" height="' + barHeight + '" fill="' + status + '" rx="3" opacity="0.85"/>';
+
+      if (month.indiceSeveridad > 0) {
+        svg += '<text x="' + (x + barWidth / 2) + '" y="' + (y - 4) + '" fill="#212529" font-size="9" font-weight="600" text-anchor="middle">' + month.indiceSeveridad.toFixed(1) + '</text>';
+      }
+
+      svg += '<text x="' + (x + barWidth / 2) + '" y="' + (P.t + cH + 16) + '" fill="#6c757d" font-size="11" font-weight="500" text-anchor="middle">' + month.mesLabel + '</text>';
+    });
+
+    // Label Y
+    svg += '<text x="15" y="' + (P.t + cH / 2) + '" fill="#6c757d" font-size="11" text-anchor="middle" transform="rotate(-90 15 ' + (P.t + cH / 2) + ')">Índice de Severidad</text>';
+
     svg += '</svg>';
-    
+
     container.innerHTML = svg;
   }
   
