@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>K+AIR - Frecuencia de la Accidentalidad</title>
+  <link rel="stylesheet" href="frecuencia-accidentalidad.css">
+</head>
+<body>
+
+  <!-- ==================== HEADER ==================== -->
+  <header class="kair-header">
+    <div class="kair-header-content">
+      <h1>K+AIR - Sistema de Gestión SST</h1>
+      <p>Submódulo 3.3.1 Frecuencia de la Accidentalidad</p>
+    </div>
+    <div class="kair-header-actions">
+      <button class="kair-btn kair-btn-light" id="btnRefrescar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <polyline points="1 20 1 14 7 14"></polyline>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+        Refrescar
+      </button>
+    </div>
+  </header>
+
+  <main class="kair-container" id="app">
+    
+    <!-- ==================== SYNC BAR ==================== -->
+    <div class="kair-sync-bar">
+      <span class="kair-badge">
+        <span class="kair-dot"></span> 
+        Vinculado a Excel de origen
+      </span>
+      <span class="kair-sync-info">
+        Los cambios se guardan directamente en INDICADORES 2024.xlsx
+      </span>
+    </div>
+
+    <!-- ==================== KPIs ==================== -->
+    <section class="kair-kpis" id="kpiSection">
+      <div class="kair-kpi">
+        <div class="kair-kpi-label">Índice Frecuencia Prom.</div>
+        <div class="kair-kpi-value primary" id="kpiIF">-</div>
+        <div class="kair-kpi-sub">Meta: <span id="kpiMetaF">-</span></div>
+      </div>
+      <div class="kair-kpi">
+        <div class="kair-kpi-label">Total AT 2024</div>
+        <div class="kair-kpi-value warning" id="kpiTotalAT">-</div>
+        <div class="kair-kpi-sub">Histórico: <span id="kpiHist">-</span></div>
+      </div>
+      <div class="kair-kpi">
+        <div class="kair-kpi-label">Índice Severidad Prom.</div>
+        <div class="kair-kpi-value primary" id="kpiIS">-</div>
+        <div class="kair-kpi-sub">Meta: <span id="kpiMetaS">-</span></div>
+      </div>
+      <div class="kair-kpi">
+        <div class="kair-kpi-label">Meses Exceden Meta</div>
+        <div class="kair-kpi-value danger" id="kpiExceden">-</div>
+        <div class="kair-kpi-sub">Frecuencia</div>
+      </div>
+      <div class="kair-kpi">
+        <div class="kair-kpi-label">Mortalidad</div>
+        <div class="kair-kpi-value success" id="kpiMort">-</div>
+        <div class="kair-kpi-sub">Accidentes mortales</div>
+      </div>
+      <div class="kair-kpi">
+        <div class="kair-kpi-label">Ausentismo Prom.</div>
+        <div class="kair-kpi-value primary" id="kpiAus">-</div>
+        <div class="kair-kpi-sub">Meta: 3%</div>
+      </div>
+    </section>
+
+    <!-- ==================== CHART ==================== -->
+    <div class="kair-card">
+      <div class="kair-card-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="20" x2="18" y2="10"></line>
+          <line x1="12" y1="20" x2="12" y2="4"></line>
+          <line x1="6" y1="20" x2="6" y2="14"></line>
+        </svg>
+        Índice de Frecuencia Mensual
+        <span class="kair-badge" style="font-size: 0.65rem; padding: 2px 8px;">EXCEL ORIGEN</span>
+      </div>
+      <div class="kair-chart-container" id="chartContainer">
+        <div class="kair-loading">
+          <div class="kair-spinner"></div>
+          <p class="kair-loading-text">Cargando gráfico...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TABLE ==================== -->
+    <div class="kair-card">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+        <div class="kair-card-title">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+          </svg>
+          Tabla de Frecuencia - Editable
+        </div>
+        <span style="font-size: 0.8rem; color: var(--kair-text-sec);">
+          Clic en un valor para editar
+        </span>
+      </div>
+      <div class="kair-table-wrap">
+        <table class="kair-table" id="tablaFrecuencia">
+          <thead>
+            <tr>
+              <th>Mes</th>
+              <th>AT</th>
+              <th>Trabajadores</th>
+              <th>Índice Frecuencia</th>
+              <th>Días Perdidos</th>
+              <th>Índice Severidad</th>
+              <th>Meta</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="tablaBody"></tbody>
+          <tfoot id="tablaFoot"></tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- ==================== COLLAPSIBLES ==================== -->
+    <div id="seccionesColapsables"></div>
+
+    <!-- ==================== METHODOLOGY ==================== -->
+    <div class="kair-card">
+      <div class="kair-card-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+        </svg>
+        Metodología de Cálculo
+      </div>
+      <div class="kair-methodology">
+        <p><strong>Índice de Frecuencia (IF):</strong></p>
+        <p class="kair-method-formula">
+          IF = (Número de AT × 200,000) / (Total Horas-Trabajadas × 1,000,000)
+        </p>
+        <p><strong>Índice de Severidad (IS):</strong></p>
+        <p class="kair-method-formula">
+          IS = (Total Días Perdidos × 200,000) / (Total Horas-Trabajadas × 1,000,000)
+        </p>
+        <p><strong>Flujo de datos bidireccional:</strong></p>
+        <p class="kair-method-formula">
+          Excel de origen (INDICADORES 2024.xlsx) ↔ Interfaz K+AIR - Sincronización directa, sin copias intermedias
+        </p>
+        <p style="font-size: 0.8rem; color: var(--kair-text-sec); margin-top: 1rem;">
+          <strong>Fuentes:</strong> INDICADORES 2024.xlsx, Dashboard Caracterización Temposum.xlsx. Resolución 2851 de 2015.
+        </p>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ==================== TOAST CONTAINER ==================== -->
+  <div id="toastContainer"></div>
+
+</body>
+</html>

@@ -1,0 +1,615 @@
+/* ============================================================
+   K+AIR SG-SST - frecuencia-accidentalidad.css
+   Submódulo 3.3.1 Frecuencia de la Accidentalidad
+   Sistema Visual Oficial K+AIR
+   ============================================================ */
+
+/* ── Variables CSS (Sistema Visual K+AIR) ── */
+:root {
+  --kair-primary: #174ea6;
+  --kair-primary-hover: #185abd;
+  --kair-success: #28a745;
+  --kair-warning: #ffc107;
+  --kair-danger: #dc3545;
+  --kair-bg: #f8f9fa;
+  --kair-card: #ffffff;
+  --kair-text: #2d3748;
+  --kair-text-sec: #6c757d;
+  --kair-border: #dee2e6;
+  --kair-radius: 0.375rem;
+  --kair-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  --kair-shadow-lg: 0 4px 12px rgba(0,0,0,0.12);
+  --kair-font: "Segoe UI", Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ── Reset y Base ── */
+* { 
+  box-sizing: border-box; 
+  margin: 0; 
+  padding: 0; 
+}
+
+body {
+  font-family: var(--kair-font);
+  background: var(--kair-bg);
+  color: var(--kair-text);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+/* ── Header ── */
+.kair-header {
+  background: var(--kair-primary);
+  color: #fff;
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.kair-header-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.kair-header h1 { 
+  font-size: 1.1rem; 
+  font-weight: 700; 
+  margin: 0;
+}
+
+.kair-header p { 
+  font-size: 0.75rem; 
+  opacity: 0.9;
+  margin: 0;
+}
+
+.kair-header-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* ── Container ── */
+.kair-container { 
+  max-width: 1400px; 
+  margin: 0 auto; 
+  padding: 1.25rem; 
+}
+
+/* ── Sync Bar ── */
+.kair-sync-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: rgba(23, 78, 166, 0.04);
+  border-radius: var(--kair-radius);
+  border: 1px solid rgba(23, 78, 166, 0.1);
+}
+
+.kair-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(23, 78, 166, 0.08);
+  border: 1px solid rgba(23, 78, 166, 0.2);
+  color: var(--kair-primary);
+}
+
+.kair-badge-success {
+  background: rgba(40, 167, 69, 0.08);
+  border-color: rgba(40, 167, 69, 0.2);
+  color: var(--kair-success);
+}
+
+.kair-badge-warning {
+  background: rgba(255, 193, 7, 0.08);
+  border-color: rgba(255, 193, 7, 0.2);
+  color: #856404;
+}
+
+.kair-dot {
+  width: 8px; 
+  height: 8px;
+  border-radius: 50%;
+  background: var(--kair-success);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse { 
+  0%, 100% { opacity: 1; transform: scale(1); } 
+  50% { opacity: 0.5; transform: scale(0.9); } 
+}
+
+.kair-sync-info {
+  font-size: 0.75rem;
+  color: var(--kair-text-sec);
+  font-style: italic;
+}
+
+/* ── Cards ── */
+.kair-card {
+  background: var(--kair-card);
+  border-radius: var(--kair-radius);
+  box-shadow: var(--kair-shadow);
+  border: 1px solid var(--kair-border);
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.kair-card-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--kair-text);
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.kair-card-subtitle {
+  font-size: 0.8rem;
+  color: var(--kair-text-sec);
+  font-weight: 400;
+}
+
+/* ── KPIs Grid ── */
+.kair-kpis { 
+  display: grid; 
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
+  gap: 1rem; 
+  margin-bottom: 1.25rem; 
+}
+
+.kair-kpi {
+  background: var(--kair-card);
+  border-radius: var(--kair-radius);
+  box-shadow: var(--kair-shadow);
+  border: 1px solid var(--kair-border);
+  padding: 1rem;
+  text-align: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.kair-kpi:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--kair-shadow-lg);
+}
+
+.kair-kpi-label { 
+  font-size: 0.75rem; 
+  color: var(--kair-text-sec); 
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.kair-kpi-value { 
+  font-size: 1.75rem; 
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.kair-kpi-sub { 
+  font-size: 0.7rem; 
+  color: var(--kair-text-sec); 
+  margin-top: 0.25rem;
+}
+
+.kair-kpi-value.success { color: var(--kair-success); }
+.kair-kpi-value.danger { color: var(--kair-danger); }
+.kair-kpi-value.warning { color: var(--kair-warning); }
+.kair-kpi-value.primary { color: var(--kair-primary); }
+
+/* ── Chart Container ── */
+.kair-chart-container {
+  width: 100%;
+  min-height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Table ── */
+.kair-table-wrap {
+  overflow-x: auto;
+  border-radius: var(--kair-radius);
+  border: 1px solid var(--kair-border);
+}
+
+.kair-table { 
+  width: 100%; 
+  border-collapse: collapse; 
+  font-size: 0.85rem;
+  background: var(--kair-card);
+}
+
+.kair-table thead th { 
+  background: var(--kair-primary); 
+  color: #fff; 
+  padding: 0.75rem 0.5rem; 
+  font-weight: 600; 
+  text-align: center;
+  white-space: nowrap;
+}
+
+.kair-table thead th:first-child { 
+  text-align: left; 
+  border-top-left-radius: var(--kair-radius);
+}
+
+.kair-table thead th:last-child {
+  border-top-right-radius: var(--kair-radius);
+}
+
+.kair-table tbody tr { 
+  border-bottom: 1px solid var(--kair-border); 
+}
+
+.kair-table tbody tr:nth-child(even) { 
+  background: #f8f9fa; 
+}
+
+.kair-table tbody tr:hover {
+  background: rgba(23, 78, 166, 0.04);
+}
+
+.kair-table td { 
+  padding: 0.6rem 0.5rem; 
+  text-align: center;
+  vertical-align: middle;
+}
+
+.kair-table td:first-child { 
+  font-weight: 600; 
+  text-align: left;
+  color: var(--kair-text);
+}
+
+.kair-table tfoot tr {
+  background: rgba(23, 78, 166, 0.06);
+  border-top: 2px solid var(--kair-primary);
+  font-weight: 700;
+}
+
+.kair-table tfoot td {
+  padding: 0.75rem 0.5rem;
+}
+
+/* ── Editable Cells ── */
+.kair-editable {
+  color: var(--kair-primary);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline dotted var(--kair-primary);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  transition: background 0.2s;
+  display: inline-block;
+  min-width: 40px;
+}
+
+.kair-editable:hover { 
+  background: rgba(23, 78, 166, 0.08);
+}
+
+.kair-input {
+  width: 70px;
+  padding: 0.35rem 0.5rem;
+  border: 2px solid var(--kair-primary);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-family: var(--kair-font);
+  outline: none;
+  text-align: center;
+}
+
+.kair-input:focus {
+  box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.2);
+}
+
+/* ── Status Badges ── */
+.kair-badge-status {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.kair-badge-cumple { background: var(--kair-success); }
+.kair-badge-excede { background: var(--kair-danger); }
+
+/* ── Buttons ── */
+.kair-btn {
+  background: transparent;
+  color: var(--kair-primary);
+  border: 1px solid var(--kair-primary);
+  border-radius: var(--kair-radius);
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-family: var(--kair-font);
+  font-weight: 600;
+  font-size: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: all 0.2s;
+}
+
+.kair-btn:hover { 
+  background: var(--kair-primary); 
+  color: #fff; 
+}
+
+.kair-btn-primary {
+  background: var(--kair-primary);
+  color: #fff;
+  border-color: var(--kair-primary);
+}
+
+.kair-btn-primary:hover {
+  background: var(--kair-primary-hover);
+  border-color: var(--kair-primary-hover);
+}
+
+.kair-btn-light {
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+  border-color: rgba(255,255,255,0.3);
+}
+
+.kair-btn-light:hover {
+  background: rgba(255,255,255,0.2);
+}
+
+/* ── Collapsibles ── */
+.kair-collapsible { 
+  background: var(--kair-card); 
+  border-radius: var(--kair-radius); 
+  box-shadow: var(--kair-shadow); 
+  border: 1px solid var(--kair-border); 
+  margin-bottom: 1rem; 
+  overflow: hidden; 
+}
+
+.kair-collapsible-header { 
+  width: 100%; 
+  display: flex; 
+  align-items: center; 
+  justify-content: space-between; 
+  padding: 0.85rem 1.1rem; 
+  background: transparent; 
+  border: none; 
+  cursor: pointer; 
+  color: var(--kair-text); 
+  font-family: var(--kair-font); 
+  font-size: 0.9rem; 
+  font-weight: 700;
+  transition: background 0.2s;
+}
+
+.kair-collapsible-header:hover {
+  background: rgba(23, 78, 166, 0.04);
+}
+
+.kair-collapsible-body { 
+  border-top: 1px solid var(--kair-border); 
+  padding: 1.1rem;
+  display: none;
+}
+
+.kair-collapsible-body.open {
+  display: block;
+}
+
+.kair-collapsible-arrow {
+  font-size: 0.7rem;
+  transition: transform 0.2s;
+}
+
+.kair-collapsible-arrow.open {
+  transform: rotate(90deg);
+}
+
+/* ── Progress Bars ── */
+.kair-progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.kair-progress-label {
+  flex: 0 0 160px;
+  font-size: 0.8rem;
+  text-align: right;
+  color: var(--kair-text-sec);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kair-progress-track {
+  flex: 1;
+  height: 20px;
+  background: #e9ecef;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.kair-progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+  opacity: 0.85;
+}
+
+.kair-progress-value {
+  flex: 0 0 40px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: right;
+}
+
+/* ── Methodology ── */
+.kair-methodology { 
+  font-size: 0.85rem; 
+  color: var(--kair-text-sec); 
+  line-height: 1.7; 
+}
+
+.kair-methodology strong { 
+  color: var(--kair-text); 
+}
+
+.kair-method-formula { 
+  padding: 0.75rem 1rem;
+  border-left: 3px solid var(--kair-primary); 
+  margin-bottom: 0.75rem;
+  background: rgba(23, 78, 166, 0.04);
+  border-radius: 0 var(--kair-radius) var(--kair-radius) 0;
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+}
+
+/* ── Toast ── */
+.kair-toast {
+  position: fixed; 
+  bottom: 1.25rem; 
+  right: 1.25rem;
+  background: var(--kair-success);
+  color: #fff;
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--kair-radius);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  font-size: 0.85rem;
+  font-weight: 600;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  animation: slideIn 0.3s ease;
+  max-width: 400px;
+}
+
+.kair-toast.error { 
+  background: var(--kair-danger); 
+}
+
+.kair-toast.warning {
+  background: var(--kair-warning);
+  color: #333;
+}
+
+@keyframes slideIn { 
+  from { transform: translateX(100%); opacity: 0; } 
+  to { transform: translateX(0); opacity: 1; } 
+}
+
+/* ── Loading ── */
+.kair-loading { 
+  display: flex; 
+  flex-direction: column;
+  align-items: center; 
+  justify-content: center; 
+  min-height: 60vh; 
+  text-align: center; 
+}
+
+.kair-spinner { 
+  width: 40px; 
+  height: 40px; 
+  border: 3px solid var(--kair-border); 
+  border-top-color: var(--kair-primary); 
+  border-radius: 50%; 
+  animation: spin 0.8s linear infinite; 
+  margin-bottom: 1rem; 
+}
+
+@keyframes spin { 
+  to { transform: rotate(360deg); } 
+}
+
+.kair-loading-text {
+  color: var(--kair-text-sec);
+  font-size: 0.9rem;
+}
+
+/* ── Empty State ── */
+.kair-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  text-align: center;
+}
+
+.kair-empty-icon {
+  width: 64px;
+  height: 64px;
+  color: var(--kair-text-sec);
+  opacity: 0.5;
+  margin-bottom: 1rem;
+}
+
+.kair-empty h3 {
+  font-size: 1.1rem;
+  color: var(--kair-text);
+  margin-bottom: 0.5rem;
+}
+
+.kair-empty p {
+  font-size: 0.85rem;
+  color: var(--kair-text-sec);
+  max-width: 400px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .kair-kpis {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .kair-header {
+    flex-direction: column;
+    gap: 0.75rem;
+    text-align: center;
+  }
+  
+  .kair-sync-bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .kair-table-wrap {
+    font-size: 0.75rem;
+  }
+  
+  .kair-collapsible-header {
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .kair-kpis {
+    grid-template-columns: 1fr;
+  }
+  
+  .kair-container {
+    padding: 0.75rem;
+  }
+}
