@@ -480,6 +480,13 @@
   if (btnRefrescar) {
     btnRefrescar.addEventListener('click', cargarDatos);
   }
+
+  var btnVolver = getElement('btnVolver');
+  if (btnVolver) {
+    btnVolver.addEventListener('click', function() {
+      window.parent.postMessage({ type: 'back-to-module-request' }, '*');
+    });
+  }
   
   setTimeout(cargarDatos, 100);
   
