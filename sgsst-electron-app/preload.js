@@ -309,6 +309,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     escribirEnExcel: (mes, campos) => ipcRenderer.invoke('frecuencia-accidentalidad:escribir-excel', mes, campos),
   },
 
+  // --- Severidad de la Accidentalidad (3.3.2) ---
+  severidadAccidentalidad: {
+    configurarRutas: (companyName) => ipcRenderer.invoke('severidad-accidentalidad:configurar-rutas', companyName),
+    leerIndicadores: () => ipcRenderer.invoke('severidad-accidentalidad:leer-indicadores'),
+    escribirEnExcel: (mes, campos) => ipcRenderer.invoke('severidad-accidentalidad:escribir-excel', mes, campos),
+  },
+
   // --- Eventos IPC ---
   send: (channel, data) => ipcRenderer.send(channel, data),
   onIpcMessage: (channel, listener) => {

@@ -3892,6 +3892,9 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
     } else if (submoduleName === "3.3.1 Frecuencia de la accidentalidad") {
       showFrecuenciaAccidentalidadContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
 
+    } else if (submoduleName === "3.3.2 Severidad de la accidentalidad") {
+      showSeveridadAccidentalidadContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
+
     } else if (submoduleName === "3.3.6 Medición del ausentismo por causa médica") {
       showMedicionAusentismoContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
 
@@ -4371,6 +4374,56 @@ function showFrecuenciaAccidentalidadContent(container, currentCompany, moduleNa
     })
     .catch(error => {
       console.error('[FrecuenciaAccidentalidad] Error al cargar:', error);
+      showDevelopmentMessage(container, submoduleName);
+    });
+}
+
+function showSeveridadAccidentalidadContent(container, currentCompany, moduleName, submoduleName) {
+  console.log('%c[SeveridadAccidentalidad] ========== CARGANDO ==========', 'color: green; font-weight: bold; font-size: 14px;');
+  console.log('[SeveridadAccidentalidad] Empresa:', currentCompany);
+  console.log('[SeveridadAccidentalidad] Contenedor:', container ? 'EXISTS' : 'NULL');
+  container.innerHTML = '<p style="color: blue;">Cargando severidad de la accidentalidad... (v1)</p>';
+
+  const BASE = 'modules/gestion-salud/severidad-accidentalidad/';
+
+  // Cargar CSS si no está cargado
+  if (!document.querySelector(`link[href="${BASE}severidad-accidentalidad.css"]`)) {
+    const cssLink = document.createElement('link');
+    cssLink.rel = 'stylesheet';
+    cssLink.href = BASE + 'severidad-accidentalidad.css';
+    document.head.appendChild(cssLink);
+  }
+
+  // Cargar HTML y luego el script
+  fetch(BASE + 'severidad-accidentalidad.html')
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.text();
+    })
+    .then(html => {
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      container.innerHTML = doc.body.innerHTML;
+
+      // Guardar empresa seleccionada para que el módulo la use
+      localStorage.setItem('selectedCompany', currentCompany);
+
+      // Cargar el script del módulo con tag script (con cache-busting)
+      var ts = Date.now();
+      var scriptUrl = BASE + 'severidad-accidentalidad.js?_t=' + ts;
+      console.log('[SeveridadAccidentalidad] Cargando script tag:', scriptUrl);
+
+      var s = document.createElement('script');
+      s.src = scriptUrl;
+      s.onload = function() {
+        console.log('[SeveridadAccidentalidad] Script cargado OK');
+      };
+      s.onerror = function(e) {
+        console.error('[SeveridadAccidentalidad] Error cargando script:', e);
+      };
+      document.body.appendChild(s);
+    })
+    .catch(error => {
+      console.error('[SeveridadAccidentalidad] Error al cargar:', error);
       showDevelopmentMessage(container, submoduleName);
     });
 }

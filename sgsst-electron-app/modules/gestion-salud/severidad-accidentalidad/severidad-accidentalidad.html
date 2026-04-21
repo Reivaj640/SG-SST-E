@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>K+AIR - Frecuencia de la Accidentalidad</title>
-  <link rel="stylesheet" href="frecuencia-accidentalidad.css">
+  <title>K+AIR - Severidad de la Accidentalidad</title>
+  <link rel="stylesheet" href="severidad-accidentalidad.css">
 </head>
 <body>
 
@@ -12,7 +12,7 @@
   <header class="kair-header">
     <div class="kair-header-content">
       <h1>K+AIR - Sistema de Gestión SST</h1>
-      <p>Submódulo 3.3.1 Frecuencia de la Accidentalidad</p>
+      <p>Submódulo 3.3.2 Severidad de la Accidentalidad</p>
     </div>
     <div class="kair-header-actions">
       <button class="kair-btn kair-btn-light" id="btnVolver" title="Volver al módulo">
@@ -34,11 +34,11 @@
   </header>
 
   <main class="kair-container" id="app">
-    
+
     <!-- ==================== SYNC BAR ==================== -->
     <div class="kair-sync-bar">
       <span class="kair-badge">
-        <span class="kair-dot"></span> 
+        <span class="kair-dot"></span>
         Vinculado a Excel de origen
       </span>
       <span class="kair-sync-info">
@@ -49,34 +49,34 @@
     <!-- ==================== KPIs ==================== -->
     <section class="kair-kpis" id="kpiSection">
       <div class="kair-kpi">
-        <div class="kair-kpi-label">Índice Frecuencia Prom.</div>
-        <div class="kair-kpi-value primary" id="kpiIF">-</div>
-        <div class="kair-kpi-sub">Meta: <span id="kpiMetaF">-</span></div>
-      </div>
-      <div class="kair-kpi">
-        <div class="kair-kpi-label">Total AT 2024</div>
-        <div class="kair-kpi-value warning" id="kpiTotalAT">-</div>
-        <div class="kair-kpi-sub">Histórico: <span id="kpiHist">-</span></div>
-      </div>
-      <div class="kair-kpi">
         <div class="kair-kpi-label">Índice Severidad Prom.</div>
         <div class="kair-kpi-value primary" id="kpiIS">-</div>
-        <div class="kair-kpi-sub">Meta: <span id="kpiMetaS">-</span></div>
+        <div class="kair-kpi-sub">Meta: <span id="kpiMeta">-</span></div>
       </div>
       <div class="kair-kpi">
-        <div class="kair-kpi-label">Meses Exceden Meta</div>
+        <div class="kair-kpi-label">Días Perdidos Total</div>
+        <div class="kair-kpi-value warning" id="kpiDias">-</div>
+        <div class="kair-kpi-sub">Acumulado 2024</div>
+      </div>
+      <div class="kair-kpi">
+        <div class="kair-kpi-label">Trab. Promedio</div>
+        <div class="kair-kpi-value primary" id="kpiTrab">-</div>
+        <div class="kair-kpi-sub">Personal tempo.</div>
+      </div>
+      <div class="kair-kpi">
+        <div class="kair-kpi-label">Meses Exceden</div>
         <div class="kair-kpi-value danger" id="kpiExceden">-</div>
-        <div class="kair-kpi-sub">Frecuencia</div>
+        <div class="kair-kpi-sub">Sobre meta</div>
       </div>
       <div class="kair-kpi">
-        <div class="kair-kpi-label">Mortalidad</div>
-        <div class="kair-kpi-value success" id="kpiMort">-</div>
-        <div class="kair-kpi-sub">Accidentes mortales</div>
+        <div class="kair-kpi-label">Mes Peor</div>
+        <div class="kair-kpi-value danger" id="kpiMesPeor">-</div>
+        <div class="kair-kpi-sub">Índice más alto</div>
       </div>
       <div class="kair-kpi">
-        <div class="kair-kpi-label">Ausentismo Prom.</div>
-        <div class="kair-kpi-value primary" id="kpiAus">-</div>
-        <div class="kair-kpi-sub">Meta: 3%</div>
+        <div class="kair-kpi-label">Meses sin AT</div>
+        <div class="kair-kpi-value success" id="kpiSinAT">-</div>
+        <div class="kair-kpi-sub">Cero accidentes</div>
       </div>
     </section>
 
@@ -88,7 +88,7 @@
         </svg>
       </div>
       <div class="kair-target-info">
-        <div class="kair-target-label">Meta del Indicador (Índice de Frecuencia)</div>
+        <div class="kair-target-label">Meta del Indicador (Índice de Severidad)</div>
         <div class="kair-target-value" id="targetValue">0</div>
       </div>
       <div class="kair-target-badge" id="targetBadge">
@@ -104,7 +104,7 @@
           <line x1="12" y1="20" x2="12" y2="4"></line>
           <line x1="6" y1="20" x2="6" y2="14"></line>
         </svg>
-        Índice de Frecuencia Mensual
+        Índice de Severidad Mensual
         <span class="kair-badge" style="font-size: 0.65rem; padding: 2px 8px;">EXCEL ORIGEN</span>
       </div>
       <div class="kair-chart-container" id="chartContainer">
@@ -125,21 +125,19 @@
             <line x1="16" y1="13" x2="8" y2="13"></line>
             <line x1="16" y1="17" x2="8" y2="17"></line>
           </svg>
-          Tabla de Frecuencia - Editable
+          Tabla de Severidad - Editable
         </div>
         <span style="font-size: 0.8rem; color: var(--kair-text-sec);">
           Clic en un valor para editar
         </span>
       </div>
       <div class="kair-table-wrap">
-        <table class="kair-table" id="tablaFrecuencia">
+        <table class="kair-table" id="tablaSeveridad">
           <thead>
             <tr>
               <th>Mes</th>
-              <th>AT</th>
-              <th>Trabajadores</th>
-              <th>Índice Frecuencia</th>
               <th>Días Perdidos</th>
+              <th>Trabajadores</th>
               <th>Índice Severidad</th>
               <th>Meta</th>
               <th>Estado</th>
@@ -162,17 +160,14 @@
       <div class="kair-ref-title">Referencia del Indicador</div>
       <div class="kair-ref-grid">
         <div><strong>Tipo:</strong> <span id="refType">RESULTADO</span></div>
-        <div><strong>Frecuencia:</strong> <span id="refFormula">(AT × 200,000) / (Horas-Trab. × 1,000,000)</span></div>
+        <div><strong>Fórmula:</strong> <span id="refFormula">(Días Perdidos / Nº Trabajadores) × 100</span></div>
         <div><strong>Frecuencia:</strong> <span id="refFreq">MENSUAL</span></div>
-        <div><strong>Meta Frecuencia:</strong> <span id="refTargetF">0</span></div>
+        <div><strong>Meta:</strong> <span id="refTarget">0</span></div>
       </div>
       <div class="kair-ref-calc">
-        <strong>Cálculo:</strong> Índice de Frecuencia = (AT × 200,000) / (Horas-Trabajadas × 1,000,000)
+        <strong>Cálculo:</strong> Índice de Severidad = (Días Perdidos / Nº Trabajadores) × 100
       </div>
     </div>
-
-    <!-- ==================== COLLAPSIBLES ==================== -->
-    <div id="seccionesColapsables"></div>
 
     <!-- ==================== METHODOLOGY ==================== -->
     <div class="kair-card">
@@ -186,20 +181,16 @@
         Metodología de Cálculo
       </div>
       <div class="kair-methodology">
-        <p><strong>Índice de Frecuencia (IF):</strong></p>
-        <p class="kair-method-formula">
-          IF = (Número de AT × 200,000) / (Total Horas-Trabajadas × 1,000,000)
-        </p>
         <p><strong>Índice de Severidad (IS):</strong></p>
         <p class="kair-method-formula">
-          IS = (Total Días Perdidos × 200,000) / (Total Horas-Trabajadas × 1,000,000)
+          IS = (Días Perdidos / Nº Trabajadores) × 100
         </p>
         <p><strong>Flujo de datos bidireccional:</strong></p>
         <p class="kair-method-formula">
-          Excel de origen (INDICADORES 2024.xlsx) ↔ Interfaz K+AIR - Sincronización directa, sin copias intermedias
+          Excel de origen (INDICADORES 2024.xlsx) ↔ Interfaz K+AIR - Sincronización directa
         </p>
         <p style="font-size: 0.8rem; color: var(--kair-text-sec); margin-top: 1rem;">
-          <strong>Fuentes:</strong> INDICADORES 2024.xlsx, Dashboard Caracterización Temposum.xlsx. Resolución 2851 de 2015.
+          <strong>Fuentes:</strong> INDICADORES 2024.xlsx. Resolución 2851 de 2015.
         </p>
       </div>
     </div>

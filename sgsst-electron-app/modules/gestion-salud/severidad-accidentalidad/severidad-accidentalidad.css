@@ -1,6 +1,6 @@
 /* ============================================================
-   K+AIR SG-SST - frecuencia-accidentalidad.css
-   Submódulo 3.3.1 Frecuencia de la Accidentalidad
+   K+AIR SG-SST - severidad-accidentalidad.css
+   Submódulo 3.3.2 Severidad de la Accidentalidad
    Sistema Visual Oficial K+AIR
    ============================================================ */
 
@@ -376,95 +376,6 @@ body {
   background: rgba(255,255,255,0.2);
 }
 
-/* ── Collapsibles ── */
-.kair-collapsible { 
-  background: var(--kair-card); 
-  border-radius: var(--kair-radius); 
-  box-shadow: var(--kair-shadow); 
-  border: 1px solid var(--kair-border); 
-  margin-bottom: 1rem; 
-  overflow: hidden; 
-}
-
-.kair-collapsible-header { 
-  width: 100%; 
-  display: flex; 
-  align-items: center; 
-  justify-content: space-between; 
-  padding: 0.85rem 1.1rem; 
-  background: transparent; 
-  border: none; 
-  cursor: pointer; 
-  color: var(--kair-text); 
-  font-family: var(--kair-font); 
-  font-size: 0.9rem; 
-  font-weight: 700;
-  transition: background 0.2s;
-}
-
-.kair-collapsible-header:hover {
-  background: rgba(23, 78, 166, 0.04);
-}
-
-.kair-collapsible-body { 
-  border-top: 1px solid var(--kair-border); 
-  padding: 1.1rem;
-  display: none;
-}
-
-.kair-collapsible-body.open {
-  display: block;
-}
-
-.kair-collapsible-arrow {
-  font-size: 0.7rem;
-  transition: transform 0.2s;
-}
-
-.kair-collapsible-arrow.open {
-  transform: rotate(90deg);
-}
-
-/* ── Progress Bars ── */
-.kair-progress-wrap {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.5rem;
-}
-
-.kair-progress-label {
-  flex: 0 0 160px;
-  font-size: 0.8rem;
-  text-align: right;
-  color: var(--kair-text-sec);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.kair-progress-track {
-  flex: 1;
-  height: 20px;
-  background: #e9ecef;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.kair-progress-fill {
-  height: 100%;
-  border-radius: 4px;
-  transition: width 0.5s ease;
-  opacity: 0.85;
-}
-
-.kair-progress-value {
-  flex: 0 0 40px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-align: right;
-}
-
 /* ── Methodology ── */
 .kair-methodology { 
   font-size: 0.85rem; 
@@ -584,24 +495,20 @@ body {
   .kair-kpis {
     grid-template-columns: repeat(2, 1fr);
   }
-  
+
   .kair-header {
     flex-direction: column;
     gap: 0.75rem;
     text-align: center;
   }
-  
+
   .kair-sync-bar {
     flex-direction: column;
     align-items: flex-start;
   }
-  
+
   .kair-table-wrap {
     font-size: 0.75rem;
-  }
-  
-  .kair-collapsible-header {
-    font-size: 0.85rem;
   }
 }
 

@@ -173,10 +173,13 @@
       renderEmptyState();
       return;
     }
-    
+
     renderKPIs();
+    renderTargetCard();
     renderChart();
     renderTabla();
+    renderMonthCards();
+    renderReference();
     renderColapsables();
   }
   
@@ -247,11 +250,19 @@
   function renderChart() {
     var fM = indicadores.frecuenciaMensual;
     var meta = indicadores.config.metaFrecuencia;
-    
+
     var container = getElement('chartContainer');
     if (!container) return;
-    
-    var W = 800, H = 320;
+
+    // Dimensiones dinámicas basadas en el contenedor
+    var containerWidth = container.offsetWidth || 800;
+    var screenWidth = window.innerWidth;
+
+    // Ajustar ancho según tamaño de pantalla
+    var baseWidth = screenWidth >= 2560 ? 1400 : screenWidth >= 1920 ? 1200 : 800;
+    var W = Math.max(800, Math.min(containerWidth, baseWidth));
+    var H = Math.max(320, Math.round(W * 0.4));
+
     var P = { t: 30, r: 40, b: 50, l: 60 };
     var cW = W - P.l - P.r;
     var cH = H - P.t - P.b;
@@ -465,8 +476,68 @@
       body.classList.add('open');
       if (arrow) arrow.classList.add('open');
     }
+}
+
+  function renderTargetCard() {
+    var config = indicadores.config || {};
+    var meta = config.metaFrecuencia || 0;
+    var fM = indicadores.frecuenciaMensual;
+
+    var fNZ = fM.filter(function(f) { return f.indiceFrecuencia > 0; });
+    var promIF = fNZ.length ? fNZ.reduce(function(s, f) { return s + f.indiceFrecuencia; }, 0) / fNZ.length : 0;
+
+    var targetValue = getElement('targetValue');
+    if (targetValue) targetValue.textContent = meta;
+
+    var targetBadge = getElement('targetBadge');
+    if (targetBadge) {
+      targetBadge.textContent = 'Promedio: ' + fmt(promIF, 4);
+      targetBadge.className = 'kair-target-badge ' + (promIF > meta ? 'danger' : promIF > 0 ? 'warning' : 'success');
+    }
   }
-  
+
+  function renderMonthCards() {
+    var container = getElement('monthCards');
+    if (!container) return;
+
+    var config = indicadores.config || {};
+    var meta = config.metaFrecuencia || 0;
+    var fM = indicadores.frecuenciaMensual;
+
+    var html = '';
+
+    fM.forEach(function(month) {
+      var status = month.accidentes === 0 ? 'success' : month.indiceFrecuencia <= meta ? 'success' : month.indiceFrecuencia <= meta * 5 ? 'warning' : 'danger';
+      var statusColor = status === 'success' ? '#28a745' : status === 'warning' ? '#856404' : '#dc3545';
+      var statusLabel = status === 'success' ? 'Sin AT' : status === 'warning' ? 'Precaución' : 'Crítico';
+
+      html += '<div class="kair-month-card" style="border-top: 3px solid ' + statusColor + '">';
+      html += '<div class="kair-month-card-name">' + month.mesLabel + '</div>';
+      html += '<div class="kair-month-card-value" style="color:' + statusColor + '">' + fmt(month.indiceFrecuencia, 4) + '</div>';
+      html += '<div class="kair-month-card-detail">' + month.accidentes + ' AT / ' + month.trabajadores + ' trab.</div>';
+      html += '<span class="kair-badge-status kair-badge-' + (status === 'success' ? 'cumple' : 'excede') + '">' + statusLabel + '</span>';
+      html += '</div>';
+    });
+
+    container.innerHTML = html;
+  }
+
+  function renderReference() {
+    var config = indicadores.config || {};
+
+    var refType = getElement('refType');
+    if (refType) refType.textContent = 'RESULTADO';
+
+    var refFormula = getElement('refFormula');
+    if (refFormula) refFormula.textContent = '(AT × 200,000) / (Horas-Trab. × 1,000,000)';
+
+    var refFreq = getElement('refFreq');
+    if (refFreq) refFreq.textContent = 'MENSUAL';
+
+    var refTargetF = getElement('refTargetF');
+    if (refTargetF) refTargetF.textContent = fmt(config.metaFrecuencia || 0, 4);
+  }
+
   // Init
   api = window.electronAPI && window.electronAPI.frecuenciaAccidentalidad;
   
