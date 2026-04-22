@@ -206,6 +206,7 @@ function getPythonScriptPath(scriptName) {
 }
 
 let mainWindow;
+let loadingWindow = null;
 let isWindowCreated = false; // Variable para rastrear si la ventana ya ha sido creada
 
 // --- Función de Logging Centralizada ---
@@ -556,6 +557,35 @@ if (require('electron-squirrel-startup')) {
   app.quit();
 }
 
+// Función para crear la ventana de carga (splash screen)
+const createLoadingWindow = () => {
+  loadingWindow = new BrowserWindow({
+    width: 500,
+    height: 600,
+    frame: false,
+    resizable: false,
+    center: true,
+    icon: path.join(__dirname, 'assets', 'KIAR256.ico'),
+    webPreferences: {
+      preload: path.join(__dirname, 'loading', 'preload-loading.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+  loadingWindow.loadFile(path.join(__dirname, 'loading', 'loading.html'));
+  loadingWindow.on('closed', () => { loadingWindow = null; });
+
+  // Fallback: si el IPC nunca llega, mostrar mainWindow a los 10 segundos
+  setTimeout(() => {
+    if (loadingWindow && !loadingWindow.isDestroyed()) {
+      loadingWindow.close();
+    }
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+    }
+  }, 10000);
+};
+
 // Función para crear la ventana principal
 const createWindow = () => {
   initDbOnce();
@@ -574,6 +604,7 @@ const createWindow = () => {
     height: 700, // Alto inicial 700 para que quepa en 768px con margen para barra de título
     minWidth: 1024, // Mínimo razonable para UI funcional
     minHeight: 650, // Permite uso en pantallas 1366x768
+    show: false, // Oculta hasta que loading screen complete
     icon: path.join(__dirname, 'assets', 'KIAR256.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -6205,10 +6236,24 @@ function registerFuratHandlers(appInstance) {
 
 // Manejador para la creación de la ventana principal
 app.whenReady().then(() => {
-  // Solo crear ventana si no ha sido creada antes
+  // Mostrar pantalla de carga inmediatamente
+  createLoadingWindow();
+
+  // Crear ventana principal en paralelo (oculta hasta que carga termine)
   if (!isWindowCreated) {
     createWindow();
   }
+
+  // Handler: la pantalla de carga terminó → cerrar loading, mostrar app
+  ipcMain.on('loading-complete', () => {
+    if (loadingWindow && !loadingWindow.isDestroyed()) {
+      loadingWindow.close();
+    }
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
 
   // Registrar handlers de Archivo y Retención Documental (Submódulo 2.5.1)
   try {
@@ -12460,7 +12505,7 @@ ipcMain.handle('get-accidentes-stats', async (event, companyName) => {
 
   const filePath = furatFiles[companyName.toUpperCase()];
   if (!filePath || !fs.existsSync(filePath)) {
-    return { success: true, data: { totalYear: 0, mesActual: 0, year: new Date().getFullYear(), mes: '---' } };
+    return { success: true, data: { totalYear: 0, mesActual: 0, year: new Date().getFullYear(), mes: '---', mensual: Array(12).fill(0) } };
   }
 
   const cacheKey = `accidentes_${companyName.toUpperCase()}`;
@@ -12490,6 +12535,7 @@ ipcMain.handle('get-accidentes-stats', async (event, companyName) => {
       const currentMonth = today.getMonth();
       const monthNames = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
 
+      const monthlyCount = Array(12).fill(0);
       let totalCount = 0;
       let monthCount = 0;
 
@@ -12508,6 +12554,7 @@ ipcMain.handle('get-accidentes-stats', async (event, companyName) => {
         if (fecha && !isNaN(fecha.getTime())) {
           if (fecha.getFullYear() === currentYear) {
             totalCount++;
+            monthlyCount[fecha.getMonth()]++;
             if (fecha.getMonth() === currentMonth) {
               monthCount++;
             }
@@ -12519,11 +12566,12 @@ ipcMain.handle('get-accidentes-stats', async (event, companyName) => {
         totalYear: totalCount,
         mesActual: monthCount,
         year: currentYear,
-        mes: monthNames[currentMonth]
+        mes: monthNames[currentMonth],
+        mensual: monthlyCount
       };
     } catch (err) {
       console.error('[ACCIDENTES] Error calculando:', err);
-      return { totalYear: 0, mesActual: 0, year: new Date().getFullYear(), mes: 'ERROR' };
+      return { totalYear: 0, mesActual: 0, year: new Date().getFullYear(), mes: 'ERROR', mensual: Array(12).fill(0) };
     }
   });
 
