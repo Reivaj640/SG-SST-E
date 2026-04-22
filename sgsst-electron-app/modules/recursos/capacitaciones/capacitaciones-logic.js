@@ -578,7 +578,12 @@ class CapacitacionesComponent {
                             style="color:var(--k-success);border-color:var(--k-success);"
                             data-id="${item.id}" title="Marcar como Realizada">
                         <i class="bi bi-check-lg"></i>
-                    </button>` : ''}
+                    </button>` : `
+                    <button class="k-btn k-btn-outline k-btn-icon revert-btn"
+                            style="color:var(--k-warning,#ffc107);border-color:var(--k-warning,#ffc107);"
+                            data-id="${item.id}" title="Revertir a Pendiente">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>`}
                 </td>
             `;
             tbody.appendChild(tr);
@@ -589,6 +594,9 @@ class CapacitacionesComponent {
         );
         tbody.querySelectorAll('.complete-btn').forEach(btn =>
             btn.addEventListener('click', () => this.completeTraining(parseInt(btn.dataset.id)))
+        );
+        tbody.querySelectorAll('.revert-btn').forEach(btn =>
+            btn.addEventListener('click', () => this.revertTraining(parseInt(btn.dataset.id)))
         );
     }
 
@@ -756,6 +764,15 @@ class CapacitacionesComponent {
         await this._saveDataToExcel();
         this.applyFilters();
         this.showNotification('¡Capacitación completada!', 'success');
+    }
+
+    async revertTraining(id) {
+        const index = this.capacitaciones.findIndex(c => c.id === id);
+        if (index === -1) return;
+        this.capacitaciones[index].estado = 'pending';
+        await this._saveDataToExcel();
+        this.applyFilters();
+        this.showNotification('Capacitación revertida a Pendiente.', 'warning');
     }
 
     async _saveDataToExcel() {
