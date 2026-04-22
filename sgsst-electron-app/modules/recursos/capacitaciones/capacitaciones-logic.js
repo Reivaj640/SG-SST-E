@@ -16,6 +16,7 @@ class CapacitacionesComponent {
         this.availableSheets = [];
         this.chartInstance = null;
         this._modalInBody = null; // ✏️ NUEVO — referencia al modal montado en body
+        this._isSaving = false;
     }
 
     render() {
@@ -34,6 +35,7 @@ class CapacitacionesComponent {
                     this.initializeCharts();
 
                     this.handleFileChange = () => {
+                        if (this._isSaving) return;
                         this.showNotification('Archivo modificado externamente. Recargando...', 'info');
                         this.loadDataForYear(this.currentYear);
                     };
@@ -780,6 +782,7 @@ class CapacitacionesComponent {
         const sheetName = this.availableSheets.find(s => s.includes(this.currentYear.toString()));
         if (!sheetName) return;
 
+        this._isSaving = true;
         try {
             const sorted = [...this.capacitaciones].sort((a, b) => a.rowIndex - b.rowIndex);
             this.showNotification('Guardando cambios en Excel...', 'info');
@@ -800,6 +803,8 @@ class CapacitacionesComponent {
         } catch (error) {
             console.error('Save error:', error);
             this.showNotification(`Error al guardar: ${error.message}`, 'danger');
+        } finally {
+            this._isSaving = false;
         }
     }
 

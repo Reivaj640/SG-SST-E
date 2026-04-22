@@ -3150,27 +3150,32 @@ ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacita
     });
 
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile(filePath);
+    // Cargar como buffer evita el bug de ExcelJS donde readFile() devuelve 0 worksheets
+    // con ciertos archivos .xlsx/.xlsm generados por otras librerías (ej. SheetJS)
+    const fileBuffer = await fsp.readFile(filePath);
+    await workbook.xlsx.load(fileBuffer);
+
+    sendLog(`[UPDATE-CAP][MAIN] Worksheets encontradas por ExcelJS: ${workbook.worksheets.map(ws => ws.name).join(', ') || '(ninguna)'}`, 'INFO');
 
     let sheetName = requestedSheetName;
     let worksheet = sheetName ? workbook.getWorksheet(sheetName) : null;
 
-    // Añadir búsqueda tolerante por si hay discrepancias entre librerías (xlsx vs exceljs)
+    // Búsqueda tolerante por espacios extra
     if (!worksheet && sheetName) {
         const tolerantSheet = workbook.worksheets.find(ws => ws.name.trim() === sheetName.trim());
         if (tolerantSheet) {
             worksheet = tolerantSheet;
-            sendLog(`[WARN] Se encontró la hoja '${sheetName}' con una búsqueda tolerante (sin espacios extra).`, 'WARN');
+            sheetName = worksheet.name;
+            sendLog(`[WARN] Hoja encontrada con búsqueda tolerante: '${sheetName}'`, 'WARN');
         }
     }
 
+    // Búsqueda por año actual si todavía no encontramos la hoja
     if (!worksheet) {
-        if(sheetName) sendLog(`[WARN] La hoja solicitada '${sheetName}' sigue sin encontrarse. Buscando una alternativa por año.`, 'WARN');
+        if (sheetName) sendLog(`[WARN] Hoja '${sheetName}' no encontrada. Buscando alternativa por año.`, 'WARN');
         const currentYear = new Date().getFullYear().toString();
         const matrixPatternCurrent = new RegExp(`Matriz Cap\\.\\s*${currentYear}`, 'i');
-
         const foundSheet = workbook.worksheets.find(ws => matrixPatternCurrent.test(ws.name));
-
         if (foundSheet) {
             worksheet = foundSheet;
             sheetName = worksheet.name;
@@ -3178,7 +3183,7 @@ ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacita
         } else if (workbook.worksheets.length > 0) {
             worksheet = workbook.worksheets[0];
             sheetName = worksheet.name;
-            sendLog(`[WARN] No se encontró hoja por año. Usando la primera hoja disponible como fallback: '${sheetName}'`, 'WARN');
+            sendLog(`[WARN] Usando primera hoja disponible como fallback: '${sheetName}'`, 'WARN');
         }
     }
 

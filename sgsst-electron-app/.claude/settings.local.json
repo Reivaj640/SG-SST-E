@@ -5,7 +5,8 @@
       "Bash(\"/c/Users/jrf20/AppData/Roaming/Claude/claude-code/2.1.92/claude.exe\" --help)",
       "Bash(\"/c/Users/jrf20/AppData/Roaming/Claude/claude-code/2.1.92/claude.exe\" plugin:*)",
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); cp=d.get\\('companyPaths',{}\\); [print\\(k, '->', v.get\\('root',''\\)\\) for k,v in list\\(cp.items\\(\\)\\)[:3]]\")",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(grep -E \"\\\\.js$\")"
     ]
   }
 }
