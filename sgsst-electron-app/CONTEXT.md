@@ -476,3 +476,4 @@ npx electron-builder --win --publish=always
 **Documento creado:** 19 de marzo de 2026  
 **Propósito:** Contexto unificado para IA y nuevos desarrolladores  
 **Mantenimiento:** Actualizar con cada cambio arquitectónico mayor
+$content
