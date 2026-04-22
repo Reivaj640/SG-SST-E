@@ -1609,6 +1609,147 @@ function setAuthUIState(isAuthenticated) {
   });
 }
 
+// --- Controlador de Animación de Carga K+AIR ---
+
+class KairLoadingController {
+  constructor() {
+    this.progress = 0;
+    this.messageIndex = 0;
+    this.isComplete = false;
+    this.messages = [
+      { main: 'Iniciando...', sub: 'Cargando recursos' },
+      { main: 'Verificando credenciales', sub: 'Validando permisos' },
+      { main: 'Cargando configuración', sub: 'Sincronizando datos' },
+      { main: 'Preparando interfaz', sub: 'Cargando módulos' },
+      { main: 'Completando', sub: 'Verificando acceso' }
+    ];
+    this.messageEl = null;
+    this.submessageEl = null;
+    this.progressFill = null;
+  }
+
+  _getElements() {
+    if (!this.messageEl) {
+      this.messageEl = document.querySelector('.loading-message');
+      this.submessageEl = document.querySelector('.loading-submessage');
+      this.progressFill = document.querySelector('.progress-fill');
+      this.progressPercent = document.querySelector('.loading-progress-percent');
+    }
+    return { messageEl: this.messageEl, submessageEl: this.submessageEl, progressFill: this.progressFill, progressPercent: this.progressPercent };
+  }
+
+  setProgress(value) {
+    const { progressFill, progressPercent } = this._getElements();
+    if (progressFill) {
+      this.progress = Math.max(0, Math.min(100, value));
+      progressFill.style.width = `${this.progress}%`;
+      if (progressPercent) progressPercent.textContent = `${this.progress}%`;
+    }
+  }
+
+  setMessage(main, sub) {
+    const { messageEl, submessageEl } = this._getElements();
+    setTimeout(() => {
+      if (messageEl) {
+        messageEl.textContent = main;
+        messageEl.style.opacity = '1';
+      }
+      if (submessageEl) {
+        submessageEl.textContent = sub;
+        submessageEl.style.opacity = '1';
+      }
+    }, 200);
+  }
+
+  advanceMessage() {
+    if (this.messageIndex < this.messages.length - 1) {
+      this.messageIndex++;
+      const msg = this.messages[this.messageIndex];
+      this.setMessage(msg.main, msg.sub);
+    }
+  }
+
+  updateMessage() {
+    const msg = this.messages[this.messageIndex];
+    this.setMessage(msg.main, msg.sub);
+  }
+
+  complete() {
+    if (this.isComplete) return;
+    this.isComplete = true;
+    const container = document.querySelector('.loading-container');
+    if (container) {
+      container.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+      container.style.opacity = '0';
+      container.style.transform = 'scale(0.98)';
+    }
+    window.dispatchEvent(new CustomEvent('kair-loading-complete'));
+  }
+
+  showError(message = 'Error al cargar. Intentelo de nuevo.') {
+    const { messageEl, progressFill } = this._getElements();
+    if (messageEl) {
+      messageEl.textContent = message;
+      messageEl.style.color = '#dc3545';
+    }
+    const { submessageEl } = this._getElements();
+    if (submessageEl) {
+      submessageEl.textContent = '';
+    }
+    document.querySelectorAll('.spinner-ring').forEach(el => {
+      el.style.animationPlayState = 'paused';
+    });
+    document.querySelectorAll('.accent-dot').forEach(el => {
+      el.style.animationPlayState = 'paused';
+    });
+    document.querySelectorAll('.particle').forEach(el => {
+      el.style.animationPlayState = 'paused';
+    });
+    if (progressFill) {
+      progressFill.style.background = '#dc3545';
+    }
+  }
+
+  reset() {
+    this.progress = 0;
+    this.messageIndex = 0;
+    this.isComplete = false;
+    this.setProgress(0);
+    this.updateMessage();
+    const container = document.querySelector('.loading-container');
+    if (container) {
+      container.style.opacity = '1';
+      container.style.transform = 'scale(1)';
+    }
+  }
+
+  startSimulation() {
+    this.updateMessage();
+    const steps = [
+      { delay: 400, target: 15 },
+      { delay: 800, target: 30 },
+      { delay: 600, target: 42 },
+      { delay: 1000, target: 55 },
+      { delay: 700, target: 65 },
+      { delay: 900, target: 78 },
+      { delay: 500, target: 88 },
+      { delay: 1200, target: 95 },
+      { delay: 800, target: 100 }
+    ];
+    let cumulativeDelay = 0;
+    steps.forEach(step => {
+      cumulativeDelay += step.delay;
+      setTimeout(() => {
+        this.setProgress(step.target);
+        this.advanceMessage();
+      }, cumulativeDelay);
+    });
+    setTimeout(() => this.complete(), cumulativeDelay + 500);
+  }
+}
+
+window.kairLoading = new KairLoadingController();
+
 // --- Funciones de Transición Login → Interfaz ---
 
 /**
@@ -1623,54 +1764,82 @@ function wait(ms) {
  */
 function createTransitionOverlay() {
   const overlay = document.createElement('div');
-  overlay.id = 'kair-transition-overlay';
-  overlay.className = 'kair-transition-overlay kair-transition-hidden';
+  overlay.className = 'loading-container';
   overlay.innerHTML = `
-    <!-- Ondas -->
-    <div class="kair-transition-ripple"></div>
-    <div class="kair-transition-ripple"></div>
-    <div class="kair-transition-ripple"></div>
+    <!-- Partículas flotantes -->
+    <div class="loading-particles">
+      <div class="particle"></div>
+      <div class="particle"></div>
+      <div class="particle"></div>
+      <div class="particle"></div>
+      <div class="particle"></div>
+      <div class="particle"></div>
+      <div class="particle"></div>
+      <div class="particle"></div>
+    </div>
 
-    <!-- Logo -->
-    <div class="kair-transition-logo-container">
-      <div class="kair-transition-logo">
-        <div class="kair-transition-logo-icon">K+</div>
-        <div class="kair-transition-logo-text">
-          <span class="kair-transition-logo-brand">K+AIR</span>
-          <span class="kair-transition-logo-tagline">SG-SST Colombia</span>
+    <!-- Tarjeta de carga -->
+    <div class="loading-card">
+      <!-- Logo con ícono oficial K+AIR -->
+      <div class="loading-logo-section">
+        <img class="loading-logo-icon" src="assets/KIAR256.ico" alt="K+AIR" onerror="this.style.display='none'">
+        <div class="loading-logo-text">
+          <span class="loading-logo-brand">K+AIR</span>
+          <span class="loading-logo-tagline">SG-SST COLOMBIA</span>
         </div>
+      </div>
+
+      <!-- Spinner -->
+      <div class="loading-spinner-section">
+        <div class="spinner-ring"></div>
+        <div class="spinner-ring"></div>
+      </div>
+
+      <!-- Mensajes -->
+      <div class="loading-message-section">
+        <div class="loading-message">Iniciando...</div>
+        <div class="loading-submessage">Cargando recursos</div>
+        <div class="accent-dots">
+          <div class="accent-dot accent-dot--yellow"></div>
+          <div class="accent-dot accent-dot--blue"></div>
+          <div class="accent-dot accent-dot--navy"></div>
+          <div class="accent-dot accent-dot--purple"></div>
+        </div>
+      </div>
+
+      <!-- Progreso -->
+      <div class="loading-progress-section">
+        <div class="loading-progress-bar">
+          <div class="progress-fill"></div>
+        </div>
+        <div class="loading-progress-percent">0%</div>
+      </div>
+
+      <!-- Éxito -->
+      <div class="loading-success" id="loading-success" style="display: none;">
+        <svg class="loading-success-icon" viewBox="0 0 52 52">
+          <circle class="loading-success-circle" cx="26" cy="26" r="25"/>
+          <path class="loading-success-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+        </svg>
+        <div class="loading-welcome">¡Bienvenido!</div>
+        <div class="loading-welcome-user" id="loading-welcome-user">Usuario</div>
       </div>
     </div>
 
-    <!-- Spinner -->
-    <div class="kair-transition-spinner-container" id="transition-spinner">
-      <div class="kair-transition-spinner"></div>
-      <div class="kair-transition-spinner-inner"></div>
-    </div>
-
-    <!-- Mensajes -->
-    <div class="kair-transition-message" id="transition-message">
-      Verificando credenciales<span class="kair-transition-dots"><span></span><span></span><span></span></span>
-    </div>
-    <div class="kair-transition-submessage" id="transition-submessage">
-      Preparando tu espacio de trabajo
-    </div>
-
-    <!-- Progreso -->
-    <div class="kair-transition-progress-container">
-      <div class="kair-transition-progress-bar" id="transition-progress-bar"></div>
-    </div>
-
-    <!-- Éxito -->
-    <div class="kair-transition-success" id="transition-success">
-      <svg class="kair-transition-success-icon" viewBox="0 0 52 52">
-        <circle class="kair-transition-success-circle" cx="26" cy="26" r="25"/>
-        <path class="kair-transition-success-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
-      </svg>
-      <div class="kair-transition-welcome">¡Bienvenido!</div>
-      <div class="kair-transition-welcome-user" id="transition-welcome-user">Usuario</div>
-    </div>
+    <!-- Footer -->
+    <div class="loading-footer-text">K+AIR v<span id="loading-ver">—</span> · Sistema de Gestión en Seguridad y Salud en el Trabajo</div>
   `;
+
+  // Inyectar versión de la app de forma asíncrona
+  if (window.electronAPI && window.electronAPI.getAppVersion) {
+    window.electronAPI.getAppVersion()
+      .then(v => {
+        const el = overlay.querySelector('#loading-ver');
+        if (el) el.textContent = v;
+      })
+      .catch(() => {});
+  }
+
   return overlay;
 }
 
@@ -1678,10 +1847,10 @@ function createTransitionOverlay() {
  * Actualiza el mensaje de transición
  */
 function updateTransitionMessage(main, sub) {
-  const messageEl = document.getElementById('transition-message');
-  const submessageEl = document.getElementById('transition-submessage');
+  const messageEl = document.querySelector('.loading-message');
+  const submessageEl = document.querySelector('.loading-submessage');
   if (messageEl) {
-    messageEl.innerHTML = `${main}<span class="kair-transition-dots"><span></span><span></span><span></span></span>`;
+    messageEl.textContent = main;
   }
   if (submessageEl) {
     submessageEl.textContent = sub;
@@ -1697,6 +1866,9 @@ async function executeLoginTransition(userName) {
   const authScreen = document.querySelector('.kair-auth-screen');
   const overlay = createTransitionOverlay();
   document.body.appendChild(overlay);
+
+  // Resetear controlador para reutilizar
+  window.kairLoading.reset();
 
   // Forzar reflow
   overlay.offsetHeight;
@@ -1714,61 +1886,65 @@ async function executeLoginTransition(userName) {
   if (authScreen) {
     authScreen.style.display = 'none';
   }
-  overlay.classList.remove('kair-transition-hidden');
+  overlay.classList.remove('hidden');
   await wait(300);
 
-  // 3. Secuencia de mensajes
-  updateTransitionMessage('Verificando credenciales', 'Validando permisos...');
-  document.getElementById('transition-progress-bar').style.width = '25%';
+  // 3. Usar controlador para secuencia de mensajes y progreso
+  window.kairLoading.setProgress(25);
+  window.kairLoading.setMessage('Verificando credenciales', 'Validando permisos...');
   await wait(600);
 
-  updateTransitionMessage('Cargando configuración', 'Sincronizando datos...');
-  document.getElementById('transition-progress-bar').style.width = '50%';
+  window.kairLoading.setProgress(50);
+  window.kairLoading.setMessage('Cargando configuración', 'Sincronizando datos...');
   await wait(500);
 
-  updateTransitionMessage('Preparando interfaz', 'Cargando módulos...');
-  document.getElementById('transition-progress-bar').style.width = '75%';
+  window.kairLoading.setProgress(75);
+  window.kairLoading.setMessage('Preparando interfaz', 'Cargando módulos...');
   await wait(500);
 
-  updateTransitionMessage('Completando', 'Verificando permisos...');
-  document.getElementById('transition-progress-bar').style.width = '95%';
+  window.kairLoading.setProgress(95);
+  window.kairLoading.setMessage('Completando', 'Verificando acceso...');
   await wait(400);
 
-  // 4. Mostrar éxito
-  document.getElementById('transition-progress-bar').style.width = '100%';
+  window.kairLoading.setProgress(100);
   await wait(200);
 
-  // Ocultar spinner y mensajes
-  const spinner = document.getElementById('transition-spinner');
-  const progressContainer = document.querySelector('.kair-transition-progress-container');
-  const message = document.getElementById('transition-message');
-  const submessage = document.getElementById('transition-submessage');
+  // 4. Mostrar éxito (checkmark) - Ocultar spinner y progreso, mostrar éxito
+  const spinner = document.querySelector('.loading-spinner-section');
+  const progressSection = document.querySelector('.loading-progress-section');
+  const messageSection = document.querySelector('.loading-message-section');
 
   if (spinner) spinner.style.display = 'none';
-  if (progressContainer) progressContainer.style.display = 'none';
-  if (message) message.style.display = 'none';
-  if (submessage) submessage.style.display = 'none';
+  if (progressSection) progressSection.style.display = 'none';
+  if (messageSection) messageSection.style.display = 'none';
 
-  // Mostrar check de éxito
-  const welcomeUser = document.getElementById('transition-welcome-user');
+  const welcomeUser = document.getElementById('loading-welcome-user');
   if (welcomeUser) {
     welcomeUser.textContent = userName || 'Usuario';
   }
-  const successContainer = document.getElementById('transition-success');
+  const successContainer = document.getElementById('loading-success');
   if (successContainer) {
-    successContainer.classList.add('visible');
+    successContainer.style.display = 'flex';
+    successContainer.style.flexDirection = 'column';
+    successContainer.style.alignItems = 'center';
   }
 
   await wait(1200);
 
-  // 5. Fade out del overlay
-  overlay.classList.add('kair-transition-exiting');
-  await wait(400);
+  // 5. Escuchar evento de completitud y limpiar overlay
+  window.addEventListener('kair-loading-complete', function onComplete() {
+    window.removeEventListener('kair-loading-complete', onComplete);
+    overlay.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+    overlay.style.opacity = '0';
+    overlay.style.transform = 'scale(0.98)';
+    setTimeout(() => {
+overlay.remove();
+      console.log('✅ Transición completada');
+    }, 500);
+  });
 
-  // 6. Limpiar overlay
-  overlay.remove();
-
-  console.log('✅ Transición completada');
+  // 6. Ejecutar complete() para disparar evento
+  window.kairLoading.complete();
 }
 
 // --- Fin Funciones de Transición ---
