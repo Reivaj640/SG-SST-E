@@ -316,6 +316,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     escribirEnExcel: (mes, campos) => ipcRenderer.invoke('severidad-accidentalidad:escribir-excel', mes, campos),
   },
 
+  // --- Índice de Mortalidad (3.3.3) ---
+  mortalidad: {
+    configurarRutas: (companyName) => ipcRenderer.invoke('mortalidad:configurar-rutas', companyName),
+    leerIndicadores: () => ipcRenderer.invoke('mortalidad:leer-indicadores'),
+    escribirExcel: (mes, campos) => ipcRenderer.invoke('mortalidad:escribir-excel', mes, campos),
+  },
+
   // --- Eventos IPC ---
   send: (channel, data) => ipcRenderer.send(channel, data),
   onIpcMessage: (channel, listener) => {

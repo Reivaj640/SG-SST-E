@@ -3895,6 +3895,9 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
     } else if (submoduleName === "3.3.2 Severidad de la accidentalidad") {
       showSeveridadAccidentalidadContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
 
+    } else if (submoduleName === "3.3.3 Proporción de accidentes de trabajo mortales") {
+      showIndiceMortalidadContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
+
     } else if (submoduleName === "3.3.6 Medición del ausentismo por causa médica") {
       showMedicionAusentismoContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
 
@@ -4424,6 +4427,85 @@ function showSeveridadAccidentalidadContent(container, currentCompany, moduleNam
     })
     .catch(error => {
       console.error('[SeveridadAccidentalidad] Error al cargar:', error);
+      showDevelopmentMessage(container, submoduleName);
+    });
+}
+
+function showIndiceMortalidadContent(container, currentCompany, moduleName, submoduleName) {
+  console.log('[IndiceMortalidad] ✅ showIndiceMortalidadContent INICIADO');
+  console.log('[IndiceMortalidad] container:', container);
+  console.log('[IndiceMortalidad] currentCompany:', currentCompany);
+  console.log('[IndiceMortalidad] moduleName:', moduleName);
+  console.log('[IndiceMortalidad] submoduleName:', submoduleName);
+
+  container.innerHTML = '<p style="color: blue;">📥 Cargando índice de mortalidad...</p>';
+
+  const BASE = './modules/gestion-salud/indice-mortalidad/';
+  console.log('[IndiceMortalidad] Ruta BASE:', BASE);
+
+  // Cargar CSS si no está cargado
+  if (!document.querySelector(`link[href="${BASE}indice-mortalidad.css"]`)) {
+    const cssLink = document.createElement('link');
+    cssLink.rel = 'stylesheet';
+    cssLink.href = BASE + 'indice-mortalidad.css';
+    document.head.appendChild(cssLink);
+  }
+
+  // Cargar HTML y luego el script
+  const htmlUrl = BASE + 'indice-mortalidad.html';
+  console.log('[IndiceMortalidad] Intentando fetch:', htmlUrl);
+
+  fetch(htmlUrl)
+    .then(r => {
+      console.log('[IndiceMortalidad] Fetch response status:', r.status, r.ok ? 'OK' : 'FALLO');
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.text();
+    })
+    .then(html => {
+      // Parser el HTML completo
+      var parser = new DOMParser();
+      var doc = parser.parseFromString(html, 'text/html');
+      
+      // Mover todos los elementos del body al contenedor
+      var sourceBody = doc.body;
+      var elements = sourceBody.children;
+      while (elements.length > 0) {
+        container.appendChild(elements[0]);
+      }
+      
+      console.log('[IndiceMortalidad] HTML insertado, elementos移入');
+      console.log('[IndiceMortalidad] tableSection elemento:', !!container.querySelector('#tableSection'));
+      
+      // Cargar Chart.js si no está disponible
+      if (typeof Chart === 'undefined') {
+        console.log('[IndiceMortalidad] Cargando Chart.js...');
+        var chartScript = document.createElement('script');
+        chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+        chartScript.onload = function() { console.log('[IndiceMortalidad] Chart.js cargado OK'); };
+        chartScript.onerror = function(e) { console.error('[IndiceMortalidad] Error cargando Chart.js', e); };
+        document.head.appendChild(chartScript);
+      }
+
+      // Guardar empresa seleccionada para que el módulo la use
+      localStorage.setItem('selectedCompany', currentCompany);
+
+      // Cargar el script del módulo con tag script (con cache-busting)
+      var ts = Date.now();
+      var scriptUrl = BASE + 'indice-mortalidad.js?_t=' + ts;
+      console.log('[IndiceMortalidad] Cargando script tag:', scriptUrl);
+
+      var s = document.createElement('script');
+      s.src = scriptUrl;
+      s.onload = function() {
+        console.log('[IndiceMortalidad] Script cargado OK');
+      };
+      s.onerror = function(e) {
+        console.error('[IndiceMortalidad] Error cargando script:', e);
+      };
+      document.body.appendChild(s);
+    })
+    .catch(error => {
+      console.error('[IndiceMortalidad] Error al cargar:', error);
       showDevelopmentMessage(container, submoduleName);
     });
 }

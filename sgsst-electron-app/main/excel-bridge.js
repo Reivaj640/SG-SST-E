@@ -448,11 +448,146 @@ async function escribirEnExcel(mes, campos) {
   };
 }
 
+// ============================================================
+// ÍNDICE DE MORTALIDAD (Submódulo 3.3.3)
+// ============================================================
+
+// Filas específicas para Mortalidad
+const FILAS_MORTALIDAD = {
+  eventosMortales: 13,
+  trabajadores: 14,
+};
+
+async function leerIndicadoresMortalidad() {
+  if (!EXCEL_INDICADORES) {
+    // Si no hay INDICADORES, retornar datos demo
+    return {
+      success: true,
+      data: {
+        eventos: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        trabajadores: 150,
+        meta: 0,
+        frecuencia: 'Anual'
+      }
+    };
+  }
+
+  if (!fs.existsSync(EXCEL_INDICADORES)) {
+    return {
+      success: true,
+      data: {
+        eventos: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        trabajadores: 150,
+        meta: 0,
+        frecuencia: 'Anual'
+      }
+    };
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.readFile(EXCEL_INDICADORES);
+
+  // Buscar hoja
+  var hojaNombres = [
+    "TASA DE MORTALIDAD",
+    "DATOS Y GRÁFICOS RESULTADO",
+    "DATOS Y GRAFICOS RESULTADO",
+    "Mortalidad",
+    "Hoja1"
+  ];
+  var ws = null;
+
+  for (var i = 0; i < hojaNombres.length; i++) {
+    ws = workbook.getWorksheet(hojaNombres[i]);
+    if (ws) break;
+  }
+
+  if (!ws) {
+    // Usar hoja por defecto
+    ws = workbook.getWorksheet(1);
+  }
+
+  const meta = obtenerValor(ws, FILAS_MORTALIDAD.eventosMortales, COLUMNA_META);
+  const trabajadores = obtenerValor(ws, FILAS_MORTALIDAD.trabajadores, 5) || 150;
+
+  const eventos = [];
+  for (let mes = 1; mes <= 12; mes++) {
+    const col = mesAColumna(mes);
+    const valor = obtenerValor(ws, FILAS_MORTALIDAD.eventosMortales, col);
+    eventos.push(valor);
+  }
+
+  console.log('[EXCEL-BRIDGE Mortalidad] meta:', meta, 'trabajadores:', trabajadores, 'eventos:', eventos);
+
+  return {
+    success: true,
+    data: {
+      eventos: eventos,
+      trabajadores: trabajadores,
+      meta: meta,
+      frecuencia: 'Anual'
+    }
+  };
+}
+
+async function escribirEnExcelMortalidad(mes, campos) {
+  if (!EXCEL_INDICADORES) {
+    throw new Error("Ruta de INDICADORES no configurada");
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.readFile(EXCEL_INDICADORES);
+
+  var hojaNombres = [
+    "TASA DE MORTALIDAD",
+    "DATOS Y GRÁFICOS RESULTADO",
+    "DATOS Y GRAFICOS RESULTADO",
+    "Mortalidad",
+    "Hoja1"
+  ];
+  var ws = null;
+
+  for (var i = 0; i < hojaNombres.length; i++) {
+    ws = workbook.getWorksheet(hojaNombres[i]);
+    if (ws) break;
+  }
+
+  if (!ws) {
+    ws = workbook.getWorksheet(1);
+  }
+
+  if (!ws) throw new Error("Hoja no encontrada");
+
+  // Escribir valores
+  if (campos.eventos !== undefined) {
+    const col = mes ? mesAColumna(mes) : 5;
+    ws.getCell(FILAS_MORTALIDAD.eventosMortales, col).value = campos.eventos;
+  }
+
+  if (campos.trabajadores !== undefined) {
+    const col = mes ? mesAColumna(mes) : 5;
+    ws.getCell(FILAS_MORTALIDAD.trabajadores, col).value = campos.trabajadores;
+  }
+
+  // Guardar IN-PLACE
+  await workbook.xlsx.writeFile(EXCEL_INDICADORES);
+
+  return {
+    success: true,
+    data: {
+      mensaje: "Excel actualizado correctamente",
+      archivo: path.basename(EXCEL_INDICADORES)
+    }
+  };
+}
+
 // ── Exportar para usar en main.js ──
-module.exports = { 
+module.exports = {
   configurarRutas,
   configurarRutasConRuta,
-  leerIndicadores, 
-  leerCaracterizacion, 
-  escribirEnExcel 
+  leerIndicadores,
+  leerCaracterizacion,
+  escribirEnExcel,
+  leerIndicadoresMortalidad,
+  escribirEnExcelMortalidad
 };

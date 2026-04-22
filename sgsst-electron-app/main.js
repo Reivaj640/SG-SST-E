@@ -13280,6 +13280,157 @@ ipcMain.handle('severidad-accidentalidad:escribir-excel', async (event, mes, cam
   }
 });
 
+// Índice de Mortalidad - Handlers IPC (Submódulo 3.3.3)
+// =============================================================================
+
+// Configurar rutas de archivos Excel para una empresa específica
+ipcMain.handle('mortalidad:configurar-rutas', async (event, companyName) => {
+  console.log('[IndiceMortalidad][MAIN] ===== HANDLER CALLED =====');
+  console.log('[IndiceMortalidad][MAIN] companyName recibido:', companyName);
+
+  try {
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+
+    const normalizedInput = (companyName || '').toLowerCase();
+    const companyKey = Object.keys(config.companyPaths || {}).find(
+      key => key.toLowerCase() === normalizedInput
+    );
+
+    const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+
+    if (!companyConfig || !companyConfig.root) {
+      return {
+        success: false,
+        error: {
+          code: 'COMPANY_NOT_FOUND',
+          message: `Empresa "${companyName}" no encontrada`
+        }
+      };
+    }
+
+    if (!companyConfig.structure?.structure) {
+      return {
+        success: false,
+        error: {
+          code: 'NO_STRUCTURE',
+          message: `Empresa "${companyName}" no tiene estructura mapeada`
+        }
+      };
+    }
+
+    const rootStructure = companyConfig.structure.structure;
+
+    function findDirFlexible(subdirs, target) {
+      if (!subdirs) return null;
+
+      const normalizedTarget = target
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      for (const [key, value] of Object.entries(subdirs)) {
+        const normalizedKey = key
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        if (normalizedKey === normalizedTarget) {
+          return value;
+        }
+      }
+      return null;
+    }
+
+    // Buscar carpeta de indicadores - probar múltiples ubicaciones
+    var mortalidadPath = null;
+    var ubicacionesAPrueba = [
+      { modulo: "3. Gestion de la Salud", submodulo: "3.3.3 Proporcion de accidentes de trabajo mortales" },
+      { modulo: "3. Gestion de la Salud", submodulo: "3.3.3 Indice de Mortalidad" },
+      { modulo: "3. Gestion de la Salud", submodulo: "3.3.3 Proporcion de accidentes mortales" },
+    ];
+
+    for (var i = 0; i < ubicacionesAPrueba.length; i++) {
+      var loc = ubicacionesAPrueba[i];
+      var modulo = findDirFlexible(rootStructure.subdirectories, loc.modulo);
+      if (modulo && modulo.subdirectories) {
+        var submodulo = findDirFlexible(modulo.subdirectories, loc.submodulo);
+        if (submodulo) {
+          mortalidadPath = submodulo;
+          console.log('[IndiceMortalidad][MAIN] ENCONTRADO en:', loc.modulo, '->', loc.submodulo);
+          break;
+        }
+      }
+    }
+
+    if (!mortalidadPath) {
+      return {
+        success: false,
+        error: {
+          code: 'SUBMODULE_NOT_FOUND',
+          message: 'No se encontró carpeta de indicadores de mortalidad'
+        }
+      };
+    }
+
+    console.log('[IndiceMortalidad][MAIN] mortalidadPath.path:', mortalidadPath.path);
+
+    const rutas = excelBridge.configurarRutasConRuta(mortalidadPath.path);
+
+    return {
+      success: true,
+      data: {
+        indicadores: rutas.indicadores ? path.basename(rutas.indicadores) : null
+      }
+    };
+  } catch (error) {
+    console.error('[IndiceMortalidad][MAIN] EXCEPTION:', error.message);
+    return {
+      success: false,
+      error: {
+        code: 'CONFIG_ERROR',
+        message: error.message
+      }
+    };
+  }
+});
+
+// Leer indicadores desde Excel de origen
+ipcMain.handle('mortalidad:leer-indicadores', async () => {
+  try {
+    return await excelBridge.leerIndicadoresMortalidad();
+  } catch (error) {
+    console.error('[IndiceMortalidad] Error leyendo indicadores:', error);
+    return {
+      success: false,
+      error: {
+        code: 'EXCEL_READ_ERROR',
+        message: error.message
+      }
+    };
+  }
+});
+
+// Escribir en Excel de origen
+ipcMain.handle('mortalidad:escribir-excel', async (event, mes, campos) => {
+  try {
+    return await excelBridge.escribirEnExcelMortalidad(mes, campos);
+  } catch (error) {
+    console.error('[IndiceMortalidad] Error escribiendo en Excel:', error);
+    return {
+      success: false,
+      error: {
+        code: 'EXCEL_WRITE_ERROR',
+        message: error.message
+      }
+    };
+  }
+});
+
 // Iniciar el servidor OnlyOffice al iniciar la aplicación
 app.whenReady().then(() => {
     createWindow();
