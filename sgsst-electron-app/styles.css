@@ -866,6 +866,8 @@ select.form-control {
 }
 
 #app-header {
+  width: 100%;
+  box-sizing: border-box;
   background-color: var(--white-color);
   border-bottom: 1px solid var(--border-color);
   padding: calc(var(--spacer-sm) * 0.5) var(--spacer);
@@ -876,11 +878,13 @@ select.form-control {
 
 .header-content {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  width: 100%;
+  gap: 0;
 }
 
 .logo-container {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
 }
@@ -899,13 +903,17 @@ select.form-control {
 }
 
 .header-title-left {
+  flex: 1 1 auto;
   text-align: left;
-  flex-grow: 1;
+  margin: 0;
+  min-width: 0;
 }
 
 .header-buttons {
+  flex: 0 0 auto;
   display: flex;
   gap: var(--spacer-sm);
+  margin-left: auto;
 }
 
 .header-btn {
