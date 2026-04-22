@@ -141,6 +141,66 @@ class GestionSaludHome {
         if (data.remisiones && this.widgets.remisiones) {
             this.widgets.remisiones.update(data.remisiones);
         }
+        // Actualizar gráfica de accidentes
+        if (data.accidentes) {
+            this.renderAccidentesChart(data.accidentes);
+        }
+    }
+
+    renderAccidentesChart(data) {
+        if (typeof Chart === 'undefined') return;
+        const canvas = document.getElementById('saludAccidentesChart');
+        if (!canvas) return;
+
+        const monthlyData = data && data.mensual ? data.mensual : Array(12).fill(0);
+        const labels = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+        
+        // Detectar mes actual para resaltar
+        const currentMonth = new Date().getMonth();
+        const barColors = monthlyData.map((count, i) => {
+            if (count === 0) return 'rgba(40, 167, 69, 0.5)';
+            return i === currentMonth ? 'rgba(23, 78, 166, 0.8)' : 'rgba(220, 53, 69, 0.7)';
+        });
+        const borderColors = monthlyData.map((count, i) => {
+            if (count === 0) return '#28a745';
+            return i === currentMonth ? '#174ea6' : '#dc3545';
+        });
+
+        const existingChart = Chart.getChart(canvas);
+        if (existingChart) existingChart.destroy();
+
+        new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Accidentes',
+                    data: monthlyData,
+                    backgroundColor: barColors,
+                    borderColor: borderColors,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => ` ${ctx.raw} accidente${ctx.raw !== 1 ? 's' : ''}`
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1, precision: 0 },
+                        title: { display: true, text: 'Cantidad', font: { size: 10 } }
+                    }
+                }
+            }
+        });
     }
 
     renderMainArea(container) {
@@ -167,26 +227,22 @@ class GestionSaludHome {
 
         container.appendChild(widgetsContainer);
         
-        // Gráfica
+        // Gráfica de Accidentes
         const chartContainer = document.createElement('div');
         chartContainer.className = 'chart-container';
         chartContainer.innerHTML = `
-            <h3>Índice de Accidentabilidad</h3>
-            <div class="chart-placeholder">
-                <div class="chart-lines">
-                    <svg width="100%" height="150" viewBox="0 0 200 150" preserveAspectRatio="none">
-                        <polyline points="10,140 40,120 70,100 100,110 130,80 160,90 190,70" 
-                                  fill="none" stroke="#28a745" stroke-width="2"></polyline>
-                        <polyline points="10,130 40,110 70,90 100,100 130,70 160,80 190,60" 
-                                  fill="none" stroke="#174ea6" stroke-width="2" stroke-dasharray="5,5"></polyline>
-                    </svg>
-                    <div class="chart-labels">
-                        <span>Ene</span><span>Feb</span><span>Mar</span><span>Abr</span><span>May</span><span>Jun</span><span>Jul</span>
-                    </div>
-                </div>
+            <h3>Accidentes por Mes — ${new Date().getFullYear()}</h3>
+            <div class="chart-placeholder" style="padding: 0.5rem 0;">
+                <canvas id="saludAccidentesChart" style="max-height: 180px;"></canvas>
             </div>
         `;
         container.appendChild(chartContainer);
+        
+        // Lanzar gráfica con datos cacheados o luego con datos frescos
+        const cachedAcc = cachedData.accidentes;
+        setTimeout(() => {
+            this.renderAccidentesChart(cachedAcc || { mensual: Array(12).fill(0) });
+        }, 50);
         
         // Listado de submódulos
         const submodulesContainer = document.createElement('div');
@@ -599,6 +655,12 @@ class GestionSaludHome {
             .submodule-item { display: flex; align-items: center; justify-content: space-between; padding: 1rem; background: white; border: 1px solid var(--k-border); border-radius: 8px; transition: transform 0.2s; }
             .submodule-item:hover { transform: translateX(5px); border-color: var(--k-primary); }
             .btn-ingresar { background: var(--k-primary); color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; }
+            
+            .main-area { display: flex; flex-direction: column; gap: 1rem; }
+            .submodules-container { margin-top: 0.5rem; }
+            .submodules-container h3 { font-size: 0.8rem; font-weight: 600; color: var(--k-text-main); margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+            .chart-container { background: white; border: 1px solid var(--k-border); border-radius: 8px; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+            .chart-container h3 { font-size: 0.75rem; font-weight: 600; color: var(--k-primary); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
         `;
         document.head.appendChild(style);
     }
