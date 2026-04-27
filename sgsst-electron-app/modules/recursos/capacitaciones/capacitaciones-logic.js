@@ -90,12 +90,24 @@ class CapacitacionesComponent {
         console.log('[CapacitacionesComponent] Modal montado en document.body.');
     }
 
-    updateHeaderContext() {
-        const headerContext = document.getElementById('header-context-text');
-        if (headerContext) {
-            headerContext.textContent = `${this.currentCompany} / Recursos / Capacitaciones`;
-        }
+  updateHeaderContext() {
+    const companyText = document.getElementById('header-company-text');
+    if (companyText) {
+      companyText.textContent = this.currentCompany || '—';
     }
+  }
+
+  updateTabBadge() {
+    const badge = document.getElementById('badge-trainings');
+    if (!badge) return;
+    const pending = this.capacitaciones.filter(c => c.status === 'pending').length;
+    if (pending > 0) {
+      badge.textContent = pending;
+      badge.style.display = '';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
 
     destroy() {
         if (this.excelFilePath) {
@@ -117,11 +129,11 @@ class CapacitacionesComponent {
 
     initializeEventListeners() {
         // Navegación (Tabs)
-        document.querySelectorAll('.k-nav-item').forEach(item => {
-            item.addEventListener('click', () => {
-                this.switchView(item.getAttribute('data-view'));
-            });
-        });
+    document.querySelectorAll('.kair-header__tab').forEach(item => {
+      item.addEventListener('click', () => {
+        this.switchView(item.getAttribute('data-view'));
+      });
+    });
 
         // Botón Volver
         const backBtn = document.getElementById('btn-back-module');
@@ -168,9 +180,9 @@ class CapacitacionesComponent {
     }
 
     switchView(viewId) {
-        document.querySelectorAll('.k-nav-item').forEach(el => {
-            el.classList.toggle('active', el.getAttribute('data-view') === viewId);
-        });
+    document.querySelectorAll('.kair-header__tab').forEach(el => {
+      el.classList.toggle('active', el.getAttribute('data-view') === viewId);
+    });
         document.querySelectorAll('.k-view-section').forEach(el => el.classList.remove('active'));
 
         const targetSection = document.getElementById(`view-${viewId}`);
@@ -516,9 +528,10 @@ class CapacitacionesComponent {
             return !isNaN(f.getTime()) && (f.getMonth() + 1) == monthFilter;
         });
 
-        this.filteredCapacitaciones = filtered;
-        this.updateDashboardStats();
-        if (this.currentView === 'trainings') this.renderTable();
+    this.filteredCapacitaciones = filtered;
+    this.updateDashboardStats();
+    this.updateTabBadge();
+    if (this.currentView === 'trainings') this.renderTable();
         this.renderRecentList();
         this.updateCharts();
     }
