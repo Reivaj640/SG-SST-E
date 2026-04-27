@@ -63,21 +63,23 @@ class PresupuestoGestionComponent {
         }
     }
 
-    setupIframeEvents(iframe, loadingDiv, viewType) {
-        iframe.onload = () => {
-            this.log('INFO', `✅ Iframe cargado (${viewType})`);
-            if (loadingDiv.parentNode) loadingDiv.style.display = 'none';
+  setupIframeEvents(iframe, loadingDiv, viewType) {
+    iframe.onload = () => {
+      this.log('INFO', `✅ Iframe cargado (${viewType})`);
+      if (loadingDiv.parentNode) loadingDiv.style.display = 'none';
 
-            // Enviar archivos si es el selector o el home (para detectar año activo)
-            if (viewType === 'selector' || viewType === 'home') {
-                this.sendFilesToSelectorIframe(iframe);
-            }
+      if (viewType === 'selector' || viewType === 'gestion') {
+        iframe.contentWindow.postMessage({ company: this.currentCompany }, '*');
+      }
 
-            // Si es la vista de gestión, enviamos el archivo seleccionado para que lo tenga de inmediato.
-            if (viewType === 'gestion' && this.currentFile) {
-                iframe.contentWindow.postMessage({ file: this.currentFile }, '*');
-            }
-        };
+      if (viewType === 'selector' || viewType === 'home') {
+        this.sendFilesToSelectorIframe(iframe);
+      }
+
+      if (viewType === 'gestion' && this.currentFile) {
+        iframe.contentWindow.postMessage({ file: this.currentFile }, '*');
+      }
+    };
         iframe.onerror = (error) => this.log('CRITICAL', `❌ Error al cargar iframe: ${error.message}`);
 
         const messageHandler = (event) => this.handleIframeMessage(event);

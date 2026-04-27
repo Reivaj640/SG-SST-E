@@ -39,21 +39,167 @@
             display: flex; flex-direction: column;
         }
 
-        /* HEADER */
-        header {
-            background-color: var(--k-bg-card);
-            border-bottom: 1px solid var(--k-border);
-            padding: 0 1.5rem;
-            height: var(--k-header-height);
-            display: flex; align-items: center; justify-content: space-between;
-            flex-shrink: 0; z-index: 20;
-        }
+/* =========================================
+   HEADER SYSTEM v2.0 — Patrón 3 adaptado (BEM)
+   ========================================= */
 
-        .header-left { display: flex; align-items: center; gap: 1rem; }
-        .k-module-title { font-size: 1.2rem; font-weight: 600; color: var(--k-primary); line-height: 1.2; }
-        .k-module-subtitle { font-size: 0.8rem; color: var(--k-text-muted); font-weight: 400; }
+.kair-header {
+  background: #ffffff;
+  border-bottom: 1px solid #dee2e6;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
 
-        .header-actions { display: flex; gap: 0.75rem; }
+.kair-header__bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.75rem;
+  min-height: 52px;
+  padding: 0 1.5rem;
+}
+
+.kair-header__left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.kair-header__back {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #5a6378;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  font-size: 1rem;
+}
+
+.kair-header__back:hover {
+  background: #e8f0fe;
+  color: #174ea6;
+}
+
+.kair-header__divider {
+  width: 1px;
+  height: 24px;
+  background: #dee2e6;
+}
+
+.kair-header__center {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.kair-header__title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.kair-header__title i {
+  color: #174ea6;
+}
+
+.kair-header__breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: #5a6378;
+}
+
+.kair-header__breadcrumb li + li::before {
+  content: '›';
+  margin-right: 0.375rem;
+  color: #adb5bd;
+}
+
+.kair-header__breadcrumb a {
+  color: #5a6378;
+  text-decoration: none;
+}
+
+.kair-header__breadcrumb--active {
+  color: #174ea6;
+  font-weight: 500;
+}
+
+.kair-header__right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-left: auto;
+}
+
+.kair-header__company {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: #5a6378;
+}
+
+.kair-header__company i {
+  font-size: 0.875rem;
+}
+
+.kair-header__action--primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #fff;
+  background: #174ea6;
+  border: 1px solid #174ea6;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  font-family: var(--k-font-family);
+}
+
+.kair-header__action--primary:hover {
+  background: #185abd;
+}
+
+.kair-header__action--success {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #fff;
+  background: #28a745;
+  border: 1px solid #28a745;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  font-family: var(--k-font-family);
+}
+
+.kair-header__action--success:hover {
+  background: #218838;
+}
 
         /* BOTONES */
         .k-btn {
@@ -208,29 +354,39 @@
 </head>
 <body>
 
-    <header>
-        <div class="header-left">
-            <button class="k-btn" id="backToSelectorBtn">
-                <i class="fas fa-chevron-left"></i>
-            </button>
-            <button class="k-btn" id="backToSubmodulesBtn">
-                <i class="fas fa-home"></i>
-            </button>
-            <div>
-                <div class="k-module-title" id="moduleTitle">Gestión Presupuestal</div>
-                <div class="k-module-subtitle">Asignación y Control de Recursos</div>
-            </div>
-        </div>
-        <div class="header-actions">
-            <button class="k-btn" id="backBtn" style="display:none;">Volver</button>
-            <button class="k-btn k-btn-primary" id="addRowBtn">
-                <i class="fas fa-plus"></i> Nueva Partida
-            </button>
-            <button class="k-btn k-btn-success" id="saveBtn">
-                <i class="fas fa-save"></i> Guardar Cambios
-            </button>
-        </div>
-    </header>
+<header class="kair-header">
+  <div class="kair-header__bar">
+    <div class="kair-header__left">
+      <button class="kair-header__back" id="backToSelectorBtn" title="Volver al selector">
+        <i class="fas fa-chevron-left"></i>
+      </button>
+    </div>
+    <div class="kair-header__divider"></div>
+    <div class="kair-header__center">
+      <h1 class="kair-header__title" id="moduleTitle">
+        <i class="fas fa-coins"></i> Gestión Presupuestal
+      </h1>
+      <ol class="kair-header__breadcrumb">
+        <li><a>Recursos</a></li>
+        <li><a>1.1.3 Asignación</a></li>
+        <li class="kair-header__breadcrumb--active">Gestión</li>
+      </ol>
+    </div>
+    <div class="kair-header__right">
+      <span class="kair-header__company">
+        <i class="fas fa-building"></i>
+        <span id="header-company-text">—</span>
+      </span>
+      <div class="kair-header__divider"></div>
+      <button class="kair-header__action--primary" id="addRowBtn">
+        <i class="fas fa-plus"></i> Nueva Partida
+      </button>
+      <button class="kair-header__action--success" id="saveBtn">
+        <i class="fas fa-save"></i> Guardar Cambios
+      </button>
+    </div>
+  </div>
+</header>
 
     <div class="content-wrapper">
         <!-- KPIs -->
@@ -305,10 +461,15 @@
             setupEventListeners();
 
             // Mensajes del padre
-            window.addEventListener('message', async (event) => {
-                if (event.source !== parent) return;
+  window.addEventListener('message', async (event) => {
+    if (event.source !== parent) return;
 
-                if (event.data.file) {
+    if (event.data.company) {
+      const el = document.getElementById('header-company-text');
+      if (el) el.textContent = event.data.company;
+    }
+
+    if (event.data.file) {
                     currentFile = event.data.file;
                     updateFileInfo();
                     await loadData();
@@ -330,29 +491,24 @@
             });
         });
 
-        function setupEventListeners() {
-            const backToSelector = () => {
-                if (!hasPendingChanges || confirm('Tiene cambios sin guardar. ¿Está seguro de que desea salir?')) {
-                    window.parent.postMessage({ action: 'backToSelector' }, '*');
-                }
-            };
-            const backToSubmodules = () => {
-                if (!hasPendingChanges || confirm('Tiene cambios sin guardar. ¿Está seguro de que desea salir?')) {
-                    window.parent.postMessage({ action: 'backToSubmodules' }, '*');
-                }
-            };
+function setupEventListeners() {
+  const backToSelector = () => {
+    if (!hasPendingChanges || confirm('Tiene cambios sin guardar. ¿Está seguro de que desea salir?')) {
+      window.parent.postMessage({ action: 'backToSelector' }, '*');
+    }
+  };
 
-            document.getElementById('backToSelectorBtn').addEventListener('click', backToSelector);
-            document.getElementById('backToSubmodulesBtn').addEventListener('click', backToSubmodules);
-            document.getElementById('addRowBtn').addEventListener('click', addNewRow);
-            document.getElementById('saveBtn').addEventListener('click', saveChanges);
+  document.getElementById('backToSelectorBtn').addEventListener('click', backToSelector);
+  document.getElementById('addRowBtn').addEventListener('click', addNewRow);
+  document.getElementById('saveBtn').addEventListener('click', saveChanges);
         }
 
-        function updateFileInfo() {
-            if (!currentFile) return;
-            const year = extractYearFromFileName(currentFile.name);
-            document.getElementById('moduleTitle').textContent = `Presupuesto ${year}`;
-        }
+function updateFileInfo() {
+  if (!currentFile) return;
+  const year = extractYearFromFileName(currentFile.name);
+  const titleEl = document.getElementById('moduleTitle');
+  if (titleEl) titleEl.innerHTML = `<i class="fas fa-coins"></i> Presupuesto ${year}`;
+}
 
         function extractYearFromFileName(fileName) {
             const yearMatch = fileName.match(/(20\d{2})/);
