@@ -82,12 +82,12 @@ class InduccionesComponent {
         this.applyFilters();
     }
 
-    updateHeaderContext() {
-        const headerContext = document.getElementById('header-context-text');
-        if (headerContext) {
-            headerContext.textContent = `${this.currentCompany} / Recursos / Inducción y Reinducción`;
-        }
+  updateHeaderContext() {
+    const companyText = document.getElementById('header-company-text');
+    if (companyText) {
+      companyText.textContent = this.currentCompany || '—';
     }
+  }
 
     destroy() {
         // Limpieza de gráficos para evitar fugas de memoria
@@ -103,7 +103,7 @@ class InduccionesComponent {
 
     initializeEventListeners() {
         // Navegación (Tabs)
-        document.querySelectorAll('.k-nav-item').forEach(item => {
+        document.querySelectorAll('.kair-header__tab').forEach(item => {
             item.addEventListener('click', () => {
                 const view = item.getAttribute('data-view');
                 this.switchView(view);
@@ -146,8 +146,8 @@ class InduccionesComponent {
     }
 
     switchView(viewId) {
-        document.querySelectorAll('.k-nav-item').forEach(i => i.classList.remove('active'));
-        const activeTab = document.querySelector(`.k-nav-item[data-view="${viewId}"]`);
+        document.querySelectorAll('.kair-header__tab').forEach(i => i.classList.remove('active'));
+        const activeTab = document.querySelector(`.kair-header__tab[data-view="${viewId}"]`);
         if(activeTab) activeTab.classList.add('active');
 
         document.querySelectorAll('.k-view-section').forEach(s => s.classList.remove('active'));
@@ -203,10 +203,18 @@ class InduccionesComponent {
             return matchYear && matchSearch;
         });
 
-        this.renderDashboardStats();
-        this.renderTable();
-        
-        // Actualizar gráficos si están visibles
+    this.renderDashboardStats();
+    this.renderTable();
+
+    // Actualizar badge de registros
+    const badge = document.getElementById('badge-list');
+    if (badge) {
+      const count = this.state.filteredData.length;
+      badge.textContent = count;
+      badge.style.display = count > 0 ? 'inline-flex' : 'none';
+    }
+
+    // Actualizar gráficos si están visibles
         if(this.state.currentView === 'dashboard') this.updateDashboardCharts(this.state.filteredData);
         if(this.state.currentView === 'reports') this.renderReportsCharts();
     }
@@ -569,34 +577,34 @@ class InduccionesComponent {
     /**
      * Actualiza el indicador de estado de sincronización
      */
-    setSyncStatus(status, text) {
-        const statusEl = document.getElementById('sync-status');
-        const textEl = document.getElementById('sync-status-text');
-        
-        if (!statusEl) return;
+  setSyncStatus(status, text) {
+    const statusEl = document.getElementById('sync-status');
+    const textEl = document.getElementById('sync-status-text');
 
-        statusEl.className = 'k-sync-status';
-        
-        switch (status) {
-            case 'syncing':
-                statusEl.classList.add('syncing');
-                statusEl.innerHTML = '<i class="bi bi-arrow-clockwise"></i>';
-                break;
-            case 'synced':
-                statusEl.innerHTML = '<i class="bi bi-check-circle-fill" style="color: var(--k-success);"></i>';
-                break;
-            case 'error':
-                statusEl.classList.add('error');
-                statusEl.innerHTML = '<i class="bi bi-exclamation-circle-fill"></i>';
-                break;
-            default:
-                statusEl.innerHTML = '<i class="bi bi-check-circle-fill" style="color: var(--k-success);"></i>';
-        }
-        
-        if (textEl && text) {
-            textEl.textContent = text;
-        }
+    if (statusEl) {
+      statusEl.className = 'k-sync-status';
+
+      switch (status) {
+        case 'syncing':
+          statusEl.classList.add('syncing');
+          statusEl.innerHTML = '<i class="bi bi-arrow-clockwise"></i>';
+          break;
+        case 'synced':
+          statusEl.innerHTML = '<i class="bi bi-check-circle-fill" style="color: var(--k-success);"></i>';
+          break;
+        case 'error':
+          statusEl.classList.add('error');
+          statusEl.innerHTML = '<i class="bi bi-exclamation-circle-fill"></i>';
+          break;
+        default:
+          statusEl.innerHTML = '<i class="bi bi-check-circle-fill" style="color: var(--k-success);"></i>';
+      }
+
+      if (textEl && text) {
+        textEl.textContent = text;
+      }
     }
+  }
 
     showToast(msg, type='info') {
         const container = document.getElementById('toastContainer');
