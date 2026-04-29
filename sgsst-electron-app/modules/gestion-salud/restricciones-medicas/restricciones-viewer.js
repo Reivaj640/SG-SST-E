@@ -442,7 +442,7 @@
     function setupEventListeners() {
         // Back button
         document.getElementById('backBtn').addEventListener('click', function () {
-            window.parent.postMessage({ type: 'back-to-module-request', payload: {} }, '*');
+            window.parent.postMessage({ type: 'back-to-submodule-home', payload: {} }, '*');
         });
 
         // Refresh

@@ -904,13 +904,24 @@ RestriccionesMedicasComponent.prototype.handleIframeMessage = function(event) {
     var payload = event.data.payload;
 
     switch (type) {
+        case 'back-to-submodule-home':
+            console.log('[RM-BRIDGE] Regresando al home del submódulo 3.1.6');
+            if (self._messageHandler) {
+                window.removeEventListener('message', self._messageHandler);
+                self._messageHandler = null;
+            }
+            if (self._viewerFrame) {
+                self._viewerFrame.remove();
+                self._viewerFrame = null;
+            }
+            self.render();
+            break;
         case 'back-to-module-request':
             console.log('[RM-BRIDGE] Regresando a la antesala del submódulo 3.1.6');
             if (self._messageHandler) {
                 window.removeEventListener('message', self._messageHandler);
                 self._messageHandler = null;
             }
-            // Limpiar iframe antes de renderizar antesala
             if (self._viewerFrame) {
                 self._viewerFrame.remove();
                 self._viewerFrame = null;

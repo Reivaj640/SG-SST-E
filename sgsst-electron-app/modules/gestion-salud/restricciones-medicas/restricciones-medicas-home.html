@@ -63,8 +63,39 @@
             border-radius: var(--radius);
             box-shadow: var(--shadow-lg);
             padding: 3rem;
-            text-align: center;
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
             animation: fadeIn 0.5s ease-out;
+        }
+
+        /* Botón volver */
+        .back-btn-internal {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            color: #6c757d;
+            text-decoration: none;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            margin: 0 0 1.5rem 0;
+            width: auto;
+        }
+
+        .back-btn-internal:hover {
+            color: #174ea6;
+            background: #e8f0fe;
+            border-color: #174ea6;
+        }
+
+        .back-btn-internal i {
+            font-size: 0.85rem;
         }
 
         @keyframes fadeIn {
@@ -114,7 +145,8 @@
 
         /* STATUS PILL */
         .status-pill {
-            display: inline-flex;
+            display: flex;
+            justify-content: center;
             align-items: center;
             gap: 6px;
             padding: 6px 18px;
@@ -124,6 +156,7 @@
             font-size: 0.85rem;
             font-weight: 600;
             margin-bottom: 2rem;
+            align-self: center;
         }
 
         /* HERO SECTION */
@@ -316,25 +349,10 @@
     <div class="portal-container">
         <div class="portal-card">
 
-            <!-- BARRA SUPERIOR INTERNA (Header System v2.0) -->
-            <div class="portal-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid #dee2e6;">
-                <div style="display: flex; align-items: center; gap: 0.75rem;">
-                    <button onclick="rmGoBackToModule()" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; color: #5a6378; border-radius: 0.375rem; cursor: pointer; transition: background 0.15s ease;" onmouseover="this.style.background='#e8f0fe';this.style.color='#174ea6'" onmouseout="this.style.background='transparent';this.style.color='#5a6378'">
-                        <i class="bi bi-arrow-left"></i>
-                    </button>
-                    <div style="display: flex; flex-direction: column; gap: 0.125rem;">
-                        <h1 style="font-size: 1.25rem; font-weight: 600; color: #1a1a2e; margin: 0;">Restricciones y Recomendaciones Médicas</h1>
-                        <ol style="display: flex; align-items: center; gap: 0.375rem; list-style: none; margin: 0; padding: 0; font-size: 0.8125rem; font-weight: 400; color: #5a6378;">
-                            <li><a href="#" onclick="return false;" style="color: #5a6378; text-decoration: none;">Gestión de la Salud</a></li>
-                            <li style="color: #174ea6; font-weight: 500;">3.1.6 Restricciones y Recomendaciones Médicas</li>
-                        </ol>
-                    </div>
-                </div>
-                <span style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem; color: #5a6378;">
-                    <i class="bi bi-building"></i>
-                    <span id="header-company-text">—</span>
-                </span>
-            </div>
+            <a class="back-btn-internal" onclick="rmGoBackToModule()">
+                <i class="fas fa-arrow-left"></i>
+                <span>Volver al Menú</span>
+            </a>
 
             <!-- STATUS PILL -->
             <div class="status-pill">

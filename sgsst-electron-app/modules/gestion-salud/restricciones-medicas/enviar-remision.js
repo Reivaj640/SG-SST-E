@@ -60,7 +60,7 @@
     function setupEventListeners() {
         // Volver
         document.getElementById('backBtn').addEventListener('click', function () {
-            window.parent.postMessage({ type: 'back-to-module-request' }, '*');
+            window.parent.postMessage({ type: 'back-to-submodule-home' }, '*');
         });
 
         // Drop zone — click invoca el diálogo nativo del backend
