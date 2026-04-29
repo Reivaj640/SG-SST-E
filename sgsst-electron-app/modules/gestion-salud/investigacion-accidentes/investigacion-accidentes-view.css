@@ -205,6 +205,8 @@ body {
 }
 
 .main-content {
+    min-height: calc(100vh - 52px);
+    overflow-y: auto;
     max-width: 1280px;
     margin: 0 auto;
     padding: 1.5rem 1rem;

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestión de Investigaciones - K+AIR</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="investigaciones-view.css">
@@ -12,23 +13,36 @@
 
     <div class="inv-wrapper">
 
-        <!-- Header -->
+        <!-- Header System v2.0 -->
         <header class="inv-header">
-            <div class="inv-header-left">
-                <button id="backBtn" class="inv-btn inv-btn-secondary" aria-label="Volver al portal">
-                    <i class="fas fa-arrow-left"></i>
-                    <span>Volver</span>
-                </button>
-                <div class="inv-header-divider"></div>
-                <div class="inv-header-title">
-                    <h1>Gestión de Investigaciones</h1>
-                    <p>Consulta, administra y carga FURATs de accidentes</p>
+            <div class="inv-header-bar">
+                <div class="inv-header-left">
+                    <button id="backBtn" class="inv-header-back" aria-label="Volver al portal">
+                        <i class="bi bi-arrow-left"></i>
+                    </button>
                 </div>
-            </div>
-            <div class="inv-header-actions">
-                <button id="refreshBtn" class="inv-btn inv-btn-secondary" title="Actualizar lista">
-                    <i class="fas fa-sync-alt" id="refreshIcon"></i>
-                </button>
+                <div class="inv-header-divider"></div>
+                <div class="inv-header-center">
+                    <h1 class="inv-header-title">
+                        <i class="fas fa-folder-open" style="color: #174ea6;"></i>
+                        Gestión de Investigaciones
+                    </h1>
+                    <ol class="inv-header-breadcrumb">
+                        <li><a href="#" onclick="return false;">Gestión de la Salud</a></li>
+                        <li><a href="#" onclick="return false;">3.2.2 Investigación</a></li>
+                        <li class="active">Ver Investigaciones</li>
+                    </ol>
+                </div>
+                <div class="inv-header-right">
+                    <span class="inv-header-company">
+                        <i class="bi bi-building"></i>
+                        <span id="invCompanyName">—</span>
+                    </span>
+                    <div class="inv-header-divider"></div>
+                    <button id="refreshBtn" class="inv-btn inv-btn-secondary" title="Actualizar lista">
+                        <i class="fas fa-sync-alt" id="refreshIcon"></i>
+                    </button>
+                </div>
             </div>
         </header>
 
