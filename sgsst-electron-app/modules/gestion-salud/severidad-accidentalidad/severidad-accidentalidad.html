@@ -4,36 +4,44 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>K+AIR - Severidad de la Accidentalidad</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="severidad-accidentalidad.css">
 </head>
 <body>
 
-  <!-- ==================== HEADER ==================== -->
+<div class="severidad-container">
+
+  <!-- HEADER DEL MÓDULO (Header System v2.0 — Patrón 2: breadcrumb + company + action--ghost) -->
   <header class="kair-header">
-    <div class="kair-header-content">
-      <h1>K+AIR - Sistema de Gestión SST</h1>
-      <p>Submódulo 3.3.2 Severidad de la Accidentalidad</p>
-    </div>
-    <div class="kair-header-actions">
-      <button class="kair-btn kair-btn-light" id="btnVolver" title="Volver al módulo">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="19" y1="12" x2="5" y2="12"></line>
-          <polyline points="12 19 5 12 12 5"></polyline>
-        </svg>
-        Volver
-      </button>
-      <button class="kair-btn kair-btn-light" id="btnRefrescar">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="23 4 23 10 17 10"></polyline>
-          <polyline points="1 20 1 14 7 14"></polyline>
-          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-        </svg>
-        Refrescar
-      </button>
+    <div class="kair-header__bar">
+      <div class="kair-header__left">
+        <button class="kair-header__back" id="btnVolver" title="Volver a Gestión de la Salud">
+          <i class="bi bi-arrow-left"></i>
+        </button>
+      </div>
+      <div class="kair-header__divider"></div>
+      <div class="kair-header__center">
+        <h1 class="kair-header__title">Severidad de la Accidentalidad</h1>
+        <ol class="kair-header__breadcrumb">
+          <li><a href="#" onclick="return false;">Gestión de la Salud</a></li>
+          <li class="kair-header__breadcrumb--active">3.3.2 Severidad de la Accidentalidad</li>
+        </ol>
+      </div>
+      <div class="kair-header__right">
+        <span class="kair-header__company">
+          <i class="bi bi-building"></i>
+          <span id="header-company-text">—</span>
+        </span>
+        <div class="kair-header__divider"></div>
+        <button class="kair-header__action--ghost" id="btnRefrescar" title="Refrescar datos">
+          <i class="bi bi-arrow-clockwise"></i> Refrescar
+        </button>
+      </div>
     </div>
   </header>
 
   <main class="kair-container" id="app">
+    <div class="k-main-content">
 
     <!-- ==================== SYNC BAR ==================== -->
     <div class="kair-sync-bar">
@@ -195,10 +203,14 @@
       </div>
     </div>
 
+    </div>
+
   </main>
 
   <!-- ==================== TOAST CONTAINER ==================== -->
   <div id="toastContainer"></div>
+
+</div>
 
 </body>
 </html>
