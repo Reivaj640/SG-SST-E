@@ -79,12 +79,19 @@
     return String(val);
   }
 
-  function getCompanyName() {
-    var params = new URLSearchParams(window.location.search);
-    return params.get('company') || localStorage.getItem('selectedCompany') || '';
-  }
+function getCompanyName() {
+  var params = new URLSearchParams(window.location.search);
+  return params.get('company') || localStorage.getItem('selectedCompany') || '';
+}
 
-  // ==================== STATUS BADGE ====================
+function updateHeaderContext() {
+  var companyText = document.getElementById('header-company-text');
+  if (companyText) {
+    companyText.textContent = companyName || '—';
+  }
+}
+
+// ==================== STATUS BADGE ====================
   function getStatusBadge(valor, meta) {
     valor = toNum(valor);
     meta = toNum(meta);
@@ -727,20 +734,20 @@
       console.log('[IndiceMortalidad] electronAPI asignada');
     }
 
-    // Event listeners
-    var btnVolver = getElement('btnVolver');
-    var btnRefrescar = getElement('btnRefrescar');
-    var btnGuardar = getElement('btnGuardar');
+  // Event listeners
+  var btnBack = getElement('btn-back-module');
+  var btnRefrescar = getElement('btnRefrescar');
+  var btnGuardar = getElement('btnGuardar');
 
-    if (btnVolver) {
-      btnVolver.onclick = function() {
-        if (window.navigateToModule) {
-          window.navigateToModule('3. Gestion de la Salud');
-        } else {
-          window.history.back();
-        }
-      };
-    }
+  if (btnBack) {
+    btnBack.onclick = function() {
+      if (window.parent && window.parent.postMessage) {
+        window.parent.postMessage({ type: 'back-to-module-request' }, '*');
+      } else {
+        window.history.back();
+      }
+    };
+  }
 
     if (btnRefrescar) {
       btnRefrescar.onclick = function() {
@@ -756,8 +763,11 @@
       };
     }
 
-    // Cargar datos
-    cargarDatos();
+  // Actualizar contexto del header
+  updateHeaderContext();
+
+  // Cargar datos
+  cargarDatos();
   }
 
   // Iniciar cuando DOM listo

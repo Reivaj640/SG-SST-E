@@ -3883,6 +3883,7 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
 
 .kair-auth-input-with-icon {
     padding-left: 40px;
+    padding-right: 40px;
 }
 
 .kair-auth-input::placeholder {
@@ -3912,8 +3913,97 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
     animation: kair-auth-shake 0.5s ease;
 }
 
+.kair-password-toggle {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-lighter-color);
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s ease;
+}
+
+.kair-password-toggle:hover {
+    color: var(--text-light-color);
+}
+
+.kair-password-toggle i {
+    font-size: 1.1rem;
+}
+
 .kair-auth-form-group:focus-within .kair-auth-input-icon {
     color: var(--primary-color);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   CHECKBOX RECORDAR
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+.kair-auth-remember {
+    opacity: 0;
+    animation: kair-auth-fade-in 0.5s ease forwards;
+    animation-delay: 0.5s;
+}
+
+.kair-auth-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: var(--text-light-color);
+    user-select: none;
+}
+
+.kair-auth-checkbox {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.kair-auth-checkbox-custom {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border-color);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.kair-auth-checkbox-custom::after {
+    content: '';
+    width: 10px;
+    height: 10px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+    background-size: contain;
+    background-repeat: no-repeat;
+    opacity: 0;
+    transform: scale(0.5);
+    transition: all 0.2s ease;
+}
+
+.kair-auth-checkbox:checked + .kair-auth-checkbox-custom {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.kair-auth-checkbox:checked + .kair-auth-checkbox-custom::after {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.kair-auth-checkbox-label:hover .kair-auth-checkbox-custom {
+    border-color: var(--primary-color);
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

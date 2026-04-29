@@ -1977,7 +1977,17 @@ function renderLoginScreen(errorMessage = '') {
           <div class="kair-auth-input-wrapper">
             <i class="kair-auth-input-icon fas fa-lock"></i>
             <input id="kair-login-pass" class="kair-auth-input kair-auth-input-with-icon" type="password" autocomplete="current-password" placeholder="••••••••" required />
+            <button type="button" class="kair-password-toggle" id="kair-password-toggle" tabindex="-1">
+              <i class="bi bi-eye-slash"></i>
+            </button>
           </div>
+        </div>
+        <div class="kair-auth-remember">
+          <label class="kair-auth-checkbox-label">
+            <input type="checkbox" id="kair-remember-me" class="kair-auth-checkbox" />
+            <span class="kair-auth-checkbox-custom"></span>
+            <span>Recordar mis datos</span>
+          </label>
         </div>
         <div class="kair-auth-error" id="kair-login-error">${errorMessage || ''}</div>
         <button class="kair-auth-button" type="submit" id="kair-login-button">Ingresar</button>
@@ -2018,6 +2028,31 @@ function renderLoginScreen(errorMessage = '') {
   const errorDiv = document.getElementById('kair-login-error');
   const emailInput = document.getElementById('kair-login-email');
   const passwordInput = document.getElementById('kair-login-pass');
+  const rememberCheckbox = document.getElementById('kair-remember-me');
+
+  const savedEmail = localStorage.getItem('kair_remembered_email');
+  const savedPassword = localStorage.getItem('kair_remembered_password');
+  if (savedEmail) {
+    emailInput.value = savedEmail;
+    if (savedPassword) {
+      passwordInput.value = savedPassword;
+      rememberCheckbox.checked = true;
+    }
+  }
+
+  const passwordToggle = document.getElementById('kair-password-toggle');
+  const passwordToggleIcon = passwordToggle.querySelector('i');
+  passwordToggle.addEventListener('click', function() {
+    if (passwordInput.type === 'password') {
+      passwordInput.type = 'text';
+      passwordToggleIcon.classList.remove('bi-eye-slash');
+      passwordToggleIcon.classList.add('bi-eye');
+    } else {
+      passwordInput.type = 'password';
+      passwordToggleIcon.classList.remove('bi-eye');
+      passwordToggleIcon.classList.add('bi-eye-slash');
+    }
+  });
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -2054,6 +2089,14 @@ function renderLoginScreen(errorMessage = '') {
         if (key) companyRoleByKey[key] = c.role;
       });
       localStorage.setItem(AUTH_TOKEN_KEY, authToken);
+
+      if (rememberCheckbox.checked) {
+        localStorage.setItem('kair_remembered_email', email);
+        localStorage.setItem('kair_remembered_password', password);
+      } else {
+        localStorage.removeItem('kair_remembered_email');
+        localStorage.removeItem('kair_remembered_password');
+      }
 
       // Extraer nombre del usuario para la transición
       const userName = email.split('@')[0].split('.')[0].charAt(0).toUpperCase() + email.split('@')[0].split('.')[0].slice(1);
@@ -3664,6 +3707,7 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
   submoduleContentDiv.style.width = '100%';
   submoduleContentDiv.style.display = 'flex';
   submoduleContentDiv.style.flexDirection = 'column';
+  submoduleContentDiv.style.overflow = 'hidden';
   container.appendChild(submoduleContentDiv);
 
   try {
@@ -4613,8 +4657,6 @@ function showIndiceMortalidadContent(container, currentCompany, moduleName, subm
   console.log('[IndiceMortalidad] currentCompany:', currentCompany);
   console.log('[IndiceMortalidad] moduleName:', moduleName);
   console.log('[IndiceMortalidad] submoduleName:', submoduleName);
-
-  container.innerHTML = '<p style="color: blue;">📥 Cargando índice de mortalidad...</p>';
 
   const BASE = './modules/gestion-salud/indice-mortalidad/';
   console.log('[IndiceMortalidad] Ruta BASE:', BASE);

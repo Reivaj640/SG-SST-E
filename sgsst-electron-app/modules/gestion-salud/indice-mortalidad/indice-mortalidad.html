@@ -1,210 +1,220 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>K+AIR - Índice de Mortalidad</title>
-  <link rel="stylesheet" href="indice-mortalidad.css">
-  <!-- Chart.js para gráfico de barras -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>K+AIR - Índice de Mortalidad</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link rel="stylesheet" href="indice-mortalidad.css">
+<!-- Chart.js para gráfico de barras -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
-  <!-- ==================== HEADER ==================== -->
-  <header class="kair-header">
-    <div class="kair-header-content">
-      <h1>K+AIR - Sistema de Gestión SST</h1>
-      <p>Submódulo 3.3.3 Índice de Mortalidad</p>
-    </div>
-    <div class="kair-header-actions">
-      <button class="kair-btn kair-btn-success" id="btnGuardar" style="display:none">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="20 6 9 17 4 12"></polyline>
-        </svg>
-        <span id="save-label">Guardar (0)</span>
-      </button>
-      <button class="kair-btn kair-btn-light" id="btnVolver" title="Volver al módulo">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="19" y1="12" x2="5" y2="12"></line>
-          <polyline points="12 19 5 12 12 5"></polyline>
-        </svg>
-        Volver
-      </button>
-      <button class="kair-btn kair-btn-light" id="btnRefrescar">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="23 4 23 10 17 10"></polyline>
-          <polyline points="1 20 1 14 7 14"></polyline>
-          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-        </svg>
-        Refrescar
-      </button>
-    </div>
-  </header>
+<div class="indice-mortalidad-container">
 
-  <main class="kair-container" id="app">
+<!-- HEADER DEL MÓDULO (Header System v2.0 — Patrón 2: breadcrumb + company + action--success + action--ghost) -->
+<header class="kair-header">
+<div class="kair-header__bar">
+<div class="kair-header__left">
+<button class="kair-header__back" id="btn-back-module" title="Volver a Gestión de la Salud">
+<i class="bi bi-arrow-left"></i>
+</button>
+</div>
+<div class="kair-header__divider"></div>
+<div class="kair-header__center">
+<h1 class="kair-header__title">Índice de Mortalidad</h1>
+<ol class="kair-header__breadcrumb">
+<li><a href="#" onclick="return false;">Gestión de la Salud</a></li>
+<li class="kair-header__breadcrumb--active">3.3.3 Índice de Mortalidad</li>
+</ol>
+</div>
+<div class="kair-header__right">
+<span class="kair-header__company">
+<i class="bi bi-building"></i>
+<span id="header-company-text">—</span>
+</span>
+<div class="kair-header__divider"></div>
+<button class="kair-header__action--success" id="btnGuardar" style="display:none">
+<i class="bi bi-check-lg"></i>
+<span id="save-label">Guardar (0)</span>
+</button>
+<button class="kair-header__action--ghost" id="btnRefrescar" title="Refrescar datos">
+<i class="bi bi-arrow-clockwise"></i> Refrescar
+</button>
+</div>
+</div>
+</header>
 
-    <!-- ==================== SYNC BAR ==================== -->
-    <div class="kair-sync-bar">
-      <span class="kair-badge">
-        <span class="kair-dot"></span>
-        Vinculado a Excel de origen
-      </span>
-      <span class="kair-sync-info">
-        Los cambios se guardan directamente en INDICADORES 2024.xlsx
-      </span>
-    </div>
+<main class="kair-container" id="app">
+<div class="k-main-content">
 
-    <!-- ==================== LOADING ==================== -->
-    <div class="kair-loading" id="loadingSection">
-      <div class="kair-spinner"></div>
-      <p>Cargando indicadores...</p>
-    </div>
+<!-- ==================== SYNC BAR ==================== -->
+<div class="kair-sync-bar">
+<span class="kair-badge">
+<span class="kair-dot"></span>
+Vinculado a Excel de origen
+</span>
+<span class="kair-sync-info">
+Los cambios se guardan directamente en INDICADORES 2024.xlsx
+</span>
+</div>
 
-    <!-- ==================== KPIs ==================== -->
-    <section class="kair-kpis" id="kpiSection" style="display:none">
-      <div class="kair-kpi">
-        <div class="kair-kpi-label">EVENTOS MORTALES</div>
-        <div class="kair-kpi-value" id="kpiEventos">-</div>
-        <div class="kair-kpi-sub">Período actual</div>
-      </div>
-      <div class="kair-kpi">
-        <div class="kair-kpi-label">TASA MORTALIDAD</div>
-        <div class="kair-kpi-value primary" id="kpiTasa">-</div>
-        <div class="kair-kpi-sub">x 1000 trab.</div>
-      </div>
-      <div class="kair-kpi">
-        <div class="kair-kpi-label">TRABAJADORES</div>
-        <div class="kair-kpi-value" id="kpiTrabajadores">-</div>
-        <div class="kair-kpi-sub">Período base</div>
-      </div>
-      <div class="kair-kpi">
-        <div class="kair-kpi-label">META</div>
-        <div class="kair-kpi-value primary" id="kpiMeta">-</div>
-        <div class="kair-kpi-sub">Meta del indicador</div>
-      </div>
-      <div class="kair-kpi">
-        <div class="kair-kpi-label">RESULTADO</div>
-        <div class="kair-kpi-value" id="kpiResultado">-</div>
-        <div class="kair-kpi-sub">Resultado obtenido</div>
-      </div>
-      <div class="kair-kpi">
-        <div class="kair-kpi-label">ESTADO</div>
-        <div class="kair-kpi-value">
-          <span class="kair-status-badge" id="kpiEstado">-</span>
-        </div>
-        <div class="kair-kpi-sub">Evaluación</div>
-      </div>
-    </section>
+<!-- ==================== LOADING ==================== -->
+<div class="kair-loading" id="loadingSection">
+<div class="kair-spinner"></div>
+<p>Cargando indicadores...</p>
+</div>
 
-    <!-- ==================== META SECTION ==================== -->
-    <section class="kair-meta-section" id="metaSection" style="display:none">
-      <div class="kair-meta-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-        </svg>
-      </div>
-      <div class="kair-meta-info">
-        <div class="kair-meta-title">Meta del Indicador (Índice de Mortalidad)</div>
-        <div class="kair-meta-subtitle">Objetivo anual definido para el indicador</div>
-      </div>
-      <div class="kair-meta-value-container">
-        <div class="kair-meta-value" id="metaDisplay">-</div>
-        <span class="kair-promedio-badge" id="promedioBadge">Promedio: -</span>
-      </div>
-    </section>
+<!-- ==================== KPIs ==================== -->
+<section class="kair-kpis" id="kpiSection" style="display:none">
+<div class="kair-kpi">
+<div class="kair-kpi-label">EVENTOS MORTALES</div>
+<div class="kair-kpi-value" id="kpiEventos">-</div>
+<div class="kair-kpi-sub">Período actual</div>
+</div>
+<div class="kair-kpi">
+<div class="kair-kpi-label">TASA MORTALIDAD</div>
+<div class="kair-kpi-value primary" id="kpiTasa">-</div>
+<div class="kair-kpi-sub">x 1000 trab.</div>
+</div>
+<div class="kair-kpi">
+<div class="kair-kpi-label">TRABAJADORES</div>
+<div class="kair-kpi-value" id="kpiTrabajadores">-</div>
+<div class="kair-kpi-sub">Período base</div>
+</div>
+<div class="kair-kpi">
+<div class="kair-kpi-label">META</div>
+<div class="kair-kpi-value primary" id="kpiMeta">-</div>
+<div class="kair-kpi-sub">Meta del indicador</div>
+</div>
+<div class="kair-kpi">
+<div class="kair-kpi-label">RESULTADO</div>
+<div class="kair-kpi-value" id="kpiResultado">-</div>
+<div class="kair-kpi-sub">Resultado obtenido</div>
+</div>
+<div class="kair-kpi">
+<div class="kair-kpi-label">ESTADO</div>
+<div class="kair-kpi-value">
+<span class="kair-status-badge" id="kpiEstado">-</span>
+</div>
+<div class="kair-kpi-sub">Evaluación</div>
+</div>
+</section>
 
-    <!-- ==================== CHART ==================== -->
-    <section class="kair-chart-section" id="chartSection" style="display:none">
-      <div class="kair-chart-header">
-        <div>
-          <h3 class="kair-chart-title">Índice de Mortalidad Mensual</h3>
-          <p class="kair-chart-subtitle">Evolución por mes del índice</p>
-        </div>
-        <div class="kair-chart-legend">
-          <span class="kair-legend-item">
-            <span class="kair-legend-color" style="background:#dc2626"></span> Índice
-          </span>
-          <span class="kair-legend-item">
-            <span class="kair-legend-line"></span> Meta
-          </span>
-        </div>
-      </div>
-      <div class="kair-chart-container">
-        <canvas id="mortalityChart"></canvas>
-      </div>
-    </section>
+<!-- ==================== META SECTION ==================== -->
+<section class="kair-meta-section" id="metaSection" style="display:none">
+<div class="kair-meta-icon">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
+<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+</svg>
+</div>
+<div class="kair-meta-info">
+<div class="kair-meta-title">Meta del Indicador (Índice de Mortalidad)</div>
+<div class="kair-meta-subtitle">Objetivo anual definido para el indicador</div>
+</div>
+<div class="kair-meta-value-container">
+<div class="kair-meta-value" id="metaDisplay">-</div>
+<span class="kair-promedio-badge" id="promedioBadge">Promedio: -</span>
+</div>
+</section>
 
-    <!-- ==================== TABLE ==================== -->
-    <section class="kair-table-section" id="tableSection" style="display:none">
-      <div class="kair-table-wrapper">
-        <table class="kair-data-table" id="dataTable">
-          <thead>
-            <tr class="kair-table-header">
-              <th>Mes</th>
-              <th>Eventos Mortales</th>
-              <th>Trabajadores</th>
-              <th>Meta</th>
-              <th>Resultado</th>
-              <th>Estado</th>
-            </tr>
-          </thead>
-          <tbody id="tableBody">
-            <!-- Generated by JavaScript -->
-          </tbody>
-          <tfoot>
-            <tr class="kair-table-total">
-              <td>TOTAL</td>
-              <td id="totalEventos">-</td>
-              <td>-</td>
-              <td>-</td>
-              <td id="totalResultado">-</td>
-              <td>-</td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    </section>
+<!-- ==================== CHART ==================== -->
+<section class="kair-chart-section" id="chartSection" style="display:none">
+<div class="kair-chart-header">
+<div>
+<h3 class="kair-chart-title">Índice de Mortalidad Mensual</h3>
+<p class="kair-chart-subtitle">Evolución por mes del índice</p>
+</div>
+<div class="kair-chart-legend">
+<span class="kair-legend-item">
+<span class="kair-legend-color" style="background:#dc2626"></span> Índice
+</span>
+<span class="kair-legend-item">
+<span class="kair-legend-line"></span> Meta
+</span>
+</div>
+</div>
+<div class="kair-chart-container">
+<canvas id="mortalityChart"></canvas>
+</div>
+</section>
 
-    <!-- ==================== HINT ==================== -->
-    <p class="kair-edit-hint" id="editHint" style="display:none">
-      Click en una celda para editar. Presione <strong>Enter</strong> para confirmar o <strong>Escape</strong> para cancelar.
-    </p>
+<!-- ==================== TABLE ==================== -->
+<section class="kair-table-section" id="tableSection" style="display:none">
+<div class="kair-table-wrapper">
+<table class="kair-data-table" id="dataTable">
+<thead>
+<tr class="kair-table-header">
+<th>Mes</th>
+<th>Eventos Mortales</th>
+<th>Trabajadores</th>
+<th>Meta</th>
+<th>Resultado</th>
+<th>Estado</th>
+</tr>
+</thead>
+<tbody id="tableBody">
+<!-- Generated by JavaScript -->
+</tbody>
+<tfoot>
+<tr class="kair-table-total">
+<td>TOTAL</td>
+<td id="totalEventos">-</td>
+<td>-</td>
+<td>-</td>
+<td id="totalResultado">-</td>
+<td>-</td>
+</tr>
+</tfoot>
+</table>
+</div>
+</section>
 
-    <!-- ==================== METHODOLOGY ==================== -->
-    <section class="kair-methodology-section" id="methodologySection" style="display:none">
-      <div class="kair-methodology-header">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2">
-          <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-          <line x1="12" y1="9" x2="12" y2="13"/>
-          <line x1="12" y1="17" x2="12.01" y2="17"/>
-        </svg>
-        <h3>Metodología</h3>
-      </div>
-      <div class="kair-methodology-content">
-        <p><strong>Fuente:</strong> <span id="metFuente">SST / ARL y Gestión Humana</span></p>
-        <p><strong>Responsable:</strong> <span id="metResponsable">Responsable SGSST</span></p>
-        <p><strong>Frecuencia:</strong> <span id="metFrecuencia">-</span></p>
-        <p><strong>Definición:</strong> Accidentes mortales presentados en un período determinado</p>
-        <p><strong>Interpretación:</strong> Accidentes mortales presentados en un período determinado</p>
-      </div>
-    </section>
+<!-- ==================== HINT ==================== -->
+<p class="kair-edit-hint" id="editHint" style="display:none">
+Click en una celda para editar. Presione <strong>Enter</strong> para confirmar o <strong>Escape</strong> para cancelar.
+</p>
 
-    <!-- ==================== ERROR ==================== -->
-    <div class="kair-error" id="errorSection" style="display:none">
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#dc3545" stroke-width="2">
-        <circle cx="12" cy="12" r="10"></circle>
-        <line x1="12" y1="8" x2="12" y2="12"></line>
-        <line x1="12" y1="16" x2="12.01" y2="16"></line>
-      </svg>
-      <p id="errorMessage">Error al cargar los datos</p>
-    </div>
+<!-- ==================== METHODOLOGY ==================== -->
+<section class="kair-methodology-section" id="methodologySection" style="display:none">
+<div class="kair-methodology-header">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2">
+<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+<line x1="12" y1="9" x2="12" y2="13"/>
+<line x1="12" y1="17" x2="12.01" y2="17"/>
+</svg>
+<h3>Metodología</h3>
+</div>
+<div class="kair-methodology-content">
+<p><strong>Fuente:</strong> <span id="metFuente">SST / ARL y Gestión Humana</span></p>
+<p><strong>Responsable:</strong> <span id="metResponsable">Responsable SGSST</span></p>
+<p><strong>Frecuencia:</strong> <span id="metFrecuencia">-</span></p>
+<p><strong>Definición:</strong> Accidentes mortales presentados en un período determinado</p>
+<p><strong>Interpretación:</strong> Accidentes mortales presentados en un período determinado</p>
+</div>
+</section>
 
-  </main>
+<!-- ==================== ERROR ==================== -->
+<div class="kair-error" id="errorSection" style="display:none">
+<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#dc3545" stroke-width="2">
+<circle cx="12" cy="12" r="10"></circle>
+<line x1="12" y1="8" x2="12" y2="12"></line>
+<line x1="12" y1="16" x2="12.01" y2="16"></line>
+</svg>
+<p id="errorMessage">Error al cargar los datos</p>
+</div>
 
-  <!-- ==================== TOAST CONTAINER ==================== -->
-  <div id="toastContainer"></div>
+</div>
 
-  <!-- ==================== SCRIPTS ==================== -->
-  <script src="indice-mortalidad.js"></script>
+</main>
+
+<!-- ==================== TOAST CONTAINER ==================== -->
+<div id="toastContainer"></div>
+
+</div>
+
+<!-- ==================== SCRIPTS ==================== -->
+<script src="indice-mortalidad.js"></script>
 </body>
 </html>
