@@ -1302,6 +1302,46 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   // --- END: Collapsible Sidebar Logic ---
 
+// --- BEGIN: Collapsible Header Logic ---
+const appHeader = document.getElementById('app-header');
+const headerHoverZone = document.getElementById('header-hover-zone');
+if (appHeader) {
+  let headerHideTimeout = null;
+
+  function showHeader() {
+    if (headerHideTimeout) {
+      clearTimeout(headerHideTimeout);
+      headerHideTimeout = null;
+    }
+    appHeader.classList.add('app-header-hovering');
+    appHeader.classList.remove('app-header-collapsed');
+  }
+
+  function hideHeader() {
+    appHeader.classList.remove('app-header-hovering');
+    headerHideTimeout = setTimeout(() => {
+      if (!appHeader.classList.contains('app-header-hovering')) {
+        appHeader.classList.add('app-header-collapsed');
+      }
+    }, 500);
+  }
+
+  setTimeout(() => {
+    appHeader.classList.add('app-header-collapsed');
+  }, 5000);
+
+  appHeader.addEventListener('mouseenter', showHeader);
+  appHeader.addEventListener('mouseleave', hideHeader);
+
+  if (headerHoverZone) {
+    headerHoverZone.addEventListener('mouseenter', showHeader);
+    headerHoverZone.addEventListener('mouseleave', hideHeader);
+  }
+
+  console.log('Collapsible header logic initialized.');
+}
+// --- END: Collapsible Header Logic ---
+
   // Escuchar eventos de log desde el proceso principal
   if (window.electronAPI && window.electronAPI.onIpcMessage) {
     window.electronAPI.onIpcMessage('log-message', (message, level) => {
