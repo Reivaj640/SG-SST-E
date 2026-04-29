@@ -5330,3 +5330,212 @@ aside:has([data-module-list]) > [data-module-list],
 html {
   scroll-behavior: smooth;
 }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   SPLASH SCREEN - Logo Flotante Pre-Login
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+.kair-splash-screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+  transition: opacity 0.6s ease-in-out, transform 0.6s ease-in-out;
+}
+
+.kair-splash-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  z-index: -1;
+}
+
+.kair-splash-screen.kair-splash-hidden {
+  opacity: 0;
+  transform: scale(1.1);
+  pointer-events: none;
+}
+
+.kair-splash-logo-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  animation: kair-float 3s ease-in-out infinite;
+}
+
+.kair-splash-logo {
+  width: 140px;
+  height: 140px;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.4));
+  transition: transform 0.3s ease;
+}
+
+.kair-splash-logo-container:hover .kair-splash-logo {
+  transform: scale(1.08);
+}
+
+.kair-splash-logo-text {
+  margin-top: 20px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 42px;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  letter-spacing: 2px;
+}
+
+.kair-splash-logo-subtitle {
+  margin-top: 8px;
+  font-family: 'Open Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.75);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+
+.kair-splash-hint {
+  position: absolute;
+  bottom: 40px;
+  font-family: 'Open Sans', sans-serif;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  animation: kair-pulse 2s ease-in-out infinite;
+}
+
+/* Orbes flotantes */
+.kair-splash-orb {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.5;
+  animation: kair-orb-float 8s ease-in-out infinite;
+}
+
+.kair-splash-orb-1 {
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(100, 180, 255, 0.4) 0%, transparent 70%);
+  top: 10%;
+  left: 15%;
+  animation-delay: 0s;
+}
+
+.kair-splash-orb-2 {
+  width: 150px;
+  height: 150px;
+  background: radial-gradient(circle, rgba(80, 200, 180, 0.35) 0%, transparent 70%);
+  top: 60%;
+  right: 20%;
+  animation-delay: -2s;
+}
+
+.kair-splash-orb-3 {
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle, rgba(150, 100, 255, 0.3) 0%, transparent 70%);
+  bottom: 20%;
+  left: 25%;
+  animation-delay: -4s;
+}
+
+/* Formas poligonales */
+.kair-splash-polygon {
+  position: absolute;
+  opacity: 0.15;
+  animation: kair-polygon-rotate 20s linear infinite;
+}
+
+.kair-splash-polygon-1 {
+  width: 80px;
+  height: 80px;
+  top: 15%;
+  right: 25%;
+  background: transparent;
+  border: 3px solid rgba(255, 255, 255, 0.6);
+  clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
+}
+
+.kair-splash-polygon-2 {
+  width: 60px;
+  height: 60px;
+  bottom: 30%;
+  right: 15%;
+  background: transparent;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+}
+
+/* Partículas flotantes */
+.kair-splash-particle {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  animation: kair-particle-float 6s ease-in-out infinite;
+}
+
+.kair-splash-particle:nth-of-type(1) { top: 20%; left: 30%; animation-delay: 0s; }
+.kair-splash-particle:nth-of-type(2) { top: 40%; left: 70%; animation-delay: -1s; }
+.kair-splash-particle:nth-of-type(3) { top: 70%; left: 40%; animation-delay: -2s; }
+.kair-splash-particle:nth-of-type(4) { top: 30%; left: 80%; animation-delay: -3s; }
+.kair-splash-particle:nth-of-type(5) { top: 80%; left: 60%; animation-delay: -4s; }
+.kair-splash-particle:nth-of-type(6) { top: 50%; left: 20%; animation-delay: -5s; }
+
+/* Keyframes */
+@keyframes kair-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-15px); }
+}
+
+@keyframes kair-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+@keyframes kair-orb-float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(20px, -30px) scale(1.1); }
+  66% { transform: translate(-15px, 20px) scale(0.95); }
+}
+
+@keyframes kair-polygon-rotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes kair-particle-float {
+  0%, 100% { transform: translate(0, 0); opacity: 0.4; }
+  50% { transform: translate(10px, -20px); opacity: 0.8; }
+}
+
+/* Transición del formulario de login */
+#kair-auth-card {
+  transition: opacity 0.6s ease-in-out, transform 0.6s ease-in-out, box-shadow 0.3s ease !important;
+}
+
+#kair-auth-card.kair-auth-fade-out {
+  opacity: 0 !important;
+  transform: translateY(20px) !important;
+  pointer-events: none !important;
+  animation: none !important;
+}
+
+#kair-auth-card.kair-auth-fade-in {
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+  pointer-events: auto !important;
+  animation: none !important;
+}

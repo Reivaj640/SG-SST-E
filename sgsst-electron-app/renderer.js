@@ -1986,7 +1986,27 @@ function renderLoginScreen(errorMessage = '') {
   authScreen.className = 'kair-auth-screen';
   authScreen.id = 'vanta-login-container';
   authScreen.innerHTML = `
-    <div class="kair-auth-card">
+    <div class="kair-splash-screen" id="kair-splash">
+      <div class="kair-splash-overlay"></div>
+      <div class="kair-splash-orb kair-splash-orb-1"></div>
+      <div class="kair-splash-orb kair-splash-orb-2"></div>
+      <div class="kair-splash-orb kair-splash-orb-3"></div>
+      <div class="kair-splash-polygon kair-splash-polygon-1"></div>
+      <div class="kair-splash-polygon kair-splash-polygon-2"></div>
+      <div class="kair-splash-particle"></div>
+      <div class="kair-splash-particle"></div>
+      <div class="kair-splash-particle"></div>
+      <div class="kair-splash-particle"></div>
+      <div class="kair-splash-particle"></div>
+      <div class="kair-splash-particle"></div>
+      <div class="kair-splash-logo-container" id="kair-splash-logo-btn">
+        <img class="kair-splash-logo" src="assets/KIAR256.ico" alt="K+AIR" />
+        <div class="kair-splash-logo-text">K+AIR</div>
+        <div class="kair-splash-logo-subtitle">SG-SST</div>
+      </div>
+      <div class="kair-splash-hint">Haz clic en el logo para continuar</div>
+    </div>
+    <div class="kair-auth-card" id="kair-auth-card">
       <div class="kair-auth-title">Ingreso a K+AIR</div>
       <div class="kair-auth-subtitle">Acceso seguro por usuario</div>
       <form id="kair-login-form" class="kair-auth-form">
@@ -2022,6 +2042,19 @@ function renderLoginScreen(errorMessage = '') {
   `;
 
   contentArea.appendChild(authScreen);
+
+  // Splash Screen - Ocultar formulario inicialmente
+  const splashScreen = document.getElementById('kair-splash');
+  const authCard = document.getElementById('kair-auth-card');
+  authCard.classList.add('kair-auth-fade-out');
+
+  // Evento click en el logo del splash para mostrar el login
+  const splashLogoBtn = document.getElementById('kair-splash-logo-btn');
+  splashLogoBtn.addEventListener('click', function() {
+    splashScreen.classList.add('kair-splash-hidden');
+    authCard.classList.remove('kair-auth-fade-out');
+    authCard.classList.add('kair-auth-fade-in');
+  });
 
   // Aplicar Vanta.js al fondo del login (mismos tonos que selección de empresa)
   if (typeof VANTA !== 'undefined' && typeof VANTA.WAVES !== 'undefined') {
