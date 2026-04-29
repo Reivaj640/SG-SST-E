@@ -4290,24 +4290,54 @@ function showEnviarRemisionContent(container) {
 function showControlRemisionesContent(container) {
   container.innerHTML = '';
 
-  // Header oficial con botón de regreso (clases del sistema visual)
-  const header = document.createElement('div');
-  header.className = 'submodule-header';
+  // Agregar Bootstrap Icons si no existe
+  if (!document.querySelector('link[href*="bootstrap-icons"]')) {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css';
+    document.head.appendChild(link);
+  }
 
-  const backBtn = document.createElement('button');
-  backBtn.className = 'btn-back';
-  backBtn.textContent = '← Volver';
+  // Header System v2.0
+  const header = document.createElement('header');
+  header.className = 'kair-header';
+  header.style.cssText = 'background: #ffffff; border-bottom: 1px solid #dee2e6; position: sticky; top: 0; z-index: 100;';
+  header.innerHTML = `
+    <div style="display: flex; align-items: center; justify-content: flex-start; gap: 0.75rem; min-height: 52px; padding: 0 1.5rem;">
+      <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <button id="btnVolver" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; color: #5a6378; border-radius: 0.375rem; cursor: pointer;">
+          <i class="bi bi-arrow-left"></i>
+        </button>
+      </div>
+      <div style="width: 1px; height: 24px; background: #dee2e6;"></div>
+      <div style="display: flex; flex-direction: column; gap: 0.125rem;">
+        <h1 style="font-size: 1.25rem; font-weight: 600; color: #1a1a2e; margin: 0;">
+          <i class="fas fa-clipboard-check" style="color: #174ea6;"></i>
+          Control de Remisiones
+        </h1>
+        <ol style="display: flex; align-items: center; gap: 0.375rem; list-style: none; margin: 0; padding: 0; font-size: 0.8125rem; color: #5a6378;">
+          <li><a href="#" style="color: #5a6378; text-decoration: none;">Gestión de la Salud</a></li>
+          <li>›</li>
+          <li><a href="#" style="color: #5a6378; text-decoration: none;">3.1.6</a></li>
+          <li>›</li>
+          <li style="color: #174ea6; font-weight: 500;">3.1.6.1 Control de Remisiones</li>
+        </ol>
+      </div>
+      <div style="margin-left: auto; display: flex; align-items: center; gap: 0.75rem;">
+        <span style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem; color: #5a6378;">
+          <i class="bi bi-building"></i>
+          <span id="header-company-text">${currentCompany || '—'}</span>
+        </span>
+      </div>
+    </div>
+  `;
+  container.appendChild(header);
+
+  const backBtn = header.querySelector('#btnVolver');
   backBtn.addEventListener('click', () => {
     currentSubmodule = null;
-    if (currentModule) showModuleContent(currentModule);
+    showSubmoduleContent("3.1.6 Restricciones y recomendaciones médicas");
   });
-  header.appendChild(backBtn);
-
-  const title = document.createElement('h3');
-  title.textContent = '3.1.6.1 Control de Remisiones';
-  header.appendChild(title);
-
-  container.appendChild(header);
 
   // Contenedor principal tipo card
   const wrapper = document.createElement('div');
