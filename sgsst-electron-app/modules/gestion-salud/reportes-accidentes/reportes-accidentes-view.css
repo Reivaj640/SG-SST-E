@@ -83,6 +83,135 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
+/* Header System v2.0 */
+.kair-header {
+    background: #ffffff;
+    border-bottom: 1px solid #dee2e6;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.kair-header__bar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.75rem;
+    min-height: 52px;
+    padding: 0 1.5rem;
+}
+
+.kair-header__left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.kair-header__back {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: #5a6378;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    font-size: 1rem;
+}
+
+.kair-header__back:hover {
+    background: #e8f0fe;
+    color: #174ea6;
+}
+
+.kair-header__divider {
+    width: 1px;
+    height: 24px;
+    background: #dee2e6;
+}
+
+.kair-header__center {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+.kair-header__title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1a1a2e;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.kair-header__breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 0.8125rem;
+    font-weight: 400;
+    color: #5a6378;
+}
+
+.kair-header__breadcrumb li + li::before {
+    content: '\203A';
+    margin-right: 0.375rem;
+    color: #adb5bd;
+}
+
+.kair-header__breadcrumb a {
+    color: #5a6378;
+    text-decoration: none;
+}
+
+.kair-header__breadcrumb a:hover {
+    color: #174ea6;
+}
+
+.kair-header__breadcrumb--active {
+    color: #174ea6;
+    font-weight: 500;
+}
+
+.kair-header__right {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-left: auto;
+}
+
+.kair-header__company {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.8125rem;
+    font-weight: 400;
+    color: #5a6378;
+}
+
+/* Container & Main Content */
+.kair-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.k-main-content {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+}
+
 /* APP CONTAINER */
 .furat-app {
     display: flex;
@@ -92,13 +221,10 @@ body {
     overflow: hidden;
 }
 
-/* HEADER */
+/* HEADER (oculto - ahora usa Header System v2.0) */
 .furat-header {
-    background: linear-gradient(135deg, var(--furat-primary), var(--furat-primary-hover));
-    color: #ffffff;
-    padding: 0 24px;
-    display: flex;
-    justify-content: space-between;
+    display: none;
+}
     align-items: center;
     height: 64px;
     flex-shrink: 0;
