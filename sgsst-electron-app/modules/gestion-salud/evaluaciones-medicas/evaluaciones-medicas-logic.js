@@ -93,8 +93,8 @@ class EvaluacionesMedicasComponent {
         const data = event.data;
         if (!data || !data.type) return;
 
-        // Volver al portal de bienvenida
-        if (data.type === 'back-to-module-request') {
+        // Volver al portal de bienvenida (home del submódulo)
+        if (data.type === 'back-to-submodule-home' || data.type === 'back-to-module-request') {
             this._removeViewer();
             this.render();
             return;

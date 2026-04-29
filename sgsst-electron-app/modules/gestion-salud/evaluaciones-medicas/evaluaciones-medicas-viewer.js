@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function setupEventListeners() {
     // Header
     document.getElementById('backBtn').addEventListener('click', () => {
-        window.parent.postMessage({ type: 'back-to-module-request' }, '*');
+        window.parent.postMessage({ type: 'back-to-submodule-home' }, '*');
     });
 
     // Tabs

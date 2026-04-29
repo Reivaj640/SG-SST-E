@@ -41,6 +41,7 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            min-height: 0;
         }
 
         /* PORTAL CONTENEDOR PRINCIPAL */
@@ -51,8 +52,10 @@
             align-items: center;
             justify-content: flex-start;
             padding: 2rem;
-            overflow-y: auto;
             min-height: 0;
+            box-sizing: border-box;
+            width: 100%;
+            height: 100%;
         }
 
         .portal-card {
@@ -64,6 +67,12 @@
             padding: 3rem;
             text-align: center;
             animation: fadeIn 0.5s ease-out;
+            min-height: 0;
+            max-height: calc(100vh - 120px);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            flex: 1;
         }
 
         @keyframes fadeIn {
@@ -113,7 +122,8 @@
 
         /* STATUS PILL */
         .status-pill {
-            display: inline-flex;
+            display: flex;
+            justify-content: center;
             align-items: center;
             gap: 6px;
             padding: 6px 18px;
@@ -123,6 +133,7 @@
             font-size: 0.85rem;
             font-weight: 600;
             margin-bottom: 2rem;
+            align-self: center;
         }
 
         /* HERO SECTION */
@@ -149,6 +160,7 @@
             grid-template-columns: repeat(2, 1fr);
             gap: 1.5rem;
             margin-bottom: 2rem;
+            flex-shrink: 0;
         }
 
         .main-action-card {
@@ -220,6 +232,7 @@
         .quick-actions {
             margin-top: 3rem;
             text-align: left;
+            flex-shrink: 0;
         }
 
         .quick-actions-title {

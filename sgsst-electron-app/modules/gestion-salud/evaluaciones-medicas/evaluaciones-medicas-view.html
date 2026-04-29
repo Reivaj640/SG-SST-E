@@ -11,22 +11,32 @@
 <body>
     <div class="em-app">
 
-        <!-- HEADER -->
-        <header class="em-header">
-            <div class="em-header__left">
-                <div class="em-header__logo">
-                    <i class="fas fa-stethoscope"></i>
-                    <div>
-                        <h1>EMO</h1>
-                        <span>Evaluaciones Médicas Ocupacionales</span>
-                    </div>
+        <!-- Header System v2.0 -->
+        <header class="kair-header" style="background: #ffffff; border-bottom: 1px solid #dee2e6; position: sticky; top: 0; z-index: 100;">
+            <div style="display: flex; align-items: center; justify-content: flex-start; gap: 0.75rem; min-height: 52px; padding: 0 1.5rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <button id="backBtn" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; color: #5a6378; border-radius: 0.375rem; cursor: pointer;">
+                        <i class="fas fa-arrow-left" style="font-size: 1.25rem; line-height: 1; color: #5a6378;"></i>
+                    </button>
                 </div>
-            </div>
-            <div class="em-header__actions">
-                <button class="em-btn em-btn--ghost" id="backBtn" title="Volver al módulo">
-                    <i class="fas fa-arrow-left"></i>
-                    <span>Volver</span>
-                </button>
+                <div style="width: 1px; height: 24px; background: #dee2e6;"></div>
+                <div style="display: flex; flex-direction: column; gap: 0.125rem;">
+                    <h1 style="font-size: 1.25rem; font-weight: 600; color: #1a1a2e; margin: 0;">
+                        <i class="fas fa-file-medical" style="color: #174ea6;"></i>
+                        Evaluaciones Médicas Ocupacionales
+                    </h1>
+                    <ol style="display: flex; align-items: center; gap: 0.375rem; list-style: none; margin: 0; padding: 0; font-size: 0.8125rem; color: #5a6378;">
+                        <li><a href="#" style="color: #5a6378; text-decoration: none;">Gestión de la Salud</a></li>
+                        <li>›</li>
+                        <li style="color: #174ea6; font-weight: 500;">3.1.4 Evaluaciones Médicas</li>
+                    </ol>
+                </div>
+                <div style="margin-left: auto; display: flex; align-items: center; gap: 0.75rem;">
+                    <span style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem; color: #5a6378;">
+                        <i class="bi bi-building"></i>
+                        <span id="header-company-text">—</span>
+                    </span>
+                </div>
             </div>
         </header>
 

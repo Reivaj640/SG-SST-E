@@ -722,6 +722,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
 
+      // Delegar mensajes de EMO al componente evaluaciones-medicas-logic.js
+      // El componente ya tiene listeners para estos mensajes
+      if (type === 'emo-get-dashboard-data-request' || type === 'emo-get-library-data-request') {
+        console.log(`[RENDERER] Delegando mensaje EMO al componente: ${type} - NO procesando en renderer, permitiendo propagación`);
+        return; // IMPORTANTE: Este return permite que el evento se propague al componente
+      }
+
       console.log('RENDERER: Message received from iframe:', { type, payload, requestId });
 
       // Find the iframe that sent the message
@@ -864,6 +871,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                   console.log('RENDERER: Received back-to-module-request from iframe.');
                   if (typeof currentModule !== 'undefined' && currentModule) {
                       currentSubmodule = null;
+                      showModuleContent(currentModule);
+                  } else {
+                      showHomePage();
+                  }
+                  return;
+              case 'back-to-submodule-home':
+                  // Volver al home del submódulo actual (Evaluaciones Médicas 3.1.4)
+                  console.log('RENDERER: Received back-to-submodule-home from iframe.');
+                  if (typeof currentSubmodule !== 'undefined' && currentSubmodule) {
+                      showSubmoduleContent(currentSubmodule);
+                  } else if (typeof currentModule !== 'undefined' && currentModule) {
                       showModuleContent(currentModule);
                   } else {
                       showHomePage();
@@ -1154,11 +1172,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                   break;
 
               // ═══════════════════════════════════════════════════════════
-              // NOTA: Los mensajes de remisiones médicas (-request) NO deben
-              // manejarse aquí. El bridge restricciones-medicas-logic.js ya
-              // los maneja correctamente a través de su handler de postMessage.
+              // NOTA: Los mensajes de remisiones médicas (-request) y evaluaciones
+              // médicas (-request) NO deben manejarse aquí. Los bridges
+              // restricciones-medicas-logic.js y evaluaciones-medicas-logic.js ya
+              // los manejan correctamente a través de sus handlers de postMessage.
               // Si se agregan aquí, se duplican las respuestas.
               // ═══════════════════════════════════════════════════════════
+              
+              // Delegar al componente EvaluacionesMedicasComponent para mensajes EMO
+              case 'emo-get-dashboard-data-request':
+              case 'emo-get-library-data-request':
+                  console.log(`[RENDERER] Delegando mensaje EMO al componente: ${type} - no procesando`);
+                  break; // break permite que el evento continúe hacia otros listeners (el componente)
 
               default:
                   // Verificar si es un mensaje de respuesta (ya procesado), para evitar bucles
