@@ -84,23 +84,25 @@ class GestionSaludHome {
 
         try {
             // Ejecutar peticiones en paralelo (main.js responderá rápido gracias a su caché de archivos)
-            const [recursosResult, ausResult, accResult, examResult, segResult, remResult] = await Promise.all([
-                window.electronAPI.getRecursosStats(company),
-                window.electronAPI.getAusentismoStats(company, 'year'),
-                window.electronAPI.getAccidentesStats(company),
-                window.electronAPI.getExamenesStats(company),
-                window.electronAPI.getSaludSeguimientosStats(company),
-                window.electronAPI.getRemisionesStats(company)
-            ]);
+const [recursosResult, ausResult, accResult, examResult, segResult, remResult, indicadoresResult] = await Promise.all([
+window.electronAPI.getRecursosStats(company),
+window.electronAPI.getAusentismoStats(company, 'year'),
+window.electronAPI.getAccidentesStats(company),
+window.electronAPI.getExamenesStats(company),
+window.electronAPI.getSaludSeguimientosStats(company),
+window.electronAPI.getRemisionesStats(company),
+window.electronAPI.getIndicadoresSaludStats(company)
+]);
 
-            const newData = {
-                inducciones: recursosResult.success ? recursosResult.stats.inducciones : null,
-                ausentismo: ausResult.success ? ausResult.data : null,
-                accidentes: accResult.success ? accResult.data : null,
-                examenes: examResult.success ? examResult.data : null,
-                seguimientos: segResult.success ? segResult.data : null,
-                remisiones: remResult.success ? remResult.data : null
-            };
+const newData = {
+inducciones: recursosResult.success ? recursosResult.stats.inducciones : null,
+ausentismo: ausResult.success ? ausResult.data : null,
+accidentes: accResult.success ? accResult.data : null,
+examenes: examResult.success ? examResult.data : null,
+seguimientos: segResult.success ? segResult.data : null,
+remisiones: remResult.success ? remResult.data : null,
+indicadores: indicadoresResult.success ? indicadoresResult.data : null
+};
 
             // Guardar en caché de sesión
             window._saludHomeState.cache.set(company, newData);
@@ -142,9 +144,12 @@ class GestionSaludHome {
             this.widgets.remisiones.update(data.remisiones);
         }
         // Actualizar gráfica de accidentes
-        if (data.accidentes) {
-            this.renderAccidentesChart(data.accidentes);
-        }
+if (data.accidentes) {
+this.renderAccidentesChart(data.accidentes);
+}
+if (data.indicadores) {
+this.renderIndicesChart(data.indicadores);
+}
     }
 
     renderAccidentesChart(data) {
@@ -200,10 +205,184 @@ class GestionSaludHome {
                     }
                 }
             }
-        });
+});
+}
+
+renderIndicesChart(indicadores) {
+if (typeof Chart === 'undefined') return;
+const canvas = document.getElementById('saludIndicesChart');
+if (!canvas) return;
+
+const labels = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+const freqData = indicadores && indicadores.frecuenciaMensual
+  ? indicadores.frecuenciaMensual.map(m => m.indiceFrecuencia)
+  : Array(12).fill(0);
+const sevData = indicadores && indicadores.severidadMensual
+  ? indicadores.severidadMensual.map(m => m.indiceSeveridad)
+  : Array(12).fill(0);
+const mortData = indicadores && indicadores.eventosMortalesMensual
+  ? indicadores.eventosMortalesMensual.map(m => m.eventosMortales)
+  : Array(12).fill(0);
+
+const metaFrecuencia = indicadores && indicadores.config ? (indicadores.config.metaFrecuencia || 0) : 0;
+const metaSeveridad = indicadores && indicadores.config ? (indicadores.config.metaSeveridad || 0) : 0;
+
+const existingChart = Chart.getChart(canvas);
+if (existingChart) existingChart.destroy();
+
+const metaPlugin = {
+  id: 'metaLines',
+  afterDraw(chart) {
+    const ctx = chart.ctx;
+    const yAxis = chart.scales.y;
+    const xAxis = chart.scales.x;
+
+    if (metaFrecuencia > 0 && yAxis) {
+      const yPixel = yAxis.getPixelForValue(metaFrecuencia);
+      if (yPixel >= yAxis.top && yPixel <= yAxis.bottom) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.setLineDash([6, 4]);
+        ctx.strokeStyle = '#174ea6';
+        ctx.lineWidth = 1.5;
+        ctx.moveTo(xAxis.left, yPixel);
+        ctx.lineTo(xAxis.right, yPixel);
+        ctx.stroke();
+        ctx.fillStyle = '#174ea6';
+        ctx.font = '10px Segoe UI, Roboto, sans-serif';
+        ctx.fillText('Meta IF', xAxis.right - 40, yPixel - 4);
+        ctx.restore();
+      }
     }
 
-    renderMainArea(container) {
+    if (metaSeveridad > 0 && yAxis) {
+      const yPixel = yAxis.getPixelForValue(metaSeveridad);
+      if (yPixel >= yAxis.top && yPixel <= yAxis.bottom) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.setLineDash([6, 4]);
+        ctx.strokeStyle = '#b8860b';
+        ctx.lineWidth = 1.5;
+        ctx.moveTo(xAxis.left, yPixel);
+        ctx.lineTo(xAxis.right, yPixel);
+        ctx.stroke();
+        ctx.fillStyle = '#b8860b';
+        ctx.font = '10px Segoe UI, Roboto, sans-serif';
+        ctx.fillText('Meta IS', xAxis.right - 40, yPixel - 4);
+        ctx.restore();
+      }
+    }
+  }
+};
+
+new Chart(canvas, {
+  type: 'bar',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Índice Frecuencia (3.3.1)',
+        data: freqData,
+        backgroundColor: 'rgba(23, 78, 166, 0.7)',
+        borderColor: '#174ea6',
+        borderWidth: 1,
+        yAxisID: 'y',
+        order: 2
+      },
+      {
+        label: 'Índice Severidad (3.3.2)',
+        data: sevData,
+        backgroundColor: 'rgba(255, 193, 7, 0.7)',
+        borderColor: '#ffc107',
+        borderWidth: 1,
+        yAxisID: 'y',
+        order: 2
+      },
+      {
+        label: 'Mortalidad (3.3.3)',
+        data: mortData,
+        type: 'line',
+        borderColor: '#dc3545',
+        backgroundColor: 'rgba(220, 53, 69, 0.1)',
+        borderWidth: 2,
+        pointBackgroundColor: '#dc3545',
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        fill: true,
+        tension: 0.3,
+        yAxisID: 'y1',
+        order: 1
+      }
+    ]
+  },
+  plugins: [metaPlugin],
+  options: {
+    responsive: true,
+    maintainAspectRatio: true,
+    interaction: {
+      mode: 'index',
+      intersect: false
+    },
+    plugins: {
+      legend: {
+        display: true,
+        position: 'bottom',
+        labels: {
+          font: { size: 10 },
+          boxWidth: 12,
+          padding: 8
+        }
+      },
+      tooltip: {
+        callbacks: {
+          label: function(ctx) {
+            const label = ctx.dataset.label || '';
+            const value = ctx.raw;
+            if (ctx.dataset.yAxisID === 'y1') {
+              return ` ${label}: ${value} evento${value !== 1 ? 's' : ''}`;
+            }
+            return ` ${label}: ${value}`;
+          }
+        }
+      }
+    },
+    scales: {
+      y: {
+        type: 'linear',
+        position: 'left',
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: 'Índice (IF / IS)',
+          font: { size: 10 }
+        },
+        ticks: { font: { size: 9 } }
+      },
+      y1: {
+        type: 'linear',
+        position: 'right',
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: 'Eventos Mortales',
+          font: { size: 10 }
+        },
+        ticks: {
+          stepSize: 1,
+          precision: 0,
+          font: { size: 9 }
+        },
+        grid: {
+          drawOnChartArea: false
+        }
+      }
+    }
+  }
+});
+}
+
+renderMainArea(container) {
         const widgetsContainer = document.createElement('div');
         widgetsContainer.className = 'widgets-container';
 
@@ -225,24 +404,37 @@ class GestionSaludHome {
         widgetsContainer.appendChild(ausentismoWidget);
         widgetsContainer.appendChild(induccionesWidget);
 
-        container.appendChild(widgetsContainer);
-        
-        // Gráfica de Accidentes
-        const chartContainer = document.createElement('div');
-        chartContainer.className = 'chart-container';
-        chartContainer.innerHTML = `
-            <h3>Accidentes por Mes — ${new Date().getFullYear()}</h3>
-            <div class="chart-placeholder" style="padding: 0.5rem 0;">
-                <canvas id="saludAccidentesChart" style="max-height: 180px;"></canvas>
-            </div>
-        `;
-        container.appendChild(chartContainer);
-        
-        // Lanzar gráfica con datos cacheados o luego con datos frescos
-        const cachedAcc = cachedData.accidentes;
-        setTimeout(() => {
-            this.renderAccidentesChart(cachedAcc || { mensual: Array(12).fill(0) });
-        }, 50);
+container.appendChild(widgetsContainer);
+
+const chartsGrid = document.createElement('div');
+chartsGrid.className = 'charts-grid-salud';
+
+const chartContainer = document.createElement('div');
+chartContainer.className = 'chart-container';
+chartContainer.innerHTML = `
+<h3>Accidentes por Mes — ${new Date().getFullYear()}</h3>
+<div class="chart-placeholder" style="padding: 0.5rem 0;">
+<canvas id="saludAccidentesChart" style="max-height: 180px;"></canvas>
+</div>
+`;
+chartsGrid.appendChild(chartContainer);
+
+const indicesChartContainer = document.createElement('div');
+indicesChartContainer.className = 'chart-container';
+indicesChartContainer.innerHTML = `
+<h3>Índices de Accidentalidad — ${new Date().getFullYear()}</h3>
+<div class="chart-placeholder" style="padding: 0.5rem 0;">
+<canvas id="saludIndicesChart" style="max-height: 180px;"></canvas>
+</div>
+`;
+chartsGrid.appendChild(indicesChartContainer);
+
+container.appendChild(chartsGrid);
+
+setTimeout(() => {
+this.renderAccidentesChart(cachedData.accidentes || { mensual: Array(12).fill(0) });
+this.renderIndicesChart(cachedData.indicadores || null);
+}, 50);
         
         // Listado de submódulos
         const submodulesContainer = document.createElement('div');
@@ -670,8 +862,10 @@ overflow-y: auto;
 .submodules-container { background: var(--k-bg-card); border: 1px solid var(--k-border); border-radius: var(--k-radius-lg); padding: 1.5rem; box-shadow: var(--k-shadow-sm); margin-top: 0.5rem; }
 .submodules-container h3 { margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem; font-weight: 600; color: var(--k-text-main); padding-bottom: 1rem; border-bottom: 1px solid var(--k-border); text-transform: uppercase; letter-spacing: 0.05em; }
             .chart-container { background: var(--k-bg-card); border: 1px solid var(--k-border); border-radius: var(--k-radius-lg); padding: 1.5rem; box-shadow: var(--k-shadow-sm); min-height: 350px; display: flex; flex-direction: column; }
-            .chart-container h3 { margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem; font-weight: 600; color: var(--k-text-main); text-transform: uppercase; letter-spacing: 0.05em; }
-        `;
+.chart-container h3 { margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem; font-weight: 600; color: var(--k-text-main); text-transform: uppercase; letter-spacing: 0.05em; }
+.charts-grid-salud { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 992px) { .charts-grid-salud { grid-template-columns: 1fr; } }
+`;
         document.head.appendChild(style);
     }
 }

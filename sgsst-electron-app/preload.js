@@ -240,8 +240,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('get-ausentismo-stats', companyName, mode),
 
   // --- Estadísticas de Accidentes FURAT (widget home) ---
-  getAccidentesStats: (companyName) =>
-    ipcRenderer.invoke('get-accidentes-stats', companyName),
+getAccidentesStats: (companyName) =>
+ipcRenderer.invoke('get-accidentes-stats', companyName),
+
+getIndicadoresSaludStats: (companyName) =>
+ipcRenderer.invoke('get-indicadores-salud-stats', companyName),
 
   // --- Estadísticas de Exámenes Médicos (widget home) ---
   getExamenesStats: (companyName) =>

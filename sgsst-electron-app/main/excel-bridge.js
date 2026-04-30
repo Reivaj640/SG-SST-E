@@ -199,14 +199,16 @@ if (!fs.existsSync(EXCEL_INDICADORES)) {
   const frecuenciaMensual = [];
   const severidadMensual = [];
   const ausentismoMensual = [];
+  const eventosMortalesMensual = [];
   let totalAT = 0;
 
   for (let mes = 1; mes <= 12; mes++) {
     const col = mesAColumna(mes);
-    const accidentes = obtenerValor(ws, FILAS.accidentesAT, col);
-    const trabajadores = obtenerValor(ws, FILAS.trabajadoresFreq, col);
-    const diasPerdidos = obtenerValor(ws, FILAS.diasPerdidos, col);
-    const eventosAusencia = obtenerValor(ws, FILAS.eventosAusencia, col);
+const accidentes = obtenerValor(ws, FILAS.accidentesAT, col);
+  const trabajadores = obtenerValor(ws, FILAS.trabajadoresFreq, col);
+  const diasPerdidos = obtenerValor(ws, FILAS.diasPerdidos, col);
+  const eventosAusencia = obtenerValor(ws, FILAS.eventosAusencia, col);
+  const eventosMortalesMes = obtenerValor(ws, FILAS.eventosMortales, col);
     
     console.log(`[EXCEL-BRIDGE] Mes ${mes} (col ${col}): AT=${accidentes}, Trab=${trabajadores}, Dias=${diasPerdidos}, Aus=${eventosAusencia}`);
 
@@ -242,28 +244,37 @@ if (!fs.existsSync(EXCEL_INDICADORES)) {
       indiceSeveridad 
     });
     
-    ausentismoMensual.push({ 
-      mes, 
-      mesLabel: MESES_LABELS[mes-1], 
-      eventosAusencia, 
-      tasaAusentismo 
+ausentismoMensual.push({
+      mes,
+      mesLabel: MESES_LABELS[mes-1],
+      eventosAusencia,
+      tasaAusentismo
+    });
+
+    eventosMortalesMensual.push({
+      mes,
+      mesLabel: MESES_LABELS[mes-1],
+      eventosMortales: eventosMortalesMes
     });
   }
 
-  const mortalidad = obtenerValor(ws, FILAS.eventosMortales, 5);
+const mortalidad = obtenerValor(ws, FILAS.eventosMortales, 5);
   const prevalenciaEL = obtenerValor(ws, FILAS.prevalenciaEL, 5);
+  const metaMortalidad = obtenerValor(ws, FILAS.eventosMortales, COLUMNA_META);
 
   return {
     success: true,
     data: {
-      frecuenciaMensual, 
-      severidadMensual, 
+      frecuenciaMensual,
+      severidadMensual,
       ausentismoMensual,
-      config: { 
-        metaFrecuencia, 
-        metaSeveridad, 
-        mortalidad, 
-        prevalenciaEL 
+      eventosMortalesMensual,
+      config: {
+        metaFrecuencia,
+        metaSeveridad,
+        metaMortalidad,
+        mortalidad,
+        prevalenciaEL
       },
       totalAT2024: totalAT,
     }

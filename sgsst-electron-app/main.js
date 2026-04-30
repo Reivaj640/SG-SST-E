@@ -13333,6 +13333,122 @@ ipcMain.handle('severidad-accidentalidad:escribir-excel', async (event, mes, cam
   }
 });
 
+// =============================================================================
+// Indicadores de Salud - Handler integral (Home Gestion de la Salud)
+// Lee datos de submodulos 3.3.1, 3.3.2, 3.3.3 en una sola llamada
+// =============================================================================
+ipcMain.handle('get-indicadores-salud-stats', async (event, companyName) => {
+try {
+const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+const config = JSON.parse(configData);
+
+const normalizedInput = (companyName || '').toLowerCase();
+const companyKey = Object.keys(config.companyPaths || {}).find(
+  key => key.toLowerCase() === normalizedInput
+);
+
+const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+
+if (!companyConfig || !companyConfig.root) {
+  return {
+    success: false,
+    error: {
+      code: 'COMPANY_NOT_FOUND',
+      message: `Empresa "${companyName}" no encontrada`
+    }
+  };
+}
+
+if (!companyConfig.structure?.structure) {
+  return {
+    success: false,
+    error: {
+      code: 'NO_STRUCTURE',
+      message: `Empresa "${companyName}" no tiene estructura mapeada`
+    }
+  };
+}
+
+const rootStructure = companyConfig.structure.structure;
+
+function findDirFlexible(subdirs, target) {
+  if (!subdirs) return null;
+  const normalizedTarget = target
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  for (const [key, value] of Object.entries(subdirs)) {
+    const normalizedKey = key
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (normalizedKey === normalizedTarget) {
+      return value;
+    }
+  }
+  return null;
+}
+
+var indicadoresPath = null;
+var ubicacionesAPrueba = [
+  { modulo: "3. Gestion de la Salud", submodulo: "3.3.1 Frecuencia de la Accidentalidad" },
+  { modulo: "3. Gestion de la Salud", submodulo: "3.2.3 Frecuencia de la Accidentalidad" },
+  { modulo: "6. Verificacion", submodulo: "6.1.1 Definicion de indicadores" },
+  { modulo: "6. Verificación", submodulo: "6.1.1 Definición de indicadores" },
+];
+
+for (var i = 0; i < ubicacionesAPrueba.length; i++) {
+  var loc = ubicacionesAPrueba[i];
+  var modulo = findDirFlexible(rootStructure.subdirectories, loc.modulo);
+  if (modulo && modulo.subdirectories) {
+    var submodulo = findDirFlexible(modulo.subdirectories, loc.submodulo);
+    if (submodulo) {
+      indicadoresPath = submodulo;
+      break;
+    }
+  }
+}
+
+if (!indicadoresPath) {
+  for (var key in rootStructure.subdirectories) {
+    if (key.toLowerCase().includes('indicador') || key.toLowerCase().includes('frecuencia')) {
+      indicadoresPath = rootStructure.subdirectories[key];
+      break;
+    }
+  }
+}
+
+if (!indicadoresPath) {
+  return {
+    success: false,
+    error: {
+      code: 'SUBMODULE_NOT_FOUND',
+      message: 'No se encontró carpeta de indicadores'
+    }
+  };
+}
+
+excelBridge.configurarRutasConRuta(indicadoresPath.path);
+
+const result = await excelBridge.leerIndicadores();
+
+return result;
+} catch (error) {
+console.error('[IndicadoresSalud] Error:', error);
+return {
+  success: false,
+  error: {
+    code: 'INDICADORES_READ_ERROR',
+    message: error.message
+  }
+};
+}
+});
+
 // Índice de Mortalidad - Handlers IPC (Submódulo 3.3.3)
 // =============================================================================
 
