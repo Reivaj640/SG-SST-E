@@ -520,31 +520,44 @@ var btnClone = getElement('btnCloneYear');
 if (btnClone) {
   btnClone.addEventListener('click', function() {
     if (!currentYear) {
-      showToast('Seleccione un año primero', 'warning');
+      window.updateNotifier.show({ type: 'warning', title: 'Año no seleccionado', subtitle: 'Seleccione un año primero', autoClose: 4000 });
       return;
     }
     var nextYear = currentYear + 1;
-    if (!confirm('¿Duplicar archivo de ' + currentYear + ' para el año ' + nextYear + '?\nSe conservarán metas y trabajadores, se limpiarán datos de ejecución.')) return;
 
-    var currentFile = availableFiles.find(function(f) { return f.year === currentYear; });
-    if (!currentFile) {
-      showToast('No se encontró el archivo actual', 'error');
-      return;
-    }
+    window.updateNotifier.show({
+      type: 'warning',
+      title: 'Duplicar Archivo',
+      subtitle: '¿Duplicar INDICADORES ' + currentYear + ' para ' + nextYear + '?',
+      message: 'Se conservarán metas y trabajadores. Datos de ejecución se limpiarán.',
+      buttonText: 'Duplicar',
+      onClick: function() {
+        window.updateNotifier.remove(window.updateNotifier.currentToast);
 
-    window.electronAPI.duplicateIndicadoresFile({
-      currentFilePath: currentFile.filePath,
-      newYear: nextYear
-    }).then(function(result) {
-      if (result.success) {
-        showToast('Archivo duplicado: ' + result.newFileName);
-        currentYear = nextYear;
-        cargarDatos();
-      } else {
-        showToast(result.error && result.error.message || 'Error al duplicar', 'error');
-      }
-    })['catch'](function(e) {
-      showToast('Error: ' + e.message, 'error');
+        var currentFile = availableFiles.find(function(f) { return f.year === currentYear; });
+        if (!currentFile) {
+          window.updateNotifier.show({ type: 'error', title: 'Archivo no encontrado', subtitle: 'No se encontró el archivo actual', autoClose: 5000 });
+          return;
+        }
+
+        window.updateNotifier.show({ type: 'info', title: 'Duplicando Archivo', subtitle: 'Creando INDICADORES ' + nextYear + '.xlsx...', progress: { percent: 0 }, autoClose: 0 });
+
+        window.electronAPI.duplicateIndicadoresFile({
+          currentFilePath: currentFile.filePath,
+          newYear: nextYear
+        }).then(function(result) {
+          if (result.success) {
+            window.updateNotifier.show({ type: 'success', title: 'Archivo Duplicado', subtitle: result.newFileName, message: 'Metas y trabajadores conservados. Datos de ejecución limpiados.', autoClose: 5000 });
+            currentYear = nextYear;
+            cargarDatos();
+          } else {
+            window.updateNotifier.show({ type: 'error', title: 'Error al Duplicar', subtitle: result.error && result.error.message || 'Error desconocido', autoClose: 6000 });
+          }
+        })['catch'](function(e) {
+          window.updateNotifier.show({ type: 'error', title: 'Error Inesperado', subtitle: e.message, autoClose: 6000 });
+        });
+      },
+      autoClose: 0
     });
   });
 }
