@@ -8496,27 +8496,42 @@ ipcMain.handle('get-inducciones-data', async (event, companyName) => {
         // Col I (8): Cargo
         // Col L (11): Género
 
-        inducciones.push({
-            id: i,
-            date: fecha || '',
-            year: row[4] || '',
-            name: empleado,
-            idCard: row[7] || 'N/A',
-            position: row[8] || 'N/A',
-            gender: row[11] || '',
-            score: row[1] || '0 / 22',
-            status: (row[2] && row[2].toString().toLowerCase().includes('aprob')) ? 'approved' : 'failed'
-        });
-    }
-
-    return { success: true, data: inducciones, filePath };
-  } catch (error) {
-    sendLog(`[MAIN] Error en get-inducciones-data: ${error.message}`, 'ERROR');
-    return { success: false, error: error.message };
-  }
+let rawScore = row[1];
+let numericScore = 0;
+if (typeof rawScore === 'number') {
+  numericScore = rawScore;
+} else if (typeof rawScore === 'string') {
+  const parsed = parseFloat(rawScore);
+  numericScore = isNaN(parsed) ? 0 : parsed;
+}
+let status;
+const colC = row[2] ? row[2].toString().toLowerCase().trim() : '';
+if (colC.includes('aprob') && !colC.includes('reprob')) {
+  status = 'approved';
+} else if (colC.includes('reprob')) {
+  status = 'failed';
+} else {
+  status = numericScore >= 20 ? 'approved' : 'failed';
+}
+inducciones.push({
+  id: i,
+  date: fecha || '',
+  year: row[4] || '',
+  name: empleado,
+  idCard: row[7] || 'N/A',
+  position: row[8] || 'N/A',
+  gender: row[11] || '',
+score: numericScore,
+status: status
 });
+}
 
-// ============================================================================
+return { success: true, data: inducciones, filePath };
+} catch (error) {
+sendLog(`[MAIN] Error en get-inducciones-data: ${error.message}`, 'ERROR');
+return { success: false, error: error.message };
+}
+});
 // INDUCCIONES - Actualizar Excel Power Query (COM Automation via VBScript)
 // ============================================================================
 async function refreshExcelPowerQuery(filePath) {
@@ -8917,20 +8932,37 @@ ipcMain.handle('sync-inducciones-from-forms', async (event, companyName) => {
             fecha = fecha.toISOString().split('T')[0];
         }
 
+        let rawScore = row[1];
+        let numericScore = 0;
+        if (typeof rawScore === 'number') {
+          numericScore = rawScore;
+        } else if (typeof rawScore === 'string') {
+          const parsed = parseFloat(rawScore);
+          numericScore = isNaN(parsed) ? 0 : parsed;
+        }
+        let status;
+        const colC = row[2] ? row[2].toString().toLowerCase().trim() : '';
+        if (colC.includes('aprob') && !colC.includes('reprob')) {
+          status = 'approved';
+        } else if (colC.includes('reprob')) {
+          status = 'failed';
+        } else {
+          status = numericScore >= 20 ? 'approved' : 'failed';
+        }
         inducciones.push({
-            id: i,
-            date: fecha || '',
-            year: row[4] || '',
-            name: empleado,
-            idCard: row[7] || 'N/A',
-            position: row[8] || 'N/A',
-            gender: row[11] || '',
-            score: row[1] || '0 / 22',
-            status: (row[2] && row[2].toString().toLowerCase().includes('aprob')) ? 'approved' : 'failed'
+          id: i,
+          date: fecha || '',
+          year: row[4] || '',
+          name: empleado,
+          idCard: row[7] || 'N/A',
+          position: row[8] || 'N/A',
+          gender: row[11] || '',
+          score: numericScore,
+          status: status
         });
-    }
+      }
 
-    // Obtener stats del archivo
+      // Obtener stats del archivo
     const stats = await fsp.stat(filePath);
     
     sendLog(`[MAIN] Sincronización completada: ${inducciones.length} registros`, 'INFO');

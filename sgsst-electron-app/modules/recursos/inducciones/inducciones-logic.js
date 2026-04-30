@@ -37,41 +37,47 @@ class InduccionesComponent {
         }
     }
 
-    async loadData() {
-        try {
-            console.log('🔄 [Inducciones] Cargando datos reales para:', this.currentCompany);
-            this.showToast('Cargando datos desde Excel...', 'info');
+  async loadData() {
+    const notifier = window.updateNotifier;
+    try {
+      console.log('🔄 [Inducciones] Cargando datos reales para:', this.currentCompany);
 
-            if (!window.electronAPI || !window.electronAPI.getInduccionesData) {
-                throw new Error('API de inducciones no disponible');
-            }
+      if (!window.electronAPI || !window.electronAPI.getInduccionesData) {
+        throw new Error('API de inducciones no disponible');
+      }
 
-            const result = await window.electronAPI.getInduccionesData(this.currentCompany);
+      const result = await window.electronAPI.getInduccionesData(this.currentCompany);
 
-            if (result.success) {
-                console.log('✅ [Inducciones] Datos cargados:', result.data.length, 'registros');
-                this.state.data = result.data;
-                this.state.currentHash = result.currentHash || null;
-                this.state.lastSyncTime = new Date();
-                
-                this.populateYearFilter();
-                this.applyFilters();
-                this.switchView('dashboard');
-                this.showToast(`Se cargaron ${result.data.length} registros exitosamente`, 'success');
-                
-                // Verificar si hay cambios disponibles después de cargar
-                setTimeout(() => this.checkForChanges(), 1000);
-            } else {
-                console.warn('⚠️ [Inducciones] No se pudieron cargar datos reales:', result.error);
-                this.showToast('No se encontró el archivo Excel. Usando datos de ejemplo.', 'warning');
-                this.loadSampleData();
-            }
-        } catch (error) {
-            console.error('❌ [Inducciones] Error en loadData:', error);
-            this.showToast('Error al acceder al archivo Excel', 'danger');
-            this.loadSampleData();
+      if (result.success) {
+        console.log('✅ [Inducciones] Datos cargados:', result.data.length, 'registros');
+        this.state.data = result.data;
+        this.state.currentHash = result.currentHash || null;
+        this.state.lastSyncTime = new Date();
+
+        this.populateYearFilter();
+        this.applyFilters();
+        this.switchView('dashboard');
+
+        if (notifier) {
+          notifier.show({ type: 'success', title: 'Datos Cargados', subtitle: `${result.data.length} registros cargados desde Excel`, autoClose: 3000 });
         }
+
+        setTimeout(() => this.checkForChanges(), 1000);
+      } else {
+        console.warn('⚠️ [Inducciones] No se pudieron cargar datos reales:', result.error);
+        if (notifier) {
+          notifier.show({ type: 'warning', title: 'Archivo no encontrado', subtitle: 'Usando datos de ejemplo', autoClose: 4000 });
+        }
+        this.loadSampleData();
+      }
+    } catch (error) {
+      console.error('❌ [Inducciones] Error en loadData:', error);
+      if (notifier) {
+        notifier.show({ type: 'error', title: 'Error', subtitle: 'Error al acceder al archivo Excel', autoClose: 5000 });
+      }
+      this.loadSampleData();
     }
+  }
 
     loadSampleData() {
         this.state.data = [
@@ -543,36 +549,54 @@ class InduccionesComponent {
     /**
      * Sincroniza datos desde Google Forms (actualiza Excel y recarga datos)
      */
-    async syncFromForms() {
-        try {
-            this.setSyncStatus('syncing', 'Sincronizando...');
-            this.showToast('Actualizando datos desde Google Forms...', 'info');
+  async syncFromForms() {
+    const btn = document.getElementById('btn-sync-manual');
+    const icon = document.getElementById('sync-icon');
+    const notifier = window.updateNotifier;
 
-            if (!window.electronAPI || !window.electronAPI.syncInduccionesFromForms) {
-                throw new Error('API de sincronización no disponible');
-            }
+    try {
+      if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+      if (icon) { icon.classList.add('bi-spin'); icon.style.animation = 'spin 1s linear infinite'; }
+      this.setSyncStatus('syncing', 'Sincronizando...');
 
-            const result = await window.electronAPI.syncInduccionesFromForms(this.currentCompany);
+      if (notifier) {
+        notifier.show({ type: 'info', title: 'Sincronizando', subtitle: 'Actualizando datos desde Google Forms...', progress: { percent: 0 }, autoClose: 0 });
+      }
 
-            if (result.success) {
-                console.log('✅ [Inducciones] Sincronización completada:', result.data.length, 'registros');
-                this.state.data = result.data;
-                this.state.currentHash = result.currentHash;
-                this.state.lastSyncTime = new Date();
-                
-                this.populateYearFilter();
-                this.applyFilters();
-                this.setSyncStatus('synced', `Sincronizado ${new Date().toLocaleTimeString()}`);
-                this.showToast(`✓ ${result.message}`, 'success');
-            } else {
-                throw new Error(result.error || 'Error en sincronización');
-            }
-        } catch (error) {
-            console.error('❌ [Inducciones] Error en sincronización:', error);
-            this.setSyncStatus('error', 'Error en sincronización');
-            this.showToast(`Error: ${error.message}`, 'danger');
+      if (!window.electronAPI || !window.electronAPI.syncInduccionesFromForms) {
+        throw new Error('API de sincronización no disponible');
+      }
+
+      const result = await window.electronAPI.syncInduccionesFromForms(this.currentCompany);
+
+      if (result.success) {
+        console.log('✅ [Inducciones] Sincronización completada:', result.data.length, 'registros');
+        this.state.data = result.data;
+        this.state.currentHash = result.currentHash;
+        this.state.lastSyncTime = new Date();
+
+        this.populateYearFilter();
+        this.applyFilters();
+        this.setSyncStatus('synced', `Sincronizado ${new Date().toLocaleTimeString()}`);
+
+        if (notifier) {
+          notifier.show({ type: 'success', title: 'Sincronización Completa', subtitle: result.message || `${result.data.length} registros actualizados`, autoClose: 5000 });
         }
+      } else {
+        throw new Error(result.error || 'Error en sincronización');
+      }
+    } catch (error) {
+      console.error('❌ [Inducciones] Error en sincronización:', error);
+      this.setSyncStatus('error', 'Error en sincronización');
+
+      if (notifier) {
+        notifier.show({ type: 'error', title: 'Error de Sincronización', subtitle: error.message, autoClose: 6000 });
+      }
+    } finally {
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+      if (icon) { icon.classList.remove('bi-spin'); icon.style.animation = ''; }
     }
+  }
 
     /**
      * Actualiza el indicador de estado de sincronización
@@ -582,12 +606,13 @@ class InduccionesComponent {
     const textEl = document.getElementById('sync-status-text');
 
     if (statusEl) {
+      statusEl.style.display = 'inline-flex';
       statusEl.className = 'k-sync-status';
 
       switch (status) {
         case 'syncing':
           statusEl.classList.add('syncing');
-          statusEl.innerHTML = '<i class="bi bi-arrow-clockwise"></i>';
+          statusEl.innerHTML = '<i class="bi bi-arrow-clockwise" style="animation:spin 1s linear infinite;"></i>';
           break;
         case 'synced':
           statusEl.innerHTML = '<i class="bi bi-check-circle-fill" style="color: var(--k-success);"></i>';
@@ -599,10 +624,11 @@ class InduccionesComponent {
         default:
           statusEl.innerHTML = '<i class="bi bi-check-circle-fill" style="color: var(--k-success);"></i>';
       }
+    }
 
-      if (textEl && text) {
-        textEl.textContent = text;
-      }
+    if (textEl) {
+      textEl.style.display = 'inline';
+      if (text) textEl.textContent = text;
     }
   }
 

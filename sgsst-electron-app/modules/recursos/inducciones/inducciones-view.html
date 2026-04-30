@@ -46,10 +46,12 @@
         <span id="header-company-text">—</span>
       </span>
       <div class="kair-header__divider"></div>
-      <button class="kair-header__action--ghost" id="btn-sync-manual" title="Sincronizar con Google Forms">
-        <i class="bi bi-arrow-clockwise"></i>
-        Sincronizar
-      </button>
+        <button class="kair-header__action--ghost" id="btn-sync-manual" title="Sincronizar con Google Forms">
+          <i class="bi bi-arrow-clockwise" id="sync-icon"></i>
+          Sincronizar
+        </button>
+        <span id="sync-status" class="k-sync-status" style="margin-left:0.25rem;display:none;"></span>
+        <span id="sync-status-text" style="font-size:0.7rem;color:var(--k-text-muted);display:none;"></span>
       <button class="kair-header__action--ghost" id="btn-export-excel" title="Exportar datos">
         <i class="bi bi-file-earmark-excel"></i>
         Exportar
