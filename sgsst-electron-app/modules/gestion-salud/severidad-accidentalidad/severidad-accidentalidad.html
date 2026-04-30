@@ -27,16 +27,22 @@
           <li class="kair-header__breadcrumb--active">3.3.2 Severidad de la Accidentalidad</li>
         </ol>
       </div>
-      <div class="kair-header__right">
-        <span class="kair-header__company">
-          <i class="bi bi-building"></i>
-          <span id="header-company-text">—</span>
-        </span>
-        <div class="kair-header__divider"></div>
-        <button class="kair-header__action--ghost" id="btnRefrescar" title="Refrescar datos">
-          <i class="bi bi-arrow-clockwise"></i> Refrescar
-        </button>
-      </div>
+<div class="kair-header__right">
+      <span class="kair-header__company">
+        <i class="bi bi-building"></i>
+        <span id="header-company-text">—</span>
+      </span>
+      <div class="kair-header__divider"></div>
+      <label style="font-size:0.75rem;color:var(--kair-text-sec);margin-right:4px;">Año:</label>
+      <select id="yearFilter" style="font-size:0.8rem;padding:2px 6px;border:1px solid var(--kair-border);border-radius:4px;background:var(--kair-bg-card);color:var(--kair-text-main);cursor:pointer;"></select>
+      <button id="btnCloneYear" title="Clonar a año siguiente" style="background:none;border:1px solid var(--kair-border);border-radius:4px;padding:2px 8px;cursor:pointer;color:var(--kair-text-sec);font-size:0.8rem;">
+        <i class="bi bi-copy"></i>
+      </button>
+      <div class="kair-header__divider"></div>
+      <button class="kair-header__action--ghost" id="btnRefrescar" title="Refrescar datos">
+        <i class="bi bi-arrow-clockwise"></i> Refrescar
+      </button>
+    </div>
     </div>
   </header>
 
@@ -49,8 +55,8 @@
         <span class="kair-dot"></span>
         Vinculado a Excel de origen
       </span>
-      <span class="kair-sync-info">
-        Los cambios se guardan directamente en INDICADORES 2024.xlsx
+<span class="kair-sync-info">
+      Los cambios se guardan directamente en <span id="syncFileName">—</span>
       </span>
     </div>
 
@@ -64,7 +70,7 @@
       <div class="kair-kpi">
         <div class="kair-kpi-label">Días Perdidos Total</div>
         <div class="kair-kpi-value warning" id="kpiDias">-</div>
-        <div class="kair-kpi-sub">Acumulado 2024</div>
+        <div class="kair-kpi-sub">Acumulado <span id="kpiYearLabel">2024</span></div>
       </div>
       <div class="kair-kpi">
         <div class="kair-kpi-label">Trab. Promedio</div>
@@ -194,12 +200,12 @@
           IS = (Días Perdidos / Nº Trabajadores) × 100
         </p>
         <p><strong>Flujo de datos bidireccional:</strong></p>
-        <p class="kair-method-formula">
-          Excel de origen (INDICADORES 2024.xlsx) ↔ Interfaz K+AIR - Sincronización directa
-        </p>
-        <p style="font-size: 0.8rem; color: var(--kair-text-sec); margin-top: 1rem;">
-          <strong>Fuentes:</strong> INDICADORES 2024.xlsx. Resolución 2851 de 2015.
-        </p>
+<p class="kair-method-formula">
+      Excel de origen (<span id="methodFileName">—</span>) ↔ Interfaz K+AIR - Sincronización directa
+      </p>
+      <p style="font-size: 0.8rem; color: var(--kair-text-sec); margin-top: 1rem;">
+        <strong>Fuentes:</strong> <span id="methodSources">—</span>. Resolución 2851 de 2015.
+      </p>
       </div>
     </div>
 

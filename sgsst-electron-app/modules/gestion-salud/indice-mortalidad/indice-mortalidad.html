@@ -30,19 +30,25 @@
 </ol>
 </div>
 <div class="kair-header__right">
-<span class="kair-header__company">
-<i class="bi bi-building"></i>
-<span id="header-company-text">—</span>
-</span>
-<div class="kair-header__divider"></div>
-<button class="kair-header__action--success" id="btnGuardar" style="display:none">
-<i class="bi bi-check-lg"></i>
-<span id="save-label">Guardar (0)</span>
-</button>
-<button class="kair-header__action--ghost" id="btnRefrescar" title="Refrescar datos">
-<i class="bi bi-arrow-clockwise"></i> Refrescar
-</button>
-</div>
+      <span class="kair-header__company">
+        <i class="bi bi-building"></i>
+        <span id="header-company-text">—</span>
+      </span>
+      <div class="kair-header__divider"></div>
+      <label style="font-size:0.75rem;color:var(--kair-text-sec);margin-right:4px;">Año:</label>
+      <select id="yearFilter" style="font-size:0.8rem;padding:2px 6px;border:1px solid var(--kair-border);border-radius:4px;background:var(--kair-bg-card);color:var(--kair-text-main);cursor:pointer;"></select>
+      <button id="btnCloneYear" title="Clonar a año siguiente" style="background:none;border:1px solid var(--kair-border);border-radius:4px;padding:2px 8px;cursor:pointer;color:var(--kair-text-sec);font-size:0.8rem;">
+        <i class="bi bi-copy"></i>
+      </button>
+      <div class="kair-header__divider"></div>
+      <button class="kair-header__action--success" id="btnGuardar" style="display:none">
+        <i class="bi bi-check-lg"></i>
+        <span id="save-label">Guardar (0)</span>
+      </button>
+      <button class="kair-header__action--ghost" id="btnRefrescar" title="Refrescar datos">
+        <i class="bi bi-arrow-clockwise"></i> Refrescar
+      </button>
+    </div>
 </div>
 </header>
 
@@ -56,8 +62,8 @@
 Vinculado a Excel de origen
 </span>
 <span class="kair-sync-info">
-Los cambios se guardan directamente en INDICADORES 2024.xlsx
-</span>
+      Los cambios se guardan directamente en <span id="syncFileName">—</span>
+      </span>
 </div>
 
 <!-- ==================== LOADING ==================== -->
@@ -69,9 +75,9 @@ Los cambios se guardan directamente en INDICADORES 2024.xlsx
 <!-- ==================== KPIs ==================== -->
 <section class="kair-kpis" id="kpiSection" style="display:none">
 <div class="kair-kpi">
-<div class="kair-kpi-label">EVENTOS MORTALES</div>
-<div class="kair-kpi-value" id="kpiEventos">-</div>
-<div class="kair-kpi-sub">Período actual</div>
+  <div class="kair-kpi-label">EVENTOS MORTALES <span id="kpiYearLabel" style="font-weight:400;color:var(--kair-text-sec);"></span></div>
+          <div class="kair-kpi-value" id="kpiEventos">-</div>
+          <div class="kair-kpi-sub">Período actual</div>
 </div>
 <div class="kair-kpi">
 <div class="kair-kpi-label">TASA MORTALIDAD</div>
@@ -187,11 +193,11 @@ Click en una celda para editar. Presione <strong>Enter</strong> para confirmar o
 <h3>Metodología</h3>
 </div>
 <div class="kair-methodology-content">
-<p><strong>Fuente:</strong> <span id="metFuente">SST / ARL y Gestión Humana</span></p>
-<p><strong>Responsable:</strong> <span id="metResponsable">Responsable SGSST</span></p>
-<p><strong>Frecuencia:</strong> <span id="metFrecuencia">-</span></p>
-<p><strong>Definición:</strong> Accidentes mortales presentados en un período determinado</p>
-<p><strong>Interpretación:</strong> Accidentes mortales presentados en un período determinado</p>
+<p><strong>Fuente:</strong> <span id="methodSources">SST / ARL y Gestión Humana</span></p>
+        <p><strong>Responsable:</strong> <span id="metResponsable">Responsable SGSST</span></p>
+        <p><strong>Frecuencia:</strong> <span id="metFrecuencia">-</span></p>
+        <p><strong>Definición:</strong> Accidentes mortales presentados en un período determinado</p>
+        <p><strong>Interpretación:</strong> Accidentes mortales presentados en un período determinado — <span id="methodFileName">—</span></p>
 </div>
 </section>
 

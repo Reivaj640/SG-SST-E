@@ -12952,8 +12952,18 @@ ipcMain.handle('send-remision-by-email', async (event, docPath, extractedData, e
 // Handler: Frecuencia de la Accidentalidad (Submódulo 3.3.1)
 // =============================================================================
 
+var _indicadoresRutas = {};
+
+function _setRuta(submodulo, rutaIndicadores, rutaCaracterizacion) {
+  _indicadoresRutas[submodulo] = { indicadores: rutaIndicadores, caracterizacion: rutaCaracterizacion || null };
+}
+
+function _getRuta(submodulo) {
+  return _indicadoresRutas[submodulo] || null;
+}
+
 // Configurar rutas de archivos Excel para una empresa específica
-ipcMain.handle('frecuencia-accidentalidad:configurar-rutas', async (event, companyName) => {
+ipcMain.handle('frecuencia-accidentalidad:configurar-rutas', async (event, companyName, year) => {
   console.log('[FrecuenciaAccidentalidad][MAIN] ===== HANDLER CALLED =====');
   console.log('[FrecuenciaAccidentalidad][MAIN] companyName recibido:', companyName);
   
@@ -13080,18 +13090,22 @@ ipcMain.handle('frecuencia-accidentalidad:configurar-rutas', async (event, compa
     console.log('[FrecuenciaAccidentalidad][MAIN] indicadoresPath.path:', indicadoresPath.path);
     console.log('[FrecuenciaAccidentalidad][MAIN] Llamando a excelBridge.configurarRutasConRuta()...');
     
-    const rutas = excelBridge.configurarRutasConRuta(indicadoresPath.path);
-    console.log('[FrecuenciaAccidentalidad][MAIN] rutas result:', rutas);
-    console.log('[FrecuenciaAccidentalidad][MAIN] rutas.indicadores:', rutas.indicadores);
-    console.log('[FrecuenciaAccidentalidad][MAIN] rutas.caracterizacion:', rutas.caracterizacion);
-    
-    return {
-      success: true,
-      data: {
-        indicadores: rutas.indicadores ? path.basename(rutas.indicadores) : null,
-        caracterizacion: rutas.caracterizacion ? path.basename(rutas.caracterizacion) : null
-      }
-    };
+const rutas = excelBridge.configurarRutasConRuta(indicadoresPath.path, year);
+console.log('[FrecuenciaAccidentalidad][MAIN] rutas result:', rutas);
+console.log('[FrecuenciaAccidentalidad][MAIN] rutas.indicadores:', rutas.indicadores);
+console.log('[FrecuenciaAccidentalidad][MAIN] rutas.caracterizacion:', rutas.caracterizacion);
+
+_setRuta('frecuencia', rutas.indicadores, rutas.caracterizacion);
+
+return {
+success: true,
+data: {
+indicadores: rutas.indicadores ? path.basename(rutas.indicadores) : null,
+caracterizacion: rutas.caracterizacion ? path.basename(rutas.caracterizacion) : null,
+selectedFile: rutas.selectedFile,
+availableFiles: rutas.availableFiles
+        }
+      };
   } catch (error) {
     console.error('[FrecuenciaAccidentalidad][MAIN] EXCEPTION:', error.message);
     console.error('[FrecuenciaAccidentalidad][MAIN] STACK:', error.stack);
@@ -13107,8 +13121,9 @@ ipcMain.handle('frecuencia-accidentalidad:configurar-rutas', async (event, compa
 
 // Leer indicadores desde Excel de origen
 ipcMain.handle('frecuencia-accidentalidad:leer-indicadores', async () => {
-  try {
-    return await excelBridge.leerIndicadores();
+try {
+var rutas = _getRuta('frecuencia');
+return await excelBridge.leerIndicadores(rutas && rutas.indicadores);
   } catch (error) {
     console.error('[FrecuenciaAccidentalidad] Error leyendo indicadores:', error);
     return { 
@@ -13123,8 +13138,9 @@ ipcMain.handle('frecuencia-accidentalidad:leer-indicadores', async () => {
 
 // Leer caracterización desde Excel de origen
 ipcMain.handle('frecuencia-accidentalidad:leer-caracterizacion', async () => {
-  try {
-    return await excelBridge.leerCaracterizacion();
+try {
+var rutas = _getRuta('frecuencia');
+return await excelBridge.leerCaracterizacion(rutas && rutas.caracterizacion);
   } catch (error) {
     console.error('[FrecuenciaAccidentalidad] Error leyendo caracterización:', error);
     return { 
@@ -13139,8 +13155,9 @@ ipcMain.handle('frecuencia-accidentalidad:leer-caracterizacion', async () => {
 
 // Escribir en Excel de origen
 ipcMain.handle('frecuencia-accidentalidad:escribir-excel', async (event, mes, campos) => {
-  try {
-    return await excelBridge.escribirEnExcel(mes, campos);
+try {
+var rutas = _getRuta('frecuencia');
+return await excelBridge.escribirEnExcel(mes, campos, rutas && rutas.indicadores);
   } catch (error) {
     console.error('[FrecuenciaAccidentalidad] Error escribiendo en Excel:', error);
     return {
@@ -13158,7 +13175,7 @@ ipcMain.handle('frecuencia-accidentalidad:escribir-excel', async (event, mes, ca
 // =============================================================================
 
 // Configurar rutas de archivos Excel para una empresa específica
-ipcMain.handle('severidad-accidentalidad:configurar-rutas', async (event, companyName) => {
+ipcMain.handle('severidad-accidentalidad:configurar-rutas', async (event, companyName, year) => {
   console.log('[SeveridadAccidentalidad][MAIN] ===== HANDLER CALLED =====');
   console.log('[SeveridadAccidentalidad][MAIN] companyName recibido:', companyName);
 
@@ -13228,12 +13245,12 @@ ipcMain.handle('severidad-accidentalidad:configurar-rutas', async (event, compan
 
     var indicadoresPath = null;
 
-    var ubicacionesAPrueba = [
-      { modulo: "3. Gestion de la Salud", submodulo: "3.3.2 Severidad de la Accidentalidad" },
-      { modulo: "3. Gestion de la Salud", submodulo: "3.3.1 Frecuencia de la Accidentalidad" },
-      { modulo: "6. Verificacion", submodulo: "6.1.1 Definicion de indicadores" },
-      { modulo: "6. Verificación", submodulo: "6.1.1 Definición de indicadores" },
-    ];
+var ubicacionesAPrueba = [
+  { modulo: "6. Verificacion", submodulo: "6.1.1 Definicion de indicadores" },
+  { modulo: "6. Verificación", submodulo: "6.1.1 Definición de indicadores" },
+  { modulo: "3. Gestion de la Salud", submodulo: "3.3.2 Severidad de la Accidentalidad" },
+  { modulo: "3. Gestion de la Salud", submodulo: "3.3.1 Frecuencia de la Accidentalidad" },
+];
 
     console.log('[SeveridadAccidentalidad][MAIN] Probando ubicaciones para indicadores...');
 
@@ -13278,16 +13295,20 @@ ipcMain.handle('severidad-accidentalidad:configurar-rutas', async (event, compan
     console.log('[SeveridadAccidentalidad][MAIN] indicadoresPath.path:', indicadoresPath.path);
     console.log('[SeveridadAccidentalidad][MAIN] Llamando a excelBridge.configurarRutasConRuta()...');
 
-    const rutas = excelBridge.configurarRutasConRuta(indicadoresPath.path);
-    console.log('[SeveridadAccidentalidad][MAIN] rutas result:', rutas);
+const rutas = excelBridge.configurarRutasConRuta(indicadoresPath.path, year);
+console.log('[SeveridadAccidentalidad][MAIN] rutas result:', rutas);
 
-    return {
-      success: true,
-      data: {
-        indicadores: rutas.indicadores ? path.basename(rutas.indicadores) : null,
-        caracterizacion: rutas.caracterizacion ? path.basename(rutas.caracterizacion) : null
-      }
-    };
+_setRuta('severidad', rutas.indicadores, rutas.caracterizacion);
+
+return {
+        success: true,
+        data: {
+          indicadores: rutas.indicadores ? path.basename(rutas.indicadores) : null,
+          caracterizacion: rutas.caracterizacion ? path.basename(rutas.caracterizacion) : null,
+          selectedFile: rutas.selectedFile,
+          availableFiles: rutas.availableFiles
+        }
+      };
   } catch (error) {
     console.error('[SeveridadAccidentalidad][MAIN] EXCEPTION:', error.message);
     console.error('[SeveridadAccidentalidad][MAIN] STACK:', error.stack);
@@ -13303,8 +13324,9 @@ ipcMain.handle('severidad-accidentalidad:configurar-rutas', async (event, compan
 
 // Leer indicadores desde Excel de origen
 ipcMain.handle('severidad-accidentalidad:leer-indicadores', async () => {
-  try {
-    return await excelBridge.leerIndicadores();
+try {
+var rutas = _getRuta('severidad');
+return await excelBridge.leerIndicadores(rutas && rutas.indicadores);
   } catch (error) {
     console.error('[SeveridadAccidentalidad] Error leyendo indicadores:', error);
     return {
@@ -13319,8 +13341,9 @@ ipcMain.handle('severidad-accidentalidad:leer-indicadores', async () => {
 
 // Escribir en Excel de origen
 ipcMain.handle('severidad-accidentalidad:escribir-excel', async (event, mes, campos) => {
-  try {
-    return await excelBridge.escribirEnExcel(mes, campos);
+try {
+var rutas = _getRuta('severidad');
+return await excelBridge.escribirEnExcel(mes, campos, rutas && rutas.indicadores);
   } catch (error) {
     console.error('[SeveridadAccidentalidad] Error escribiendo en Excel:', error);
     return {
@@ -13338,8 +13361,9 @@ ipcMain.handle('severidad-accidentalidad:escribir-excel', async (event, mes, cam
 // Lee datos de submodulos 3.3.1, 3.3.2, 3.3.3 en una sola llamada
 // =============================================================================
 ipcMain.handle('get-indicadores-salud-stats', async (event, companyName) => {
-try {
-const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+  try {
+    const currentYear = new Date().getFullYear();
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
 const config = JSON.parse(configData);
 
 const normalizedInput = (companyName || '').toLowerCase();
@@ -13432,7 +13456,7 @@ if (!indicadoresPath) {
   };
 }
 
-excelBridge.configurarRutasConRuta(indicadoresPath.path);
+excelBridge.configurarRutasConRuta(indicadoresPath.path, currentYear);
 
 const result = await excelBridge.leerIndicadores();
 
@@ -13449,11 +13473,157 @@ return {
 }
 });
 
+// =============================================================================
+// Indicadores de Salud - Listar archivos disponibles + Duplicar para nuevo año
+// =============================================================================
+
+ipcMain.handle('get-indicadores-files', async (event, { companyName, submodule }) => {
+  try {
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+
+    const normalizedInput = (companyName || '').toLowerCase();
+    const companyKey = Object.keys(config.companyPaths || {}).find(
+      key => key.toLowerCase() === normalizedInput
+    );
+
+    const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+    if (!companyConfig || !companyConfig.root || !companyConfig.structure?.structure) {
+      return { success: false, error: { code: 'CONFIG_NOT_FOUND' } };
+    }
+
+    const rootStructure = companyConfig.structure.structure;
+
+    function findDirFlexible(subdirs, target) {
+      if (!subdirs) return null;
+      const normalizedTarget = target.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+      for (const [key, value] of Object.entries(subdirs)) {
+        const normalizedKey = key.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+        if (normalizedKey === normalizedTarget) return value;
+      }
+      return null;
+    }
+
+    var searchPaths = [];
+    if (submodule === '3.3.1') {
+      searchPaths = [
+        { modulo: "3. Gestion de la Salud", submodulo: "3.3.1 Frecuencia de la Accidentalidad" },
+        { modulo: "3. Gestion de la Salud", submodulo: "3.2.3 Frecuencia de la Accidentalidad" },
+        { modulo: "6. Verificacion", submodulo: "6.1.1 Definicion de indicadores" },
+      ];
+    } else if (submodule === '3.3.2') {
+      searchPaths = [
+        { modulo: "3. Gestion de la Salud", submodulo: "3.3.2 Severidad de la Accidentalidad" },
+        { modulo: "3. Gestion de la Salud", submodulo: "3.3.1 Frecuencia de la Accidentalidad" },
+        { modulo: "6. Verificacion", submodulo: "6.1.1 Definicion de indicadores" },
+      ];
+    } else if (submodule === '3.3.3') {
+      searchPaths = [
+        { modulo: "3. Gestion de la Salud", submodulo: "3.3.3 Proporcion de accidentes de trabajo mortales" },
+        { modulo: "3. Gestion de la Salud", submodulo: "3.3.3 Indice de Mortalidad" },
+        { modulo: "3. Gestion de la Salud", submodulo: "3.3.3 Proporcion de accidentes mortales" },
+      ];
+    }
+
+    var foundPath = null;
+    for (var i = 0; i < searchPaths.length; i++) {
+      var loc = searchPaths[i];
+      var modulo = findDirFlexible(rootStructure.subdirectories, loc.modulo);
+      if (modulo && modulo.subdirectories) {
+        var submodulo = findDirFlexible(modulo.subdirectories, loc.submodulo);
+        if (submodulo) {
+          foundPath = submodulo;
+          break;
+        }
+      }
+    }
+
+    if (!foundPath) {
+      for (var key in rootStructure.subdirectories) {
+        if (key.toLowerCase().includes('indicador') || key.toLowerCase().includes('frecuencia')) {
+          foundPath = rootStructure.subdirectories[key];
+          break;
+        }
+      }
+    }
+
+    if (!foundPath) {
+      return { success: false, error: { code: 'SUBMODULE_NOT_FOUND' } };
+    }
+
+    const availableFiles = excelBridge.listarIndicadoresFiles(foundPath.path);
+    return { success: true, files: availableFiles, folderPath: foundPath.path };
+  } catch (error) {
+    return { success: false, error: { code: 'LIST_FILES_ERROR', message: error.message } };
+  }
+});
+
+ipcMain.handle('duplicate-indicadores-file', async (event, { currentFilePath, newYear }) => {
+  try {
+    if (!currentFilePath || !fs.existsSync(currentFilePath)) {
+      return { success: false, error: { code: 'FILE_NOT_FOUND', message: 'Archivo origen no encontrado' } };
+    }
+
+    const dir = path.dirname(currentFilePath);
+    const ext = path.extname(currentFilePath);
+    const baseName = path.basename(currentFilePath, ext);
+
+    const yearMatch = baseName.match(/(20\d{2})/);
+    let newFileName;
+    if (yearMatch) {
+      newFileName = baseName.replace(yearMatch[1], String(newYear)) + ext;
+    } else {
+      newFileName = baseName + ' ' + newYear + ext;
+    }
+
+    const newFilePath = path.join(dir, newFileName);
+
+    if (fs.existsSync(newFilePath)) {
+      return { success: false, error: { code: 'FILE_EXISTS', message: `Ya existe "${newFileName}"` } };
+    }
+
+    fs.copyFileSync(currentFilePath, newFilePath);
+
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(newFilePath);
+
+    const ROWS_TO_CLEAR = [9, 11, 13, 15, 17, 19, 20];
+    const DATA_COLS = [5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27];
+
+    workbook.eachSheet(function(worksheet) {
+      ROWS_TO_CLEAR.forEach(function(rowNum) {
+        const row = worksheet.getRow(rowNum);
+        if (row) {
+          DATA_COLS.forEach(function(colNum) {
+            const cell = row.getCell(colNum);
+            if (cell && cell.type !== ExcelJS.ValueType.Null) {
+              cell.value = 0;
+            }
+          });
+        }
+      });
+    });
+
+    await workbook.xlsx.writeFile(newFilePath);
+
+    return {
+      success: true,
+      newFilePath: newFilePath,
+      newFileName: newFileName,
+      message: `Archivo duplicado como "${newFileName}" con datos de ejecución limpiados`
+    };
+  } catch (error) {
+    console.error('[duplicate-indicadores-file] Error:', error);
+    return { success: false, error: { code: 'DUPLICATE_ERROR', message: error.message } };
+  }
+});
+
 // Índice de Mortalidad - Handlers IPC (Submódulo 3.3.3)
 // =============================================================================
 
 // Configurar rutas de archivos Excel para una empresa específica
-ipcMain.handle('mortalidad:configurar-rutas', async (event, companyName) => {
+ipcMain.handle('mortalidad:configurar-rutas', async (event, companyName, year) => {
   console.log('[IndiceMortalidad][MAIN] ===== HANDLER CALLED =====');
   console.log('[IndiceMortalidad][MAIN] companyName recibido:', companyName);
 
@@ -13517,11 +13687,13 @@ ipcMain.handle('mortalidad:configurar-rutas', async (event, companyName) => {
 
     // Buscar carpeta de indicadores - probar múltiples ubicaciones
     var mortalidadPath = null;
-    var ubicacionesAPrueba = [
-      { modulo: "3. Gestion de la Salud", submodulo: "3.3.3 Proporcion de accidentes de trabajo mortales" },
-      { modulo: "3. Gestion de la Salud", submodulo: "3.3.3 Indice de Mortalidad" },
-      { modulo: "3. Gestion de la Salud", submodulo: "3.3.3 Proporcion de accidentes mortales" },
-    ];
+var ubicacionesAPrueba = [
+  { modulo: "6. Verificacion", submodulo: "6.1.1 Definicion de indicadores" },
+  { modulo: "6. Verificación", submodulo: "6.1.1 Definición de indicadores" },
+  { modulo: "3. Gestion de la Salud", submodulo: "3.3.3 Proporcion de accidentes de trabajo mortales" },
+  { modulo: "3. Gestion de la Salud", submodulo: "3.3.3 Indice de Mortalidad" },
+  { modulo: "3. Gestion de la Salud", submodulo: "3.3.3 Proporcion de accidentes mortales" },
+];
 
     for (var i = 0; i < ubicacionesAPrueba.length; i++) {
       var loc = ubicacionesAPrueba[i];
@@ -13548,14 +13720,18 @@ ipcMain.handle('mortalidad:configurar-rutas', async (event, companyName) => {
 
     console.log('[IndiceMortalidad][MAIN] mortalidadPath.path:', mortalidadPath.path);
 
-    const rutas = excelBridge.configurarRutasConRuta(mortalidadPath.path);
+const rutas = excelBridge.configurarRutasConRuta(mortalidadPath.path, year);
 
-    return {
-      success: true,
-      data: {
-        indicadores: rutas.indicadores ? path.basename(rutas.indicadores) : null
-      }
-    };
+_setRuta('mortalidad', rutas.indicadores, null);
+
+return {
+        success: true,
+        data: {
+          indicadores: rutas.indicadores ? path.basename(rutas.indicadores) : null,
+          selectedFile: rutas.selectedFile,
+          availableFiles: rutas.availableFiles
+        }
+      };
   } catch (error) {
     console.error('[IndiceMortalidad][MAIN] EXCEPTION:', error.message);
     return {
@@ -13570,8 +13746,9 @@ ipcMain.handle('mortalidad:configurar-rutas', async (event, companyName) => {
 
 // Leer indicadores desde Excel de origen
 ipcMain.handle('mortalidad:leer-indicadores', async () => {
-  try {
-    return await excelBridge.leerIndicadoresMortalidad();
+try {
+var rutas = _getRuta('mortalidad');
+return await excelBridge.leerIndicadoresMortalidad(rutas && rutas.indicadores);
   } catch (error) {
     console.error('[IndiceMortalidad] Error leyendo indicadores:', error);
     return {
@@ -13586,8 +13763,9 @@ ipcMain.handle('mortalidad:leer-indicadores', async () => {
 
 // Escribir en Excel de origen
 ipcMain.handle('mortalidad:escribir-excel', async (event, mes, campos) => {
-  try {
-    return await excelBridge.escribirEnExcelMortalidad(mes, campos);
+try {
+var rutas = _getRuta('mortalidad');
+return await excelBridge.escribirEnExcelMortalidad(mes, campos, rutas && rutas.indicadores);
   } catch (error) {
     console.error('[IndiceMortalidad] Error escribiendo en Excel:', error);
     return {

@@ -97,74 +97,107 @@ function configurarRutas(companyRoot) {
 }
 
 // ── Configurar rutas CON Ruta específica del submódulo ──
-function configurarRutasConRuta(submodulePath) {
-  console.log('[FrecuenciaAccidentalidad][EXCEL-BRIDGE] ===== configurarRutasConRuta =====');
-  console.log('[FrecuenciaAccidentalidad][EXCEL-BRIDGE] submodulePath:', submodulePath);
-  
+function listarIndicadoresFiles(submodulePath) {
+  if (!submodulePath || !fs.existsSync(submodulePath)) {
+    return [];
+  }
+  const files = fs.readdirSync(submodulePath);
+  const indicadoresFiles = files.filter(f => f.toLowerCase().includes("indicadores") && f.endsWith(".xlsx"));
+  return indicadoresFiles.map(f => {
+    const yearMatch = f.match(/(20\d{2})/);
+    return {
+      fileName: f,
+      year: yearMatch ? parseInt(yearMatch[1]) : null,
+      filePath: path.join(submodulePath, f)
+    };
+  }).sort((a, b) => (b.year || 0) - (a.year || 0));
+}
+
+function configurarRutasConRuta(submodulePath, year) {
+  console.log('[EXCEL-BRIDGE] ===== configurarRutasConRuta =====');
+  console.log('[EXCEL-BRIDGE] submodulePath:', submodulePath, '| year:', year);
+
   if (!submodulePath) {
-    console.log('[FrecuenciaAccidentalidad][EXCEL-BRIDGE] ERROR: Ruta no proporcionada');
     throw new Error("Ruta del submódulo no proporcionada");
   }
-  
-  const exists = fs.existsSync(submodulePath);
-  console.log('[FrecuenciaAccidentalidad][EXCEL-BRIDGE] Carpeta existe:', exists);
-  
-  if (!exists) {
-    console.log('[FrecuenciaAccidentalidad][EXCEL-BRIDGE] ERROR: Carpeta no existe');
+
+  if (!fs.existsSync(submodulePath)) {
     throw new Error("Carpeta no encontrada: " + submodulePath);
   }
-  
+
   const files = fs.readdirSync(submodulePath);
-  console.log('[FrecuenciaAccidentalidad][EXCEL-BRIDGE] Archivos en carpeta:', files.length);
-  files.forEach(function(f) {
-    console.log('[FrecuenciaAccidentalidad][EXCEL-BRIDGE]   -', f);
-  });
-  
-  // Priorizar INDICADORES 2024.xlsx sobre otros archivos
   const indicadoresFiles = files.filter(f => f.toLowerCase().includes("indicadores") && f.endsWith(".xlsx"));
-  let indicadoresFile = indicadoresFiles.find(f => f.toLowerCase().includes("2024"));
-  if (!indicadoresFile && indicadoresFiles.length > 0) {
-    indicadoresFile = indicadoresFiles[0];
+
+  let indicadoresFile = null;
+
+  if (year) {
+    indicadoresFile = indicadoresFiles.find(f => f.includes(String(year)));
   }
+
+  if (!indicadoresFile) {
+    const currentYear = new Date().getFullYear();
+    indicadoresFile = indicadoresFiles.find(f => f.includes(String(currentYear)));
+  }
+
+  if (!indicadoresFile && indicadoresFiles.length > 0) {
+    const withYear = indicadoresFiles.filter(f => f.match(/20\d{2}/));
+    if (withYear.length > 0) {
+      withYear.sort((a, b) => {
+        const ya = parseInt(a.match(/20\d{2}/)[0]);
+        const yb = parseInt(b.match(/20\d{2}/)[0]);
+        return yb - ya;
+      });
+      indicadoresFile = withYear[0];
+    } else {
+      indicadoresFile = indicadoresFiles[0];
+    }
+  }
+
+  const availableFiles = listarIndicadoresFiles(submodulePath);
   const caracterizacionFile = files.find(f => f.toLowerCase().includes("caracterización") && f.endsWith(".xlsx"));
-  
-  console.log('[FrecuenciaAccidentalidad][EXCEL-BRIDGE] indicadoresFile:', indicadoresFile);
-  console.log('[FrecuenciaAccidentalidad][EXCEL-BRIDGE] caracterizacionFile:', caracterizacionFile);
-  
+
+  console.log('[EXCEL-BRIDGE] indicadoresFile:', indicadoresFile);
+  console.log('[EXCEL-BRIDGE] availableFiles:', availableFiles.length);
+
   if (indicadoresFile) {
     EXCEL_INDICADORES = path.join(submodulePath, indicadoresFile);
-    console.log('[FrecuenciaAccidentalidad][EXCEL-BRIDGE] EXCEL_INDICADORES:', EXCEL_INDICADORES);
+  } else {
+    EXCEL_INDICADORES = null;
   }
-  
+
   if (caracterizacionFile) {
     EXCEL_CARACTERIZACION = path.join(submodulePath, caracterizacionFile);
-    console.log('[FrecuenciaAccidentalidad][EXCEL-BRIDGE] EXCEL_CARACTERIZACION:', EXCEL_CARACTERIZACION);
   }
-  
+
   return {
     indicadores: EXCEL_INDICADORES,
-    caracterizacion: EXCEL_CARACTERIZACION
+    caracterizacion: EXCEL_CARACTERIZACION,
+    selectedFile: indicadoresFile || null,
+    availableFiles: availableFiles
   };
 }
 
 // ============================================================
 // LECTURA desde Excel de origen (INDICADORES)
 // ============================================================
+// LECTURA desde Excel de origen (INDICADORES)
+// ============================================================
 
-async function leerIndicadores() {
-  if (!EXCEL_INDICADORES) {
-    throw new Error("Ruta de INDICADORES no configurada");
-  }
-  
-if (!fs.existsSync(EXCEL_INDICADORES)) {
-    throw new Error("Archivo no encontrado: " + EXCEL_INDICADORES);
-  }
+async function leerIndicadores(rutaOverride) {
+var ruta = rutaOverride || EXCEL_INDICADORES;
+if (!ruta) {
+throw new Error("Ruta de INDICADORES no configurada");
+}
 
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.readFile(EXCEL_INDICADORES);
+if (!fs.existsSync(ruta)) {
+throw new Error("Archivo no encontrado: " + ruta);
+}
+
+const workbook = new ExcelJS.Workbook();
+await workbook.xlsx.readFile(ruta);
   
   // Buscar hoja - probar múltiples nombres
-  console.log('[EXCEL-BRIDGE] Buscando hoja en', EXCEL_INDICADORES);
+  console.log('[EXCEL-BRIDGE] Buscando hoja en', ruta);
   var hojaNombres = [
     "TASA DE ACCIDENTALIDAD",
     "DATOS Y GRÁFICOS RESULTADO", 
@@ -285,29 +318,29 @@ const mortalidad = obtenerValor(ws, FILAS.eventosMortales, 5);
 // LECTURA de Caracterización (Dashboard)
 // ============================================================
 
-async function leerCaracterizacion() {
-  if (!EXCEL_CARACTERIZACION) {
-    // Si no hay archivo de caracterización, retornar datos vacíos
-    return {
-      success: true,
-      data: {
-        historialAnual: [],
-        severidadDesglose: [],
-        severidadGenero: [],
-        empresaDesglose: [],
-        tipoEvento: [],
-        mesHistorico: [],
-        totalGeneral: 0
-      }
-    };
-  }
-  
-  if (!fs.existsSync(EXCEL_CARACTERIZACION)) {
-    throw new Error(`Archivo no encontrado: ${EXCEL_CARACTERIZACION}`);
-  }
+async function leerCaracterizacion(rutaOverride) {
+var ruta = rutaOverride || EXCEL_CARACTERIZACION;
+if (!ruta) {
+return {
+success: true,
+data: {
+historialAnual: [],
+severidadDesglose: [],
+severidadGenero: [],
+empresaDesglose: [],
+tipoEvento: [],
+mesHistorico: [],
+totalGeneral: 0
+}
+};
+}
 
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.readFile(EXCEL_CARACTERIZACION);
+if (!fs.existsSync(ruta)) {
+throw new Error(`Archivo no encontrado: ${ruta}`);
+}
+
+const workbook = new ExcelJS.Workbook();
+await workbook.xlsx.readFile(ruta);
   const ws = workbook.getWorksheet("Data");
   
   if (!ws) throw new Error("Hoja 'Data' no encontrada en Caracterización");
@@ -413,15 +446,16 @@ async function leerCaracterizacion() {
 // ESCRITURA directa al Excel de origen
 // ============================================================
 
-async function escribirEnExcel(mes, campos) {
-  if (mes < 1 || mes > 12) throw new Error("Mes debe ser 1-12");
-  
-  if (!EXCEL_INDICADORES) {
-    throw new Error("Ruta de INDICADORES no configurada");
-  }
+async function escribirEnExcel(mes, campos, rutaOverride) {
+if (mes < 1 || mes > 12) throw new Error("Mes debe ser 1-12");
 
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.readFile(EXCEL_INDICADORES);
+var ruta = rutaOverride || EXCEL_INDICADORES;
+if (!ruta) {
+throw new Error("Ruta de INDICADORES no configurada");
+}
+
+const workbook = new ExcelJS.Workbook();
+await workbook.xlsx.readFile(ruta);
   const ws = workbook.getWorksheet(HOJA_DATOS);
   
   if (!ws) throw new Error("Hoja no encontrada: " + HOJA_DATOS);
@@ -469,34 +503,34 @@ const FILAS_MORTALIDAD = {
   trabajadores: 14,
 };
 
-async function leerIndicadoresMortalidad() {
-  if (!EXCEL_INDICADORES) {
-    // Si no hay INDICADORES, retornar datos demo
-    return {
-      success: true,
-      data: {
-        eventos: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        trabajadores: 150,
-        meta: 0,
-        frecuencia: 'Anual'
-      }
-    };
-  }
+async function leerIndicadoresMortalidad(rutaOverride) {
+var ruta = rutaOverride || EXCEL_INDICADORES;
+if (!ruta) {
+return {
+success: true,
+data: {
+eventos: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+trabajadores: 150,
+meta: 0,
+frecuencia: 'Anual'
+}
+};
+}
 
-  if (!fs.existsSync(EXCEL_INDICADORES)) {
-    return {
-      success: true,
-      data: {
-        eventos: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        trabajadores: 150,
-        meta: 0,
-        frecuencia: 'Anual'
-      }
-    };
-  }
+if (!fs.existsSync(ruta)) {
+return {
+success: true,
+data: {
+eventos: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+trabajadores: 150,
+meta: 0,
+frecuencia: 'Anual'
+}
+};
+}
 
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.readFile(EXCEL_INDICADORES);
+const workbook = new ExcelJS.Workbook();
+await workbook.xlsx.readFile(ruta);
 
   // Buscar hoja
   var hojaNombres = [
@@ -541,13 +575,14 @@ async function leerIndicadoresMortalidad() {
   };
 }
 
-async function escribirEnExcelMortalidad(mes, campos) {
-  if (!EXCEL_INDICADORES) {
-    throw new Error("Ruta de INDICADORES no configurada");
-  }
+async function escribirEnExcelMortalidad(mes, campos, rutaOverride) {
+var ruta = rutaOverride || EXCEL_INDICADORES;
+if (!ruta) {
+throw new Error("Ruta de INDICADORES no configurada");
+}
 
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.readFile(EXCEL_INDICADORES);
+const workbook = new ExcelJS.Workbook();
+await workbook.xlsx.readFile(ruta);
 
   var hojaNombres = [
     "TASA DE MORTALIDAD",
@@ -596,6 +631,7 @@ async function escribirEnExcelMortalidad(mes, campos) {
 module.exports = {
   configurarRutas,
   configurarRutasConRuta,
+  listarIndicadoresFiles,
   leerIndicadores,
   leerCaracterizacion,
   escribirEnExcel,

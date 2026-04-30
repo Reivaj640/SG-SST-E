@@ -8,6 +8,8 @@
   'use strict';
   
   var api, indicadores, caracterizacion, companyName;
+var currentYear = null;
+var availableFiles = [];
   
   function getElement(id) {
     return document.getElementById(id);
@@ -70,55 +72,93 @@
     return g;
   }
   
-  function configurarRutas() {
-    return new Promise(function(resolve, reject) {
-      companyName = getCompanyName();
-      console.log('[FrecuenciaAccidentalidad] ===== CONFIGURAR RUTAS =====');
-      console.log('[FrecuenciaAccidentalidad] companyName:', companyName);
-      console.log('[FrecuenciaAccidentalidad] api.configurarRutas existe:', typeof api.configurarRutas);
-      
-      if (!companyName) {
-        showToast('No se ha seleccionado una empresa', 'warning');
-        console.log('[FrecuenciaAccidentalidad] ERROR: No hay empresa seleccionada');
-        resolve(false);
-        return;
-      }
-      
-      console.log('[FrecuenciaAccidentalidad] Llamando a api.configurarRutas(' + companyName + ')...');
-      
-      api.configurarRutas(companyName).then(function(res) {
-        console.log('[FrecuenciaAccidentalidad] Respuesta de configurarRutas:', res);
-        
-        if (res.success) {
-          console.log('[FrecuenciaAccidentalidad] SUCCESS: Rutas configuradas');
-          console.log('[FrecuenciaAccidentalidad] indicadores:', res.data && res.data.indicadores);
-          console.log('[FrecuenciaAccidentalidad] caracterizacion:', res.data && res.data.caracterizacion);
-          resolve(true);
-        } else {
-          console.log('[FrecuenciaAccidentalidad] ERROR en configurarRutas:', res.error);
-          showToast(res.error && res.error.message || 'Error configurando rutas', 'error');
-          resolve(false);
-        }
-      })['catch'](function(e) {
-        console.log('[FrecuenciaAccidentalidad] EXCEPTION en configurarRutas:', e.message);
-        showToast('Error de conexion: ' + e.message, 'error');
-        resolve(false);
-      });
-    });
-  }
-  
-  function cargarDatos() {
-    console.log('[FrecuenciaAccidentalidad] ===== CARGAR DATOS =====');
-    
-    var chartContainer = getElement('chartContainer');
-    if (chartContainer) {
-      chartContainer.innerHTML = '<div class="kair-loading"><div class="kair-spinner"></div><p class="kair-loading-text">Cargando datos desde Excel...</p></div>';
+function configurarRutas(year) {
+  return new Promise(function(resolve, reject) {
+    companyName = getCompanyName();
+    console.log('[FrecuenciaAccidentalidad] ===== CONFIGURAR RUTAS =====');
+    console.log('[FrecuenciaAccidentalidad] companyName:', companyName, '| year:', year);
+
+    if (!companyName) {
+      showToast('No se ha seleccionado una empresa', 'warning');
+      resolve(false);
+      return;
     }
-    
-    console.log('[FrecuenciaAccidentalidad] Llamando a configurarRutas()...');
-    
-    configurarRutas().then(function(rutasOk) {
-      console.log('[FrecuenciaAccidentalidad] configurarRutas result:', rutasOk);
+
+    api.configurarRutas(companyName, year || undefined).then(function(res) {
+      console.log('[FrecuenciaAccidentalidad] Respuesta de configurarRutas:', res);
+
+      if (res.success) {
+        if (res.data.availableFiles) {
+          availableFiles = res.data.availableFiles;
+          populateYearFilter();
+        }
+        if (res.data.selectedFile) {
+          updateYearLabels(res.data.selectedFile);
+        }
+        resolve(true);
+      } else {
+        console.log('[FrecuenciaAccidentalidad] ERROR en configurarRutas:', res.error);
+        showToast(res.error && res.error.message || 'Error configurando rutas', 'error');
+        resolve(false);
+      }
+    })['catch'](function(e) {
+      console.log('[FrecuenciaAccidentalidad] EXCEPTION en configurarRutas:', e.message);
+      showToast('Error de conexion: ' + e.message, 'error');
+      resolve(false);
+    });
+  });
+}
+
+function populateYearFilter() {
+  var select = getElement('yearFilter');
+  if (!select) return;
+
+  select.innerHTML = '';
+
+  availableFiles.forEach(function(f) {
+    var opt = document.createElement('option');
+    opt.value = f.year || '';
+    opt.textContent = f.year ? String(f.year) : f.fileName;
+    if (f.year === currentYear) opt.selected = true;
+    select.appendChild(opt);
+  });
+
+  if (!currentYear && availableFiles.length > 0) {
+    currentYear = availableFiles[0].year || null;
+    select.value = currentYear || '';
+  }
+}
+
+function updateYearLabels(fileName) {
+  var syncEl = getElement('syncFileName');
+  if (syncEl) syncEl.textContent = fileName;
+
+  var yearMatch = fileName && fileName.match(/(20\d{2})/);
+  var year = yearMatch ? yearMatch[1] : String(new Date().getFullYear());
+  currentYear = parseInt(year) || null;
+
+  var kpiYearEl = getElement('kpiYearLabel');
+  if (kpiYearEl) kpiYearEl.textContent = year;
+
+  var methodFileEl = getElement('methodFileName');
+  if (methodFileEl) methodFileEl.textContent = fileName;
+
+  var methodSourcesEl = getElement('methodSources');
+  if (methodSourcesEl) methodSourcesEl.textContent = fileName;
+}
+  
+function cargarDatos() {
+  console.log('[FrecuenciaAccidentalidad] ===== CARGAR DATOS =====');
+
+  var chartContainer = getElement('chartContainer');
+  if (chartContainer) {
+    chartContainer.innerHTML = '<div class="kair-loading"><div class="kair-spinner"></div><p class="kair-loading-text">Cargando datos desde Excel...</p></div>';
+  }
+
+  var year = currentYear || undefined;
+
+  configurarRutas(year).then(function(rutasOk) {
+    console.log('[FrecuenciaAccidentalidad] configurarRutas result:', rutasOk);
       
       if (!rutasOk) {
         console.log('[FrecuenciaAccidentalidad] ERROR: No se pudieron configurar las rutas');
@@ -188,9 +228,9 @@
     var chartContainer = getElement('chartContainer');
     
     if (kpiSection) kpiSection.style.display = 'none';
-    if (chartContainer) {
-      chartContainer.innerHTML = '<div class="kair-empty"><svg class="kair-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg><h3>No hay datos disponibles</h3><p>No se encontro el archivo INDICADORES 2024.xlsx en la carpeta 3.2.3 de esta empresa.</p></div>';
-    }
+if (chartContainer) {
+    chartContainer.innerHTML = '<div class="kair-empty"><svg class="kair-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg><h3>No hay datos disponibles</h3><p>No se encontró el archivo de indicadores para el año ' + (currentYear || 'seleccionado') + ' en la carpeta de esta empresa.</p></div>';
+  }
   }
   
   function renderKPIs() {
@@ -557,10 +597,52 @@
     return;
   }
   
-  var btnRefrescar = getElement('btnRefrescar');
-  if (btnRefrescar) {
-    btnRefrescar.addEventListener('click', cargarDatos);
-  }
+var btnRefrescar = getElement('btnRefrescar');
+if (btnRefrescar) {
+  btnRefrescar.addEventListener('click', cargarDatos);
+}
+
+var yearFilter = getElement('yearFilter');
+if (yearFilter) {
+  yearFilter.addEventListener('change', function() {
+    var selectedYear = parseInt(this.value) || null;
+    currentYear = selectedYear;
+    cargarDatos();
+  });
+}
+
+var btnClone = getElement('btnCloneYear');
+if (btnClone) {
+  btnClone.addEventListener('click', function() {
+    if (!currentYear) {
+      showToast('Seleccione un año primero', 'warning');
+      return;
+    }
+    var nextYear = currentYear + 1;
+    if (!confirm('¿Duplicar archivo de ' + currentYear + ' para el año ' + nextYear + '?\nSe conservarán metas y trabajadores, se limpiarán datos de ejecución.')) return;
+
+    var currentFile = availableFiles.find(function(f) { return f.year === currentYear; });
+    if (!currentFile) {
+      showToast('No se encontró el archivo actual', 'error');
+      return;
+    }
+
+    window.electronAPI.duplicateIndicadoresFile({
+      currentFilePath: currentFile.filePath,
+      newYear: nextYear
+    }).then(function(result) {
+      if (result.success) {
+        showToast('Archivo duplicado: ' + result.newFileName);
+        currentYear = nextYear;
+        cargarDatos();
+      } else {
+        showToast(result.error && result.error.message || 'Error al duplicar', 'error');
+      }
+    })['catch'](function(e) {
+      showToast('Error: ' + e.message, 'error');
+    });
+  });
+}
 
   var btnVolver = getElement('btnVolver');
   if (btnVolver) {

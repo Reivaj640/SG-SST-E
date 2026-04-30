@@ -304,29 +304,32 @@ ipcRenderer.invoke('get-indicadores-salud-stats', companyName),
   updateGestionCambioEstado: (companyName, changeId, nuevoEstado, extraData) =>
     ipcRenderer.invoke('gestion-cambio-update-estado', companyName, changeId, nuevoEstado, extraData),
 
-  // --- Frecuencia de la Accidentalidad (3.3.1) ---
-  frecuenciaAccidentalidad: {
-    configurarRutas: (companyName) => ipcRenderer.invoke('frecuencia-accidentalidad:configurar-rutas', companyName),
-    leerIndicadores: () => ipcRenderer.invoke('frecuencia-accidentalidad:leer-indicadores'),
-    leerCaracterizacion: () => ipcRenderer.invoke('frecuencia-accidentalidad:leer-caracterizacion'),
-    escribirEnExcel: (mes, campos) => ipcRenderer.invoke('frecuencia-accidentalidad:escribir-excel', mes, campos),
-  },
+// --- Frecuencia de la Accidentalidad (3.3.1) ---
+frecuenciaAccidentalidad: {
+  configurarRutas: (companyName, year) => ipcRenderer.invoke('frecuencia-accidentalidad:configurar-rutas', companyName, year),
+  leerIndicadores: () => ipcRenderer.invoke('frecuencia-accidentalidad:leer-indicadores'),
+  leerCaracterizacion: () => ipcRenderer.invoke('frecuencia-accidentalidad:leer-caracterizacion'),
+  escribirEnExcel: (mes, campos) => ipcRenderer.invoke('frecuencia-accidentalidad:escribir-excel', mes, campos),
+},
 
-  // --- Severidad de la Accidentalidad (3.3.2) ---
-  severidadAccidentalidad: {
-    configurarRutas: (companyName) => ipcRenderer.invoke('severidad-accidentalidad:configurar-rutas', companyName),
-    leerIndicadores: () => ipcRenderer.invoke('severidad-accidentalidad:leer-indicadores'),
-    escribirEnExcel: (mes, campos) => ipcRenderer.invoke('severidad-accidentalidad:escribir-excel', mes, campos),
-  },
+// --- Severidad de la Accidentalidad (3.3.2) ---
+severidadAccidentalidad: {
+  configurarRutas: (companyName, year) => ipcRenderer.invoke('severidad-accidentalidad:configurar-rutas', companyName, year),
+  leerIndicadores: () => ipcRenderer.invoke('severidad-accidentalidad:leer-indicadores'),
+  escribirEnExcel: (mes, campos) => ipcRenderer.invoke('severidad-accidentalidad:escribir-excel', mes, campos),
+},
 
-  // --- Índice de Mortalidad (3.3.3) ---
-  mortalidad: {
-    configurarRutas: (companyName) => ipcRenderer.invoke('mortalidad:configurar-rutas', companyName),
-    leerIndicadores: () => ipcRenderer.invoke('mortalidad:leer-indicadores'),
-    escribirExcel: (mes, campos) => ipcRenderer.invoke('mortalidad:escribir-excel', mes, campos),
-  },
+// --- Índice de Mortalidad (3.3.3) ---
+mortalidad: {
+  configurarRutas: (companyName, year) => ipcRenderer.invoke('mortalidad:configurar-rutas', companyName, year),
+  leerIndicadores: () => ipcRenderer.invoke('mortalidad:leer-indicadores'),
+  escribirExcel: (mes, campos) => ipcRenderer.invoke('mortalidad:escribir-excel', mes, campos),
+},
 
-  // --- Eventos IPC ---
+getIndicadoresFiles: ({ companyName, submodule }) => ipcRenderer.invoke('get-indicadores-files', { companyName, submodule }),
+duplicateIndicadoresFile: ({ currentFilePath, newYear }) => ipcRenderer.invoke('duplicate-indicadores-file', { currentFilePath, newYear }),
+
+// --- Eventos IPC ---
   send: (channel, data) => ipcRenderer.send(channel, data),
   onIpcMessage: (channel, listener) => {
     ipcRenderer.on(channel, (event, ...args) => listener(...args));

@@ -9,19 +9,23 @@
 
   console.log('[IndiceMortalidad] 📦 Módulo JS cargado');
 
-  var api;
-  var indicadores;
-  var companyName;
-  var pendingChanges = new Map();
-  var chartInstance = null;
+var api;
+var mortalidadApi;
+var indicadores;
+var companyName;
+var currentYear = null;
+var availableFiles = [];
+var pendingChanges = new Map();
+var chartInstance = null;
 
   var MESES = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
 
   // Asignar API desde window.electronAPI si existe
-  if (typeof window !== 'undefined' && window.electronAPI) {
-    api = window.electronAPI;
-    console.log('[IndiceMortalidad] electronAPI asignada:', typeof api.mortalidadConfigurarRutas);
-  }
+if (typeof window !== 'undefined' && window.electronAPI) {
+  api = window.electronAPI;
+  mortalidadApi = window.electronAPI.mortalidad;
+  console.log('[IndiceMortalidad] electronAPI asignada, mortalidad:', !!mortalidadApi);
+}
 
   function getElement(id) {
     // Buscar primero por ID directa
@@ -303,102 +307,169 @@ function updateHeaderContext() {
     container.appendChild(svg);
   }
 
-  // ==================== CONFIGURAR RUTAS ====================
-  function configurarRutas() {
-    return new Promise(function(resolve, reject) {
-      companyName = getCompanyName();
-      console.log('[IndiceMortalidad] ===== CONFIGURAR RUTAS =====');
-      console.log('[IndiceMortalidad] companyName:', companyName);
+// ==================== CONFIGURAR RUTAS ====================
+function configurarRutas(year) {
+  return new Promise(function(resolve, reject) {
+    companyName = getCompanyName();
+    console.log('[IndiceMortalidad] ===== CONFIGURAR RUTAS =====');
+    console.log('[IndiceMortalidad] companyName:', companyName, '| year:', year);
 
-      if (!companyName) {
-        showToast('No se ha seleccionado una empresa', 'warning');
-        console.log('[IndiceMortalidad] ERROR: No hay empresa seleccionada');
-        resolve(false);
-        return;
-      }
-
-      if (typeof api !== 'undefined' && api.mortalidadConfigurarRutas) {
-        api.mortalidadConfigurarRutas(companyName).then(function(res) {
-          console.log('[IndiceMortalidad] Respuesta de configurarRutas:', res);
-
-          if (res.success) {
-            console.log('[IndiceMortalidad] SUCCESS: Rutas configuradas');
-            resolve(true);
-          } else {
-            console.log('[IndiceMortalidad] ERROR en configurarRutas:', res.error);
-            showToast(res.error && res.error.message || 'Error configurando rutas', 'error');
-            resolve(false);
-          }
-        })['catch'](function(e) {
-          console.log('[IndiceMortalidad] EXCEPTION en configurarRutas:', e.message);
-          showToast('Error de conexión: ' + e.message, 'error');
-          resolve(false);
-        });
-      } else {
-        // En testing o sin API, resolvemos directamente
-        console.log('[IndiceMortalidad] API no disponible, simulando éxito');
-        resolve(true);
-      }
-    });
-  }
-
-  // ==================== CARGAR DATOS ====================
-  function cargarDatos() {
-    console.log('[IndiceMortalidad] ===== CARGAR DATOS =====');
-
-    showLoading(true);
-
-    configurarRutas().then(function(rutasOk) {
-      if (!rutasOk) {
-        console.log('[IndiceMortalidad] ERROR: No se pudieron configurar las rutas');
-        showError('No se pudieron configurar las rutas');
-        return;
-      }
-
-      if (typeof api !== 'undefined' && api.mortalidadLeerIndicadores) {
-        api.mortalidadLeerIndicadores().then(function(res) {
-          console.log('[IndiceMortalidad] leerIndicadores response:', res);
-
-          if (res.success) {
-            console.log('[IndiceMortalidad] indicadores cargados OK');
-            indicadores = res.data;
-          } else {
-            console.log('[IndiceMortalidad] ERROR leerIndicadores:', res.error);
-            showToast(res.error && res.error.message || 'Error al leer indicadores', 'error');
-            indicadores = generateDemoData();
-          }
-
-          renderizar();
-        })['catch'](function(e) {
-          console.log('[IndiceMortalidad] usando datos demo:', e.message);
-          indicadores = generateDemoData();
-          renderizar();
-        });
-      } else {
-        // Modo demo sin API
-        console.log('[IndiceMortalidad] Modo demo sin API');
-        indicadores = generateDemoData();
-        renderizar();
-      }
-    });
-  }
-
-  // ==================== DATOS DEMO ====================
-  function generateDemoData() {
-    return {
-      eventos: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      trabajadores: 150,
-      meta: 0,
-      frecuencia: 'Anual'
-    };
-  }
-
-  // ==================== RENDERIZAR ====================
-  function renderizar() {
-    if (!indicadores) {
-      showError('No hay datos disponibles');
+    if (!companyName) {
+      showToast('No se ha seleccionado una empresa', 'warning');
+      resolve(false);
       return;
     }
+
+    if (mortalidadApi && mortalidadApi.configurarRutas) {
+      mortalidadApi.configurarRutas(companyName, year || undefined).then(function(res) {
+        console.log('[IndiceMortalidad] Respuesta de configurarRutas:', res);
+
+        if (res.success) {
+          if (res.data.availableFiles) {
+            availableFiles = res.data.availableFiles;
+            populateYearFilter();
+          }
+          if (res.data.selectedFile) {
+            updateYearLabels(res.data.selectedFile);
+          }
+          resolve(true);
+        } else {
+          console.log('[IndiceMortalidad] ERROR en configurarRutas:', res.error);
+          showToast(res.error && res.error.message || 'Error configurando rutas', 'error');
+          resolve(false);
+        }
+      })['catch'](function(e) {
+        console.log('[IndiceMortalidad] EXCEPTION en configurarRutas:', e.message);
+        showToast('Error de conexion: ' + e.message, 'error');
+        resolve(false);
+      });
+    } else {
+      console.log('[IndiceMortalidad] API no disponible, simulando exito');
+      resolve(true);
+    }
+  });
+}
+
+function populateYearFilter() {
+  var select = getElement('yearFilter');
+  if (!select) return;
+
+  select.innerHTML = '';
+
+  availableFiles.forEach(function(f) {
+    var opt = document.createElement('option');
+    opt.value = f.year || '';
+    opt.textContent = f.year ? String(f.year) : f.fileName;
+    if (f.year === currentYear) opt.selected = true;
+    select.appendChild(opt);
+  });
+
+  if (!currentYear && availableFiles.length > 0) {
+    currentYear = availableFiles[0].year || null;
+    select.value = currentYear || '';
+  }
+}
+
+function updateYearLabels(fileName) {
+  var syncEl = getElement('syncFileName');
+  if (syncEl) syncEl.textContent = fileName;
+
+  var yearMatch = fileName && fileName.match(/(20\d{2})/);
+  var year = yearMatch ? yearMatch[1] : String(new Date().getFullYear());
+  currentYear = parseInt(year) || null;
+
+  var kpiYearEl = getElement('kpiYearLabel');
+  if (kpiYearEl) kpiYearEl.textContent = year;
+
+  var methodFileEl = getElement('methodFileName');
+  if (methodFileEl) methodFileEl.textContent = fileName;
+
+  var methodSourcesEl = getElement('methodSources');
+  if (methodSourcesEl) methodSourcesEl.textContent = fileName;
+}
+
+// ==================== CARGAR DATOS ====================
+function cargarDatos() {
+  console.log('[IndiceMortalidad] ===== CARGAR DATOS =====');
+
+  showLoading(true);
+
+  var year = currentYear || undefined;
+
+  configurarRutas(year).then(function(rutasOk) {
+    if (!rutasOk) {
+      console.log('[IndiceMortalidad] ERROR: No se pudieron configurar las rutas');
+      renderEmptyState();
+      return;
+    }
+
+    if (mortalidadApi && mortalidadApi.leerIndicadores) {
+      mortalidadApi.leerIndicadores().then(function(res) {
+        console.log('[IndiceMortalidad] leerIndicadores response:', res);
+
+        if (res.success) {
+          console.log('[IndiceMortalidad] indicadores cargados OK');
+          indicadores = res.data;
+        } else {
+          console.log('[IndiceMortalidad] ERROR leerIndicadores:', res.error);
+          showToast(res.error && res.error.message || 'Error al leer indicadores', 'error');
+          indicadores = null;
+        }
+
+        renderizar();
+      })['catch'](function(e) {
+        console.log('[IndiceMortalidad] usando datos demo:', e.message);
+        indicadores = generateDemoData();
+        renderizar();
+      });
+    } else {
+      console.log('[IndiceMortalidad] Modo demo sin API');
+      indicadores = generateDemoData();
+      renderizar();
+    }
+  });
+}
+
+  // ==================== DATOS DEMO ====================
+function generateDemoData() {
+  return {
+    eventos: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    trabajadores: 150,
+    meta: 0,
+    frecuencia: 'Anual'
+  };
+}
+
+function renderEmptyState() {
+  showLoading(false);
+  var kpiSection = document.querySelector('.kair-kpis') || getElement('kpiSection');
+  var metaSection = document.querySelector('.kair-meta-section') || getElement('metaSection');
+  var chartSection = document.querySelector('.kair-chart-section') || getElement('chartSection');
+  var tableSection = document.querySelector('.kair-table-section') || getElement('tableSection');
+  var editHint = document.querySelector('.kair-edit-hint') || getElement('editHint');
+  var methodologySection = document.querySelector('.kair-methodology-section') || getElement('methodologySection');
+
+  if (kpiSection) kpiSection.style.display = 'none';
+  if (metaSection) metaSection.style.display = 'none';
+  if (chartSection) chartSection.style.display = 'none';
+  if (tableSection) tableSection.style.display = 'none';
+  if (editHint) editHint.style.display = 'none';
+  if (methodologySection) methodologySection.style.display = 'none';
+
+  var errorSection = getElement('errorSection');
+  if (errorSection) {
+    errorSection.style.display = 'flex';
+    var msgEl = getElement('errorMessage');
+    if (msgEl) msgEl.textContent = 'No se encontro el archivo de indicadores para el ano ' + (currentYear || 'seleccionado');
+  }
+}
+
+  // ==================== RENDERIZAR ====================
+function renderizar() {
+  if (!indicadores) {
+    renderEmptyState();
+    return;
+  }
 
     showLoading(false);
 
@@ -685,13 +756,13 @@ function updateHeaderContext() {
     btn.disabled = true;
 
     var promises = [];
-    pendingChanges.forEach(function(change, key) {
-      if (typeof api !== 'undefined' && api.mortalidadEscribirExcel) {
-        promises.push(
-          api.mortalidadEscribirExcel(change.mes, { eventos: change.value })
-        );
-      }
-    });
+  pendingChanges.forEach(function(change, key) {
+    if (mortalidadApi && mortalidadApi.escribirExcel) {
+      promises.push(
+        mortalidadApi.escribirExcel(change.mes, { eventos: change.value })
+      );
+    }
+  });
 
     Promise.all(promises).then(function(results) {
       btn.disabled = false;
@@ -725,16 +796,15 @@ function updateHeaderContext() {
   }
 
   // ==================== INICIALIZAR ====================
-  function init() {
-    console.log('[IndiceMortalidad] ===== INIT =====');
+function init() {
+  console.log('[IndiceMortalidad] ===== INIT =====');
 
-    // Asignar API desde window
-    if (window.electronAPI) {
-      api = window.electronAPI;
-      console.log('[IndiceMortalidad] electronAPI asignada');
-    }
+  if (window.electronAPI) {
+    api = window.electronAPI;
+    mortalidadApi = window.electronAPI.mortalidad;
+    console.log('[IndiceMortalidad] electronAPI asignada, mortalidad:', !!mortalidadApi);
+  }
 
-  // Event listeners
   var btnBack = getElement('btn-back-module');
   var btnRefrescar = getElement('btnRefrescar');
   var btnGuardar = getElement('btnGuardar');
@@ -749,26 +819,66 @@ function updateHeaderContext() {
     };
   }
 
-    if (btnRefrescar) {
-      btnRefrescar.onclick = function() {
-        pendingChanges.clear();
-        updateSaveButton();
-        cargarDatos();
-      };
-    }
+  if (btnRefrescar) {
+    btnRefrescar.onclick = function() {
+      pendingChanges.clear();
+      updateSaveButton();
+      cargarDatos();
+    };
+  }
 
-    if (btnGuardar) {
-      btnGuardar.onclick = function() {
-        guardarCambios();
-      };
-    }
+  if (btnGuardar) {
+    btnGuardar.onclick = function() {
+      guardarCambios();
+    };
+  }
 
-  // Actualizar contexto del header
+  var yearFilter = getElement('yearFilter');
+  if (yearFilter) {
+    yearFilter.addEventListener('change', function() {
+      var selectedYear = parseInt(this.value) || null;
+      currentYear = selectedYear;
+      cargarDatos();
+    });
+  }
+
+  var btnClone = getElement('btnCloneYear');
+  if (btnClone) {
+    btnClone.addEventListener('click', function() {
+      if (!currentYear) {
+        showToast('Seleccione un ano primero', 'warning');
+        return;
+      }
+      var nextYear = currentYear + 1;
+      if (!confirm('Duplicar archivo de ' + currentYear + ' para el ano ' + nextYear + '?\nSe conservaran metas y trabajadores, se limpiaran datos de ejecucion.')) return;
+
+      var currentFile = availableFiles.find(function(f) { return f.year === currentYear; });
+      if (!currentFile) {
+        showToast('No se encontro el archivo actual', 'error');
+        return;
+      }
+
+      window.electronAPI.duplicateIndicadoresFile({
+        currentFilePath: currentFile.filePath,
+        newYear: nextYear
+      }).then(function(result) {
+        if (result.success) {
+          showToast('Archivo duplicado: ' + result.newFileName);
+          currentYear = nextYear;
+          cargarDatos();
+        } else {
+          showToast(result.error && result.error.message || 'Error al duplicar', 'error');
+        }
+      })['catch'](function(e) {
+        showToast('Error: ' + e.message, 'error');
+      });
+    });
+  }
+
   updateHeaderContext();
 
-  // Cargar datos
   cargarDatos();
-  }
+}
 
   // Iniciar cuando DOM listo
   if (document.readyState === 'loading') {
