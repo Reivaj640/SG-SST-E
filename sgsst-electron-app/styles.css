@@ -5568,9 +5568,64 @@ html {
 }
 
 #app-header.app-header-hovering {
-  max-height: 70px !important;
-  padding-top: calc(var(--spacer-sm) * 0.5) !important;
-  padding-bottom: calc(var(--spacer-sm) * 0.5) !important;
-  border-bottom: 1px solid var(--border-color) !important;
-  box-shadow: var(--box-shadow) !important;
+max-height: 70px !important;
+padding-top: calc(var(--spacer-sm) * 0.5) !important;
+padding-bottom: calc(var(--spacer-sm) * 0.5) !important;
+border-bottom: 1px solid var(--border-color) !important;
+box-shadow: var(--box-shadow) !important;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+VANTA FULLSCREEN MODE - Pantallas con fondo animado (Login / Home selección)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.vanta-fullscreen #content-area {
+padding: 0 !important;
+background-color: transparent !important;
+border-radius: 0 !important;
+box-shadow: none !important;
+overflow: hidden !important;
+}
+
+.vanta-fullscreen #main-content {
+margin-left: 0 !important;
+padding: 0 !important;
+background-color: transparent !important;
+}
+
+.vanta-fullscreen #app-footer {
+display: none !important;
+}
+
+.vanta-fullscreen #app-header {
+position: absolute;
+top: 0;
+left: 0;
+right: 0;
+z-index: 1000;
+background-color: transparent !important;
+border-bottom: none !important;
+box-shadow: none !important;
+}
+
+.vanta-fullscreen #app-header.app-header-collapsed {
+max-height: 0 !important;
+}
+
+.vanta-fullscreen #app-header.app-header-hovering {
+background-color: rgba(255, 255, 255, 0.95) !important;
+border-bottom: 1px solid var(--border-color) !important;
+box-shadow: var(--box-shadow) !important;
+}
+
+.vanta-fullscreen #header-hover-zone {
+z-index: 1001;
+}
+
+.vanta-fullscreen #app {
+position: relative;
+}
+
+.vanta-fullscreen .main-container {
+margin-top: 0;
+height: 100vh;
 }

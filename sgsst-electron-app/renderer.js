@@ -2015,12 +2015,19 @@ overlay.remove();
 // --- Fin Funciones de Transición ---
 
 function renderLoginScreen(errorMessage = '') {
-  currentCompany = null;
-  currentModule = null;
-  currentSubmodule = null;
+currentCompany = null;
+currentModule = null;
+currentSubmodule = null;
 
-  setAuthUIState(false);
-  contentArea.innerHTML = '';
+setAuthUIState(false);
+
+const mainContainer = document.querySelector('.main-container');
+if (mainContainer) mainContainer.classList.add('vanta-fullscreen');
+
+const appHeader = document.getElementById('app-header');
+if (appHeader) appHeader.classList.add('app-header-collapsed');
+
+contentArea.innerHTML = '';
 
   const authScreen = document.createElement('div');
   authScreen.className = 'kair-auth-screen';
@@ -2348,11 +2355,17 @@ async function showHomePage(overrideCompanies = null) {
   hideCalendar(contentArea);
   console.log('Showing home page...');
 
-  // --- OCULTAR SIDEBAR EN HOME PRINCIPAL ---
-  const sidebar = document.getElementById('sidebar');
-  if (sidebar) {
-    sidebar.classList.add('sidebar-hidden');
-  }
+// --- OCULTAR SIDEBAR EN HOME PRINCIPAL ---
+const sidebar = document.getElementById('sidebar');
+if (sidebar) {
+sidebar.classList.add('sidebar-hidden');
+}
+
+const mainContainerForHome = document.querySelector('.main-container');
+if (mainContainerForHome) mainContainerForHome.classList.add('vanta-fullscreen');
+
+const appHeaderForHome = document.getElementById('app-header');
+if (appHeaderForHome) appHeaderForHome.classList.add('app-header-collapsed');
 
   // Cargar dinámicamente las empresas desde la configuración
   let dynamicCompanies = [];
@@ -2503,10 +2516,16 @@ async function showHomePage(overrideCompanies = null) {
 }
 
 async function selectCompany(companyName, buttonElement) {
-  console.log(`Selecting company: ${companyName}`);
-  currentCompany = companyName;
+console.log(`Selecting company: ${companyName}`);
+currentCompany = companyName;
 
-  // --- MOSTRAR SIDEBAR AL SELECCIONAR EMPRESA ---
+const mainContainerSel = document.querySelector('.main-container');
+if (mainContainerSel) mainContainerSel.classList.remove('vanta-fullscreen');
+
+const appHeaderSel = document.getElementById('app-header');
+if (appHeaderSel) appHeaderSel.classList.remove('app-header-collapsed');
+
+// --- MOSTRAR SIDEBAR AL SELECCIONAR EMPRESA ---
   const sidebar = document.getElementById('sidebar');
   if (sidebar) {
     sidebar.classList.remove('sidebar-hidden');
@@ -2635,10 +2654,16 @@ function handleCompanyHome() {
 }
 
 async function handleLogout() {
-  console.log('Handling logout...');
-  currentCompany = null;
-  currentModule = null;
-  currentSubmodule = null; // Asegurar que también se resetea el submódulo
+console.log('Handling logout...');
+currentCompany = null;
+currentModule = null;
+currentSubmodule = null;
+
+const mainContainerLogout = document.querySelector('.main-container');
+if (mainContainerLogout) mainContainerLogout.classList.add('vanta-fullscreen');
+
+const appHeaderLogout = document.getElementById('app-header');
+if (appHeaderLogout) appHeaderLogout.classList.add('app-header-collapsed');
 
   // Resetear UI
   if (companyNameElement) {
@@ -2700,8 +2725,14 @@ async function handleLogout() {
 }
 
 function showCompanyHomePage() {
-  // ✅ LIMPIAR ESTADO
-  currentSubmodule = null;
+// ✅ LIMPIAR ESTADO
+currentSubmodule = null;
+
+const mainContainerDash = document.querySelector('.main-container');
+if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
+
+const appHeaderDash = document.getElementById('app-header');
+if (appHeaderDash) appHeaderDash.classList.remove('app-header-collapsed');
   
   // ✅ LIMPIAR BOTÓN ACTIVO DEL SIDEBAR (estamos en dashboard, no en módulo)
   if (window.activeSidebarButton) {
@@ -3483,14 +3514,20 @@ function getTagTextColor(priority) {
 
 
 function showModuleContent(moduleName) {
-  console.log(`Showing content for module: ${moduleName}`);
-  // ✅ SOLUCIÓN TEMPORAL: No cambiar módulo si estamos en un submódulo
-    if (currentSubmodule) {
-        console.warn(`🚨 [showModuleContent] BLOQUEANDO cambio de módulo porque estamos en submódulo: "${currentSubmodule}"`);
-        return;
-    }
+console.log(`Showing content for module: ${moduleName}`);
+// ✅ SOLUCIÓN TEMPORAL: No cambiar módulo si estamos en un submódulo
+if (currentSubmodule) {
+console.warn(`🚨 [showModuleContent] BLOQUEANDO cambio de módulo porque estamos en submódulo: "${currentSubmodule}"`);
+return;
+}
 
-  currentModule = moduleName;
+const mainContainerMod = document.querySelector('.main-container');
+if (mainContainerMod) mainContainerMod.classList.remove('vanta-fullscreen');
+
+const appHeaderMod = document.getElementById('app-header');
+if (appHeaderMod) appHeaderMod.classList.remove('app-header-collapsed');
+
+currentModule = moduleName;
   // ✅ LIMPIAR ESTADO: Al cambiar de módulo, ya no estamos en un submódulo
   currentSubmodule = null;
   console.log(`🔍 [showModuleContent] currentModule actualizado a: ${currentModule}`);
@@ -3771,8 +3808,14 @@ function showGenericModuleHome(container, moduleName, submodules) {
 
 
 function showSubmoduleContent(container, moduleName, submoduleName) {
-  // ✅ ACTUALIZAR ESTADO: Establecer que estamos en un submódulo
-  currentSubmodule = submoduleName;
+// ✅ ACTUALIZAR ESTADO: Establecer que estamos en un submódulo
+currentSubmodule = submoduleName;
+
+const mainContainerSub = document.querySelector('.main-container');
+if (mainContainerSub) mainContainerSub.classList.remove('vanta-fullscreen');
+
+const appHeaderSub = document.getElementById('app-header');
+if (appHeaderSub) appHeaderSub.classList.remove('app-header-collapsed');
 
   // Inspeccionar el DOM antes de limpiar
   hideCalendar(); // No necesita argumento con la nueva implementación
@@ -4920,8 +4963,14 @@ function createModuleCard(title, description, onClick) {
    * Carga una vista de módulo HTML en el área de contenido principal
    * @param {string} viewPath - Ruta del archivo HTML a cargar
    */
-  function loadModuleViewInContentArea(viewPath) {
-    console.log('[RENDERER] Cargando vista de módulo:', viewPath);
+function loadModuleViewInContentArea(viewPath) {
+console.log('[RENDERER] Cargando vista de módulo:', viewPath);
+
+const mainContainerView = document.querySelector('.main-container');
+if (mainContainerView) mainContainerView.classList.remove('vanta-fullscreen');
+
+const appHeaderView = document.getElementById('app-header');
+if (appHeaderView) appHeaderView.classList.remove('app-header-collapsed');
     
     // Verificar que contentArea exista
     if (!contentArea) {
