@@ -480,8 +480,8 @@ this.renderIndicesChart(cachedData.indicadores || null);
                 <div class="kb-amount" style="text-align:center;">
                     <span>${pendientes}</span>
                 </div>
-                <div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:8px;">
-                    Casos pendientes (incapacidad > 15 días)
+<div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:4px;">
+Casos pendientes (incapacidad > 15 días)
                 </div>
                 <div class="kb-footer">
                     <div>
@@ -539,8 +539,8 @@ this.renderIndicesChart(cachedData.indicadores || null);
                 <div class="kb-amount" style="text-align:center;">
                     <span>${value}</span>
                 </div>
-                <div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:8px;">
-                    Incapacidades registradas
+<div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:4px;">
+Incapacidades registradas
                 </div>
                 <div class="kb-footer">
                     <div>
@@ -597,8 +597,8 @@ this.renderIndicesChart(cachedData.indicadores || null);
                 <div class="kb-amount" style="text-align:center;">
                     <span>${value}</span>
                 </div>
-                <div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:8px;">
-                    Evaluaciones médicas
+<div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:4px;">
+Evaluaciones médicas
                 </div>
                 <div class="kb-footer">
                     <div>
@@ -655,8 +655,8 @@ this.renderIndicesChart(cachedData.indicadores || null);
                 <div class="kb-amount" style="text-align:center;">
                     <span>${value}</span>
                 </div>
-                <div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:8px;">
-                    Reportes FURAT
+<div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:4px;">
+Reportes FURAT
                 </div>
                 <div class="kb-footer">
                     <div>
@@ -703,11 +703,11 @@ this.renderIndicesChart(cachedData.indicadores || null);
                     <span class="kb-title">Remisiones a EPS</span>
                     <span class="kb-badge" style="background:#17a2b8;">TOTAL</span>
                 </div>
-                <div class="kb-amount" style="text-align:center; padding: 1.2rem 0;">
-                    <span>${displayData.total}</span>
+<div class="kb-amount" style="text-align:center;">
+<span>${displayData.total}</span>
                 </div>
-                <div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:8px;">
-                    Control de remisiones y recomendaciones
+<div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:4px;">
+Control de remisiones y recomendaciones
                 </div>
                 <div class="kb-footer">
                     <div>
@@ -750,10 +750,10 @@ this.renderIndicesChart(cachedData.indicadores || null);
                 <div class="kb-amount" style="text-align:center;">
                     <span>${displayData.completadas}</span>
                 </div>
-                <div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:8px;">
-                    Trabajadores con inducción al día
+<div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:4px;">
+Trabajadores con inducción al día
                 </div>
-                <div class="kb-progress-track" style="margin: 10px 0;">
+                <div class="kb-progress-track" style="margin-bottom: 0.5rem;">
                     <div class="kb-progress-bar" style="width: ${displayData.porcentajeCompletado}%"></div>
                 </div>
                 <div class="kb-footer">
@@ -831,25 +831,25 @@ background: var(--k-bg-app);
 height: 100%;
 overflow-y: auto;
 }
-            .widgets-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+            .widgets-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 0 !important; }
             .widget { background: var(--k-bg-card); border: 1px solid var(--k-border); border-radius: var(--k-radius-lg); padding: 1rem; box-shadow: var(--k-shadow-sm); display: flex; flex-direction: column; min-height: 120px; transition: transform 0.2s ease; } .widget:hover { transform: translateY(-3px); box-shadow: var(--k-shadow-md); } .widget h4 { margin: 0 0 0.5rem 0; font-size: 0.65rem; color: var(--k-text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; } .widget-value { font-size: 1.4rem; font-weight: 700; color: var(--k-text-main); margin-bottom: 0.5rem; } .widget-description { font-size: 0.65rem; color: var(--k-text-muted); }
             .k-budget-card .kb-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
             .k-budget-card .kb-title { font-size: 0.65rem; font-weight: 600; color: var(--k-text-muted); text-transform: uppercase; }
             .k-budget-card .kb-badge { font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 1rem; color: white; background-color: var(--k-success); }
             .k-budget-card .bg-success { background: var(--k-success) !important; }
             .k-budget-card .bg-danger { background: var(--k-danger) !important; }
-            .k-budget-card .kb-amount { font-size: 1.4rem; font-weight: 700; color: var(--k-text-main); padding: 0.5rem 0; }
+            .k-budget-card .kb-amount { font-size: 1.4rem; font-weight: 700; color: var(--k-text-main); margin-bottom: 0.5rem; }
             .k-budget-card .kb-footer { display: flex; justify-content: space-between; margin-top: auto; padding-top: 0.5rem; border-top: 1px solid #eee; }
-            .k-budget-card .kb-label { font-size: 0.65rem; color: var(--k-text-muted); text-transform: uppercase; }
-            .k-budget-card .kb-value { font-size: 0.85rem; font-weight: 600; }
+            .k-budget-card .kb-label { font-size: 0.6rem; color: var(--k-text-muted); text-transform: uppercase; }
+            .k-budget-card .kb-value { font-size: 0.6rem; font-weight: 600; }
             .kb-exec { color: var(--k-success); }
             .kb-rem { color: var(--k-primary); }
             
 .kb-progress-track { width: 100%; height: 10px; background: #e9ecef; border-radius: 5px; overflow: hidden; margin-bottom: 0.5rem; position: relative; }
 .kb-progress-bar { height: 100%; width: 0%; border-radius: 5px; background-color: var(--k-success); transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s; }
 
-            .ausentismo-toggles { display: flex; gap: 4px; margin: 8px 0; background: #f1f3f4; padding: 3px; border-radius: 6px; }
-.ausentismo-toggle { flex: 1; border: none; background: transparent; font-size: 0.7rem; padding: 4px; border-radius: var(--k-radius-md); cursor: pointer; color: var(--k-text-muted); transition: all 0.2s; }
+            .ausentismo-toggles { display: flex; gap: 4px; margin: 4px 0; background: #f1f3f4; padding: 3px; border-radius: 6px; }
+.ausentismo-toggle { flex: 1; border: none; background: transparent; font-size: 0.7rem; padding: 2px 6px; border-radius: var(--k-radius-md); cursor: pointer; color: var(--k-text-muted); transition: all 0.2s; }
 .ausentismo-toggle.active { background: white; color: var(--k-primary); box-shadow: var(--k-shadow-sm); font-weight: 600; }
 
             .submodules-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
@@ -859,12 +859,17 @@ overflow-y: auto;
 .btn-ingresar:hover { background-color: var(--k-primary-hover); }
             
             .main-area { display: flex; flex-direction: column; gap: 1rem; }
-.submodules-container { background: var(--k-bg-card); border: 1px solid var(--k-border); border-radius: var(--k-radius-lg); padding: 1.5rem; box-shadow: var(--k-shadow-sm); margin-top: 0.5rem; }
+.submodules-container { background: var(--k-bg-card); border: 1px solid var(--k-border); border-radius: var(--k-radius-lg); padding: 1.5rem; box-shadow: var(--k-shadow-sm); margin-top: 0 !important; }
 .submodules-container h3 { margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem; font-weight: 600; color: var(--k-text-main); padding-bottom: 1rem; border-bottom: 1px solid var(--k-border); text-transform: uppercase; letter-spacing: 0.05em; }
             .chart-container { background: var(--k-bg-card); border: 1px solid var(--k-border); border-radius: var(--k-radius-lg); padding: 1.5rem; box-shadow: var(--k-shadow-sm); min-height: 350px; display: flex; flex-direction: column; }
 .chart-container h3 { margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem; font-weight: 600; color: var(--k-text-main); text-transform: uppercase; letter-spacing: 0.05em; }
 .charts-grid-salud { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 @media (max-width: 992px) { .charts-grid-salud { grid-template-columns: 1fr; } }
+
+/* ANULAR ESTILOS GLOBALES (styles.css) */
+.gestion-salud-home .widget { margin-bottom: 0 !important; padding: 1rem !important; }
+.gestion-salud-home .chart-container { margin-top: 0 !important; margin-bottom: 0 !important; }
+.gestion-salud-home .charts-grid-salud { margin-top: 0 !important; }
 `;
         document.head.appendChild(style);
     }

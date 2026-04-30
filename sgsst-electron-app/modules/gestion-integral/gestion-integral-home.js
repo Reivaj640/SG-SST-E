@@ -134,8 +134,8 @@ class GestionIntegralHome {
             .main-area {
                 display: flex;
                 flex-direction: column;
-                gap: 1.5rem;
-                overflow-y: auto;
+gap: 1rem;
+overflow-y: auto;
                 padding-right: 0.5rem;
                 width: 100%;
                 flex: 1;
@@ -305,7 +305,7 @@ class GestionIntegralHome {
                 border-radius: var(--k-radius-lg);
                 padding: 1.5rem;
                 box-shadow: var(--k-shadow-sm);
-                min-height: 450px;
+                min-height: 350px;
                 display: flex;
                 flex-direction: column;
             }
@@ -571,10 +571,15 @@ class GestionIntegralHome {
             .submodules-list {
                 display: grid;
                 grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-                gap: 1rem;
-            }
-            
-            @media (max-width: 768px) {
+gap: 1rem;
+}
+
+/* ANULAR ESTILOS GLOBALES (styles.css) */
+.gestion-integral-home .widget { margin-bottom: 0 !important; padding: 1rem !important; }
+.gestion-integral-home .widgets-container { margin-bottom: 0 !important; }
+.gestion-integral-home .chart-container { margin-top: 0 !important; margin-bottom: 0 !important; }
+
+@media (max-width: 768px) {
                 .submodules-list {
                     grid-template-columns: 1fr;
                 }
