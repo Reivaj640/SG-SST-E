@@ -5597,28 +5597,11 @@ display: none !important;
 }
 
 .vanta-fullscreen #app-header {
-position: absolute;
-top: 0;
-left: 0;
-right: 0;
-z-index: 1000;
-background-color: transparent !important;
-border-bottom: none !important;
-box-shadow: none !important;
-}
-
-.vanta-fullscreen #app-header.app-header-collapsed {
-max-height: 0 !important;
-}
-
-.vanta-fullscreen #app-header.app-header-hovering {
-background-color: rgba(255, 255, 255, 0.95) !important;
-border-bottom: 1px solid var(--border-color) !important;
-box-shadow: var(--box-shadow) !important;
+display: none !important;
 }
 
 .vanta-fullscreen #header-hover-zone {
-z-index: 1001;
+display: none !important;
 }
 
 .vanta-fullscreen #app {

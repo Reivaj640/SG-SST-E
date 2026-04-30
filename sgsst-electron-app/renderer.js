@@ -1661,17 +1661,27 @@ let activeSidebarButton = null;
 
 // --- Auth UI helpers ---
 function setAuthUIState(isAuthenticated) {
-  const sidebar = document.getElementById('sidebar');
-  const headerButtons = document.querySelectorAll('.header-btn');
+const sidebar = document.getElementById('sidebar');
+const appHeader = document.getElementById('app-header');
+const headerHoverZone = document.getElementById('header-hover-zone');
+const headerButtons = document.querySelectorAll('.header-btn');
 
-  if (sidebar) {
-    sidebar.style.display = isAuthenticated ? '' : 'none';
-  }
+if (sidebar) {
+sidebar.style.display = isAuthenticated ? '' : 'none';
+}
 
-  headerButtons.forEach(btn => {
-    btn.style.pointerEvents = isAuthenticated ? 'auto' : 'none';
-    btn.style.opacity = isAuthenticated ? '1' : '0.4';
-  });
+if (appHeader) {
+appHeader.style.display = isAuthenticated ? '' : 'none';
+}
+
+if (headerHoverZone) {
+headerHoverZone.style.display = isAuthenticated ? '' : 'none';
+}
+
+headerButtons.forEach(btn => {
+btn.style.pointerEvents = isAuthenticated ? 'auto' : 'none';
+btn.style.opacity = isAuthenticated ? '1' : '0.4';
+});
 }
 
 // --- Controlador de Animación de Carga K+AIR ---
@@ -2024,9 +2034,6 @@ setAuthUIState(false);
 const mainContainer = document.querySelector('.main-container');
 if (mainContainer) mainContainer.classList.add('vanta-fullscreen');
 
-const appHeader = document.getElementById('app-header');
-if (appHeader) appHeader.classList.add('app-header-collapsed');
-
 contentArea.innerHTML = '';
 
   const authScreen = document.createElement('div');
@@ -2364,10 +2371,7 @@ sidebar.classList.add('sidebar-hidden');
 const mainContainerForHome = document.querySelector('.main-container');
 if (mainContainerForHome) mainContainerForHome.classList.add('vanta-fullscreen');
 
-const appHeaderForHome = document.getElementById('app-header');
-if (appHeaderForHome) appHeaderForHome.classList.add('app-header-collapsed');
-
-  // Cargar dinámicamente las empresas desde la configuración
+// Cargar dinámicamente las empresas desde la configuración
   let dynamicCompanies = [];
   
   // === FUNCIÓN AUXILIAR PARA VERIFICAR SI ES ADMIN ===
@@ -2522,9 +2526,6 @@ currentCompany = companyName;
 const mainContainerSel = document.querySelector('.main-container');
 if (mainContainerSel) mainContainerSel.classList.remove('vanta-fullscreen');
 
-const appHeaderSel = document.getElementById('app-header');
-if (appHeaderSel) appHeaderSel.classList.remove('app-header-collapsed');
-
 // --- MOSTRAR SIDEBAR AL SELECCIONAR EMPRESA ---
   const sidebar = document.getElementById('sidebar');
   if (sidebar) {
@@ -2662,10 +2663,7 @@ currentSubmodule = null;
 const mainContainerLogout = document.querySelector('.main-container');
 if (mainContainerLogout) mainContainerLogout.classList.add('vanta-fullscreen');
 
-const appHeaderLogout = document.getElementById('app-header');
-if (appHeaderLogout) appHeaderLogout.classList.add('app-header-collapsed');
-
-  // Resetear UI
+// Resetear UI
   if (companyNameElement) {
     companyNameElement.textContent = 'Empresa';
   }
@@ -2731,10 +2729,7 @@ currentSubmodule = null;
 const mainContainerDash = document.querySelector('.main-container');
 if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
 
-const appHeaderDash = document.getElementById('app-header');
-if (appHeaderDash) appHeaderDash.classList.remove('app-header-collapsed');
-  
-  // ✅ LIMPIAR BOTÓN ACTIVO DEL SIDEBAR (estamos en dashboard, no en módulo)
+// ✅ LIMPIAR BOTÓN ACTIVO DEL SIDEBAR (estamos en dashboard, no en módulo)
   if (window.activeSidebarButton) {
     window.activeSidebarButton.classList.remove('active');
     window.activeSidebarButton = null;
@@ -3524,9 +3519,6 @@ return;
 const mainContainerMod = document.querySelector('.main-container');
 if (mainContainerMod) mainContainerMod.classList.remove('vanta-fullscreen');
 
-const appHeaderMod = document.getElementById('app-header');
-if (appHeaderMod) appHeaderMod.classList.remove('app-header-collapsed');
-
 currentModule = moduleName;
   // ✅ LIMPIAR ESTADO: Al cambiar de módulo, ya no estamos en un submódulo
   currentSubmodule = null;
@@ -3814,10 +3806,7 @@ currentSubmodule = submoduleName;
 const mainContainerSub = document.querySelector('.main-container');
 if (mainContainerSub) mainContainerSub.classList.remove('vanta-fullscreen');
 
-const appHeaderSub = document.getElementById('app-header');
-if (appHeaderSub) appHeaderSub.classList.remove('app-header-collapsed');
-
-  // Inspeccionar el DOM antes de limpiar
+// Inspeccionar el DOM antes de limpiar
   hideCalendar(); // No necesita argumento con la nueva implementación
 
   // ✅ Verificar que container no sea null
@@ -4969,10 +4958,7 @@ console.log('[RENDERER] Cargando vista de módulo:', viewPath);
 const mainContainerView = document.querySelector('.main-container');
 if (mainContainerView) mainContainerView.classList.remove('vanta-fullscreen');
 
-const appHeaderView = document.getElementById('app-header');
-if (appHeaderView) appHeaderView.classList.remove('app-header-collapsed');
-    
-    // Verificar que contentArea exista
+// Verificar que contentArea exista
     if (!contentArea) {
       console.error('contentArea is not defined or accessible in loadModuleViewInContentArea.');
       contentArea = document.getElementById('content-area');
