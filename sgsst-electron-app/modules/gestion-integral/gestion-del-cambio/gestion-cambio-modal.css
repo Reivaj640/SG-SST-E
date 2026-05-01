@@ -32,7 +32,7 @@
   border-radius: 0.5rem;
   box-shadow: 0 20px 60px rgba(0,0,0,0.3);
   width: 100%;
-  max-width: 1020px;
+  max-width: min(1200px, 90vw);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -458,10 +458,10 @@
 /* Column widths */
 .kair-gc-col-num   { width: 36px; text-align: center !important; color: #6c757d; font-weight: 600; }
 .kair-gc-col-resp  { width: 50px; }
-.kair-gc-col-esp   { width: 200px; }
-.kair-gc-col-pers  { width: 150px; }
-.kair-gc-col-date  { width: 130px; }
-.kair-gc-col-estado { width: 130px; }
+.kair-gc-col-esp { width: auto; min-width: 200px; }
+.kair-gc-col-pers { width: auto; min-width: 120px; }
+.kair-gc-col-date { width: auto; min-width: 110px; }
+.kair-gc-col-estado { width: auto; min-width: 110px; }
 
 /* ─── Decision Group ─────────────────────────── */
 .kair-gc-decision-group {
@@ -529,7 +529,7 @@
 
 .kair-gc-control-row {
   display: grid;
-  grid-template-columns: 160px 1fr;
+  grid-template-columns: auto 1fr;
   gap: 0.75rem;
   align-items: center;
   padding: 0.6rem 0.75rem;

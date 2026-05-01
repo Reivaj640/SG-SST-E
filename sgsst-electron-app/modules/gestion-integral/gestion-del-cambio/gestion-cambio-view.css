@@ -24,9 +24,7 @@
 
 /* ─── Container ──────────────────────────────── */
 .kair-gc-container {
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 1.5rem;
+padding: 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
@@ -41,7 +39,7 @@
   background-color: var(--kair-gc-card);
   border-bottom: 1px solid var(--kair-gc-border);
   padding: 0 1.5rem;
-  height: 60px;
+  min-height: 60px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -103,7 +101,7 @@
 /* ─── KPI Cards ──────────────────────────────── */
 .kair-gc-metrics-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1rem;
 }
 
