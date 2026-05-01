@@ -3784,7 +3784,7 @@ if (mainContainerSub) mainContainerSub.classList.remove('vanta-fullscreen');
   submoduleContentDiv.style.width = '100%';
   submoduleContentDiv.style.display = 'flex';
   submoduleContentDiv.style.flexDirection = 'column';
-  submoduleContentDiv.style.overflow = 'hidden';
+  submoduleContentDiv.style.overflowY = 'auto';
   container.appendChild(submoduleContentDiv);
 
   try {
