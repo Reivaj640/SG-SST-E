@@ -2782,47 +2782,7 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
     overflow: hidden;
   `;
 
-  // --- HEADER ---
-  const header = document.createElement('header');
-  header.style.cssText = `
-    height: 70px;
-    border-bottom: 1px solid #e2e8f0;
-    padding: 0 30px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: white;
-    flex-shrink: 0;
-    z-index: 10;
-  `;
 
-  const headerLeft = document.createElement('div');
-  headerLeft.innerHTML = `
-    <h1 style="font-size: 20px; font-weight: 700; color: #1e293b; margin: 0;">${currentCompany}</h1>
-    <p style="font-size: 12px; color: #64748b; margin-top: 2px;" id="company-info-text">SG-SST · Cargando información...</p>
-  `;
-
-  const notifBtn = document.createElement('button');
-  notifBtn.id = 'notif-btn';
-  notifBtn.style.cssText = `
-    width: 40px; height: 40px; border-radius: 50%; border: 1px solid #e2e8f0;
-    background: white; cursor: pointer; position: relative; display: flex;
-    align-items: center; justify-content: center; font-size: 16px; color: #64748b;
-    transition: all 0.2s;
-  `;
-  notifBtn.innerHTML = `
-    <i class="fas fa-bell"></i>
-    <span id="notif-badge" style="position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; background: #ef4444; color: white; border-radius: 50%; font-size: 10px; font-weight: 700; display: none; align-items: center; justify-content: center;">0</span>
-  `;
-  notifBtn.onmouseover = function() { this.style.background = '#174ea6'; this.style.color = 'white'; this.style.borderColor = '#174ea6'; };
-  notifBtn.onmouseout = function() { this.style.background = 'white'; this.style.color = '#64748b'; this.style.borderColor = '#e2e8f0'; };
-
-  header.appendChild(headerLeft);
-  const headerRight = document.createElement('div');
-  headerRight.style.cssText = 'display: flex; gap: 15px; align-items: center;';
-  headerRight.appendChild(notifBtn);
-  header.appendChild(headerRight);
-  dashboardContainer.appendChild(header);
 
   // --- KPIs ---
   const kpiRow = document.createElement('section');
@@ -3036,11 +2996,9 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
 async function loadDashboardData() {
   console.log('🔍 [DASHBOARD] loadDashboardData INICIANDO para:', currentCompany);
 
-  const tasksContainer = document.getElementById('tasks-container');
-  const notifBadge = document.getElementById('notif-badge');
-  
-  console.log('🔍 [DASHBOARD] tasks-container:', tasksContainer);
-  console.log('🔍 [DASHBOARD] notif-badge:', notifBadge);
+    const tasksContainer = document.getElementById('tasks-container');
+
+    console.log('🔍 [DASHBOARD] tasks-container:', tasksContainer);
 
   try {
     console.log('🔍 [DASHBOARD] Llamando a window.electronAPI.getDashboardSummary...');
@@ -3091,15 +3049,10 @@ async function loadDashboardData() {
       }
 
       // Actualizar badge de notificaciones
-      const totalTasks = data.tasks ? data.tasks.length : 0;
-      console.log('🔍 [DASHBOARD] Total tasks:', totalTasks);
-      if (notifBadge) {
-        notifBadge.textContent = totalTasks;
-        notifBadge.style.display = totalTasks > 0 ? 'flex' : 'none';
-        console.log('🔍 [DASHBOARD] Badge actualizado:', totalTasks);
-      }
+        const totalTasks = data.tasks ? data.tasks.length : 0;
+        console.log('🔍 [DASHBOARD] Total tasks:', totalTasks);
 
-      // Renderizar tareas
+        // Renderizar tareas
       console.log('🔍 [DASHBOARD] Llamando a renderTasks()');
       renderTasks(data.tasks || []);
 
@@ -3107,15 +3060,9 @@ async function loadDashboardData() {
       const recursosAlerts = data.kpis?.recursos_alerts || 0;
       const gestionSaludAlerts = data.kpis?.gestion_salud_alerts || 0;
       console.log('🔍 [DASHBOARD] Llamando a updateModuleBadges con recursos_alerts:', recursosAlerts, 'gestion_salud_alerts:', gestionSaludAlerts);
-      updateModuleBadges(data.module_status || {}, recursosAlerts, gestionSaludAlerts);
+        updateModuleBadges(data.module_status || {}, recursosAlerts, gestionSaludAlerts);
 
-      // Actualizar información de la empresa en el header
-      const companyInfoText = document.getElementById('company-info-text');
-      if (companyInfoText && data.company_info) {
-        companyInfoText.textContent = `SG-SST · Riesgo ${data.company_info.risk || 'N/A'} · ${data.company_info.employees || 'N/A'} Colaboradores`;
-      }
-
-      console.log('🔍 [DASHBOARD] loadDashboardData COMPLETADO');
+        console.log('🔍 [DASHBOARD] loadDashboardData COMPLETADO');
 
     } else {
       console.error('[DASHBOARD] Error en respuesta:', response.error);
