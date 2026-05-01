@@ -4095,7 +4095,8 @@ if (mainContainerSub) mainContainerSub.classList.remove('vanta-fullscreen');
         submoduleContentDiv,
         moduleName,
         submoduleName,
-        safeBackToModuleCallback
+        safeBackToModuleCallback,
+        currentCompany
       );
       if (!window.EvaluacionSeleccionComponent) {
         console.error('❌ EvaluacionSeleccionComponent no encontrado');
