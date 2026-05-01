@@ -4078,13 +4078,14 @@ if (mainContainerSub) mainContainerSub.classList.remove('vanta-fullscreen');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 
-    } else if (submoduleName === "2.9.1 Identificación y evaluación para la adquisición de bienes y servicios") {
-      createComponentSafely(window.EvaluacionProveedores,
-        submoduleContentDiv,
-        moduleName,
-        submoduleName,
-        safeBackToModuleCallback
-      );
+ } else if (submoduleName === "2.9.1 Identificación y evaluación para la adquisición de bienes y servicios") {
+ createComponentSafely(window.EvaluacionProveedores,
+ submoduleContentDiv,
+ moduleName,
+ submoduleName,
+ safeBackToModuleCallback,
+ currentCompany
+ );
       if (!window.EvaluacionProveedores) {
         console.error('❌ EvaluacionProveedores no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
@@ -4202,8 +4203,21 @@ if (mainContainerSub) mainContainerSub.classList.remove('vanta-fullscreen');
     } else if (submoduleName === "Registrar Ausentismo") {
       showRegistrarAusentismoContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
 
-    } else if (submoduleName === "1.1.3 Asignación de Recursos") {
-      showAsignacionRecursosContent(submoduleContentDiv);
+ } else if (submoduleName === "4.1.1 Metodologia IPEVR") {
+ createComponentSafely(window.MetodologiaIpevrComponent,
+ submoduleContentDiv,
+ currentCompany,
+ moduleName,
+ submoduleName,
+ safeBackToModuleCallback
+ );
+ if (!window.MetodologiaIpevrComponent) {
+ console.error('❌ MetodologiaIpevrComponent no encontrado');
+ showDevelopmentMessage(submoduleContentDiv, submoduleName);
+ }
+
+ } else if (submoduleName === "1.1.3 Asignación de Recursos") {
+ showAsignacionRecursosContent(submoduleContentDiv);
 
     } else {
       // ------------------ Submódulos genéricos ------------------ //

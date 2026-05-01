@@ -42,48 +42,221 @@
       overflow-x: auto;
     }
 
-    /* ── Header Bar ──────────────────────────────────────────── */
-    .kair-ar-header {
-      background: var(--kair-primary);
-      color: #fff;
-      padding: 0 24px;
-      height: 52px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      box-shadow: 0 2px 8px rgba(0,0,0,.18);
-    }
+/* ═══════════════════════════════════════════════════════════
+ HEADER K+AIR v2.0 — Patrón Simple (sin tabs)
+ ═══════════════════════════════════════════════════════════ */
+.kair-ar-header.kair-header {
+ background: #ffffff;
+ border-bottom: 1px solid #dee2e6;
+ flex-shrink: 0;
+ position: sticky;
+ top: 0;
+ z-index: 100;
+}
 
-    .kair-ar-header-left {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
+.kair-ar-header .kair-header__bar {
+ display: flex;
+ align-items: center;
+ justify-content: flex-start;
+ gap: 0.75rem;
+ min-height: 52px;
+ padding: 0 1.5rem;
+}
 
-    .kair-ar-header-logo svg {
-      width: 28px;
-      height: 28px;
-      flex-shrink: 0;
-    }
+.kair-ar-header .kair-header__left {
+ display: flex;
+ align-items: center;
+ gap: 0.5rem;
+}
 
-    .kair-ar-header-breadcrumb {
-      font-size: 13px;
-      font-weight: 500;
-      letter-spacing: .3px;
-      opacity: .95;
-    }
+.kair-ar-header .kair-header__back {
+ width: 32px;
+ height: 32px;
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ border: none;
+ background: transparent;
+ color: #5a6378;
+ border-radius: 0.375rem;
+ cursor: pointer;
+ transition: background 0.15s ease;
+ font-size: 1rem;
+}
 
-    .kair-ar-header-breadcrumb span {
-      opacity: .6;
-    }
+.kair-ar-header .kair-header__back:hover {
+ background: #e8f0fe;
+ color: #174ea6;
+}
 
-    .kair-ar-header-actions {
-      display: flex;
-      gap: 8px;
-    }
+.kair-ar-header .kair-header__divider {
+ width: 1px;
+ height: 24px;
+ background: #dee2e6;
+}
+
+.kair-ar-header .kair-header__center {
+ display: flex;
+ flex-direction: column;
+ gap: 0.125rem;
+}
+
+.kair-ar-header .kair-header__title {
+ font-size: 1.25rem;
+ font-weight: 600;
+ color: #1a1a2e;
+ margin: 0;
+ display: flex;
+ align-items: center;
+ gap: 0.5rem;
+}
+
+.kair-ar-header .kair-header__title i {
+ color: #174ea6;
+}
+
+.kair-ar-header .kair-header__breadcrumb {
+ display: flex;
+ align-items: center;
+ gap: 0.375rem;
+ list-style: none;
+ margin: 0;
+ padding: 0;
+ font-size: 0.8125rem;
+ font-weight: 400;
+ color: #5a6378;
+}
+
+.kair-ar-header .kair-header__breadcrumb li + li::before {
+ content: '\203A';
+ margin-right: 0.375rem;
+ color: #adb5bd;
+}
+
+.kair-ar-header .kair-header__breadcrumb a {
+ color: #5a6378;
+ text-decoration: none;
+}
+
+.kair-ar-header .kair-header__breadcrumb a:hover {
+ color: #174ea6;
+}
+
+.kair-ar-header .kair-header__breadcrumb--active {
+ color: #174ea6;
+ font-weight: 500;
+}
+
+.kair-ar-header .kair-header__right {
+ display: flex;
+ align-items: center;
+ gap: 0.75rem;
+ margin-left: auto;
+}
+
+.kair-ar-header .kair-header__company {
+ display: flex;
+ align-items: center;
+ gap: 0.375rem;
+ font-size: 0.8125rem;
+ font-weight: 400;
+ color: #5a6378;
+}
+
+.kair-ar-header .kair-header__company i {
+ font-size: 0.875rem;
+}
+
+.kair-ar-header .kair-header__action--ghost {
+ display: inline-flex;
+ align-items: center;
+ gap: 0.375rem;
+ padding: 0.375rem 0.75rem;
+ font-size: 0.8125rem;
+ font-weight: 500;
+ color: #5a6378;
+ background: transparent;
+ border: none;
+ border-radius: 0.375rem;
+ cursor: pointer;
+ transition: background 0.15s ease;
+ font-family: inherit;
+}
+
+.kair-ar-header .kair-header__action--ghost:hover {
+ background: #f0f2f5;
+ color: #1a1a2e;
+}
+
+/* Dark theme — Header v2.0 */
+[data-theme="dark"] .kair-ar-header.kair-header {
+ background: #2d3748;
+ border-bottom-color: #4a5568;
+}
+
+[data-theme="dark"] .kair-ar-header .kair-header__title {
+ color: #e9ecef;
+}
+
+[data-theme="dark"] .kair-ar-header .kair-header__breadcrumb,
+[data-theme="dark"] .kair-ar-header .kair-header__breadcrumb a {
+ color: #a0aec0;
+}
+
+[data-theme="dark"] .kair-ar-header .kair-header__breadcrumb--active {
+ color: #90cdf4;
+}
+
+[data-theme="dark"] .kair-ar-header .kair-header__company {
+ color: #a0aec0;
+}
+
+[data-theme="dark"] .kair-ar-header .kair-header__divider {
+ background: #4a5568;
+}
+
+[data-theme="dark"] .kair-ar-header .kair-header__back {
+ color: #a0aec0;
+}
+
+[data-theme="dark"] .kair-ar-header .kair-header__back:hover {
+ background: #4a5568;
+ color: #90cdf4;
+}
+
+[data-theme="dark"] .kair-ar-header .kair-header__action--ghost {
+ color: #a0aec0;
+}
+
+[data-theme="dark"] .kair-ar-header .kair-header__action--ghost:hover {
+ background: #4a5568;
+ color: #e9ecef;
+}
+
+/* Responsive — Header v2.0 */
+@media (max-width: 900px) {
+ .kair-ar-header .kair-header__bar {
+ min-height: 48px;
+ padding: 0 1rem;
+ }
+
+ .kair-ar-header .kair-header__center {
+ flex-direction: column;
+ gap: 0;
+ }
+
+ .kair-ar-header .kair-header__title {
+ font-size: 1rem;
+ }
+
+ .kair-ar-header .kair-header__right {
+ gap: 0.5rem;
+ }
+
+ .kair-ar-header .kair-header__company {
+ display: none;
+ }
+}
 
     /* ── Buttons ─────────────────────────────────────────────── */
     .kair-ar-btn {
@@ -221,11 +394,9 @@
     }
 
     /* ── Main Content ────────────────────────────────────────── */
-    .kair-ar-main {
-      max-width: 1600px;
-      margin: 0 auto;
-      padding: 20px 24px 40px;
-    }
+.kair-ar-main {
+ padding: 1.5rem 1.5rem 2.5rem;
+ }
 
     /* ── Title Section ───────────────────────────────────────── */
     .kair-ar-title-section {
@@ -246,12 +417,12 @@
     }
 
     /* ── Stats Cards ─────────────────────────────────────────── */
-    .kair-ar-stats {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 16px;
-      margin-bottom: 20px;
-    }
+.kair-ar-stats {
+ display: grid;
+ grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+ gap: 16px;
+ margin-bottom: 20px;
+ }
 
     .kair-ar-stat-card {
       background: var(--kair-card);
@@ -1110,56 +1281,49 @@
 </head>
 <body class="kair-ar-body">
 
-  <!-- ═══════════════════════════════════════════════════════════
-       HEADER BAR
-       ═══════════════════════════════════════════════════════════ -->
-  <header class="kair-ar-header">
-    <div class="kair-ar-header-left">
-      <button class="kair-ar-btn kair-ar-btn-light" id="btnVolver" title="Volver al módulo">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="15 18 9 12 15 6"/>
-        </svg>
-        Volver
-      </button>
-      <div class="kair-ar-header-logo">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-        </svg>
-      </div>
-      <div class="kair-ar-header-breadcrumb">
-        K+AIR — SG-SST <span>›</span> Módulo 2 <span>›</span> Submódulo 2.5.1
-      </div>
-    </div>
-    <div class="kair-ar-header-actions">
-      <button class="kair-ar-btn kair-ar-btn-success" id="btnGuardar"
-              style="display:none" title="Guardar todos los cambios en el Excel">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" stroke-width="2"
-             stroke-linecap="round" stroke-linejoin="round">
-          <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
-          <polyline points="17 21 17 13 7 13 7 21"/>
-          <polyline points="7 3 7 8 15 8"/>
-        </svg>
-        Guardar Cambios
-      </button>
-      <button class="kair-ar-btn kair-ar-btn-light" id="btnExportar" title="Exportar CSV">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-          <polyline points="7 10 12 15 17 10"/>
-          <line x1="12" y1="15" x2="12" y2="3"/>
-        </svg>
-        Exportar CSV
-      </button>
-      <button class="kair-ar-btn kair-ar-btn-light" id="btnActualizar" title="Actualizar datos">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="23 4 23 10 17 10"/>
-          <polyline points="1 20 1 14 7 14"/>
-          <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
-        </svg>
-        Actualizar
-      </button>
-    </div>
-  </header>
+<!-- ═══════════════════════════════════════════════════════════
+HEADER K+AIR v2.0 — Patrón Simple
+═══════════════════════════════════════════════════════════ -->
+<header class="kair-ar-header kair-header">
+ <div class="kair-header__bar">
+ <div class="kair-header__left">
+ <button class="kair-header__back" id="btnVolver" title="Volver al módulo principal">
+ <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+ </button>
+ </div>
+ <div class="kair-header__divider"></div>
+ <div class="kair-header__center">
+ <h1 class="kair-header__title">
+ <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#174ea6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+ Archivo y Retención Documental
+ </h1>
+ <ol class="kair-header__breadcrumb">
+ <li>Gestión Integral</li>
+ <li>2.5.1</li>
+ <li class="kair-header__breadcrumb--active">Archivo y Retención</li>
+ </ol>
+ </div>
+ <div class="kair-header__right">
+ <span class="kair-header__company">
+ <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><path d="M9 22V2h6v20"/></svg>
+ <span id="ar-header-company"></span>
+ </span>
+ <div class="kair-header__divider"></div>
+ <button class="kair-header__action--ghost" id="btnGuardar" style="display:none" title="Guardar cambios en el Excel">
+ <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+ Guardar
+ </button>
+ <button class="kair-header__action--ghost" id="btnExportar" title="Exportar CSV">
+ <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+ Exportar
+ </button>
+ <button class="kair-header__action--ghost" id="btnActualizar" title="Actualizar datos">
+ <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+ Actualizar
+ </button>
+ </div>
+ </div>
+</header>
 
   <!-- ═══════════════════════════════════════════════════════════
        MAIN CONTENT
@@ -2260,12 +2424,15 @@
       }
 
       // ── Initialize ───────────────────────────────────────────
-      function init() {
-        const params = new URLSearchParams(window.location.search);
-        companyName = params.get('company') || '';
+function init() {
+ const params = new URLSearchParams(window.location.search);
+ companyName = params.get('company') || '';
 
-        bindEvents();
-        loadData();
+ const companyEl = document.getElementById('ar-header-company');
+ if (companyEl) companyEl.textContent = companyName;
+
+ bindEvents();
+ loadData();
 
         window.parent.postMessage({ type: 'iframe-ready' }, '*');
       }

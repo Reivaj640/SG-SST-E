@@ -147,74 +147,248 @@
 
 /* Layout */
 .ep-module-container {
-    max-width: 1400px;
-    margin: 0 auto;
-    position: relative;
+ position: relative;
+ display: flex;
+ flex-direction: column;
+ height: 100%;
 }
 
-/* Header */
-.ep-module-header {
-    margin-bottom: 1.5rem;
-    border-bottom: 1px solid var(--ep-gray-300);
-    padding-bottom: 1rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
+/* Content scroll area */
+.ep-content-scroll {
+ flex: 1;
+ overflow-y: auto;
+ padding: 1.5rem;
 }
 
-.ep-header-content {
-    flex: 1;
+/* ========================================================================
+ HEADER K+AIR v2.0 — Patrón Simple (sin tabs)
+ ======================================================================== */
+.evaluacion-proveedores .kair-header {
+ background: #ffffff;
+ border-bottom: 1px solid #dee2e6;
+ flex-shrink: 0;
+ position: sticky;
+ top: 0;
+ z-index: 100;
 }
 
-.ep-btn-back-module {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    background-color: var(--ep-gray-200);
-    color: var(--ep-dark);
-    border: 1px solid var(--ep-gray-300);
-    border-radius: var(--ep-radius);
-    font-size: 0.85rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    white-space: nowrap;
-    height: fit-content;
-    align-self: center;
+.evaluacion-proveedores .kair-header__bar {
+ display: flex;
+ align-items: center;
+ justify-content: flex-start;
+ gap: 0.75rem;
+ min-height: 52px;
+ padding: 0 1.5rem;
 }
 
-.ep-btn-back-module:hover {
-    background-color: var(--ep-gray-300);
-    border-color: var(--ep-gray-600);
-    transform: translateX(-2px);
+.evaluacion-proveedores .kair-header__left {
+ display: flex;
+ align-items: center;
+ gap: 0.5rem;
 }
 
-.ep-btn-back-module i {
-    font-size: 1rem;
+.evaluacion-proveedores .kair-header__back {
+ width: 32px;
+ height: 32px;
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ border: none;
+ background: transparent;
+ color: #5a6378;
+ border-radius: 0.375rem;
+ cursor: pointer;
+ transition: background 0.15s ease;
+ font-size: 1rem;
 }
 
-.ep-module-title {
-    font-family: var(--ep-font-heading);
-    font-size: 1.5rem;
-    color: var(--ep-primary);
-    font-weight: 600;
-    margin: 0;
+.evaluacion-proveedores .kair-header__back:hover {
+ background: #e8f0fe;
+ color: #174ea6;
 }
 
-.ep-module-subtitle {
-    color: var(--ep-gray-600);
-    font-size: 0.9rem;
-    margin-top: 0.25rem;
+.evaluacion-proveedores .kair-header__divider {
+ width: 1px;
+ height: 24px;
+ background: #dee2e6;
 }
+
+.evaluacion-proveedores .kair-header__center {
+ display: flex;
+ flex-direction: column;
+ gap: 0.125rem;
+}
+
+.evaluacion-proveedores .kair-header__title {
+ font-size: 1.25rem;
+ font-weight: 600;
+ color: #1a1a2e;
+ margin: 0;
+ display: flex;
+ align-items: center;
+ gap: 0.5rem;
+}
+
+.evaluacion-proveedores .kair-header__title i {
+ color: #174ea6;
+}
+
+.evaluacion-proveedores .kair-header__breadcrumb {
+ display: flex;
+ align-items: center;
+ gap: 0.375rem;
+ list-style: none;
+ margin: 0;
+ padding: 0;
+ font-size: 0.8125rem;
+ font-weight: 400;
+ color: #5a6378;
+}
+
+.evaluacion-proveedores .kair-header__breadcrumb li + li::before {
+ content: '\203A';
+ margin-right: 0.375rem;
+ color: #adb5bd;
+}
+
+.evaluacion-proveedores .kair-header__breadcrumb a {
+ color: #5a6378;
+ text-decoration: none;
+}
+
+.evaluacion-proveedores .kair-header__breadcrumb a:hover {
+ color: #174ea6;
+}
+
+.evaluacion-proveedores .kair-header__breadcrumb--active {
+ color: #174ea6;
+ font-weight: 500;
+}
+
+.evaluacion-proveedores .kair-header__right {
+ display: flex;
+ align-items: center;
+ gap: 0.75rem;
+ margin-left: auto;
+}
+
+.evaluacion-proveedores .kair-header__company {
+ display: flex;
+ align-items: center;
+ gap: 0.375rem;
+ font-size: 0.8125rem;
+ font-weight: 400;
+ color: #5a6378;
+}
+
+.evaluacion-proveedores .kair-header__company i {
+ font-size: 0.875rem;
+}
+
+.evaluacion-proveedores .kair-header__action--ghost {
+ display: inline-flex;
+ align-items: center;
+ gap: 0.375rem;
+ padding: 0.375rem 0.75rem;
+ font-size: 0.8125rem;
+ font-weight: 500;
+ color: #5a6378;
+ background: transparent;
+ border: none;
+ border-radius: 0.375rem;
+ cursor: pointer;
+ transition: background 0.15s ease;
+ font-family: inherit;
+}
+
+.evaluacion-proveedores .kair-header__action--ghost:hover {
+ background: #f0f2f5;
+ color: #1a1a2e;
+}
+
+/* Dark theme — Header v2.0 */
+.evaluacion-proveedores[data-theme="dark"] .kair-header {
+ background: var(--k-bg-card, #2d3748);
+ border-bottom-color: var(--k-border, #4a5568);
+}
+
+.evaluacion-proveedores[data-theme="dark"] .kair-header__title {
+ color: #e9ecef;
+}
+
+.evaluacion-proveedores[data-theme="dark"] .kair-header__breadcrumb,
+.evaluacion-proveedores[data-theme="dark"] .kair-header__breadcrumb a {
+ color: #adb5bd;
+}
+
+.evaluacion-proveedores[data-theme="dark"] .kair-header__breadcrumb--active {
+ color: var(--k-primary, #4da6ff);
+}
+
+.evaluacion-proveedores[data-theme="dark"] .kair-header__company {
+ color: #adb5bd;
+}
+
+.evaluacion-proveedores[data-theme="dark"] .kair-header__divider {
+ background: var(--k-border, #4a5568);
+}
+
+.evaluacion-proveedores[data-theme="dark"] .kair-header__back {
+ color: #adb5bd;
+}
+
+.evaluacion-proveedores[data-theme="dark"] .kair-header__back:hover {
+ background: rgba(77, 166, 255, 0.15);
+ color: var(--k-primary, #4da6ff);
+}
+
+.evaluacion-proveedores[data-theme="dark"] .kair-header__action--ghost {
+ color: #adb5bd;
+}
+
+.evaluacion-proveedores[data-theme="dark"] .kair-header__action--ghost:hover {
+ background: rgba(255, 255, 255, 0.08);
+ color: #e9ecef;
+}
+
+/* Responsive — Header */
+@media (max-width: 768px) {
+ .evaluacion-proveedores .kair-header__bar {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  min-height: auto;
+ }
+
+ .evaluacion-proveedores .kair-header__center {
+  flex: 1 1 100%;
+  order: 3;
+ }
+
+ .evaluacion-proveedores .kair-header__title {
+  font-size: 1.1rem;
+ }
+
+ .evaluacion-proveedores .kair-header__right {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+ }
+
+ .evaluacion-proveedores .kair-header__company {
+  display: none;
+ }
+}
+
+/* ========================================================================
+ FIN HEADER K+AIR v2.0
+ ======================================================================== */
 
 /* Métricas */
 .ep-metrics-row {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1.5rem;
-    margin-bottom: 2rem;
+ display: grid;
+ grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+ gap: 1.5rem;
+ margin-bottom: 2rem;
 }
 
 .ep-metric-card {
@@ -285,16 +459,17 @@
 
 /* Tabla */
 .ep-data-table-container {
-    background: var(--ep-bg-card);
-    border-radius: var(--ep-radius);
-    box-shadow: var(--ep-shadow-sm);
-    overflow: hidden;
-    border: 1px solid var(--ep-gray-300);
+ background: var(--ep-bg-card);
+ border-radius: var(--ep-radius);
+ box-shadow: var(--ep-shadow-sm);
+ overflow-x: auto;
+ border: 1px solid var(--ep-gray-300);
 }
 
 .ep-data-table {
-    width: 100%;
-    border-collapse: collapse;
+ width: 100%;
+ border-collapse: collapse;
+ min-width: 900px;
 }
 
 .ep-data-table th,
@@ -800,13 +975,10 @@
    VISTA DE DETALLE (FICHA TÉCNICA DE PROVEEDOR)
    ======================================================================== */
 .ep-detail-view {
-    display: none; /* Oculto por defecto */
-    max-width: 1200px;
-    margin: 0 auto;
-    animation: epFadeIn 0.3s ease-in-out;
-    min-height: 100vh;
-    padding: 1rem;
-    box-sizing: border-box;
+ display: none;
+ animation: epFadeIn 0.3s ease-in-out;
+ padding: 1rem;
+ box-sizing: border-box;
 }
 
 .ep-detail-view[style*="display: block"] {
@@ -1077,28 +1249,20 @@
 
 /* Responsive */
 @media (max-width: 1200px) {
-    .ep-metrics-row {
-        grid-template-columns: repeat(2, 1fr);
-    }
+ .ep-form-grid {
+  grid-template-columns: 1fr;
+ }
 
-    .ep-form-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .ep-evidence-section {
-        grid-column: span 1;
-    }
+ .ep-evidence-section {
+  grid-column: span 1;
+ }
 }
 
 @media (max-width: 768px) {
-    .ep-metrics-row {
-        grid-template-columns: 1fr;
-    }
-
-    .ep-toolbar {
-        flex-direction: column;
-        align-items: stretch;
-    }
+ .ep-toolbar {
+  flex-direction: column;
+  align-items: stretch;
+ }
 
     .ep-search-box {
         flex-direction: column;
