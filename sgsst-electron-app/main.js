@@ -9551,7 +9551,8 @@ async function calculateInduccionesStats(basePath, companyName) {
     pendientes: 0,               // ← CAMBIA: Ahora es employees - completadas
     porcentajeCompletado: 0,     // ← CAMBIA: (completadas / employees) * 100
     mensual: new Array(12).fill(0),
-    ultimoMesRegistrado: null    // ← NUEVO: Último mes con inducción completada
+    mensualApproved: new Array(12).fill(0),
+    ultimoMesRegistrado: null // ← NUEVO: Último mes con inducción completada
   };
   try {
     // ========================================================================
@@ -9569,27 +9570,57 @@ async function calculateInduccionesStats(basePath, companyName) {
       }
     }
 
-    if (!basePath) return stats;
+  if (!basePath) return stats;
 
-    const recursosPath = path.join(basePath, '1. Recursos');
-    let targetPath = path.join(recursosPath, '1.1 Inducción y Reinducción');
+  const recursosPath = path.join(basePath, '1. Recursos');
+  let targetPath = path.join(recursosPath, '1.1 Inducción y Reinducción');
 
-    if (!fs.existsSync(targetPath)) {
-       if (fs.existsSync(recursosPath)) {
-            const subs = await fsp.readdir(recursosPath);
-            const indFolder = subs.find(s => s.includes('1.1') || s.toLowerCase().includes('inducci'));
-            if (indFolder) targetPath = path.join(recursosPath, indFolder);
-        }
+  if (!fs.existsSync(targetPath)) {
+    sendLog(`[INDUCCIONES-STATS] Ruta estándar no existe, buscando alternativas...`, 'DEBUG');
+    if (fs.existsSync(recursosPath)) {
+      const subs = await fsp.readdir(recursosPath);
+      sendLog(`[INDUCCIONES-STATS] Subcarpetas en Recursos: ${subs.join(', ')}`, 'DEBUG');
+
+      const normalize = (str) => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const indFolder = subs.find(s => {
+        const norm = normalize(s);
+        return norm.includes('induccion') || norm.includes('reinduccion');
+      });
+      const indFolderNumeric = subs.find(s => {
+        const norm = normalize(s);
+        return (s.startsWith('1.1') || s.startsWith('1.2')) && norm.includes('induccion');
+      });
+      const fallbackFolder = subs.find(s => s.includes('1.1') || normalize(s).includes('inducci'));
+      const finalFolder = indFolder || indFolderNumeric || fallbackFolder;
+
+      sendLog(`[INDUCCIONES-STATS] Carpeta encontrada: ${finalFolder || 'NINGUNA'}`, 'DEBUG');
+      if (finalFolder) targetPath = path.join(recursosPath, finalFolder);
     }
+  }
 
-    if (!fs.existsSync(targetPath)) return stats;
+  if (!fs.existsSync(targetPath)) {
+    sendLog(`[INDUCCIONES-STATS] No se encontró carpeta de inducciones. Ruta buscada: ${targetPath}`, 'WARN');
+    return stats;
+  }
 
-    const files = await fsp.readdir(targetPath);
-    // Filtrar archivos Excel que coincidan con ACT-FO-046
-    const excelFiles = files.filter(f =>
-        !f.startsWith('~$') && (f.endsWith('.xlsx') || f.endsWith('.xls')) &&
-        f.toLowerCase().includes('act-fo-046')
-    );
+  const files = await fsp.readdir(targetPath);
+  sendLog(`[INDUCCIONES-STATS] Archivos en carpeta: ${files.join(', ')}`, 'DEBUG');
+
+  const excelFiles = files.filter(f => {
+    if (!f.startsWith('~$') && (f.endsWith('.xlsx') || f.endsWith('.xls'))) {
+      const lowerName = f.toLowerCase();
+      return lowerName.includes('inducción') ||
+             lowerName.includes('induccion') ||
+             lowerName.includes('inducciones') ||
+             lowerName.includes('fo-046') ||
+             lowerName.includes('fo_046') ||
+             lowerName.includes('046') ||
+             lowerName.includes('registro');
+    }
+    return false;
+  });
+
+  sendLog(`[INDUCCIONES-STATS] Archivos Excel coincidentes: ${excelFiles.join(', ') || 'NINGUNO'}`, 'DEBUG');
 
     // Track del último mes registrado
     let ultimoMesIndex = -1;
@@ -9627,13 +9658,33 @@ async function calculateInduccionesStats(basePath, companyName) {
                 // Año en Col E (4) como respaldo
                 const yearVal = row[4] ? parseInt(row[4]) : null;
 
-                // Contar si es del año actual
-                if ((rowDate && rowDate.getFullYear() === currentYear) || yearVal === currentYear) {
-                    stats.totalInducciones++;
-                    stats.completadas++;
-                    if (rowDate) stats.mensual[rowDate.getMonth()]++;
+      // Contar si es del año actual
+      if ((rowDate && rowDate.getFullYear() === currentYear) || yearVal === currentYear) {
+        stats.totalInducciones++;
+        stats.completadas++;
+        if (rowDate) stats.mensual[rowDate.getMonth()]++;
 
-                    // Track del último mes encontrado (considerando año + mes)
+        // Determinar si es aprobada (misma lógica que get-inducciones-data)
+        let isApproved = false;
+        const rawScore = row[1];
+        let numericScore = 0;
+        if (typeof rawScore === 'number') {
+          numericScore = rawScore;
+        } else if (typeof rawScore === 'string') {
+          const p = parseFloat(rawScore);
+          numericScore = isNaN(p) ? 0 : p;
+        }
+        const colC = row[2] ? row[2].toString().toLowerCase().trim() : '';
+        if (colC.includes('aprob') && !colC.includes('reprob')) {
+          isApproved = true;
+        } else if (colC.includes('reprob')) {
+          isApproved = false;
+        } else {
+          isApproved = numericScore >= 20;
+        }
+        if (isApproved && rowDate) stats.mensualApproved[rowDate.getMonth()]++;
+
+        // Track del último mes encontrado (considerando año + mes)
                     if (rowDate) {
                         const monthIndex = rowDate.getMonth();
                         const fileYear = rowDate.getFullYear();
@@ -9656,18 +9707,11 @@ async function calculateInduccionesStats(basePath, companyName) {
     // Asignar último mes registrado
     stats.ultimoMesRegistrado = ultimoMesRegistrado ? ultimoMesRegistrado.display : null;
 
-    // ========================================================================
-    // 2. CALCULAR PENDIENTES Y PORCENTAJE REAL BASADO EN TRABAJADORES
-    // ========================================================================
-    // Convertir mensual a acumulado para el gráfico de tendencia
-    let cumulative = 0;
-    const trendData = [...stats.mensual];
-    for (let i = 0; i < 12; i++) {
-        cumulative += trendData[i];
-        stats.mensual[i] = cumulative;
-    }
+  // ========================================================================
+  // 2. CALCULAR PENDIENTES Y PORCENTAJE REAL BASADO EN TRABAJADORES
+  // ========================================================================
 
-    // Calcular pendientes: trabajadores que NO han recibido inducción
+  // Calcular pendientes: trabajadores que NO han recibido inducción
     stats.pendientes = Math.max(0, stats.totalTrabajadores - stats.completadas);
 
     // Calcular porcentaje REAL: (completadas / totalTrabajadores) * 100
@@ -9678,7 +9722,7 @@ async function calculateInduccionesStats(basePath, companyName) {
         stats.porcentajeCompletado = stats.totalInducciones > 0 ? 100 : 0;
     }
 
-    sendLog(`[DEBUG] calculateInduccionesStats - Completadas: ${stats.completadas}, Pendientes: ${stats.pendientes}, Porcentaje: ${stats.porcentajeCompletado}%, Último: ${stats.ultimoMesRegistrado || 'N/A'}`, 'DEBUG');
+    sendLog(`[INDUCCIONES-STATS] Completadas: ${stats.completadas}, Pendientes: ${stats.pendientes}, Porcentaje: ${stats.porcentajeCompletado}%, Último: ${stats.ultimoMesRegistrado || 'N/A'}, Mensual: [${stats.mensual.join(',')}], Approved: [${stats.mensualApproved.join(',')}]`, 'INFO');
 
   } catch (e) {
     sendLog(`Error calculando inducciones: ${e.message}`, 'WARN');

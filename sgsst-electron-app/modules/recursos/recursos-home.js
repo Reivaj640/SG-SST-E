@@ -579,7 +579,7 @@ margin-bottom: 0.5rem;
 
             // Inicializar estructura base
             this.resourceStats = {
-                inducciones: { totalTrabajadores: 0, totalInducciones: 0, completadas: 0, pendientes: 0, porcentajeCompletado: 0, mensual: new Array(12).fill(0) },
+                inducciones: { totalTrabajadores: 0, totalInducciones: 0, completadas: 0, pendientes: 0, porcentajeCompletado: 0, mensual: new Array(12).fill(0), mensualApproved: new Array(12).fill(0) },
                 capacitaciones: { totalCapacitaciones: 0, programadas: 0, realizadas: 0, porcentajeCumplimiento: 0, mensual: { programadas: new Array(12).fill(0), realizadas: new Array(12).fill(0) } },
                 epps: { totalEPPs: 0, entregados: 0, pendientes: 0, stockActual: 0 },
                 copasst: { totalActas: 0, actaMesEnCurso: false, ultimoMesRegistrado: null, actasAnio: 0, estado: 'ok', alertas: [] },
@@ -1812,32 +1812,43 @@ margin-bottom: 0.5rem;
             });
         }
 
-        // 3. Induction Chart (Line: Tendencia)
-        const ctxInduction = document.getElementById('inductionChart');
-        if(ctxInduction && typeof Chart !== 'undefined') {
-            const iData = this.resourceStats?.inducciones?.mensual || new Array(12).fill(0);
+    // 3. Induction Chart (Line: Realizadas vs Aprobadas)
+    const ctxInduction = document.getElementById('inductionChart');
+    if(ctxInduction && typeof Chart !== 'undefined') {
+      const iData = this.resourceStats?.inducciones?.mensual || new Array(12).fill(0);
+      const iApproved = this.resourceStats?.inducciones?.mensualApproved || new Array(12).fill(0);
 
-            this.charts.induction = new Chart(ctxInduction, {
-                type: 'line',
-                data: {
-                    labels: labels12,
-                    datasets: [{
-                        label: 'Inducciones Acumuladas',
-                        data: iData,
-                        borderColor: '#ffc107',
-                        backgroundColor: 'rgba(255, 193, 7, 0.1)',
-                        fill: true,
-                        tension: 0.3
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true } }
-                }
-            });
+      this.charts.induction = new Chart(ctxInduction, {
+        type: 'line',
+        data: {
+          labels: labels12,
+          datasets: [
+            {
+              label: 'Realizadas',
+              data: iData,
+              borderColor: '#174ea6',
+              backgroundColor: 'rgba(23,78,166,0.1)',
+              fill: true,
+              tension: 0.4
+            },
+            {
+              label: 'Aprobadas',
+              data: iApproved,
+              borderColor: '#28a745',
+              backgroundColor: 'rgba(40,167,69,0.1)',
+              fill: true,
+              tension: 0.4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom' } },
+          scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
         }
+      });
+    }
     }
 
     // Método para obtener datos específicos del dashboard de capacitaciones para la gráfica
