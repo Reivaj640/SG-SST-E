@@ -1,7 +1,7 @@
 /* ==========================================================================
 K+AIR — Módulo 4.2.4 Inspecciones Sistemáticas
 Componente principal — Type C Direct DOM con Header v2.0 Patrón 4
-Constructor: (container, moduleName, submoduleTitle, backToModuleCallback, currentCompany)
+Constructor: (container, currentCompany, moduleName, submoduleTitle, backToModuleCallback)
 ========================================================================== */
 (function () {
   'use strict';
@@ -13,12 +13,12 @@ Constructor: (container, moduleName, submoduleTitle, backToModuleCallback, curre
     { key: 'historial', label: 'Historial', icon: 'bi-clock-history' }
   ];
 
-  function InspeccionesComponent(container, moduleName, submoduleTitle, backToModuleCallback, currentCompany) {
+function InspeccionesComponent(container, currentCompany, moduleName, submoduleTitle, backToModuleCallback) {
     this.container = container;
+    this.currentCompany = currentCompany;
     this.moduleName = moduleName;
     this.submoduleTitle = submoduleTitle;
     this.backToModuleCallback = backToModuleCallback;
-    this.currentCompany = currentCompany;
     this.currentView = 'dashboard';
     this.cssLoaded = false;
   }
@@ -38,24 +38,27 @@ Constructor: (container, moduleName, submoduleTitle, backToModuleCallback, curre
     this.container.innerHTML = '';
   };
 
-  InspeccionesComponent.prototype._loadCSS = function (callback) {
-    if (this.cssLoaded) {
-      callback();
-      return;
-    }
-    var link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = '../modules/gestion-peligros/inspecciones/inspecciones.css';
-    link.onload = function () {
-      this.cssLoaded = true;
-      callback();
-    }.bind(this);
-    link.onerror = function () {
-      this.cssLoaded = true;
-      callback();
-    }.bind(this);
-    document.head.appendChild(link);
-  };
+InspeccionesComponent.prototype._loadCSS = function (callback) {
+  var cssHref = 'modules/gestion-peligros/inspecciones/inspecciones.css';
+  var existingLink = document.querySelector('link[href="' + cssHref + '"]');
+  if (existingLink || this.cssLoaded) {
+    this.cssLoaded = true;
+    callback();
+    return;
+  }
+  var link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = cssHref;
+  link.onload = function () {
+    this.cssLoaded = true;
+    callback();
+  }.bind(this);
+  link.onerror = function () {
+    this.cssLoaded = true;
+    callback();
+  }.bind(this);
+  document.head.appendChild(link);
+};
 
   InspeccionesComponent.prototype._renderUI = function () {
     var self = this;
@@ -63,7 +66,7 @@ Constructor: (container, moduleName, submoduleTitle, backToModuleCallback, curre
     var tabsHtml = VIEWS.map(function (v) {
       var badgeHtml = '';
       if (v.key === 'dashboard' || v.key === 'programa') {
-        badgeHtml = '<span class="kair-header__tab-badge" id="kair-insp-tab-badge-pending" style="display:none;">0</span>';
+        badgeHtml = '<span class="kair-header__tab-badge" id="kair-insp-tab-badge-' + v.key + '" style="display:none;">0</span>';
       }
       return '<button class="kair-header__tab' + (v.key === 'dashboard' ? ' active' : '') + '" data-view="' + v.key + '">' +
         '<i class="bi ' + v.icon + '"></i> ' + v.label + ' ' + badgeHtml +

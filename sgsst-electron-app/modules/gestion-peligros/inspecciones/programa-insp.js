@@ -22,24 +22,24 @@ Sub-módulo: Grilla anual con toggle c/p, KPIs, exportar
       if (!container) return;
 
       var self = this;
-      InspeccionesService.getSchedule(this.companyName, this.currentYear).then(function (result) {
-        if (!result.success) return;
-        var kpis = result.data.kpis;
-        var rateClass = kpis.indicator >= 80 ? 'success' : (kpis.indicator >= 50 ? 'warning' : 'primary');
-        container.innerHTML =
-          '<div class="kair-insp__kpi-card">' +
-            '<div class="kair-insp__kpi-value kair-insp__kpi-value--' + rateClass + '">' + kpis.indicator + '%</div>' +
-            '<div class="kair-insp__kpi-label">Indicador de Cumplimiento</div>' +
-          '</div>' +
-          '<div class="kair-insp__kpi-card">' +
-            '<div class="kair-insp__kpi-value kair-insp__kpi-value--success">' + kpis.completed + '</div>' +
-            '<div class="kair-insp__kpi-label">Completadas</div>' +
-          '</div>' +
-          '<div class="kair-insp__kpi-card">' +
-            '<div class="kair-insp__kpi-value kair-insp__kpi-value--warning">' + kpis.pending + '</div>' +
-            '<div class="kair-insp__kpi-label">Pendientes</div>' +
-          '</div>';
-      });
+        InspeccionesService.getSchedule(this.companyName, this.currentYear).then(function (result) {
+            if (!result.success) return;
+            var kpis = result.data.kpis;
+            var rateClass = kpis.indicator >= 80 ? 'success' : (kpis.indicator >= 50 ? 'warning' : 'primary');
+            container.innerHTML =
+                '<div class="kair-insp__kpi-card">' +
+                '<div class="kair-insp__kpi-value kair-insp__kpi-value--' + rateClass + '">' + kpis.indicator + '%</div>' +
+                '<div class="kair-insp__kpi-label">Indicador de Cumplimiento</div>' +
+                '</div>' +
+                '<div class="kair-insp__kpi-card">' +
+                '<div class="kair-insp__kpi-value kair-insp__kpi-value--success">' + kpis.completed + '</div>' +
+                '<div class="kair-insp__kpi-label">Completadas</div>' +
+                '</div>' +
+                '<div class="kair-insp__kpi-card">' +
+                '<div class="kair-insp__kpi-value kair-insp__kpi-value--warning">' + kpis.pending + '</div>' +
+                '<div class="kair-insp__kpi-label">Pendientes</div>' +
+                '</div>';
+        }).catch(function (err) { console.error('[4.2.4] getSchedule (kpis) error:', err); });
     },
 
     renderTable: function () {
@@ -86,8 +86,8 @@ Sub-módulo: Grilla anual con toggle c/p, KPIs, exportar
           '</div>';
 
         self.bindCellToggle();
-        self.bindExport();
-      });
+            self.bindExport();
+        }).catch(function (err) { console.error('[4.2.4] getSchedule (table) error:', err); });
     },
 
     bindCellToggle: function () {
@@ -106,10 +106,10 @@ Sub-módulo: Grilla anual con toggle c/p, KPIs, exportar
           } else {
             nextStatus = 'p';
           }
-          InspeccionesService.updateMonth(self.companyName, activityId, month, nextStatus).then(function () {
-            self.renderKPIs();
-            self.renderTable();
-          });
+            InspeccionesService.updateMonth(self.companyName, activityId, month, nextStatus).then(function () {
+                self.renderKPIs();
+                self.renderTable();
+            }).catch(function (err) { console.error('[4.2.4] updateMonth error:', err); });
         });
       });
     },
@@ -119,30 +119,30 @@ Sub-módulo: Grilla anual con toggle c/p, KPIs, exportar
       if (!btn) return;
       var self = this;
       btn.addEventListener('click', function () {
-        InspeccionesService.getSchedule(self.companyName, self.currentYear).then(function (result) {
-          if (!result.success) return;
-          var schedule = result.data;
-          var csvContent = 'Actividad,Tipo,Frecuencia,' + MONTHS.join(',') + '\n';
-          schedule.activities.forEach(function (act) {
-            var row = [
-              '"' + act.name + '"',
-              act.type,
-              act.frequency
-            ];
-            for (var i = 0; i < 12; i++) {
-              row.push(act.months[i] === 'c' ? 'Completada' : (act.months[i] === 'p' ? 'Pendiente' : ''));
-            }
-            csvContent += row.join(',') + '\n';
-          });
-          var blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-          var url = URL.createObjectURL(blob);
-          var link = document.createElement('a');
-          link.href = url;
-          link.download = 'Programa_Inspecciones_' + self.currentYear + '.csv';
-          link.click();
-          URL.revokeObjectURL(url);
-          self.showNotification('Programa exportado como CSV', 'success');
-        });
+            InspeccionesService.getSchedule(self.companyName, self.currentYear).then(function (result) {
+                if (!result.success) return;
+                var schedule = result.data;
+                var csvContent = 'Actividad,Tipo,Frecuencia,' + MONTHS.join(',') + '\n';
+                schedule.activities.forEach(function (act) {
+                    var row = [
+                        '"' + act.name + '"',
+                        act.type,
+                        act.frequency
+                    ];
+                    for (var i = 0; i < 12; i++) {
+                        row.push(act.months[i] === 'c' ? 'Completada' : (act.months[i] === 'p' ? 'Pendiente' : ''));
+                    }
+                    csvContent += row.join(',') + '\n';
+                });
+                var blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+                var url = URL.createObjectURL(blob);
+                var link = document.createElement('a');
+                link.href = url;
+                link.download = 'Programa_Inspecciones_' + self.currentYear + '.csv';
+                link.click();
+                URL.revokeObjectURL(url);
+                self.showNotification('Programa exportado como CSV', 'success');
+            }).catch(function (err) { console.error('[4.2.4] getSchedule (export) error:', err); });
       });
     },
 

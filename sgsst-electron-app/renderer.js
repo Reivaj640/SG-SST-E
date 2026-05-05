@@ -3821,13 +3821,18 @@ if (mainContainerSub) mainContainerSub.classList.remove('vanta-fullscreen');
         }
       }
 
-      if (ComponentConstructor) {
-        const component = new ComponentConstructor(...args);
-        // Guardar referencia al componente activo
-        currentActiveComponent = component;
-        component.render();
-        return component;
-      } else {
+    if (ComponentConstructor) {
+        try {
+            const component = new ComponentConstructor(...args);
+            currentActiveComponent = component;
+            component.render();
+            return component;
+        } catch (e) {
+            console.error('❌ Error al crear/renderizar componente:', e);
+            currentActiveComponent = null;
+            return null;
+        }
+    } else {
         console.error(`❌ Constructor de componente no encontrado`);
         return null;
       }
@@ -4217,13 +4222,13 @@ showDevelopmentMessage(submoduleContentDiv, submoduleName);
 }
 
 } else if (submoduleName === "4.2.4 Realización de inspecciones sistematicas a las instalaciones, maquinas o equipos") {
-createComponentSafely(window.InspeccionesComponent,
-submoduleContentDiv,
-moduleName,
-submoduleName,
-safeBackToModuleCallback,
-currentCompany
-);
+                createComponentSafely(window.InspeccionesComponent,
+                    submoduleContentDiv,
+                    currentCompany,
+                    moduleName,
+                    submoduleName,
+                    safeBackToModuleCallback
+                );
 if (!window.InspeccionesComponent) {
 console.error('❌ InspeccionesComponent no encontrado');
 showDevelopmentMessage(submoduleContentDiv, submoduleName);

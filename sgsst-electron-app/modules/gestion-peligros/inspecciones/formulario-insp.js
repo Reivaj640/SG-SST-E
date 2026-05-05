@@ -31,20 +31,21 @@ Sub-módulo: Formulario dinámico con auto-save, lectura/escritura Excel
 
       container.innerHTML = '<div class="kair-insp-loading"><div class="kair-insp-spinner"></div><p>Cargando formulario...</p></div>';
 
-      InspeccionesService.readExcel(this.companyName, 'EXTINTOR').then(function (result) {
-        if (!result.success) {
-          container.innerHTML = '<div class="kair-insp-empty-state"><i class="bi bi-exclamation-circle"></i><h3>Error</h3><p>' + (result.error ? result.error.message : 'No se pudo cargar la plantilla') + '</p></div>';
-          return;
-        }
-        self.templateData = result.data;
-        self.renderForm(result.data);
-        self.startAutoSave();
-      });
+        InspeccionesService.readExcel(this.companyName, 'EXTINTOR').then(function (result) {
+            if (!result.success) {
+                container.innerHTML = '<div class="kair-insp-empty-state"><i class="bi bi-exclamation-circle"></i><h3>Error</h3><p>' + (result.error ? result.error.message : 'No se pudo cargar la plantilla') + '</p></div>';
+                return;
+            }
+            self.templateData = result.data;
+            self.renderForm(result.data);
+            self.startAutoSave();
+        }).catch(function (err) { console.error('[4.2.4] readExcel error:', err); });
     },
 
-    renderForm: function (template) {
-      var container = document.getElementById('kair-insp-formulario-content');
-      if (!container) return;
+  renderForm: function (template) {
+    var self = this;
+    var container = document.getElementById('kair-insp-formulario-content');
+    if (!container) return;
 
       var items = template.items || [];
       var header = template.structure && template.structure.headerRows && template.structure.headerRows[0] ? template.structure.headerRows[0].cells : [];
@@ -285,27 +286,27 @@ Sub-módulo: Formulario dinámico con auto-save, lectura/escritura Excel
 
       var self = this;
 
-      if (writeToExcel) {
-        InspeccionesService.writeExcel(this.companyName, 'EXTINTOR', formData).then(function (result) {
-          if (result.success) {
-            self.markClean();
-            self.clearDraft();
-            self.showNotification('Formulario guardado en Excel correctamente', 'success');
-          } else {
-            self.showNotification('Error al guardar en Excel: ' + (result.error ? result.error.message : 'Desconocido'), 'error');
-          }
-        });
-      } else {
-        InspeccionesService.writeExcel(this.companyName, 'EXTINTOR', formData).then(function (result) {
-          if (result.success) {
-            self.markClean();
-            self.clearDraft();
-            self.showNotification('Formulario guardado correctamente', 'success');
-          } else {
-            self.showNotification('Error al guardar: ' + (result.error ? result.error.message : 'Desconocido'), 'error');
-          }
-        });
-      }
+        if (writeToExcel) {
+            InspeccionesService.writeExcel(this.companyName, 'EXTINTOR', formData).then(function (result) {
+                if (result.success) {
+                    self.markClean();
+                    self.clearDraft();
+                    self.showNotification('Formulario guardado en Excel correctamente', 'success');
+                } else {
+                    self.showNotification('Error al guardar en Excel: ' + (result.error ? result.error.message : 'Desconocido'), 'error');
+                }
+            }).catch(function (err) { console.error('[4.2.4] writeExcel error:', err); });
+        } else {
+            InspeccionesService.writeExcel(this.companyName, 'EXTINTOR', formData).then(function (result) {
+                if (result.success) {
+                    self.markClean();
+                    self.clearDraft();
+                    self.showNotification('Formulario guardado correctamente', 'success');
+                } else {
+                    self.showNotification('Error al guardar: ' + (result.error ? result.error.message : 'Desconocido'), 'error');
+                }
+            }).catch(function (err) { console.error('[4.2.4] writeExcel error:', err); });
+        }
     },
 
     showNotification: function (message, type) {

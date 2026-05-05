@@ -93,8 +93,8 @@ Sub-módulo: Tabla, filtros, búsqueda, acciones CRUD
       if (!container) return;
 
       var self = this;
-      InspeccionesService.listInspections(this.companyName, this.currentFilters).then(function (result) {
-        if (!result.success) return;
+        InspeccionesService.listInspections(this.companyName, this.currentFilters).then(function (result) {
+            if (!result.success) return;
         var items = result.data.items;
 
         if (items.length === 0) {
@@ -150,7 +150,7 @@ Sub-módulo: Tabla, filtros, búsqueda, acciones CRUD
         '</div>';
 
         self.bindRowActions();
-      });
+        }).catch(function (err) { console.error('[4.2.4] listInspections error:', err); });
     },
 
     _esc: function (val) {
@@ -216,7 +216,7 @@ Sub-módulo: Tabla, filtros, búsqueda, acciones CRUD
           '</div>';
 
         modal.classList.add('visible');
-      });
+        }).catch(function (err) { console.error('[4.2.4] getInspection error:', err); });
     },
 
     confirmDelete: function (id) {
@@ -247,14 +247,14 @@ Sub-módulo: Tabla, filtros, búsqueda, acciones CRUD
 
     deleteInspection: function (id) {
       var self = this;
-      InspeccionesService.deleteInspection(this.companyName, id).then(function (result) {
-        if (result.success) {
-          self.showNotification('Inspección eliminada', 'success');
-          self.renderTable();
-        } else {
-          self.showNotification('Error al eliminar', 'error');
-        }
-      });
+        InspeccionesService.deleteInspection(this.companyName, id).then(function (result) {
+            if (result.success) {
+                self.showNotification('Inspección eliminada', 'success');
+                self.renderTable();
+            } else {
+                self.showNotification('Error al eliminar', 'error');
+            }
+        }).catch(function (err) { console.error('[4.2.4] deleteInspection error:', err); });
     },
 
     showNewModal: function () {
@@ -319,14 +319,14 @@ Sub-módulo: Tabla, filtros, búsqueda, acciones CRUD
       };
 
       var self = this;
-      InspeccionesService.createInspection(this.companyName, inspectionData).then(function (result) {
-        if (result.success) {
-          self.showNotification('Inspección creada correctamente', 'success');
-          self.renderTable();
-        } else {
-          self.showNotification('Error al crear inspección', 'error');
-        }
-      });
+        InspeccionesService.createInspection(this.companyName, inspectionData).then(function (result) {
+            if (result.success) {
+                self.showNotification('Inspección creada correctamente', 'success');
+                self.renderTable();
+            } else {
+                self.showNotification('Error al crear inspección', 'error');
+            }
+        }).catch(function (err) { console.error('[4.2.4] createInspection error:', err); });
     },
 
     showNotification: function (message, type) {

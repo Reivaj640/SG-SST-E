@@ -20,43 +20,43 @@ Sub-módulo: Panel Principal con KPIs, calendario, recientes, alertas
       var container = document.getElementById('kair-insp-dashboard-stats');
       if (!container) return;
 
-      InspeccionesService.getStats(this.companyName).then(function (result) {
-        if (!result.success) {
-          container.innerHTML = '<div class="kair-insp-empty-state"><i class="bi bi-exclamation-circle"></i><p>Error al cargar estadísticas</p></div>';
-          return;
-        }
-        var s = result.data;
-        var rateColor = s.tasaCumplimiento >= 80 ? 'success' : (s.tasaCumplimiento >= 50 ? 'warning' : 'danger');
-        container.innerHTML =
-          '<div class="kair-insp__stat-card kair-insp__stat-card--primary">' +
-            '<div class="kair-insp__stat-card-icon"><i class="bi bi-clipboard-check"></i></div>' +
-            '<div class="kair-insp__stat-card-content">' +
-              '<div class="kair-insp__stat-card-value">' + s.totalInspecciones + '</div>' +
-              '<div class="kair-insp__stat-card-label">Inspecciones Realizadas</div>' +
-            '</div>' +
-          '</div>' +
-          '<div class="kair-insp__stat-card kair-insp__stat-card--warning">' +
-            '<div class="kair-insp__stat-card-icon"><i class="bi bi-clock-history"></i></div>' +
-            '<div class="kair-insp__stat-card-content">' +
-              '<div class="kair-insp__stat-card-value" style="color:var(--kair-insp-' + rateColor + ')">' + s.pendientesMes + '</div>' +
-              '<div class="kair-insp__stat-card-label">Pendientes del Mes</div>' +
-            '</div>' +
-          '</div>' +
-          '<div class="kair-insp__stat-card kair-insp__stat-card--info">' +
-            '<div class="kair-insp__stat-card-icon"><i class="bi bi-graph-up"></i></div>' +
-            '<div class="kair-insp__stat-card-content">' +
-              '<div class="kair-insp__stat-card-value" style="color:var(--kair-insp-' + rateColor + ')">' + s.tasaCumplimiento + '%</div>' +
-              '<div class="kair-insp__stat-card-label">Tasa de Cumplimiento</div>' +
-            '</div>' +
-          '</div>' +
-          '<div class="kair-insp__stat-card kair-insp__stat-card--success">' +
-            '<div class="kair-insp__stat-card-icon"><i class="bi bi-fire"></i></div>' +
-            '<div class="kair-insp__stat-card-content">' +
-              '<div class="kair-insp__stat-card-value">' + s.extintoresVigentes + '<span style="font-size:0.875rem;color:var(--kair-insp-text-muted);font-weight:400">/' + s.extintoresTotal + '</span></div>' +
-              '<div class="kair-insp__stat-card-label">Extintores Vigentes</div>' +
-            '</div>' +
-          '</div>';
-      });
+        InspeccionesService.getStats(this.companyName).then(function (result) {
+            if (!result.success) {
+                container.innerHTML = '<div class="kair-insp-empty-state"><i class="bi bi-exclamation-circle"></i><p>Error al cargar estadísticas</p></div>';
+                return;
+            }
+            var s = result.data;
+            var rateColor = s.tasaCumplimiento >= 80 ? 'success' : (s.tasaCumplimiento >= 50 ? 'warning' : 'danger');
+            container.innerHTML =
+                '<div class="kair-insp__stat-card kair-insp__stat-card--primary">' +
+                '<div class="kair-insp__stat-card-icon"><i class="bi bi-clipboard-check"></i></div>' +
+                '<div class="kair-insp__stat-card-content">' +
+                '<div class="kair-insp__stat-card-value">' + s.totalInspecciones + '</div>' +
+                '<div class="kair-insp__stat-card-label">Inspecciones Realizadas</div>' +
+                '</div>' +
+                '</div>' +
+                '<div class="kair-insp__stat-card kair-insp__stat-card--warning">' +
+                '<div class="kair-insp__stat-card-icon"><i class="bi bi-clock-history"></i></div>' +
+                '<div class="kair-insp__stat-card-content">' +
+                '<div class="kair-insp__stat-card-value" style="color:var(--kair-insp-' + rateColor + ')">' + s.pendientesMes + '</div>' +
+                '<div class="kair-insp__stat-card-label">Pendientes del Mes</div>' +
+                '</div>' +
+                '</div>' +
+                '<div class="kair-insp__stat-card kair-insp__stat-card--info">' +
+                '<div class="kair-insp__stat-card-icon"><i class="bi bi-graph-up"></i></div>' +
+                '<div class="kair-insp__stat-card-content">' +
+                '<div class="kair-insp__stat-card-value" style="color:var(--kair-insp-' + rateColor + ')">' + s.tasaCumplimiento + '%</div>' +
+                '<div class="kair-insp__stat-card-label">Tasa de Cumplimiento</div>' +
+                '</div>' +
+                '</div>' +
+                '<div class="kair-insp__stat-card kair-insp__stat-card--success">' +
+                '<div class="kair-insp__stat-card-icon"><i class="bi bi-fire"></i></div>' +
+                '<div class="kair-insp__stat-card-content">' +
+                '<div class="kair-insp__stat-card-value">' + s.extintoresVigentes + '<span style="font-size:0.875rem;color:var(--kair-insp-text-muted);font-weight:400">/' + s.extintoresTotal + '</span></div>' +
+                '<div class="kair-insp__stat-card-label">Extintores Vigentes</div>' +
+                '</div>' +
+                '</div>';
+        }).catch(function (err) { console.error('[4.2.4] getStats error:', err); });
     },
 
     renderCalendar: function () {
@@ -110,7 +110,7 @@ Sub-módulo: Panel Principal con KPIs, calendario, recientes, alertas
           '</div>';
 
         self.bindCalendarEvents();
-      });
+        }).catch(function (err) { console.error('[4.2.4] getSchedule (calendar) error:', err); });
     },
 
     bindCalendarEvents: function () {
@@ -120,62 +120,66 @@ Sub-módulo: Panel Principal con KPIs, calendario, recientes, alertas
         cell.addEventListener('click', function () {
           var activityId = cell.getAttribute('data-activity');
           var month = parseInt(cell.getAttribute('data-month'), 10);
-          InspeccionesService.updateMonth(self.companyName, activityId, month, 'c').then(function () {
-            self.renderCalendar();
-            self.renderStats();
-            self.updateTabBadge();
-          });
+            InspeccionesService.updateMonth(self.companyName, activityId, month, 'c').then(function () {
+                self.renderCalendar();
+                self.renderStats();
+                self.updateTabBadge();
+            }).catch(function (err) { console.error('[4.2.4] updateMonth error:', err); });
         });
       });
     },
 
-    updateTabBadge: function () {
-      var badge = document.getElementById('kair-insp-tab-badge-pending');
-      if (!badge) return;
-      InspeccionesService.getStats(this.companyName).then(function (result) {
-        if (result.success && result.data.pendientesMes > 0) {
-          badge.textContent = result.data.pendientesMes;
-          badge.style.display = '';
-        } else {
-          badge.style.display = 'none';
-        }
-      });
-    },
+  updateTabBadge: function () {
+        InspeccionesService.getStats(this.companyName).then(function (result) {
+            var count = (result.success && result.data.pendientesMes > 0) ? result.data.pendientesMes : 0;
+            ['dashboard', 'programa'].forEach(function (tabKey) {
+                var badge = document.getElementById('kair-insp-tab-badge-' + tabKey);
+                if (badge) {
+                    if (count > 0) {
+                        badge.textContent = count;
+                        badge.style.display = '';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                }
+            });
+        }).catch(function (err) { console.error('[4.2.4] getStats (badge) error:', err); });
+  },
 
     renderRecent: function () {
       var container = document.getElementById('kair-insp-dashboard-recent');
       if (!container) return;
 
-      InspeccionesService.listInspections(this.companyName, {}).then(function (result) {
-        if (!result.success) return;
-        var items = result.data.items.slice(0, 5);
-        var html = items.map(function (insp) {
-          var iconClass = insp.status === 'COMPLETED' ? 'completed' : 'draft';
-          var icon = InspeccionesService.getTypeIcon(insp.type);
-          var badgeClass = insp.status === 'COMPLETED' ? 'completed' : 'draft';
-          var statusLabel = InspeccionesService.getStatusLabel(insp.status);
-          var typeLabel = InspeccionesService.getTypeLabel(insp.type);
-          return '<div class="kair-insp__recent-item">' +
-            '<div class="kair-insp__recent-icon kair-insp__recent-icon--' + iconClass + '"><i class="bi ' + icon + '"></i></div>' +
-            '<div class="kair-insp__recent-info">' +
-              '<div class="kair-insp__recent-title">' + insp.location + '</div>' +
-              '<div class="kair-insp__recent-meta">' + typeLabel + ' &middot; ' + insp.inspector + ' &middot; ' + insp.date + '</div>' +
-            '</div>' +
-            '<span class="kair-insp__recent-badge kair-insp__recent-badge--' + badgeClass + '">' + statusLabel + '</span>' +
-          '</div>';
-        }).join('');
+        InspeccionesService.listInspections(this.companyName, {}).then(function (result) {
+            if (!result.success) return;
+            var items = result.data.items.slice(0, 5);
+            var html = items.map(function (insp) {
+                var iconClass = insp.status === 'COMPLETED' ? 'completed' : 'draft';
+                var icon = InspeccionesService.getTypeIcon(insp.type);
+                var badgeClass = insp.status === 'COMPLETED' ? 'completed' : 'draft';
+                var statusLabel = InspeccionesService.getStatusLabel(insp.status);
+                var typeLabel = InspeccionesService.getTypeLabel(insp.type);
+                return '<div class="kair-insp__recent-item">' +
+                    '<div class="kair-insp__recent-icon kair-insp__recent-icon--' + iconClass + '"><i class="bi ' + icon + '"></i></div>' +
+                    '<div class="kair-insp__recent-info">' +
+                    '<div class="kair-insp__recent-title">' + insp.location + '</div>' +
+                    '<div class="kair-insp__recent-meta">' + typeLabel + ' &middot; ' + insp.inspector + ' &middot; ' + insp.date + '</div>' +
+                    '</div>' +
+                    '<span class="kair-insp__recent-badge kair-insp__recent-badge--' + badgeClass + '">' + statusLabel + '</span>' +
+                    '</div>';
+            }).join('');
 
-        if (items.length === 0) {
-          html = '<div class="kair-insp-empty-state" style="padding:1.5rem;"><i class="bi bi-inbox"></i><p>No hay inspecciones registradas</p></div>';
-        }
+            if (items.length === 0) {
+                html = '<div class="kair-insp-empty-state" style="padding:1.5rem;"><i class="bi bi-inbox"></i><p>No hay inspecciones registradas</p></div>';
+            }
 
-        container.innerHTML = '<div class="kair-insp__section-card">' +
-          '<div class="kair-insp__section-card-header">' +
-            '<div class="kair-insp__section-card-title"><i class="bi bi-clock-history"></i> Inspecciones Recientes</div>' +
-          '</div>' +
-          '<div class="kair-insp__section-card-body">' + html + '</div>' +
-        '</div>';
-      });
+            container.innerHTML = '<div class="kair-insp__section-card">' +
+                '<div class="kair-insp__section-card-header">' +
+                '<div class="kair-insp__section-card-title"><i class="bi bi-clock-history"></i> Inspecciones Recientes</div>' +
+                '</div>' +
+                '<div class="kair-insp__section-card-body">' + html + '</div>' +
+                '</div>';
+        }).catch(function (err) { console.error('[4.2.4] listInspections (recent) error:', err); });
     },
 
     renderAlerts: function () {
@@ -183,47 +187,47 @@ Sub-módulo: Panel Principal con KPIs, calendario, recientes, alertas
       if (!container) return;
       var self = this;
 
-      InspeccionesService.getStats(this.companyName).then(function (result) {
-        if (!result.success) return;
-        var s = result.data;
-        var alerts = '';
+        InspeccionesService.getStats(this.companyName).then(function (result) {
+            if (!result.success) return;
+            var s = result.data;
+            var alerts = '';
 
-        if (s.pendientesMes > 0) {
-          alerts += '<div class="kair-insp__alert kair-insp__alert--warning">' +
-            '<i class="bi bi-exclamation-triangle-fill"></i>' +
-            '<div>Tienes <strong>' + s.pendientesMes + ' inspecci' + (s.pendientesMes > 1 ? 'ones' : '\u00f3n') + ' pendiente' + (s.pendientesMes > 1 ? 's' : '') + '</strong> este mes. Revisa el programa y marca como completadas al realizarlas.</div>' +
-          '</div>';
-        }
+            if (s.pendientesMes > 0) {
+                alerts += '<div class="kair-insp__alert kair-insp__alert--warning">' +
+                    '<i class="bi bi-exclamation-triangle-fill"></i>' +
+                    '<div>Tienes <strong>' + s.pendientesMes + ' inspecci' + (s.pendientesMes > 1 ? 'ones' : '\u00f3n') + ' pendiente' + (s.pendientesMes > 1 ? 's' : '') + '</strong> este mes. Revisa el programa y marca como completadas al realizarlas.</div>' +
+                    '</div>';
+            }
 
-        if (s.extintoresVigentes < s.extintoresTotal) {
-          var noVigentes = s.extintoresTotal - s.extintoresVigentes;
-          alerts += '<div class="kair-insp__alert kair-insp__alert--danger">' +
-            '<i class="bi bi-exclamation-octagon-fill"></i>' +
-            '<div><strong>' + noVigentes + ' extintor' + (noVigentes > 1 ? 'es' : '') + ' vencido' + (noVigentes > 1 ? 's' : '') + '</strong> requieren recarga o reemplazo inmediato.</div>' +
-          '</div>';
-        }
+            if (s.extintoresVigentes < s.extintoresTotal) {
+                var noVigentes = s.extintoresTotal - s.extintoresVigentes;
+                alerts += '<div class="kair-insp__alert kair-insp__alert--danger">' +
+                    '<i class="bi bi-exclamation-octagon-fill"></i>' +
+                    '<div><strong>' + noVigentes + ' extintor' + (noVigentes > 1 ? 'es' : '') + ' vencido' + (noVigentes > 1 ? 's' : '') + '</strong> requieren recarga o reemplazo inmediato.</div>' +
+                    '</div>';
+            }
 
-        if (s.tasaCumplimiento < 50) {
-          alerts += '<div class="kair-insp__alert kair-insp__alert--danger">' +
-            '<i class="bi bi-graph-down-arrow"></i>' +
-            '<div>Tasa de cumplimiento <strong>inferior al 50%</strong>. Se requiere plan de acción inmediato.</div>' +
-          '</div>';
-        }
+            if (s.tasaCumplimiento < 50) {
+                alerts += '<div class="kair-insp__alert kair-insp__alert--danger">' +
+                    '<i class="bi bi-graph-down-arrow"></i>' +
+                    '<div>Tasa de cumplimiento <strong>inferior al 50%</strong>. Se requiere plan de acción inmediato.</div>' +
+                    '</div>';
+            }
 
-        if (!alerts) {
-          alerts = '<div class="kair-insp__alert" style="background:var(--kair-insp-success-light);border:1px solid rgba(40,167,69,0.3);color:#155724;">' +
-            '<i class="bi bi-check-circle-fill" style="color:var(--kair-insp-success);"></i>' +
-            '<div>Todo en orden. No hay alertas pendientes.</div>' +
-          '</div>';
-        }
+            if (!alerts) {
+                alerts = '<div class="kair-insp__alert" style="background:var(--kair-insp-success-light);border:1px solid rgba(40,167,69,0.3);color:#155724;">' +
+                    '<i class="bi bi-check-circle-fill" style="color:var(--kair-insp-success);"></i>' +
+                    '<div>Todo en orden. No hay alertas pendientes.</div>' +
+                    '</div>';
+            }
 
-        container.innerHTML = '<div class="kair-insp__section-card">' +
-          '<div class="kair-insp__section-card-header">' +
-            '<div class="kair-insp__section-card-title"><i class="bi bi-bell"></i> Alertas</div>' +
-          '</div>' +
-          '<div class="kair-insp__section-card-body">' + alerts + '</div>' +
-        '</div>';
-      });
+            container.innerHTML = '<div class="kair-insp__section-card">' +
+                '<div class="kair-insp__section-card-header">' +
+                '<div class="kair-insp__section-card-title"><i class="bi bi-bell"></i> Alertas</div>' +
+                '</div>' +
+                '<div class="kair-insp__section-card-body">' + alerts + '</div>' +
+                '</div>';
+        }).catch(function (err) { console.error('[4.2.4] getStats (alerts) error:', err); });
     }
   };
 
