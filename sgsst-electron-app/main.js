@@ -25,6 +25,9 @@ const { registerArchivoRetencionHandlers } = require('./modules/gestion-integral
 // Importar módulo de Frecuencia de la Accidentalidad (Submódulo 3.3.1)
 const excelBridge = require('./main/excel-bridge');
 
+// Importar handlers de Inspecciones Sistemáticas (Submódulo 4.2.4)
+const { registerInspeccionesHandlers } = require('./main/inspecciones-bridge');
+
 // Capturar promesas no manejadas globalmente
 process.on('unhandledRejection', (reason, promise) => {
   const errorMessage = `
@@ -6260,13 +6263,21 @@ app.whenReady().then(() => {
     }
   });
 
-  // Registrar handlers de Archivo y Retención Documental (Submódulo 2.5.1)
-  try {
-    registerArchivoRetencionHandlers(app);
-    sendLog('[MAIN] Handlers de Archivo y Retención Documental (2.5.1) registrados correctamente', 'INFO');
-  } catch (err) {
-    sendLog(`[MAIN] Error registrando handlers de Archivo Retención: ${err.message}`, 'ERROR');
-  }
+// Registrar handlers de Archivo y Retención Documental (Submódulo 2.5.1)
+try {
+registerArchivoRetencionHandlers(app);
+sendLog('[MAIN] Handlers de Archivo y Retención Documental (2.5.1) registrados correctamente', 'INFO');
+} catch (err) {
+sendLog(`[MAIN] Error registrando handlers de Archivo Retención: ${err.message}`, 'ERROR');
+}
+
+// Registrar handlers de Inspecciones Sistemáticas (Submódulo 4.2.4)
+try {
+registerInspeccionesHandlers(app);
+sendLog('[MAIN] Handlers de Inspecciones Sistemáticas (4.2.4) registrados correctamente', 'INFO');
+} catch (err) {
+sendLog(`[MAIN] Error registrando handlers de Inspecciones Sistemáticas: ${err.message}`, 'ERROR');
+}
 
   // Registrar handlers de FURAT - Reportes de Accidentes (Submódulo 3.2.1)
   try {

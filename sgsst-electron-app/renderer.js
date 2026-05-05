@@ -4203,18 +4203,31 @@ if (mainContainerSub) mainContainerSub.classList.remove('vanta-fullscreen');
     } else if (submoduleName === "Registrar Ausentismo") {
       showRegistrarAusentismoContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
 
- } else if (submoduleName === "4.1.1 Metodologia IPEVR") {
- createComponentSafely(window.MetodologiaIpevrComponent,
- submoduleContentDiv,
- currentCompany,
- moduleName,
- submoduleName,
- safeBackToModuleCallback
- );
- if (!window.MetodologiaIpevrComponent) {
- console.error('❌ MetodologiaIpevrComponent no encontrado');
- showDevelopmentMessage(submoduleContentDiv, submoduleName);
- }
+} else if (submoduleName === "4.1.1 Metodologia IPEVR") {
+createComponentSafely(window.MetodologiaIpevrComponent,
+submoduleContentDiv,
+currentCompany,
+moduleName,
+submoduleName,
+safeBackToModuleCallback
+);
+if (!window.MetodologiaIpevrComponent) {
+console.error('❌ MetodologiaIpevrComponent no encontrado');
+showDevelopmentMessage(submoduleContentDiv, submoduleName);
+}
+
+} else if (submoduleName === "4.2.4 Realización de inspecciones sistematicas a las instalaciones, maquinas o equipos") {
+createComponentSafely(window.InspeccionesComponent,
+submoduleContentDiv,
+moduleName,
+submoduleName,
+safeBackToModuleCallback,
+currentCompany
+);
+if (!window.InspeccionesComponent) {
+console.error('❌ InspeccionesComponent no encontrado');
+showDevelopmentMessage(submoduleContentDiv, submoduleName);
+}
 
  } else if (submoduleName === "1.1.3 Asignación de Recursos") {
  showAsignacionRecursosContent(submoduleContentDiv);

@@ -329,7 +329,21 @@ mortalidad: {
 getIndicadoresFiles: ({ companyName, submodule }) => ipcRenderer.invoke('get-indicadores-files', { companyName, submodule }),
 duplicateIndicadoresFile: ({ currentFilePath, newYear }) => ipcRenderer.invoke('duplicate-indicadores-file', { currentFilePath, newYear }),
 
-// --- Eventos IPC ---
+  // --- Inspecciones Sistemáticas (4.2.4) ---
+  inspecciones: {
+    getStats: (companyName) => ipcRenderer.invoke('inspecciones:get-stats', companyName),
+    getSchedule: (companyName, year) => ipcRenderer.invoke('inspecciones:get-schedule', companyName, year),
+    updateMonth: (companyName, activityId, month, status) => ipcRenderer.invoke('inspecciones:update-month', companyName, activityId, month, status),
+    readExcel: (companyName, type) => ipcRenderer.invoke('inspecciones:read-excel', companyName, type),
+    writeExcel: (companyName, type, formData) => ipcRenderer.invoke('inspecciones:write-excel', companyName, type, formData),
+    getTemplate: (companyName, type) => ipcRenderer.invoke('inspecciones:get-template', companyName, type),
+    listInspections: (companyName, filters) => ipcRenderer.invoke('inspecciones:list', companyName, filters),
+    getInspection: (companyName, id) => ipcRenderer.invoke('inspecciones:get', companyName, id),
+    createInspection: (companyName, inspectionData) => ipcRenderer.invoke('inspecciones:create', companyName, inspectionData),
+    deleteInspection: (companyName, id) => ipcRenderer.invoke('inspecciones:delete', companyName, id),
+  },
+
+  // --- Eventos IPC ---
   send: (channel, data) => ipcRenderer.send(channel, data),
   onIpcMessage: (channel, listener) => {
     ipcRenderer.on(channel, (event, ...args) => listener(...args));
