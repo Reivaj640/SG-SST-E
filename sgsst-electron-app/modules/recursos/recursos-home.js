@@ -1680,17 +1680,21 @@ margin-bottom: 0.5rem;
         };
     }
 
-    parseFormattedNumber(value) {
-        if (value === null || value === undefined || value === '') return 0;
-        if (typeof value === 'number') return value;
-        if (typeof value === 'object' && value.value !== undefined) return value.value;
-        if (typeof value === 'string') {
-            let clean = value.toString().replace(/\$/g, '').replace(/\s/g, '').replace(/,/g, '');
-            const parsed = parseFloat(clean);
-            return isNaN(parsed) ? 0 : parsed;
+parseFormattedNumber(value) {
+            if (value === null || value === undefined || value === '') return 0;
+            if (typeof value === 'number') return value;
+            if (typeof value === 'object' && value.value !== undefined) return value.value;
+            if (typeof value === 'string') {
+                let clean = value.toString()
+                    .replace(/\$/g, '')
+                    .replace(/\s/g, '')
+                    .replace(/\./g, '')
+                    .replace(/,/g, '.');
+                const parsed = parseFloat(clean);
+                return isNaN(parsed) ? 0 : parsed;
+            }
+            return 0;
         }
-        return 0;
-    }
 
     formatCurrency(amount) {
         return new Intl.NumberFormat('es-CO', {

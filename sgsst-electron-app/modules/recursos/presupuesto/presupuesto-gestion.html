@@ -553,13 +553,17 @@ function updateFileInfo() {
             btn.innerHTML = '<i class="fas fa-save"></i> Guardar Cambios';
         }
 
-        function parseFormattedNumber(value) {
-            if (value === null || value === undefined || value === '') return 0;
-            if (typeof value === 'number') return value;
-            let clean = value.toString().replace(/\$/g, '').replace(/\s/g, '').replace(/,/g, '');
-            const parsed = parseFloat(clean);
-            return isNaN(parsed) ? 0 : parsed;
-        }
+function parseFormattedNumber(value) {
+    if (value === null || value === undefined || value === '') return 0;
+    if (typeof value === 'number') return value;
+    let clean = value.toString()
+        .replace(/\$/g, '')
+        .replace(/\s/g, '')
+        .replace(/\./g, '')
+        .replace(/,/g, '.');
+    const parsed = parseFloat(clean);
+    return isNaN(parsed) ? 0 : parsed;
+  }
 
         function formatNumber(num) {
             if (num === null || num === undefined || num === '') return '0,00';

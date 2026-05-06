@@ -3727,12 +3727,12 @@ ipcMain.handle('readPresupuestoData', async (event, filePath) => {
     // --- FIN DE LA CORRECCIÓN ---
 
     // Obtener todos los datos de la hoja usando el rango corregido
-    const allData = xlsx.utils.sheet_to_json(worksheet, {
-        header: 1,
-        raw: false,
-        defval: null,
-        range: correctedRangeStr // Usar el rango corregido aquí
-    });
+const allData = xlsx.utils.sheet_to_json(worksheet, {
+            header: 1,
+            raw: true,
+            defval: null,
+            range: correctedRangeStr
+        });
 
     // Extraer encabezados de la fila 9 (índice 8) y datos desde la fila 10 (índice 9 en adelante)
     const headers = allData[8] || []; // Fila 9 para encabezados (índice 8)
@@ -3791,53 +3791,34 @@ ipcMain.handle('readPresupuestoData', async (event, filePath) => {
       // Si encontramos "TOTAL AÑO" en cualquier celda de la fila (A o B), creamos la fila TOTAL AÑO con los totales acumulados
       if ((typeof firstCell === 'string' && firstCell.includes('TOTAL AÑO')) ||
           (typeof secondCell === 'string' && secondCell.includes('TOTAL AÑO'))) {
-        // FUNCIÓN DE FORMATEO - Agregar ANTES de crear el objeto TOTAL AÑO
-        function formatColombianDisplay(value) {
-          // Si el valor es 0 o vacío, retornar "$ -"
-          if (!value || value === 0) {
-            return ' $ -   ';
-          }
+function toNumericValue(value) {
+                    if (!value || value === 0) return 0;
+                    const num = typeof value === 'number' ? value : parseFloat(value);
+                    return isNaN(num) ? 0 : num;
+                }
 
-          // Asegurarse de que es un número
-          const num = typeof value === 'number' ? value : parseFloat(value);
-
-          if (isNaN(num)) {
-            return ' $ -   ';
-          }
-
-          // Formatear con comas como separador de miles (formato internacional) y sin decimales
-          // Este es el formato que se usa en tus archivos Excel: 13,407,464
-          const formatted = num.toLocaleString('en-US', {
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0
-          });
-
-          return ` $ ${formatted} `;
-        }
-
-        // Actualizar la fila TOTAL AÑO con los totales acumulados, formateados adecuadamente
-        const obj = {
-          id: typeof firstCell === 'string' && firstCell.includes('TOTAL AÑO') ? firstCell :
-              typeof secondCell === 'string' && secondCell.includes('TOTAL AÑO') ? secondCell : 'TOTAL AÑO',
-          detalle: 'TOTAL AÑO',  // Mostrar TOTAL AÑO en la columna de detalle
-          asignacion: formatColombianDisplay(totalAccumulators.asignacion),
-          ejecutado_acumulado: formatColombianDisplay(totalAccumulators.ejecutado_acumulado),
-          porcentaje_ejecutado: totalAccumulators.asignacion > 0
-            ? ((totalAccumulators.ejecutado_acumulado / totalAccumulators.asignacion) * 100).toFixed(2) + '%'
-            : '0,00%',
-          enero: formatColombianDisplay(totalAccumulators.enero),
-          febrero: formatColombianDisplay(totalAccumulators.febrero),
-          marzo: formatColombianDisplay(totalAccumulators.marzo),
-          abril: formatColombianDisplay(totalAccumulators.abril),
-          mayo: formatColombianDisplay(totalAccumulators.mayo),
-          junio: formatColombianDisplay(totalAccumulators.junio),
-          julio: formatColombianDisplay(totalAccumulators.julio),
-          agosto: formatColombianDisplay(totalAccumulators.agosto),
-          septiembre: formatColombianDisplay(totalAccumulators.septiembre),
-          octubre: formatColombianDisplay(totalAccumulators.octubre),
-          noviembre: formatColombianDisplay(totalAccumulators.noviembre),
-          diciembre: formatColombianDisplay(totalAccumulators.diciembre)
-        };
+                const obj = {
+                    id: typeof firstCell === 'string' && firstCell.includes('TOTAL AÑO') ? firstCell :
+                        typeof secondCell === 'string' && secondCell.includes('TOTAL AÑO') ? secondCell : 'TOTAL AÑO',
+                    detalle: 'TOTAL AÑO',
+                    asignacion: toNumericValue(totalAccumulators.asignacion),
+                    ejecutado_acumulado: toNumericValue(totalAccumulators.ejecutado_acumulado),
+                    porcentaje_ejecutado: totalAccumulators.asignacion > 0
+                        ? ((totalAccumulators.ejecutado_acumulado / totalAccumulators.asignacion) * 100).toFixed(2) + '%'
+                        : '0,00%',
+                    enero: toNumericValue(totalAccumulators.enero),
+                    febrero: toNumericValue(totalAccumulators.febrero),
+                    marzo: toNumericValue(totalAccumulators.marzo),
+                    abril: toNumericValue(totalAccumulators.abril),
+                    mayo: toNumericValue(totalAccumulators.mayo),
+                    junio: toNumericValue(totalAccumulators.junio),
+                    julio: toNumericValue(totalAccumulators.julio),
+                    agosto: toNumericValue(totalAccumulators.agosto),
+                    septiembre: toNumericValue(totalAccumulators.septiembre),
+                    octubre: toNumericValue(totalAccumulators.octubre),
+                    noviembre: toNumericValue(totalAccumulators.noviembre),
+                    diciembre: toNumericValue(totalAccumulators.diciembre)
+                };
         processedData.push(obj);
         sendLog(`[DEBUG] readPresupuestoData - Detectado TOTAL AÑO en fila ${i + dataStartIndex + 1}, deteniendo lectura`, 'DEBUG');
         break; // Detener el bucle para no incluir filas posteriores
@@ -10332,8 +10313,7 @@ async function calculatePresupuestoStats(basePath, companyName) {
       if (typeof value === 'number') return value;
       if (typeof value === 'object' && value.value !== undefined) return value.value;
       if (typeof value === 'string') {
-        // Limpiar formato: "$ 13,407,464" -> 13407464
-        const clean = value.toString().replace(/\$/g, '').replace(/\s/g, '').replace(/,/g, '');
+        const clean = value.toString().replace(/\$/g, '').replace(/\s/g, '').replace(/\./g, '').replace(/,/g, '.');
         return parseFloat(clean) || 0;
       }
       return 0;

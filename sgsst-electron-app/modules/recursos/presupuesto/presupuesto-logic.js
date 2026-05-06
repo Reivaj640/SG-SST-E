@@ -124,31 +124,30 @@ class PresupuestoGestionComponent {
                 if (this.onBack) this.onBack();
                 break;
 
-            case 'requestBudgetData':
-                if (file && file.path) {
-                    try {
-                        this.log('DEBUG', `Solicitando datos procesados para: ${file.path}`);
-                        const result = await window.electronAPI.readPresupuestoData(file.path);
-                        if (result.success) {
-                            const gestionIframe = this.container.querySelector('iframe');
-                            if (gestionIframe) {
-                                const formattedData = this.formatBudgetDataForDisplay(result.data.processedData);
-                                gestionIframe.contentWindow.postMessage({
-                                    budgetData: formattedData,
-                                    calculationData: result.data.filteredData,
-                                    formulaCells: result.data.formulaCells,
-                                    headers: result.data.headers
-                                }, '*');
-                            }
-                        } else {
-                            throw new Error(result.error);
-                        }
-                    } catch (error) {
-                        this.log('CRITICAL', `Error en requestBudgetData: ${error.message}`, error.stack);
-                        this.showErrorUI(error);
-                    }
+case 'requestBudgetData':
+          if (file && file.path) {
+            try {
+              this.log('DEBUG', `Solicitando datos procesados para: ${file.path}`);
+              const result = await window.electronAPI.readPresupuestoData(file.path);
+              if (result.success) {
+                const gestionIframe = this.container.querySelector('iframe');
+                if (gestionIframe) {
+                  gestionIframe.contentWindow.postMessage({
+                    budgetData: result.data.processedData,
+                    calculationData: result.data.filteredData,
+                    formulaCells: result.data.formulaCells,
+                    headers: result.data.headers
+                  }, '*');
                 }
-                break;
+              } else {
+                throw new Error(result.error);
+              }
+            } catch (error) {
+              this.log('CRITICAL', `Error en requestBudgetData: ${error.message}`, error.stack);
+              this.showErrorUI(error);
+            }
+          }
+          break;
 
             case 'duplicate-budget-file':
                 try {
@@ -183,25 +182,7 @@ class PresupuestoGestionComponent {
         }
     }
 
-    // Método para formatear los datos del presupuesto para mostrar en la interfaz
-    formatBudgetDataForDisplay(data) {
-        return data.map(row => {
-            const newRow = { ...row };
-            // Formatear valores numéricos, manteniendo los originales para cálculos
-            for (const key in newRow) {
-                if (typeof newRow[key] === 'number') {
-                    // Aplicar formato de número con separadores de miles y 2 decimales
-                    newRow[key] = newRow[key].toLocaleString('es-CO', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2
-                    });
-                }
-            }
-            return newRow;
-        });
-    }
-
-    createLoadingElement(message) {
+createLoadingElement(message) {
         const div = document.createElement('div');
         div.style.cssText = `display: flex; align-items: center; justify-content: center; height: 100%;`;
         div.innerHTML = `<h3>${message}</h3>`;
