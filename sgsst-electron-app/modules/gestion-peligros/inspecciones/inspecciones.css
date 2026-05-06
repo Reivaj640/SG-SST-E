@@ -1422,6 +1422,330 @@ COMPONENTES BASE (botones, cards, modal, notificación)
 }
 
 /* ==========================================================================
+FORMULARIO — Tipo Tabs (Extintor / Instalación / Emergencia / Botiquín)
+========================================================================== */
+.kair-insp__form-type-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--kair-insp-bg-card);
+  border-radius: var(--kair-insp-border-radius-lg);
+  border: 1px solid var(--kair-insp-border-light);
+  box-shadow: var(--kair-insp-shadow-sm);
+  margin-bottom: var(--kair-insp-space-5);
+  overflow: hidden;
+}
+
+.kair-insp__form-type-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.625rem 1.25rem;
+  border: none;
+  background: transparent;
+  font-family: var(--kair-insp-font-family);
+  font-size: var(--kair-insp-font-size-sm);
+  font-weight: var(--kair-insp-font-weight-medium);
+  color: var(--kair-insp-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  white-space: nowrap;
+}
+
+.kair-insp__form-type-tab:hover {
+  color: var(--kair-insp-primary);
+  background: var(--kair-insp-primary-light);
+}
+
+.kair-insp__form-type-tab.active {
+  color: var(--kair-insp-primary);
+  font-weight: var(--kair-insp-font-weight-semibold);
+  background: var(--kair-insp-primary-light);
+  box-shadow: inset 0 -2px 0 var(--kair-insp-primary);
+}
+
+.kair-insp__form-type-tab + .kair-insp__form-type-tab {
+  border-left: 1px solid var(--kair-insp-border-light);
+}
+
+.kair-insp__form-type-tab i {
+  font-size: 0.875rem;
+}
+
+/* ==========================================================================
+FORMULARIO — Header Fields Grid (editable encabezado)
+========================================================================== */
+.kair-insp__form-header-fields {
+  background: var(--kair-insp-bg-card);
+  border-radius: var(--kair-insp-border-radius-lg);
+  border: 1px solid var(--kair-insp-border-light);
+  box-shadow: var(--kair-insp-shadow-sm);
+  padding: var(--kair-insp-space-5);
+  margin-bottom: var(--kair-insp-space-5);
+}
+
+.kair-insp__form-hf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--kair-insp-space-4);
+  margin-top: var(--kair-insp-space-3);
+}
+
+.kair-insp__form-hf-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kair-insp__form-hf-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--kair-insp-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.kair-insp__form-hf-input {
+  padding: 0.375rem 0.625rem;
+  border: 1px solid var(--kair-insp-border-color);
+  border-radius: var(--kair-insp-border-radius);
+  font-family: var(--kair-insp-font-family);
+  font-size: var(--kair-insp-font-size-sm);
+  color: var(--kair-insp-text-primary);
+  background: var(--kair-insp-bg-input);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.kair-insp__form-hf-input:focus {
+  outline: none;
+  border-color: var(--kair-insp-border-focus);
+  box-shadow: 0 0 0 2px rgba(23, 78, 166, 0.15);
+}
+
+/* ==========================================================================
+FORMULARIO — Section Separator Rows (GI-FO-025)
+========================================================================== */
+.kair-insp__form-table tbody tr.kair-insp__form-section-row td {
+  background: var(--kair-insp-bg-app);
+  font-weight: var(--kair-insp-font-weight-semibold);
+  color: var(--kair-insp-primary);
+  font-size: var(--kair-insp-font-size-sm);
+  padding: var(--kair-insp-space-2) var(--kair-insp-space-3);
+  border-bottom: 2px solid var(--kair-insp-primary-light);
+}
+
+.kair-insp__form-section-row i {
+  font-size: 0.75rem;
+  opacity: 0.6;
+  margin-right: 4px;
+}
+
+/* ==========================================================================
+FORMULARIO — Radio Groups (SI/NO/N/A, BUENO/MALO/N/A)
+========================================================================== */
+.kair-insp__form-radio-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.kair-insp__form-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--kair-insp-border-radius-sm);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  transition: background 0.15s ease;
+  user-select: none;
+}
+
+.kair-insp__form-radio input[type="radio"] {
+  display: none;
+}
+
+.kair-insp__form-radio span {
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid var(--kair-insp-border-light);
+  background: var(--kair-insp-bg-card);
+  transition: all 0.15s ease;
+}
+
+.kair-insp__form-radio--ok input:checked + span {
+  background: var(--kair-insp-success-light);
+  color: var(--kair-insp-success-dark);
+  border-color: var(--kair-insp-success);
+}
+
+.kair-insp__form-radio--bad input:checked + span {
+  background: var(--kair-insp-danger-light);
+  color: var(--kair-insp-danger-dark);
+  border-color: var(--kair-insp-danger);
+}
+
+.kair-insp__form-radio--na input:checked + span {
+  background: var(--kair-insp-bg-hover);
+  color: var(--kair-insp-text-muted);
+  border-color: var(--kair-insp-text-light);
+}
+
+.kair-insp__form-radio:hover span {
+  border-color: var(--kair-insp-primary);
+}
+
+/* ==========================================================================
+FORMULARIO — Read-only Cell
+========================================================================== */
+.kair-insp__form-cell-readonly {
+  color: var(--kair-insp-text-secondary);
+  font-size: var(--kair-insp-font-size-xs);
+}
+
+/* ==========================================================================
+FORMULARIO — Row Number
+========================================================================== */
+.kair-insp__form-row-num {
+  font-size: 0.6875rem;
+  font-weight: var(--kair-insp-font-weight-semibold);
+  color: var(--kair-insp-text-light);
+  text-align: center;
+  width: 32px;
+  min-width: 32px;
+}
+
+/* ==========================================================================
+FORMULARIO — Check Rows (bottom yes/no items like GI-FO-031)
+========================================================================== */
+.kair-insp__form-check-rows {
+  background: var(--kair-insp-bg-card);
+  border-radius: var(--kair-insp-border-radius-lg);
+  border: 1px solid var(--kair-insp-border-light);
+  box-shadow: var(--kair-insp-shadow-sm);
+  padding: var(--kair-insp-space-4) var(--kair-insp-space-5);
+  margin-top: var(--kair-insp-space-4);
+}
+
+.kair-insp__form-check-row {
+  display: flex;
+  align-items: center;
+  gap: var(--kair-insp-space-4);
+  padding: var(--kair-insp-space-2) 0;
+  border-bottom: 1px solid var(--kair-insp-border-light);
+}
+
+.kair-insp__form-check-row:last-child {
+  border-bottom: none;
+}
+
+.kair-insp__form-check-label {
+  font-size: var(--kair-insp-font-size-sm);
+  font-weight: var(--kair-insp-font-weight-medium);
+  color: var(--kair-insp-text-primary);
+  min-width: 180px;
+}
+
+/* ==========================================================================
+FORMULARIO — General Observations Textarea
+========================================================================== */
+.kair-insp__form-general-obs {
+  background: var(--kair-insp-bg-card);
+  border-radius: var(--kair-insp-border-radius-lg);
+  border: 1px solid var(--kair-insp-border-light);
+  box-shadow: var(--kair-insp-shadow-sm);
+  padding: var(--kair-insp-space-4) var(--kair-insp-space-5);
+  margin-top: var(--kair-insp-space-4);
+}
+
+.kair-insp__form-textarea {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--kair-insp-border-color);
+  border-radius: var(--kair-insp-border-radius);
+  font-family: var(--kair-insp-font-family);
+  font-size: var(--kair-insp-font-size-sm);
+  color: var(--kair-insp-text-primary);
+  background: var(--kair-insp-bg-input);
+  resize: vertical;
+  min-height: 60px;
+}
+
+.kair-insp__form-textarea:focus {
+  outline: none;
+  border-color: var(--kair-insp-border-focus);
+  box-shadow: 0 0 0 2px rgba(23, 78, 166, 0.15);
+}
+
+/* ==========================================================================
+PROGRAMA — Editable Inputs (Responsable, Observaciones)
+========================================================================== */
+.kair-insp__programa-editable {
+  min-width: 100px;
+}
+
+.kair-insp__programa-input {
+  width: 100%;
+  padding: 0.25rem 0.375rem;
+  border: 1px solid transparent;
+  border-radius: var(--kair-insp-border-radius-sm);
+  font-family: var(--kair-insp-font-family);
+  font-size: 0.75rem;
+  color: var(--kair-insp-text-primary);
+  background: transparent;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.kair-insp__programa-input:hover {
+  border-color: var(--kair-insp-border-color);
+  background: var(--kair-insp-bg-input);
+}
+
+.kair-insp__programa-input:focus {
+  outline: none;
+  border-color: var(--kair-insp-border-focus);
+  background: var(--kair-insp-bg-input);
+  box-shadow: 0 0 0 2px rgba(23, 78, 166, 0.15);
+}
+
+.kair-insp__programa-input::placeholder {
+  color: var(--kair-insp-text-light);
+  font-style: italic;
+}
+
+/* ==========================================================================
+PROGRAMA — Obj Gral / Obj Esp / Activity cells
+========================================================================== */
+.kair-insp__programa-obj-gral,
+.kair-insp__programa-obj-esp {
+  font-size: 0.75rem;
+  color: var(--kair-insp-text-secondary);
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kair-insp__programa-activity {
+  font-weight: var(--kair-insp-font-weight-medium);
+  color: var(--kair-insp-text-primary);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.kair-insp__programa-pct {
+  font-weight: var(--kair-insp-font-weight-semibold);
+  font-size: 0.75rem;
+}
+
+.kair-insp__programa-status {
+  font-size: 0.6875rem;
+  font-weight: var(--kair-insp-font-weight-medium);
+}
+
+/* ==========================================================================
 DARK THEME
 ========================================================================== */
 [data-theme="dark"] .kair-insp-wrapper {
@@ -1590,10 +1914,87 @@ DARK THEME
 }
 
 [data-theme="dark"] .kair-insp__form-select,
-[data-theme="dark"] .kair-insp__form-input {
+[data-theme="dark"] .kair-insp__form-input,
+[data-theme="dark"] .kair-insp__form-hf-input,
+[data-theme="dark"] .kair-insp__form-textarea,
+[data-theme="dark"] .kair-insp__programa-input {
   background: #374151;
   border-color: #4a5568;
   color: #e9ecef;
+}
+
+[data-theme="dark"] .kair-insp__form-type-tabs {
+  background: #2d3748;
+  border-color: #374151;
+}
+
+[data-theme="dark"] .kair-insp__form-type-tab {
+  color: #8c95a4;
+}
+
+[data-theme="dark"] .kair-insp__form-type-tab:hover {
+  color: #4da6ff;
+  background: rgba(77, 166, 255, 0.08);
+}
+
+[data-theme="dark"] .kair-insp__form-type-tab.active {
+  color: #4da6ff;
+  background: rgba(77, 166, 255, 0.15);
+  box-shadow: inset 0 -2px 0 #4da6ff;
+}
+
+[data-theme="dark"] .kair-insp__form-type-tab + .kair-insp__form-type-tab {
+  border-left-color: #374151;
+}
+
+[data-theme="dark"] .kair-insp__form-header-fields {
+  background: #2d3748;
+  border-color: #374151;
+}
+
+[data-theme="dark"] .kair-insp__form-table tbody tr.kair-insp__form-section-row td {
+  background: #374151;
+  color: #4da6ff;
+  border-bottom-color: rgba(77, 166, 255, 0.2);
+}
+
+[data-theme="dark"] .kair-insp__form-radio span {
+  background: #374151;
+  border-color: #4a5568;
+}
+
+[data-theme="dark"] .kair-insp__form-radio--ok input:checked + span {
+  background: rgba(92, 184, 92, 0.15);
+  color: #7ed67e;
+  border-color: rgba(92, 184, 92, 0.4);
+}
+
+[data-theme="dark"] .kair-insp__form-radio--bad input:checked + span {
+  background: rgba(217, 83, 79, 0.15);
+  color: #ef7b77;
+  border-color: rgba(217, 83, 79, 0.4);
+}
+
+[data-theme="dark"] .kair-insp__form-radio--na input:checked + span {
+  background: #374151;
+  color: #8c95a4;
+  border-color: #4a5568;
+}
+
+[data-theme="dark"] .kair-insp__form-check-rows,
+[data-theme="dark"] .kair-insp__form-general-obs {
+  background: #2d3748;
+  border-color: #374151;
+}
+
+[data-theme="dark"] .kair-insp__programa-input:hover,
+[data-theme="dark"] .kair-insp__programa-input:focus {
+  background: #374151;
+  border-color: #4da6ff;
+}
+
+[data-theme="dark"] .kair-insp__programa-input::placeholder {
+  color: #606060;
 }
 
 [data-theme="dark"] .kair-insp__form-table thead th {
@@ -1709,5 +2110,21 @@ RESPONSIVE
   }
   .kair-insp__programa-kpis {
     grid-template-columns: 1fr;
+  }
+  .kair-insp__form-type-tabs {
+    overflow-x: auto;
+  }
+  .kair-insp__form-hf-grid {
+    grid-template-columns: 1fr;
+  }
+  .kair-insp__form-radio-group {
+    flex-wrap: wrap;
+  }
+  .kair-insp__form-check-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .kair-insp__form-check-label {
+    min-width: 0;
   }
 }

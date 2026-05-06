@@ -1,10 +1,3 @@
-// ============================================================
-// K+AIR SG-SST - inspecciones-bridge.js
-// Módulo de lectura/escritura Excel para Inspecciones Sistemáticas (4.2.4)
-// Ubicación: main/inspecciones-bridge.js
-// Usa ExcelJS para .xlsx y xlsx (SheetJS) para leer .xls legacy
-// ============================================================
-
 const ExcelJS = require("exceljs");
 const xlsx = require("xlsx");
 const path = require("path");
@@ -16,41 +9,135 @@ const INSPECTION_TEMPLATES = {
   EXTINTOR: {
     code: "GI-FO-026",
     name: "Inspección de Extintores",
-    sheetName: null,
-    dataStartRow: 12,
-    dataEndRow: 19,
-    colMap: { A:"ubicacion", B:"tipo", C:"capacidad", D:"fabricacion", E:"vencimiento", F:"presion", G:"manometro", H:"manguera", I:"seguro", J:"etiqueta", K:"senalizacion", L:"observaciones" },
+    ext: ".xlsx",
+    sheetName: "Extintores",
+    headerFields: [
+      { key: "fecha", label: "Fecha de realización", row: 7, col: 2 },
+      { key: "inspector", label: "Realizada por", row: 8, col: 3 },
+      { key: "cargo", label: "Cargo", row: 8, col: 7 }
+    ],
+ generalObservations: { row: 21, col: 1, endCol: 12 },
+ dataStartRow: 12,
+ dataEndRow: 19,
+ defaultRowCount: 7,
+ colMap: {
+      A: { field: "ubicacion", label: "UBICACIÓN", type: "text" },
+      B: { field: "numExtintor", label: "# EXTINTOR", type: "text" },
+      C: { field: "tipo", label: "Tipo", type: "text" },
+      D: { field: "capacidad", label: "Capacidad", type: "text" },
+      E: { field: "recarga", label: "Fecha Recarga", type: "text" },
+      F: { field: "vencimiento", label: "Fecha Vencimiento", type: "text" },
+      G: { field: "presion", label: "Presión manómetro", type: "select", options: ["OK","BAJO","N/A"] },
+      H: { field: "estadoCilindro", label: "Estado Cilindro", type: "select", options: ["BUENO","MALO","REGULAR","N/A"] },
+      I: { field: "pasador", label: "Pasador", type: "select", options: ["BUENO","MALO","REGULAR","N/A"] },
+      J: { field: "anilloVerificacion", label: "Anillo Verificación", type: "select", options: ["BUENO","MALO","REGULAR","N/A"] },
+      K: { field: "baseSoporte", label: "Base Soporte", type: "select", options: ["BUENO","MALO","REGULAR","N/A"] },
+      L: { field: "observaciones", label: "Observaciones", type: "text" }
+    },
     colIndexes: { A:1, B:2, C:3, D:4, E:5, F:6, G:7, H:8, I:9, J:10, K:11, L:12 }
   },
   INSTALACION: {
     code: "GI-FO-025",
     name: "Inspección de Instalaciones",
-    sheetName: null,
-    dataStartRow: 11,
-    dataEndRow: 35,
-    colMap: { B:"item", C:"cumple", D:"observaciones", E:"responsable" },
-    colIndexes: { B:2, C:3, D:4, E:5 }
+    ext: ".xls",
+    sheetName: "OFICINA",
+    headerFields: [
+      { key: "fecha", label: "Fecha", row: 6, col: 1 },
+      { key: "lugar", label: "Lugar", row: 6, col: 6 }
+    ],
+    signFields: [
+      { key: "inspeccionadoPor", label: "Inspeccionado por", row: 37, col: 1 },
+      { key: "cargoFirma", label: "Cargo", row: 38, col: 1 }
+    ],
+    sections: [
+      { label: "INSTALACIONES SANITARIAS", row: 11 },
+      { label: "INSTALACIONES ELÉCTRICAS", row: 15 },
+      { label: "ORDEN Y LIMPIEZA", row: 18 },
+      { label: "ERGONOMÍA E HIGIENE", row: 21 },
+      { label: "PLANTA FÍSICA", row: 28 }
+    ],
+    dataRows: [12,13,14,16,17,19,20,22,23,24,25,26,27,29,30,31,32,33,34,35],
+    colMap: {
+      A: { field: "item", label: "ITEM REVISIÓN", type: "text", readOnly: true },
+      C: { field: "si", label: "SI", type: "check", options: ["SI",""] },
+      D: { field: "no", label: "NO", type: "check", options: ["NO",""] },
+      E: { field: "na", label: "N/A", type: "check", options: ["N/A",""] },
+      F: { field: "observaciones", label: "OBSERVACIONES", type: "text" },
+      G: { field: "compromisos", label: "COMPROMISOS", type: "text" },
+      H: { field: "responsableFechas", label: "RESPONSABLE - FECHAS", type: "text" },
+      I: { field: "seguimientoEstado", label: "SEGUIMIENTO - ESTADO", type: "text" }
+    },
+    colIndexes: { A:1, C:3, D:4, E:5, F:6, G:7, H:8, I:9 }
   },
   EMERGENCIA: {
     code: "GI-FO-023",
     name: "Inspección Equipos de Emergencia",
-    sheetName: null,
-    dataStartRow: 11,
-    dataEndRow: 19,
-    colMap: { B:"equipo", C:"ubicacion", D:"estado", E:"ultimaRevision", F:"proximaRevision", G:"observaciones" },
-    colIndexes: { B:2, C:3, D:4, E:5, F:6, G:7 }
+    ext: ".xls",
+    sheetName: "E EMERGENCIA",
+    headerFields: [
+      { key: "fecha", label: "Fecha", row: 6, col: 2 },
+      { key: "sitio", label: "Sitio de Inspección", row: 7, col: 2 }
+    ],
+    dataStartRow: 12,
+    dataEndRow: 20,
+    colMap: {
+      A: { field: "equipo", label: "ITEMS PARA REVISAR", type: "text", readOnly: true },
+      B: { field: "bueno", label: "BUENO", type: "check", options: ["BUENO",""] },
+      C: { field: "malo", label: "MALO", type: "check", options: ["MALO",""] },
+      D: { field: "na", label: "N/A", type: "check", options: ["N/A",""] },
+      E: { field: "recomendaciones", label: "RECOMENDACIONES / COMPROMISOS", type: "text" },
+      F: { field: "responsables", label: "RESPONSABLES / FECHAS", type: "text" },
+      G: { field: "seguimiento", label: "SEGUIMIENTO / ESTATUS", type: "text" }
+    },
+    colIndexes: { A:1, B:2, C:3, D:4, E:5, F:6, G:7 }
+  },
+  BOTIQUIN: {
+    code: "GI-FO-031",
+    name: "Inspección de Botiquín",
+    ext: ".xls",
+    sheetName: "INSUMOS BASICOS PARA BOTIQUIN",
+    headerFields: [
+      { key: "fecha", label: "Fecha", row: 6, col: 1 },
+      { key: "realizadoPor", label: "Realizado por", row: 6, col: 5 }
+    ],
+    dataStartRow: 9,
+    dataEndRow: 31,
+    checkRows: [
+      { row: 32, field: "botiquinBuenEstado", label: "Botiquín en buen estado", type: "check", options: ["SI","NO"] },
+      { row: 33, field: "higieneAdecuada", label: "Higiene adecuada del botiquín", type: "check", options: ["SI","NO"] }
+    ],
+    colMap: {
+      A: { field: "numero", label: "ITEM", type: "text", readOnly: true },
+      B: { field: "elemento", label: "ELEMENTOS", type: "text", readOnly: true },
+      E: { field: "cantidad", label: "CANTIDAD", type: "text" },
+      F: { field: "fechaVencimiento", label: "FECHA DE VENCIMIENTO", type: "text" },
+      G: { field: "estadoObservacion", label: "ESTADO / OBSERVACIÓN", type: "text" }
+    },
+    colIndexes: { A:1, B:2, E:5, F:6, G:7 }
   }
 };
 
 const PROGRAMA_SHEET_CONFIG = {
   startRow: 8,
   endRow: 16,
-  startCol: 7,
-  endCol: 18
+  startCol: 6,
+  endCol: 17,
+  colMap: {
+    B: { field: "objetivoGeneral", label: "OBJETIVO GENERAL", editable: false, col: 2 },
+    C: { field: "objetivosEspecificos", label: "OBJETIVOS ESPECÍFICOS", editable: false, col: 3 },
+    D: { field: "actividades", label: "ACTIVIDADES", editable: false, col: 4 },
+    E: { field: "responsable", label: "RESPONSABLE", editable: true, col: 5 },
+    R: { field: "porcentaje", label: "%", editable: false, col: 18 },
+    S: { field: "estado", label: "ESTADO", editable: false, col: 19 },
+    T: { field: "observacionesSeguimiento", label: "OBSERVACIONES Y SEGUIMIENTO", editable: true, col: 20 }
+  }
 };
 
 function _getCompanyInspeccionesDir(companyRoot) {
-  var gestionPeligrosDir = path.join(companyRoot, "4. Gestión de Peligros y Riesgos");
+  var gestionPeligrosDir = path.join(companyRoot, "4. Gestion de Peligros y Riesgos");
+  if (!fs.existsSync(gestionPeligrosDir)) {
+    gestionPeligrosDir = path.join(companyRoot, "4. Gestión de Peligros y Riesgos");
+  }
   if (fs.existsSync(gestionPeligrosDir)) {
     try {
       var entries = fs.readdirSync(gestionPeligrosDir);
@@ -62,9 +149,7 @@ function _getCompanyInspeccionesDir(companyRoot) {
   }
 
   var directPath = path.join(companyRoot, "4.2.4");
-  if (fs.existsSync(directPath)) {
-    return directPath;
-  }
+  if (fs.existsSync(directPath)) return directPath;
 
   if (fs.existsSync(companyRoot)) {
     try {
@@ -74,9 +159,7 @@ function _getCompanyInspeccionesDir(companyRoot) {
         var gestionFullPath = path.join(companyRoot, gestionFolder);
         var subEntries = fs.readdirSync(gestionFullPath);
         var inspFolder = subEntries.find(function(f) { return f.startsWith("4.2.4"); });
-        if (inspFolder) {
-          return path.join(gestionFullPath, inspFolder);
-        }
+        if (inspFolder) return path.join(gestionFullPath, inspFolder);
       }
     } catch (e) { /* ignore */ }
   }
@@ -94,7 +177,7 @@ function _findExcelFile(dir, pattern) {
     } catch (e) { return false; }
     var lower = f.toLowerCase();
     return (lower.endsWith('.xlsx') || lower.endsWith('.xls')) &&
-           f.toUpperCase().indexOf(pattern.toUpperCase()) !== -1;
+      f.toUpperCase().indexOf(pattern.toUpperCase()) !== -1;
   });
   return match ? path.join(dir, match) : null;
 }
@@ -122,15 +205,23 @@ function _readXlsWithSheetJs(filePath) {
   var workbook = xlsx.readFile(filePath, { type: "file" });
   var sheetName = workbook.SheetNames[0];
   var ws = workbook.Sheets[sheetName];
-  return xlsx.utils.sheet_to_json(ws, { header: 1, defval: "" });
+  return { rawData: xlsx.utils.sheet_to_json(ws, { header: 1, defval: "", raw: true }), workbook: workbook, sheetName: sheetName };
 }
 
-async function _readXlsxWithExcelJS(filePath, sheetName) {
-  var workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.readFile(filePath);
-  var ws = workbook.getWorksheet(sheetName || 1);
-  if (!ws) return null;
-  return { workbook: workbook, worksheet: ws };
+function _colLetterToIndex(letter) {
+  var idx = 0;
+  for (var i = 0; i < letter.length; i++) {
+    idx = idx * 26 + (letter.charCodeAt(i) - 64);
+  }
+  return idx;
+}
+
+function _createBackup(filePath, dir) {
+  var backupDir = path.join(dir, "backup");
+  if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+  var backupPath = path.join(backupDir, path.basename(filePath, path.extname(filePath)) + "_" + Date.now() + path.extname(filePath));
+  fs.copyFileSync(filePath, backupPath);
+  return backupPath;
 }
 
 function readInspeccionExcel(companyRoot, type) {
@@ -145,9 +236,7 @@ function readInspeccionExcel(companyRoot, type) {
   }
 
   var filePath = _findExcelFileDeep(dir, config.code);
-  if (!filePath) {
-    filePath = _findExcelFileDeep(dir, type);
-  }
+  if (!filePath) filePath = _findExcelFileDeep(dir, type);
   if (!filePath) {
     return { success: false, error: { code: "FILE_NOT_FOUND", message: "No se encontró el archivo Excel para " + config.name + " en " + dir } };
   }
@@ -161,57 +250,180 @@ function readInspeccionExcel(companyRoot, type) {
   }
 
   var ext = path.extname(filePath).toLowerCase();
-  var rows = [];
+  var result = { items: [], headerFields: {}, generalObservations: "", checkRows: [], sections: [] };
 
   try {
-  if (ext === ".xls") {
-    var rawData = _readXlsWithSheetJs(filePath);
-    for (var r = config.dataStartRow - 1; r < Math.min(config.dataEndRow, rawData.length); r++) {
-      var row = rawData[r] || [];
-      var item = { row: r + 1 };
-      Object.keys(config.colIndexes).forEach(function(col) {
-        var field = config.colMap[col];
-        var colIdx = config.colIndexes[col] - 1;
-        item[field] = row[colIdx] !== undefined ? String(row[colIdx]).trim() : "";
-      });
-      rows.push(item);
-    }
-  } else {
-    var raw = xlsx.readFile(filePath, { type: "file" });
-    var sheetName = raw.SheetNames[0];
-    var sheetData = xlsx.utils.sheet_to_json(raw.Sheets[sheetName], { header: 1, defval: "" });
-    for (var r2 = config.dataStartRow - 1; r2 < Math.min(config.dataEndRow, sheetData.length); r2++) {
-      var rowData = sheetData[r2] || [];
-      var item2 = { row: r2 + 1 };
-      Object.keys(config.colIndexes).forEach(function(col2) {
-        var field2 = config.colMap[col2];
-        var colIdx2 = config.colIndexes[col2] - 1;
-        item2[field2] = rowData[colIdx2] !== undefined ? String(rowData[colIdx2]).trim() : "";
-      });
-      rows.push(item2);
-    }
-  }
+    if (ext === ".xlsx") {
+      var wb = xlsx.readFile(filePath, { type: "file" });
+      var sn = config.sheetName || wb.SheetNames[0];
+      var sheetData = xlsx.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: "", raw: true });
 
-  var headerCells = Object.keys(config.colMap).map(function(col) {
-    return { col: col, label: config.colMap[col].toUpperCase() };
-  });
+      config.headerFields.forEach(function(hf) {
+        var rowIdx = hf.row - 1;
+        var colIdx = hf.col - 1;
+        if (rowIdx < sheetData.length && sheetData[rowIdx]) {
+          result.headerFields[hf.key] = String(sheetData[rowIdx][colIdx] || "").trim();
+        }
+      });
 
-  return {
-    success: true,
-    data: {
-      code: config.code,
-      name: config.name,
-      type: type,
-      structure: {
-        headerRows: [{ cells: headerCells }],
-        dataStartRow: config.dataStartRow,
-        dataEndRow: config.dataEndRow
-      },
-      items: rows,
-      validationRules: type === "EXTINTOR" ? { presion: ["OK","BAJO","N/A"], estado: ["BUENO","MALO","N/A","REGULAR"] } : {},
-      _filePath: filePath
+      if (config.generalObservations) {
+        var obsRow = config.generalObservations.row - 1;
+        if (obsRow < sheetData.length && sheetData[obsRow]) {
+          result.generalObservations = String(sheetData[obsRow][0] || "").replace(/^OBSERVACIONES\s*:\s*/i, "").trim();
+        }
+      }
+
+      var startRow = config.dataStartRow - 1;
+      var endRow = config.dataEndRow;
+      for (var r = startRow; r < Math.min(endRow, sheetData.length); r++) {
+        var row = sheetData[r] || [];
+        var item = { row: r + 1 };
+        var hasData = false;
+        Object.keys(config.colIndexes).forEach(function(col) {
+          var field = config.colMap[col].field;
+          var colIdx = config.colIndexes[col] - 1;
+          var val = row[colIdx];
+          item[field] = val !== undefined && val !== null && val !== "" ? String(val).trim() : "";
+          if (item[field]) hasData = true;
+        });
+ if (hasData) result.items.push(item);
+ }
+
+ if (result.items.length === 0 && config.defaultRowCount) {
+ for (var di = 0; di < config.defaultRowCount; di++) {
+ var emptyItem = { row: config.dataStartRow + di };
+ Object.keys(config.colIndexes).forEach(function(col) {
+ emptyItem[config.colMap[col].field] = "";
+ });
+ result.items.push(emptyItem);
+ }
+ }
+ } else {
+      var xlsResult = _readXlsWithSheetJs(filePath);
+      var rawData = xlsResult.rawData;
+
+      config.headerFields.forEach(function(hf) {
+        var rowIdx = hf.row - 1;
+        var colIdx = hf.col - 1;
+        if (rowIdx < rawData.length && rawData[rowIdx]) {
+          result.headerFields[hf.key] = String(rawData[rowIdx][colIdx] || "").trim();
+        }
+      });
+
+      if (config.signFields) {
+        result.signFields = {};
+        config.signFields.forEach(function(sf) {
+          var rowIdx = sf.row - 1;
+          var colIdx = sf.col - 1;
+          if (rowIdx < rawData.length && rawData[rowIdx]) {
+            var rawVal = String(rawData[rowIdx][colIdx] || "").trim();
+            result.signFields[sf.key] = rawVal.replace(/_{2,}/g, "").trim();
+          }
+        });
+      }
+
+      if (config.sections) {
+        config.sections.forEach(function(sec) {
+          var rowIdx = sec.row - 1;
+          var secText = "";
+          if (rowIdx < rawData.length && rawData[rowIdx]) {
+            for (var c = 0; c < (rawData[rowIdx].length || 0); c++) {
+              if (rawData[rowIdx][c] && String(rawData[rowIdx][c]).trim()) {
+                secText = String(rawData[rowIdx][c]).trim();
+                break;
+              }
+            }
+          }
+          result.sections.push({ label: secText || sec.label, row: sec.row, type: "section" });
+        });
+      }
+
+      if (config.dataRows) {
+        config.dataRows.forEach(function(rowNum) {
+          var rowIdx = rowNum - 1;
+          var row = rawData[rowIdx] || [];
+          var item = { row: rowNum };
+          var hasData = false;
+          Object.keys(config.colIndexes).forEach(function(col) {
+            var field = config.colMap[col].field;
+            var colIdx = config.colIndexes[col] - 1;
+            var val = row[colIdx];
+            item[field] = val !== undefined && val !== null && val !== "" ? String(val).trim() : "";
+            if (item[field] && !config.colMap[col].readOnly) hasData = true;
+          });
+          item._isSection = false;
+          result.items.push(item);
+        });
+      } else {
+        var startRow2 = config.dataStartRow - 1;
+        var endRow2 = config.dataEndRow;
+        for (var r2 = startRow2; r2 < Math.min(endRow2, rawData.length); r2++) {
+          var row2 = rawData[r2] || [];
+          var item2 = { row: r2 + 1 };
+          var hasData2 = false;
+          Object.keys(config.colIndexes).forEach(function(col2) {
+            var field2 = config.colMap[col2].field;
+            var colIdx2 = config.colIndexes[col2] - 1;
+            var val2 = row2[colIdx2];
+            item2[field2] = val2 !== undefined && val2 !== null && val2 !== "" ? String(val2).trim() : "";
+            if (item2[field2]) hasData2 = true;
+          });
+ if (hasData2) result.items.push(item2);
+ }
+ }
+
+ if (result.items.length === 0 && config.defaultRowCount) {
+ for (var dj = 0; dj < config.defaultRowCount; dj++) {
+ var emptyItem2 = { row: config.dataStartRow + dj };
+ Object.keys(config.colIndexes).forEach(function(col2) {
+ emptyItem2[config.colMap[col2].field] = "";
+ });
+ result.items.push(emptyItem2);
+ }
+ }
+
+ if (config.checkRows) {
+        config.checkRows.forEach(function(cr) {
+          var rowIdx = cr.row - 1;
+          var row = rawData[rowIdx] || [];
+          var val = "";
+          for (var c = 0; c < (row.length || 0); c++) {
+            if (row[c] && String(row[c]).trim()) {
+              val = String(row[c]).trim();
+              break;
+            }
+          }
+          result.checkRows.push({ row: cr.row, field: cr.field, label: cr.label, value: val, type: cr.type, options: cr.options });
+        });
+      }
     }
-  };
+
+    var headerCells = [];
+    Object.keys(config.colMap).forEach(function(col) {
+      var cm = config.colMap[col];
+      headerCells.push({ col: col, field: cm.field, label: cm.label, type: cm.type, readOnly: cm.readOnly || false, options: cm.options || null });
+    });
+
+    return {
+      success: true,
+      data: {
+        code: config.code,
+        name: config.name,
+        type: type,
+        headerFields: result.headerFields,
+        generalObservations: result.generalObservations,
+        signFields: result.signFields || null,
+        checkRows: result.checkRows.length > 0 ? result.checkRows : null,
+        sections: result.sections.length > 0 ? result.sections : null,
+        structure: {
+          headerCells: headerCells,
+      dataStartRow: config.dataStartRow != null ? config.dataStartRow : (config.dataRows ? config.dataRows[0] : null),
+      dataEndRow: config.dataEndRow != null ? config.dataEndRow : (config.dataRows ? config.dataRows[config.dataRows.length - 1] : null)
+        },
+        items: result.items,
+        _filePath: filePath
+      }
+    };
   } catch (e) {
     return { success: false, error: { code: "READ_ERROR", message: "Error leyendo archivo Excel: " + e.message } };
   }
@@ -225,55 +437,306 @@ async function writeInspeccionExcel(companyRoot, type, formData) {
   var originalPath = _findExcelFileDeep(dir, config.code) || _findExcelFileDeep(dir, type);
   if (!originalPath) return { success: false, error: { code: "FILE_NOT_FOUND", message: "Archivo Excel no encontrado para escritura" } };
 
-  var backupDir = path.join(dir, "backup");
-  if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
-  var backupPath = path.join(backupDir, path.basename(originalPath, path.extname(originalPath)) + "_" + Date.now() + path.extname(originalPath));
-  fs.copyFileSync(originalPath, backupPath);
-
-  var newFilePath = originalPath;
   var ext = path.extname(originalPath).toLowerCase();
+  _createBackup(originalPath, dir);
 
-  if (ext === ".xls") {
-    newFilePath = originalPath.replace(/\.xls$/i, ".xlsx");
+  try {
+    if (ext === ".xlsx") {
+      var workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.readFile(originalPath);
+      var ws = workbook.getWorksheet(config.sheetName || 1);
+      if (!ws) return { success: false, error: { code: "SHEET_NOT_FOUND", message: "Hoja no encontrada" } };
+
+      if (formData.headerFields) {
+        config.headerFields.forEach(function(hf) {
+          if (formData.headerFields[hf.key] !== undefined) {
+            ws.getCell(hf.row, hf.col).value = formData.headerFields[hf.key];
+          }
+        });
+      }
+
+      if (formData.generalObservations !== undefined && config.generalObservations) {
+        ws.getCell(config.generalObservations.row, config.generalObservations.col).value =
+          "OBSERVACIONES : " + formData.generalObservations;
+      }
+
+      var items = formData.items || [];
+      items.forEach(function(item) {
+        var rowNum = item.row || config.dataStartRow;
+        Object.keys(config.colIndexes).forEach(function(col) {
+          var field = config.colMap[col].field;
+          var colIdx = config.colIndexes[col];
+          if (item[field] !== undefined) {
+            ws.getCell(rowNum, colIdx).value = item[field];
+          }
+        });
+      });
+
+      await workbook.xlsx.writeFile(originalPath);
+    } else {
+      var xlsResult = _readXlsWithSheetJs(originalPath);
+      var rawData = xlsResult.rawData;
+      var wbOrig = xlsResult.workbook;
+      var sheetNameOrig = xlsResult.sheetName;
+      var wsOrig = wbOrig.Sheets[sheetNameOrig];
+      var merges = wsOrig['!merges'] || [];
+
+      if (formData.headerFields) {
+        config.headerFields.forEach(function(hf) {
+          if (formData.headerFields[hf.key] !== undefined) {
+            var rowIdx = hf.row - 1;
+            var colIdx = hf.col - 1;
+            if (!rawData[rowIdx]) rawData[rowIdx] = [];
+            rawData[rowIdx][colIdx] = formData.headerFields[hf.key];
+          }
+        });
+      }
+
+      if (formData.signFields && config.signFields) {
+        config.signFields.forEach(function(sf) {
+          if (formData.signFields[sf.key] !== undefined) {
+            var rowIdx = sf.row - 1;
+            var colIdx = sf.col - 1;
+            if (!rawData[rowIdx]) rawData[rowIdx] = [];
+            rawData[rowIdx][colIdx] = formData.signFields[sf.key];
+          }
+        });
+      }
+
+      var items2 = formData.items || [];
+      items2.forEach(function(item) {
+        var rowNum = item.row;
+        var rowIdx = rowNum - 1;
+        if (!rawData[rowIdx]) rawData[rowIdx] = [];
+        Object.keys(config.colIndexes).forEach(function(col) {
+          var field = config.colMap[col].field;
+          var colIdx = config.colIndexes[col] - 1;
+          if (item[field] !== undefined) {
+            rawData[rowIdx][colIdx] = item[field];
+          }
+        });
+      });
+
+      if (formData.checkRows && config.checkRows) {
+        config.checkRows.forEach(function(cr, idx) {
+          if (formData.checkRows[idx] !== undefined) {
+            var rowIdx = cr.row - 1;
+            if (!rawData[rowIdx]) rawData[rowIdx] = [];
+            rawData[rowIdx][0] = formData.checkRows[idx];
+          }
+        });
+      }
+
+      if (formData.generalObservations !== undefined && config.generalObservations) {
+        var obsRowIdx = config.generalObservations.row - 1;
+        if (!rawData[obsRowIdx]) rawData[obsRowIdx] = [];
+        rawData[obsRowIdx][0] = "OBSERVACIONES : " + formData.generalObservations;
+      }
+
+      var newWs = xlsx.utils.aoa_to_sheet(rawData);
+      newWs['!merges'] = merges;
+
+      var newWb = xlsx.utils.book_new();
+      xlsx.utils.book_append_sheet(newWb, newWs, sheetNameOrig);
+
+      var outPath = originalPath;
+      if (ext === ".xls") {
+        xlsx.writeFile(newWb, outPath, { bookType: "xls", type: "file" });
+      } else {
+        xlsx.writeFile(newWb, outPath, { type: "file" });
+      }
+    }
+
+    return {
+      success: true,
+      data: { filePath: originalPath, saved: true, rowCount: (formData.items || []).length }
+    };
+  } catch (e) {
+    return { success: false, error: { code: "WRITE_ERROR", message: "Error escribiendo Excel: " + e.message } };
   }
+}
 
-  var workbook = new ExcelJS.Workbook();
-  if (ext === ".xls") {
-    var rawData = _readXlsWithSheetJs(originalPath);
-    var ws = workbook.addWorksheet("Inspección");
-    rawData.forEach(function(row, rowIdx) {
-      row.forEach(function(cellVal, colIdx) {
-        ws.getCell(rowIdx + 1, colIdx + 1).value = cellVal;
+async function writeInspeccionHeader(companyRoot, type, headerData) {
+  var dir = _getCompanyInspeccionesDir(companyRoot);
+  var config = INSPECTION_TEMPLATES[type];
+  if (!config) return { success: false, error: { code: "UNKNOWN_TYPE", message: "Tipo desconocido: " + type } };
+
+  var originalPath = _findExcelFileDeep(dir, config.code) || _findExcelFileDeep(dir, type);
+  if (!originalPath) return { success: false, error: { code: "FILE_NOT_FOUND", message: "Archivo Excel no encontrado" } };
+
+  var ext = path.extname(originalPath).toLowerCase();
+  _createBackup(originalPath, dir);
+
+  try {
+    if (ext === ".xlsx") {
+      var workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.readFile(originalPath);
+      var ws = workbook.getWorksheet(config.sheetName || 1);
+      if (!ws) return { success: false, error: { code: "SHEET_NOT_FOUND", message: "Hoja no encontrada" } };
+
+      config.headerFields.forEach(function(hf) {
+        if (headerData[hf.key] !== undefined) {
+          ws.getCell(hf.row, hf.col).value = headerData[hf.key];
+        }
+      });
+
+      if (headerData.generalObservations !== undefined && config.generalObservations) {
+        ws.getCell(config.generalObservations.row, config.generalObservations.col).value =
+          "OBSERVACIONES : " + headerData.generalObservations;
+      }
+
+      if (headerData.signFields && config.signFields) {
+        config.signFields.forEach(function(sf) {
+          if (headerData.signFields[sf.key] !== undefined) {
+            ws.getCell(sf.row, sf.col).value = headerData.signFields[sf.key];
+          }
+        });
+      }
+
+      await workbook.xlsx.writeFile(originalPath);
+    } else {
+      var xlsResult = _readXlsWithSheetJs(originalPath);
+      var rawData = xlsResult.rawData;
+      var merges = xlsResult.workbook.Sheets[xlsResult.sheetName]['!merges'] || [];
+
+      config.headerFields.forEach(function(hf) {
+        if (headerData[hf.key] !== undefined) {
+          var rowIdx = hf.row - 1;
+          var colIdx = hf.col - 1;
+          if (!rawData[rowIdx]) rawData[rowIdx] = [];
+          rawData[rowIdx][colIdx] = headerData[hf.key];
+        }
+      });
+
+      if (headerData.signFields && config.signFields) {
+        config.signFields.forEach(function(sf) {
+          if (headerData.signFields[sf.key] !== undefined) {
+            var rowIdx = sf.row - 1;
+            var colIdx = sf.col - 1;
+            if (!rawData[rowIdx]) rawData[rowIdx] = [];
+            rawData[rowIdx][colIdx] = headerData.signFields[sf.key];
+          }
+        });
+      }
+
+      if (headerData.checkRows && config.checkRows) {
+        config.checkRows.forEach(function(cr, idx) {
+          if (headerData.checkRows[idx] !== undefined) {
+            var rowIdx = cr.row - 1;
+            if (!rawData[rowIdx]) rawData[rowIdx] = [];
+            rawData[rowIdx][0] = headerData.checkRows[idx];
+          }
+        });
+      }
+
+      if (headerData.generalObservations !== undefined && config.generalObservations) {
+        var obsRowIdx = config.generalObservations.row - 1;
+        if (!rawData[obsRowIdx]) rawData[obsRowIdx] = [];
+        rawData[obsRowIdx][0] = "OBSERVACIONES : " + headerData.generalObservations;
+      }
+
+      var newWs = xlsx.utils.aoa_to_sheet(rawData);
+      newWs['!merges'] = merges;
+      var newWb = xlsx.utils.book_new();
+      xlsx.utils.book_append_sheet(newWb, newWs, xlsResult.sheetName);
+      xlsx.writeFile(newWb, originalPath, { bookType: ext === ".xls" ? "xls" : "xlsx", type: "file" });
+    }
+
+    return { success: true, data: { filePath: originalPath, saved: true } };
+  } catch (e) {
+    return { success: false, error: { code: "WRITE_ERROR", message: "Error escribiendo header: " + e.message } };
+  }
+}
+
+function listInspeccionFiles(companyRoot) {
+  var dir = _getCompanyInspeccionesDir(companyRoot);
+  if (!fs.existsSync(dir)) return { success: true, data: { files: [] } };
+
+  try {
+    var entries = fs.readdirSync(dir);
+    var files = [];
+    entries.forEach(function(f) {
+      var fullPath = path.join(dir, f);
+      try {
+        var stat = fs.statSync(fullPath);
+        if (!stat.isFile()) return;
+      } catch (e) { return; }
+      var lower = f.toLowerCase();
+      if (!lower.endsWith('.xlsx') && !lower.endsWith('.xls')) return;
+
+      var type = "DESCONOCIDO";
+      var upper = f.toUpperCase();
+      if (upper.indexOf("GI-FO-026") !== -1 || upper.indexOf("EXTINTOR") !== -1) type = "EXTINTOR";
+      else if (upper.indexOf("GI-FO-025") !== -1 || upper.indexOf("INSTALACION") !== -1) type = "INSTALACION";
+      else if (upper.indexOf("GI-FO-023") !== -1 || upper.indexOf("EMERGENCIA") !== -1) type = "EMERGENCIA";
+      else if (upper.indexOf("GI-FO-031") !== -1 || upper.indexOf("BOTIQUIN") !== -1) type = "BOTIQUIN";
+      else if (upper.indexOf("PROGRAMA") !== -1) type = "PROGRAMA";
+
+      var config = INSPECTION_TEMPLATES[type] || {};
+      files.push({
+        name: f,
+        path: fullPath,
+        type: type,
+        code: config.code || "",
+        typeName: config.name || f.replace(/\.(xlsx|xls)$/i, ""),
+        ext: path.extname(f).toLowerCase(),
+        size: fs.statSync(fullPath).size,
+        modified: fs.statSync(fullPath).mtime.toISOString()
       });
     });
-  } else {
-    await workbook.xlsx.readFile(originalPath);
+
+    return { success: true, data: { files: files } };
+  } catch (e) {
+    return { success: false, error: { code: "READ_ERROR", message: "Error listando archivos: " + e.message } };
+  }
+}
+
+function getInspeccionFileMetadata(companyRoot, filePath) {
+  if (!fs.existsSync(filePath)) {
+    return { success: false, error: { code: "FILE_NOT_FOUND", message: "Archivo no encontrado: " + filePath } };
   }
 
-  var ws2 = workbook.getWorksheet(1);
-  if (!ws2) return { success: false, error: { code: "SHEET_NOT_FOUND", message: "Hoja no encontrada" } };
+  var fileName = path.basename(filePath).toUpperCase();
+  var type = "DESCONOCIDO";
+  if (fileName.indexOf("GI-FO-026") !== -1 || fileName.indexOf("EXTINTOR") !== -1) type = "EXTINTOR";
+  else if (fileName.indexOf("GI-FO-025") !== -1 || fileName.indexOf("INSTALACION") !== -1) type = "INSTALACION";
+  else if (fileName.indexOf("GI-FO-023") !== -1 || fileName.indexOf("EMERGENCIA") !== -1) type = "EMERGENCIA";
+  else if (fileName.indexOf("GI-FO-031") !== -1 || fileName.indexOf("BOTIQUIN") !== -1) type = "BOTIQUIN";
+  else if (fileName.indexOf("PROGRAMA") !== -1) type = "PROGRAMA";
 
-  var items = formData.items || [];
-  items.forEach(function(item) {
-    var rowNum = item.row || config.dataStartRow;
-    Object.keys(config.colIndexes).forEach(function(col) {
-      var field = config.colMap[col];
-      var colIdx = config.colIndexes[col];
-      if (item[field] !== undefined) {
-        ws2.getCell(rowNum, colIdx).value = item[field];
+  var config = INSPECTION_TEMPLATES[type];
+  if (!config) {
+    var stat = fs.statSync(filePath);
+    return {
+      success: true,
+      data: {
+        type: type,
+        typeName: path.basename(filePath, path.extname(filePath)),
+        code: "",
+        filePath: filePath,
+        fileName: path.basename(filePath),
+        modified: stat.mtime.toISOString(),
+        headerFields: {},
+        itemsCount: 0
       }
-    });
-  });
+    };
+  }
 
-  await workbook.xlsx.writeFile(newFilePath);
+  var readResult = readInspeccionExcel(companyRoot, type);
+  if (!readResult.success) return readResult;
 
+  var stat2 = fs.statSync(filePath);
   return {
     success: true,
     data: {
-      filePath: newFilePath,
-      backupPath: backupPath,
-      saved: true,
-      rowCount: items.length
+      type: type,
+      typeName: config.name,
+      code: config.code,
+      filePath: filePath,
+      fileName: path.basename(filePath),
+      modified: stat2.mtime.toISOString(),
+      headerFields: readResult.data.headerFields,
+      itemsCount: readResult.data.items.length
     }
   };
 }
@@ -292,10 +755,7 @@ function readProgramaInspecciones(companyRoot, year) {
     return { success: false, error: { code: "DIR_NOT_FOUND", message: "Carpeta 4.2.4 no encontrada" } };
   }
 
-  var filePath = _findExcelFileDeep(dir, "PROGRAMA DE INSPECCIONES");
-  if (!filePath) {
-    filePath = _findExcelFileDeep(dir, "PROGRAMA");
-  }
+  var filePath = _findExcelFileDeep(dir, "PROGRAMA DE INSPECCIONES") || _findExcelFileDeep(dir, "PROGRAMA");
   if (!filePath) {
     return { success: false, error: { code: "FILE_NOT_FOUND", message: "Archivo PROGRAMA DE INSPECCIONES no encontrado" } };
   }
@@ -309,37 +769,43 @@ function readProgramaInspecciones(companyRoot, year) {
   }
 
   var rawData;
+  var merges = [];
+  var sheetName = "PROGRAMA";
   try {
-    rawData = _readXlsWithSheetJs(filePath);
+    var xlsResult = _readXlsWithSheetJs(filePath);
+    rawData = xlsResult.rawData;
+    merges = xlsResult.workbook.Sheets[xlsResult.sheetName]['!merges'] || [];
+    sheetName = xlsResult.sheetName;
   } catch (e) {
     return { success: false, error: { code: "READ_ERROR", message: "Error leyendo programa: " + e.message } };
   }
 
+  var kpiRow1 = rawData[3] || [];
+  var kpiRow2 = rawData[4] || [];
+  var indicador = kpiRow1[2] || 0;
+  var sinRealizar = kpiRow1[5] || 0;
+  var realizadas = kpiRow2[5] || 0;
+
   var activities = [];
   var emptyCount = 0;
-  var MAX_ROWS = 80;
 
-  for (var r = 0; r < Math.min(MAX_ROWS, rawData.length); r++) {
+  for (var r = PROGRAMA_SHEET_CONFIG.startRow - 1; r < Math.min(PROGRAMA_SHEET_CONFIG.endRow, rawData.length); r++) {
     var row = rawData[r] || [];
-
-    var actName = "";
-    for (var c = 0; c < PROGRAMA_SHEET_CONFIG.startCol - 1; c++) {
-      if (row[c] !== undefined && row[c] !== null && String(row[c]).trim() !== "") {
-        actName = String(row[c]).trim();
-        break;
-      }
-    }
-
-    if (!actName) {
+    var actividad = String(row[3] || "").trim();
+    if (!actividad) {
       emptyCount++;
       if (emptyCount >= 3 && activities.length > 0) break;
       continue;
     }
     emptyCount = 0;
 
+    var objetivoGeneral = String(row[1] || "").trim();
+    var objetivosEspecificos = String(row[2] || "").trim();
+    var responsable = String(row[4] || "").trim();
+
     var months = {};
     for (var m = 0; m < 12; m++) {
-      var colIdx = PROGRAMA_SHEET_CONFIG.startCol - 1 + m;
+      var colIdx = PROGRAMA_SHEET_CONFIG.startCol + m - 1;
       var val = row[colIdx];
       if (val !== undefined && val !== null && String(val).trim() !== "") {
         var s = String(val).trim().toUpperCase();
@@ -355,19 +821,32 @@ function readProgramaInspecciones(companyRoot, year) {
       }
     }
 
+    var porcentaje = row[17] || 0;
+    var estado = String(row[18] || "").trim();
+    var observaciones = String(row[19] || "").trim();
+
     var hasAnyMonth = Object.values(months).some(function(v) { return v !== null; });
     var actType = "INSTALACION";
-    var upperName = actName.toUpperCase();
+    var upperName = actividad.toUpperCase();
     if (upperName.indexOf("EXTINTOR") !== -1) actType = "EXTINTOR";
     else if (upperName.indexOf("EMERGENCIA") !== -1) actType = "EMERGENCIA";
     else if (upperName.indexOf("BOTIQU") !== -1) actType = "BOTIQUIN";
+    else if (upperName.indexOf("GERENCIAL") !== -1 || upperName.indexOf("GERENC") !== -1) actType = "GERENCIAL";
+    else if (upperName.indexOf("PROTECCION") !== -1) actType = "EPP";
 
     activities.push({
       id: "act-prog-" + (r + 1),
-      name: actName,
+      row: r + 1,
+      objetivoGeneral: objetivoGeneral,
+      objetivosEspecificos: objetivosEspecificos,
+      actividades: actividad,
+      responsable: responsable,
       type: actType,
       frequency: hasAnyMonth ? _inferFrequency(months) : "Según programa",
-      months: months
+      months: months,
+      porcentaje: porcentaje,
+      estado: estado,
+      observacionesSeguimiento: observaciones
     });
   }
 
@@ -378,21 +857,109 @@ function readProgramaInspecciones(companyRoot, year) {
       else if (v === "p") totalP++;
     });
   });
-  var total = totalC + totalP;
 
   return {
     success: true,
     data: {
       year: year || new Date().getFullYear(),
+      filePath: filePath,
       activities: activities,
       kpis: {
-        indicator: total > 0 ? Math.round((totalC / total) * 100) : 0,
+        indicator: typeof indicador === 'number' ? Math.round(indicador * 100) / 100 : indicador,
         completed: totalC,
         pending: totalP,
-        total: total
+        total: totalC + totalP,
+        realizadas: typeof realizadas === 'number' ? realizadas : 0,
+        sinRealizar: typeof sinRealizar === 'number' ? sinRealizar : 0
       }
     }
   };
+}
+
+async function updateProgramaMonth(companyRoot, activityId, month, status) {
+  var dir = _getCompanyInspeccionesDir(companyRoot);
+  var filePath = _findExcelFileDeep(dir, "PROGRAMA DE INSPECCIONES") || _findExcelFileDeep(dir, "PROGRAMA");
+  if (!filePath) return { success: false, error: { code: "FILE_NOT_FOUND", message: "Archivo PROGRAMA no encontrado" } };
+
+  _createBackup(filePath, dir);
+
+  try {
+    var xlsResult = _readXlsWithSheetJs(filePath);
+    var rawData = xlsResult.rawData;
+    var merges = xlsResult.workbook.Sheets[xlsResult.sheetName]['!merges'] || [];
+
+    var rowIdx = parseInt(activityId.replace("act-prog-", ""), 10) - 1;
+    var colIdx = PROGRAMA_SHEET_CONFIG.startCol + month - 1;
+
+    if (rawData[rowIdx]) {
+      var newValue = status === "c" ? "c" : (status === "p" ? "p" : "");
+      rawData[rowIdx][colIdx] = newValue;
+
+      var totalC = 0, totalP = 0;
+      for (var m = 0; m < 12; m++) {
+        var mv = rawData[rowIdx][PROGRAMA_SHEET_CONFIG.startCol + m - 1];
+        if (mv) {
+          var ms = String(mv).trim().toLowerCase();
+          if (ms === "c") totalC++;
+          else if (ms === "p") totalP++;
+        }
+      }
+      var total = totalC + totalP;
+      rawData[rowIdx][17] = total > 0 ? Math.round((totalC / total) * 100) / 100 : 0;
+      rawData[rowIdx][18] = totalC > 0 && totalP === 0 ? "Ejecutado" : (totalP > 0 ? " Sin Iniciar" : "");
+    }
+
+    var newWs = xlsx.utils.aoa_to_sheet(rawData);
+    newWs['!merges'] = merges;
+    var newWb = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(newWb, newWs, xlsResult.sheetName);
+    xlsx.writeFile(newWb, filePath, { bookType: path.extname(filePath).toLowerCase() === ".xls" ? "xls" : "xlsx", type: "file" });
+
+    return readProgramaInspecciones(companyRoot, new Date().getFullYear());
+  } catch (e) {
+    return { success: false, error: { code: "WRITE_ERROR", message: "Error actualizando programa: " + e.message } };
+  }
+}
+
+async function updateProgramaField(companyRoot, activityId, field, value) {
+  var dir = _getCompanyInspeccionesDir(companyRoot);
+  var filePath = _findExcelFileDeep(dir, "PROGRAMA DE INSPECCIONES") || _findExcelFileDeep(dir, "PROGRAMA");
+  if (!filePath) return { success: false, error: { code: "FILE_NOT_FOUND", message: "Archivo PROGRAMA no encontrado" } };
+
+  var colConfig = PROGRAMA_SHEET_CONFIG.colMap[
+    Object.keys(PROGRAMA_SHEET_CONFIG.colMap).find(function(k) {
+      return PROGRAMA_SHEET_CONFIG.colMap[k].field === field;
+    })
+  ];
+  if (!colConfig || !colConfig.editable) {
+    return { success: false, error: { code: "FIELD_NOT_EDITABLE", message: "Campo no editable: " + field } };
+  }
+
+  _createBackup(filePath, dir);
+
+  try {
+    var xlsResult = _readXlsWithSheetJs(filePath);
+    var rawData = xlsResult.rawData;
+    var merges = xlsResult.workbook.Sheets[xlsResult.sheetName]['!merges'] || [];
+
+    var rowIdx = parseInt(activityId.replace("act-prog-", ""), 10) - 1;
+    var colIdx = colConfig.col - 1;
+
+    if (rawData[rowIdx]) {
+      if (!rawData[rowIdx]) rawData[rowIdx] = [];
+      rawData[rowIdx][colIdx] = value;
+    }
+
+    var newWs = xlsx.utils.aoa_to_sheet(rawData);
+    newWs['!merges'] = merges;
+    var newWb = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(newWb, newWs, xlsResult.sheetName);
+    xlsx.writeFile(newWb, filePath, { bookType: path.extname(filePath).toLowerCase() === ".xls" ? "xls" : "xlsx", type: "file" });
+
+    return readProgramaInspecciones(companyRoot, new Date().getFullYear());
+  } catch (e) {
+    return { success: false, error: { code: "WRITE_ERROR", message: "Error actualizando campo programa: " + e.message } };
+  }
 }
 
 function getInspeccionesStats(companyRoot) {
@@ -423,7 +990,8 @@ function getInspeccionesStats(companyRoot) {
     totalExt = extintoresResult.data.items.length;
     var currentYear = new Date().getFullYear();
     vigentes = extintoresResult.data.items.filter(function(item) {
-      return parseInt(item.vencimiento) >= currentYear;
+      var venc = parseInt(item.vencimiento);
+      return !isNaN(venc) && venc >= currentYear;
     }).length;
   }
 
@@ -475,28 +1043,20 @@ function registerInspeccionesHandlers(app, deps) {
     try {
       var companyRoot = await getCompanyRootPath(companyName);
       if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
-      var dir = _getCompanyInspeccionesDir(companyRoot);
-      var filePath = _findExcelFileDeep(dir, "PROGRAMA DE INSPECCIONES") || _findExcelFileDeep(dir, "PROGRAMA");
-      if (filePath) {
-        var rawData = _readXlsWithSheetJs(filePath);
-        var rowIdx = parseInt(activityId.replace("act-prog-", ""), 10) - 1;
-        var colIdx = PROGRAMA_SHEET_CONFIG.startCol - 1 + month;
-        if (rawData[rowIdx]) {
-          var newValue = status === "c" ? "C" : (status === "p" ? "P" : "");
-          rawData[rowIdx][colIdx] = newValue;
-          var wb = xlsx.utils.book_new();
-          var ws = xlsx.utils.aoa_to_sheet(rawData);
-          xlsx.utils.book_append_sheet(wb, ws, "Sheet1");
-          var backupDir = path.join(dir, "backup");
-          if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
-          var backupPath = path.join(backupDir, "PROGRAMA_INSPECCIONES_" + Date.now() + ".xls");
-          if (fs.existsSync(filePath)) fs.copyFileSync(filePath, backupPath);
-          xlsx.writeFile(wb, filePath);
-        }
-      }
-      return readProgramaInspecciones(companyRoot, new Date().getFullYear());
+      return await updateProgramaMonth(companyRoot, activityId, month, status);
     } catch (e) {
       console.error("[4.2.4] Error en update-month:", e);
+      return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
+    }
+  });
+
+  ipcMain.handle("inspecciones:update-field", async function(event, companyName, activityId, field, value) {
+    try {
+      var companyRoot = await getCompanyRootPath(companyName);
+      if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
+      return await updateProgramaField(companyRoot, activityId, field, value);
+    } catch (e) {
+      console.error("[4.2.4] Error en update-field:", e);
       return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
     }
   });
@@ -523,6 +1083,17 @@ function registerInspeccionesHandlers(app, deps) {
     }
   });
 
+  ipcMain.handle("inspecciones:write-header", async function(event, companyName, type, headerData) {
+    try {
+      var companyRoot = await getCompanyRootPath(companyName);
+      if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
+      return await writeInspeccionHeader(companyRoot, type, headerData);
+    } catch (e) {
+      console.error("[4.2.4] Error en write-header:", e);
+      return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
+    }
+  });
+
   ipcMain.handle("inspecciones:get-template", async function(event, companyName, type) {
     try {
       var companyRoot = await getCompanyRootPath(companyName);
@@ -534,29 +1105,54 @@ function registerInspeccionesHandlers(app, deps) {
     }
   });
 
+  ipcMain.handle("inspecciones:list-files", async function(event, companyName) {
+    try {
+      var companyRoot = await getCompanyRootPath(companyName);
+      if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
+      return listInspeccionFiles(companyRoot);
+    } catch (e) {
+      console.error("[4.2.4] Error en list-files:", e);
+      return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
+    }
+  });
+
+  ipcMain.handle("inspecciones:get-file-metadata", async function(event, companyName, filePath) {
+    try {
+      var companyRoot = await getCompanyRootPath(companyName);
+      if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
+      return getInspeccionFileMetadata(companyRoot, filePath);
+    } catch (e) {
+      console.error("[4.2.4] Error en get-file-metadata:", e);
+      return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
+    }
+  });
+
   ipcMain.handle("inspecciones:list", async function(event, companyName, filters) {
     try {
       var companyRoot = await getCompanyRootPath(companyName);
       if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
-      var dataDir = path.join(_getCompanyInspeccionesDir(companyRoot), "inspecciones_data.json");
-      var items = [];
-      if (fs.existsSync(dataDir)) {
-        var content = fs.readFileSync(dataDir, "utf8");
-        var data = JSON.parse(content);
-        items = data.items || data.inspections || [];
-      }
+      var filesResult = listInspeccionFiles(companyRoot);
+      if (!filesResult.success) return filesResult;
+
+      var items = filesResult.data.files.filter(function(f) { return f.type !== "PROGRAMA"; });
+
       if (filters) {
         if (filters.type) items = items.filter(function(i) { return i.type === filters.type; });
-        if (filters.status) items = items.filter(function(i) { return i.status === filters.status; });
         if (filters.search) {
           var s = filters.search.toLowerCase();
           items = items.filter(function(i) {
-            return (i.location || "").toLowerCase().indexOf(s) !== -1 ||
-              (i.inspector || "").toLowerCase().indexOf(s) !== -1 ||
-              (i.observations || "").toLowerCase().indexOf(s) !== -1;
+            return (i.typeName || "").toLowerCase().indexOf(s) !== -1 ||
+              (i.name || "").toLowerCase().indexOf(s) !== -1;
           });
         }
+        if (filters.dateFrom) {
+          items = items.filter(function(i) { return i.modified >= filters.dateFrom; });
+        }
+        if (filters.dateTo) {
+          items = items.filter(function(i) { return i.modified <= filters.dateTo + "T23:59:59.999Z"; });
+        }
       }
+
       return { success: true, data: { items: items, total: items.length } };
     } catch (e) {
       console.error("[4.2.4] Error en list:", e);
@@ -568,63 +1164,19 @@ function registerInspeccionesHandlers(app, deps) {
     try {
       var companyRoot = await getCompanyRootPath(companyName);
       if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
-      var dir = _getCompanyInspeccionesDir(companyRoot);
-      var dataFile = path.join(dir, "inspecciones_data.json");
-      var data = { inspections: [] };
-      if (fs.existsSync(dataFile)) {
-        data = JSON.parse(fs.readFileSync(dataFile, "utf8"));
-      }
-      var insp = data.inspections.find(function(i) { return i.id === id; });
-      if (insp) return { success: true, data: insp };
-      return { success: false, error: { code: "INSPECTION_NOT_FOUND", message: "Inspección no encontrada: " + id } };
+      return getInspeccionFileMetadata(companyRoot, id);
     } catch (e) {
       console.error("[4.2.4] Error en get:", e);
       return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
     }
   });
 
-  ipcMain.handle("inspecciones:create", async function(event, companyName, inspectionData) {
-    try {
-      var companyRoot = await getCompanyRootPath(companyName);
-      if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
-      var dir = _getCompanyInspeccionesDir(companyRoot);
-      var dataFile = path.join(dir, "inspecciones_data.json");
-      var data = { inspections: [] };
-      if (fs.existsSync(dataFile)) {
-        data = JSON.parse(fs.readFileSync(dataFile, "utf8"));
-      }
-      var newInsp = {
-        id: "insp-" + Date.now(),
-        type: inspectionData.type || "EXTINTOR",
-        format: inspectionData.format || "GI-FO-026",
-        location: inspectionData.location || "",
-        inspector: inspectionData.inspector || "",
-        date: inspectionData.date || new Date().toISOString().slice(0, 10),
-        status: inspectionData.status || "DRAFT",
-        items: inspectionData.items || 0,
-        observations: inspectionData.observations || ""
-      };
-      data.inspections.unshift(newInsp);
-      fs.writeFileSync(dataFile, JSON.stringify(data, null, 2), "utf8");
-      return { success: true, data: newInsp };
-    } catch (e) {
-      console.error("[4.2.4] Error en create:", e);
-      return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
-    }
-  });
-
   ipcMain.handle("inspecciones:delete", async function(event, companyName, id) {
     try {
-      var companyRoot = await getCompanyRootPath(companyName);
-      if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
-      var dir = _getCompanyInspeccionesDir(companyRoot);
-      var dataFile = path.join(dir, "inspecciones_data.json");
-      var data = { inspections: [] };
-      if (fs.existsSync(dataFile)) {
-        data = JSON.parse(fs.readFileSync(dataFile, "utf8"));
-      }
-      data.inspections = data.inspections.filter(function(i) { return i.id !== id; });
-      fs.writeFileSync(dataFile, JSON.stringify(data, null, 2), "utf8");
+      if (!fs.existsSync(id)) return { success: false, error: { code: "FILE_NOT_FOUND", message: "Archivo no encontrado" } };
+      var dir = _getCompanyInspeccionesDir(await getCompanyRootPath(companyName));
+      _createBackup(id, dir);
+      fs.unlinkSync(id);
       return { success: true, data: { deleted: true, id: id } };
     } catch (e) {
       console.error("[4.2.4] Error en delete:", e);

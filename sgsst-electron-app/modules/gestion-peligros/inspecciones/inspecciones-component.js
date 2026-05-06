@@ -6,12 +6,11 @@ Constructor: (container, currentCompany, moduleName, submoduleTitle, backToModul
 (function () {
   'use strict';
 
-  var VIEWS = [
-    { key: 'historial', label: 'Inspecciones', icon: 'bi-clipboard-check' },
-    { key: 'programa', label: 'Programa', icon: 'bi-calendar3' },
-    { key: 'formulario', label: 'Formulario', icon: 'bi-file-earmark-text' },
-    { key: 'dashboard', label: 'Panel', icon: 'bi-speedometer2' }
-  ];
+var VIEWS = [
+  { key: 'historial', label: 'Inspecciones', icon: 'bi-clipboard-check' },
+  { key: 'programa', label: 'Programa', icon: 'bi-calendar3' },
+  { key: 'formulario', label: 'Formulario', icon: 'bi-file-earmark-text' }
+];
 
 function InspeccionesComponent(container, currentCompany, moduleName, submoduleTitle, backToModuleCallback) {
     this.container = container;
@@ -64,10 +63,10 @@ InspeccionesComponent.prototype._loadCSS = function (callback) {
     var self = this;
 
     var tabsHtml = VIEWS.map(function (v) {
-      var badgeHtml = '';
-      if (v.key === 'dashboard' || v.key === 'programa') {
-        badgeHtml = '<span class="kair-header__tab-badge" id="kair-insp-tab-badge-' + v.key + '" style="display:none;">0</span>';
-      }
+    var badgeHtml = '';
+    if (v.key === 'programa') {
+      badgeHtml = '<span class="kair-header__tab-badge" id="kair-insp-tab-badge-' + v.key + '" style="display:none;">0</span>';
+    }
       return '<button class="kair-header__tab' + (v.key === 'historial' ? ' active' : '') + '" data-view="' + v.key + '">' +
         '<i class="bi ' + v.icon + '"></i> ' + v.label + ' ' + badgeHtml +
       '</button>';
@@ -87,14 +86,13 @@ InspeccionesComponent.prototype._loadCSS = function (callback) {
             '<ol class="kair-header__breadcrumb">' +
               '<li>Gestión de Peligros</li>' +
               '<li>4.2.4</li>' +
-              '<li class="kair-header__breadcrumb--active" id="kair-insp-breadcrumb-active">Panel</li>' +
+              '<li class="kair-header__breadcrumb--active" id="kair-insp-breadcrumb-active">Inspecciones</li>' +
             '</ol>' +
           '</div>' +
           '<div class="kair-header__right">' +
             '<span class="kair-header__pill--section">4.2.4</span>' +
             '<span class="kair-header__company" id="kair-insp-header-company"><i class="bi bi-building"></i> <span></span></span>' +
-            '<button class="kair-header__action--primary" id="kair-insp-btn-new" style="display:none;"><i class="bi bi-plus-lg"></i> Nueva Inspección</button>' +
-            '<button class="kair-header__action--ghost" id="kair-insp-btn-export" style="display:none;"><i class="bi bi-download"></i> Exportar</button>' +
+'<button class="kair-header__action--ghost" id="kair-insp-btn-export" style="display:none;"><i class="bi bi-download"></i> Exportar</button>' +
           '</div>' +
         '</div>' +
         '<div class="kair-header__tabs" id="kair-insp-tabs">' +
@@ -138,33 +136,23 @@ InspeccionesComponent.prototype._loadCSS = function (callback) {
   };
 
   InspeccionesComponent.prototype._getViewSkeleton = function (viewKey) {
-    switch (viewKey) {
-      case 'dashboard':
-        return '<div id="kair-insp-dashboard-stats" class="kair-insp__stats-grid"></div>' +
-          '<div class="kair-insp__dashboard-grid">' +
-            '<div class="kair-insp__dashboard-full" id="kair-insp-dashboard-calendar"></div>' +
-          '</div>' +
-          '<div class="kair-insp__dashboard-grid" style="margin-top:1.5rem;">' +
-            '<div id="kair-insp-dashboard-recent"></div>' +
-            '<div id="kair-insp-dashboard-alerts"></div>' +
-          '</div>';
+  switch (viewKey) {
+    case 'programa':
+      return '<div id="kair-insp-programa-kpis" class="kair-insp__programa-kpis"></div>' +
+        '<div id="kair-insp-programa-table"></div>';
 
-      case 'programa':
-        return '<div id="kair-insp-programa-kpis" class="kair-insp__programa-kpis"></div>' +
-          '<div id="kair-insp-programa-table"></div>';
-
-      case 'formulario':
-        return '<div id="kair-insp-formulario-content">' +
-          '<div class="kair-insp-loading"><div class="kair-insp-spinner"></div><p>Cargando formulario...</p></div>' +
+    case 'formulario':
+      return '<div id="kair-insp-formulario-content">' +
+        '<div class="kair-insp-loading"><div class="kair-insp-spinner"></div><p>Cargando formulario...</p></div>' +
         '</div>';
 
-      case 'historial':
-        return '<div id="kair-insp-historial-filters"></div>' +
-          '<div id="kair-insp-historial-table"></div>';
+    case 'historial':
+      return '<div id="kair-insp-historial-filters"></div>' +
+        '<div id="kair-insp-historial-table"></div>';
 
-      default:
-        return '<div class="kair-insp-empty-state"><i class="bi bi-inbox"></i><h3>Vista no disponible</h3></div>';
-    }
+    default:
+      return '<div class="kair-insp-empty-state"><i class="bi bi-inbox"></i><h3>Vista no disponible</h3></div>';
+  }
   };
 
   InspeccionesComponent.prototype._initNavigation = function () {
@@ -219,26 +207,21 @@ InspeccionesComponent.prototype._loadCSS = function (callback) {
       breadcrumbActive.textContent = viewObj ? viewObj.label : viewKey;
     }
 
-    var btnNew = wrapper.querySelector('#kair-insp-btn-new');
-    var btnExport = wrapper.querySelector('#kair-insp-btn-export');
-    if (btnNew) btnNew.style.display = (viewKey === 'historial') ? '' : 'none';
-    if (btnExport) btnExport.style.display = (viewKey === 'programa') ? '' : 'none';
+  var btnExport = wrapper.querySelector('#kair-insp-btn-export');
+  if (btnExport) btnExport.style.display = (viewKey === 'programa') ? '' : 'none';
 
     setTimeout(function () {
-      switch (viewKey) {
-        case 'dashboard':
-          if (window.DashboardInsp) DashboardInsp.load(this.currentCompany);
-          break;
-        case 'programa':
-          if (window.ProgramaInsp) ProgramaInsp.load(this.currentCompany);
-          break;
-        case 'formulario':
-          if (window.FormularioInsp) FormularioInsp.load(this.currentCompany);
-          break;
-        case 'historial':
-          if (window.HistorialInsp) HistorialInsp.load(this.currentCompany);
-          break;
-      }
+    switch (viewKey) {
+      case 'programa':
+        if (window.ProgramaInsp) ProgramaInsp.load(this.currentCompany);
+        break;
+      case 'formulario':
+        if (window.FormularioInsp) FormularioInsp.load(this.currentCompany);
+        break;
+      case 'historial':
+        if (window.HistorialInsp) HistorialInsp.load(this.currentCompany);
+        break;
+    }
     }.bind(this), 50);
 
     this._updateHeaderContext();
@@ -248,25 +231,17 @@ InspeccionesComponent.prototype._loadCSS = function (callback) {
     var wrapper = this.container.querySelector('.kair-insp-wrapper');
     if (!wrapper) return;
 
-    var companyEl = wrapper.querySelector('#kair-insp-header-company span');
-    if (companyEl) {
-      companyEl.textContent = this.currentCompany || '';
-    }
+  var companyEl = wrapper.querySelector('#kair-insp-header-company span');
+  if (companyEl) {
+    companyEl.textContent = this.currentCompany || '';
+  }
 
-    var btnNew = wrapper.querySelector('#kair-insp-btn-new');
-    if (btnNew && !btnNew._kairBound) {
-      btnNew._kairBound = true;
-      btnNew.addEventListener('click', function () {
-        if (window.HistorialInsp) HistorialInsp.showNewModal();
-      });
-    }
-
-    var btnExport = wrapper.querySelector('#kair-insp-btn-export');
-    if (btnExport && !btnExport._kairBound) {
-      btnExport._kairBound = true;
-      btnExport.setAttribute('id', 'kair-insp-programa-export');
-    }
-  };
+  var btnExport = wrapper.querySelector('#kair-insp-btn-export');
+  if (btnExport && !btnExport._kairBound) {
+    btnExport._kairBound = true;
+    btnExport.setAttribute('id', 'kair-insp-programa-export');
+  }
+};
 
   InspeccionesComponent.prototype._bindModalEvents = function () {
     var wrapper = this.container.querySelector('.kair-insp-wrapper');
