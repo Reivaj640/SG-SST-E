@@ -875,7 +875,7 @@ ipcMain.handle('companies-sync-v1', async (event, payload = {}) => {
 
     const config = readConfigSync();
     const companyPaths = config.companyPaths || {};
-    companiesSyncInternal(localDb);
+    companiesSyncInternal();
     return { success: true, data: { count: Object.keys(companyPaths).length } };
   } catch (error) {
     console.error('[COMPANIES] Error en sync:', error);
@@ -6273,7 +6273,7 @@ sendLog(`[MAIN] Error registrando handlers de Archivo Retención: ${err.message}
 
 // Registrar handlers de Inspecciones Sistemáticas (Submódulo 4.2.4)
 try {
-registerInspeccionesHandlers(app);
+registerInspeccionesHandlers(app, { getCompanyRootPath });
 sendLog('[MAIN] Handlers de Inspecciones Sistemáticas (4.2.4) registrados correctamente', 'INFO');
 } catch (err) {
 sendLog(`[MAIN] Error registrando handlers de Inspecciones Sistemáticas: ${err.message}`, 'ERROR');

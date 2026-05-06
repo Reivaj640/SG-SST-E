@@ -1364,43 +1364,6 @@ COMPONENTES BASE (botones, cards, modal, notificación)
   gap: var(--kair-insp-space-3);
 }
 
-/* --- Notificación toast --- */
-.kair-insp-notification {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  background: var(--kair-insp-bg-card);
-  padding: var(--kair-insp-space-4) var(--kair-insp-space-5);
-  border-radius: var(--kair-insp-border-radius-lg);
-  box-shadow: var(--kair-insp-shadow-lg);
-  display: flex;
-  align-items: center;
-  gap: var(--kair-insp-space-3);
-  transform: translateX(calc(100% + 40px));
-  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-  z-index: 9999;
-  border: 1px solid var(--kair-insp-border-light);
-  max-width: 380px;
-}
-
-.kair-insp-notification.show {
-  transform: translateX(0);
-}
-
-.kair-insp-notification--success { border-left: 4px solid var(--kair-insp-success); }
-.kair-insp-notification--error { border-left: 4px solid var(--kair-insp-danger); }
-.kair-insp-notification--warning { border-left: 4px solid var(--kair-insp-warning); }
-
-.kair-insp-notification__icon { font-size: 1.125rem; }
-.kair-insp-notification--success .kair-insp-notification__icon { color: var(--kair-insp-success); }
-.kair-insp-notification--error .kair-insp-notification__icon { color: var(--kair-insp-danger); }
-.kair-insp-notification--warning .kair-insp-notification__icon { color: var(--kair-insp-warning); }
-
-.kair-insp-notification__message {
-  font-size: var(--kair-insp-font-size-sm);
-  color: var(--kair-insp-text-primary);
-}
-
 /* --- Empty state --- */
 .kair-insp-empty-state {
   display: flex;

@@ -50,14 +50,72 @@ const PROGRAMA_SHEET_CONFIG = {
 };
 
 function _getCompanyInspeccionesDir(companyRoot) {
-  return path.join(companyRoot, "4.2.4");
+  var gestionPeligrosDir = path.join(companyRoot, "4. Gestión de Peligros y Riesgos");
+  if (fs.existsSync(gestionPeligrosDir)) {
+    try {
+      var entries = fs.readdirSync(gestionPeligrosDir);
+      var inspeccionesFolder = entries.find(function(f) { return f.startsWith("4.2.4"); });
+      if (inspeccionesFolder) {
+        return path.join(gestionPeligrosDir, inspeccionesFolder);
+      }
+    } catch (e) { /* ignore readdir errors */ }
+  }
+
+  var directPath = path.join(companyRoot, "4.2.4");
+  if (fs.existsSync(directPath)) {
+    return directPath;
+  }
+
+  if (fs.existsSync(companyRoot)) {
+    try {
+      var rootEntries = fs.readdirSync(companyRoot);
+      var gestionFolder = rootEntries.find(function(f) { return f.startsWith("4."); });
+      if (gestionFolder) {
+        var gestionFullPath = path.join(companyRoot, gestionFolder);
+        var subEntries = fs.readdirSync(gestionFullPath);
+        var inspFolder = subEntries.find(function(f) { return f.startsWith("4.2.4"); });
+        if (inspFolder) {
+          return path.join(gestionFullPath, inspFolder);
+        }
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  return path.join(gestionPeligrosDir, "4.2.4");
 }
 
 function _findExcelFile(dir, pattern) {
   if (!fs.existsSync(dir)) return null;
   var files = fs.readdirSync(dir);
-  var match = files.find(function(f) { return f.toUpperCase().indexOf(pattern.toUpperCase()) !== -1; });
+  var match = files.find(function(f) {
+    var fullPath = path.join(dir, f);
+    try {
+      if (!fs.statSync(fullPath).isFile()) return false;
+    } catch (e) { return false; }
+    var lower = f.toLowerCase();
+    return (lower.endsWith('.xlsx') || lower.endsWith('.xls')) &&
+           f.toUpperCase().indexOf(pattern.toUpperCase()) !== -1;
+  });
   return match ? path.join(dir, match) : null;
+}
+
+function _findExcelFileDeep(dir, pattern) {
+  var direct = _findExcelFile(dir, pattern);
+  if (direct) return direct;
+  if (!fs.existsSync(dir)) return null;
+  try {
+    var entries = fs.readdirSync(dir);
+  } catch (e) { return null; }
+  for (var i = 0; i < entries.length; i++) {
+    var sub = path.join(dir, entries[i]);
+    try {
+      if (fs.statSync(sub).isDirectory()) {
+        var found = _findExcelFileDeep(sub, pattern);
+        if (found) return found;
+      }
+    } catch (e) { /* skip inaccessible entries */ }
+  }
+  return null;
 }
 
 function _readXlsWithSheetJs(filePath) {
@@ -86,17 +144,26 @@ function readInspeccionExcel(companyRoot, type) {
     return { success: false, error: { code: "UNKNOWN_TYPE", message: "Tipo de inspección desconocido: " + type } };
   }
 
-  var filePath = _findExcelFile(dir, config.code);
+  var filePath = _findExcelFileDeep(dir, config.code);
   if (!filePath) {
-    filePath = _findExcelFile(dir, type);
+    filePath = _findExcelFileDeep(dir, type);
   }
   if (!filePath) {
     return { success: false, error: { code: "FILE_NOT_FOUND", message: "No se encontró el archivo Excel para " + config.name + " en " + dir } };
   }
 
+  try {
+    if (!fs.statSync(filePath).isFile()) {
+      return { success: false, error: { code: "NOT_A_FILE", message: "La ruta no es un archivo: " + filePath } };
+    }
+  } catch (e) {
+    return { success: false, error: { code: "STAT_ERROR", message: "No se pudo acceder al archivo: " + filePath } };
+  }
+
   var ext = path.extname(filePath).toLowerCase();
   var rows = [];
 
+  try {
   if (ext === ".xls") {
     var rawData = _readXlsWithSheetJs(filePath);
     for (var r = config.dataStartRow - 1; r < Math.min(config.dataEndRow, rawData.length); r++) {
@@ -145,6 +212,9 @@ function readInspeccionExcel(companyRoot, type) {
       _filePath: filePath
     }
   };
+  } catch (e) {
+    return { success: false, error: { code: "READ_ERROR", message: "Error leyendo archivo Excel: " + e.message } };
+  }
 }
 
 async function writeInspeccionExcel(companyRoot, type, formData) {
@@ -152,7 +222,7 @@ async function writeInspeccionExcel(companyRoot, type, formData) {
   var config = INSPECTION_TEMPLATES[type];
   if (!config) return { success: false, error: { code: "UNKNOWN_TYPE", message: "Tipo desconocido: " + type } };
 
-  var originalPath = _findExcelFile(dir, config.code) || _findExcelFile(dir, type);
+  var originalPath = _findExcelFileDeep(dir, config.code) || _findExcelFileDeep(dir, type);
   if (!originalPath) return { success: false, error: { code: "FILE_NOT_FOUND", message: "Archivo Excel no encontrado para escritura" } };
 
   var backupDir = path.join(dir, "backup");
@@ -208,29 +278,64 @@ async function writeInspeccionExcel(companyRoot, type, formData) {
   };
 }
 
+function _inferFrequency(months) {
+  var count = Object.values(months).filter(function(v) { return v !== null; }).length;
+  if (count >= 10) return "Mensual";
+  if (count >= 3 && count <= 5) return "Trimestral";
+  if (count >= 1 && count <= 2) return "Semestral";
+  return "Según programa";
+}
+
 function readProgramaInspecciones(companyRoot, year) {
   var dir = _getCompanyInspeccionesDir(companyRoot);
   if (!fs.existsSync(dir)) {
     return { success: false, error: { code: "DIR_NOT_FOUND", message: "Carpeta 4.2.4 no encontrada" } };
   }
 
-  var filePath = _findExcelFile(dir, "PROGRAMA DE INSPECCIONES");
+  var filePath = _findExcelFileDeep(dir, "PROGRAMA DE INSPECCIONES");
   if (!filePath) {
-    filePath = _findExcelFile(dir, "PROGRAMA");
+    filePath = _findExcelFileDeep(dir, "PROGRAMA");
   }
   if (!filePath) {
     return { success: false, error: { code: "FILE_NOT_FOUND", message: "Archivo PROGRAMA DE INSPECCIONES no encontrado" } };
   }
 
-  var rawData = _readXlsWithSheetJs(filePath);
+  try {
+    if (!fs.statSync(filePath).isFile()) {
+      return { success: false, error: { code: "NOT_A_FILE", message: "La ruta no es un archivo: " + filePath } };
+    }
+  } catch (e) {
+    return { success: false, error: { code: "STAT_ERROR", message: "No se pudo acceder al archivo: " + filePath } };
+  }
+
+  var rawData;
+  try {
+    rawData = _readXlsWithSheetJs(filePath);
+  } catch (e) {
+    return { success: false, error: { code: "READ_ERROR", message: "Error leyendo programa: " + e.message } };
+  }
+
   var activities = [];
+  var emptyCount = 0;
+  var MAX_ROWS = 80;
 
-  for (var r = PROGRAMA_SHEET_CONFIG.startRow - 1; r < Math.min(PROGRAMA_SHEET_CONFIG.endRow, rawData.length); r++) {
+  for (var r = 0; r < Math.min(MAX_ROWS, rawData.length); r++) {
     var row = rawData[r] || [];
-    if (!row[0] && !row[1]) continue;
 
-    var actName = row[0] ? String(row[0]).trim() : (row[1] ? String(row[1]).trim() : "");
-    if (!actName) continue;
+    var actName = "";
+    for (var c = 0; c < PROGRAMA_SHEET_CONFIG.startCol - 1; c++) {
+      if (row[c] !== undefined && row[c] !== null && String(row[c]).trim() !== "") {
+        actName = String(row[c]).trim();
+        break;
+      }
+    }
+
+    if (!actName) {
+      emptyCount++;
+      if (emptyCount >= 3 && activities.length > 0) break;
+      continue;
+    }
+    emptyCount = 0;
 
     var months = {};
     for (var m = 0; m < 12; m++) {
@@ -250,11 +355,18 @@ function readProgramaInspecciones(companyRoot, year) {
       }
     }
 
+    var hasAnyMonth = Object.values(months).some(function(v) { return v !== null; });
+    var actType = "INSTALACION";
+    var upperName = actName.toUpperCase();
+    if (upperName.indexOf("EXTINTOR") !== -1) actType = "EXTINTOR";
+    else if (upperName.indexOf("EMERGENCIA") !== -1) actType = "EMERGENCIA";
+    else if (upperName.indexOf("BOTIQU") !== -1) actType = "BOTIQUIN";
+
     activities.push({
       id: "act-prog-" + (r + 1),
       name: actName,
-      type: "INSTALACION",
-      frequency: "Según programa",
+      type: actType,
+      frequency: hasAnyMonth ? _inferFrequency(months) : "Según programa",
       months: months
     });
   }
@@ -330,8 +442,12 @@ function getInspeccionesStats(companyRoot) {
   };
 }
 
-function registerInspeccionesHandlers(app) {
+function registerInspeccionesHandlers(app, deps) {
   var ipcMain = require("electron").ipcMain;
+  var getCompanyRootPath = deps && deps.getCompanyRootPath;
+  if (!getCompanyRootPath) {
+    throw new Error("[4.2.4] registerInspeccionesHandlers requiere deps.getCompanyRootPath");
+  }
 
   ipcMain.handle("inspecciones:get-stats", async function(event, companyName) {
     try {
@@ -360,7 +476,7 @@ function registerInspeccionesHandlers(app) {
       var companyRoot = await getCompanyRootPath(companyName);
       if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
       var dir = _getCompanyInspeccionesDir(companyRoot);
-      var filePath = _findExcelFile(dir, "PROGRAMA DE INSPECCIONES") || _findExcelFile(dir, "PROGRAMA");
+      var filePath = _findExcelFileDeep(dir, "PROGRAMA DE INSPECCIONES") || _findExcelFileDeep(dir, "PROGRAMA");
       if (filePath) {
         var rawData = _readXlsWithSheetJs(filePath);
         var rowIdx = parseInt(activityId.replace("act-prog-", ""), 10) - 1;

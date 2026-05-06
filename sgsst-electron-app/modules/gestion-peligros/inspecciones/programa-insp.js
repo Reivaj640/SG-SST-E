@@ -141,28 +141,11 @@ Sub-módulo: Grilla anual con toggle c/p, KPIs, exportar
                 link.download = 'Programa_Inspecciones_' + self.currentYear + '.csv';
                 link.click();
                 URL.revokeObjectURL(url);
-                self.showNotification('Programa exportado como CSV', 'success');
+                InspeccionesService.toast('Programa exportado como CSV', 'success');
             }).catch(function (err) { console.error('[4.2.4] getSchedule (export) error:', err); });
       });
-    },
+  }
+};
 
-    showNotification: function (message, type) {
-      var existing = document.querySelector('.kair-insp-notification');
-      if (existing) existing.remove();
-
-      var icons = { success: 'bi-check-circle-fill', error: 'bi-x-circle-fill', warning: 'bi-exclamation-triangle-fill' };
-      var notif = document.createElement('div');
-      notif.className = 'kair-insp-notification kair-insp-notification--' + (type || 'success');
-      notif.innerHTML = '<i class="bi ' + (icons[type] || icons.success) + ' kair-insp-notification__icon"></i>' +
-        '<span class="kair-insp-notification__message">' + message + '</span>';
-      document.body.appendChild(notif);
-      setTimeout(function () { notif.classList.add('show'); }, 10);
-      setTimeout(function () {
-        notif.classList.remove('show');
-        setTimeout(function () { notif.remove(); }, 400);
-      }, 3000);
-    }
-  };
-
-  window.ProgramaInsp = ProgramaInsp;
+window.ProgramaInsp = ProgramaInsp;
 })();

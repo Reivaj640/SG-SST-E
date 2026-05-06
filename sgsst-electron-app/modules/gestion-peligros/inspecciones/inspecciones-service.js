@@ -93,10 +93,20 @@ Todos los m√©todos retornan { success, data?, error? } conforme al contrato est√
     return window.electronAPI && window.electronAPI.inspecciones && typeof window.electronAPI.inspecciones.getStats === 'function';
   }
 
+  function _toast(message, type) {
+    var mappedType = type === 'error' ? 'danger' : (type || 'info');
+    if (window.KAIRUtils && typeof window.KAIRUtils.showToast === 'function') {
+      window.KAIRUtils.showToast(message, mappedType);
+    } else {
+      console.log('[4.2.4] ' + mappedType.toUpperCase() + ': ' + message);
+    }
+  }
+
   var InspeccionesService = {
 
-    MONTHS: MONTHS,
-    TYPES: INSPECTION_TYPES,
+  MONTHS: MONTHS,
+  TYPES: INSPECTION_TYPES,
+  toast: _toast,
 
     getStats: function (companyName) {
       if (_hasElectronAPI()) {

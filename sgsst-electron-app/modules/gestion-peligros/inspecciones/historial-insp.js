@@ -190,7 +190,7 @@ Sub-módulo: Tabla, filtros, búsqueda, acciones CRUD
     showDetail: function (id) {
       InspeccionesService.getInspection(this.companyName, id).then(function (result) {
         if (!result.success) {
-          HistorialInsp.showNotification('Inspección no encontrada', 'error');
+          InspeccionesService.toast('Inspección no encontrada', 'error');
           return;
         }
         var insp = result.data;
@@ -249,11 +249,11 @@ Sub-módulo: Tabla, filtros, búsqueda, acciones CRUD
       var self = this;
         InspeccionesService.deleteInspection(this.companyName, id).then(function (result) {
             if (result.success) {
-                self.showNotification('Inspección eliminada', 'success');
-                self.renderTable();
-            } else {
-                self.showNotification('Error al eliminar', 'error');
-            }
+      InspeccionesService.toast('Inspección eliminada', 'success');
+        self.renderTable();
+      } else {
+        InspeccionesService.toast('Error al eliminar', 'error');
+      }
         }).catch(function (err) { console.error('[4.2.4] deleteInspection error:', err); });
     },
 
@@ -321,31 +321,14 @@ Sub-módulo: Tabla, filtros, búsqueda, acciones CRUD
       var self = this;
         InspeccionesService.createInspection(this.companyName, inspectionData).then(function (result) {
             if (result.success) {
-                self.showNotification('Inspección creada correctamente', 'success');
-                self.renderTable();
-            } else {
-                self.showNotification('Error al crear inspección', 'error');
-            }
+      InspeccionesService.toast('Inspección creada correctamente', 'success');
+        self.renderTable();
+      } else {
+        InspeccionesService.toast('Error al crear inspección', 'error');
+      }
         }).catch(function (err) { console.error('[4.2.4] createInspection error:', err); });
-    },
+  }
+};
 
-    showNotification: function (message, type) {
-      var existing = document.querySelector('.kair-insp-notification');
-      if (existing) existing.remove();
-
-      var icons = { success: 'bi-check-circle-fill', error: 'bi-x-circle-fill', warning: 'bi-exclamation-triangle-fill' };
-      var notif = document.createElement('div');
-      notif.className = 'kair-insp-notification kair-insp-notification--' + (type || 'success');
-      notif.innerHTML = '<i class="bi ' + (icons[type] || icons.success) + ' kair-insp-notification__icon"></i>' +
-        '<span class="kair-insp-notification__message">' + message + '</span>';
-      document.body.appendChild(notif);
-      setTimeout(function () { notif.classList.add('show'); }, 10);
-      setTimeout(function () {
-        notif.classList.remove('show');
-        setTimeout(function () { notif.remove(); }, 400);
-      }, 3000);
-    }
-  };
-
-  window.HistorialInsp = HistorialInsp;
+window.HistorialInsp = HistorialInsp;
 })();

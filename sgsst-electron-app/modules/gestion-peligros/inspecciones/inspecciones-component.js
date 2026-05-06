@@ -7,10 +7,10 @@ Constructor: (container, currentCompany, moduleName, submoduleTitle, backToModul
   'use strict';
 
   var VIEWS = [
-    { key: 'dashboard', label: 'Panel', icon: 'bi-speedometer2' },
+    { key: 'historial', label: 'Inspecciones', icon: 'bi-clipboard-check' },
     { key: 'programa', label: 'Programa', icon: 'bi-calendar3' },
     { key: 'formulario', label: 'Formulario', icon: 'bi-file-earmark-text' },
-    { key: 'historial', label: 'Historial', icon: 'bi-clock-history' }
+    { key: 'dashboard', label: 'Panel', icon: 'bi-speedometer2' }
   ];
 
 function InspeccionesComponent(container, currentCompany, moduleName, submoduleTitle, backToModuleCallback) {
@@ -19,7 +19,7 @@ function InspeccionesComponent(container, currentCompany, moduleName, submoduleT
     this.moduleName = moduleName;
     this.submoduleTitle = submoduleTitle;
     this.backToModuleCallback = backToModuleCallback;
-    this.currentView = 'dashboard';
+    this.currentView = 'historial';
     this.cssLoaded = false;
   }
 
@@ -29,7 +29,7 @@ function InspeccionesComponent(container, currentCompany, moduleName, submoduleT
     this._loadCSS(function () {
       self._renderUI();
       self._initNavigation();
-      self._navigate('dashboard');
+      self._navigate('historial');
       self._updateHeaderContext();
     });
   };
@@ -68,7 +68,7 @@ InspeccionesComponent.prototype._loadCSS = function (callback) {
       if (v.key === 'dashboard' || v.key === 'programa') {
         badgeHtml = '<span class="kair-header__tab-badge" id="kair-insp-tab-badge-' + v.key + '" style="display:none;">0</span>';
       }
-      return '<button class="kair-header__tab' + (v.key === 'dashboard' ? ' active' : '') + '" data-view="' + v.key + '">' +
+      return '<button class="kair-header__tab' + (v.key === 'historial' ? ' active' : '') + '" data-view="' + v.key + '">' +
         '<i class="bi ' + v.icon + '"></i> ' + v.label + ' ' + badgeHtml +
       '</button>';
     }).join('');
@@ -103,7 +103,7 @@ InspeccionesComponent.prototype._loadCSS = function (callback) {
       '</header>';
 
     var viewsHtml = VIEWS.map(function (v) {
-      return '<div class="kair-insp-view' + (v.key === 'dashboard' ? ' kair-insp-view--active' : '') + '" id="kair-insp-view-' + v.key + '">' +
+      return '<div class="kair-insp-view' + (v.key === 'historial' ? ' kair-insp-view--active' : '') + '" id="kair-insp-view-' + v.key + '">' +
         self._getViewSkeleton(v.key) +
       '</div>';
     }).join('');

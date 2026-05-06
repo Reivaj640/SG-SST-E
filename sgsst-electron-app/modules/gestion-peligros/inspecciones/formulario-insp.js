@@ -279,53 +279,36 @@ Sub-módulo: Formulario dinámico con auto-save, lectura/escritura Excel
 
     saveForm: function (writeToExcel) {
       var formData = this.collectFormData();
-      if (!formData) {
-        this.showNotification('No hay datos para guardar', 'warning');
-        return;
-      }
+    if (!formData) {
+      InspeccionesService.toast('No hay datos para guardar', 'warning');
+      return;
+    }
 
       var self = this;
 
         if (writeToExcel) {
             InspeccionesService.writeExcel(this.companyName, 'EXTINTOR', formData).then(function (result) {
                 if (result.success) {
-                    self.markClean();
-                    self.clearDraft();
-                    self.showNotification('Formulario guardado en Excel correctamente', 'success');
-                } else {
-                    self.showNotification('Error al guardar en Excel: ' + (result.error ? result.error.message : 'Desconocido'), 'error');
-                }
-            }).catch(function (err) { console.error('[4.2.4] writeExcel error:', err); });
-        } else {
-            InspeccionesService.writeExcel(this.companyName, 'EXTINTOR', formData).then(function (result) {
-                if (result.success) {
-                    self.markClean();
-                    self.clearDraft();
-                    self.showNotification('Formulario guardado correctamente', 'success');
-                } else {
-                    self.showNotification('Error al guardar: ' + (result.error ? result.error.message : 'Desconocido'), 'error');
-                }
-            }).catch(function (err) { console.error('[4.2.4] writeExcel error:', err); });
-        }
-    },
-
-    showNotification: function (message, type) {
-      var existing = document.querySelector('.kair-insp-notification');
-      if (existing) existing.remove();
-
-      var icons = { success: 'bi-check-circle-fill', error: 'bi-x-circle-fill', warning: 'bi-exclamation-triangle-fill' };
-      var notif = document.createElement('div');
-      notif.className = 'kair-insp-notification kair-insp-notification--' + (type || 'success');
-      notif.innerHTML = '<i class="bi ' + (icons[type] || icons.success) + ' kair-insp-notification__icon"></i>' +
-        '<span class="kair-insp-notification__message">' + message + '</span>';
-      document.body.appendChild(notif);
-      setTimeout(function () { notif.classList.add('show'); }, 10);
-      setTimeout(function () {
-        notif.classList.remove('show');
-        setTimeout(function () { notif.remove(); }, 400);
-      }, 3000);
+        self.markClean();
+        self.clearDraft();
+        InspeccionesService.toast('Formulario guardado en Excel correctamente', 'success');
+      } else {
+        InspeccionesService.toast('Error al guardar en Excel: ' + (result.error ? result.error.message : 'Desconocido'), 'error');
+      }
+    }).catch(function (err) { console.error('[4.2.4] writeExcel error:', err); });
+  } else {
+    InspeccionesService.writeExcel(this.companyName, 'EXTINTOR', formData).then(function (result) {
+      if (result.success) {
+        self.markClean();
+        self.clearDraft();
+        InspeccionesService.toast('Formulario guardado correctamente', 'success');
+      } else {
+        InspeccionesService.toast('Error al guardar: ' + (result.error ? result.error.message : 'Desconocido'), 'error');
+      }
+    }).catch(function (err) { console.error('[4.2.4] writeExcel error:', err); });
     }
-  };
+  }
+};
 
-  window.FormularioInsp = FormularioInsp;
+window.FormularioInsp = FormularioInsp;
 })();
