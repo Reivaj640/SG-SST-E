@@ -1,442 +1,960 @@
-// --- LÓGICA POLITICA-V2.JS (CORREGIDO) ---
+// politica-viewer.js
 
-console.log('[IFRAME] politica-viewer.js cargado');
+let currentDocument = null;
+let currentViewer = null;
+let currentZoom = 100;
+let totalPages = 0;
+let currentPage = 1;
+let currentFolderPath = '';
+let pathHistory = [];
 
-// --- CONFIGURACIÓN ONLYOFFICE ---
-const OO_SERVER_URL = 'http://localhost:8080';
-const BRIDGE_URL = 'http://localhost:3011';
+// --- START: Communication Logic ---
 
-// Estado Global
-const state = {
-    currentPath: '',
-    history: [],
-    currentFile: null,
-    zoom: 100,
-    isEditMode: false,
-    isReady: false
+function callParentAPI(type, payload) {
+console.log(`[politica-viewer.js][callParentAPI] Enviando solicitud al padre. Tipo: ${type}, Payload:`, payload);
+return new Promise((resolve, reject) => {
+const requestId = `req-${Date.now()}-${Math.random()}`;
+
+const handleResponse = (event) => {
+if (event.origin !== 'file://' || event.source !== window.parent) {
+return;
+}
+
+const response = event.data;
+if (response.type === `${type}-response` && response.requestId === requestId) {
+window.removeEventListener('message', handleResponse);
+console.log(`[politica-viewer.js][callParentAPI] Respuesta recibida. Success: ${response.payload && response.payload.success}`);
+
+if (response.payload && response.payload.success) {
+resolve(response.payload);
+} else {
+const errorMessage = (response.payload && response.payload.error) || 'Unknown error from parent process';
+console.error(`[politica-viewer.js][callParentAPI] Error:`, errorMessage);
+reject(new Error(errorMessage));
+}
+}
 };
 
-// Contador para evitar spam de logs
-let logCounter = 0;
+window.addEventListener('message', handleResponse);
 
-// --- COMUNICACIÓN CON EL PADRE (Electron) ---
-function callParentAPI(type, payload) {
-    return new Promise((resolve, reject) => {
-        const requestId = `req-${Date.now()}`;
-        
-        const handler = (event) => {
-            // Solo procesar si es la respuesta correcta
-            if (event.data?.type !== `${type}-response` || event.data?.requestId !== requestId) {
-                return;
-            }
-            
-            window.removeEventListener('message', handler);
-            
-            if (event.data.payload?.success) {
-                resolve(event.data.payload);
-            } else {
-                reject(new Error(event.data.payload?.error || 'Error desconocido'));
-            }
-        };
-        
-        window.addEventListener('message', handler);
-        
-        // Enviar mensaje al padre
-        try {
-            window.parent.postMessage({ type: `${type}-request`, payload, requestId }, '*');
-        } catch (e) {
-            reject(e);
-        }
-    });
+window.parent.postMessage({
+type: `${type}-request`,
+payload,
+requestId
+}, 'file://');
+});
 }
+// --- END: Communication Logic ---
 
-// --- INICIALIZACIÓN ---
-document.addEventListener('DOMContentLoaded', async () => {
-    const params = new URLSearchParams(window.location.search);
-    const company = params.get('company');
-    
-    const companyLabel = document.getElementById('companyLabel');
-    if (companyLabel) {
-        companyLabel.textContent = company;
-    }
 
-    setupListeners();
-    
-    // Notificar al padre que el iframe está listo
-    window.parent.postMessage({ type: 'iframe-ready' }, '*');
-    
-    // Cargar carpetas
-    await loadRootFolder();
+// Inicialización
+document.addEventListener('DOMContentLoaded', function() {
+setupEventListeners();
+setupDragAndDrop();
+setupContextMenu();
+loadFolders();
 });
 
-function setupListeners() {
-    const backToModuleBtn = document.getElementById('backToModuleBtn');
-    if (backToModuleBtn) {
-        backToModuleBtn.onclick = () => window.parent.postMessage({ type: 'back-to-module-request' }, '*');
-    }
+// Configurar event listeners
+function setupEventListeners() {
+// Navegación Global
+document.getElementById('backToModuleBtn').addEventListener('click', () => {
+if (window.parent && window.parent.postMessage) {
+window.parent.postMessage({ type: 'back-to-module-request' }, '*');
+}
+});
 
-    const navUpBtn = document.getElementById('navUpBtn');
-    if (navUpBtn) navUpBtn.onclick = goUp;
+// Acciones de Documento
+document.getElementById('downloadBtn').addEventListener('click', downloadDocument);
+document.getElementById('printBtn').addEventListener('click', printDocument);
+document.getElementById('closeDocBtn').addEventListener('click', closeDocument);
 
-    const closeDocBtn = document.getElementById('closeDocBtn');
-    if (closeDocBtn) closeDocBtn.onclick = closeDocument;
+// Navegación Local (Carpetas)
+document.getElementById('goBackBtn').addEventListener('click', () => goUpLevel());
 
-    const downloadBtn = document.getElementById('downloadBtn');
-    if (downloadBtn) downloadBtn.onclick = downloadCurrentFile;
-
-    const editModeBtn = document.getElementById('editModeBtn');
-    if (editModeBtn) editModeBtn.onclick = enableEditMode;
-
-    const zoomInBtn = document.getElementById('zoomInBtn');
-    if (zoomInBtn) zoomInBtn.onclick = () => adjustZoom(10);
-
-    const zoomOutBtn = document.getElementById('zoomOutBtn');
-    if (zoomOutBtn) zoomOutBtn.onclick = () => adjustZoom(-10);
-
-    console.log('[IFRAME] Listeners configurados');
+// Zoom Controls
+document.getElementById('zoomInBtn').addEventListener('click', zoomIn);
+document.getElementById('zoomOutBtn').addEventListener('click', zoomOut);
+document.getElementById('fitWidthBtn').addEventListener('click', fitWidth);
 }
 
-// --- NAVEGACIÓN DE ARCHIVOS ---
-async function loadRootFolder() {
-    try {
-        const params = new URLSearchParams(window.location.search);
-        const result = await callParentAPI('get-document-folders', {
-            companyName: params.get('company'),
-            moduleName: params.get('module'),
-            submoduleName: params.get('submodule')
-        });
+// ===============================
+// DRAG & DROP FUNCTIONALITY (Por Carpeta)
+// ===============================
 
-        state.currentPath = result.basePath || '';
-        state.history = [];
-        updateNavState();
-        renderFolders(result.folders || []);
-        renderFiles(result.files || []);
-        
-        console.log('[IFRAME] ✅ Carpetas cargadas:', result.files?.length || 0, 'archivos');
-    } catch (e) {
-        console.error('[IFRAME] Error cargando carpetas:', e.message);
-        showToast('Error cargando carpeta raíz', 'error');
-    }
+function setupDragAndDrop() {
+console.log('[Drag&Drop] Setup completado - se activará por carpeta');
 }
 
-async function goUp() {
-    if (state.history.length === 0) return;
-    const prev = state.history.pop();
-    state.currentPath = prev;
-    updateNavState();
-    await loadFilesInPath(prev);
+function setupFolderDragAndDrop(folderElement, folderPath) {
+const overlay = document.createElement('div');
+overlay.className = 'drag-drop-overlay';
+overlay.style.display = 'none';
+overlay.innerHTML = `
+<div class="drag-drop-content">
+<i class="fas fa-cloud-upload-alt"></i>
+<h3>Suelta aquí</h3>
+</div>
+`;
+
+folderElement.appendChild(overlay);
+
+let dragCounter = 0;
+
+['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+folderElement.addEventListener(eventName, preventDefaults, false);
+});
+
+folderElement.addEventListener('dragenter', (e) => {
+dragCounter++;
+if (dragCounter === 1) {
+overlay.style.display = 'flex';
+folderElement.classList.add('drag-over');
+console.log(`[Drag&Drop] Enter en carpeta: ${folderPath}`);
+}
+}, false);
+
+folderElement.addEventListener('dragover', handleDragOver, false);
+
+folderElement.addEventListener('dragleave', (e) => {
+dragCounter--;
+if (dragCounter === 0) {
+overlay.style.display = 'none';
+folderElement.classList.remove('drag-over');
+console.log(`[Drag&Drop] Leave en carpeta: ${folderPath}`);
+}
+}, false);
+
+folderElement.addEventListener('drop', (e) => {
+e.preventDefault();
+overlay.style.display = 'none';
+folderElement.classList.remove('drag-over');
+
+const files = e.dataTransfer.files;
+
+if (files.length === 0) {
+showToast('No se detectaron archivos', 'warning');
+return;
 }
 
-async function loadFilesInPath(path) {
-    try {
-        const result = await callParentAPI('get-documents-in-folder', path);
-        renderFolders([]);
-        renderFiles(result.files || []);
-    } catch (e) {
-        console.error('[IFRAME] Error cargando archivos:', e.message);
-    }
+console.log(`[Drag&Drop] Archivos detectados: ${files.length} en carpeta ${folderPath}`);
+
+Array.from(files).forEach(file => {
+uploadFile(file, folderPath);
+});
+}, false);
 }
 
-function updateNavState() {
-    const navUpBtn = document.getElementById('navUpBtn');
-    if (navUpBtn) {
-        navUpBtn.disabled = state.history.length === 0;
-    }
+function preventDefaults(e) {
+e.preventDefault();
+e.stopPropagation();
 }
 
-// --- RENDERIZADO ---
+function handleDragOver(e) {
+e.preventDefault();
+e.dataTransfer.dropEffect = 'copy';
+}
+
+async function uploadFile(file, folderPath) {
+try {
+console.log(`[Drag&Drop] Subiendo archivo: ${file.name} a ${folderPath}`);
+showToast(`Subiendo ${file.name}...`, 'info');
+
+const base64Data = await fileToBase64(file);
+
+const destinationPath = folderPath || currentFolderPath;
+
+if (!destinationPath) {
+showToast('No hay una carpeta seleccionada', 'error');
+return;
+}
+
+const result = await callParentAPI('upload-document', {
+fileName: file.name,
+base64Data: base64Data,
+destinationPath: destinationPath
+});
+
+if (result.success) {
+showToast(result.message || 'Archivo subido exitosamente', 'success');
+await loadDocuments(destinationPath);
+} else {
+showToast(`Error: ${result.error}`, 'error');
+}
+
+} catch (error) {
+console.error('[Drag&Drop] Error al subir archivo:', error);
+showToast(`Error al subir archivo: ${error.message}`, 'error');
+}
+}
+
+function fileToBase64(file) {
+return new Promise((resolve, reject) => {
+const reader = new FileReader();
+reader.readAsDataURL(file);
+reader.onload = () => resolve(reader.result);
+reader.onerror = error => reject(error);
+});
+}
+
+// ===============================
+// CONTEXT MENU (CLIC DERECHO)
+// ===============================
+
+let currentContextMenuDoc = null;
+
+function showContextMenu(x, y, doc) {
+const menu = document.getElementById('contextMenu');
+if (!menu) return;
+
+currentContextMenuDoc = doc;
+
+menu.style.display = 'block';
+menu.style.left = `${x}px`;
+menu.style.top = `${y}px`;
+
+const rect = menu.getBoundingClientRect();
+if (rect.right > window.innerWidth) {
+menu.style.left = `${window.innerWidth - rect.width - 10}px`;
+}
+if (rect.bottom > window.innerHeight) {
+menu.style.top = `${window.innerHeight - rect.height - 10}px`;
+}
+
+console.log(`[ContextMenu] Mostrando menú para: ${doc.name}`);
+}
+
+function hideContextMenu() {
+const menu = document.getElementById('contextMenu');
+if (menu) {
+menu.style.display = 'none';
+}
+currentContextMenuDoc = null;
+}
+
+async function deleteDocument() {
+if (!currentContextMenuDoc) {
+console.error('[ContextMenu] No hay documento seleccionado');
+showToast('No hay archivo seleccionado', 'error');
+return;
+}
+
+const doc = currentContextMenuDoc;
+
+console.log('[ContextMenu] Mostrando modal para eliminar:', doc.name);
+
+showConfirmModal(doc.name, async () => {
+console.log('[ConfirmModal] Callback ejecutado - Eliminando archivo:', doc.path);
+
+try {
+console.log('[ContextMenu] Cerrando documento para liberar archivo...');
+closeDocument();
+
+console.log(`[ContextMenu] Eliminando archivo: ${doc.path}`);
+
+const result = await callParentAPI('delete-document', {
+filePath: doc.path
+});
+
+console.log('[ContextMenu] Resultado de eliminar:', result);
+
+if (result.success) {
+showToast('Archivo eliminado correctamente', 'success');
+console.log('[ContextMenu] Recargando lista de archivos...');
+await loadDocuments(currentFolderPath);
+} else {
+console.error('[ContextMenu] Error en respuesta:', result.error);
+
+if (result.code === 'EPERM') {
+showToast(
+'⚠️ El archivo está abierto en otra aplicación.<br><strong>CIérralo e intenta nuevamente.</strong>',
+'warning',
+6000
+);
+} else if (result.code === 'ENOENT') {
+showToast('El archivo no existe. Puede que ya haya sido eliminado.', 'info');
+} else if (result.code === 'EACCES') {
+showToast('No tienes permisos para eliminar este archivo.', 'error');
+} else {
+showToast(`Error: ${result.error}`, 'error');
+}
+}
+} catch (error) {
+console.error('[ContextMenu] Error al eliminar:', error);
+showToast(`Error al eliminar archivo: ${error.message}`, 'error');
+}
+});
+}
+
+function setupContextMenu() {
+document.addEventListener('click', () => {
+hideContextMenu();
+});
+
+document.addEventListener('keydown', (e) => {
+if (e.key === 'Escape') {
+hideContextMenu();
+}
+});
+
+setupConfirmModal();
+
+const deleteBtn = document.getElementById('deleteFileBtn');
+if (deleteBtn) {
+deleteBtn.addEventListener('click', (e) => {
+e.stopPropagation();
+deleteDocument();
+});
+}
+
+const openBtn = document.getElementById('openFileBtn');
+if (openBtn) {
+openBtn.addEventListener('click', (e) => {
+e.stopPropagation();
+openFile();
+});
+}
+}
+
+// ===============================
+// TOAST NOTIFICATIONS (K+AIR Modern Style)
+// ===============================
+
+function showToast(message, type = 'info', duration = 3000) {
+const container = document.getElementById('kToastContainer');
+if (!container) {
+console.error('[Toast] Contenedor no encontrado');
+return;
+}
+
+const icons = {
+success: 'fa-check-circle',
+error: 'fa-times-circle',
+warning: 'fa-exclamation-circle',
+info: 'fa-info-circle'
+};
+
+const toast = document.createElement('div');
+toast.className = `k-toast ${type}`;
+toast.innerHTML = `
+<i class="fas ${icons[type] || icons.info} k-toast-icon"></i>
+<span class="k-toast-message">${message}</span>
+`;
+
+container.appendChild(toast);
+
+setTimeout(() => {
+toast.classList.add('closing');
+setTimeout(() => toast.remove(), 300);
+}, duration);
+}
+
+// ===============================
+// CONFIRM MODAL (K+AIR Modern)
+// ===============================
+
+let confirmCallback = null;
+
+function showConfirmModal(fileName, callback) {
+const modal = document.getElementById('confirmModal');
+const fileNameEl = document.getElementById('confirmFileName');
+
+if (!modal || !fileNameEl) {
+console.error('[ConfirmModal] Elementos no encontrados');
+return;
+}
+
+console.log('[ConfirmModal] Mostrando modal para:', fileName);
+console.log('[ConfirmModal] Callback registrado:', !!callback);
+
+fileNameEl.textContent = fileName;
+confirmCallback = callback;
+
+modal.style.display = 'flex';
+
+document.getElementById('confirmCancelBtn').focus();
+}
+
+function hideConfirmModal() {
+const modal = document.getElementById('confirmModal');
+if (modal) {
+modal.style.display = 'none';
+}
+confirmCallback = null;
+}
+
+function acceptConfirm() {
+console.log('[ConfirmModal] Aceptando confirmación, callback existe:', !!confirmCallback);
+if (confirmCallback) {
+console.log('[ConfirmModal] Ejecutando callback...');
+confirmCallback();
+} else {
+console.error('[ConfirmModal] No hay callback registrado');
+}
+hideConfirmModal();
+}
+
+function cancelConfirm() {
+hideConfirmModal();
+}
+
+function setupConfirmModal() {
+const acceptBtn = document.getElementById('confirmAcceptBtn');
+const cancelBtn = document.getElementById('confirmCancelBtn');
+const modal = document.getElementById('confirmModal');
+
+if (acceptBtn) {
+acceptBtn.addEventListener('click', acceptConfirm);
+}
+
+if (cancelBtn) {
+cancelBtn.addEventListener('click', cancelConfirm);
+}
+
+if (modal) {
+modal.addEventListener('click', (e) => {
+if (e.target === modal) {
+cancelConfirm();
+}
+});
+}
+
+document.addEventListener('keydown', (e) => {
+if (e.key === 'Escape' && modal && modal.style.display === 'flex') {
+cancelConfirm();
+}
+});
+}
+
+// Abrir archivo con aplicación predeterminada
+async function openFile() {
+if (!currentContextMenuDoc) {
+console.error('[ContextMenu] No hay documento seleccionado');
+showToast('No hay archivo seleccionado', 'error');
+return;
+}
+
+const doc = currentContextMenuDoc;
+
+try {
+console.log(`[ContextMenu] Abriendo archivo: ${doc.path}`);
+
+const result = await callParentAPI('open-file', {
+filePath: doc.path
+});
+
+if (!result.success) {
+showToast(`Error al abrir archivo: ${result.error}`, 'error');
+}
+} catch (error) {
+console.error('[ContextMenu] Error al abrir:', error);
+showToast(`Error al abrir archivo: ${error.message}`, 'error');
+}
+
+hideContextMenu();
+}
+
+// Cargar carpetas
+async function loadFolders() {
+console.log('VIEWER: Iniciando loadFolders...');
+showLoading();
+
+const urlParams = new URLSearchParams(window.location.search);
+const companyName = urlParams.get('company');
+const moduleName = urlParams.get('module');
+const submoduleName = urlParams.get('submodule');
+
+if (!companyName || !moduleName || !submoduleName) {
+showNotification('Faltan parámetros en la URL', 'error');
+hideLoading();
+return;
+}
+
+try {
+const result = await callParentAPI('get-document-folders', { companyName, moduleName, submoduleName });
+currentFolderPath = result.basePath;
+pathHistory = [];
+
+updateNavigationState();
+
+renderFolders(result.folders);
+renderDocuments(result.files);
+} catch (error) {
+showNotification(`Error al cargar contenido: ${error.message}`, 'error');
+} finally {
+hideLoading();
+}
+}
+
+// Renderizar carpetas
 function renderFolders(folders) {
-    const container = document.getElementById('folderList');
-    if (!container) return;
-    
-    if (!folders || folders.length === 0) {
-        container.innerHTML = '';
-        return;
-    }
-    
-    container.innerHTML = folders.map(f => `
-        <div class="file-item" onclick="enterFolder('${encodeURIComponent(f.path)}')">
-            <div class="file-icon icon-folder"><i class="fas fa-folder"></i></div>
-            <div class="file-info"><div class="file-name">${f.name}</div></div>
-        </div>
-    `).join('');
+const folderList = document.getElementById('folderList');
+folderList.innerHTML = '';
+
+if (!folders || folders.length === 0) {
+folderList.innerHTML = '<div style="padding:1rem; color:#999; font-size:0.85rem;">No hay carpetas.</div>';
+return;
 }
 
-function renderFiles(files) {
-    const container = document.getElementById('fileList');
-    const docCount = document.getElementById('docCount');
-    
-    if (!container) return;
-    
-    if (docCount) {
-        docCount.textContent = files.length;
-    }
+folders.forEach(folder => {
+const folderItem = document.createElement('div');
+folderItem.className = 'list-item folder';
+folderItem.dataset.path = folder.path;
 
-    if (!files || files.length === 0) {
-        container.innerHTML = `<div style="padding:1rem; text-align:center; color:#999;">Sin documentos</div>`;
-        return;
-    }
+const iconDiv = document.createElement('div');
+iconDiv.className = 'item-icon folder';
+iconDiv.innerHTML = '<i class="fas fa-folder"></i>';
 
-    container.innerHTML = files.map(f => {
-        let iconClass = 'icon-doc';
-        if (f.extension && f.extension.toLowerCase().includes('pdf')) iconClass = 'icon-pdf';
-        if (f.extension && (f.extension.toLowerCase().includes('xls') || f.extension.toLowerCase().includes('xlsx'))) iconClass = 'icon-xls';
-        
-        return `
-        <div class="file-item" onclick="openFile('${encodeURIComponent(f.path)}', '${f.name}', '${f.extension || ''}')">
-            <div class="file-icon ${iconClass}">
-                <i class="fas fa-file-alt"></i>
-            </div>
-            <div class="file-info">
-                <div class="file-name">${f.name}</div>
-                <div class="file-meta">${(f.extension || '').toUpperCase()}</div>
-            </div>
-        </div>
-    `;
-    }).join('');
+const infoDiv = document.createElement('div');
+infoDiv.className = 'item-info';
+
+const nameDiv = document.createElement('div');
+nameDiv.className = 'item-name';
+nameDiv.textContent = folder.name;
+
+infoDiv.appendChild(nameDiv);
+folderItem.appendChild(iconDiv);
+folderItem.appendChild(infoDiv);
+
+folderItem.addEventListener('click', () => {
+selectFolder(folder.path);
+});
+
+setupFolderDragAndDrop(folderItem, folder.path);
+
+folderList.appendChild(folderItem);
+});
 }
 
-// --- GESTIÓN DE DOCUMENTOS ---
-async function openFile(encodedPath, name, ext) {
-    const filePath = decodeURIComponent(encodedPath);
-    
-    state.currentFile = { path: filePath, name: name, ext: ext };
-
-    // UI Updates
-    const emptyState = document.getElementById('emptyState');
-    const docWrapper = document.getElementById('documentWrapper');
-    const currentDocTitle = document.getElementById('currentDocTitle');
-    const editModeBtn = document.getElementById('editModeBtn');
-    
-    if (emptyState) emptyState.style.display = 'none';
-    if (docWrapper) docWrapper.classList.add('active');
-    if (currentDocTitle) currentDocTitle.textContent = name;
-    
-    // Reset Views
-    exitEditMode();
-
-    const extLower = (ext || '').toLowerCase();
-    const isWord = ['doc', 'docx'].includes(extLower);
-
-    if (isWord) {
-        await openOnlyOfficeEditor(filePath, name);
-    } else if (extLower === 'pdf') {
-        showToast('PDF no editable en esta versión', 'warning');
-    } else {
-        showToast('Formato no soportado', 'warning');
-    }
+// Seleccionar carpeta
+async function selectFolder(path) {
+try {
+if (currentFolderPath !== path) {
+pathHistory.push(currentFolderPath);
 }
 
-function renderPDF(base64) {
-    const container = document.getElementById('viewerContainer');
-    if (!container) return;
-    
-    container.innerHTML = `<iframe id="pdfFrame" class="viewer-frame active" src="data:application/pdf;base64,${base64}"></iframe>`;
-    state.zoom = 100;
+currentFolderPath = path;
+
+document.querySelectorAll('.list-item').forEach(item => {
+item.classList.remove('active');
+});
+
+const selectedItem = document.querySelector(`[data-path="${path}"]`);
+if (selectedItem) {
+selectedItem.classList.add('active');
+}
+
+await loadDocuments(path);
+updateNavigationState();
+
+} catch (error) {
+showNotification('Error al seleccionar carpeta', 'error');
+}
+}
+
+// Cargar documentos
+async function loadDocuments(folderPath) {
+try {
+const result = await callParentAPI('get-documents-in-folder', folderPath);
+renderDocuments(result.files);
+} catch (error) {
+showNotification(`Error al cargar documentos: ${error.message}`, 'error');
+}
+}
+
+// Renderizar documentos
+function renderDocuments(documents) {
+const documentList = document.getElementById('fileList');
+const docCount = document.getElementById('docCount');
+
+documentList.innerHTML = '';
+
+if (!documents || documents.length === 0) {
+documentList.innerHTML = '<div style="padding:1rem; color:#999; font-size:0.85rem;">Carpeta vacía.</div>';
+if(docCount) docCount.innerText = '0';
+return;
+}
+
+if(docCount) docCount.innerText = documents.length;
+
+documents.forEach(doc => {
+const docItem = document.createElement('div');
+docItem.className = 'list-item';
+docItem.dataset.path = doc.path;
+
+const fileTypeInfo = getFileTypeInfo(doc.extension);
+
+const iconDiv = document.createElement('div');
+iconDiv.className = `item-icon ${fileTypeInfo.className}`;
+iconDiv.innerHTML = `<i class="fas ${fileTypeInfo.icon}"></i>`;
+
+const infoDiv = document.createElement('div');
+infoDiv.className = 'item-info';
+
+const nameDiv = document.createElement('div');
+nameDiv.className = 'item-name';
+nameDiv.textContent = doc.name;
+
+const metaDiv = document.createElement('div');
+metaDiv.className = 'item-meta';
+metaDiv.innerHTML = `<span class="badge-type">${doc.extension.toUpperCase()}</span>`;
+
+infoDiv.appendChild(nameDiv);
+infoDiv.appendChild(metaDiv);
+docItem.appendChild(iconDiv);
+docItem.appendChild(infoDiv);
+
+docItem.addEventListener('click', () => {
+selectDocument(doc);
+});
+
+docItem.addEventListener('contextmenu', (e) => {
+e.preventDefault();
+showContextMenu(e.clientX, e.clientY, doc);
+});
+
+documentList.appendChild(docItem);
+});
+}
+
+function getFileTypeInfo(extension) {
+const ext = extension.toLowerCase().replace('.', '');
+
+const types = {
+'pdf': { className: 'pdf', icon: 'fa-file-pdf' },
+'xls': { className: 'excel', icon: 'fa-file-excel' },
+'xlsx': { className: 'excel', icon: 'fa-file-excel' },
+'doc': { className: 'word', icon: 'fa-file-word' },
+'docx': { className: 'word', icon: 'fa-file-word' },
+'ppt': { className: 'powerpoint', icon: 'fa-file-powerpoint' },
+'pptx': { className: 'powerpoint', icon: 'fa-file-powerpoint' },
+'txt': { className: 'default', icon: 'fa-file-alt' }
+};
+
+return types[ext] || { className: 'default', icon: 'fa-file' };
+}
+
+// Seleccionar documento
+async function selectDocument(doc) {
+try {
+currentDocument = doc;
+document.getElementById('docName').textContent = doc.name;
+
+const extension = doc.extension.toLowerCase().replace('.', '');
+
+document.querySelectorAll('.list-item').forEach(i => i.classList.remove('active'));
+const activeItem = document.querySelector(`[data-path="${doc.path}"]`);
+if(activeItem) activeItem.classList.add('active');
+
+showLoading();
+document.getElementById('emptyState').style.display = 'none';
+
+enableDocActions(true);
+
+if (extension === 'pdf') {
+loadPDF(doc.path);
+} else if (extension === 'xls' || extension === 'xlsx') {
+loadExcel(doc.path);
+} else if (extension === 'doc' || extension === 'docx') {
+loadWord(doc.path);
+} else {
+showUnsupportedMessage(extension);
+}
+
+} catch (error) {
+showNotification('Error al seleccionar documento: ' + error.message, 'error');
+hideLoading();
+}
+}
+
+// Cargar PDF
+async function loadPDF(filePath) {
+try {
+const result = await callParentAPI('get-pdf-preview', { filePath: filePath });
+if (result.success) {
+displayPDF(result.data);
+} else {
+showErrorInViewer(`Error al previsualizar PDF: ${result.error}`);
+}
+} catch (error) {
+showErrorInViewer(`Error al cargar PDF: ${error.message}`);
+}
+}
+
+// Cargar Excel
+async function loadExcel(filePath) {
+try {
+const result = await callParentAPI('get-excel-preview', { filePath: filePath });
+if (result.success) {
+displayPDF(result.data);
+} else {
+showErrorInViewer(`Error al previsualizar Excel: ${result.error}`);
+}
+} catch (error) {
+showErrorInViewer(`Error al cargar Excel: ${error.message}`);
+}
+}
+
+// Cargar Word
+async function loadWord(filePath) {
+try {
+const result = await callParentAPI('get-word-preview', { filePath: filePath });
+if (result.success) {
+displayPDF(result.data);
+} else {
+showErrorInViewer(`Error al previsualizar Word: ${result.error}`);
+}
+} catch (error) {
+showErrorInViewer(`Error al cargar Word: ${error.message}`);
+}
+}
+
+// Mostrar PDF
+function displayPDF(pdfData) {
+hideLoading();
+
+const viewerContainer = document.getElementById('viewerContainer');
+viewerContainer.style.display = 'flex';
+document.getElementById('toolbar').classList.add('visible');
+
+viewerContainer.innerHTML = `<iframe id="docFrame" class="pdf-viewer" src="data:application/pdf;base64,${pdfData}"></iframe>`;
+
+currentZoom = 100;
+updateZoomDisplay();
+}
+
+function showUnsupportedMessage(extension) {
+hideLoading();
+const viewerContainer = document.getElementById('viewerContainer');
+viewerContainer.style.display = 'flex';
+document.getElementById('toolbar').classList.remove('visible');
+
+viewerContainer.innerHTML = `
+<div class="error-message">
+<h3>Previsualización no disponible</h3>
+<p>La previsualización interna no está disponible para archivos .${extension}.</p>
+<p>Puede usar el botón de descarga en la barra superior para abrirlo externamente.</p>
+</div>
+`;
+}
+
+function showErrorInViewer(message) {
+hideLoading();
+const viewerContainer = document.getElementById('viewerContainer');
+viewerContainer.style.display = 'flex';
+document.getElementById('toolbar').classList.remove('visible');
+
+viewerContainer.innerHTML = `
+<div class="error-message">
+<h3 style="color:var(--danger)">Error de Carga</h3>
+<p>${message}</p>
+</div>
+`;
 }
 
 function closeDocument() {
-    state.currentFile = null;
-    const docWrapper = document.getElementById('documentWrapper');
-    const emptyState = document.getElementById('emptyState');
-    const viewerContainer = document.getElementById('viewerContainer');
-    
-    if (docWrapper) docWrapper.classList.remove('active');
-    if (emptyState) emptyState.style.display = 'flex';
-    if (viewerContainer) viewerContainer.innerHTML = '';
-    exitEditMode();
+currentDocument = null;
+
+document.getElementById('emptyState').style.display = 'block';
+document.getElementById('viewerContainer').style.display = 'none';
+document.getElementById('toolbar').classList.remove('visible');
+document.getElementById('viewerContainer').innerHTML = '';
+
+enableDocActions(false);
+
+document.querySelectorAll('.list-item').forEach(i => i.classList.remove('active'));
 }
 
-function exitEditMode() {
-    const editorLayer = document.getElementById('editorLayer');
-    const viewerContainer = document.getElementById('viewerContainer');
-    const editModeBtn = document.getElementById('editModeBtn');
-    
-    if (editorLayer) editorLayer.classList.remove('active');
-    if (viewerContainer) viewerContainer.classList.add('active');
-    if (editModeBtn) editModeBtn.style.display = 'flex';
-    state.isEditMode = false;
+function enableDocActions(enable) {
+const btns = ['closeDocBtn', 'downloadBtn', 'printBtn'];
+btns.forEach(id => {
+const btn = document.getElementById(id);
+if(btn) {
+btn.disabled = !enable;
+btn.style.opacity = enable ? '1' : '0.3';
+btn.style.cursor = enable ? 'pointer' : 'not-allowed';
+}
+});
 }
 
-function enableEditMode() {
-    if (!state.currentFile) return;
-    
-    const editorLayer = document.getElementById('editorLayer');
-    const viewerContainer = document.getElementById('viewerContainer');
-    
-    if (editorLayer && viewerContainer) {
-        editorLayer.classList.add('active');
-        viewerContainer.classList.remove('active');
-        state.isEditMode = true;
-    }
+function updateNavigationState() {
+const backBtn = document.getElementById('goBackBtn');
+if (backBtn) {
+backBtn.disabled = pathHistory.length === 0;
+backBtn.style.opacity = backBtn.disabled ? '0.5' : '1';
+backBtn.style.cursor = backBtn.disabled ? 'not-allowed' : 'pointer';
 }
 
-async function checkOnlyOfficeServer() {
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
+const breadcrumb = document.getElementById('breadcrumb');
+let bcHTML = `<div class="crumb-item" onclick="resetToRoot()"><i class="fas fa-hdd"></i> Raíz</div>`;
 
-        const response = await fetch('http://localhost:8080', {
-            method: 'GET',
-            mode: 'no-cors',
-            signal: controller.signal
-        }).catch(() => null);
-
-        clearTimeout(timeoutId);
-
-        return response !== null;
-    } catch (e) {
-        return false;
-    }
+if (pathHistory.length > 0) {
+const currentFolderName = currentFolderPath.split('\\').pop().split('/').pop();
+bcHTML += `<div class="crumb-separator"><i class="fas fa-chevron-right"></i></div>`;
+bcHTML += `<div class="crumb-item">${currentFolderName}</div>`;
 }
 
-// --- SOLO EDITOR ONLYOFFICE ---
-async function openOnlyOfficeEditor(filePath, fileName) {
-    if (!filePath) return;
-
-    showToast('Cargando editor OnlyOffice...', 'info');
-
-    const serverAvailable = await checkOnlyOfficeServer();
-    if (!serverAvailable) {
-        showToast('Error: El servidor OnlyOffice no está disponible. Por favor inícielo con el comando: docker run -i -t -d -p 8080:80 onlyoffice/documentserver', 'error');
-        return;
-    }
-
-    try {
-        // Obtener configuración del editor
-        const config = await callParentAPI('open-onlyoffice-editor', {
-            filePath: filePath,
-            fileName: fileName
-        });
-        
-        if (config.success && config.editorUrl) {
-            console.log('[IFRAME] ✅ OnlyOffice configurado, inicializando editor...');
-            launchOnlyOfficeEditor(config);
-        } else {
-            throw new Error(config.error || 'Error configurando OnlyOffice');
-        }
-    } catch (error) {
-        console.error('[IFRAME] Error OnlyOffice:', error.message);
-
-        if (error.message.includes('ECONNREFUSED') || error.message.includes('connect')) {
-            showToast('Error: El servidor OnlyOffice no está disponible. Verifique que el servidor esté corriendo en http://localhost:8080', 'error');
-        } else if (error.message.includes('DocsAPI not loaded')) {
-            showToast('Error: No se pudo cargar la API de OnlyOffice. Verifique que el servidor esté corriendo en http://localhost:8080', 'error');
-        } else {
-            showToast('Error al abrir editor: ' + error.message, 'error');
-        }
-    }
+breadcrumb.innerHTML = bcHTML;
 }
 
-function launchOnlyOfficeEditor(data) {
-    const viewerContainer = document.getElementById('viewerContainer');
-    if (!viewerContainer) return;
-    
-    console.log('[IFRAME] 🚀 Inicializando OnlyOffice con DocsAPI wrapper');
-    console.log('[IFRAME] 📦 Config recibida:', data.config);
-    
-    // Limpiar contenedor
-    viewerContainer.innerHTML = '';
-    
-    // Cargar wrapper.html que inicializa DocsAPI
-    const wrapperUrl = 'onlyoffice-wrapper.html';
-    
-    console.log('[IFRAME] 📄 Cargando wrapper:', wrapperUrl);
-    
-    // Crear iframe para el wrapper
-    const iframe = document.createElement('iframe');
-    iframe.id = 'onlyoffice-wrapper-iframe';
-    iframe.src = wrapperUrl;
-    iframe.style.cssText = 'width: 100%; height: 100%; border: none; display: block;';
-    iframe.setAttribute('allow', 'fullscreen; clipboard-read; clipboard-write');
-    
-    // Esperar que el wrapper esté listo
-    iframe.addEventListener('load', function() {
-        console.log('[IFRAME] ✅ Wrapper cargado, enviando config...');
-        
-        // Esperar un momento y enviar la config al wrapper
-        setTimeout(() => {
-            if (iframe.contentWindow) {
-                console.log('[IFRAME] 📤 Enviando config al wrapper via postMessage');
-                
-                iframe.contentWindow.postMessage({
-                    type: 'onlyoffice-config',
-                    payload: data.config
-                }, '*');
-                
-                showToast('Editor OnlyOffice inicializando...', 'info');
-            } else {
-                console.error('[IFRAME] ❌ No se pudo acceder al contentWindow del iframe');
-                showToast('Error: No se pudo inicializar el editor', 'error');
-            }
-        }, 500);
-    });
-    
-    // Escuchar mensajes del wrapper
-    window.addEventListener('message', function(event) {
-        if (event.data && event.data.type === 'wrapper-ready') {
-            console.log('[IFRAME] 📢 Wrapper listo, config enviada');
-        }
-        
-        if (event.data && event.data.type === 'wrapper-error') {
-            console.error('[IFRAME] ❌ Error del wrapper:', event.data.error);
-            showToast('Error en el editor: ' + event.data.error, 'error');
-        }
-        
-        if (event.data && event.data.type === 'onlyoffice-error') {
-            console.error('[IFRAME] ❌ Error de OnlyOffice:', event.data.error);
-            showToast('Error en OnlyOffice: ' + event.data.error, 'error');
-        }
-        
-        if (event.data && event.data.type === 'onlyoffice-ready') {
-            console.log('[IFRAME] ✅ Documento OnlyOffice cargado y listo');
-            showToast('Documento cargado correctamente', 'success');
-        }
-    });
-    
-    viewerContainer.appendChild(iframe);
+async function resetToRoot() {
+if (pathHistory.length > 0) {
+loadFolders();
+}
 }
 
-// --- UTILIDADES ---
-function adjustZoom(delta) {
-    if (state.isEditMode) return;
-    state.zoom += delta;
-    const iframe = document.getElementById('pdfFrame');
-    if (iframe && iframe.src) {
-        const url = iframe.src.split('#')[0];
-        iframe.src = url + `#zoom=${state.zoom}`;
-    }
+async function goUpLevel() {
+if (pathHistory.length > 0) {
+const previousPath = pathHistory.pop();
+await selectFolder(previousPath);
+updateNavigationState();
+}
 }
 
-async function downloadCurrentFile() {
-    if (!state.currentFile) return;
-    showToast('Iniciando descarga...', 'info');
-    
-    try {
-        const result = await callParentAPI('download-document', state.currentFile.path);
-        if (result.success) {
-            const link = document.createElement('a');
-            link.href = `data:application/octet-stream;base64,${result.base64Data}`;
-            link.download = result.fileName;
-            link.click();
-        }
-    } catch (e) {
-        console.error('[IFRAME] Error descargando:', e.message);
-    }
+// Utilidades
+function showLoading() {
+const overlay = document.getElementById('loadingOverlay');
+if(overlay) overlay.classList.add('active');
 }
 
-function showToast(msg, type='success') {
-    const t = document.getElementById('toast');
-    const txt = document.getElementById('toastMsg');
-    if (t && txt) {
-        txt.innerText = msg;
-        t.className = `toast ${type} show`;
-        setTimeout(() => t.classList.remove('show'), 3000);
-    }
+function hideLoading() {
+const overlay = document.getElementById('loadingOverlay');
+if(overlay) overlay.classList.remove('active');
 }
 
-function cancelEditMode() {
-    if (confirm('¿Desea salir del modo edición? Los cambios no guardados se perderán.')) {
-        exitEditMode();
-    }
+function showNotification(message, type = 'success') {
+const notification = document.getElementById('notification');
+const messageDiv = notification.querySelector('.notification-message');
+const icon = notification.querySelector('.notification-icon');
+
+messageDiv.textContent = message;
+notification.className = `notification ${type}`;
+
+let iconClass = 'fa-info-circle';
+if(type === 'success') iconClass = 'fa-check-circle';
+if(type === 'error') iconClass = 'fa-times-circle';
+if(type === 'warning') iconClass = 'fa-exclamation-triangle';
+
+icon.className = `notification-icon fas ${iconClass}`;
+
+notification.classList.add('show');
+setTimeout(() => {
+notification.classList.remove('show');
+}, 3000);
+}
+
+async function downloadDocument() {
+if (currentDocument) {
+try {
+showNotification('Preparando descarga...', 'info');
+const result = await callParentAPI('download-document', currentDocument.path);
+
+if (result.success) {
+const binaryData = atob(result.base64Data);
+const bytes = new Uint8Array(binaryData.length);
+for (let i = 0; i < binaryData.length; i++) {
+bytes[i] = binaryData.charCodeAt(i);
+}
+
+const blob = new Blob([bytes], { type: 'application/octet-stream' });
+const url = URL.createObjectURL(blob);
+
+const link = document.createElement('a');
+link.href = url;
+link.download = result.fileName;
+document.body.appendChild(link);
+link.click();
+
+document.body.removeChild(link);
+URL.revokeObjectURL(url);
+
+showNotification('Descarga completada', 'success');
+} else {
+showNotification(`Error: ${result.error}`, 'error');
+}
+} catch (error) {
+showNotification(`Error: ${error.message}`, 'error');
+}
+}
+}
+
+function printDocument() {
+if (!currentDocument) return;
+
+const iframe = document.getElementById('docFrame');
+if (iframe && iframe.contentWindow) {
+iframe.contentWindow.print();
+} else {
+printConvertedDocument(currentDocument.path, currentDocument.extension);
+}
+}
+
+async function printConvertedDocument(filePath, extension) {
+try {
+showNotification('Preparando impresión...', 'info');
+let result = await callParentAPI('get-pdf-preview', { filePath: filePath });
+
+const ext = extension.toLowerCase();
+if(ext.includes('xls')) result = await callParentAPI('get-excel-preview', { filePath });
+if(ext.includes('doc')) result = await callParentAPI('get-word-preview', { filePath });
+
+if (result.success) {
+const printWindow = window.open('', '_blank');
+printWindow.document.write(
+`<html>
+<body style="margin:0;">
+<iframe src="data:application/pdf;base64,${result.data}"
+style="width:100%; height:100vh; border:none;"
+onload="window.print(); window.onafterprint = function() { window.close(); }">
+</iframe>
+</body>
+</html>`
+);
+printWindow.document.close();
+}
+} catch (error) {
+showNotification('Error al imprimir', 'error');
+}
+}
+
+function zoomIn() {
+currentZoom += 10;
+applyZoom();
+}
+
+function zoomOut() {
+if (currentZoom > 20) {
+currentZoom -= 10;
+applyZoom();
+}
+}
+
+function fitWidth() {
+currentZoom = 'width';
+applyZoom();
+}
+
+function updateZoomDisplay() {
+const display = document.getElementById('zoomLevelDisplay');
+if(display) {
+display.innerText = (currentZoom === 'width') ? 'Ancho' : `${currentZoom}%`;
+}
+}
+
+function applyZoom() {
+const iframe = document.getElementById('docFrame');
+if (!iframe) return;
+
+updateZoomDisplay();
+
+let src = iframe.src.split('#')[0];
+let zoomParam = '';
+
+if (currentZoom === 'width') {
+zoomParam = '#view=FitH';
+} else {
+zoomParam = `#zoom=${currentZoom}`;
+}
+
+iframe.src = src + zoomParam;
 }

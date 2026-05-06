@@ -3999,18 +3999,21 @@ if (mainContainerSub) mainContainerSub.classList.remove('vanta-fullscreen');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 
-    } else if (submoduleName === "2.1.1 Politica del SG-SST") {
-      createComponentSafely(window.PoliticaComponent,
-        submoduleContentDiv,
-        currentCompany,
-        moduleName,
-        submoduleName,
-        safeBackToModuleCallback // <-- USAR EL CALLBACK SEGURO
-      );
-      if (!window.PoliticaComponent) {
-        console.error('❌ PoliticaComponent no encontrado');
-        showDevelopmentMessage(submoduleContentDiv, submoduleName);
-      }
+} else if (submoduleName === "2.1.1 Politica del SG-SST") {
+if (window.PoliticaComponent) {
+const politicaComponent = new window.PoliticaComponent(
+submoduleContentDiv,
+currentCompany,
+moduleName,
+submoduleName,
+safeBackToModuleCallback
+);
+currentActiveComponent = politicaComponent;
+politicaComponent.render();
+} else {
+console.error('❌ PoliticaComponent no encontrado');
+showDevelopmentMessage(submoduleContentDiv, submoduleName);
+}
 
     } else if (submoduleName === "2.2.1 Objetivos SST") {
       createComponentSafely(window.ObjetivosSSTComponent,
