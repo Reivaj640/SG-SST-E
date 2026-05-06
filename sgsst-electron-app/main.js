@@ -4017,10 +4017,30 @@ ipcMain.handle('convertExcelToPdf', async (event, filePath) => {
 
 // --- Manejadores para el Visor de Documentos ---
 
-ipcMain.handle('get-excel-preview', async (event, filePath) => {
-  sendLog(`[MAIN][get-excel-preview] Solicitud recibida para filePath: ${filePath}`, 'INFO');
+ipcMain.handle('get-excel-preview', async (event, rawFilePath) => {
+    sendLog(`[MAIN][get-excel-preview] Solicitud recibida para filePath: ${rawFilePath}`, 'INFO');
 
-  let tempPdfPath = null; // Variable para el archivo temporal
+    // Normalizar ruta (igual que get-word-preview)
+    let filePath = typeof rawFilePath === 'string' ? rawFilePath : (rawFilePath?.filePath || '');
+    let prev = '';
+    while (filePath !== prev) {
+        prev = filePath;
+        try {
+            filePath = decodeURIComponent(filePath);
+        } catch (e) {
+            break;
+        }
+    }
+
+    const driveLetterMatch = filePath.match(/^([A-Za-z]):(.*)$/);
+    if (driveLetterMatch) {
+        filePath = driveLetterMatch[1] + ':' + driveLetterMatch[2];
+        filePath = filePath.replace(/\\/g, '\\').replace(/\//g, '\\');
+    }
+
+    sendLog(`[MAIN][get-excel-preview] Ruta normalizada: ${filePath}`, 'INFO');
+
+    let tempPdfPath = null;
 
   try {
     // 1. Verificar que el archivo es accesible
