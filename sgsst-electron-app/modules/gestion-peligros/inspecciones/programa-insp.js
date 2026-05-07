@@ -87,11 +87,10 @@ var ProgramaInsp = {
         var rowHtml = '<tr data-activity-id="' + act.id + '">';
         rowHtml += '<td class="kair-insp__programa-obj-gral' + actClass + '">' + this._esc(act.objetivoGeneral || '') + '</td>';
         rowHtml += '<td class="kair-insp__programa-obj-esp' + actClass + '">' + this._esc(act.objetivosEspecificos || '') + '</td>';
-        rowHtml += '<td class="kair-insp__programa-activity">' +
-          '<i class="bi ' + typeIcon + '" style="color:var(--kair-insp-primary);margin-right:4px;"></i>' +
-          this._esc(act.actividades || '') +
-          '<span class="kair-insp__programa-type-badge" style="background:var(--kair-insp-primary-light);color:var(--kair-insp-primary);">' + typeLabel + '</span>' +
-          '</td>';
+ rowHtml += '<td class="kair-insp__programa-activity' + actClass + '">' +
+ '<i class="bi ' + typeIcon + ' kair-insp__programa-activity-icon"></i>' +
+ this._esc(act.actividades || '') +
+ '</td>';
         rowHtml += '<td class="kair-insp__programa-editable"><input type="text" class="kair-insp__programa-input" data-activity="' + act.id + '" data-field="responsable" value="' + this._esc(act.responsable || '') + '" placeholder="Responsable"></td>';
 
         for (var i = 0; i < 12; i++) {

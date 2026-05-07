@@ -834,16 +834,18 @@ PROGRAMA ANUAL
 }
 
 .kair-insp__programa-table tbody td {
-  padding: var(--kair-insp-space-2);
-  border-bottom: 1px solid var(--kair-insp-border-light);
-  text-align: center;
-  vertical-align: middle;
+ padding: var(--kair-insp-space-2);
+ border-bottom: 1px solid var(--kair-insp-border-light);
+ text-align: center;
+ vertical-align: middle;
 }
 
-.kair-insp__programa-table tbody td:first-child {
-  text-align: left;
-  font-weight: var(--kair-insp-font-weight-medium);
-  color: var(--kair-insp-text-primary);
+.kair-insp__programa-table tbody td:first-child,
+.kair-insp__programa-table tbody td.kair-insp__programa-obj-gral,
+.kair-insp__programa-table tbody td.kair-insp__programa-obj-esp,
+.kair-insp__programa-table tbody td.kair-insp__programa-activity,
+.kair-insp__programa-table tbody td.kair-insp__programa-editable {
+ text-align: left;
 }
 
 .kair-insp__programa-cell {
@@ -883,15 +885,6 @@ PROGRAMA ANUAL
   background: var(--kair-insp-bg-hover);
   color: var(--kair-insp-text-light);
   border-color: var(--kair-insp-border-light);
-}
-
-.kair-insp__programa-type-badge {
-  display: inline-block;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  padding: 0.0625rem 0.375rem;
-  border-radius: 8px;
-  margin-left: var(--kair-insp-space-2);
 }
 
 /* ==========================================================================
@@ -1729,10 +1722,16 @@ PROGRAMA — Obj Gral / Obj Esp / Activity cells
 }
 
 .kair-insp__programa-activity {
-  font-weight: var(--kair-insp-font-weight-medium);
-  color: var(--kair-insp-text-primary);
-  text-align: left;
-  white-space: nowrap;
+ vertical-align: middle;
+ font-weight: var(--kair-insp-font-weight-medium);
+ color: var(--kair-insp-text-primary);
+ white-space: nowrap;
+}
+
+.kair-insp__programa-activity-icon {
+ color: var(--kair-insp-primary);
+ margin-right: 4px;
+ font-size: 0.75rem;
 }
 
 .kair-insp__programa-pct {
