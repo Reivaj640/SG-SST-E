@@ -323,19 +323,19 @@ var FormularioInsp = {
       }.bind(this));
     }
 
-    var saveBtn = body.querySelector('#kair-insp-form-save');
-    if (saveBtn) {
-      saveBtn.addEventListener('click', function () {
-        this.saveForm(false);
-      }.bind(this));
-    }
+ var saveBtn = body.querySelector('#kair-insp-form-save');
+ if (saveBtn) {
+ saveBtn.addEventListener('click', function () {
+ this.saveForm();
+ }.bind(this));
+ }
 
-    var saveExcelBtn = body.querySelector('#kair-insp-form-save-excel');
-    if (saveExcelBtn) {
-      saveExcelBtn.addEventListener('click', function () {
-        this.saveForm(true);
-      }.bind(this));
-    }
+ var saveExcelBtn = body.querySelector('#kair-insp-form-save-excel');
+ if (saveExcelBtn) {
+ saveExcelBtn.addEventListener('click', function () {
+ this.saveForm();
+ }.bind(this));
+ }
   },
 
   _getConfig: function (type) {
@@ -549,7 +549,7 @@ var FormularioInsp = {
     };
   },
 
-  saveForm: function (writeToExcel) {
+  saveForm: function () {
     var formData = this.collectFormData();
     if (!formData) {
       InspeccionesService.toast('No hay datos para guardar', 'warning');

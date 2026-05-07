@@ -41,14 +41,14 @@ const INSPECTION_TEMPLATES = {
     name: "Inspección de Instalaciones",
     ext: ".xls",
     sheetName: "OFICINA",
-    headerFields: [
-      { key: "fecha", label: "Fecha", row: 6, col: 1 },
-      { key: "lugar", label: "Lugar", row: 6, col: 6 }
-    ],
-    signFields: [
-      { key: "inspeccionadoPor", label: "Inspeccionado por", row: 37, col: 1 },
-      { key: "cargoFirma", label: "Cargo", row: 38, col: 1 }
-    ],
+ headerFields: [
+ { key: "fecha", label: "Fecha", row: 6, col: 1, labelPrefix: "FECHA:" },
+ { key: "lugar", label: "Lugar", row: 6, col: 6, labelPrefix: "LUGAR :" }
+ ],
+ signFields: [
+ { key: "inspeccionadoPor", label: "Inspeccionado por", row: 37, col: 1, labelPrefix: "INSPECCIONADO POR:" },
+ { key: "cargoFirma", label: "Cargo", row: 38, col: 1, labelPrefix: "CARGO:" }
+ ],
     sections: [
       { label: "INSTALACIONES SANITARIAS", row: 11 },
       { label: "INSTALACIONES ELÉCTRICAS", row: 15 },
@@ -74,10 +74,10 @@ const INSPECTION_TEMPLATES = {
     name: "Inspección Equipos de Emergencia",
     ext: ".xls",
     sheetName: "E EMERGENCIA",
-    headerFields: [
-      { key: "fecha", label: "Fecha", row: 6, col: 2 },
-      { key: "sitio", label: "Sitio de Inspección", row: 7, col: 2 }
-    ],
+ headerFields: [
+ { key: "fecha", label: "Fecha", row: 6, col: 1, labelPrefix: "FECHA:" },
+ { key: "sitio", label: "Sitio de Inspección", row: 7, col: 1, labelPrefix: "SITIO DE INSPECCION:" }
+ ],
     dataStartRow: 12,
     dataEndRow: 20,
     colMap: {
@@ -96,16 +96,16 @@ const INSPECTION_TEMPLATES = {
     name: "Inspección de Botiquín",
     ext: ".xls",
     sheetName: "INSUMOS BASICOS PARA BOTIQUIN",
-    headerFields: [
-      { key: "fecha", label: "Fecha", row: 6, col: 1 },
-      { key: "realizadoPor", label: "Realizado por", row: 6, col: 5 }
-    ],
+ headerFields: [
+ { key: "fecha", label: "Fecha", row: 6, col: 1, labelPrefix: "FECHA:" },
+ { key: "realizadoPor", label: "Realizado por", row: 6, col: 5, labelPrefix: "REALIZADO POR:" }
+ ],
     dataStartRow: 9,
     dataEndRow: 31,
-    checkRows: [
-      { row: 32, field: "botiquinBuenEstado", label: "Botiquín en buen estado", type: "check", options: ["SI","NO"] },
-      { row: 33, field: "higieneAdecuada", label: "Higiene adecuada del botiquín", type: "check", options: ["SI","NO"] }
-    ],
+ checkRows: [
+ { row: 32, field: "botiquinBuenEstado", label: "Botiquín en buen estado", type: "check", options: ["SI","NO"], valueCol: 6 },
+ { row: 33, field: "higieneAdecuada", label: "Higiene adecuada del botiquín", type: "check", options: ["SI","NO"], valueCol: 6 }
+ ],
     colMap: {
       A: { field: "numero", label: "ITEM", type: "text", readOnly: true },
       B: { field: "elemento", label: "ELEMENTOS", type: "text", readOnly: true },
@@ -118,8 +118,8 @@ const INSPECTION_TEMPLATES = {
 };
 
 const PROGRAMA_SHEET_CONFIG = {
-  startRow: 8,
-  endRow: 16,
+ startRow: 9,
+ endRow: 18,
   startCol: 6,
   endCol: 17,
   colMap: {
@@ -208,6 +208,33 @@ function _readXlsWithSheetJs(filePath) {
   return { rawData: xlsx.utils.sheet_to_json(ws, { header: 1, defval: "", raw: true }), workbook: workbook, sheetName: sheetName };
 }
 
+function _escapeRegex(s) {
+ return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function _extractValueAfterLabel(cellText, labelPrefix) {
+ if (!labelPrefix) return String(cellText || "").trim();
+ var raw = String(cellText || "").trim();
+ var re = new RegExp("^" + _escapeRegex(labelPrefix) + "\\s*");
+ var val = raw.replace(re, "").replace(/_+/g, "").trim();
+ if (/^[\/\-\.]+$/.test(val)) val = "";
+ return val;
+}
+
+function _buildLabelCell(labelPrefix, value) {
+ if (!labelPrefix) return String(value || "");
+ return labelPrefix + " " + String(value || "").trim();
+}
+
+function _extractYear(val) {
+ if (!val) return NaN;
+ var s = String(val).trim();
+ var m = s.match(/\b(20\d{2})\b/);
+ if (m) return parseInt(m[1], 10);
+ var n = parseInt(s, 10);
+ return (!isNaN(n) && n >= 2000 && n <= 2100) ? n : NaN;
+}
+
 function _colLetterToIndex(letter) {
   var idx = 0;
   for (var i = 0; i < letter.length; i++) {
@@ -258,13 +285,14 @@ function readInspeccionExcel(companyRoot, type) {
       var sn = config.sheetName || wb.SheetNames[0];
       var sheetData = xlsx.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: "", raw: true });
 
-      config.headerFields.forEach(function(hf) {
-        var rowIdx = hf.row - 1;
-        var colIdx = hf.col - 1;
-        if (rowIdx < sheetData.length && sheetData[rowIdx]) {
-          result.headerFields[hf.key] = String(sheetData[rowIdx][colIdx] || "").trim();
-        }
-      });
+ config.headerFields.forEach(function(hf) {
+ var rowIdx = hf.row - 1;
+ var colIdx = hf.col - 1;
+ if (rowIdx < sheetData.length && sheetData[rowIdx]) {
+ var rawCell = String(sheetData[rowIdx][colIdx] || "").trim();
+ result.headerFields[hf.key] = hf.labelPrefix ? _extractValueAfterLabel(rawCell, hf.labelPrefix) : rawCell;
+ }
+ });
 
       if (config.generalObservations) {
         var obsRow = config.generalObservations.row - 1;
@@ -302,23 +330,28 @@ function readInspeccionExcel(companyRoot, type) {
       var xlsResult = _readXlsWithSheetJs(filePath);
       var rawData = xlsResult.rawData;
 
-      config.headerFields.forEach(function(hf) {
-        var rowIdx = hf.row - 1;
-        var colIdx = hf.col - 1;
-        if (rowIdx < rawData.length && rawData[rowIdx]) {
-          result.headerFields[hf.key] = String(rawData[rowIdx][colIdx] || "").trim();
-        }
-      });
+ config.headerFields.forEach(function(hf) {
+ var rowIdx = hf.row - 1;
+ var colIdx = hf.col - 1;
+ if (rowIdx < rawData.length && rawData[rowIdx]) {
+ var rawCell = String(rawData[rowIdx][colIdx] || "").trim();
+ result.headerFields[hf.key] = hf.labelPrefix ? _extractValueAfterLabel(rawCell, hf.labelPrefix) : rawCell;
+ }
+ });
 
-      if (config.signFields) {
-        result.signFields = {};
-        config.signFields.forEach(function(sf) {
-          var rowIdx = sf.row - 1;
-          var colIdx = sf.col - 1;
-          if (rowIdx < rawData.length && rawData[rowIdx]) {
-            var rawVal = String(rawData[rowIdx][colIdx] || "").trim();
-            result.signFields[sf.key] = rawVal.replace(/_{2,}/g, "").trim();
-          }
+ if (config.signFields) {
+ result.signFields = {};
+ config.signFields.forEach(function(sf) {
+ var rowIdx = sf.row - 1;
+ var colIdx = sf.col - 1;
+ if (rowIdx < rawData.length && rawData[rowIdx]) {
+ var rawVal = String(rawData[rowIdx][colIdx] || "").trim();
+ if (sf.labelPrefix) {
+ result.signFields[sf.key] = _extractValueAfterLabel(rawVal, sf.labelPrefix);
+ } else {
+ result.signFields[sf.key] = rawVal.replace(/_{2,}/g, "").trim();
+ }
+ }
         });
       }
 
@@ -383,17 +416,21 @@ function readInspeccionExcel(companyRoot, type) {
  }
 
  if (config.checkRows) {
-        config.checkRows.forEach(function(cr) {
-          var rowIdx = cr.row - 1;
-          var row = rawData[rowIdx] || [];
-          var val = "";
-          for (var c = 0; c < (row.length || 0); c++) {
-            if (row[c] && String(row[c]).trim()) {
-              val = String(row[c]).trim();
-              break;
-            }
-          }
-          result.checkRows.push({ row: cr.row, field: cr.field, label: cr.label, value: val, type: cr.type, options: cr.options });
+ config.checkRows.forEach(function(cr) {
+ var rowIdx = cr.row - 1;
+ var row = rawData[rowIdx] || [];
+ var val = "";
+ if (cr.valueCol) {
+ val = String(row[cr.valueCol - 1] || "").trim();
+ } else {
+ for (var c = 0; c < (row.length || 0); c++) {
+ if (row[c] && String(row[c]).trim()) {
+ val = String(row[c]).trim();
+ break;
+ }
+ }
+ }
+ result.checkRows.push({ row: cr.row, field: cr.field, label: cr.label, value: val, type: cr.type, options: cr.options });
         });
       }
     }
@@ -481,25 +518,25 @@ async function writeInspeccionExcel(companyRoot, type, formData) {
       var wsOrig = wbOrig.Sheets[sheetNameOrig];
       var merges = wsOrig['!merges'] || [];
 
-      if (formData.headerFields) {
-        config.headerFields.forEach(function(hf) {
-          if (formData.headerFields[hf.key] !== undefined) {
-            var rowIdx = hf.row - 1;
-            var colIdx = hf.col - 1;
-            if (!rawData[rowIdx]) rawData[rowIdx] = [];
-            rawData[rowIdx][colIdx] = formData.headerFields[hf.key];
-          }
-        });
-      }
+ if (formData.headerFields) {
+ config.headerFields.forEach(function(hf) {
+ if (formData.headerFields[hf.key] !== undefined) {
+ var rowIdx = hf.row - 1;
+ var colIdx = hf.col - 1;
+ if (!rawData[rowIdx]) rawData[rowIdx] = [];
+ rawData[rowIdx][colIdx] = hf.labelPrefix ? _buildLabelCell(hf.labelPrefix, formData.headerFields[hf.key]) : formData.headerFields[hf.key];
+ }
+ });
+ }
 
-      if (formData.signFields && config.signFields) {
-        config.signFields.forEach(function(sf) {
-          if (formData.signFields[sf.key] !== undefined) {
-            var rowIdx = sf.row - 1;
-            var colIdx = sf.col - 1;
-            if (!rawData[rowIdx]) rawData[rowIdx] = [];
-            rawData[rowIdx][colIdx] = formData.signFields[sf.key];
-          }
+ if (formData.signFields && config.signFields) {
+ config.signFields.forEach(function(sf) {
+ if (formData.signFields[sf.key] !== undefined) {
+ var rowIdx = sf.row - 1;
+ var colIdx = sf.col - 1;
+ if (!rawData[rowIdx]) rawData[rowIdx] = [];
+ rawData[rowIdx][colIdx] = sf.labelPrefix ? _buildLabelCell(sf.labelPrefix, formData.signFields[sf.key]) : formData.signFields[sf.key];
+ }
         });
       }
 
@@ -517,15 +554,16 @@ async function writeInspeccionExcel(companyRoot, type, formData) {
         });
       });
 
-      if (formData.checkRows && config.checkRows) {
-        config.checkRows.forEach(function(cr, idx) {
-          if (formData.checkRows[idx] !== undefined) {
-            var rowIdx = cr.row - 1;
-            if (!rawData[rowIdx]) rawData[rowIdx] = [];
-            rawData[rowIdx][0] = formData.checkRows[idx];
-          }
-        });
-      }
+ if (formData.checkRows && config.checkRows) {
+ config.checkRows.forEach(function(cr, idx) {
+ if (formData.checkRows[idx] !== undefined) {
+ var rowIdx = cr.row - 1;
+ if (!rawData[rowIdx]) rawData[rowIdx] = [];
+ var writeCol = cr.valueCol ? (cr.valueCol - 1) : 0;
+ rawData[rowIdx][writeCol] = formData.checkRows[idx];
+ }
+ });
+ }
 
       if (formData.generalObservations !== undefined && config.generalObservations) {
         var obsRowIdx = config.generalObservations.row - 1;
@@ -574,24 +612,24 @@ async function writeInspeccionHeader(companyRoot, type, headerData) {
       var ws = workbook.getWorksheet(config.sheetName || 1);
       if (!ws) return { success: false, error: { code: "SHEET_NOT_FOUND", message: "Hoja no encontrada" } };
 
-      config.headerFields.forEach(function(hf) {
-        if (headerData[hf.key] !== undefined) {
-          ws.getCell(hf.row, hf.col).value = headerData[hf.key];
-        }
-      });
+ config.headerFields.forEach(function(hf) {
+ if (headerData[hf.key] !== undefined) {
+ ws.getCell(hf.row, hf.col).value = hf.labelPrefix ? _buildLabelCell(hf.labelPrefix, headerData[hf.key]) : headerData[hf.key];
+ }
+ });
 
-      if (headerData.generalObservations !== undefined && config.generalObservations) {
-        ws.getCell(config.generalObservations.row, config.generalObservations.col).value =
-          "OBSERVACIONES : " + headerData.generalObservations;
-      }
+ if (headerData.generalObservations !== undefined && config.generalObservations) {
+ ws.getCell(config.generalObservations.row, config.generalObservations.col).value =
+ "OBSERVACIONES : " + headerData.generalObservations;
+ }
 
-      if (headerData.signFields && config.signFields) {
-        config.signFields.forEach(function(sf) {
-          if (headerData.signFields[sf.key] !== undefined) {
-            ws.getCell(sf.row, sf.col).value = headerData.signFields[sf.key];
-          }
-        });
-      }
+ if (headerData.signFields && config.signFields) {
+ config.signFields.forEach(function(sf) {
+ if (headerData.signFields[sf.key] !== undefined) {
+ ws.getCell(sf.row, sf.col).value = sf.labelPrefix ? _buildLabelCell(sf.labelPrefix, headerData.signFields[sf.key]) : headerData.signFields[sf.key];
+ }
+ });
+ }
 
       await workbook.xlsx.writeFile(originalPath);
     } else {
@@ -599,35 +637,36 @@ async function writeInspeccionHeader(companyRoot, type, headerData) {
       var rawData = xlsResult.rawData;
       var merges = xlsResult.workbook.Sheets[xlsResult.sheetName]['!merges'] || [];
 
-      config.headerFields.forEach(function(hf) {
-        if (headerData[hf.key] !== undefined) {
-          var rowIdx = hf.row - 1;
-          var colIdx = hf.col - 1;
-          if (!rawData[rowIdx]) rawData[rowIdx] = [];
-          rawData[rowIdx][colIdx] = headerData[hf.key];
-        }
-      });
+ config.headerFields.forEach(function(hf) {
+ if (headerData[hf.key] !== undefined) {
+ var rowIdx = hf.row - 1;
+ var colIdx = hf.col - 1;
+ if (!rawData[rowIdx]) rawData[rowIdx] = [];
+ rawData[rowIdx][colIdx] = hf.labelPrefix ? _buildLabelCell(hf.labelPrefix, headerData[hf.key]) : headerData[hf.key];
+ }
+ });
 
-      if (headerData.signFields && config.signFields) {
-        config.signFields.forEach(function(sf) {
-          if (headerData.signFields[sf.key] !== undefined) {
-            var rowIdx = sf.row - 1;
-            var colIdx = sf.col - 1;
-            if (!rawData[rowIdx]) rawData[rowIdx] = [];
-            rawData[rowIdx][colIdx] = headerData.signFields[sf.key];
-          }
-        });
-      }
+ if (headerData.signFields && config.signFields) {
+ config.signFields.forEach(function(sf) {
+ if (headerData.signFields[sf.key] !== undefined) {
+ var rowIdx = sf.row - 1;
+ var colIdx = sf.col - 1;
+ if (!rawData[rowIdx]) rawData[rowIdx] = [];
+ rawData[rowIdx][colIdx] = sf.labelPrefix ? _buildLabelCell(sf.labelPrefix, headerData.signFields[sf.key]) : headerData.signFields[sf.key];
+ }
+ });
+ }
 
-      if (headerData.checkRows && config.checkRows) {
-        config.checkRows.forEach(function(cr, idx) {
-          if (headerData.checkRows[idx] !== undefined) {
-            var rowIdx = cr.row - 1;
-            if (!rawData[rowIdx]) rawData[rowIdx] = [];
-            rawData[rowIdx][0] = headerData.checkRows[idx];
-          }
-        });
-      }
+ if (headerData.checkRows && config.checkRows) {
+ config.checkRows.forEach(function(cr, idx) {
+ if (headerData.checkRows[idx] !== undefined) {
+ var rowIdx = cr.row - 1;
+ if (!rawData[rowIdx]) rawData[rowIdx] = [];
+ var writeCol = cr.valueCol ? (cr.valueCol - 1) : 0;
+ rawData[rowIdx][writeCol] = headerData.checkRows[idx];
+ }
+ });
+ }
 
       if (headerData.generalObservations !== undefined && config.generalObservations) {
         var obsRowIdx = config.generalObservations.row - 1;
@@ -989,9 +1028,9 @@ function getInspeccionesStats(companyRoot) {
   if (extintoresResult.success && extintoresResult.data.items) {
     totalExt = extintoresResult.data.items.length;
     var currentYear = new Date().getFullYear();
-    vigentes = extintoresResult.data.items.filter(function(item) {
-      var venc = parseInt(item.vencimiento);
-      return !isNaN(venc) && venc >= currentYear;
+ vigentes = extintoresResult.data.items.filter(function(item) {
+ var venc = _extractYear(item.vencimiento);
+ return !isNaN(venc) && venc >= currentYear;
     }).length;
   }
 
