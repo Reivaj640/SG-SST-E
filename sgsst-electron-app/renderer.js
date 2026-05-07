@@ -4237,7 +4237,20 @@ console.error('❌ InspeccionesComponent no encontrado');
 showDevelopmentMessage(submoduleContentDiv, submoduleName);
 }
 
- } else if (submoduleName === "1.1.3 Asignación de Recursos") {
+ } else if (submoduleName === "4.2.5 Mantenimiento periodico de equipos, instalaciones herramientas") {
+createComponentSafely(window.MantenimientoComponent,
+ submoduleContentDiv,
+ currentCompany,
+ moduleName,
+ submoduleName,
+ safeBackToModuleCallback
+);
+if (!window.MantenimientoComponent) {
+ console.error('❌ MantenimientoComponent no encontrado');
+ showDevelopmentMessage(submoduleContentDiv, submoduleName);
+}
+
+} else if (submoduleName === "1.1.3 Asignación de Recursos") {
  showAsignacionRecursosContent(submoduleContentDiv);
 
     } else {

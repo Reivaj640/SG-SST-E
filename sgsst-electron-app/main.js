@@ -28,6 +28,9 @@ const excelBridge = require('./main/excel-bridge');
 // Importar handlers de Inspecciones Sistemáticas (Submódulo 4.2.4)
 const { registerInspeccionesHandlers } = require('./main/inspecciones-bridge');
 
+// Importar handlers de Mantenimiento Periódico (Submódulo 4.2.5)
+const { registerMantenimientoHandlers } = require('./main/mantenimiento-bridge');
+
 // Capturar promesas no manejadas globalmente
 process.on('unhandledRejection', (reason, promise) => {
   const errorMessage = `
@@ -6278,9 +6281,17 @@ registerInspeccionesHandlers(app, { getCompanyRootPath });
 sendLog('[MAIN] Handlers de Inspecciones Sistemáticas (4.2.4) registrados correctamente', 'INFO');
 } catch (err) {
 sendLog(`[MAIN] Error registrando handlers de Inspecciones Sistemáticas: ${err.message}`, 'ERROR');
-}
+ }
 
-  // Registrar handlers de FURAT - Reportes de Accidentes (Submódulo 3.2.1)
+ // Registrar handlers de Mantenimiento Periódico (Submódulo 4.2.5)
+ try {
+  registerMantenimientoHandlers(app, { getCompanyRootPath });
+  sendLog('[MAIN] Handlers de Mantenimiento Periódico (4.2.5) registrados correctamente', 'INFO');
+ } catch (err) {
+  sendLog(`[MAIN] Error registrando handlers de Mantenimiento Periódico: ${err.message}`, 'ERROR');
+ }
+
+ // Registrar handlers de FURAT - Reportes de Accidentes (Submódulo 3.2.1)
   try {
     registerFuratHandlers(app);
     sendLog('[MAIN] Handlers de FURAT (3.2.1) registrados correctamente', 'INFO');

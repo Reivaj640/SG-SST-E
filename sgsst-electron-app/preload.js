@@ -343,8 +343,21 @@ duplicateIndicadoresFile: ({ currentFilePath, newYear }) => ipcRenderer.invoke('
     getFileMetadata: (companyName, filePath) => ipcRenderer.invoke('inspecciones:get-file-metadata', companyName, filePath),
     listInspections: (companyName, filters) => ipcRenderer.invoke('inspecciones:list', companyName, filters),
     getInspection: (companyName, id) => ipcRenderer.invoke('inspecciones:get', companyName, id),
-    deleteInspection: (companyName, id) => ipcRenderer.invoke('inspecciones:delete', companyName, id),
-  },
+ deleteInspection: (companyName, id) => ipcRenderer.invoke('inspecciones:delete', companyName, id),
+ },
+
+ // --- Mantenimiento Periódico (4.2.5) ---
+ mantenimiento: {
+  read: (companyName) => ipcRenderer.invoke('mantenimiento:read', companyName),
+  save: (companyName, items) => ipcRenderer.invoke('mantenimiento:save', companyName, items),
+  toggleMonth: (companyName, rowIndex, month, type, value) => ipcRenderer.invoke('mantenimiento:toggle-month', companyName, rowIndex, month, type, value),
+  updateField: (companyName, rowIndex, field, value) => ipcRenderer.invoke('mantenimiento:update-field', companyName, rowIndex, field, value),
+  addRow: (companyName, itemData) => ipcRenderer.invoke('mantenimiento:add-row', companyName, itemData),
+  saveEvidence: (companyName, evidenceData) => ipcRenderer.invoke('mantenimiento:save-evidence', companyName, evidenceData),
+  readEvidenceFile: (companyName, fileName) => ipcRenderer.invoke('mantenimiento:read-evidence-file', companyName, fileName),
+  deleteEvidence: (companyName, fileName) => ipcRenderer.invoke('mantenimiento:delete-evidence', companyName, fileName),
+  listEvidences: (companyName, rowIndex) => ipcRenderer.invoke('mantenimiento:list-evidences', companyName, rowIndex),
+ },
 
   // --- Eventos IPC ---
   send: (channel, data) => ipcRenderer.send(channel, data),
