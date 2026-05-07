@@ -354,9 +354,9 @@ duplicateIndicadoresFile: ({ currentFilePath, newYear }) => ipcRenderer.invoke('
   updateField: (companyName, rowIndex, field, value) => ipcRenderer.invoke('mantenimiento:update-field', companyName, rowIndex, field, value),
   addRow: (companyName, itemData) => ipcRenderer.invoke('mantenimiento:add-row', companyName, itemData),
   saveEvidence: (companyName, evidenceData) => ipcRenderer.invoke('mantenimiento:save-evidence', companyName, evidenceData),
-  readEvidenceFile: (companyName, fileName) => ipcRenderer.invoke('mantenimiento:read-evidence-file', companyName, fileName),
-  deleteEvidence: (companyName, fileName) => ipcRenderer.invoke('mantenimiento:delete-evidence', companyName, fileName),
-  listEvidences: (companyName, rowIndex) => ipcRenderer.invoke('mantenimiento:list-evidences', companyName, rowIndex),
+  readEvidenceFile: (companyName, relativePath) => ipcRenderer.invoke('mantenimiento:read-evidence-file', companyName, relativePath),
+  deleteEvidence: (companyName, relativePath) => ipcRenderer.invoke('mantenimiento:delete-evidence', companyName, relativePath),
+  listEvidences: (companyName, rowIndex, category, year) => ipcRenderer.invoke('mantenimiento:list-evidences', companyName, rowIndex, category, year),
  },
 
   // --- Eventos IPC ---

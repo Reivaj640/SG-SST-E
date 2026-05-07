@@ -29,9 +29,18 @@ Vista Cronograma — Tabla editable con toggles de meses y evidencias
   return div.innerHTML;
  }
 
+ function _getItemCategory(rowIndex) {
+  if (!_data || !_data.items) return '';
+  var item = _data.items.find(function (i) { return i.rowIndex === rowIndex; });
+  return item ? (item._category || item.item || '') : '';
+ }
+
+ function _getDataYear() {
+  return (_data && _data.header && _data.header.year) || new Date().getFullYear();
+ }
+
  function _formatFileSize(bytes) {
   if (!bytes) return '0 B';
-  if (bytes < 1024) return bytes + ' B';
   if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
   return (bytes / 1048576).toFixed(1) + ' MB';
  }
@@ -339,10 +348,12 @@ Vista Cronograma — Tabla editable con toggles de meses y evidencias
    });
   },
 
-  _preloadEvidenceCounts: function () {
-   if (!_data || !_data.items) return;
-   _data.items.forEach(function (item) {
-    MantenimientoService.listEvidences(this.companyName, item.rowIndex).then(function (result) {
+ _preloadEvidenceCounts: function () {
+  if (!_data || !_data.items) return;
+  var year = _getDataYear();
+  _data.items.forEach(function (item) {
+   var category = item._category || item.item || '';
+   MantenimientoService.listEvidences(this.companyName, item.rowIndex, category, year).then(function (result) {
      if (result.success && result.data) {
       _evidenceCache[item.rowIndex] = result.data.length;
       var btn = document.querySelector('.kair-mnt-evidence-btn[data-row="' + item.rowIndex + '"]');
@@ -441,11 +452,13 @@ Vista Cronograma — Tabla editable con toggles de meses y evidencias
    };
   },
 
-  _loadEvidenceList: function (rowIndex) {
-   var listEl = document.getElementById('kair-mnt-evidence-list');
-   if (!listEl) return;
+ _loadEvidenceList: function (rowIndex) {
+  var listEl = document.getElementById('kair-mnt-evidence-list');
+  if (!listEl) return;
+  var category = _getItemCategory(rowIndex);
+  var year = _getDataYear();
 
-   MantenimientoService.listEvidences(this.companyName, rowIndex).then(function (result) {
+  MantenimientoService.listEvidences(this.companyName, rowIndex, category, year).then(function (result) {
     if (!result.success || !result.data || result.data.length === 0) {
      listEl.innerHTML = '<div class="kair-mnt-empty-state" style="padding:1rem"><i class="bi bi-inbox"></i><p>Sin evidencias registradas</p></div>';
      return;
@@ -484,44 +497,48 @@ Vista Cronograma — Tabla editable con toggles de meses y evidencias
    });
   },
 
-  _bindEvidenceListEvents: function (listEl, rowIndex) {
-   var self = this;
+ _bindEvidenceListEvents: function (listEl, rowIndex) {
+  var self = this;
 
-   listEl.querySelectorAll('[data-preview]').forEach(function (el) {
-    el.addEventListener('click', function () {
-     var fileName = el.getAttribute('data-preview');
-     self._previewImage(fileName);
-    });
+  listEl.querySelectorAll('[data-preview]').forEach(function (el) {
+   el.addEventListener('click', function () {
+    var relativePath = el.getAttribute('data-preview');
+    self._previewImage(relativePath);
    });
+  });
 
-   listEl.querySelectorAll('[data-delete]').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-     var fileName = btn.getAttribute('data-delete');
-     if (confirm('¿Eliminar esta evidencia?')) {
-      self._deleteEvidence(rowIndex, fileName);
-     }
-    });
-   });
-  },
-
-  _handleFileUpload: function (rowIndex, files) {
-   var self = this;
-   var maxBytes = 10 * 1024 * 1024;
-
-   Array.from(files).forEach(function (file) {
-    if (file.size > maxBytes) {
-     MantenimientoService.toast('Archivo ' + file.name + ' excede 10 MB', 'error');
-     return;
+  listEl.querySelectorAll('[data-delete]').forEach(function (btn) {
+   btn.addEventListener('click', function () {
+    var relativePath = btn.getAttribute('data-delete');
+    if (confirm('\u00bfEliminar esta evidencia?')) {
+     self._deleteEvidence(rowIndex, relativePath);
     }
+   });
+  });
+ },
 
-    var reader = new FileReader();
-    reader.onload = function () {
-     var buffer = reader.result.split(',')[1];
-     var evidenceData = {
-      itemRowIndex: rowIndex,
-      fileName: file.name,
-      buffer: buffer
-     };
+ _handleFileUpload: function (rowIndex, files) {
+  var self = this;
+  var maxBytes = 10 * 1024 * 1024;
+  var category = _getItemCategory(rowIndex);
+  var year = _getDataYear();
+
+  Array.from(files).forEach(function (file) {
+   if (file.size > maxBytes) {
+    MantenimientoService.toast('Archivo ' + file.name + ' excede 10 MB', 'error');
+    return;
+   }
+
+   var reader = new FileReader();
+   reader.onload = function () {
+    var buffer = reader.result.split(',')[1];
+    var evidenceData = {
+     itemRowIndex: rowIndex,
+     fileName: file.name,
+     buffer: buffer,
+     category: category,
+     year: year
+    };
 
      MantenimientoService.saveEvidence(self.companyName, evidenceData).then(function (result) {
       if (result.success) {
@@ -540,10 +557,10 @@ Vista Cronograma — Tabla editable con toggles de meses y evidencias
    });
   },
 
-  _deleteEvidence: function (rowIndex, fileName) {
-   var self = this;
+ _deleteEvidence: function (rowIndex, relativePath) {
+  var self = this;
 
-   MantenimientoService.deleteEvidence(this.companyName, fileName).then(function (result) {
+  MantenimientoService.deleteEvidence(this.companyName, relativePath).then(function (result) {
     if (result.success) {
      MantenimientoService.toast('Evidencia eliminada', 'success');
      _evidenceCache[rowIndex] = Math.max(0, (_evidenceCache[rowIndex] || 1) - 1);
@@ -579,15 +596,15 @@ Vista Cronograma — Tabla editable con toggles de meses y evidencias
    }
   },
 
-  _previewImage: function (fileName) {
-   var viewer = document.getElementById('kair-mnt-image-viewer');
-   var viewerImg = document.getElementById('kair-mnt-image-viewer-img');
-   if (!viewer || !viewerImg) return;
+ _previewImage: function (relativePath) {
+  var viewer = document.getElementById('kair-mnt-image-viewer');
+  var viewerImg = document.getElementById('kair-mnt-image-viewer-img');
+  if (!viewer || !viewerImg) return;
 
-   viewerImg.src = '';
-   viewer.classList.add('visible');
+  viewerImg.src = '';
+  viewer.classList.add('visible');
 
-   MantenimientoService.readEvidenceFile(this.companyName, fileName).then(function (result) {
+  MantenimientoService.readEvidenceFile(this.companyName, relativePath).then(function (result) {
     if (result.success && result.data) {
      viewerImg.src = 'data:' + result.data.mimeType + ';base64,' + result.data.buffer;
     } else {

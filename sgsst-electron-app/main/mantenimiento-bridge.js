@@ -104,15 +104,31 @@ function _createBackup(filePath) {
  } catch (e) { return null; }
 }
 
-function _getEvidenceDir(companyRoot) {
- var dir = _getCompanyMantenimientoDir(companyRoot);
- if (!dir) return null;
- var evidenceDir = path.join(dir, 'evidencias');
- if (!fs.existsSync(evidenceDir)) {
-  try { fs.mkdirSync(evidenceDir, { recursive: true }); } catch (e) { return null; }
- }
- return evidenceDir;
+function _sanitizeFolderName(name) {
+ return name.replace(/[<>:"/\\|?*]/g, '_').trim().substring(0, 80) || 'SIN_CATEGORIA';
 }
+
+function _getEvidenceSubdir(companyRoot, category, year) {
+ var base = _getCompanyMantenimientoDir(companyRoot);
+ if (!base) return null;
+ var yearStr = String(year || new Date().getFullYear());
+ var safeCat = _sanitizeFolderName(category || 'SIN_CATEGORIA');
+ var dir = path.join(base, 'evidencias', yearStr, safeCat);
+ if (!fs.existsSync(dir)) {
+  try { fs.mkdirSync(dir, { recursive: true }); } catch (e) { return null; }
+ }
+ return dir;
+}
+
+function _getEvidenceBaseDir(companyRoot) {
+ var base = _getCompanyMantenimientoDir(companyRoot);
+ if (!base) return null;
+ var dir = path.join(base, 'evidencias');
+ if (!fs.existsSync(dir)) {
+  try { fs.mkdirSync(dir, { recursive: true }); } catch (e) { return null; }
+ }
+ return dir;
+ }
 
 function _safeStr(v) {
  if (v === null || v === undefined) return '';
@@ -496,7 +512,9 @@ function _addRow(companyRoot, itemData) {
 }
 
 function _saveEvidence(companyRoot, evidenceData) {
- var evidenceDir = _getEvidenceDir(companyRoot);
+ var category = evidenceData.category || 'SIN_CATEGORIA';
+ var year = evidenceData.year || new Date().getFullYear();
+ var evidenceDir = _getEvidenceSubdir(companyRoot, category, year);
  if (!evidenceDir) {
   return { success: false, error: { code: 'DIR_ERROR', message: 'No se pudo crear directorio de evidencias' } };
  }
@@ -507,12 +525,15 @@ function _saveEvidence(companyRoot, evidenceData) {
   var ts = Date.now();
   var rand = crypto.randomBytes(4).toString('hex');
   var ext = path.extname(fileName) || '';
-  var base = path.basename(fileName, ext).substring(0, 40);
   var safeName = 'row' + rowIndex + '_' + ts + '_' + rand + ext;
   var filePath = path.join(evidenceDir, safeName);
 
   var buffer = Buffer.from(evidenceData.buffer, 'base64');
   fs.writeFileSync(filePath, buffer);
+
+  var yearStr = String(year);
+  var safeCat = _sanitizeFolderName(category);
+  var relativePath = yearStr + '/' + safeCat + '/' + safeName;
 
   return {
    success: true,
@@ -520,7 +541,7 @@ function _saveEvidence(companyRoot, evidenceData) {
     id: ts + '_' + rand,
     itemRowIndex: rowIndex,
     fileName: fileName,
-    filePath: safeName,
+    filePath: relativePath,
     fileSize: buffer.length,
     createdAt: new Date().toISOString()
    }
@@ -530,21 +551,26 @@ function _saveEvidence(companyRoot, evidenceData) {
  }
 }
 
-function _readEvidenceFile(companyRoot, fileName) {
- var evidenceDir = _getEvidenceDir(companyRoot);
- if (!evidenceDir) {
-  return { success: false, error: { code: 'DIR_ERROR', message: 'Directorio de evidencias no encontrado' } };
- }
+function _resolveEvidencePath(companyRoot, relativePath) {
+ var baseDir = _getEvidenceBaseDir(companyRoot);
+ if (!baseDir) return null;
+ var parts = relativePath.split('/').map(function(p) { return path.basename(p); });
+ var resolved = path.join.apply(null, [baseDir].concat(parts));
+ if (resolved.indexOf(baseDir) !== 0) return null;
+ if (fs.existsSync(resolved)) return resolved;
+ var flatPath = path.join(baseDir, path.basename(relativePath));
+ if (fs.existsSync(flatPath)) return flatPath;
+ return null;
+}
 
- var safeName = path.basename(fileName);
- var filePath = path.join(evidenceDir, safeName);
-
- if (!fs.existsSync(filePath)) {
+function _readEvidenceFile(companyRoot, relativePath) {
+ var resolved = _resolveEvidencePath(companyRoot, relativePath);
+ if (!resolved) {
   return { success: false, error: { code: 'FILE_NOT_FOUND', message: 'Archivo de evidencia no encontrado' } };
  }
-
  try {
-  var buffer = fs.readFileSync(filePath);
+  var buffer = fs.readFileSync(resolved);
+  var safeName = path.basename(resolved);
   var ext = path.extname(safeName).toLowerCase();
   var mimeType = 'application/octet-stream';
   if (ext === '.png') mimeType = 'image/png';
@@ -553,7 +579,6 @@ function _readEvidenceFile(companyRoot, fileName) {
   else if (ext === '.pdf') mimeType = 'application/pdf';
   else if (ext === '.doc' || ext === '.docx') mimeType = 'application/msword';
   else if (ext === '.xls' || ext === '.xlsx') mimeType = 'application/vnd.ms-excel';
-
   return {
    success: true,
    data: {
@@ -567,58 +592,93 @@ function _readEvidenceFile(companyRoot, fileName) {
  }
 }
 
-function _deleteEvidence(companyRoot, fileName) {
- var evidenceDir = _getEvidenceDir(companyRoot);
- if (!evidenceDir) {
-  return { success: false, error: { code: 'DIR_ERROR', message: 'Directorio de evidencias no encontrado' } };
+function _deleteEvidence(companyRoot, relativePath) {
+ var resolved = _resolveEvidencePath(companyRoot, relativePath);
+ if (!resolved) {
+  return { success: false, error: { code: 'FILE_NOT_FOUND', message: 'Archivo de evidencia no encontrado' } };
  }
-
- var safeName = path.basename(fileName);
- var filePath = path.join(evidenceDir, safeName);
-
  try {
-  if (fs.existsSync(filePath)) {
-   fs.unlinkSync(filePath);
-  }
+  fs.unlinkSync(resolved);
   return { success: true, data: { message: 'Evidencia eliminada' } };
  } catch (e) {
   return { success: false, error: { code: 'DELETE_ERROR', message: e.message } };
  }
 }
 
-function _listEvidences(companyRoot, rowIndex) {
- var evidenceDir = _getEvidenceDir(companyRoot);
- if (!evidenceDir || !fs.existsSync(evidenceDir)) {
+function _listEvidences(companyRoot, rowIndex, category, year) {
+ var baseDir = _getEvidenceBaseDir(companyRoot);
+ if (!baseDir || !fs.existsSync(baseDir)) {
   return { success: true, data: [] };
  }
-
  try {
-  var prefix = 'row' + (rowIndex !== undefined ? rowIndex : '') + '_';
-  var entries = fs.readdirSync(evidenceDir);
   var result = [];
+  var yearStr = String(year || new Date().getFullYear());
+  var safeCat = _sanitizeFolderName(category || '');
+  var subdir = path.join(baseDir, yearStr, safeCat);
+  if (category && year && fs.existsSync(subdir)) {
+   _scanEvidenceDir(subdir, rowIndex, yearStr + '/' + safeCat + '/', result);
+  } else if (category && year) {
+   var legacyDir = path.join(baseDir, yearStr);
+   if (fs.existsSync(legacyDir)) {
+    _scanEvidenceDir(legacyDir, rowIndex, yearStr + '/', result);
+   }
+   _scanEvidenceDir(baseDir, rowIndex, '', result);
+  } else {
+   _scanEvidenceTree(baseDir, rowIndex, '', result);
+  }
+  result.sort(function(a, b) { return b.createdAt.localeCompare(a.createdAt); });
+  return { success: true, data: result };
+ } catch (e) {
+  return { success: false, error: { code: 'LIST_ERROR', message: e.message } };
+ }
+}
 
+function _scanEvidenceDir(dir, rowIndex, pathPrefix, result) {
+ if (!fs.existsSync(dir)) return;
+ try {
+  var entries = fs.readdirSync(dir);
+  var prefix = rowIndex !== undefined && rowIndex !== null ? 'row' + rowIndex + '_' : null;
   entries.forEach(function(entry) {
-   if (rowIndex !== undefined && rowIndex !== null && !entry.startsWith(prefix)) return;
-   var fp = path.join(evidenceDir, entry);
+   var fp = path.join(dir, entry);
    try {
     var stat = fs.statSync(fp);
     if (stat.isFile()) {
+     if (prefix && !entry.startsWith(prefix)) return;
      result.push({
       fileName: entry,
-      filePath: entry,
+      filePath: pathPrefix + entry,
       fileSize: stat.size,
       createdAt: stat.mtime.toISOString()
      });
     }
    } catch (e) {}
   });
+ } catch (e) {}
+}
 
-  result.sort(function(a, b) { return b.createdAt.localeCompare(a.createdAt); });
-
-  return { success: true, data: result };
- } catch (e) {
-  return { success: false, error: { code: 'LIST_ERROR', message: e.message } };
- }
+function _scanEvidenceTree(dir, rowIndex, pathPrefix, result) {
+ if (!fs.existsSync(dir)) return;
+ try {
+  var entries = fs.readdirSync(dir);
+  var prefix = rowIndex !== undefined && rowIndex !== null ? 'row' + rowIndex + '_' : null;
+  entries.forEach(function(entry) {
+   var fp = path.join(dir, entry);
+   try {
+    var stat = fs.statSync(fp);
+    if (stat.isFile()) {
+     if (prefix && !entry.startsWith(prefix)) return;
+     result.push({
+      fileName: entry,
+      filePath: pathPrefix + entry,
+      fileSize: stat.size,
+      createdAt: stat.mtime.toISOString()
+     });
+    } else if (stat.isDirectory()) {
+     _scanEvidenceTree(fp, rowIndex, pathPrefix + entry + '/', result);
+    }
+   } catch (e) {}
+  });
+ } catch (e) {}
 }
 
 function registerMantenimientoHandlers(app, deps) {
@@ -687,31 +747,31 @@ function registerMantenimientoHandlers(app, deps) {
   }
  });
 
- ipcMain.handle('mantenimiento:read-evidence-file', async function(_e, companyName, fileName) {
+ ipcMain.handle('mantenimiento:read-evidence-file', async function(_e, companyName, relativePath) {
   try {
    var companyRoot = _getCompanyRootPath ? await _getCompanyRootPath(companyName) : null;
    if (!companyRoot) return { success: false, error: { code: 'COMPANY_NOT_FOUND', message: 'Empresa no encontrada' } };
-   return _readEvidenceFile(companyRoot, fileName);
+   return _readEvidenceFile(companyRoot, relativePath);
   } catch (e) {
    return { success: false, error: { code: 'READ_ERROR', message: e.message } };
   }
  });
 
- ipcMain.handle('mantenimiento:delete-evidence', async function(_e, companyName, fileName) {
+ ipcMain.handle('mantenimiento:delete-evidence', async function(_e, companyName, relativePath) {
   try {
    var companyRoot = _getCompanyRootPath ? await _getCompanyRootPath(companyName) : null;
    if (!companyRoot) return { success: false, error: { code: 'COMPANY_NOT_FOUND', message: 'Empresa no encontrada' } };
-   return _deleteEvidence(companyRoot, fileName);
+   return _deleteEvidence(companyRoot, relativePath);
   } catch (e) {
    return { success: false, error: { code: 'DELETE_ERROR', message: e.message } };
   }
  });
 
- ipcMain.handle('mantenimiento:list-evidences', async function(_e, companyName, rowIndex) {
+ ipcMain.handle('mantenimiento:list-evidences', async function(_e, companyName, rowIndex, category, year) {
   try {
    var companyRoot = _getCompanyRootPath ? await _getCompanyRootPath(companyName) : null;
    if (!companyRoot) return { success: false, error: { code: 'COMPANY_NOT_FOUND', message: 'Empresa no encontrada' } };
-   return _listEvidences(companyRoot, rowIndex);
+   return _listEvidences(companyRoot, rowIndex, category, year);
   } catch (e) {
    return { success: false, error: { code: 'LIST_ERROR', message: e.message } };
   }

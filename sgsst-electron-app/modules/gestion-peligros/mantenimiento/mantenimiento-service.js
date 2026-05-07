@@ -91,23 +91,23 @@ Service — Capa de acceso a datos vía IPC
    return Promise.resolve({ success: true, data: { id: 'mock', itemRowIndex: evidenceData.itemRowIndex, fileName: evidenceData.fileName, filePath: 'mock', fileSize: 0, createdAt: new Date().toISOString() } });
   },
 
-  readEvidenceFile: function (companyName, fileName) {
+  readEvidenceFile: function (companyName, relativePath) {
    if (_hasElectronAPI()) {
-    return window.electronAPI.mantenimiento.readEvidenceFile(companyName, fileName);
+    return window.electronAPI.mantenimiento.readEvidenceFile(companyName, relativePath);
    }
-   return Promise.resolve({ success: true, data: { buffer: '', fileName: fileName, mimeType: 'image/png' } });
+   return Promise.resolve({ success: true, data: { buffer: '', fileName: relativePath, mimeType: 'image/png' } });
   },
 
-  deleteEvidence: function (companyName, fileName) {
+  deleteEvidence: function (companyName, relativePath) {
    if (_hasElectronAPI()) {
-    return window.electronAPI.mantenimiento.deleteEvidence(companyName, fileName);
+    return window.electronAPI.mantenimiento.deleteEvidence(companyName, relativePath);
    }
    return Promise.resolve({ success: true, data: { message: 'Deleted mock' } });
   },
 
-  listEvidences: function (companyName, rowIndex) {
+  listEvidences: function (companyName, rowIndex, category, year) {
    if (_hasElectronAPI()) {
-    return window.electronAPI.mantenimiento.listEvidences(companyName, rowIndex);
+    return window.electronAPI.mantenimiento.listEvidences(companyName, rowIndex, category, year);
    }
    return Promise.resolve({ success: true, data: [] });
   },
