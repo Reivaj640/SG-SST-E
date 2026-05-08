@@ -147,6 +147,43 @@ var InspeccionesService = {
     });
   },
 
+  createInspection: function (companyName, type, month, year) {
+    if (_hasElectronAPI()) {
+      return window.electronAPI.inspecciones.createInspection(companyName, type, month, year);
+    }
+    return Promise.resolve({
+      success: false,
+      error: { code: 'NO_API', message: 'electronAPI no disponible.' }
+    });
+  },
+
+  listFilesByType: function (companyName, type) {
+    if (_hasElectronAPI()) {
+      return window.electronAPI.inspecciones.listFilesByType(companyName, type);
+    }
+    return Promise.resolve({ success: true, data: { files: [], type: type } });
+  },
+
+  readExcelByPath: function (companyName, type, filePath) {
+    if (_hasElectronAPI()) {
+      return window.electronAPI.inspecciones.readExcelByPath(companyName, type, filePath);
+    }
+    return Promise.resolve({
+      success: false,
+      error: { code: 'NO_API', message: 'electronAPI no disponible.' }
+    });
+  },
+
+  writeExcelByPath: function (companyName, type, formData, filePath) {
+    if (_hasElectronAPI()) {
+      return window.electronAPI.inspecciones.writeExcelByPath(companyName, type, formData, filePath);
+    }
+    return Promise.resolve({
+      success: false,
+      error: { code: 'NO_API', message: 'electronAPI no disponible.' }
+    });
+  },
+
   getTypeLabel: function (code) {
     var t = INSPECTION_TYPES.find(function (tp) { return tp.code === code; });
     return t ? t.name : code;

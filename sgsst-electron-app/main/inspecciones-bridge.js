@@ -14,11 +14,12 @@ function _serializedWrite(filePath, writeFn) {
 }
 
 const INSPECTION_TEMPLATES = {
-  EXTINTOR: {
-    code: "GI-FO-026",
-    name: "Inspección de Extintores",
-    ext: ".xlsx",
-    sheetName: "Extintores",
+EXTINTOR: {
+  code: "GI-FO-026",
+  name: "Inspección de Extintores",
+  ext: ".xlsx",
+  templateFile: "GI-FO-026 INSPECCION DE EXTINTORES.xlsx",
+  sheetName: "Extintores",
     headerFields: [
       { key: "fecha", label: "Fecha de realización", row: 7, col: 2 },
       { key: "inspector", label: "Realizada por", row: 8, col: 3 },
@@ -44,11 +45,12 @@ const INSPECTION_TEMPLATES = {
     },
     colIndexes: { A:1, B:2, C:3, D:4, E:5, F:6, G:7, H:8, I:9, J:10, K:11, L:12 }
   },
-  INSTALACION: {
-    code: "GI-FO-025",
-    name: "Inspección de Instalaciones",
-    ext: ".xls",
-    sheetName: "OFICINA",
+INSTALACION: {
+  code: "GI-FO-025",
+  name: "Inspección de Instalaciones",
+  ext: ".xls",
+  templateFile: "GI-FO-025 INSPECCION DE INSTALACIONES.xls",
+  sheetName: "OFICINA",
  headerFields: [
  { key: "fecha", label: "Fecha", row: 6, col: 1, labelPrefix: "FECHA:" },
  { key: "lugar", label: "Lugar", row: 6, col: 6, labelPrefix: "LUGAR :" }
@@ -77,11 +79,12 @@ const INSPECTION_TEMPLATES = {
     },
     colIndexes: { A:1, C:3, D:4, E:5, F:6, G:7, H:8, I:9 }
   },
-  EMERGENCIA: {
-    code: "GI-FO-023",
-    name: "Inspección Equipos de Emergencia",
-    ext: ".xls",
-    sheetName: "E EMERGENCIA",
+EMERGENCIA: {
+  code: "GI-FO-023",
+  name: "Inspección Equipos de Emergencia",
+  ext: ".xls",
+  templateFile: "GI-FO-023 INSPECCION DE EQUIPOS DE EMERGENCIA.xls",
+  sheetName: "E EMERGENCIA",
  headerFields: [
  { key: "fecha", label: "Fecha", row: 6, col: 1, labelPrefix: "FECHA:" },
  { key: "sitio", label: "Sitio de Inspección", row: 7, col: 1, labelPrefix: "SITIO DE INSPECCION:" }
@@ -99,11 +102,12 @@ const INSPECTION_TEMPLATES = {
     },
     colIndexes: { A:1, B:2, C:3, D:4, E:5, F:6, G:7 }
   },
-  BOTIQUIN: {
-    code: "GI-FO-031",
-    name: "Inspección de Botiquín",
-    ext: ".xls",
-    sheetName: "INSUMOS BASICOS PARA BOTIQUIN",
+BOTIQUIN: {
+  code: "GI-FO-031",
+  name: "Inspección de Botiquín",
+  ext: ".xls",
+  templateFile: "GI-FO-031 INSPECCION DE BOTIQUIN DE PRIMEROS AUXILIOS.xls",
+  sheetName: "INSUMOS BASICOS PARA BOTIQUIN",
  headerFields: [
  { key: "fecha", label: "Fecha", row: 6, col: 1, labelPrefix: "FECHA:" },
  { key: "realizadoPor", label: "Realizado por", row: 6, col: 5, labelPrefix: "REALIZADO POR:" }
@@ -295,20 +299,100 @@ function _convertXlsToXlsx(xlsPath) {
   }
 }
 
-function readInspeccionExcel(companyRoot, type) {
+function createInspeccionFile(companyRoot, type, month, year) {
   var dir = _getCompanyInspeccionesDir(companyRoot);
+  var config = INSPECTION_TEMPLATES[type];
+  if (!config) return { success: false, error: { code: "UNKNOWN_TYPE", message: "Tipo de inspección desconocido: " + type } };
+  if (!config.templateFile) return { success: false, error: { code: "NO_TEMPLATE", message: "No hay archivo plantilla definido para " + config.name } };
+
+  var templateSrc = path.join(__dirname, '..', 'utils', config.templateFile);
+  if (!fs.existsSync(templateSrc)) return { success: false, error: { code: "TEMPLATE_NOT_FOUND", message: "Plantilla no encontrada: " + config.templateFile } };
+
   if (!fs.existsSync(dir)) {
-    return { success: false, error: { code: "DIR_NOT_FOUND", message: "No se encontró la carpeta 4.2.4 para la empresa" } };
+    try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {
+      return { success: false, error: { code: "DIR_CREATE_ERROR", message: "No se pudo crear la carpeta de inspecciones" } };
+    }
   }
+
+  var newFileName = config.code + ' ' + month + '-' + year + '.xlsx';
+  var destPath = path.join(dir, newFileName);
+
+  if (fs.existsSync(destPath)) {
+    return { success: true, data: { filePath: destPath, alreadyExists: true, type: type, month: month, year: year } };
+  }
+
+  try {
+    fs.copyFileSync(templateSrc, destPath);
+  } catch (e) {
+    return { success: false, error: { code: "COPY_ERROR", message: "Error copiando plantilla: " + e.message } };
+  }
+
+  if (destPath.toLowerCase().endsWith('.xls') && !destPath.toLowerCase().endsWith('.xlsx')) {
+    var converted = _convertXlsToXlsx(destPath);
+    if (!converted) {
+      try { fs.unlinkSync(destPath); } catch (e2) {}
+      return { success: false, error: { code: "CONVERT_ERROR", message: "No se pudo convertir .xls a .xlsx" } };
+    }
+    destPath = converted;
+  }
+
+  return { success: true, data: { filePath: destPath, alreadyExists: false, type: type, month: month, year: year } };
+}
+
+function listInspeccionFilesByType(companyRoot, type) {
+  var dir = _getCompanyInspeccionesDir(companyRoot);
+  var config = INSPECTION_TEMPLATES[type];
+  if (!config) return { success: true, data: { files: [], type: type } };
+  if (!fs.existsSync(dir)) return { success: true, data: { files: [], type: type } };
+
+  try {
+    var entries = fs.readdirSync(dir);
+    var files = entries.filter(function(f) {
+      var lower = f.toLowerCase();
+      return (lower.endsWith('.xlsx') || lower.endsWith('.xls'))
+        && f.toUpperCase().indexOf(config.code.toUpperCase()) !== -1;
+    }).map(function(f) {
+      var fullPath = path.join(dir, f);
+      var stats = fs.statSync(fullPath);
+      var periodMatch = f.match(/(\d{1,2})-(\d{4})/);
+      var m = periodMatch ? parseInt(periodMatch[1], 10) : null;
+      var y = periodMatch ? parseInt(periodMatch[2], 10) : null;
+      return {
+        name: f,
+        path: fullPath,
+        month: m,
+        year: y,
+        periodLabel: m && y ? MONTHS[m - 1] + ' ' + y : (y ? String(y) : 'Sin periodo'),
+        modified: stats.mtime.toISOString(),
+        size: stats.size
+      };
+    }).sort(function(a, b) {
+      if (a.year !== b.year) return (b.year || 0) - (a.year || 0);
+      return (b.month || 0) - (a.month || 0);
+    });
+
+    return { success: true, data: { files: files, type: type } };
+  } catch (e) {
+    return { success: false, error: { code: "READ_ERROR", message: "Error listando archivos: " + e.message } };
+  }
+}
+
+function readInspeccionExcel(companyRoot, type, filePath) {
+  var dir = _getCompanyInspeccionesDir(companyRoot);
 
   var config = INSPECTION_TEMPLATES[type];
   if (!config) {
     return { success: false, error: { code: "UNKNOWN_TYPE", message: "Tipo de inspección desconocido: " + type } };
   }
 
-  var filePath = _findExcelFileDeep(dir, config.code);
-  if (!filePath) filePath = _findExcelFileDeep(dir, type);
   if (!filePath) {
+    if (!fs.existsSync(dir)) {
+      return { success: false, error: { code: "DIR_NOT_FOUND", message: "No se encontró la carpeta 4.2.4 para la empresa" } };
+    }
+    filePath = _findExcelFileDeep(dir, config.code);
+    if (!filePath) filePath = _findExcelFileDeep(dir, type);
+  }
+  if (!filePath || !fs.existsSync(filePath)) {
     return { success: false, error: { code: "FILE_NOT_FOUND", message: "No se encontró el archivo Excel para " + config.name + " en " + dir } };
   }
 
@@ -510,12 +594,15 @@ function readInspeccionExcel(companyRoot, type) {
   }
 }
 
-async function writeInspeccionExcel(companyRoot, type, formData) {
+async function writeInspeccionExcel(companyRoot, type, formData, filePath) {
   var dir = _getCompanyInspeccionesDir(companyRoot);
   var config = INSPECTION_TEMPLATES[type];
   if (!config) return { success: false, error: { code: "UNKNOWN_TYPE", message: "Tipo desconocido: " + type } };
 
-  var originalPath = _findExcelFileDeep(dir, config.code) || _findExcelFileDeep(dir, type);
+  var originalPath = filePath;
+  if (!originalPath) {
+    originalPath = _findExcelFileDeep(dir, config.code) || _findExcelFileDeep(dir, type);
+  }
   if (!originalPath) return { success: false, error: { code: "FILE_NOT_FOUND", message: "Archivo Excel no encontrado para escritura" } };
 
   if (originalPath.toLowerCase().endsWith('.xls') && !originalPath.toLowerCase().endsWith('.xlsx')) {
@@ -525,9 +612,10 @@ async function writeInspeccionExcel(companyRoot, type, formData) {
   }
 
   var capturedPath = originalPath;
+  var capturedDir = dir;
   var capturedConfig = config;
   return _serializedWrite(originalPath, function() {
-    return _doWriteInspeccionExcel(capturedPath, dir, capturedConfig, formData);
+    return _doWriteInspeccionExcel(capturedPath, capturedDir, capturedConfig, formData);
   });
 }
 
@@ -603,12 +691,15 @@ async function _doWriteInspeccionExcel(filePath, dir, config, formData) {
   }
 }
 
-async function writeInspeccionHeader(companyRoot, type, headerData) {
+async function writeInspeccionHeader(companyRoot, type, headerData, filePath) {
   var dir = _getCompanyInspeccionesDir(companyRoot);
   var config = INSPECTION_TEMPLATES[type];
   if (!config) return { success: false, error: { code: "UNKNOWN_TYPE", message: "Tipo desconocido: " + type } };
 
-  var originalPath = _findExcelFileDeep(dir, config.code) || _findExcelFileDeep(dir, type);
+  var originalPath = filePath;
+  if (!originalPath) {
+    originalPath = _findExcelFileDeep(dir, config.code) || _findExcelFileDeep(dir, type);
+  }
   if (!originalPath) return { success: false, error: { code: "FILE_NOT_FOUND", message: "Archivo Excel no encontrado" } };
 
   if (originalPath.toLowerCase().endsWith('.xls') && !originalPath.toLowerCase().endsWith('.xlsx')) {
@@ -618,9 +709,10 @@ async function writeInspeccionHeader(companyRoot, type, headerData) {
   }
 
   var capturedPath = originalPath;
+  var capturedDir = dir;
   var capturedConfig = config;
   return _serializedWrite(originalPath, function() {
-    return _doWriteInspeccionHeader(capturedPath, dir, capturedConfig, headerData);
+    return _doWriteInspeccionHeader(capturedPath, capturedDir, capturedConfig, headerData);
   });
 }
 
@@ -1266,6 +1358,50 @@ function registerInspeccionesHandlers(app, deps) {
       return { success: true, data: { deleted: true, id: id } };
     } catch (e) {
       console.error("[4.2.4] Error en delete:", e);
+      return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
+    }
+  });
+
+  ipcMain.handle("inspecciones:create", async function(event, companyName, type, month, year) {
+    try {
+      var companyRoot = await getCompanyRootPath(companyName);
+      if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
+      return createInspeccionFile(companyRoot, type, month, year);
+    } catch (e) {
+      console.error("[4.2.4] Error en create:", e);
+      return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
+    }
+  });
+
+  ipcMain.handle("inspecciones:list-by-type", async function(event, companyName, type) {
+    try {
+      var companyRoot = await getCompanyRootPath(companyName);
+      if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
+      return listInspeccionFilesByType(companyRoot, type);
+    } catch (e) {
+      console.error("[4.2.4] Error en list-by-type:", e);
+      return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
+    }
+  });
+
+  ipcMain.handle("inspecciones:read-by-path", async function(event, companyName, type, filePath) {
+    try {
+      var companyRoot = await getCompanyRootPath(companyName);
+      if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
+      return readInspeccionExcel(companyRoot, type, filePath);
+    } catch (e) {
+      console.error("[4.2.4] Error en read-by-path:", e);
+      return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
+    }
+  });
+
+  ipcMain.handle("inspecciones:write-by-path", async function(event, companyName, type, formData, filePath) {
+    try {
+      var companyRoot = await getCompanyRootPath(companyName);
+      if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
+      return await writeInspeccionExcel(companyRoot, type, formData, filePath);
+    } catch (e) {
+      console.error("[4.2.4] Error en write-by-path:", e);
       return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
     }
   });

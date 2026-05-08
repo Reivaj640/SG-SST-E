@@ -343,8 +343,12 @@ duplicateIndicadoresFile: ({ currentFilePath, newYear }) => ipcRenderer.invoke('
     getFileMetadata: (companyName, filePath) => ipcRenderer.invoke('inspecciones:get-file-metadata', companyName, filePath),
     listInspections: (companyName, filters) => ipcRenderer.invoke('inspecciones:list', companyName, filters),
     getInspection: (companyName, id) => ipcRenderer.invoke('inspecciones:get', companyName, id),
- deleteInspection: (companyName, id) => ipcRenderer.invoke('inspecciones:delete', companyName, id),
- },
+    deleteInspection: (companyName, id) => ipcRenderer.invoke('inspecciones:delete', companyName, id),
+    createInspection: (companyName, type, month, year) => ipcRenderer.invoke('inspecciones:create', companyName, type, month, year),
+    listFilesByType: (companyName, type) => ipcRenderer.invoke('inspecciones:list-by-type', companyName, type),
+    readExcelByPath: (companyName, type, filePath) => ipcRenderer.invoke('inspecciones:read-by-path', companyName, type, filePath),
+    writeExcelByPath: (companyName, type, formData, filePath) => ipcRenderer.invoke('inspecciones:write-by-path', companyName, type, formData, filePath),
+  },
 
  // --- Mantenimiento Periódico (4.2.5) ---
  mantenimiento: {

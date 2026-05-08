@@ -168,7 +168,7 @@ var HistorialInsp = {
       btn.addEventListener('click', function () {
         var filePath = btn.getAttribute('data-path');
         var type = btn.getAttribute('data-type');
-        self.openInFormulario(type);
+        self.openInFormulario(type, filePath);
       });
     });
 
@@ -180,9 +180,9 @@ var HistorialInsp = {
     });
   },
 
-  openInFormulario: function (type) {
+  openInFormulario: function (type, filePath) {
     if (window.FormularioInsp) {
-      FormularioInsp.navigateToType(type);
+      FormularioInsp.openFile(type, filePath);
     }
     if (typeof InspeccionesComponent !== 'undefined') {
       var tabBtn = document.querySelector('.kair-header__tab[data-view="formulario"]');
@@ -233,8 +233,13 @@ var HistorialInsp = {
   },
 
   showNewModal: function () {
-    InspeccionesService.toast('Use las pestañas del Formulario para crear inspecciones', 'info');
-    this.openInFormulario('EXTINTOR');
+    if (window.FormularioInsp) {
+      FormularioInsp.showNewInspectionModal();
+    }
+    if (typeof InspeccionesComponent !== 'undefined') {
+      var tabBtn = document.querySelector('.kair-header__tab[data-view="formulario"]');
+      if (tabBtn) tabBtn.click();
+    }
   }
 };
 

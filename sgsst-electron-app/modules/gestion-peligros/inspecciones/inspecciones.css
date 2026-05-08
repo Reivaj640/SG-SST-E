@@ -1745,6 +1745,281 @@ PROGRAMA — Obj Gral / Obj Esp / Activity cells
 }
 
 /* ==========================================================================
+FORMULARIO — Period Bar (selector de archivo + nueva inspeccion)
+========================================================================== */
+.kair-insp-wrapper .kair-insp__period-bar {
+  margin-bottom: var(--kair-insp-space-5);
+}
+
+.kair-insp-wrapper .kair-insp__period-bar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kair-insp-space-4);
+  background: var(--kair-insp-bg-card);
+  border-radius: var(--kair-insp-border-radius-lg);
+  border: 1px solid var(--kair-insp-border-light);
+  box-shadow: var(--kair-insp-shadow-sm);
+  padding: var(--kair-insp-space-3) var(--kair-insp-space-5);
+}
+
+.kair-insp-wrapper .kair-insp__period-left {
+  display: flex;
+  align-items: center;
+  gap: var(--kair-insp-space-3);
+  color: var(--kair-insp-text-muted);
+  font-size: var(--kair-insp-font-size-sm);
+}
+
+.kair-insp-wrapper .kair-insp__period-left i {
+  color: var(--kair-insp-primary);
+  font-size: 1rem;
+}
+
+.kair-insp-wrapper .kair-insp__period-select {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--kair-insp-border-color);
+  border-radius: var(--kair-insp-border-radius);
+  font-family: var(--kair-insp-font-family);
+  font-size: var(--kair-insp-font-size-sm);
+  font-weight: var(--kair-insp-font-weight-medium);
+  color: var(--kair-insp-text-primary);
+  background: var(--kair-insp-bg-input);
+  min-width: 180px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236c757d' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 24px;
+}
+
+.kair-insp-wrapper .kair-insp__period-select:focus {
+  outline: none;
+  border-color: var(--kair-insp-border-focus);
+  box-shadow: 0 0 0 2px rgba(23, 78, 166, 0.15);
+}
+
+.kair-insp-wrapper .kair-insp__period-info {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: var(--kair-insp-font-size-xs);
+  color: var(--kair-insp-text-muted);
+  font-weight: var(--kair-insp-font-weight-medium);
+}
+
+.kair-insp-wrapper .kair-insp__period-info i {
+  font-size: 0.8125rem;
+}
+
+.kair-insp-wrapper .kair-insp__period-right {
+  display: flex;
+  align-items: center;
+  gap: var(--kair-insp-space-2);
+}
+
+/* ==========================================================================
+FORMULARIO — New Inspection Modal (BEM kair-insp__modal)
+========================================================================== */
+.kair-insp-wrapper .kair-insp__modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--kair-insp-bg-modal-overlay);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: kairInspModalFadeIn 0.15s ease;
+}
+
+@keyframes kairInspModalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.kair-insp-wrapper .kair-insp__modal {
+  background: var(--kair-insp-bg-card);
+  border-radius: var(--kair-insp-border-radius-lg);
+  box-shadow: var(--kair-insp-shadow-lg);
+  width: 90%;
+  max-width: 440px;
+  animation: kairInspModalSlideUp 0.2s ease;
+}
+
+@keyframes kairInspModalSlideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.kair-insp-wrapper .kair-insp__modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--kair-insp-space-4) var(--kair-insp-space-5);
+  border-bottom: 1px solid var(--kair-insp-border-light);
+}
+
+.kair-insp-wrapper .kair-insp__modal-title {
+  font-size: var(--kair-insp-font-size-lg);
+  font-weight: var(--kair-insp-font-weight-semibold);
+  color: var(--kair-insp-text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--kair-insp-space-2);
+}
+
+.kair-insp-wrapper .kair-insp__modal-title i {
+  color: var(--kair-insp-primary);
+}
+
+.kair-insp-wrapper .kair-insp__modal-close {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--kair-insp-text-muted);
+  cursor: pointer;
+  border-radius: var(--kair-insp-border-radius);
+  transition: background 0.15s ease, color 0.15s ease;
+  font-size: 0.875rem;
+}
+
+.kair-insp-wrapper .kair-insp__modal-close:hover {
+  background: var(--kair-insp-bg-hover);
+  color: var(--kair-insp-danger);
+}
+
+.kair-insp-wrapper .kair-insp__modal-body {
+  padding: var(--kair-insp-space-5);
+}
+
+.kair-insp-wrapper .kair-insp__modal-desc {
+  font-size: var(--kair-insp-font-size-sm);
+  color: var(--kair-insp-text-muted);
+  margin-bottom: var(--kair-insp-space-4);
+}
+
+.kair-insp-wrapper .kair-insp__modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: var(--kair-insp-space-3);
+}
+
+.kair-insp-wrapper .kair-insp__modal-field:last-child {
+  margin-bottom: 0;
+}
+
+.kair-insp-wrapper .kair-insp__modal-field label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--kair-insp-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.kair-insp-wrapper .kair-insp__modal-select {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--kair-insp-border-color);
+  border-radius: var(--kair-insp-border-radius);
+  font-family: var(--kair-insp-font-family);
+  font-size: var(--kair-insp-font-size-base);
+  color: var(--kair-insp-text-primary);
+  background: var(--kair-insp-bg-input);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236c757d' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 24px;
+}
+
+.kair-insp-wrapper .kair-insp__modal-select:focus {
+  outline: none;
+  border-color: var(--kair-insp-border-focus);
+  box-shadow: 0 0 0 2px rgba(23, 78, 166, 0.15);
+}
+
+.kair-insp-wrapper .kair-insp__modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--kair-insp-space-3);
+  padding: var(--kair-insp-space-4) var(--kair-insp-space-5);
+  border-top: 1px solid var(--kair-insp-border-light);
+}
+
+/* ==========================================================================
+FORMULARIO — Save Success Confirmation
+========================================================================== */
+.kair-insp-wrapper .kair-insp__save-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--kair-insp-space-8) var(--kair-insp-space-6);
+  text-align: center;
+  animation: kairInspSuccessIn 0.35s ease;
+}
+
+@keyframes kairInspSuccessIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.kair-insp-wrapper .kair-insp__save-success-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--kair-insp-success-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--kair-insp-space-5);
+}
+
+.kair-insp-wrapper .kair-insp__save-success-icon i {
+  font-size: 2rem;
+  color: var(--kair-insp-success);
+}
+
+.kair-insp-wrapper .kair-insp__save-success-title {
+  font-size: var(--kair-insp-font-size-2xl);
+  font-weight: var(--kair-insp-font-weight-bold);
+  color: var(--kair-insp-text-primary);
+  margin: 0 0 var(--kair-insp-space-2) 0;
+}
+
+.kair-insp-wrapper .kair-insp__save-success-period {
+  font-size: var(--kair-insp-font-size-base);
+  font-weight: var(--kair-insp-font-weight-medium);
+  color: var(--kair-insp-primary);
+  margin: 0 0 var(--kair-insp-space-2) 0;
+}
+
+.kair-insp-wrapper .kair-insp__save-success-desc {
+  font-size: var(--kair-insp-font-size-sm);
+  color: var(--kair-insp-text-muted);
+  margin: 0 0 var(--kair-insp-space-6) 0;
+  max-width: 360px;
+}
+
+.kair-insp-wrapper .kair-insp__save-success-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--kair-insp-space-3);
+}
+
+/* ==========================================================================
 DARK THEME
 ========================================================================== */
 [data-theme="dark"] .kair-insp-wrapper {
@@ -2005,6 +2280,59 @@ DARK THEME
   border-color: #4a5568;
 }
 
+[data-theme="dark"] .kair-insp-wrapper .kair-insp__period-bar-inner {
+  background: #2d3748;
+  border-color: #374151;
+}
+
+[data-theme="dark"] .kair-insp-wrapper .kair-insp__period-select {
+  background: #374151;
+  border-color: #4a5568;
+  color: #e9ecef;
+}
+
+[data-theme="dark"] .kair-insp-wrapper .kair-insp__modal {
+  background: #2d3748;
+}
+
+[data-theme="dark"] .kair-insp-wrapper .kair-insp__modal-header {
+  border-bottom-color: #374151;
+}
+
+[data-theme="dark"] .kair-insp-wrapper .kair-insp__modal-title {
+  color: #e9ecef;
+}
+
+[data-theme="dark"] .kair-insp-wrapper .kair-insp__modal-select {
+  background: #374151;
+  border-color: #4a5568;
+  color: #e9ecef;
+}
+
+[data-theme="dark"] .kair-insp-wrapper .kair-insp__modal-footer {
+  border-top-color: #374151;
+}
+
+[data-theme="dark"] .kair-insp-wrapper .kair-insp__save-success-icon {
+  background: rgba(92, 184, 92, 0.15);
+}
+
+[data-theme="dark"] .kair-insp-wrapper .kair-insp__save-success-icon i {
+  color: #7ed67e;
+}
+
+[data-theme="dark"] .kair-insp-wrapper .kair-insp__save-success-title {
+  color: #e9ecef;
+}
+
+[data-theme="dark"] .kair-insp-wrapper .kair-insp__save-success-period {
+  color: #4da6ff;
+}
+
+[data-theme="dark"] .kair-insp-wrapper .kair-insp__save-success-desc {
+  color: #8c95a4;
+}
+
 /* ==========================================================================
 DARK-LEGACY THEME
 ========================================================================== */
@@ -2123,7 +2451,16 @@ RESPONSIVE
     flex-direction: column;
     align-items: flex-start;
   }
-  .kair-insp__form-check-label {
-    min-width: 0;
-  }
+.kair-insp__form-check-label {
+  min-width: 0;
+}
+.kair-insp-wrapper .kair-insp__save-success-actions {
+  flex-direction: column;
+  width: 100%;
+  max-width: 260px;
+}
+.kair-insp-wrapper .kair-insp__save-success-actions .kair-insp-btn {
+  width: 100%;
+  justify-content: center;
+}
 }
