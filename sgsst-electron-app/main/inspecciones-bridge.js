@@ -5,6 +5,14 @@ const fs = require("fs");
 
 const MONTHS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 
+var _writeQueues = {};
+function _serializedWrite(filePath, writeFn) {
+  var key = filePath.toLowerCase();
+  if (!_writeQueues[key]) _writeQueues[key] = Promise.resolve();
+  _writeQueues[key] = _writeQueues[key].catch(function() {}).then(writeFn);
+  return _writeQueues[key];
+}
+
 const INSPECTION_TEMPLATES = {
   EXTINTOR: {
     code: "GI-FO-026",
@@ -118,19 +126,35 @@ const INSPECTION_TEMPLATES = {
 };
 
 const PROGRAMA_SHEET_CONFIG = {
- startRow: 9,
- endRow: 18,
-  startCol: 6,
-  endCol: 17,
+  startRow: 9,
+  endRow: 18,
+  startCol: 7,
+  endCol: 18,
   colMap: {
-    B: { field: "objetivoGeneral", label: "OBJETIVO GENERAL", editable: false, col: 2 },
-    C: { field: "objetivosEspecificos", label: "OBJETIVOS ESPECÍFICOS", editable: false, col: 3 },
-    D: { field: "actividades", label: "ACTIVIDADES", editable: false, col: 4 },
-    E: { field: "responsable", label: "RESPONSABLE", editable: true, col: 5 },
-    R: { field: "porcentaje", label: "%", editable: false, col: 18 },
-    S: { field: "estado", label: "ESTADO", editable: false, col: 19 },
-    T: { field: "observacionesSeguimiento", label: "OBSERVACIONES Y SEGUIMIENTO", editable: true, col: 20 }
+    B: { field: "objetivoGeneral", label: "OBJETIVO GENERAL", editable: false, col: 3 },
+    C: { field: "objetivosEspecificos", label: "OBJETIVOS ESPECÍFICOS", editable: false, col: 4 },
+    D: { field: "actividades", label: "ACTIVIDADES", editable: false, col: 5 },
+    E: { field: "responsable", label: "RESPONSABLE", editable: true, col: 6 },
+    R: { field: "porcentaje", label: "%", editable: false, col: 19 },
+    S: { field: "estado", label: "ESTADO", editable: false, col: 20 },
+    T: { field: "observacionesSeguimiento", label: "OBSERVACIONES Y SEGUIMIENTO", editable: true, col: 21 }
   }
+};
+
+const PROGRAMA_EXCELJS_ROW_OFFSET = 1;
+
+const PROGRAMA_SHEETJS_COL = {
+  objetivoGeneral: 1,
+  objetivosEspecificos: 2,
+  actividades: 3,
+  responsable: 4,
+  monthStart: 5,
+  porcentaje: 17,
+  estado: 18,
+  observacionesSeguimiento: 19,
+  kpiIndicador: 2,
+  kpiSinRealizar: 5,
+  kpiRealizadas: 5
 };
 
 function _getCompanyInspeccionesDir(companyRoot) {
@@ -244,11 +268,31 @@ function _colLetterToIndex(letter) {
 }
 
 function _createBackup(filePath, dir) {
-  var backupDir = path.join(dir, "backup");
-  if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
-  var backupPath = path.join(backupDir, path.basename(filePath, path.extname(filePath)) + "_" + Date.now() + path.extname(filePath));
-  fs.copyFileSync(filePath, backupPath);
-  return backupPath;
+  if (!filePath || !fs.existsSync(filePath)) return null;
+  var backupDir = path.join(dir || path.dirname(filePath), "backup");
+  if (!fs.existsSync(backupDir)) { try { fs.mkdirSync(backupDir, { recursive: true }); } catch (e) { return null; } }
+  var ts = new Date().toISOString().replace(/[:.]/g, '-');
+  var backupPath = path.join(backupDir, path.basename(filePath) + '_' + ts + '.bak');
+  try { fs.copyFileSync(filePath, backupPath); return backupPath; } catch (e) { return null; }
+}
+
+function _convertXlsToXlsx(xlsPath) {
+  var xlsxPath = xlsPath.replace(/\.xls$/i, '.xlsx');
+  if (fs.existsSync(xlsxPath)) return xlsxPath;
+  try {
+    var wb = xlsx.readFile(xlsPath, { type: 'file' });
+    var xlsxPath = xlsPath.replace(/\.xls$/i, '.xlsx');
+    xlsx.writeFile(wb, xlsxPath, { bookType: 'xlsx' });
+    var backupDir = path.join(path.dirname(xlsPath), 'backup');
+    if (!fs.existsSync(backupDir)) { try { fs.mkdirSync(backupDir, { recursive: true }); } catch (e) {} }
+    var backupPath = path.join(backupDir, path.basename(xlsPath) + '_pre_xlsx_conversion.bak');
+    try { fs.copyFileSync(xlsPath, backupPath); } catch (e) {}
+    try { fs.unlinkSync(xlsPath); } catch (e) {}
+    return xlsxPath;
+  } catch (e) {
+    console.error('[4.2.4] Error convirtiendo .xls a .xlsx:', e.message);
+    return null;
+  }
 }
 
 function readInspeccionExcel(companyRoot, type) {
@@ -474,122 +518,87 @@ async function writeInspeccionExcel(companyRoot, type, formData) {
   var originalPath = _findExcelFileDeep(dir, config.code) || _findExcelFileDeep(dir, type);
   if (!originalPath) return { success: false, error: { code: "FILE_NOT_FOUND", message: "Archivo Excel no encontrado para escritura" } };
 
-  var ext = path.extname(originalPath).toLowerCase();
-  _createBackup(originalPath, dir);
+  if (originalPath.toLowerCase().endsWith('.xls') && !originalPath.toLowerCase().endsWith('.xlsx')) {
+    var converted = _convertXlsToXlsx(originalPath);
+    if (!converted) return { success: false, error: { code: "CONVERT_ERROR", message: "No se pudo convertir .xls a .xlsx" } };
+    originalPath = converted;
+  }
+
+  var capturedPath = originalPath;
+  var capturedConfig = config;
+  return _serializedWrite(originalPath, function() {
+    return _doWriteInspeccionExcel(capturedPath, dir, capturedConfig, formData);
+  });
+}
+
+async function _doWriteInspeccionExcel(filePath, dir, config, formData) {
+  var backupPath = _createBackup(filePath, dir);
 
   try {
-    if (ext === ".xlsx") {
-      var workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.readFile(originalPath);
-      var ws = workbook.getWorksheet(config.sheetName || 1);
-      if (!ws) return { success: false, error: { code: "SHEET_NOT_FOUND", message: "Hoja no encontrada" } };
+    var workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+    var ws = workbook.getWorksheet(config.sheetName || 1);
+    if (!ws) {
+      if (backupPath && fs.existsSync(backupPath)) { try { fs.unlinkSync(backupPath); } catch (e) {} }
+      return { success: false, error: { code: "SHEET_NOT_FOUND", message: "Hoja no encontrada" } };
+    }
 
-      if (formData.headerFields) {
-        config.headerFields.forEach(function(hf) {
-          if (formData.headerFields[hf.key] !== undefined) {
-            ws.getCell(hf.row, hf.col).value = formData.headerFields[hf.key];
-          }
-        });
-      }
-
-      if (formData.generalObservations !== undefined && config.generalObservations) {
-        ws.getCell(config.generalObservations.row, config.generalObservations.col).value =
-          "OBSERVACIONES : " + formData.generalObservations;
-      }
-
-      var items = formData.items || [];
-      items.forEach(function(item) {
-        var rowNum = item.row || config.dataStartRow;
-        Object.keys(config.colIndexes).forEach(function(col) {
-          var field = config.colMap[col].field;
-          var colIdx = config.colIndexes[col];
-          if (item[field] !== undefined) {
-            ws.getCell(rowNum, colIdx).value = item[field];
-          }
-        });
+    if (formData.headerFields) {
+      config.headerFields.forEach(function(hf) {
+        if (formData.headerFields[hf.key] !== undefined) {
+          ws.getCell(hf.row, hf.col).value = hf.labelPrefix ? _buildLabelCell(hf.labelPrefix, formData.headerFields[hf.key]) : formData.headerFields[hf.key];
+        }
       });
+    }
 
-      await workbook.xlsx.writeFile(originalPath);
-    } else {
-      var xlsResult = _readXlsWithSheetJs(originalPath);
-      var rawData = xlsResult.rawData;
-      var wbOrig = xlsResult.workbook;
-      var sheetNameOrig = xlsResult.sheetName;
-      var wsOrig = wbOrig.Sheets[sheetNameOrig];
-      var merges = wsOrig['!merges'] || [];
-
- if (formData.headerFields) {
- config.headerFields.forEach(function(hf) {
- if (formData.headerFields[hf.key] !== undefined) {
- var rowIdx = hf.row - 1;
- var colIdx = hf.col - 1;
- if (!rawData[rowIdx]) rawData[rowIdx] = [];
- rawData[rowIdx][colIdx] = hf.labelPrefix ? _buildLabelCell(hf.labelPrefix, formData.headerFields[hf.key]) : formData.headerFields[hf.key];
- }
- });
- }
-
- if (formData.signFields && config.signFields) {
- config.signFields.forEach(function(sf) {
- if (formData.signFields[sf.key] !== undefined) {
- var rowIdx = sf.row - 1;
- var colIdx = sf.col - 1;
- if (!rawData[rowIdx]) rawData[rowIdx] = [];
- rawData[rowIdx][colIdx] = sf.labelPrefix ? _buildLabelCell(sf.labelPrefix, formData.signFields[sf.key]) : formData.signFields[sf.key];
- }
-        });
-      }
-
-      var items2 = formData.items || [];
-      items2.forEach(function(item) {
-        var rowNum = item.row;
-        var rowIdx = rowNum - 1;
-        if (!rawData[rowIdx]) rawData[rowIdx] = [];
-        Object.keys(config.colIndexes).forEach(function(col) {
-          var field = config.colMap[col].field;
-          var colIdx = config.colIndexes[col] - 1;
-          if (item[field] !== undefined) {
-            rawData[rowIdx][colIdx] = item[field];
-          }
-        });
+    if (formData.signFields && config.signFields) {
+      config.signFields.forEach(function(sf) {
+        if (formData.signFields[sf.key] !== undefined) {
+          ws.getCell(sf.row, sf.col).value = sf.labelPrefix ? _buildLabelCell(sf.labelPrefix, formData.signFields[sf.key]) : formData.signFields[sf.key];
+        }
       });
+    }
 
- if (formData.checkRows && config.checkRows) {
- config.checkRows.forEach(function(cr, idx) {
- if (formData.checkRows[idx] !== undefined) {
- var rowIdx = cr.row - 1;
- if (!rawData[rowIdx]) rawData[rowIdx] = [];
- var writeCol = cr.valueCol ? (cr.valueCol - 1) : 0;
- rawData[rowIdx][writeCol] = formData.checkRows[idx];
- }
- });
- }
+    var items = formData.items || [];
+    items.forEach(function(item) {
+      var rowNum = item.row || config.dataStartRow;
+      Object.keys(config.colIndexes).forEach(function(col) {
+        var field = config.colMap[col].field;
+        var colIdx = config.colIndexes[col];
+        if (item[field] !== undefined) {
+          ws.getCell(rowNum, colIdx).value = item[field];
+        }
+      });
+    });
 
-      if (formData.generalObservations !== undefined && config.generalObservations) {
-        var obsRowIdx = config.generalObservations.row - 1;
-        if (!rawData[obsRowIdx]) rawData[obsRowIdx] = [];
-        rawData[obsRowIdx][0] = "OBSERVACIONES : " + formData.generalObservations;
-      }
+    if (formData.checkRows && config.checkRows) {
+      config.checkRows.forEach(function(cr, idx) {
+        if (formData.checkRows[idx] !== undefined) {
+          var writeCol = cr.valueCol || 1;
+          ws.getCell(cr.row, writeCol).value = formData.checkRows[idx];
+        }
+      });
+    }
 
-      var newWs = xlsx.utils.aoa_to_sheet(rawData);
-      newWs['!merges'] = merges;
+    if (formData.generalObservations !== undefined && config.generalObservations) {
+      ws.getCell(config.generalObservations.row, config.generalObservations.col).value =
+        "OBSERVACIONES : " + formData.generalObservations;
+    }
 
-      var newWb = xlsx.utils.book_new();
-      xlsx.utils.book_append_sheet(newWb, newWs, sheetNameOrig);
+    await workbook.xlsx.writeFile(filePath);
 
-      var outPath = originalPath;
-      if (ext === ".xls") {
-        xlsx.writeFile(newWb, outPath, { bookType: "xls", type: "file" });
-      } else {
-        xlsx.writeFile(newWb, outPath, { type: "file" });
-      }
+    if (backupPath && fs.existsSync(backupPath)) {
+      try { fs.unlinkSync(backupPath); } catch (e) {}
     }
 
     return {
       success: true,
-      data: { filePath: originalPath, saved: true, rowCount: (formData.items || []).length }
+      data: { filePath: filePath, saved: true, rowCount: (formData.items || []).length }
     };
   } catch (e) {
+    if (backupPath && fs.existsSync(backupPath)) {
+      try { fs.copyFileSync(backupPath, filePath); } catch (re) {}
+    }
     return { success: false, error: { code: "WRITE_ERROR", message: "Error escribiendo Excel: " + e.message } };
   }
 }
@@ -602,87 +611,70 @@ async function writeInspeccionHeader(companyRoot, type, headerData) {
   var originalPath = _findExcelFileDeep(dir, config.code) || _findExcelFileDeep(dir, type);
   if (!originalPath) return { success: false, error: { code: "FILE_NOT_FOUND", message: "Archivo Excel no encontrado" } };
 
-  var ext = path.extname(originalPath).toLowerCase();
-  _createBackup(originalPath, dir);
+  if (originalPath.toLowerCase().endsWith('.xls') && !originalPath.toLowerCase().endsWith('.xlsx')) {
+    var converted = _convertXlsToXlsx(originalPath);
+    if (!converted) return { success: false, error: { code: "CONVERT_ERROR", message: "No se pudo convertir .xls a .xlsx" } };
+    originalPath = converted;
+  }
+
+  var capturedPath = originalPath;
+  var capturedConfig = config;
+  return _serializedWrite(originalPath, function() {
+    return _doWriteInspeccionHeader(capturedPath, dir, capturedConfig, headerData);
+  });
+}
+
+async function _doWriteInspeccionHeader(filePath, dir, config, headerData) {
+  var backupPath = _createBackup(filePath, dir);
 
   try {
-    if (ext === ".xlsx") {
-      var workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.readFile(originalPath);
-      var ws = workbook.getWorksheet(config.sheetName || 1);
-      if (!ws) return { success: false, error: { code: "SHEET_NOT_FOUND", message: "Hoja no encontrada" } };
-
- config.headerFields.forEach(function(hf) {
- if (headerData[hf.key] !== undefined) {
- ws.getCell(hf.row, hf.col).value = hf.labelPrefix ? _buildLabelCell(hf.labelPrefix, headerData[hf.key]) : headerData[hf.key];
- }
- });
-
- if (headerData.generalObservations !== undefined && config.generalObservations) {
- ws.getCell(config.generalObservations.row, config.generalObservations.col).value =
- "OBSERVACIONES : " + headerData.generalObservations;
- }
-
- if (headerData.signFields && config.signFields) {
- config.signFields.forEach(function(sf) {
- if (headerData.signFields[sf.key] !== undefined) {
- ws.getCell(sf.row, sf.col).value = sf.labelPrefix ? _buildLabelCell(sf.labelPrefix, headerData.signFields[sf.key]) : headerData.signFields[sf.key];
- }
- });
- }
-
-      await workbook.xlsx.writeFile(originalPath);
-    } else {
-      var xlsResult = _readXlsWithSheetJs(originalPath);
-      var rawData = xlsResult.rawData;
-      var merges = xlsResult.workbook.Sheets[xlsResult.sheetName]['!merges'] || [];
-
- config.headerFields.forEach(function(hf) {
- if (headerData[hf.key] !== undefined) {
- var rowIdx = hf.row - 1;
- var colIdx = hf.col - 1;
- if (!rawData[rowIdx]) rawData[rowIdx] = [];
- rawData[rowIdx][colIdx] = hf.labelPrefix ? _buildLabelCell(hf.labelPrefix, headerData[hf.key]) : headerData[hf.key];
- }
- });
-
- if (headerData.signFields && config.signFields) {
- config.signFields.forEach(function(sf) {
- if (headerData.signFields[sf.key] !== undefined) {
- var rowIdx = sf.row - 1;
- var colIdx = sf.col - 1;
- if (!rawData[rowIdx]) rawData[rowIdx] = [];
- rawData[rowIdx][colIdx] = sf.labelPrefix ? _buildLabelCell(sf.labelPrefix, headerData.signFields[sf.key]) : headerData.signFields[sf.key];
- }
- });
- }
-
- if (headerData.checkRows && config.checkRows) {
- config.checkRows.forEach(function(cr, idx) {
- if (headerData.checkRows[idx] !== undefined) {
- var rowIdx = cr.row - 1;
- if (!rawData[rowIdx]) rawData[rowIdx] = [];
- var writeCol = cr.valueCol ? (cr.valueCol - 1) : 0;
- rawData[rowIdx][writeCol] = headerData.checkRows[idx];
- }
- });
- }
-
-      if (headerData.generalObservations !== undefined && config.generalObservations) {
-        var obsRowIdx = config.generalObservations.row - 1;
-        if (!rawData[obsRowIdx]) rawData[obsRowIdx] = [];
-        rawData[obsRowIdx][0] = "OBSERVACIONES : " + headerData.generalObservations;
-      }
-
-      var newWs = xlsx.utils.aoa_to_sheet(rawData);
-      newWs['!merges'] = merges;
-      var newWb = xlsx.utils.book_new();
-      xlsx.utils.book_append_sheet(newWb, newWs, xlsResult.sheetName);
-      xlsx.writeFile(newWb, originalPath, { bookType: ext === ".xls" ? "xls" : "xlsx", type: "file" });
+    var workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+    var ws = workbook.getWorksheet(config.sheetName || 1);
+    if (!ws) {
+      if (backupPath && fs.existsSync(backupPath)) { try { fs.unlinkSync(backupPath); } catch (e) {} }
+      return { success: false, error: { code: "SHEET_NOT_FOUND", message: "Hoja no encontrada" } };
     }
 
-    return { success: true, data: { filePath: originalPath, saved: true } };
+    config.headerFields.forEach(function(hf) {
+      if (headerData[hf.key] !== undefined) {
+        ws.getCell(hf.row, hf.col).value = hf.labelPrefix ? _buildLabelCell(hf.labelPrefix, headerData[hf.key]) : headerData[hf.key];
+      }
+    });
+
+    if (headerData.generalObservations !== undefined && config.generalObservations) {
+      ws.getCell(config.generalObservations.row, config.generalObservations.col).value =
+        "OBSERVACIONES : " + headerData.generalObservations;
+    }
+
+    if (headerData.signFields && config.signFields) {
+      config.signFields.forEach(function(sf) {
+        if (headerData.signFields[sf.key] !== undefined) {
+          ws.getCell(sf.row, sf.col).value = sf.labelPrefix ? _buildLabelCell(sf.labelPrefix, headerData.signFields[sf.key]) : headerData.signFields[sf.key];
+        }
+      });
+    }
+
+    if (headerData.checkRows && config.checkRows) {
+      config.checkRows.forEach(function(cr, idx) {
+        if (headerData.checkRows[idx] !== undefined) {
+          var writeCol = cr.valueCol || 1;
+          ws.getCell(cr.row, writeCol).value = headerData.checkRows[idx];
+        }
+      });
+    }
+
+    await workbook.xlsx.writeFile(filePath);
+
+    if (backupPath && fs.existsSync(backupPath)) {
+      try { fs.unlinkSync(backupPath); } catch (e) {}
+    }
+
+    return { success: true, data: { filePath: filePath, saved: true } };
   } catch (e) {
+    if (backupPath && fs.existsSync(backupPath)) {
+      try { fs.copyFileSync(backupPath, filePath); } catch (re) {}
+    }
     return { success: false, error: { code: "WRITE_ERROR", message: "Error escribiendo header: " + e.message } };
   }
 }
@@ -799,6 +791,13 @@ function readProgramaInspecciones(companyRoot, year) {
     return { success: false, error: { code: "FILE_NOT_FOUND", message: "Archivo PROGRAMA DE INSPECCIONES no encontrado" } };
   }
 
+  if (filePath.toLowerCase().endsWith('.xls') && !filePath.toLowerCase().endsWith('.xlsx')) {
+    filePath = _convertXlsToXlsx(filePath);
+    if (!filePath) {
+      return { success: false, error: { code: "CONVERT_ERROR", message: "No se pudo convertir .xls a .xlsx" } };
+    }
+  }
+
   try {
     if (!fs.statSync(filePath).isFile()) {
       return { success: false, error: { code: "NOT_A_FILE", message: "La ruta no es un archivo: " + filePath } };
@@ -821,16 +820,16 @@ function readProgramaInspecciones(companyRoot, year) {
 
   var kpiRow1 = rawData[3] || [];
   var kpiRow2 = rawData[4] || [];
-  var indicador = kpiRow1[2] || 0;
-  var sinRealizar = kpiRow1[5] || 0;
-  var realizadas = kpiRow2[5] || 0;
+  var indicador = kpiRow1[PROGRAMA_SHEETJS_COL.kpiIndicador] || 0;
+  var sinRealizar = kpiRow1[PROGRAMA_SHEETJS_COL.kpiSinRealizar] || 0;
+  var realizadas = kpiRow2[PROGRAMA_SHEETJS_COL.kpiRealizadas] || 0;
 
   var activities = [];
   var emptyCount = 0;
 
   for (var r = PROGRAMA_SHEET_CONFIG.startRow - 1; r < Math.min(PROGRAMA_SHEET_CONFIG.endRow, rawData.length); r++) {
     var row = rawData[r] || [];
-    var actividad = String(row[3] || "").trim();
+    var actividad = String(row[PROGRAMA_SHEETJS_COL.actividades] || "").trim();
     if (!actividad) {
       emptyCount++;
       if (emptyCount >= 3 && activities.length > 0) break;
@@ -838,13 +837,13 @@ function readProgramaInspecciones(companyRoot, year) {
     }
     emptyCount = 0;
 
-    var objetivoGeneral = String(row[1] || "").trim();
-    var objetivosEspecificos = String(row[2] || "").trim();
-    var responsable = String(row[4] || "").trim();
+    var objetivoGeneral = String(row[PROGRAMA_SHEETJS_COL.objetivoGeneral] || "").trim();
+    var objetivosEspecificos = String(row[PROGRAMA_SHEETJS_COL.objetivosEspecificos] || "").trim();
+    var responsable = String(row[PROGRAMA_SHEETJS_COL.responsable] || "").trim();
 
     var months = {};
     for (var m = 0; m < 12; m++) {
-      var colIdx = PROGRAMA_SHEET_CONFIG.startCol + m - 1;
+      var colIdx = PROGRAMA_SHEETJS_COL.monthStart + m;
       var val = row[colIdx];
       if (val !== undefined && val !== null && String(val).trim() !== "") {
         var s = String(val).trim().toUpperCase();
@@ -860,9 +859,9 @@ function readProgramaInspecciones(companyRoot, year) {
       }
     }
 
-    var porcentaje = row[17] || 0;
-    var estado = String(row[18] || "").trim();
-    var observaciones = String(row[19] || "").trim();
+    var porcentaje = row[PROGRAMA_SHEETJS_COL.porcentaje] || 0;
+    var estado = String(row[PROGRAMA_SHEETJS_COL.estado] || "").trim();
+    var observaciones = String(row[PROGRAMA_SHEETJS_COL.observacionesSeguimiento] || "").trim();
 
     var hasAnyMonth = Object.values(months).some(function(v) { return v !== null; });
     var actType = "INSTALACION";
@@ -903,9 +902,10 @@ function readProgramaInspecciones(companyRoot, year) {
       year: year || new Date().getFullYear(),
       filePath: filePath,
       activities: activities,
-      kpis: {
-        indicator: typeof indicador === 'number' ? Math.round(indicador * 100) / 100 : indicador,
-        completed: totalC,
+    kpis: {
+      indicator: typeof indicador === 'number' ? Math.round(indicador * 100) / 100 : indicador,
+      computedIndicator: (totalC + totalP) > 0 ? Math.round((totalC / (totalC + totalP)) * 10000) / 100 : 0,
+      completed: totalC,
         pending: totalP,
         total: totalC + totalP,
         realizadas: typeof realizadas === 'number' ? realizadas : 0,
@@ -920,42 +920,73 @@ async function updateProgramaMonth(companyRoot, activityId, month, status) {
   var filePath = _findExcelFileDeep(dir, "PROGRAMA DE INSPECCIONES") || _findExcelFileDeep(dir, "PROGRAMA");
   if (!filePath) return { success: false, error: { code: "FILE_NOT_FOUND", message: "Archivo PROGRAMA no encontrado" } };
 
-  _createBackup(filePath, dir);
+  if (filePath.toLowerCase().endsWith('.xls') && !filePath.toLowerCase().endsWith('.xlsx')) {
+    filePath = _convertXlsToXlsx(filePath);
+    if (!filePath) return { success: false, error: { code: "CONVERT_ERROR", message: "No se pudo convertir .xls a .xlsx" } };
+  }
+
+  var capturedFilePath = filePath;
+  return _serializedWrite(filePath, function() {
+    return _doUpdateProgramaMonth(capturedFilePath, dir, activityId, month, status);
+  });
+}
+
+async function _doUpdateProgramaMonth(filePath, dir, activityId, month, status) {
+  var backupPath = _createBackup(filePath, dir);
 
   try {
-    var xlsResult = _readXlsWithSheetJs(filePath);
-    var rawData = xlsResult.rawData;
-    var merges = xlsResult.workbook.Sheets[xlsResult.sheetName]['!merges'] || [];
-
-    var rowIdx = parseInt(activityId.replace("act-prog-", ""), 10) - 1;
-    var colIdx = PROGRAMA_SHEET_CONFIG.startCol + month - 1;
-
-    if (rawData[rowIdx]) {
-      var newValue = status === "c" ? "c" : (status === "p" ? "p" : "");
-      rawData[rowIdx][colIdx] = newValue;
-
-      var totalC = 0, totalP = 0;
-      for (var m = 0; m < 12; m++) {
-        var mv = rawData[rowIdx][PROGRAMA_SHEET_CONFIG.startCol + m - 1];
-        if (mv) {
-          var ms = String(mv).trim().toLowerCase();
-          if (ms === "c") totalC++;
-          else if (ms === "p") totalP++;
-        }
-      }
-      var total = totalC + totalP;
-      rawData[rowIdx][17] = total > 0 ? Math.round((totalC / total) * 100) / 100 : 0;
-      rawData[rowIdx][18] = totalC > 0 && totalP === 0 ? "Ejecutado" : (totalP > 0 ? " Sin Iniciar" : "");
+    var workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+    var ws = workbook.getWorksheet("PROGRAMA") || workbook.worksheets[0];
+    if (!ws) {
+      if (backupPath && fs.existsSync(backupPath)) { try { fs.unlinkSync(backupPath); } catch (e) {} }
+      return { success: false, error: { code: "SHEET_NOT_FOUND", message: "Hoja no encontrada" } };
     }
 
-    var newWs = xlsx.utils.aoa_to_sheet(rawData);
-    newWs['!merges'] = merges;
-    var newWb = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(newWb, newWs, xlsResult.sheetName);
-    xlsx.writeFile(newWb, filePath, { bookType: path.extname(filePath).toLowerCase() === ".xls" ? "xls" : "xlsx", type: "file" });
+    var exceljsRow = parseInt(activityId.replace("act-prog-", ""), 10);
+    var monthCol = PROGRAMA_SHEET_CONFIG.startCol + month;
 
-    return readProgramaInspecciones(companyRoot, new Date().getFullYear());
+    var row = ws.getRow(exceljsRow);
+
+    var newValue = status === "c" ? "c" : (status === "p" ? "p" : "");
+    row.getCell(monthCol).value = newValue;
+
+    var totalC = 0, totalP = 0;
+    for (var m = 0; m < 12; m++) {
+      var cellVal = row.getCell(PROGRAMA_SHEET_CONFIG.startCol + m).value;
+      if (cellVal) {
+        var ms = String(cellVal).trim().toLowerCase();
+        if (ms === "c") totalC++;
+        else if (ms === "p") totalP++;
+      }
+    }
+    var total = totalC + totalP;
+    var pct = total > 0 ? Math.round((totalC / total) * 100) / 100 : 0;
+    var estadoVal = totalC > 0 && totalP === 0 ? "Ejecutado" : (totalP > 0 ? " Sin Iniciar" : "");
+    row.getCell(PROGRAMA_SHEET_CONFIG.colMap.R.col).value = pct;
+    row.getCell(PROGRAMA_SHEET_CONFIG.colMap.S.col).value = estadoVal;
+
+    row.commit();
+    await workbook.xlsx.writeFile(filePath);
+
+    if (backupPath && fs.existsSync(backupPath)) {
+      try { fs.unlinkSync(backupPath); } catch (e) {}
+    }
+
+    return {
+      success: true,
+      data: {
+        activities: [{
+          id: activityId,
+          porcentaje: pct,
+          estado: estadoVal
+        }]
+      }
+    };
   } catch (e) {
+    if (backupPath && fs.existsSync(backupPath)) {
+      try { fs.copyFileSync(backupPath, filePath); } catch (re) {}
+    }
     return { success: false, error: { code: "WRITE_ERROR", message: "Error actualizando programa: " + e.message } };
   }
 }
@@ -974,29 +1005,45 @@ async function updateProgramaField(companyRoot, activityId, field, value) {
     return { success: false, error: { code: "FIELD_NOT_EDITABLE", message: "Campo no editable: " + field } };
   }
 
-  _createBackup(filePath, dir);
+  if (filePath.toLowerCase().endsWith('.xls') && !filePath.toLowerCase().endsWith('.xlsx')) {
+    filePath = _convertXlsToXlsx(filePath);
+    if (!filePath) return { success: false, error: { code: "CONVERT_ERROR", message: "No se pudo convertir .xls a .xlsx" } };
+  }
+
+  var capturedFilePath = filePath;
+  var capturedColConfig = colConfig;
+  return _serializedWrite(filePath, function() {
+    return _doUpdateProgramaField(capturedFilePath, dir, activityId, capturedColConfig, value);
+  });
+}
+
+async function _doUpdateProgramaField(filePath, dir, activityId, colConfig, value) {
+  var backupPath = _createBackup(filePath, dir);
 
   try {
-    var xlsResult = _readXlsWithSheetJs(filePath);
-    var rawData = xlsResult.rawData;
-    var merges = xlsResult.workbook.Sheets[xlsResult.sheetName]['!merges'] || [];
-
-    var rowIdx = parseInt(activityId.replace("act-prog-", ""), 10) - 1;
-    var colIdx = colConfig.col - 1;
-
-    if (rawData[rowIdx]) {
-      if (!rawData[rowIdx]) rawData[rowIdx] = [];
-      rawData[rowIdx][colIdx] = value;
+    var workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+    var ws = workbook.getWorksheet("PROGRAMA") || workbook.worksheets[0];
+    if (!ws) {
+      if (backupPath && fs.existsSync(backupPath)) { try { fs.unlinkSync(backupPath); } catch (e) {} }
+      return { success: false, error: { code: "SHEET_NOT_FOUND", message: "Hoja no encontrada" } };
     }
 
-    var newWs = xlsx.utils.aoa_to_sheet(rawData);
-    newWs['!merges'] = merges;
-    var newWb = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(newWb, newWs, xlsResult.sheetName);
-    xlsx.writeFile(newWb, filePath, { bookType: path.extname(filePath).toLowerCase() === ".xls" ? "xls" : "xlsx", type: "file" });
+    var exceljsRow = parseInt(activityId.replace("act-prog-", ""), 10);
+    var row = ws.getRow(exceljsRow);
+    row.getCell(colConfig.col).value = value;
+    row.commit();
+    await workbook.xlsx.writeFile(filePath);
 
-    return readProgramaInspecciones(companyRoot, new Date().getFullYear());
+    if (backupPath && fs.existsSync(backupPath)) {
+      try { fs.unlinkSync(backupPath); } catch (e) {}
+    }
+
+    return { success: true };
   } catch (e) {
+    if (backupPath && fs.existsSync(backupPath)) {
+      try { fs.copyFileSync(backupPath, filePath); } catch (re) {}
+    }
     return { success: false, error: { code: "WRITE_ERROR", message: "Error actualizando campo programa: " + e.message } };
   }
 }

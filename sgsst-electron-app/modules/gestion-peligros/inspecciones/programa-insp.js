@@ -29,21 +29,22 @@ var ProgramaInsp = {
         container.innerHTML = '<div class="kair-insp-empty-state"><i class="bi bi-exclamation-circle"></i><p>' + (result.error ? result.error.message : 'Error cargando programa') + '</p></div>';
         return;
       }
-      var kpis = result.data.kpis;
-      var rateClass = kpis.indicator >= 80 ? 'success' : (kpis.indicator >= 50 ? 'warning' : 'primary');
-      container.innerHTML =
-        '<div class="kair-insp__kpi-card">' +
-        '<div class="kair-insp__kpi-value kair-insp__kpi-value--' + rateClass + '">' + kpis.indicator + '%</div>' +
-        '<div class="kair-insp__kpi-label">Indicador de Cumplimiento</div>' +
-        '</div>' +
-        '<div class="kair-insp__kpi-card">' +
-        '<div class="kair-insp__kpi-value kair-insp__kpi-value--success">' + (kpis.realizadas || kpis.completed || 0) + '</div>' +
-        '<div class="kair-insp__kpi-label">Realizadas</div>' +
-        '</div>' +
-        '<div class="kair-insp__kpi-card">' +
-        '<div class="kair-insp__kpi-value kair-insp__kpi-value--warning">' + (kpis.sinRealizar || kpis.pending || 0) + '</div>' +
-        '<div class="kair-insp__kpi-label">Sin Realizar</div>' +
-        '</div>';
+    var kpis = result.data.kpis;
+    var indicator = kpis.computedIndicator != null ? kpis.computedIndicator : (kpis.indicator != null ? kpis.indicator : 0);
+    var rateClass = indicator >= 80 ? 'success' : (indicator >= 50 ? 'warning' : 'primary');
+    container.innerHTML =
+      '<div class="kair-insp__kpi-card">' +
+      '<div class="kair-insp__kpi-value kair-insp__kpi-value--' + rateClass + '">' + indicator + '%</div>' +
+      '<div class="kair-insp__kpi-label">Indicador de Cumplimiento</div>' +
+      '</div>' +
+      '<div class="kair-insp__kpi-card">' +
+      '<div class="kair-insp__kpi-value kair-insp__kpi-value--success">' + (kpis.completed != null ? kpis.completed : (kpis.realizadas || 0)) + '</div>' +
+      '<div class="kair-insp__kpi-label">Realizadas</div>' +
+      '</div>' +
+      '<div class="kair-insp__kpi-card">' +
+      '<div class="kair-insp__kpi-value kair-insp__kpi-value--warning">' + (kpis.pending != null ? kpis.pending : (kpis.sinRealizar || 0)) + '</div>' +
+      '<div class="kair-insp__kpi-label">Sin Realizar</div>' +
+      '</div>';
     }.bind(this)).catch(function (err) { console.error('[4.2.4] getSchedule (kpis) error:', err); });
   },
 
@@ -129,6 +130,28 @@ var ProgramaInsp = {
 
   bindCellToggle: function () {
     var self = this;
+    var pendingToggles = {};
+    var toggleTimer = null;
+
+    function flushToggles() {
+      var batch = Object.values(pendingToggles);
+      pendingToggles = {};
+      toggleTimer = null;
+      batch.reduce(function (p, t) {
+        return p.then(function () {
+          return InspeccionesService.updateMonth(self.companyName, t.activityId, t.month, t.status);
+        }).then(function (result) {
+          if (result.success) {
+            self._updateRowAfterToggle(t.activityId, result.data);
+          }
+        }).catch(function (err) {
+          console.error('[4.2.4] updateMonth error:', err);
+        });
+      }, Promise.resolve()).then(function () {
+        self.renderKPIs();
+      });
+    }
+
     var cells = document.querySelectorAll('.kair-insp__programa-cell');
     cells.forEach(function (cell) {
       cell.addEventListener('click', function () {
@@ -150,16 +173,39 @@ var ProgramaInsp = {
         cell.textContent = cellLabel;
         cell.setAttribute('data-status', nextStatus || '');
 
-        InspeccionesService.updateMonth(self.companyName, activityId, month, nextStatus).then(function (result) {
-          if (result.success) {
-            self.renderKPIs();
-          }
-        }).catch(function (err) { console.error('[4.2.4] updateMonth error:', err); });
+        pendingToggles[activityId + '_' + month] = {
+          activityId: activityId,
+          month: month,
+          status: nextStatus
+        };
+
+        if (toggleTimer) clearTimeout(toggleTimer);
+        toggleTimer = setTimeout(flushToggles, 300);
       });
     });
   },
 
-  bindEditableFields: function () {
+_updateRowAfterToggle: function (activityId, data) {
+  if (!data || !data.activities) return;
+  var act = data.activities.find(function (a) { return a.id === activityId; });
+  if (!act) return;
+
+  var row = document.querySelector('tr[data-activity-id="' + activityId + '"]');
+  if (!row) return;
+
+  var pctCell = row.querySelector('.kair-insp__programa-pct');
+  if (pctCell) {
+    var pctVal = act.porcentaje || 0;
+    pctCell.textContent = typeof pctVal === 'number' ? Math.round(pctVal * 100) / 100 : pctVal;
+  }
+
+  var statusCell = row.querySelector('.kair-insp__programa-status');
+  if (statusCell) {
+    statusCell.textContent = act.estado || '';
+  }
+},
+
+bindEditableFields: function () {
     var self = this;
     var inputs = document.querySelectorAll('.kair-insp__programa-input');
     inputs.forEach(function (input) {
