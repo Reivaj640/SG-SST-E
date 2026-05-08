@@ -272,8 +272,9 @@ Vista Cronograma — Tabla editable con toggles de meses y evidencias
    });
   },
 
-  _toggleMonth: function (rowIndex, month, type, value, cellEl) {
-   var wasActive = cellEl.classList.contains('kair-mnt-cell--mpp') ||
+_toggleMonth: function (rowIndex, month, type, value, cellEl) {
+    var self = this;
+    var wasActive = cellEl.classList.contains('kair-mnt-cell--mpp') ||
     cellEl.classList.contains('kair-mnt-cell--mpe') ||
     cellEl.classList.contains('kair-mnt-cell--mpc');
 
@@ -295,29 +296,31 @@ Vista Cronograma — Tabla editable con toggles de meses y evidencias
     });
    }
 
-   MantenimientoService.toggleMonth(this.companyName, rowIndex, month, type, value).then(function (result) {
-    if (!result.success) {
-     if (value) {
-      cellEl.classList.remove('kair-mnt-cell--' + type.toLowerCase());
-      cellEl.classList.add('kair-mnt-cell--null');
-      cellEl.textContent = '\u2014';
-     } else {
-      cellEl.classList.remove('kair-mnt-cell--null');
-      cellEl.classList.add('kair-mnt-cell--' + type.toLowerCase());
-      cellEl.textContent = TYPE_LABELS[type];
-     }
-     if (_data && _data.items) {
-      _data.items.forEach(function (item) {
-       if (item.rowIndex === rowIndex && item.months && item.months[month]) {
-        item.months[month][type] = !value;
-       }
-      });
-     }
-     MantenimientoService.toast('Error al actualizar celda', 'error');
-    }
-   }).catch(function () {
-    MantenimientoService.toast('Error de conexión', 'error');
-   });
+MantenimientoService.toggleMonth(this.companyName, rowIndex, month, type, value).then(function (result) {
+      if (!result.success) {
+        if (value) {
+          cellEl.classList.remove('kair-mnt-cell--' + type.toLowerCase());
+          cellEl.classList.add('kair-mnt-cell--null');
+          cellEl.textContent = '\u2014';
+        } else {
+          cellEl.classList.remove('kair-mnt-cell--null');
+          cellEl.classList.add('kair-mnt-cell--' + type.toLowerCase());
+          cellEl.textContent = TYPE_LABELS[type];
+        }
+        if (_data && _data.items) {
+          _data.items.forEach(function (item) {
+            if (item.rowIndex === rowIndex && item.months && item.months[month]) {
+              item.months[month][type] = !value;
+            }
+          });
+        }
+        MantenimientoService.toast('Error al actualizar celda', 'error');
+      } else {
+        self._refreshKPIsAndFilters();
+      }
+    }).catch(function () {
+      MantenimientoService.toast('Error de conexión', 'error');
+    });
   },
 
   _scheduleFieldUpdate: function (rowIndex, field, value) {
@@ -330,8 +333,9 @@ Vista Cronograma — Tabla editable con toggles de meses y evidencias
    }.bind(this), 800);
   },
 
-  _saveField: function (rowIndex, field, value) {
-   if (_data && _data.items) {
+_saveField: function (rowIndex, field, value) {
+    var self = this;
+    if (_data && _data.items) {
     _data.items.forEach(function (item) {
      if (item.rowIndex === rowIndex) {
       item[field] = value;
@@ -339,16 +343,25 @@ Vista Cronograma — Tabla editable con toggles de meses y evidencias
     });
    }
 
-   MantenimientoService.updateField(this.companyName, rowIndex, field, value).then(function (result) {
-    if (!result.success) {
-     MantenimientoService.toast('Error al guardar campo', 'error');
-    }
-   }).catch(function () {
-    MantenimientoService.toast('Error de conexión', 'error');
-   });
+MantenimientoService.updateField(this.companyName, rowIndex, field, value).then(function (result) {
+      if (!result.success) {
+        MantenimientoService.toast('Error al guardar campo', 'error');
+      } else {
+        self._refreshKPIsAndFilters();
+      }
+    }).catch(function () {
+      MantenimientoService.toast('Error de conexión', 'error');
+    });
+},
+
+  _refreshKPIsAndFilters: function () {
+    var kpisEl = document.getElementById('kair-mnt-cronograma-kpis');
+    var filtersEl = document.getElementById('kair-mnt-cronograma-filters');
+    if (kpisEl) this._renderKPIs(kpisEl);
+    if (filtersEl) this._renderFilters(filtersEl);
   },
 
- _preloadEvidenceCounts: function () {
+  _preloadEvidenceCounts: function () {
   if (!_data || !_data.items) return;
   var year = _getDataYear();
   _data.items.forEach(function (item) {
