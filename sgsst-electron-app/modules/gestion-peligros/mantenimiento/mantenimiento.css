@@ -51,12 +51,16 @@ Sistema Visual K+AIR v2.0 — BEM aislado con prefijo kair-mnt-
  --kair-mnt-space-6: 1.5rem;
  --kair-mnt-space-8: 2rem;
 
- font-family: var(--kair-mnt-font-family);
- font-size: var(--kair-mnt-font-size-base);
- color: var(--kair-mnt-text);
- background: var(--kair-mnt-bg);
- line-height: 1.5;
- min-height: 100vh;
+  font-family: var(--kair-mnt-font-family);
+  font-size: var(--kair-mnt-font-size-base);
+  color: var(--kair-mnt-text);
+  background: var(--kair-mnt-bg);
+  line-height: 1.5;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .kair-mnt-wrapper ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -95,9 +99,13 @@ Sistema Visual K+AIR v2.0 — BEM aislado con prefijo kair-mnt-
 .kair-mnt-wrapper .kair-header__tab-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 1.25rem; height: 1.25rem; padding: 0 0.375rem; border-radius: 0.625rem; font-size: 0.625rem; font-weight: 700; background: var(--kair-mnt-danger); color: #ffffff; }
 
 /* VIEWS */
-.kair-mnt-views-container { padding: var(--kair-mnt-space-5); }
+.kair-mnt-views-container {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
 .kair-mnt-view { display: none; }
-.kair-mnt-view--active { display: block; }
+.kair-mnt-view--active { display: block; height: 100%; overflow-y: auto; padding: var(--kair-mnt-space-5); }
 
 /* FILTERS */
 .kair-mnt-filters { display: flex; align-items: center; gap: var(--kair-mnt-space-3); margin-bottom: var(--kair-mnt-space-4); flex-wrap: wrap; }
