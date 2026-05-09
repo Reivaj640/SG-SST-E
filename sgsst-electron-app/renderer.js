@@ -4224,6 +4224,19 @@ console.error('❌ MetodologiaIpevrComponent no encontrado');
 showDevelopmentMessage(submoduleContentDiv, submoduleName);
 }
 
+} else if (submoduleName === "4.1.2 Identificación de Peligros") {
+createComponentSafely(window.IdentificacionPeligrosComponent,
+submoduleContentDiv,
+currentCompany,
+moduleName,
+submoduleName,
+safeBackToModuleCallback
+);
+if (!window.IdentificacionPeligrosComponent) {
+console.error('❌ IdentificacionPeligrosComponent no encontrado');
+showDevelopmentMessage(submoduleContentDiv, submoduleName);
+}
+
 } else if (submoduleName === "4.2.4 Realización de inspecciones sistematicas a las instalaciones, maquinas o equipos") {
                 createComponentSafely(window.InspeccionesComponent,
                     submoduleContentDiv,

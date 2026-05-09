@@ -31,6 +31,9 @@ const { registerInspeccionesHandlers } = require('./main/inspecciones-bridge');
 // Importar handlers de Mantenimiento Periódico (Submódulo 4.2.5)
 const { registerMantenimientoHandlers } = require('./main/mantenimiento-bridge');
 
+// Importar handlers de Identificación de Peligros (Submódulo 4.1.2)
+const { registerIdentificacionPeligrosHandlers } = require('./main/identificacion-peligros-bridge');
+
 // Capturar promesas no manejadas globalmente
 process.on('unhandledRejection', (reason, promise) => {
   const errorMessage = `
@@ -6283,13 +6286,21 @@ sendLog('[MAIN] Handlers de Inspecciones Sistemáticas (4.2.4) registrados corre
 sendLog(`[MAIN] Error registrando handlers de Inspecciones Sistemáticas: ${err.message}`, 'ERROR');
  }
 
- // Registrar handlers de Mantenimiento Periódico (Submódulo 4.2.5)
- try {
+// Registrar handlers de Mantenimiento Periódico (Submódulo 4.2.5)
+try {
   registerMantenimientoHandlers(app, { getCompanyRootPath });
   sendLog('[MAIN] Handlers de Mantenimiento Periódico (4.2.5) registrados correctamente', 'INFO');
- } catch (err) {
+} catch (err) {
   sendLog(`[MAIN] Error registrando handlers de Mantenimiento Periódico: ${err.message}`, 'ERROR');
- }
+}
+
+// Registrar handlers de Identificación de Peligros (Submódulo 4.1.2)
+try {
+  registerIdentificacionPeligrosHandlers(app, { getCompanyRootPath });
+  sendLog('[MAIN] Handlers de Identificación de Peligros (4.1.2) registrados correctamente', 'INFO');
+} catch (err) {
+  sendLog(`[MAIN] Error registrando handlers de Identificación de Peligros: ${err.message}`, 'ERROR');
+}
 
  // Registrar handlers de FURAT - Reportes de Accidentes (Submódulo 3.2.1)
   try {

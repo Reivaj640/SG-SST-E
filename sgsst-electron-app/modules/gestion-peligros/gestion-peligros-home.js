@@ -72,24 +72,31 @@ class GestionPeligrosHome {
 		var company = this.currentCompany;
 		console.log('[PELIGROS] Refrescando estadísticas para ' + company + '...');
 
-		try {
-			var results = await Promise.all([
-				window.electronAPI.inspecciones.getStats(company),
-				window.electronAPI.mantenimiento.getStats(company)
-			]);
+  try {
+    var promises = [
+      window.electronAPI.inspecciones.getStats(company),
+      window.electronAPI.mantenimiento.getStats(company)
+    ];
+    if (window.electronAPI.matrizPeligros && window.electronAPI.matrizPeligros.stats) {
+      promises.push(window.electronAPI.matrizPeligros.stats(company));
+    }
 
-			var inspResult = results[0];
-			var mntoResult = results[1];
+    var results = await Promise.all(promises);
 
-			var newData = {
-				inspecciones: inspResult.success ? inspResult.data : null,
-				mantenimiento: mntoResult.success ? mntoResult.data : null
-			};
+    var inspResult = results[0];
+    var mntoResult = results[1];
+    var mpResult = results[2] || null;
 
-			window._peligrosHomeState.cache.set(company, newData);
-			window._peligrosHomeState.lastUpdate.set(company, Date.now());
+    var newData = {
+      inspecciones: inspResult.success ? inspResult.data : null,
+      mantenimiento: mntoResult.success ? mntoResult.data : null,
+      peligros: (mpResult && mpResult.success) ? mpResult.data : null
+    };
 
-			this.updateWidgetsUI(newData);
+    window._peligrosHomeState.cache.set(company, newData);
+    window._peligrosHomeState.lastUpdate.set(company, Date.now());
+
+    this.updateWidgetsUI(newData);
 
 		} catch (error) {
 			console.error('[PELIGROS] Error refrescando estadísticas:', error);
@@ -102,9 +109,12 @@ class GestionPeligrosHome {
 		if (data.inspecciones && this.widgets.inspecciones) {
 			this.widgets.inspecciones.update(data.inspecciones);
 		}
-		if (data.mantenimiento && this.widgets.mantenimiento) {
-			this.widgets.mantenimiento.update(data.mantenimiento);
-		}
+  if (data.mantenimiento && this.widgets.mantenimiento) {
+    this.widgets.mantenimiento.update(data.mantenimiento);
+  }
+  if (data.peligros && this.widgets.peligros) {
+    this.widgets.peligros.update(data.peligros);
+  }
 
 		if (data.inspecciones) {
 			this.renderInspeccionesChart(data.inspecciones);
@@ -120,15 +130,17 @@ class GestionPeligrosHome {
 
 		var cachedData = window._peligrosHomeState.cache.get(this.currentCompany) || {};
 
-		var inspeccionesWidget = this.createInspeccionesWidget(cachedData.inspecciones);
-		var mantenimientoWidget = this.createMantenimientoWidget(cachedData.mantenimiento);
-		var medicionesWidget = this.createMedicionesWidget(null);
-		var eppWidget = this.createEPPWidget(null);
+  var inspeccionesWidget = this.createInspeccionesWidget(cachedData.inspecciones);
+  var mantenimientoWidget = this.createMantenimientoWidget(cachedData.mantenimiento);
+  var peligrosWidget = this.createPeligrosWidget(cachedData.peligros);
+  var medicionesWidget = this.createMedicionesWidget(null);
+  var eppWidget = this.createEPPWidget(null);
 
-		widgetsContainer.appendChild(inspeccionesWidget);
-		widgetsContainer.appendChild(mantenimientoWidget);
-		widgetsContainer.appendChild(medicionesWidget);
-		widgetsContainer.appendChild(eppWidget);
+  widgetsContainer.appendChild(inspeccionesWidget);
+  widgetsContainer.appendChild(mantenimientoWidget);
+  widgetsContainer.appendChild(peligrosWidget);
+  widgetsContainer.appendChild(medicionesWidget);
+  widgetsContainer.appendChild(eppWidget);
 
 		container.appendChild(widgetsContainer);
 
@@ -293,7 +305,57 @@ class GestionPeligrosHome {
 		return widget;
 	}
 
-	createMedicionesWidget(initialData) {
+  createPeligrosWidget(initialData) {
+    var widget = document.createElement('div');
+    widget.className = 'widget k-budget-card';
+
+    var data = initialData;
+
+    var render = function() {
+      var hasData = data && data.total !== undefined;
+      var total = hasData ? data.total : '—';
+      var inaceptables = hasData ? (data.inaceptables || 0) : '—';
+      var tasa = hasData ? (data.tasaInaceptable || 0) : 0;
+      var porAcept = hasData ? (data.porAcept || {}) : {};
+
+      var nrMax = hasData ? (data.maxNR || 0) : '—';
+
+      widget.innerHTML = '\
+<div class="kb-header">\
+  <span class="kb-title">Peligros GTC-45</span>\
+  <span class="kb-badge" style="background:#a855f7 !important;">4.1.2</span>\
+</div>\
+<div class="kb-amount" style="text-align:center;">\
+  <span>' + total + '</span>\
+</div>\
+<div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:4px;">\
+  Peligros identificados\
+</div>\
+<div class="kb-progress-track" style="margin-bottom: 0.5rem;">\
+  <div class="kb-progress-bar" style="width: ' + (tasa > 0 ? Math.min(tasa, 100) : 0) + '%;background-color:' + (tasa >= 30 ? 'var(--k-danger)' : 'var(--k-success)') + ';"></div>\
+</div>\
+<div class="kb-footer">\
+  <div>\
+    <div class="kb-label">Inaceptables</div>\
+    <div class="kb-value kb-rem" style="color:' + (inaceptables > 0 ? 'var(--k-danger)' : 'var(--k-success)') + ';">' + inaceptables + '</div>\
+  </div>\
+  <div style="text-align:right;">\
+    <div class="kb-label">NR Máx</div>\
+    <div class="kb-value">' + nrMax + '</div>\
+  </div>\
+</div>\
+';
+    };
+
+    this.widgets.peligros = {
+      update: function(newData) { data = newData; render(); }
+    };
+
+    render();
+    return widget;
+  }
+
+  createMedicionesWidget(initialData) {
 		var widget = document.createElement('div');
 		widget.className = 'widget k-budget-card';
 
