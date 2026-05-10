@@ -271,6 +271,13 @@ var IdentificacionPeligrosService = {
     return Promise.resolve({ success: true, data: { rowsImported: 0, sedesCreated: 0, procesosCreated: 0, cargosCreated: 0, errors: [] } });
   },
 
+  syncXlsx: function (companyName) {
+    if (_hasElectronAPI()) {
+      return window.electronAPI.matrizPeligros.syncXlsx(companyName);
+    }
+    return Promise.resolve({ success: false });
+  },
+
   toast: _toast,
 
   getColorForNivel: function (nivel) {

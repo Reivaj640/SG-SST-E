@@ -1,6 +1,7 @@
 /* ==========================================================================
 K+AIR — Módulo 4.1.2 Identificación de Peligros
-Vista Priorización — GTC-45: 5 niveles + tabla 12 col + distribución + escala
+Vista Priorización — ISO 45001 §6.1.2: 10 col evaluación riesgos + distribución + escala
+Tabla real (<table>) con mismos estilos visuales que la Matriz
 Patrón: window.PriorizacionView = { load, destroy, refresh } — Direct DOM
 ========================================================================== */
 (function () {
@@ -30,18 +31,16 @@ var NIVEL_META = {
 };
 
 var TABLE_COLS = [
-  { key: 'nr', label: 'NR', type: 'number', width: '50px' },
-  { key: 'tipo', label: 'Tipo', type: 'text', width: '90px' },
-  { key: 'peligro', label: 'Peligro', type: 'text', width: '140px' },
-  { key: 'efectosPosibles', label: 'Efectos', type: 'text', width: '120px' },
-  { key: 'expuestos', label: 'Exp.', type: 'number', width: '45px' },
-  { key: 'nd', label: 'ND', type: 'number', width: '40px' },
-  { key: 'ne', label: 'NE', type: 'number', width: '40px' },
-  { key: 'np', label: 'NP', type: 'number', width: '40px' },
-  { key: 'nc', label: 'NC', type: 'number', width: '40px' },
-  { key: 'sede', label: 'Sede', type: 'text', width: '80px' },
-  { key: 'proceso', label: 'Proceso', type: 'text', width: '90px' },
-  { key: 'cargo', label: 'Cargo', type: 'text', width: '90px' }
+  { key: 'tipo', label: 'Tipo de\nPeligro', type: 'select-tipo' },
+  { key: 'peligro', label: 'Peligro', type: 'text' },
+  { key: 'efectosPosibles', label: 'Efectos\nPosibles', type: 'text' },
+  { key: 'nd', label: 'ND', type: 'number' },
+  { key: 'ne', label: 'NE', type: 'number' },
+  { key: 'np', label: 'NP', type: 'computed' },
+  { key: 'nc', label: 'NC', type: 'number' },
+  { key: 'nr', label: 'NR', type: 'computed' },
+  { key: 'nrNivel', label: 'Nivel de\nRiesgo', type: 'computed' },
+  { key: 'nrLabel', label: 'Aceptabilidad', type: 'computed' }
 ];
 
 function _escHtml(str) {
@@ -75,16 +74,28 @@ function _renderStatsBar() {
   var inac = _stats.inaceptables || 0;
   var tasa = _stats.tasaInaceptable || 0;
   var ev = _stats.evaluados || 0;
-  var tasaEv = _stats.tasaEvaluados || 0;
 
-  var html = '<div class="kair-mp-prior__stats-bar">';
-  html += '<div class="kair-mp-prior__stat"><span class="kair-mp-prior__stat-value">' + total + '</span><span class="kair-mp-prior__stat-label">Peligros</span></div>';
-  html += '<div class="kair-mp-prior__stat"><span class="kair-mp-prior__stat-value">' + (_stats.totalSedes || 0) + '</span><span class="kair-mp-prior__stat-label">Sedes</span></div>';
-  html += '<div class="kair-mp-prior__stat"><span class="kair-mp-prior__stat-value">' + (_stats.totalProcesos || 0) + '</span><span class="kair-mp-prior__stat-label">Procesos</span></div>';
-  html += '<div class="kair-mp-prior__stat"><span class="kair-mp-prior__stat-value">' + (_stats.totalCargos || 0) + '</span><span class="kair-mp-prior__stat-label">Cargos</span></div>';
-  html += '<div class="kair-mp-prior__stat kair-mp-prior__stat--danger"><span class="kair-mp-prior__stat-value">' + inac + '</span><span class="kair-mp-prior__stat-label">Inaceptables</span></div>';
-  html += '<div class="kair-mp-prior__stat"><span class="kair-mp-prior__stat-value">' + tasa + '%</span><span class="kair-mp-prior__stat-label">Tasa Inac.</span></div>';
-  html += '<div class="kair-mp-prior__stat"><span class="kair-mp-prior__stat-value">' + ev + '/' + total + '</span><span class="kair-mp-prior__stat-label">Evaluados</span></div>';
+  var kpis = [
+    { header: 'Peligros', value: total, footer: 'Identificados en la matriz', variant: 'morado' },
+    { header: 'Sedes', value: _stats.totalSedes || 0, footer: 'Con peligros asociados', variant: 'primary' },
+    { header: 'Procesos', value: _stats.totalProcesos || 0, footer: 'Con peligros asociados', variant: 'primary' },
+    { header: 'Cargos', value: _stats.totalCargos || 0, footer: 'Con peligros asociados', variant: 'primary' },
+    { header: 'Inaceptables', value: inac, footer: 'Nivel III / IV / V', variant: 'rojo' },
+    { header: 'Tasa Inaceptabilidad', value: tasa + '%', footer: 'Proporción del total', variant: 'naranja' },
+    { header: 'Evaluados', value: ev + '/' + total, footer: 'Con ND + NE + NC asignados', variant: 'verde' }
+  ];
+
+  var html = '<div class="kair-mp-prior__kpis">';
+  for (var i = 0; i < kpis.length; i++) {
+    var kpi = kpis[i];
+    var cls = 'kair-mp-prior__kpi';
+    if (kpi.variant) cls += ' kair-mp-prior__kpi--' + kpi.variant;
+    html += '<div class="' + cls + '">';
+    html += '<div class="kair-mp-prior__kpi-header">' + _escHtml(kpi.header) + '</div>';
+    html += '<div class="kair-mp-prior__kpi-value">' + _escHtml(String(kpi.value)) + '</div>';
+    html += '<div class="kair-mp-prior__kpi-footer">' + _escHtml(kpi.footer) + '</div>';
+    html += '</div>';
+  }
   html += '</div>';
   return html;
 }
@@ -136,46 +147,45 @@ function _renderScale() {
   return html;
 }
 
-function _renderAceptBadge(nivel) {
-  var color = GTC45_COLORS[nivel] || '#6b7280';
-  var isInaceptable = nivel === 'IV' || nivel === 'V';
-  var label = isInaceptable ? 'No Aceptable' : 'Aceptable';
-  var cls = isInaceptable ? 'kair-mp-prior__acept-badge--no' : 'kair-mp-prior__acept-badge--yes';
-  return '<span class="kair-mp-prior__acept-badge ' + cls + '" style="border-color:' + color + ';color:' + color + ';">' + label + '</span>';
-}
-
-function _renderTableHeader(nivel) {
-  var html = '<div class="kair-mp-prior__table-header">';
+function _renderTableHeader() {
+  var html = '<thead><tr>';
   for (var i = 0; i < TABLE_COLS.length; i++) {
     var col = TABLE_COLS[i];
     var isActive = _sortCol === col.key;
     var arrow = isActive ? (_sortDir === 'asc' ? ' ↑' : ' ↓') : '';
-    var cls = 'kair-mp-prior__th kair-mp-prior__th--' + col.type;
+    var cls = 'kair-mp-prior__th';
     if (isActive) cls += ' kair-mp-prior__th--active';
-    html += '<div class="' + cls + '" data-sort="' + col.key + '" data-nivel="' + nivel + '" style="min-width:' + col.width + ';">' + col.label + arrow + '</div>';
+    if (col.type === 'number') cls += ' kair-mp-prior__th--num';
+    if (col.type === 'computed') cls += ' kair-mp-prior__th--computed';
+    html += '<th class="' + cls + '" data-sort="' + col.key + '">' + col.label.replace(/\n/g, '<br>') + arrow + '</th>';
   }
-  html += '<div class="kair-mp-prior__th kair-mp-prior__th--acept" style="min-width:90px;">Aceptabilidad</div>';
-  html += '</div>';
+  html += '</tr></thead>';
   return html;
 }
 
 function _renderTableRow(p, nivel) {
-  var nrBg = GTC45_COLORS[nivel] || '#6b7280';
-  var html = '<div class="kair-mp-prior__table-row">';
-  html += '<div class="kair-mp-prior__td kair-mp-prior__td--nr" style="background:' + nrBg + '18;color:' + nrBg + ';font-weight:700;">' + (p.nr != null ? p.nr : '—') + '</div>';
-  html += '<div class="kair-mp-prior__td">' + _escHtml(p.tipo || '—') + '</div>';
-  html += '<div class="kair-mp-prior__td kair-mp-prior__td--peligro">' + _escHtml(p.peligro || '—') + '</div>';
-  html += '<div class="kair-mp-prior__td">' + _escHtml(p.efectosPosibles || '—') + '</div>';
-  html += '<div class="kair-mp-prior__td">' + _escHtml(p.expuestos != null ? p.expuestos : '—') + '</div>';
-  html += '<div class="kair-mp-prior__td kair-mp-prior__td--num">' + (p.nd != null ? p.nd : '—') + '</div>';
-  html += '<div class="kair-mp-prior__td kair-mp-prior__td--num">' + (p.ne != null ? p.ne : '—') + '</div>';
-  html += '<div class="kair-mp-prior__td kair-mp-prior__td--num">' + (p.np != null ? p.np : '—') + '</div>';
-  html += '<div class="kair-mp-prior__td kair-mp-prior__td--num">' + (p.nc != null ? p.nc : '—') + '</div>';
-  html += '<div class="kair-mp-prior__td">' + _escHtml(p.sede || '—') + '</div>';
-  html += '<div class="kair-mp-prior__td">' + _escHtml(p.proceso || '—') + '</div>';
-  html += '<div class="kair-mp-prior__td">' + _escHtml(p.cargo || '—') + '</div>';
-  html += '<div class="kair-mp-prior__td">' + _renderAceptBadge(nivel) + '</div>';
-  html += '</div>';
+  var html = '<tr class="kair-mp-prior__peligro-row">';
+  for (var i = 0; i < TABLE_COLS.length; i++) {
+    var col = TABLE_COLS[i];
+    var val = p[col.key];
+    var cls = 'kair-mp-prior__td';
+    if (col.type === 'computed') {
+      cls += ' kair-mp-acc__cell--computed';
+      if (col.key === 'nr') {
+        cls += ' kair-mp-acc__cell--nr';
+      }
+      if ((col.key === 'nr' || col.key === 'nrNivel' || col.key === 'nrLabel') && nivel) {
+        cls += ' kair-mp-acc__cell--nivel-' + nivel;
+      }
+      html += '<td class="' + cls + '">' + (val != null ? _escHtml(String(val)) : '—') + '</td>';
+    } else if (col.type === 'number') {
+      cls += ' kair-mp-prior__td--num';
+      html += '<td class="' + cls + '">' + (val != null ? val : '—') + '</td>';
+    } else {
+      html += '<td class="' + cls + '">' + _escHtml(val || '—') + '</td>';
+    }
+  }
+  html += '</tr>';
   return html;
 }
 
@@ -198,11 +208,15 @@ function _renderGroup(grupo) {
   if (count === 0) {
     html += '<div class="kair-mp-prior__empty-row"><i class="bi bi-check2-circle" style="font-size:1.2rem;opacity:0.4;"></i> <span>Sin peligros en este nivel</span></div>';
   } else {
-    html += _renderTableHeader(grupo.nivel);
-    html += '<div class="kair-mp-prior__table-body">';
+    html += '<div class="kair-mp-acc__table-wrapper">';
+    html += '<table class="kair-mp-acc__table kair-mp-prior__table">';
+    html += _renderTableHeader();
+    html += '<tbody>';
     for (var i = 0; i < sorted.length; i++) {
       html += _renderTableRow(sorted[i], grupo.nivel);
     }
+    html += '</tbody>';
+    html += '</table>';
     html += '</div>';
   }
   html += '</div>';
@@ -267,8 +281,7 @@ function _handleSort(e) {
   var th = e.target.closest('.kair-mp-prior__th');
   if (!th) return;
   var col = th.getAttribute('data-sort');
-  var nivel = th.getAttribute('data-nivel');
-  if (!col || !nivel) return;
+  if (!col) return;
 
   if (_sortCol === col) {
     _sortDir = _sortDir === 'asc' ? 'desc' : 'asc';

@@ -388,9 +388,10 @@ renameCargo: (companyName, cargoId, nombre) => ipcRenderer.invoke('matriz-peligr
     updateMetadata: (companyName, metadata) => ipcRenderer.invoke('matriz-peligros:update-metadata', companyName, metadata),
     notasAnaliticas: (companyName) => ipcRenderer.invoke('matriz-peligros:notas-analiticas', companyName),
       gtc45Options: () => ipcRenderer.invoke('matriz-peligros:gtc45-options'),
-      discoverXlsx: (companyName) => ipcRenderer.invoke('matriz-peligros:discover-xlsx', companyName),
-      importXlsx: (companyName, filePath) => ipcRenderer.invoke('matriz-peligros:import-xlsx', companyName, filePath),
-    },
+    discoverXlsx: (companyName) => ipcRenderer.invoke('matriz-peligros:discover-xlsx', companyName),
+    importXlsx: (companyName, filePath) => ipcRenderer.invoke('matriz-peligros:import-xlsx', companyName, filePath),
+    syncXlsx: (companyName) => ipcRenderer.invoke('matriz-peligros:sync-xlsx', companyName),
+  },
 
   // --- Eventos IPC ---
   send: (channel, data) => ipcRenderer.send(channel, data),

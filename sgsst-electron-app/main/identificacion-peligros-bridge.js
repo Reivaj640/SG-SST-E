@@ -2,11 +2,12 @@
 K+AIR — Módulo 4.1.2 Identificación de Peligros
 Bridge — JSON CRUD + Motor GTC-45 (ND×NE=NP, NP×NC=NR)
 Persistencia: JSON en {userData}/identificacion-peligros-data/
-Export Excel: Fase 2 (Python openpyxl)
+Auto-Sync XLSX: Export Excel con ExcelJS (backup + rollback)
 ========================================================================== */
 var path = require('path');
 var fs = require('fs');
 var xlsx = require('xlsx');
+var ExcelJS = require('exceljs');
 
 var _app = null;
 var _getCompanyRootPath = null;
@@ -442,6 +443,7 @@ function _crearMatrizVacia(companyName) {
     version: 1,
     companyName: companyName || '',
     lastModified: new Date().toISOString(),
+    sourceXlsxPath: null,
     metadata: {
       formatCode: 'GI-FO-019',
       version: 'V0',
@@ -750,8 +752,299 @@ function _findMatrizXlsx(dir) {
 		try { if (!fs.statSync(full2).isFile()) continue; } catch (e) { continue; }
 		var lower2 = f2.toLowerCase();
 		if (lower2.endsWith('.xlsx') || lower2.endsWith('.xls')) return full2;
-	}
-	return null;
+}
+  return null;
+}
+
+/* ─── XLSX Auto-Sync: Backup, Flatten, Export ────────────────────────── */
+
+var _xlsxWriteQueues = {};
+function _serializedXlsxWrite(filePath, writeFn) {
+  var key = filePath.toLowerCase();
+  if (!_xlsxWriteQueues[key]) _xlsxWriteQueues[key] = Promise.resolve();
+  _xlsxWriteQueues[key] = _xlsxWriteQueues[key].catch(function() {}).then(writeFn);
+  return _xlsxWriteQueues[key];
+}
+
+function _createXlsxBackup(filePath, dir) {
+  if (!filePath || !fs.existsSync(filePath)) return null;
+  var backupDir = path.join(dir || path.dirname(filePath), 'backup');
+  if (!fs.existsSync(backupDir)) { try { fs.mkdirSync(backupDir, { recursive: true }); } catch (e) { return null; } }
+  var ts = new Date().toISOString().replace(/[:.]/g, '-');
+  var backupPath = path.join(backupDir, path.basename(filePath) + '_' + ts + '.bak');
+  try { fs.copyFileSync(filePath, backupPath); return backupPath; } catch (e) { return null; }
+}
+
+var XLSX_COL_HEADERS = [
+  'SEDE', 'PROCESO', 'CARGO', 'ZONA', 'ACTIVIDADES', 'TAREAS', 'RUTINARIA',
+  'TIPO DE PELIGRO', 'DESCRIPCION DEL PELIGRO', 'EFECTOS POSIBLES',
+  'NRO. EXPUESTOS', 'PEOR CONSECUENCIA',
+  'ND', 'NE', 'NP', 'INTERPRETACION NP', 'NC', 'NR',
+  'NIVEL DE RIESGO', 'ACEPTABILIDAD',
+  'CRITERIO ESTABLECIDO',
+  'FUENTE', 'MEDIO', 'INDIVIDUO',
+  'MEDIDAS EXISTENTES FUENTE', 'MEDIDAS EXISTENTES MEDIO', 'MEDIDAS EXISTENTES INDIVIDUO',
+  'MEDIDA INTERVENCION', 'RESPONSABLE', 'PLAZO', 'OBSERVACIONES'
+];
+
+function _flattenMatrizToRows(matriz) {
+  var rows = [];
+  if (!matriz || !matriz.sedes) return rows;
+  for (var s = 0; s < matriz.sedes.length; s++) {
+    var sede = matriz.sedes[s];
+    if (!sede.procesos) continue;
+    for (var p = 0; p < sede.procesos.length; p++) {
+      var proc = sede.procesos[p];
+      if (!proc.cargos) continue;
+      for (var c = 0; c < proc.cargos.length; c++) {
+        var cargo = proc.cargos[c];
+        if (!cargo.peligros || !cargo.peligros.length) continue;
+        for (var pe = 0; pe < cargo.peligros.length; pe++) {
+          var pel = cargo.peligros[pe];
+          rows.push({
+            sede: sede.nombre || '',
+            proceso: proc.nombre || '',
+            cargo: cargo.nombre || '',
+            zona: cargo.zona || '',
+            actividades: cargo.actividades || '',
+            tareas: cargo.tareas || '',
+            rutinaria: cargo.rutinaria != null ? (cargo.rutinaria ? 'Si' : 'No') : '',
+            tipo: pel.tipo || '',
+            peligro: pel.peligro || '',
+            efectosPosibles: pel.efectosPosibles || '',
+            expuestos: pel.expuestos != null ? pel.expuestos : '',
+            peorConsecuencia: pel.peorConsecuencia || '',
+            nd: pel.nd != null ? pel.nd : '',
+            ne: pel.ne != null ? pel.ne : '',
+            np: pel.np != null ? pel.np : '',
+            npInterpretacion: pel.npInterpretacion || '',
+            nc: pel.nc != null ? pel.nc : '',
+            nr: pel.nr != null ? pel.nr : '',
+            nrNivel: pel.nrNivel || '',
+            nrLabel: pel.nrLabel || '',
+            criterioEstablecido: pel.criterioEstablecido || '',
+            fuente: pel.fuente || '',
+            medio: pel.medio || '',
+            individuo: pel.individuo || '',
+            medidasExistenteFuente: pel.medidasExistenteFuente || '',
+            medidasExistenteMedio: pel.medidasExistenteMedio || '',
+            medidasExistenteIndividuo: pel.medidasExistenteIndividuo || '',
+            medidasIntervencion: pel.medidasIntervencion || '',
+            responsable: pel.responsable || '',
+            plazo: pel.plazo || '',
+            observaciones: pel.observaciones || ''
+          });
+        }
+      }
+    }
+  }
+  return rows;
+}
+
+var XLSX_FIELD_ORDER = [
+  'sede', 'proceso', 'cargo', 'zona', 'actividades', 'tareas', 'rutinaria',
+  'tipo', 'peligro', 'efectosPosibles', 'expuestos', 'peorConsecuencia',
+  'nd', 'ne', 'np', 'npInterpretacion', 'nc', 'nr', 'nrNivel', 'nrLabel',
+  'criterioEstablecido', 'fuente', 'medio', 'individuo',
+  'medidasExistenteFuente', 'medidasExistenteMedio', 'medidasExistenteIndividuo',
+  'medidasIntervencion', 'responsable', 'plazo', 'observaciones'
+];
+
+var HEADER_KEYWORDS = {
+  sede: ['SEDE'],
+  proceso: ['PROCESO', 'AREA', 'ÁREA'],
+  cargo: ['CARGO', 'OCUPACION', 'OCUPACIÓN', 'PUESTO'],
+  zona: ['ZONA', 'LUGAR', 'ZONA/LUGAR'],
+  actividades: ['ACTIVIDADES'],
+  tareas: ['TAREAS', 'TAREA'],
+  rutinaria: ['RUTINARIA', 'RUTINARIO'],
+  tipo: ['TIPO DE PELIGRO', 'TIPO DE RIESGO', 'CLASIFICACION', 'CLASIFICACIÓN', 'TIPO'],
+  peligro: ['DESCRIPCION DEL PELIGRO', 'DESCRIPCIÓN DEL PELIGRO', 'FACTOR DE RIESGO', 'DESCRIPCION', 'DESCRIPCIÓN'],
+  efectosPosibles: ['EFECTOS POSIBLES', 'EFECTO', 'POSIBLES DAÑOS', 'CONSECUENCIA'],
+  nd: ['ND', 'NIVEL DE DEFICIENCIA'],
+  ne: ['NE', 'NIVEL DE EXPOSICION', 'NIVEL DE EXPOSICIÓN'],
+  np: ['NP', 'NIVEL DE PROBABILIDAD'],
+  npInterpretacion: ['INTERPRETACION NP', 'INTERPRETACIÓN NP'],
+  nc: ['NC', 'NIVEL DE CONSECUENCIA'],
+  nr: ['NR', 'NIVEL DE RIESGO'],
+  nrLabel: ['ACEPTABILIDAD', 'NIVEL DE RIESGO Y ACEPTABILIDAD'],
+  criterioEstablecido: ['CRITERIO ESTABLECIDO', 'CRITERIO DE LAS CONSECUENCIAS', 'CRITERIOS PARA ESTABLECER CONTROLES', 'CRITERIOS'],
+  fuente: ['FUENTE', 'MEDIDA FUENTE'],
+  medio: ['MEDIO', 'MEDIDA MEDIO', 'MEDIO AMBIENTE', 'MEDIO DE TRANSMISION', 'MEDIO DE TRANSMISIÓN'],
+  individuo: ['INDIVIDUO', 'MEDIDA INDIVIDUO', 'TRABAJADOR'],
+  medidasExistenteFuente: ['MEDIDAS EXISTENTES FUENTE', 'MEDIDAS DE CONTROL FUENTE', 'CONTROL FUENTE'],
+  medidasExistenteMedio: ['MEDIDAS EXISTENTES MEDIO', 'MEDIDAS DE CONTROL MEDIO', 'CONTROL MEDIO'],
+  medidasExistenteIndividuo: ['MEDIDAS EXISTENTES INDIVIDUO', 'MEDIDAS DE CONTROL INDIVIDUO', 'CONTROL INDIVIDUO'],
+  eliminacion: ['ELIMINACION', 'ELIMINACIÓN'],
+  sustitucion: ['SUSTITUCION', 'SUSTITUCIÓN'],
+  controlIngenieria: ['CONTROLES DE INGENIERÍA', 'CONTROLES DE INGENIERIA', 'CONTROL DE INGENIERÍA', 'CONTROL DE INGENIERIA'],
+  senalizacion: ['SEÑALIZACIÓN', 'SEÑALIZACION', 'SEÑALIZACIÓN/ADVERTENCIA', 'SEÑALIZACION/ADVERTENCIA', 'SEÑALIZACIÓN. ADVERTENCIA', 'SEÑALIZACION. ADVERTENCIA'],
+  epp: ['EPP', 'EQUIPOS DE PROTECCIÓN PERSONAL', 'EQUIPOS DE PROTECCION PERSONAL', 'EQUIPO DE PROTECCIÓN PERSONAL'],
+  expuestos: ['NRO EXPUESTOS', 'NRO. EXPUESTOS', 'NÚMERO DE EXPUESTOS', 'NUMERO DE EXPUESTOS', 'EXPUESTOS'],
+  peorConsecuencia: ['PEOR CONSECUENCIA'],
+  responsable: ['RESPONSABLE'],
+  plazo: ['PLAZO'],
+  observaciones: ['OBSERVACIONES', 'OBSERVACION', 'OBSERVACIÓN']
+};
+
+async function _createNewXlsxFile(xlsxPath, matriz) {
+  var workbook = new ExcelJS.Workbook();
+  var ws = workbook.addWorksheet('Matriz de Peligros');
+
+  var headerRow = ws.addRow(XLSX_COL_HEADERS);
+  headerRow.eachCell(function(cell) {
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF174EA6' } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = {
+      top: { style: 'thin' }, left: { style: 'thin' },
+      bottom: { style: 'thin' }, right: { style: 'thin' }
+    };
+  });
+
+  var rows = _flattenMatrizToRows(matriz);
+  for (var i = 0; i < rows.length; i++) {
+    var rowData = rows[i];
+    var values = [];
+    for (var f = 0; f < XLSX_FIELD_ORDER.length; f++) {
+      values.push(rowData[XLSX_FIELD_ORDER[f]]);
+    }
+    var dataRow = ws.addRow(values);
+    dataRow.eachCell(function(cell) {
+      cell.alignment = { vertical: 'middle', wrapText: true };
+      cell.border = {
+        top: { style: 'thin' }, left: { style: 'thin' },
+        bottom: { style: 'thin' }, right: { style: 'thin' }
+      };
+    });
+  }
+
+  for (var c = 1; c <= XLSX_COL_HEADERS.length; c++) {
+    ws.getColumn(c).width = 18;
+  }
+
+  var dir = path.dirname(xlsxPath);
+  if (!fs.existsSync(dir)) { try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {} }
+
+  await workbook.xlsx.writeFile(xlsxPath);
+  return rows.length;
+}
+
+async function _exportMatrizToXlsx(xlsxPath, matriz) {
+  var dir = path.dirname(xlsxPath);
+  if (!fs.existsSync(dir)) { try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {} }
+
+  if (!fs.existsSync(xlsxPath)) {
+    return await _createNewXlsxFile(xlsxPath, matriz);
+  }
+
+  var backupPath = _createXlsxBackup(xlsxPath, dir);
+
+  try {
+    var workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(xlsxPath);
+
+    var ws = null;
+    for (var si = 0; si < workbook.worksheets.length; si++) {
+      var sn = workbook.worksheets[si].name.toUpperCase();
+      if (sn.indexOf('MATRIZ') !== -1 || sn.indexOf('PELIGRO') !== -1 || sn.indexOf('GTC') !== -1 || sn.indexOf('IDENTIFICACI') !== -1) {
+        ws = workbook.worksheets[si];
+        break;
+      }
+    }
+    if (!ws) ws = workbook.getWorksheet(1);
+    if (!ws) {
+      if (backupPath && fs.existsSync(backupPath)) { try { fs.unlinkSync(backupPath); } catch (e) {} }
+      return await _createNewXlsxFile(xlsxPath, matriz);
+    }
+
+    var headerRowNum = -1;
+    var colMap = {};
+    ws.eachRow(function(row, rowNumber) {
+      if (headerRowNum > 0) return;
+      row.eachCell(function(cell, colNumber) {
+        var cellText = String(cell.value || '').toUpperCase().trim();
+        if (!cellText) return;
+        for (var fi = 0; fi < XLSX_FIELD_ORDER.length; fi++) {
+          var fieldName = XLSX_FIELD_ORDER[fi];
+          var keywords = HEADER_KEYWORDS[fieldName];
+          if (!keywords) continue;
+          if (colMap[fieldName]) continue;
+          for (var ki = 0; ki < keywords.length; ki++) {
+            if (cellText === keywords[ki] || cellText.indexOf(keywords[ki]) !== -1) {
+              colMap[fieldName] = colNumber;
+              headerRowNum = rowNumber;
+              break;
+            }
+          }
+        }
+      });
+    });
+
+    if (headerRowNum < 0) {
+      if (backupPath && fs.existsSync(backupPath)) { try { fs.unlinkSync(backupPath); } catch (e) {} }
+      return await _createNewXlsxFile(xlsxPath, matriz);
+    }
+
+    var dataStartRow = headerRowNum + 1;
+    var rows = _flattenMatrizToRows(matriz);
+    var existingRowCount = ws.rowCount - headerRowNum;
+
+    for (var ri = 0; ri < rows.length; ri++) {
+      var rowNum = dataStartRow + ri;
+      var rowData = rows[ri];
+      for (var fi2 = 0; fi2 < XLSX_FIELD_ORDER.length; fi2++) {
+        var fn = XLSX_FIELD_ORDER[fi2];
+        var colNum = colMap[fn];
+        if (!colNum) continue;
+        var cellVal = rowData[fn];
+        if (cellVal === '') cellVal = null;
+        try {
+          var existingCell = ws.getCell(rowNum, colNum);
+          if (existingCell) {
+            existingCell.value = cellVal;
+          } else {
+            ws.getCell(rowNum, colNum).value = cellVal;
+          }
+        } catch (e2) {
+          try { ws.getCell(rowNum, colNum).value = cellVal; } catch (e3) {}
+        }
+      }
+      var dataRow = ws.getRow(rowNum);
+      try {
+        dataRow.eachCell(function(cell) {
+          cell.border = {
+            top: { style: 'thin' }, left: { style: 'thin' },
+            bottom: { style: 'thin' }, right: { style: 'thin' }
+          };
+        });
+      } catch (e4) {}
+    }
+
+    if (existingRowCount > rows.length) {
+      for (var delRi = rows.length; delRi < existingRowCount; delRi++) {
+        try {
+          var delRow = ws.getRow(dataStartRow + rows.length);
+          if (delRow) {
+            delRow.eachCell(function(cell) { cell.value = null; });
+          }
+        } catch (e5) { break; }
+      }
+    }
+
+    await workbook.xlsx.writeFile(xlsxPath);
+
+    if (backupPath && fs.existsSync(backupPath)) {
+      try { fs.unlinkSync(backupPath); } catch (e) {}
+    }
+
+    return rows.length;
+  } catch (e) {
+    if (backupPath && fs.existsSync(backupPath)) {
+      try { fs.copyFileSync(backupPath, xlsxPath); } catch (re) {}
+    }
+    throw e;
+  }
 }
 
 function _parseMatrizXlsx(filePath) {
@@ -766,44 +1059,7 @@ function _parseMatrizXlsx(filePath) {
 	}
 	if (!sheetName) sheetName = workbook.SheetNames[0];
 	var ws = workbook.Sheets[sheetName];
-	var rows = xlsx.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
-
-  var HEADER_KEYWORDS = {
-    sede: ['SEDE'],
-    proceso: ['PROCESO', 'AREA', 'ÁREA'],
-    cargo: ['CARGO', 'OCUPACION', 'OCUPACIÓN', 'PUESTO'],
-    zona: ['ZONA', 'LUGAR', 'ZONA/LUGAR'],
-    actividades: ['ACTIVIDADES'],
-    tareas: ['TAREAS', 'TAREA'],
-    rutinaria: ['RUTINARIA', 'RUTINARIO'],
-    tipo: ['TIPO DE PELIGRO', 'TIPO DE RIESGO', 'CLASIFICACION', 'CLASIFICACIÓN', 'TIPO'],
-    peligro: ['DESCRIPCION DEL PELIGRO', 'DESCRIPCIÓN DEL PELIGRO', 'FACTOR DE RIESGO', 'DESCRIPCION', 'DESCRIPCIÓN'],
-    efectosPosibles: ['EFECTOS POSIBLES', 'EFECTO', 'POSIBLES DAÑOS', 'CONSECUENCIA'],
-    nd: ['ND', 'NIVEL DE DEFICIENCIA'],
-    ne: ['NE', 'NIVEL DE EXPOSICION', 'NIVEL DE EXPOSICIÓN'],
-    np: ['NP', 'NIVEL DE PROBABILIDAD'],
-    npInterpretacion: ['INTERPRETACION NP', 'INTERPRETACIÓN NP'],
-    nc: ['NC', 'NIVEL DE CONSECUENCIA'],
-    nr: ['NR', 'NIVEL DE RIESGO'],
-    nrLabel: ['ACEPTABILIDAD', 'NIVEL DE RIESGO Y ACEPTABILIDAD'],
-    criterioEstablecido: ['CRITERIO ESTABLECIDO', 'CRITERIO DE LAS CONSECUENCIAS', 'CRITERIOS PARA ESTABLECER CONTROLES', 'CRITERIOS'],
-    fuente: ['FUENTE', 'MEDIDA FUENTE'],
-    medio: ['MEDIO', 'MEDIDA MEDIO', 'MEDIO AMBIENTE', 'MEDIO DE TRANSMISION', 'MEDIO DE TRANSMISIÓN'],
-    individuo: ['INDIVIDUO', 'MEDIDA INDIVIDUO', 'TRABAJADOR'],
-    medidasExistenteFuente: ['MEDIDAS EXISTENTES FUENTE', 'MEDIDAS DE CONTROL FUENTE', 'CONTROL FUENTE'],
-    medidasExistenteMedio: ['MEDIDAS EXISTENTES MEDIO', 'MEDIDAS DE CONTROL MEDIO', 'CONTROL MEDIO'],
-    medidasExistenteIndividuo: ['MEDIDAS EXISTENTES INDIVIDUO', 'MEDIDAS DE CONTROL INDIVIDUO', 'CONTROL INDIVIDUO'],
-    eliminacion: ['ELIMINACION', 'ELIMINACIÓN'],
-    sustitucion: ['SUSTITUCION', 'SUSTITUCIÓN'],
-    controlIngenieria: ['CONTROLES DE INGENIERÍA', 'CONTROLES DE INGENIERIA', 'CONTROL DE INGENIERÍA', 'CONTROL DE INGENIERIA'],
-    senalizacion: ['SEÑALIZACIÓN', 'SEÑALIZACION', 'SEÑALIZACIÓN/ADVERTENCIA', 'SEÑALIZACION/ADVERTENCIA', 'SEÑALIZACIÓN. ADVERTENCIA', 'SEÑALIZACION. ADVERTENCIA'],
-    epp: ['EPP', 'EQUIPOS DE PROTECCIÓN PERSONAL', 'EQUIPOS DE PROTECCION PERSONAL', 'EQUIPO DE PROTECCIÓN PERSONAL'],
-    expuestos: ['NRO EXPUESTOS', 'NRO. EXPUESTOS', 'NÚMERO DE EXPUESTOS', 'NUMERO DE EXPUESTOS', 'EXPUESTOS'],
-    peorConsecuencia: ['PEOR CONSECUENCIA'],
-    responsable: ['RESPONSABLE'],
-    plazo: ['PLAZO'],
-    observaciones: ['OBSERVACIONES', 'OBSERVACION', 'OBSERVACIÓN']
-  };
+var rows = xlsx.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
 
   var SKIP_FIELDS = { np: true, npInterpretacion: true, nr: true, nrLabel: true };
   var SUB_HEADER_FIELDS = { nd: true, ne: true, nc: true, nr: true, nrLabel: true, tipo: true, peligro: true, fuente: true, medio: true, individuo: true, np: true, npInterpretacion: true, expuestos: true, eliminacion: true, sustitucion: true, controlIngenieria: true, senalizacion: true, epp: true, peorConsecuencia: true };
@@ -1429,8 +1685,9 @@ var companyRoot = _getCompanyRootPath ? await _getCompanyRootPath(companyName) :
           }
         }
       }
-      existing.lastModified = new Date().toISOString();
-      _writeMatriz(companyName, existing);
+  existing.lastModified = new Date().toISOString();
+  existing.sourceXlsxPath = filePath;
+  _writeMatriz(companyName, existing);
       return {
         success: true,
         data: {
@@ -1441,8 +1698,41 @@ var companyRoot = _getCompanyRootPath ? await _getCompanyRootPath(companyName) :
           errors: parsed.errors
         }
       };
+  } catch (e) {
+    return { success: false, error: { code: 'IMPORT_ERROR', message: e.message } };
+  }
+});
+
+  ipcMain.handle('matriz-peligros:sync-xlsx', async function(_e, companyName) {
+    try {
+      var matriz = _readMatriz(companyName);
+      _enriquecerMatriz(matriz);
+
+      var xlsxPath = matriz.sourceXlsxPath;
+      if (!xlsxPath || !fs.existsSync(xlsxPath)) {
+        var companyRoot = _getCompanyRootPath ? await _getCompanyRootPath(companyName) : null;
+        if (!companyRoot) return { success: false, error: { code: 'NO_COMPANY', message: 'No se encontró la ruta de la empresa' } };
+        var dir = _getCompanyPeligrosDir(companyRoot);
+        xlsxPath = _findMatrizXlsx(dir);
+
+        if (!xlsxPath) {
+          var safe = (companyName || '').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ _-]/g, '_');
+          xlsxPath = path.join(dir, safe + '-Matriz-Peligros.xlsx');
+        }
+
+        matriz.sourceXlsxPath = xlsxPath;
+        _writeMatriz(companyName, matriz);
+      }
+
+      var capturedPath = xlsxPath;
+      var capturedMatriz = matriz;
+
+      return await _serializedXlsxWrite(xlsxPath, async function() {
+        var rowsWritten = await _exportMatrizToXlsx(capturedPath, capturedMatriz);
+        return { success: true, data: { filePath: capturedPath, rowsWritten: rowsWritten } };
+      });
     } catch (e) {
-      return { success: false, error: { code: 'IMPORT_ERROR', message: e.message } };
+      return { success: false, error: { code: 'SYNC_ERROR', message: e.message } };
     }
   });
 }

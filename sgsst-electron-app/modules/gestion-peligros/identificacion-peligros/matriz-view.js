@@ -35,12 +35,14 @@ Patrón: window.MatrizView = { load, destroy } — Direct DOM
   ];
 
   var DEBOUNCE_MS = 600;
+var XLSX_SYNC_MS = 3000;
 
   var _companyName = null;
   var _matriz = null;
   var _stats = null;
   var _gtc45Options = null;
   var _saveTimer = null;
+var _xlsxSyncTimer = null;
   var _pendingChanges = {};
   var _editingCellId = null;
   var _filterSede = '__all__';
@@ -80,23 +82,47 @@ Patrón: window.MatrizView = { load, destroy } — Direct DOM
       grouped[peligroId][field] = changes[k];
     });
 
-    var peligroIds = Object.keys(grouped);
-    peligroIds.forEach(function (pid) {
-      IdentificacionPeligrosService.updatePeligro(_companyName, pid, grouped[pid])
-        .then(function (result) {
-          if (result && result.success && result.data) {
-            _updateComputedCells(pid, result.data);
-          } else {
-            IdentificacionPeligrosService.toast('Error al guardar cambios', 'error');
+  var peligroIds = Object.keys(grouped);
+  peligroIds.forEach(function (pid) {
+    IdentificacionPeligrosService.updatePeligro(_companyName, pid, grouped[pid])
+      .then(function (result) {
+        if (result && result.success && result.data) {
+          var pel = _findPeligroById(pid);
+          if (pel) {
+            var keys2 = Object.keys(result.data);
+            for (var ki = 0; ki < keys2.length; ki++) {
+              pel[keys2[ki]] = result.data[keys2[ki]];
+            }
           }
-        })
-        .catch(function (err) {
-          IdentificacionPeligrosService.toast('Error de guardado: ' + (err.message || ''), 'error');
-        });
-    });
-  }
+          _updateComputedCells(pid, result.data);
+        _debouncedXlsxSync();
+        } else {
+          IdentificacionPeligrosService.toast('Error al guardar cambios', 'error');
+        }
+      })
+      .catch(function (err) {
+        IdentificacionPeligrosService.toast('Error de guardado: ' + (err.message || ''), 'error');
+      });
+  });
+}
 
-  /* ─── Computed cell update (in-place, no full re-render) ──────────────── */
+/* ─── XLSX Auto-Sync (fire-and-forget, debounced 3s) ────────────────── */
+function _debouncedXlsxSync() {
+  if (_xlsxSyncTimer) clearTimeout(_xlsxSyncTimer);
+  _xlsxSyncTimer = setTimeout(function () {
+    _xlsxSyncTimer = null;
+    if (!_companyName) return;
+    IdentificacionPeligrosService.syncXlsx(_companyName)
+      .then(function (result) {
+        if (!result || !result.success) {
+          IdentificacionPeligrosService.toast('Sync XLSX: ' + (result && result.error && result.error.message || 'sin ruta'), 'warning');
+        }
+      })
+      .catch(function () {});
+  }, XLSX_SYNC_MS);
+}
+
+/* ─── Computed cell update (in-place, no full re-render) ──────────────── */
 
 /* --- Cargo field save engine --- */
 var _cargoSaveTimers = {};
@@ -119,9 +145,11 @@ function _flushCargoChanges(cargoId) {
  if (!keys.length) return;
  IdentificacionPeligrosService.updateCargo(_companyName, cargoId, changes)
  .then(function(result) {
- if (!result || !result.success) {
- IdentificacionPeligrosService.toast('Error al guardar datos del cargo', 'error');
- }
+      if (!result || !result.success) {
+        IdentificacionPeligrosService.toast('Error al guardar datos del cargo', 'error');
+      } else {
+        _debouncedXlsxSync();
+      }
  })
  .catch(function(err) {
  IdentificacionPeligrosService.toast('Error de guardado cargo: ' + (err.message || ''), 'error');
@@ -411,26 +439,27 @@ function _flushCargoChanges(cargoId) {
     var cellId = peligro.id + '@@' + col.key;
     var isEditing = _editingCellId === cellId;
 
-    if (col.type === 'select-nd' || col.type === 'select-ne' || col.type === 'select-nc' || col.type === 'select-tipo') {
-      var options = '';
-      if (col.type === 'select-nd') options = _buildSelectOptions(_gtc45Options ? _gtc45Options.nd : [], peligro[col.key]);
-      else if (col.type === 'select-ne') options = _buildSelectOptions(_gtc45Options ? _gtc45Options.ne : [], peligro[col.key]);
-      else if (col.type === 'select-nc') options = _buildSelectOptions(_gtc45Options ? _gtc45Options.nc : [], peligro[col.key]);
-      else if (col.type === 'select-tipo') options = _buildTipoOptions(_gtc45Options ? _gtc45Options.tipos : [], peligro[col.key]);
+  if (col.type === 'select-nd' || col.type === 'select-ne' || col.type === 'select-nc' || col.type === 'select-tipo') {
+    var selVal = (_pendingChanges[cellId] !== undefined) ? _pendingChanges[cellId] : peligro[col.key];
+    var options = '';
+    if (col.type === 'select-nd') options = _buildSelectOptions(_gtc45Options ? _gtc45Options.nd : [], selVal);
+    else if (col.type === 'select-ne') options = _buildSelectOptions(_gtc45Options ? _gtc45Options.ne : [], selVal);
+    else if (col.type === 'select-nc') options = _buildSelectOptions(_gtc45Options ? _gtc45Options.nc : [], selVal);
+    else if (col.type === 'select-tipo') options = _buildTipoOptions(_gtc45Options ? _gtc45Options.tipos : [], selVal);
 
       return '<td class="kair-mp-acc__cell kair-mp-acc__cell--select" data-col="' + col.key + '" data-cell-id="' + cellId + '">' +
         '<select class="kair-mp-acc__cell-select" data-peligro-id="' + peligro.id + '" data-field="' + col.key + '">' + options + '</select>' +
         '</td>';
     }
 
-    var val3 = peligro[col.key] != null ? peligro[col.key] : '';
-    if (isEditing) {
-      return '<td class="kair-mp-acc__cell kair-mp-acc__cell--editing" data-col="' + col.key + '" data-cell-id="' + cellId + '">' +
-        '<input class="kair-mp-acc__cell-input" type=' + (col.type === 'number' ? 'number' : 'text') + ' value="' + _escHtml(val3) + '" data-peligro-id="' + peligro.id + '" data-field="' + col.key + '" data-auto-focus>' +
-        '</td>';
-    }
+  var val3 = (_pendingChanges[cellId] !== undefined) ? _pendingChanges[cellId] : (peligro[col.key] != null ? peligro[col.key] : '');
+  if (isEditing) {
+    return '<td class="kair-mp-acc__cell kair-mp-acc__cell--editing" data-col="' + col.key + '" data-cell-id="' + cellId + '">' +
+      '<input class="kair-mp-acc__cell-input" type=' + (col.type === 'number' ? 'number' : 'text') + ' value="' + _escHtml(val3) + '" data-peligro-id="' + peligro.id + '" data-field="' + col.key + '" data-auto-focus>' +
+      '</td>';
+  }
 
-    var displayVal = (val3 != null && val3 !== '') ? val3 : '<span class="kair-mp-acc__cell-placeholder">—</span>';
+  var displayVal = (val3 != null && val3 !== '') ? _escHtml(val3) : '<span class="kair-mp-acc__cell-placeholder">—</span>';
     return '<td class="kair-mp-acc__cell kair-mp-acc__cell--editable" data-col="' + col.key + '" data-cell-id="' + cellId + '" data-peligro-id="' + peligro.id + '" data-field="' + col.key + '">' + displayVal + '</td>';
   }
 
@@ -577,29 +606,29 @@ function _flushCargoChanges(cargoId) {
   }
 
   /* ─── Main render ─────────────────────────────────────────────────────── */
-  function _render(container) {
-    if (!_matriz || !_matriz.sedes || !_matriz.sedes.length) {
-      container.innerHTML = _renderEmpty();
-      _bindEvents(container);
-      return;
-    }
-
-    var html = _renderToolbar();
-    html += _renderStatsBar();
-    html += _renderFilterTabs();
-    html += '<div class="kair-mp-acc__container">';
-
-    for (var s = 0; s < _matriz.sedes.length; s++) {
-      var sede = _matriz.sedes[s];
-      if (_filterSede !== '__all__' && _filterSede !== sede.id) continue;
-      html += _renderSedeCard(sede);
-    }
-
-    html += '</div>';
-    container.innerHTML = html;
-    _bindEvents(container);
-    _focusEditingCell();
+function _render(container) {
+  if (!_matriz || !_matriz.sedes || !_matriz.sedes.length) {
+    container.innerHTML = _renderEmpty();
+    _bindDocumentEvents();
+    return;
   }
+
+  var html = _renderToolbar();
+  html += _renderStatsBar();
+  html += _renderFilterTabs();
+  html += '<div class="kair-mp-acc__container">';
+
+  for (var s = 0; s < _matriz.sedes.length; s++) {
+    var sede = _matriz.sedes[s];
+    if (_filterSede !== '__all__' && _filterSede !== sede.id) continue;
+    html += _renderSedeCard(sede);
+  }
+
+  html += '</div>';
+  container.innerHTML = html;
+  _bindDocumentEvents();
+  _focusEditingCell();
+}
 
   function _renderEmpty() {
     return '<div class="kair-mp-acc__empty-state">' +
@@ -621,121 +650,127 @@ function _flushCargoChanges(cargoId) {
     }
   }
 
-  /* ─── Event binding ───────────────────────────────────────────────────── */
-  function _bindEvents(container) {
-    container.addEventListener('click', function (e) {
-      var target = e.target;
+/* ─── Event binding: container (delegated, se llama UNA VEZ en load()) ── */
+function _bindContainerEvents(container) {
+  container.addEventListener('click', function (e) {
+    var target = e.target;
 
-      var actionEl = target.closest('[data-action]');
-      if (actionEl) {
-        var action = actionEl.getAttribute('data-action');
-        _handleAction(action, actionEl, e);
-        return;
-      }
+    var actionEl = target.closest('[data-action]');
+    if (actionEl) {
+      var action = actionEl.getAttribute('data-action');
+      _handleAction(action, actionEl, e);
+      return;
+    }
 
-      var filterTab = target.closest('[data-filter-sede]');
-      if (filterTab) {
-        _filterSede = filterTab.getAttribute('data-filter-sede');
-        _render(container);
-        return;
-      }
+    var filterTab = target.closest('[data-filter-sede]');
+    if (filterTab) {
+      _filterSede = filterTab.getAttribute('data-filter-sede');
+      _render(container);
+      return;
+    }
 
-      var sedeHeader = target.closest('.kair-mp-acc__sede-header');
-      if (sedeHeader && !target.closest('[data-action]')) {
-        var sedeEl = sedeHeader.closest('.kair-mp-acc__sede');
-        if (sedeEl) _toggleSede(sedeEl.getAttribute('data-sede-id'));
-        return;
-      }
+    var sedeHeader = target.closest('.kair-mp-acc__sede-header');
+    if (sedeHeader && !target.closest('[data-action]')) {
+      var sedeEl = sedeHeader.closest('.kair-mp-acc__sede');
+      if (sedeEl) _toggleSede(sedeEl.getAttribute('data-sede-id'));
+      return;
+    }
 
-      var procHeader = target.closest('.kair-mp-acc__proceso-header');
-      if (procHeader && !target.closest('[data-action]')) {
-        var procEl = procHeader.closest('.kair-mp-acc__proceso');
-        if (procEl) _toggleProceso(procEl.getAttribute('data-proceso-id'));
-        return;
-      }
+    var procHeader = target.closest('.kair-mp-acc__proceso-header');
+    if (procHeader && !target.closest('[data-action]')) {
+      var procEl = procHeader.closest('.kair-mp-acc__proceso');
+      if (procEl) _toggleProceso(procEl.getAttribute('data-proceso-id'));
+      return;
+    }
 
-      var cargoHeader = target.closest('.kair-mp-acc__cargo-header');
-      if (cargoHeader && !target.closest('[data-action]')) {
-        var cargoEl = cargoHeader.closest('.kair-mp-acc__cargo');
-        if (cargoEl) _toggleCargo(cargoEl.getAttribute('data-cargo-id'));
-        return;
-      }
+    var cargoHeader = target.closest('.kair-mp-acc__cargo-header');
+    if (cargoHeader && !target.closest('[data-action]')) {
+      var cargoEl = cargoHeader.closest('.kair-mp-acc__cargo');
+      if (cargoEl) _toggleCargo(cargoEl.getAttribute('data-cargo-id'));
+      return;
+    }
 
-      var editableCell = target.closest('.kair-mp-acc__cell--editable');
-      if (editableCell) {
-        _startEditing(editableCell);
-        return;
-      }
-    });
+    var editableCell = target.closest('.kair-mp-acc__cell--editable');
+    if (editableCell) {
+      _startEditing(editableCell);
+      return;
+    }
+  });
 
-    container.addEventListener('change', function (e) {
-      var sel = e.target;
-      if (!sel.classList.contains('kair-mp-acc__cell-select')) return;
-      var peligroId = sel.getAttribute('data-peligro-id');
-      var field = sel.getAttribute('data-field');
-      if (!peligroId || !field) return;
-      var val = sel.value;
-      if (field === 'nd' || field === 'ne' || field === 'nc' || field === 'expuestos') {
-        val = val !== '' ? Number(val) : null;
-      }
-      _pendingChanges[peligroId + '@@' + field] = val;
-      _debouncedSave();
-    });
+  container.addEventListener('change', function (e) {
+    var sel = e.target;
+    if (!sel.classList.contains('kair-mp-acc__cell-select')) return;
+    var peligroId = sel.getAttribute('data-peligro-id');
+    var field = sel.getAttribute('data-field');
+    if (!peligroId || !field) return;
+    var val = sel.value;
+    if (field === 'nd' || field === 'ne' || field === 'nc' || field === 'expuestos') {
+      val = val !== '' ? Number(val) : null;
+    }
+    _pendingChanges[peligroId + '@@' + field] = val;
+    _debouncedSave();
+  });
 
-    container.addEventListener('input', function (e) {
-      var inp = e.target;
-      if (!inp.classList.contains('kair-mp-acc__cell-input')) return;
-      var peligroId = inp.getAttribute('data-peligro-id');
-      var field = inp.getAttribute('data-field');
-      if (!peligroId || !field) return;
-      var _inpVal = inp.value;
- var _colDef = COLS.find(function(c) { return c.key === field; });
- if (_colDef && _colDef.type === 'number' && _inpVal !== '') _inpVal = Number(_inpVal);
- if (_colDef && _colDef.type === 'number' && _inpVal === '') _inpVal = null;
- _pendingChanges[peligroId + '@@' + field] = _inpVal;
-      _debouncedSave();
-    });
+  container.addEventListener('input', function (e) {
+    var inp = e.target;
+    if (!inp.classList.contains('kair-mp-acc__cell-input')) return;
+    var peligroId = inp.getAttribute('data-peligro-id');
+    var field = inp.getAttribute('data-field');
+    if (!peligroId || !field) return;
+    var _inpVal = inp.value;
+    var _colDef = COLS.find(function(c) { return c.key === field; });
+    if (_colDef && _colDef.type === 'number' && _inpVal !== '') _inpVal = Number(_inpVal);
+    if (_colDef && _colDef.type === 'number' && _inpVal === '') _inpVal = null;
+    _pendingChanges[peligroId + '@@' + field] = _inpVal;
+    _debouncedSave();
+  });
 
-   // Cargo meta field handlers
- container.addEventListener('input', function(e) {
- var inp = e.target;
- if (!inp.classList.contains('kair-mp-acc__cargo-input')) return;
- var cargoId = inp.getAttribute('data-cargo-id');
- var field = inp.getAttribute('data-cargo-field');
- if (!cargoId || !field) return;
- _debouncedCargoSave(cargoId, field, inp.value);
- });
+  container.addEventListener('input', function(e) {
+    var inp = e.target;
+    if (!inp.classList.contains('kair-mp-acc__cargo-input')) return;
+    var cargoId = inp.getAttribute('data-cargo-id');
+    var field = inp.getAttribute('data-cargo-field');
+    if (!cargoId || !field) return;
+    _debouncedCargoSave(cargoId, field, inp.value);
+  });
 
- container.addEventListener('change', function(e) {
- var sel = e.target;
- if (!sel.classList.contains('kair-mp-acc__cargo-select')) return;
- var cargoId = sel.getAttribute('data-cargo-id');
- var field = sel.getAttribute('data-cargo-field');
- if (!cargoId || !field) return;
- var val = sel.value;
- if (field === 'rutinaria') {
- val = val === '' ? null : (val === 'true');
- }
- _debouncedCargoSave(cargoId, field, val);
- });
+  container.addEventListener('change', function(e) {
+    var sel = e.target;
+    if (!sel.classList.contains('kair-mp-acc__cargo-select')) return;
+    var cargoId = sel.getAttribute('data-cargo-id');
+    var field = sel.getAttribute('data-cargo-field');
+    if (!cargoId || !field) return;
+    var val = sel.value;
+    if (field === 'rutinaria') {
+      val = val === '' ? null : (val === 'true');
+    }
+    _debouncedCargoSave(cargoId, field, val);
+  });
+}
+
+/* ─── Event binding: document (se llama en _render() con cleanup previo) ── */
+var _containerEventsBound = false;
+
+function _bindDocumentEvents() {
+  _cleanup();
 
   _docClickHandler = function (e) {
-      if (_editingCellId && !e.target.closest('.kair-mp-acc__cell--editing')) {
-        _stopEditing();
-      }
-    };
-    document.addEventListener('mousedown', _docClickHandler);
+    if (_editingCellId && !e.target.closest('.kair-mp-acc__cell--editing')) {
+      _stopEditing();
+    }
+  };
+  document.addEventListener('mousedown', _docClickHandler);
 
-    _keyHandler = function (e) {
-      if (e.key === 'Escape' && _editingCellId) {
-        _stopEditing();
-      }
-      if (e.key === 'Tab' && _editingCellId) {
-        _tabToNextCell(e);
-      }
-    };
-    document.addEventListener('keydown', _keyHandler);
-  }
+  _keyHandler = function (e) {
+    if (e.key === 'Escape' && _editingCellId) {
+      _stopEditing();
+    }
+    if (e.key === 'Tab' && _editingCellId) {
+      _tabToNextCell(e);
+    }
+  };
+  document.addEventListener('keydown', _keyHandler);
+}
 
   /* ─── Click-to-edit: start / stop ─────────────────────────────────────── */
   function _startEditing(cellEl) {
@@ -749,11 +784,14 @@ function _flushCargoChanges(cargoId) {
     _stopEditing();
     _editingCellId = cellId;
 
-    var currentVal = '';
-    if (_matriz && _matriz.sedes) {
-      var peligro = _findPeligroById(peligroId);
-      if (peligro) currentVal = peligro[field] != null ? peligro[field] : '';
-    }
+  var currentVal = '';
+  var pendingKey = peligroId + '@@' + field;
+  if (_pendingChanges[pendingKey] !== undefined) {
+    currentVal = _pendingChanges[pendingKey];
+  } else if (_matriz && _matriz.sedes) {
+    var peligro = _findPeligroById(peligroId);
+    if (peligro) currentVal = peligro[field] != null ? peligro[field] : '';
+  }
 
     var input = document.createElement('input');
     input.className = 'kair-mp-acc__cell-input';
@@ -797,18 +835,18 @@ function _flushCargoChanges(cargoId) {
     var peligroId = parts[0];
     var field = parts[1];
 
-    var peligro = _findPeligroById(peligroId);
-    if (!peligro) return;
+  var peligro = _findPeligroById(peligroId);
+  if (!peligro) return;
 
-    var cellEl = document.querySelector('[data-cell-id="' + cellId + '"]');
-    if (cellEl) {
-      var val = peligro[field] != null ? peligro[field] : '';
-      cellEl.className = 'kair-mp-acc__cell kair-mp-acc__cell--editable';
-      cellEl.setAttribute('data-peligro-id', peligroId);
-      cellEl.setAttribute('data-field', field);
-      cellEl.innerHTML = (val != null && val !== '') ? val : '<span class="kair-mp-acc__cell-placeholder">—</span>';
-    }
+  var cellEl = document.querySelector('[data-cell-id="' + cellId + '"]');
+  if (cellEl) {
+    var val = (_pendingChanges[cellId] !== undefined) ? _pendingChanges[cellId] : (peligro[field] != null ? peligro[field] : '');
+    cellEl.className = 'kair-mp-acc__cell kair-mp-acc__cell--editable';
+    cellEl.setAttribute('data-peligro-id', peligroId);
+    cellEl.setAttribute('data-field', field);
+    cellEl.innerHTML = (val != null && val !== '') ? _escHtml(val) : '<span class="kair-mp-acc__cell-placeholder">—</span>';
   }
+}
 
   function _tabToNextCell(e) {
     if (!_editingCellId) return;
@@ -1016,8 +1054,9 @@ function _flushCargoChanges(cargoId) {
         if (!nombre) return;
         IdentificacionPeligrosService.addSede(_companyName, nombre).then(function (result) {
           if (result && result.success) {
-            IdentificacionPeligrosService.toast('Sede "' + nombre + '" creada', 'success');
-            _reload();
+      IdentificacionPeligrosService.toast('Sede "' + nombre + '" creada', 'success');
+        _debouncedXlsxSync();
+        _reload();
           } else {
             IdentificacionPeligrosService.toast('Error al crear sede', 'error');
           }
@@ -1036,9 +1075,10 @@ function _flushCargoChanges(cargoId) {
         if (!nombre) return;
         IdentificacionPeligrosService.addProceso(_companyName, sedeId, nombre).then(function (result) {
           if (result && result.success) {
-            IdentificacionPeligrosService.toast('Proceso "' + nombre + '" creado', 'success');
-            _setExpanded('sedes', sedeId, true);
-            _reload();
+IdentificacionPeligrosService.toast('Proceso "' + nombre + '" creado', 'success');
+          _setExpanded('sedes', sedeId, true);
+          _debouncedXlsxSync();
+          _reload();
           } else {
             IdentificacionPeligrosService.toast('Error al crear proceso', 'error');
           }
@@ -1057,9 +1097,10 @@ function _flushCargoChanges(cargoId) {
         if (!nombre) return;
         IdentificacionPeligrosService.addCargo(_companyName, procesoId, nombre).then(function (result) {
           if (result && result.success) {
-            IdentificacionPeligrosService.toast('Cargo "' + nombre + '" creado', 'success');
-            _setExpanded('procesos', procesoId, true);
-            _reload();
+IdentificacionPeligrosService.toast('Cargo "' + nombre + '" creado', 'success');
+          _setExpanded('procesos', procesoId, true);
+          _debouncedXlsxSync();
+          _reload();
           } else {
             IdentificacionPeligrosService.toast('Error al crear cargo', 'error');
           }
@@ -1085,8 +1126,9 @@ function _flushCargoChanges(cargoId) {
         var method = type === 'sede' ? 'deleteSede' : (type === 'proceso' ? 'deleteProceso' : 'deleteCargo');
         IdentificacionPeligrosService[method](_companyName, id).then(function (result) {
           if (result && result.success) {
-            IdentificacionPeligrosService.toast(typeName + ' eliminado/a', 'success');
-            _reload();
+IdentificacionPeligrosService.toast(typeName + ' eliminado/a', 'success');
+          _debouncedXlsxSync();
+          _reload();
           } else {
             IdentificacionPeligrosService.toast('Error al eliminar', 'error');
           }
@@ -1098,9 +1140,10 @@ function _flushCargoChanges(cargoId) {
   function _addPeligro(cargoId) {
     IdentificacionPeligrosService.addPeligro(_companyName, cargoId, {}).then(function (result) {
       if (result && result.success) {
-        IdentificacionPeligrosService.toast('Peligro agregado', 'success');
-        _setExpanded('cargos', cargoId, true);
-        _reload();
+IdentificacionPeligrosService.toast('Peligro agregado', 'success');
+      _setExpanded('cargos', cargoId, true);
+      _debouncedXlsxSync();
+      _reload();
       } else {
         IdentificacionPeligrosService.toast('Error al agregar peligro', 'error');
       }
@@ -1110,8 +1153,9 @@ function _flushCargoChanges(cargoId) {
   function _deletePeligro(peligroId) {
     IdentificacionPeligrosService.deletePeligro(_companyName, peligroId).then(function (result) {
       if (result && result.success) {
-        IdentificacionPeligrosService.toast('Peligro eliminado', 'success');
-        _reload();
+IdentificacionPeligrosService.toast('Peligro eliminado', 'success');
+      _debouncedXlsxSync();
+      _reload();
       } else {
         IdentificacionPeligrosService.toast('Error al eliminar peligro', 'error');
       }
@@ -1119,13 +1163,13 @@ function _flushCargoChanges(cargoId) {
   }
 
   /* ─── Reload ──────────────────────────────────────────────────────────── */
-  function _reload() {
-    if (_saveTimer) {
-      clearTimeout(_saveTimer);
-      _saveTimer = null;
-    }
-    _pendingChanges = {};
-    _editingCellId = null;
+function _reload() {
+  if (_saveTimer) {
+    clearTimeout(_saveTimer);
+    _saveTimer = null;
+  }
+  _flushPendingChanges();
+  _editingCellId = null;
 
     IdentificacionPeligrosService.read(_companyName).then(function (result) {
       if (result && result.success && result.data) {
@@ -1146,8 +1190,9 @@ function _flushCargoChanges(cargoId) {
   }
 
   /* ─── Cleanup ─────────────────────────────────────────────────────────── */
-  function _cleanup() {
-    if (_docClickHandler) {
+function _cleanup() {
+  if (_xlsxSyncTimer) { clearTimeout(_xlsxSyncTimer); _xlsxSyncTimer = null; }
+  if (_docClickHandler) {
       document.removeEventListener('mousedown', _docClickHandler);
       _docClickHandler = null;
     }
@@ -1159,16 +1204,22 @@ function _flushCargoChanges(cargoId) {
 
   /* ─── Public API ──────────────────────────────────────────────────────── */
   var MatrizView = {
-    load: function (companyName) {
-      _companyName = companyName;
-      _pendingChanges = {};
-      _editingCellId = null;
-      _filterSede = '__all__';
-      _expandState = { sedes: {}, procesos: {}, cargos: {} };
+  load: function (companyName) {
+    _companyName = companyName;
+    _pendingChanges = {};
+    _editingCellId = null;
+    _filterSede = '__all__';
+    _expandState = { sedes: {}, procesos: {}, cargos: {} };
 
-      var container = document.getElementById('kair-mp-matriz-content');
-      if (!container) return;
-      container.innerHTML = '<div class="kair-mp-loading"><div class="kair-mp-spinner"></div><p>Cargando matriz...</p></div>';
+    var container = document.getElementById('kair-mp-matriz-content');
+    if (!container) return;
+
+    if (!_containerEventsBound) {
+      _bindContainerEvents(container);
+      _containerEventsBound = true;
+    }
+
+    container.innerHTML = '<div class="kair-mp-loading"><div class="kair-mp-spinner"></div><p>Cargando matriz...</p></div>';
 
       var optionsPromise = IdentificacionPeligrosService.gtc45Options();
       var readPromise = IdentificacionPeligrosService.read(companyName);
@@ -1195,20 +1246,22 @@ function _flushCargoChanges(cargoId) {
       });
     },
 
-    destroy: function () {
-      _cleanup();
-      if (_saveTimer) {
-        clearTimeout(_saveTimer);
-        _saveTimer = null;
-        _flushPendingChanges();
-      }
-      _pendingChanges = {};
-      _matriz = null;
-      _stats = null;
-      _gtc45Options = null;
-      _companyName = null;
-      _editingCellId = null;
-    },
+  destroy: function () {
+    _cleanup();
+    _containerEventsBound = false;
+    if (_saveTimer) {
+      clearTimeout(_saveTimer);
+      _saveTimer = null;
+      _flushPendingChanges();
+    }
+    if (_xlsxSyncTimer) { clearTimeout(_xlsxSyncTimer); _xlsxSyncTimer = null; }
+    _pendingChanges = {};
+    _matriz = null;
+    _stats = null;
+    _gtc45Options = null;
+    _companyName = null;
+    _editingCellId = null;
+  },
 
     getMatriz: function () { return _matriz; },
     getStats: function () { return _stats; },
