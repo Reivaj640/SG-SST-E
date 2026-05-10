@@ -34,7 +34,7 @@ var TABLE_COLS = [
   { key: 'tipo', label: 'Tipo', type: 'text', width: '90px' },
   { key: 'peligro', label: 'Peligro', type: 'text', width: '140px' },
   { key: 'efectosPosibles', label: 'Efectos', type: 'text', width: '120px' },
-  { key: 'expuestos', label: 'Exp.', type: 'text', width: '45px' },
+  { key: 'expuestos', label: 'Exp.', type: 'number', width: '45px' },
   { key: 'nd', label: 'ND', type: 'number', width: '40px' },
   { key: 'ne', label: 'NE', type: 'number', width: '40px' },
   { key: 'np', label: 'NP', type: 'number', width: '40px' },
@@ -166,7 +166,7 @@ function _renderTableRow(p, nivel) {
   html += '<div class="kair-mp-prior__td">' + _escHtml(p.tipo || '—') + '</div>';
   html += '<div class="kair-mp-prior__td kair-mp-prior__td--peligro">' + _escHtml(p.peligro || '—') + '</div>';
   html += '<div class="kair-mp-prior__td">' + _escHtml(p.efectosPosibles || '—') + '</div>';
-  html += '<div class="kair-mp-prior__td">' + _escHtml(p.expuestos || '—') + '</div>';
+  html += '<div class="kair-mp-prior__td">' + _escHtml(p.expuestos != null ? p.expuestos : '—') + '</div>';
   html += '<div class="kair-mp-prior__td kair-mp-prior__td--num">' + (p.nd != null ? p.nd : '—') + '</div>';
   html += '<div class="kair-mp-prior__td kair-mp-prior__td--num">' + (p.ne != null ? p.ne : '—') + '</div>';
   html += '<div class="kair-mp-prior__td kair-mp-prior__td--num">' + (p.np != null ? p.np : '—') + '</div>';

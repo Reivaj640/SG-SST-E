@@ -11,6 +11,8 @@ Patrón: window.MatrizView = { load, destroy } — Direct DOM
     { key: 'tipo', label: 'Tipo de\nPeligro', type: 'select-tipo', editable: true },
     { key: 'peligro', label: 'Peligro', type: 'text', editable: true },
     { key: 'efectosPosibles', label: 'Efectos\nPosibles', type: 'text', editable: true },
+ { key: 'expuestos', label: 'Expuestos', type: 'number', editable: true },
+  { key: 'peorConsecuencia', label: 'Peor\nConsecuencia', type: 'text', editable: true },
     { key: 'nd', label: 'ND', type: 'select-nd', editable: true },
     { key: 'ne', label: 'NE', type: 'select-ne', editable: true },
     { key: 'np', label: 'NP', type: 'computed', editable: false },
@@ -95,6 +97,37 @@ Patrón: window.MatrizView = { load, destroy } — Direct DOM
   }
 
   /* ─── Computed cell update (in-place, no full re-render) ──────────────── */
+
+/* --- Cargo field save engine --- */
+var _cargoSaveTimers = {};
+var _pendingCargoChanges = {};
+
+function _debouncedCargoSave(cargoId, field, value) {
+ if (!_pendingCargoChanges[cargoId]) _pendingCargoChanges[cargoId] = {};
+ _pendingCargoChanges[cargoId][field] = value;
+ if (_cargoSaveTimers[cargoId]) clearTimeout(_cargoSaveTimers[cargoId]);
+ _cargoSaveTimers[cargoId] = setTimeout(function() {
+ _flushCargoChanges(cargoId);
+ }, DEBOUNCE_MS);
+}
+
+function _flushCargoChanges(cargoId) {
+ var changes = _pendingCargoChanges[cargoId] || {};
+ delete _pendingCargoChanges[cargoId];
+ delete _cargoSaveTimers[cargoId];
+ var keys = Object.keys(changes);
+ if (!keys.length) return;
+ IdentificacionPeligrosService.updateCargo(_companyName, cargoId, changes)
+ .then(function(result) {
+ if (!result || !result.success) {
+ IdentificacionPeligrosService.toast('Error al guardar datos del cargo', 'error');
+ }
+ })
+ .catch(function(err) {
+ IdentificacionPeligrosService.toast('Error de guardado cargo: ' + (err.message || ''), 'error');
+ });
+}
+
   function _updateComputedCells(peligroId, data) {
     var wrapper = document.querySelector('.kair-mp-wrapper');
     if (!wrapper) return;
@@ -371,7 +404,7 @@ Patrón: window.MatrizView = { load, destroy } — Direct DOM
     }
 
     if (!col.editable) {
-      var val2 = peligro[col.key] || '';
+      var val2 = peligro[col.key] != null ? peligro[col.key] : '';
       return '<td class="kair-mp-acc__cell" data-col="' + col.key + '">' + _escHtml(val2) + '</td>';
     }
 
@@ -390,14 +423,14 @@ Patrón: window.MatrizView = { load, destroy } — Direct DOM
         '</td>';
     }
 
-    var val3 = peligro[col.key] || '';
+    var val3 = peligro[col.key] != null ? peligro[col.key] : '';
     if (isEditing) {
       return '<td class="kair-mp-acc__cell kair-mp-acc__cell--editing" data-col="' + col.key + '" data-cell-id="' + cellId + '">' +
-        '<input class="kair-mp-acc__cell-input" type="text" value="' + _escHtml(val3) + '" data-peligro-id="' + peligro.id + '" data-field="' + col.key + '" data-auto-focus>' +
+        '<input class="kair-mp-acc__cell-input" type=' + (col.type === 'number' ? 'number' : 'text') + ' value="' + _escHtml(val3) + '" data-peligro-id="' + peligro.id + '" data-field="' + col.key + '" data-auto-focus>' +
         '</td>';
     }
 
-    var displayVal = val3 || '<span class="kair-mp-acc__cell-placeholder">—</span>';
+    var displayVal = (val3 != null && val3 !== '') ? val3 : '<span class="kair-mp-acc__cell-placeholder">—</span>';
     return '<td class="kair-mp-acc__cell kair-mp-acc__cell--editable" data-col="' + col.key + '" data-cell-id="' + cellId + '" data-peligro-id="' + peligro.id + '" data-field="' + col.key + '">' + displayVal + '</td>';
   }
 
@@ -433,7 +466,19 @@ Patrón: window.MatrizView = { load, destroy } — Direct DOM
 
     html += '<div class="kair-mp-acc__cargo-body" style="display:' + (isCollapsed ? 'none' : '') + '">';
 
-    if (!cargo.peligros || !cargo.peligros.length) {
+    
+ html += '<div class="kair-mp-acc__cargo-meta">';
+ html += '<div class="kair-mp-acc__cargo-meta-field"><label>Zona</label><input class="kair-mp-acc__cargo-input" data-cargo-id="' + cargo.id + '" data-cargo-field="zona" value="' + _escHtml(cargo.zona || '') + '" placeholder="Zona"></div>';
+ html += '<div class="kair-mp-acc__cargo-meta-field"><label>Actividades</label><input class="kair-mp-acc__cargo-input" data-cargo-id="' + cargo.id + '" data-cargo-field="actividades" value="' + _escHtml(cargo.actividades || '') + '" placeholder="Actividades"></div>';
+ html += '<div class="kair-mp-acc__cargo-meta-field"><label>Tareas</label><input class="kair-mp-acc__cargo-input" data-cargo-id="' + cargo.id + '" data-cargo-field="tareas" value="' + _escHtml(cargo.tareas || '') + '" placeholder="Tareas"></div>';
+ html += '<div class="kair-mp-acc__cargo-meta-field kair-mp-acc__cargo-meta-field--rutinaria"><label>Rutinaria</label><select class="kair-mp-acc__cargo-select" data-cargo-id="' + cargo.id + '" data-cargo-field="rutinaria">';
+ html += '<option value=""' + (cargo.rutinaria == null ? ' selected' : '') + '>Sin asignar</option>';
+ html += '<option value="true"' + (cargo.rutinaria === true ? ' selected' : '') + '>Si</option>';
+ html += '<option value="false"' + (cargo.rutinaria === false ? ' selected' : '') + '>No</option>';
+ html += '</select></div>';
+ html += '</div>';
+
+ if (!cargo.peligros || !cargo.peligros.length) {
       html += '<div class="kair-mp-acc__empty"><i class="bi bi-shield-check"></i><p>Sin peligros identificados</p>';
       html += '<button class="kair-mp-acc__add-btn" data-action="add-peligro" data-cargo-id="' + cargo.id + '"><i class="bi bi-plus-circle"></i> Agregar peligro</button>';
       html += '</div>';
@@ -630,7 +675,7 @@ Patrón: window.MatrizView = { load, destroy } — Direct DOM
       var field = sel.getAttribute('data-field');
       if (!peligroId || !field) return;
       var val = sel.value;
-      if (field === 'nd' || field === 'ne' || field === 'nc') {
+      if (field === 'nd' || field === 'ne' || field === 'nc' || field === 'expuestos') {
         val = val !== '' ? Number(val) : null;
       }
       _pendingChanges[peligroId + '@@' + field] = val;
@@ -643,11 +688,38 @@ Patrón: window.MatrizView = { load, destroy } — Direct DOM
       var peligroId = inp.getAttribute('data-peligro-id');
       var field = inp.getAttribute('data-field');
       if (!peligroId || !field) return;
-      _pendingChanges[peligroId + '@@' + field] = inp.value;
+      var _inpVal = inp.value;
+ var _colDef = COLS.find(function(c) { return c.key === field; });
+ if (_colDef && _colDef.type === 'number' && _inpVal !== '') _inpVal = Number(_inpVal);
+ if (_colDef && _colDef.type === 'number' && _inpVal === '') _inpVal = null;
+ _pendingChanges[peligroId + '@@' + field] = _inpVal;
       _debouncedSave();
     });
 
-    _docClickHandler = function (e) {
+   // Cargo meta field handlers
+ container.addEventListener('input', function(e) {
+ var inp = e.target;
+ if (!inp.classList.contains('kair-mp-acc__cargo-input')) return;
+ var cargoId = inp.getAttribute('data-cargo-id');
+ var field = inp.getAttribute('data-cargo-field');
+ if (!cargoId || !field) return;
+ _debouncedCargoSave(cargoId, field, inp.value);
+ });
+
+ container.addEventListener('change', function(e) {
+ var sel = e.target;
+ if (!sel.classList.contains('kair-mp-acc__cargo-select')) return;
+ var cargoId = sel.getAttribute('data-cargo-id');
+ var field = sel.getAttribute('data-cargo-field');
+ if (!cargoId || !field) return;
+ var val = sel.value;
+ if (field === 'rutinaria') {
+ val = val === '' ? null : (val === 'true');
+ }
+ _debouncedCargoSave(cargoId, field, val);
+ });
+
+  _docClickHandler = function (e) {
       if (_editingCellId && !e.target.closest('.kair-mp-acc__cell--editing')) {
         _stopEditing();
       }
@@ -680,12 +752,13 @@ Patrón: window.MatrizView = { load, destroy } — Direct DOM
     var currentVal = '';
     if (_matriz && _matriz.sedes) {
       var peligro = _findPeligroById(peligroId);
-      if (peligro) currentVal = peligro[field] || '';
+      if (peligro) currentVal = peligro[field] != null ? peligro[field] : '';
     }
 
     var input = document.createElement('input');
     input.className = 'kair-mp-acc__cell-input';
-    input.type = 'text';
+    var _startEditCol = COLS.find(function(c) { return c.key === field; });
+ input.type = (_startEditCol && _startEditCol.type === 'number') ? 'number' : 'text';
     input.value = currentVal;
     input.setAttribute('data-peligro-id', peligroId);
     input.setAttribute('data-field', field);
@@ -729,11 +802,11 @@ Patrón: window.MatrizView = { load, destroy } — Direct DOM
 
     var cellEl = document.querySelector('[data-cell-id="' + cellId + '"]');
     if (cellEl) {
-      var val = peligro[field] || '';
+      var val = peligro[field] != null ? peligro[field] : '';
       cellEl.className = 'kair-mp-acc__cell kair-mp-acc__cell--editable';
       cellEl.setAttribute('data-peligro-id', peligroId);
       cellEl.setAttribute('data-field', field);
-      cellEl.innerHTML = val || '<span class="kair-mp-acc__cell-placeholder">—</span>';
+      cellEl.innerHTML = (val != null && val !== '') ? val : '<span class="kair-mp-acc__cell-placeholder">—</span>';
     }
   }
 
@@ -745,7 +818,7 @@ Patrón: window.MatrizView = { load, destroy } — Direct DOM
 
     var colIndex = -1;
     for (var i = 0; i < COLS.length; i++) {
-      if (COLS[i].key === field && COLS[i].editable && COLS[i].type === 'text') {
+      if (COLS[i].key === field && COLS[i].editable && (COLS[i].type === 'text' || COLS[i].type === 'number')) {
         colIndex = i;
         break;
       }
@@ -754,7 +827,7 @@ Patrón: window.MatrizView = { load, destroy } — Direct DOM
 
     var nextIndex = e.shiftKey ? colIndex - 1 : colIndex + 1;
     while (nextIndex >= 0 && nextIndex < COLS.length) {
-      if (COLS[nextIndex].editable && COLS[nextIndex].type === 'text') {
+      if (COLS[nextIndex].editable && (COLS[nextIndex].type === 'text' || COLS[nextIndex].type === 'number')) {
         e.preventDefault();
         _stopEditing();
         var nextCellId = peligroId + '@@' + COLS[nextIndex].key;

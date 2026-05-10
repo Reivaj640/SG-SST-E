@@ -156,6 +156,7 @@ function _enriquecerMatriz(matriz) {
         for (var pe = 0; pe < cargo.peligros.length; pe++) {
           var pel = cargo.peligros[pe];
         if (pel.expuestos === undefined || pel.expuestos === '') pel.expuestos = null;
+ if (typeof pel.expuestos !== 'number' && pel.expuestos !== null) { var n = Number(pel.expuestos); pel.expuestos = isNaN(n) ? null : n; }
         if (pel.criterioEstablecido === undefined) pel.criterioEstablecido = '';
         if (pel.peorConsecuencia === undefined) pel.peorConsecuencia = '';
         _enriquecerPeligro(pel);
@@ -210,7 +211,7 @@ function _calcularStats(matriz) {
           var cKey = cargo.nombre + '@@' + sede.nombre;
           porCargo[cKey] = (porCargo[cKey] || 0) + 1;
           if (p.nr != null && p.nr > maxNR) maxNR = p.nr;
-          if (nivel === 'IV' || nivel === 'V') inaceptables++;
+          if (nivel === 'IV' || nivel === 'V' || nivel === 'III') inaceptables++;
           if (p.nd != null && p.ne != null && p.nc != null) evaluados++;
         }
       }
@@ -309,7 +310,7 @@ grupos[g].peligros.push({
                   tipo: p.tipo,
                   peligro: p.peligro,
                   efectosPosibles: p.efectosPosibles,
-                  expuestos: p.expuestos || '',
+                  expuestos: p.expuestos != null ? p.expuestos : '',
                   sede: sede.nombre,
                   proceso: proceso.nombre,
                   cargo: cargo.nombre,
@@ -589,7 +590,7 @@ function _updatePeligro(matriz, peligroId, cambios) {
   for (var i = 0; i < editableFields.length; i++) {
     if (cambios[editableFields[i]] !== undefined) {
       var val = cambios[editableFields[i]];
-      if (editableFields[i] === 'nd' || editableFields[i] === 'ne' || editableFields[i] === 'nc') {
+      if (editableFields[i] === 'nd' || editableFields[i] === 'ne' || editableFields[i] === 'nc' || editableFields[i] === 'expuestos') {
         val = val != null ? Number(val) : null;
       }
       p[editableFields[i]] = val;
@@ -1416,6 +1417,7 @@ var companyRoot = _getCompanyRootPath ? await _getCompanyRootPath(companyName) :
               var pelData = {
                 tipo: srcPel.tipo, peligro: srcPel.peligro, efectosPosibles: srcPel.efectosPosibles,
                 nd: srcPel.nd, ne: srcPel.ne, nc: srcPel.nc,
+                expuestos: srcPel.expuestos, peorConsecuencia: srcPel.peorConsecuencia,
                 criterioEstablecido: srcPel.criterioEstablecido, fuente: srcPel.fuente,
                 medio: srcPel.medio, individuo: srcPel.individuo,
                 medidasExistenteFuente: srcPel.medidasExistenteFuente, medidasExistenteMedio: srcPel.medidasExistenteMedio,

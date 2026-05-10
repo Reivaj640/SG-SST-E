@@ -565,6 +565,60 @@ Click-to-edit cells · Stats bar · Filter tabs · GTC-45 colors
 }
 
 .kair-mp-acc__cargo-body { padding: 0; }
+/* --- Cargo Meta Fields --- */
+.kair-mp-acc__cargo-meta {
+ display: flex;
+ flex-wrap: wrap;
+ gap: 0.5rem;
+ padding: 0.5rem 0.75rem;
+ background: #fefce8;
+ border-bottom: 1px solid #fde68a;
+}
+
+.kair-mp-acc__cargo-meta-field {
+ display: flex;
+ flex-direction: column;
+ gap: 0.15rem;
+ flex: 1 1 180px;
+ min-width: 120px;
+}
+
+.kair-mp-acc__cargo-meta-field--rutinaria {
+ flex: 0 0 100px;
+ min-width: 80px;
+}
+
+.kair-mp-acc__cargo-meta-field label {
+ font-size: 0.65rem;
+ font-weight: 600;
+ color: #92400e;
+ text-transform: uppercase;
+ letter-spacing: 0.03em;
+}
+
+.kair-mp-acc__cargo-input,
+.kair-mp-acc__cargo-select {
+ padding: 0.25rem 0.5rem;
+ border: 1px solid #fde68a;
+ border-radius: var(--kair-mp-border-radius-sm);
+ background: #fff;
+ font-size: 0.75rem;
+ color: var(--kair-mp-text-primary);
+ font-family: var(--kair-mp-font-family);
+ transition: border-color var(--kair-mp-transition-fast);
+}
+
+.kair-mp-acc__cargo-input:focus,
+.kair-mp-acc__cargo-select:focus {
+ outline: none;
+ border-color: var(--kair-mp-primary);
+ box-shadow: 0 0 0 2px var(--kair-mp-primary-light);
+}
+
+.kair-mp-acc__cargo-input::placeholder {
+ color: #d1d5db;
+}
+
 
 /* --- Action Buttons (shared) --- */
 .kair-mp-acc__action-btn {
@@ -1585,6 +1639,26 @@ DARK MODE
 
 [data-theme="dark"] .kair-mp-wrapper .kair-mp-acc__cargo-header {
   background: linear-gradient(135deg, #252a1e 0%, #262518 100%);
+}
+
+[data-theme="dark"] .kair-mp-wrapper .kair-mp-acc__cargo-meta {
+ background: #262518;
+ border-color: #4a3f20;
+}
+
+[data-theme="dark"] .kair-mp-wrapper .kair-mp-acc__cargo-meta-field label {
+ color: #fbbf24;
+}
+
+[data-theme="dark"] .kair-mp-wrapper .kair-mp-acc__cargo-input,
+[data-theme="dark"] .kair-mp-wrapper .kair-mp-acc__cargo-select {
+ background: #1a1a2e;
+ border-color: #4a3f20;
+ color: #e5e7eb;
+}
+
+[data-theme="dark"] .kair-mp-wrapper .kair-mp-acc__cargo-input::placeholder {
+ color: #4b5563;
 }
 
 [data-theme="dark"] .kair-mp-wrapper .kair-mp-acc__stats-bar {
