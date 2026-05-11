@@ -52,12 +52,17 @@ function ejecutarBusqueda() {
     var cedula = (document.getElementById('ct-cedula-input').value || '').trim();
     var nombre = (document.getElementById('ct-nombre-input').value || '').trim();
 
-    if (!cedula && !nombre) {
-        mostrarToast('Ingresa al menos un criterio de búsqueda (cédula o nombre).', 'warning');
-        return;
-    }
+	if (!cedula && !nombre) {
+		mostrarToast('Ingresa al menos un criterio de búsqueda (cédula o nombre).', 'warning');
+		return;
+	}
 
-    if (!ConsultaTrabajadores.empresaActiva) {
+	if (cedula && /[a-zA-ZáéíóúÁÉÍÓÚñÑü]/.test(cedula)) {
+		mostrarToast('Parece que escribiste un nombre en el campo de cédula. Usa el campo "Nombre" para búsquedas por nombre.', 'warning');
+		return;
+	}
+
+	if (!ConsultaTrabajadores.empresaActiva) {
         mostrarToast('No se ha detectado la empresa activa. Vuelve al menú y selecciona una empresa.', 'warning');
         return;
     }
@@ -66,8 +71,9 @@ function ejecutarBusqueda() {
     tableContainer.innerHTML = '<div class="ct-loading"><i class="fas fa-spinner"></i><p>Buscando en ' + ConsultaTrabajadores.empresaActiva + '...</p></div>';
     document.getElementById('ct-stats-bar').style.display = 'none';
 
-    ConsultaTrabajadores.ultimaBusqueda = { cedula: cedula, nombre: nombre };
-    ConsultaTrabajadores.resultados = [];
+  ConsultaTrabajadores._searchStart = performance.now();
+  ConsultaTrabajadores.ultimaBusqueda = { cedula: cedula, nombre: nombre };
+  ConsultaTrabajadores.resultados = [];
 
     // Enviar petición al padre (proxy)
     if (window.parent && window.parent.postMessage) {

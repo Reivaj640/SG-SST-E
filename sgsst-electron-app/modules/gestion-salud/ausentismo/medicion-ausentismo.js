@@ -6996,8 +6996,8 @@ class MedicionAusentismoComponent {
             }
 
             // Proxy: el iframe pide búsqueda → el padre consulta electronAPI
-            if (data.type === 'ct-search-request') {
-                try {
+		if (data.type === 'ct-search-request') {
+			try {
                     if (window.electronAPI && typeof window.electronAPI.consultarTrabajadoresGlobal === 'function') {
                         const result = await window.electronAPI.consultarTrabajadoresGlobal({
                             cedula: data.cedula || '',

@@ -12283,28 +12283,28 @@ function normalizarASEL(row, empresa) {
  * Filtra trabajadores por cédula y/o nombre
  */
 function filtrarTrabajadores(trabajadores, cedula, nombre) {
-  const cedulaNorm = String(cedula || '').trim().toLowerCase().replace(/\D/g, '');
-  const nombreNorm = String(nombre || '').trim().toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+	const cedulaNorm = String(cedula || '').trim().toLowerCase().replace(/\D/g, '');
+	const nombreNorm = String(nombre || '').trim().toLowerCase()
+		.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-  return trabajadores.filter(t => {
-    const tCedula = String(t.cedula || '').trim().toLowerCase().replace(/\D/g, '');
-    const tNombre = String(t.nombreCompleto || '').trim().toLowerCase()
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+	return trabajadores.filter(t => {
+		const tCedula = String(t.cedula || '').trim().toLowerCase().replace(/\D/g, '');
+		const tNombre = String(t.nombreCompleto || '').trim().toLowerCase()
+			.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-    const cedulaMatch = !cedulaNorm || tCedula.includes(cedulaNorm);
-    const nombreMatch = !nombreNorm || tNombre.includes(nombreNorm);
+		const cedulaMatch = cedulaNorm === '' || tCedula.includes(cedulaNorm);
+		const nombreMatch = nombreNorm === '' || tNombre.includes(nombreNorm);
 
-    return cedulaMatch && nombreMatch;
-  });
+		return cedulaMatch && nombreMatch;
+	});
 }
 
 /**
  * Handler: Consulta global de trabajadores
  */
 ipcMain.handle('consultar-trabajadores-global', async (event, params) => {
-  try {
-    const { cedula = '', nombre = '', empresa = 'all' } = params || {};
+	try {
+		const { cedula = '', nombre = '', empresa = 'all' } = params || {};
 
     if (!cedula.trim() && !nombre.trim()) {
       return {

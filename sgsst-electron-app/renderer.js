@@ -1155,21 +1155,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                   console.log('[RENDERER] Ver estadísticas de ausentismo solicitada');
                   // El módulo se encarga de mostrar la vista de estadísticas
                   return;
-              case 'ct-search-request':
-                  // Solicitud de búsqueda de trabajadores (Módulo Ausentismo)
-                  apiCallFunction = window.electronAPI.consultarTrabajadoresGlobal;
-                  
-                  // Intentar obtener parámetros de payload o de la raíz del objeto
-                  const searchParams = payload || {
-                      cedula: event.data.cedula,
-                      nombre: event.data.nombre,
-                      empresa: event.data.empresa
-                  };
-                  
-                  console.log('[RENDERER] 🔍 Procesando búsqueda de trabajadores:', searchParams);
-                  apiCallArgs = [searchParams];
-                  responseType = 'ct-search-response';
-                  break;
+		case 'ct-search-request':
+			// Delegar al componente MedicionAusentismo — ya maneja este mensaje
+			// directamente como proxy entre el iframe y electronAPI.
+			// Si se procesa aquí también, se duplica la llamada IPC y la respuesta.
+			console.log(`[RENDERER] Delegando búsqueda de trabajadores al componente MedicionAusentismo: ${type}`);
+			return;
 
               // ═══════════════════════════════════════════════════════════
               // NOTA: Los mensajes de remisiones médicas (-request) y evaluaciones
