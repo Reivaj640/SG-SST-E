@@ -3654,6 +3654,15 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
 }
 .toast-warning .toast-icon { background: linear-gradient(135deg, #ffc107, #e0a800) !important; }
 
+/* Soporte Bootstrap Icons en toast-card (módulos K+AIR) */
+.toast-card .toast-icon.bi-icon {
+  background: linear-gradient(135deg, var(--bi-icon-from, #174ea6), var(--bi-icon-to, #185abd)) !important;
+}
+.toast-info .toast-icon.bi-icon { --bi-icon-from: #174ea6; --bi-icon-to: #185abd; }
+.toast-success .toast-icon.bi-icon { --bi-icon-from: #28a745; --bi-icon-to: #218838; }
+.toast-error .toast-icon.bi-icon { --bi-icon-from: #dc3545; --bi-icon-to: #c82333; }
+.toast-warning .toast-icon.bi-icon { --bi-icon-from: #ffc107; --bi-icon-to: #e0a800; }
+
 /* ============================================================================
    AUTH (Login / Selector) - MEJORADO CON ANIMACIONES
    ============================================================================ */

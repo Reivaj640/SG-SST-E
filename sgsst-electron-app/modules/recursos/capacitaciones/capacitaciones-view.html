@@ -1,8 +1,5 @@
 <link rel="stylesheet" href="./modules/recursos/capacitaciones/capacitaciones-view.css">
 
-<!-- NOTIFICACIONES -->
-<div class="k-toast-container" id="toastContainer"></div>
-
 <div class="k-app-layout">
 
 <!-- 1. HEADER DEL MÓDULO (Header System v2.0 — Patrón 3: breadcrumb + tabs + acción ghost) -->
@@ -32,8 +29,40 @@
       <button class="kair-header__action--ghost" id="btn-export-excel" title="Exportar cronograma">
         <i class="bi bi-download"></i> Exportar
       </button>
-    </div>
   </div>
+ </div>
+
+ <!-- ======================== -->
+ <!-- MODAL DE CONFIRMACIÓN K+AIR -->
+ <!-- ======================== -->
+ <div class="k-modal-overlay" id="confirmModal">
+  <div class="k-modal k-modal-sm">
+
+   <div class="k-modal-header">
+    <h3 class="k-modal-title" id="confirm-title">
+     <i class="bi bi-question-circle" id="confirm-icon"></i>
+     Confirmar acción
+    </h3>
+    <button type="button" class="btn-close-modal" aria-label="Cerrar">
+     <i class="bi bi-x-lg"></i>
+    </button>
+   </div>
+
+   <div class="k-modal-body">
+    <p id="confirm-message"></p>
+    <p class="k-modal-warning" id="confirm-warning" style="display:none;"></p>
+   </div>
+
+   <div class="k-modal-footer">
+    <button type="button" class="k-btn k-btn-outline" id="btn-confirm-cancel">Cancelar</button>
+    <button type="button" class="k-btn k-btn-danger" id="btn-confirm-accept">
+     <i class="bi bi-exclamation-triangle"></i>
+     <span id="confirm-accept-label">Aceptar</span>
+    </button>
+   </div>
+
+  </div>
+ </div>
   <div class="kair-header__tabs">
     <button class="kair-header__tab active" data-view="dashboard">
       <i class="bi bi-speedometer2"></i> Dashboard
@@ -42,9 +71,7 @@
       <i class="bi bi-list-task"></i> Listado Capacitaciones
       <span class="kair-header__tab-badge" id="badge-trainings" style="display:none;">0</span>
     </button>
-    <button class="kair-header__tab" data-view="reports">
-      <i class="bi bi-graph-up"></i> Reportes
-    </button>
+
   </div>
 </header>
 
@@ -180,31 +207,7 @@
             </div>
         </section>
 
-        <!-- VISTA: REPORTES -->
-        <section id="view-reports" class="k-view-section">
-            <div class="k-chart-container k-reports-container">
-                <h3 class="k-chart-title k-chart-title--center">Generador de Reportes</h3>
-                <div class="form-group">
-                    <label class="form-label">Tipo de Reporte</label>
-                    <select class="form-control">
-                        <option>Informe Mensual de Cumplimiento</option>
-                        <option>Consolidado Anual</option>
-                        <option>Certificados Asistencia</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Periodo</label>
-                    <select class="form-control">
-                        <option>Actual</option>
-                    </select>
-                </div>
-                <div class="text-right">
-                    <button class="k-btn k-btn-primary" id="btn-generate-report">
-                        <i class="bi bi-file-earmark-pdf"></i> Descargar
-                    </button>
-                </div>
-            </div>
-        </section>
+
 
     </main>
 </div>

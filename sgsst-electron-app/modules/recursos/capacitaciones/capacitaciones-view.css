@@ -508,13 +508,6 @@
     flex-direction: column;
 }
 
-/* Contenedor de reportes (sin alto fijo) */
-.k-chart-container.k-reports-container {
-    max-width: 600px;
-    margin: 0 auto 2rem;
-    height: auto;
-}
-
 .k-chart-body {
     position: relative;
     flex: 1;
@@ -873,40 +866,6 @@ select.k-form-control {
 }
 
 /* =========================================
-   13. TOAST / NOTIFICACIONES
-   ========================================= */
-
-.k-toast-container {
-    position: fixed;
-    top: 20px; right: 20px;
-    z-index: 2100;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    pointer-events: none;
-}
-
-.k-toast {
-    background: var(--k-bg-card);
-    border-left: 4px solid var(--k-primary);
-    padding: 1rem 1.5rem;
-    border-radius: var(--k-radius-md);
-    box-shadow: var(--k-shadow-md);
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    min-width: 300px;
-    animation: slideInRight 0.3s ease;
-    transition: opacity 0.3s ease, transform 0.3s ease;
-    pointer-events: auto;
-}
-
-@keyframes slideInRight {
-    from { transform: translateX(100%); opacity: 0; }
-    to   { transform: translateX(0);    opacity: 1; }
-}
-
-/* =========================================
    14. UTILIDADES
    ========================================= */
 
@@ -941,5 +900,41 @@ select.k-form-control {
    ========================================= */
 
 @media (max-width: 992px) {
-    .dashboard-grid { grid-template-columns: 1fr; }
+ .dashboard-grid { grid-template-columns: 1fr; }
+}
+
+/* =========================================
+13. CONFIRM MODAL — variantes
+========================================= */
+
+.k-modal-overlay .k-modal.k-modal-sm {
+ max-width: 440px;
+}
+
+.k-modal-warning {
+ display: block;
+ margin-top: 0.75rem;
+ padding: 0.625rem 0.875rem;
+ font-size: 0.8125rem;
+ color: #856404;
+ background: var(--k-warning-light);
+ border-left: 3px solid var(--k-warning);
+ border-radius: 0 4px 4px 0;
+}
+
+.k-btn-danger {
+ background-color: var(--k-danger);
+ color: #ffffff;
+ box-shadow: 0 2px 4px rgba(220, 53, 69, 0.2);
+}
+.k-btn-danger:hover {
+ background-color: #c82333;
+ box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3);
+ transform: translateY(-1px);
+ color: #ffffff;
+}
+
+.capacitaciones-container[data-theme="dark"] .k-modal-warning {
+ color: #f0ad4e;
+ background: rgba(240, 173, 78, 0.1);
 }
