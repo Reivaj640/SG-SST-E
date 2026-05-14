@@ -519,17 +519,34 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('[INVESTIGACION-ACCIDENTES-MAIN] Error en el análisis:', analysisError);
             logActivity('error', `Error en el análisis: ${analysisError.message}`);
             
-            // Mostrar error en la sección de análisis
-            analysisContent.innerHTML = `
-                <div class="empty-state error-state">
-                    <div class="empty-icon">
-                        <i class="fas fa-exclamation-triangle"></i>
-                    </div>
-                    <p>Error en el análisis de causa raíz</p>
-                    <p class="error-detail">${analysisError.message}</p>
-                    <p class="error-hint">Los datos del accidente fueron extraídos correctamente. El análisis requiere GPU con suficiente memoria VRAM.</p>
-                </div>
-            `;
+	// Mostrar error en la sección de análisis
+	const isTimeout = analysisError.message && (
+		analysisError.message.includes('agotado') ||
+		analysisError.message.includes('Timeout') ||
+		analysisError.message.includes('timeout')
+	);
+	const isConnectionError = analysisError.message && (
+		analysisError.message.includes('ECONNREFUSED') ||
+		analysisError.message.includes('conexión')
+	);
+	let errorHint = 'Los datos del accidente fueron extraídos correctamente.';
+	if (isTimeout) {
+		errorHint += ' El análisis superó el tiempo límite. Esto puede ocurrir si el modelo se ejecuta en CPU (sin GPU) o si la GPU no tiene suficiente memoria VRAM. Verifique que CUDA esté disponible.';
+	} else if (isConnectionError) {
+		errorHint += ' No se pudo conectar con el servidor de IA. Verifique que Flask y transformers estén instalados en el Python del proyecto.';
+	} else {
+		errorHint += ' Verifique que el servidor LLM esté funcionando y que CUDA/GPU esté disponible.';
+	}
+	analysisContent.innerHTML = `
+		<div class="empty-state error-state">
+			<div class="empty-icon">
+				<i class="fas fa-exclamation-triangle"></i>
+			</div>
+			<p>Error en el análisis de causa raíz</p>
+			<p class="error-detail">${analysisError.message}</p>
+			<p class="error-hint">${errorHint}</p>
+		</div>
+	`;
             
             updateStepStatus(4, 'error');
             showToast('Error en análisis', `El análisis falló: ${analysisError.message}`, 'error');
@@ -621,7 +638,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const timeoutId = setTimeout(() => {
                 window.removeEventListener('message', handleResponse);
                 reject(new Error('Tiempo de espera agotado para la solicitud'));
-            }, 600000); // 600 segundos (10 minutos) de timeout
+            }, 1200000); // 1200 segundos (20 minutos) de timeout
             
             // Función para limpiar el timeout (será llamada desde handleResponse)
             window._investigacionTimeoutClear = window._investigacionTimeoutClear || {};
@@ -766,16 +783,26 @@ document.addEventListener('DOMContentLoaded', function() {
             const errorMsg = results.error || 'Error desconocido en el análisis';
             console.error('[INVESTIGACION-ACCIDENTES-MAIN] Error en resultados:', errorMsg);
             
-            analysisContent.innerHTML = `
-                <div class="empty-state error-state">
-                    <div class="empty-icon">
-                        <i class="fas fa-exclamation-triangle"></i>
-                    </div>
-                    <p>Error en el análisis de causa raíz</p>
-                    <p class="error-detail">${escapeHtml(errorMsg)}</p>
-                    <p class="error-hint">El análisis requiere una GPU con suficiente memoria VRAM (mínimo 8GB para Mistral-7B 4-bit).</p>
-                </div>
-            `;
+		const isTmout = errorMsg.includes('agotado') || errorMsg.includes('Timeout') || errorMsg.includes('timeout');
+		const isConnErr = errorMsg.includes('ECONNREFUSED') || errorMsg.includes('conexión');
+		let hint = 'Los datos del accidente fueron extraídos correctamente.';
+		if (isTmout) {
+			hint += ' El análisis superó el tiempo límite. Puede ocurrir si el modelo se ejecuta en CPU (sin GPU) o si la GPU no tiene suficiente memoria VRAM.';
+		} else if (isConnErr) {
+			hint += ' No se pudo conectar con el servidor de IA. Verifique que Flask y transformers estén instalados.';
+		} else {
+			hint += ' Verifique que el servidor LLM esté funcionando y que CUDA/GPU esté disponible.';
+		}
+		analysisContent.innerHTML = `
+			<div class="empty-state error-state">
+				<div class="empty-icon">
+					<i class="fas fa-exclamation-triangle"></i>
+				</div>
+				<p>Error en el análisis de causa raíz</p>
+				<p class="error-detail">${escapeHtml(errorMsg)}</p>
+				<p class="error-hint">${hint}</p>
+			</div>
+		`;
             return;
         }
         

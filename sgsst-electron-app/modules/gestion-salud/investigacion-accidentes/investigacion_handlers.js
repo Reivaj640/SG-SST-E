@@ -28,15 +28,14 @@ console.log('[HANDLERS] Portear src path:', PORTAR_SRC_PATH);
 console.log('[HANDLERS] LLM Server URL:', LLM_SERVER_URL);
 console.log('[HANDLERS] LLM Server Script:', LLM_SERVER_SCRIPT);
 
-// Esta función debe ser provista por main.js o importada
-async function getPython() {
-    // Implementación simplificada para este módulo.
-    // La verdadera función está en main.js y la usaremos a través de la memoria compartida.
-    if (global.cachedPythonPath) {
-        return global.cachedPythonPath;
-    }
-    // Este fallback es solo de emergencia.
-    return 'python';
+async function resolvePython() {
+	if (global.getPython) {
+		return await global.getPython();
+	}
+	if (global.cachedPythonPath && fs.existsSync(global.cachedPythonPath)) {
+		return global.cachedPythonPath;
+	}
+	return 'python';
 }
 
 function sendLog(message, level = 'INFO') {
@@ -61,7 +60,7 @@ function llmServerRequest(endpoint, method = 'GET', data = null) {
             headers: {
                 'Content-Type': 'application/json'
             },
-            timeout: 600000 // 10 minutos de timeout
+            timeout: 1200000 // 20 minutos de timeout
         };
 
         const req = http.request(options, (res) => {
@@ -146,16 +145,11 @@ async function startLlmServer() {
 
     sendLog('[LLM] Iniciando servidor LLM...');
 
-    // Obtener ruta de Python
-    let pythonExecutable = global.cachedPythonPath;
-    if (!pythonExecutable || !require('fs').existsSync(pythonExecutable)) {
-        try {
-            const { execSync } = require('child_process');
-            pythonExecutable = execSync('where python').toString().trim().split('\n')[0];
-        } catch (e) {
-            throw new Error('No se encontró Python en el sistema');
-        }
-    }
+	// Obtener ruta de Python
+	const pythonExecutable = await resolvePython();
+	if (!pythonExecutable) {
+		throw new Error('No se encontró Python en el sistema');
+	}
 
     const serverScriptPath = path.join(PORTAR_SRC_PATH, 'llm_server.py');
     
@@ -321,59 +315,40 @@ ipcMain.handle('investigacion-accidentes-process-accident-pdf', async (event, pd
             actualPdfPath = await downloadBlobToFile(pdfPath, fileName);
             sendLog(`Archivo blob convertido a archivo temporal: ${actualPdfPath}`);
         }
-        
-        // USAR global.cachedPythonPath CON VERIFICACIÓN
-        let pythonExecutable = global.cachedPythonPath;
-        if (!pythonExecutable || !require('fs').existsSync(pythonExecutable)) {
-            // Si no hay Python cached, buscar en el PATH del sistema
-            try {
-                const { execSync } = require('child_process');
-                pythonExecutable = execSync('where python').toString().trim().split('\n')[0];
-            } catch (e) {
-                throw new Error('No se encontró Python en el sistema. Por favor instale Python 3.10+ y agréguelo al PATH.');
-            }
-        }
-        
-        // Verificar que el ejecutable existe
-        if (!require('fs').existsSync(pythonExecutable)) {
-            throw new Error(`Python no encontrado en: ${pythonExecutable}`);
-        }
-        
-        // USAR PORTAR_SRC_PATH para ruta correcta
-        const pythonScriptPath = path.join(PORTAR_SRC_PATH, 'accident_processor.py');
+
+	// Obtener ruta de Python usando la función robusta de main.js
+	const pythonExecutable = await resolvePython();
+	if (!pythonExecutable) {
+		throw new Error('No se encontró Python en el sistema. Por favor instale Python 3.10+ y agréguelo al PATH.');
+	}
+
+	sendLog(`[DEBUG] Python resuelto: "${pythonExecutable}"`);
+
+	// USAR PORTAR_SRC_PATH para ruta correcta
+	const pythonScriptPath = path.join(PORTAR_SRC_PATH, 'accident_processor.py');
         
         // Verificar que el script existe
         if (!require('fs').existsSync(pythonScriptPath)) {
             throw new Error(`Script de Python no encontrado en: ${pythonScriptPath}`);
-        }
-        
-        // Usar spawn con shell: true y rutas entre comillas para manejar espacios
-        const { spawn } = require('child_process');
-        
-        // LOGS DE DIAGNÓSTICO - CRÍTICO PARA DEBUG
-        sendLog(`[DEBUG] pythonExecutable valor: "${pythonExecutable}"`);
-        sendLog(`[DEBUG] pythonScriptPath valor: "${pythonScriptPath}"`);
-        sendLog(`[DEBUG] actualPdfPath valor: "${actualPdfPath}"`);
-        sendLog(`[DEBUG] PORTAR_SRC_PATH: "${PORTAR_SRC_PATH}"`);
-        
-        // Construir el comando con TODAS las rutas entre comillas dobles
-        // CRÍTICO: En Windows, las rutas con espacios deben estar entre comillas dobles
-        const escapedPython = `"${pythonExecutable}"`;
-        const escapedPdfPath = `"${actualPdfPath}"`;
-        const escapedScriptPath = `"${pythonScriptPath}"`;
-        const command = `${escapedPython} ${escapedScriptPath} extract --pdf_path ${escapedPdfPath}`;
-        
-        sendLog(`[DEBUG] Comando completo a ejecutar: ${command}`);
-        
-        // Usar spawn con shell: true para que Windows maneje las rutas con espacios
-        // IMPORTANTE: En Windows, spawn con shell:true ejecuta: cmd.exe /c <command>
-        const pythonProcess = spawn(command, [], {
-            shell: true,
-            cwd: path.dirname(pythonScriptPath),
-            timeout: 120000,
-            windowsHide: true,
-            env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
-        });
+	}
+
+	const { spawn } = require('child_process');
+
+	sendLog(`[DEBUG] pythonExecutable: "${pythonExecutable}"`);
+	sendLog(`[DEBUG] pythonScriptPath: "${pythonScriptPath}"`);
+	sendLog(`[DEBUG] actualPdfPath: "${actualPdfPath}"`);
+
+	const pythonProcess = spawn(pythonExecutable, [
+		pythonScriptPath,
+		'extract',
+		'--pdf_path',
+		actualPdfPath
+	], {
+		cwd: path.dirname(pythonScriptPath),
+		timeout: 120000,
+		windowsHide: true,
+		env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+	});
         
         let stdoutData = '';
         let stderrData = '';
@@ -572,7 +547,7 @@ ipcMain.handle('investigacion-accidentes-generate-accident-report', (event, comb
             const reportData = { combinedData: combinedData, empresa: empresa };
             await fsp.writeFile(tempDataPath, JSON.stringify(reportData, null, 2));
 
-            const pythonExecutable = await getPython();
+	const pythonExecutable = await resolvePython();
             const pythonScriptPath = path.join(PORTAR_SRC_PATH, 'accident_report_generator.py');
             await fsp.access(pythonScriptPath);
 
@@ -666,8 +641,8 @@ ipcMain.handle('investigacion-accidentes-save-temp-pdf-file', async (event, file
 });
 
 ipcMain.handle('investigacion-accidentes-get-config', async (event, empresa) => {
-    const pythonExecutable = await getPython();
-    const investAppPath = path.join(PORTAR_SRC_PATH, 'Invest_APP_V_3.py');
+	const pythonExecutable = await resolvePython();
+	const investAppPath = path.join(PORTAR_SRC_PATH, 'Invest_APP_V_3.py');
     const { stdout } = await promisify(execFile)(pythonExecutable, [investAppPath, '--get-config', empresa], { cwd: path.dirname(investAppPath) });
     return JSON.parse(stdout.trim());
 });
@@ -697,40 +672,31 @@ async function initializeLlmServer() {
         // Iniciar servidor en segundo plano
         sendLog('[LLM] Iniciando servidor LLM...');
         
-        // Obtener ruta de Python
-        let pythonExecutable = global.cachedPythonPath;
-        if (!pythonExecutable || !require('fs').existsSync(pythonExecutable)) {
-            try {
-                const { execSync } = require('child_process');
-                pythonExecutable = execSync('where python').toString().trim().split('\n')[0];
-                sendLog(`[LLM] Python encontrado en PATH: ${pythonExecutable}`);
-            } catch (e) {
-                sendLog('[LLM] No se encontró Python, se iniciará bajo demanda', 'WARN');
-                return false;
-            }
-        } else {
-            sendLog(`[LLM] Python cached: ${pythonExecutable}`);
-        }
+	// Obtener ruta de Python
+	const pythonExecutable = await resolvePython();
+	if (!pythonExecutable) {
+		sendLog('[LLM] No se encontró Python, se iniciará bajo demanda', 'WARN');
+		return false;
+	}
+	sendLog(`[LLM] Python resuelto: ${pythonExecutable}`);
 
-        const serverScriptPath = path.join(PORTAR_SRC_PATH, 'llm_server.py');
-        sendLog(`[LLM] Ruta del script: ${serverScriptPath}`);
-        
-        // Verificar que el script existe
-        if (!require('fs').existsSync(serverScriptPath)) {
-            sendLog(`[LLM] Script del servidor no encontrado: ${serverScriptPath}`, 'ERROR');
-            return false;
-        }
+	const serverScriptPath = path.join(PORTAR_SRC_PATH, 'llm_server.py');
+	sendLog(`[LLM] Ruta del script: ${serverScriptPath}`);
 
-        sendLog(`[LLM] Iniciando servidor: "${pythonExecutable}" "${serverScriptPath}"`);
+	// Verificar que el script existe
+	if (!fs.existsSync(serverScriptPath)) {
+		sendLog(`[LLM] Script del servidor no encontrado: ${serverScriptPath}`, 'ERROR');
+		return false;
+	}
 
-        // Iniciar el servidor como proceso en background CON LOGS
-        // Usar shell: true para manejar rutas con espacios correctamente
-        llmServerProcess = spawn(`"${pythonExecutable}"`, [`"${serverScriptPath}"`], {
-            cwd: path.dirname(serverScriptPath),
-            detached: false,  // NO detached para poder capturar logs
-            stdio: ['ignore', 'pipe', 'pipe'],  // Capturar stdout y stderr
-            windowsHide: true,
-            shell: true  // CRÍTICO: Usar shell para manejar rutas con espacios
+	sendLog(`[LLM] Iniciando servidor: "${pythonExecutable}" "${serverScriptPath}"`);
+
+	llmServerProcess = spawn(pythonExecutable, [serverScriptPath], {
+		cwd: path.dirname(serverScriptPath),
+		detached: false,
+		stdio: ['ignore', 'pipe', 'pipe'],
+		windowsHide: true,
+		env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
         });
 
         sendLog(`[LLM] Proceso del servidor iniciado, PID: ${llmServerProcess.pid}`);

@@ -104,70 +104,97 @@ async function getEmbeddedPythonPath() {
 }
 
 async function findPython() {
-    console.log('[DEBUG] Starting Python path search');
+	console.log('[DEBUG] Starting Python path search');
 
-    // 1. Buscar en la variable de entorno PATH
-    console.log('[DEBUG] Searching for "python.exe" in system PATH');
-    try {
-        // En Windows, 'where' es el comando para encontrar un ejecutable en el PATH
-        const { stdout } = await execPromise('where python');
-        const potentialPaths = stdout.split(/\r?\n/).filter(p => p.endsWith('python.exe'));
+	// 1. Priorizar Python del proyecto (python-embed y .venv) antes que el del sistema
+	// Esto garantiza que se use el Python con todas las dependencias instaladas
+	const projectPythonPaths = [
+		path.join(__dirname, 'Portear', 'python-embed', 'python.exe'),
+		path.join(__dirname, 'Portear', '.venv', 'Scripts', 'python.exe')
+	];
 
-        for (const p of potentialPaths) {
-            const trimmedPath = p.trim();
-            if (trimmedPath && fs.existsSync(trimmedPath)) {
-                try {
-                    console.log(`[DEBUG] Testing Python executable from PATH: ${trimmedPath}`);
-                    await execFilePromise(trimmedPath, ['--version']);
-                    console.log(`[SUCCESS] Python found in PATH at: ${trimmedPath}`);
-                    return trimmedPath;
-                } catch (e) {
-                    console.warn(`[WARN] Path from PATH found but not executable: ${trimmedPath}. Error: ${e.message}`);
-                    continue;
-                }
-            }
-        }
-    } catch (e) {
-        console.log('[DEBUG] "where python" command failed or returned no results. Will check common paths.');
-    }
+	for (const p of projectPythonPaths) {
+		console.log(`[DEBUG] Checking project Python: ${p}`);
+		if (fs.existsSync(p)) {
+			try {
+				await execFilePromise(p, ['--version']);
+				console.log(`[SUCCESS] Project Python found at: ${p}`);
+				return p;
+			} catch (e) {
+				console.warn(`[WARN] Project Python found but not executable: ${p}. Error: ${e.message}`);
+				continue;
+			}
+		} else {
+			console.log(`[DEBUG] Project Python not found at: ${p}`);
+		}
+	}
 
-    // 2. Si no se encuentra en PATH, buscar en rutas comunes (fallback)
-    console.log('[DEBUG] Python not found in PATH, checking common installation directories.');
-    const username = os.userInfo().username;
-    console.log('[DEBUG] Current username:', username);
-    const commonPaths = [
-        path.join(__dirname, 'Portear', '.venv', 'Scripts', 'python.exe'), // Entorno virtual local
-        `C:\\Users\\${username}\\AppData\\Local\\Programs\\Python\\Python312\\python.exe`,
-        `C:\\Users\\${username}\\AppData\\Local\\Programs\\Python\\Python311\\python.exe`,
-        `C:\\Users\\${username}\\AppData\\Local\\Programs\\Python\\Python310\\python.exe`,
-        'C:\\Python312\\python.exe',
-        'C:\\Python311\\python.exe',
-        'C:\\Python310\\python.exe',
-        'C:\\Program Files\\Python312\\python.exe',
-        'C:\\Program Files\\Python311\\python.exe',
-        'C:\\Program Files\\Python310\\python.exe',
-        `C:\\Users\\${username}\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe`,
-        `C:\\Users\\${username}\\AppData\\Local\\Microsoft\\WindowsApps\\python3.exe`
-    ];
+	// 2. Buscar en la variable de entorno PATH
+	console.log('[DEBUG] Searching for "python.exe" in system PATH');
+	try {
+		const { stdout } = await execPromise('where python');
+		const potentialPaths = stdout.split(/\r?\n/).filter(p => p.endsWith('python.exe'));
 
-    for (const p of commonPaths) {
-        console.log(`[DEBUG] Checking common path: ${p}`);
-        if (fs.existsSync(p)) {
-            try {
-                console.log(`[DEBUG] Testing Python executable: ${p}`);
-                await execFilePromise(p, ['--version']);
-                console.log(`[SUCCESS] Python found at: ${p}`);
-                return p;
-            } catch (e) {
-                console.warn(`[WARN] Path found but not executable: ${p}. Error: ${e.message}`);
-                continue;
-            }
-        } else {
-            console.log(`[DEBUG] Path does not exist: ${p}`);
-        }
-    }
+		for (const p of potentialPaths) {
+			const trimmedPath = p.trim();
+			if (trimmedPath && fs.existsSync(trimmedPath)) {
+				try {
+					console.log(`[DEBUG] Testing Python executable from PATH: ${trimmedPath}`);
+					await execFilePromise(trimmedPath, ['--version']);
+					console.log(`[SUCCESS] Python found in PATH at: ${trimmedPath}`);
+					return trimmedPath;
+				} catch (e) {
+					console.warn(`[WARN] Path from PATH found but not executable: ${trimmedPath}. Error: ${e.message}`);
+					continue;
+				}
+			}
+		}
+	} catch (e) {
+		console.log('[DEBUG] "where python" command failed or returned no results. Will check common paths.');
+	}
 
-    throw new Error('No se pudo encontrar un ejecutable de Python válido en el PATH del sistema ni en las rutas conocidas.');
+	// 3. Si no se encuentra en PATH, buscar en rutas comunes (fallback)
+	console.log('[DEBUG] Python not found in PATH, checking common installation directories.');
+	const username = os.userInfo().username;
+	console.log('[DEBUG] Current username:', username);
+	const commonPaths = [
+		`C:\\Users\\${username}\\AppData\\Local\\Programs\\Python\\Python314\\python.exe`,
+		`C:\\Users\\${username}\\AppData\\Local\\Programs\\Python\\Python313\\python.exe`,
+		`C:\\Users\\${username}\\AppData\\Local\\Programs\\Python\\Python312\\python.exe`,
+		`C:\\Users\\${username}\\AppData\\Local\\Programs\\Python\\Python311\\python.exe`,
+		`C:\\Users\\${username}\\AppData\\Local\\Programs\\Python\\Python310\\python.exe`,
+		'C:\\Python314\\python.exe',
+		'C:\\Python313\\python.exe',
+		'C:\\Python312\\python.exe',
+		'C:\\Python311\\python.exe',
+		'C:\\Python310\\python.exe',
+		'C:\\Program Files\\Python314\\python.exe',
+		'C:\\Program Files\\Python313\\python.exe',
+		'C:\\Program Files\\Python312\\python.exe',
+		'C:\\Program Files\\Python311\\python.exe',
+		'C:\\Program Files\\Python310\\python.exe',
+		`C:\\Users\\${username}\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe`,
+		`C:\\Users\\${username}\\AppData\\Local\\Microsoft\\WindowsApps\\python3.exe`
+	];
+
+	for (const p of commonPaths) {
+		console.log(`[DEBUG] Checking common path: ${p}`);
+		if (fs.existsSync(p)) {
+			try {
+				console.log(`[DEBUG] Testing Python executable: ${p}`);
+				await execFilePromise(p, ['--version']);
+				console.log(`[SUCCESS] Python found at: ${p}`);
+				return p;
+			} catch (e) {
+				console.warn(`[WARN] Path found but not executable: ${p}. Error: ${e.message}`);
+				continue;
+			}
+		} else {
+			console.log(`[DEBUG] Path does not exist: ${p}`);
+		}
+	}
+
+	throw new Error('No se pudo encontrar un ejecutable de Python válido en el PATH del sistema ni en las rutas conocidas.');
 }
 
 async function getPython() {
@@ -191,10 +218,12 @@ async function getPython() {
     }
 
     // Usar Python empaquetado (producción) o buscar Python desde cero (desarrollo)
-    global.cachedPythonPath = await getEmbeddedPythonPath();
-    console.log('[DEBUG] New Python path cached:', global.cachedPythonPath);
-    return global.cachedPythonPath;
+	global.cachedPythonPath = await getEmbeddedPythonPath();
+	console.log('[DEBUG] New Python path cached:', global.cachedPythonPath);
+	return global.cachedPythonPath;
 }
+
+global.getPython = getPython;
 
 /**
  * Obtiene la ruta correcta para scripts de Python tanto en desarrollo como en app empaquetada.
