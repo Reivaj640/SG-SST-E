@@ -39,6 +39,68 @@ const FILAS = {
 
 const COLUMNA_META = 30; // Columna AD
 
+// ── Detección dinámica de filas por etiquetas en columna D ──
+// Cada empresa puede tener un layout diferente (offset de filas).
+// Escanea la hoja y mapea las etiquetas de columna D a los números de fila
+// correctos, con fallback a FILAS si no detecta.
+function detectarFilas(ws) {
+	var detectadas = {};
+	var trabajadoresCount = 0;
+
+	for (var row = 1; row <= 30; row++) {
+		var dVal = String(ws.getCell(row, 4).value || '').trim();
+		if (!dVal) continue;
+
+		var dLower = dVal.toLowerCase();
+
+		if (dLower === 'a.t') {
+			if (!detectadas.accidentesAT) {
+				detectadas.accidentesAT = row;
+			} else if (!detectadas.atMortalidad) {
+				detectadas.atMortalidad = row;
+			}
+		} else if (dLower.startsWith('n\u00b0 trabajadores') || dLower.startsWith('n° trabajadores')) {
+			trabajadoresCount++;
+			if (trabajadoresCount === 1) {
+				detectadas.trabajadoresFreq = row;
+			} else if (trabajadoresCount === 2) {
+				detectadas.trabajadoresSev = row;
+			} else if (!detectadas.trabajadoresMortalidad) {
+				detectadas.trabajadoresMortalidad = row;
+			}
+		} else if (dLower.includes('días perdidos') || dLower.includes('dias perdidos')) {
+			detectadas.diasPerdidos = row;
+		} else if (dLower.includes('eventos mortales') || dLower.includes('evento mortal')) {
+			detectadas.eventosMortales = row;
+		} else if (dLower.includes('eventos ausencia') || dLower.includes('evento ausencia')) {
+			detectadas.eventosAusencia = row;
+		} else if (dLower.includes('días programados') || dLower.includes('dias programados')) {
+			detectadas.diasProgramados = row;
+		} else if (dLower.includes('casos nuevos y antiguos')) {
+			detectadas.prevalenciaEL = row;
+		} else if (dLower.includes('casos nuevos') && !dLower.includes('antiguos')) {
+			detectadas.incidenciaEL = row;
+		}
+	}
+
+	var resultado = {};
+	resultado.accidentesAT = detectadas.accidentesAT || FILAS.accidentesAT;
+	resultado.trabajadoresFreq = detectadas.trabajadoresFreq || FILAS.trabajadoresFreq;
+	resultado.diasPerdidos = detectadas.diasPerdidos || FILAS.diasPerdidos;
+	resultado.trabajadoresSev = detectadas.trabajadoresSev || FILAS.trabajadoresSev;
+	resultado.eventosMortales = detectadas.eventosMortales || FILAS.eventosMortales;
+	resultado.prevalenciaEL = detectadas.prevalenciaEL || FILAS.prevalenciaEL;
+	resultado.incidenciaEL = detectadas.incidenciaEL || FILAS.incidenciaEL;
+	resultado.eventosAusencia = detectadas.eventosAusencia || FILAS.eventosAusencia;
+	resultado.diasProgramados = detectadas.diasProgramados || FILAS.diasProgramados;
+
+	resultado.trabajadoresMortalidad = detectadas.trabajadoresMortalidad || detectadas.atMortalidad || (resultado.eventosMortales + 1);
+
+	console.log('[EXCEL-BRIDGE] Filas detectadas:', JSON.stringify(resultado));
+
+	return resultado;
+}
+
 // ── Utilidad: obtener valor numérico de celda ──
 function obtenerValor(ws, fila, col) {
   const cell = ws.getCell(fila, col);
@@ -226,74 +288,75 @@ await workbook.xlsx.readFile(ruta);
     throw new Error("Hoja no encontrada.");
   }
 
-  const metaFrecuencia = obtenerValor(ws, FILAS.accidentesAT, COLUMNA_META);
-  const metaSeveridad = obtenerValor(ws, FILAS.diasPerdidos, COLUMNA_META);
+	const filas = detectarFilas(ws);
 
-  const frecuenciaMensual = [];
-  const severidadMensual = [];
-  const ausentismoMensual = [];
-  const eventosMortalesMensual = [];
-  let totalAT = 0;
+	const metaFrecuencia = obtenerValor(ws, filas.accidentesAT, COLUMNA_META);
+	const metaSeveridad = obtenerValor(ws, filas.diasPerdidos, COLUMNA_META);
 
-  for (let mes = 1; mes <= 12; mes++) {
-    const col = mesAColumna(mes);
-const accidentes = obtenerValor(ws, FILAS.accidentesAT, col);
-  const trabajadores = obtenerValor(ws, FILAS.trabajadoresFreq, col);
-  const diasPerdidos = obtenerValor(ws, FILAS.diasPerdidos, col);
-  const eventosAusencia = obtenerValor(ws, FILAS.eventosAusencia, col);
-  const eventosMortalesMes = obtenerValor(ws, FILAS.eventosMortales, col);
-    
-    console.log(`[EXCEL-BRIDGE] Mes ${mes} (col ${col}): AT=${accidentes}, Trab=${trabajadores}, Dias=${diasPerdidos}, Aus=${eventosAusencia}`);
+	const frecuenciaMensual = [];
+	const severidadMensual = [];
+	const ausentismoMensual = [];
+	const eventosMortalesMensual = [];
+	let totalAT = 0;
 
-    // Cálculo de índices según fórmulas estándar
-    const indiceFrecuencia = trabajadores > 0
-      ? Math.round(((accidentes / trabajadores) * 100) * 10000) / 10000
-      : 0;
+	for (let mes = 1; mes <= 12; mes++) {
+		const col = mesAColumna(mes);
+		const accidentes = obtenerValor(ws, filas.accidentesAT, col);
+		const trabajadores = obtenerValor(ws, filas.trabajadoresFreq, col);
+		const diasPerdidos = obtenerValor(ws, filas.diasPerdidos, col);
+		const eventosAusencia = obtenerValor(ws, filas.eventosAusencia, col);
+		const eventosMortalesMes = obtenerValor(ws, filas.eventosMortales, col);
 
-    const indiceSeveridad = trabajadores > 0
-      ? Math.round(((diasPerdidos / trabajadores) * 100) * 10000) / 10000
-      : 0;
+		console.log(`[EXCEL-BRIDGE] Mes ${mes} (col ${col}): AT=${accidentes}, Trab=${trabajadores}, Dias=${diasPerdidos}, Aus=${eventosAusencia}`);
 
-    const diasProgramados = obtenerValor(ws, FILAS.diasProgramados, col);
-    const tasaAusentismo = diasProgramados > 0
-      ? Math.round(((eventosAusencia / diasProgramados) * 100) * 10000) / 10000
-      : 0;
+		const indiceFrecuencia = trabajadores > 0
+			? Math.round(((accidentes / trabajadores) * 100) * 10000) / 10000
+			: 0;
 
-    totalAT += accidentes;
+		const indiceSeveridad = trabajadores > 0
+			? Math.round(((diasPerdidos / trabajadores) * 100) * 10000) / 10000
+			: 0;
 
-    frecuenciaMensual.push({ 
-      mes, 
-      mesLabel: MESES_LABELS[mes-1], 
-      accidentes, 
-      trabajadores, 
-      indiceFrecuencia 
-    });
-    
-    severidadMensual.push({ 
-      mes, 
-      mesLabel: MESES_LABELS[mes-1], 
-      diasPerdidos, 
-      trabajadores, 
-      indiceSeveridad 
-    });
-    
-ausentismoMensual.push({
-      mes,
-      mesLabel: MESES_LABELS[mes-1],
-      eventosAusencia,
-      tasaAusentismo
-    });
+		const diasProgramados = obtenerValor(ws, filas.diasProgramados, col);
+		const tasaAusentismo = diasProgramados > 0
+			? Math.round(((eventosAusencia / diasProgramados) * 100) * 10000) / 10000
+			: 0;
 
-    eventosMortalesMensual.push({
-      mes,
-      mesLabel: MESES_LABELS[mes-1],
-      eventosMortales: eventosMortalesMes
-    });
-  }
+		totalAT += accidentes;
 
-const mortalidad = obtenerValor(ws, FILAS.eventosMortales, 5);
-  const prevalenciaEL = obtenerValor(ws, FILAS.prevalenciaEL, 5);
-  const metaMortalidad = obtenerValor(ws, FILAS.eventosMortales, COLUMNA_META);
+		frecuenciaMensual.push({
+			mes,
+			mesLabel: MESES_LABELS[mes-1],
+			accidentes,
+			trabajadores,
+			indiceFrecuencia
+		});
+
+		severidadMensual.push({
+			mes,
+			mesLabel: MESES_LABELS[mes-1],
+			diasPerdidos,
+			trabajadores,
+			indiceSeveridad
+		});
+
+		ausentismoMensual.push({
+			mes,
+			mesLabel: MESES_LABELS[mes-1],
+			eventosAusencia,
+			tasaAusentismo
+		});
+
+		eventosMortalesMensual.push({
+			mes,
+			mesLabel: MESES_LABELS[mes-1],
+			eventosMortales: eventosMortalesMes
+		});
+	}
+
+	const mortalidad = obtenerValor(ws, filas.eventosMortales, 5);
+	const prevalenciaEL = obtenerValor(ws, filas.prevalenciaEL, 5);
+	const metaMortalidad = obtenerValor(ws, filas.eventosMortales, COLUMNA_META);
 
   return {
     success: true,
@@ -458,28 +521,30 @@ const workbook = new ExcelJS.Workbook();
 await workbook.xlsx.readFile(ruta);
   const ws = workbook.getWorksheet(HOJA_DATOS);
   
-  if (!ws) throw new Error("Hoja no encontrada: " + HOJA_DATOS);
+	if (!ws) throw new Error("Hoja no encontrada: " + HOJA_DATOS);
 
-  const col = mesAColumna(mes);
+	const filas = detectarFilas(ws);
 
-  // Solo escribir en columnas impares (datos), NO en columnas pares (fórmulas)
-  if (campos.accidentes !== undefined) ws.getCell(FILAS.accidentesAT, col).value = campos.accidentes;
-  if (campos.trabajadores !== undefined) ws.getCell(FILAS.trabajadoresFreq, col).value = campos.trabajadores;
-  if (campos.diasPerdidos !== undefined) ws.getCell(FILAS.diasPerdidos, col).value = campos.diasPerdidos;
-  if (campos.eventosAusencia !== undefined) ws.getCell(FILAS.eventosAusencia, col).value = campos.eventosAusencia;
+	const col = mesAColumna(mes);
 
-  // Valores anuales (se escriben en todos los meses)
-  if (campos.eventosMortales !== undefined) {
-    for (let m = 1; m <= 12; m++) {
-      ws.getCell(FILAS.eventosMortales, mesAColumna(m)).value = campos.eventosMortales;
-    }
-  }
-  
-  if (campos.prevalenciaEL !== undefined) {
-    for (let m = 1; m <= 12; m++) {
-      ws.getCell(FILAS.prevalenciaEL, mesAColumna(m)).value = campos.prevalenciaEL;
-    }
-  }
+	// Solo escribir en columnas impares (datos), NO en columnas pares (fórmulas)
+	if (campos.accidentes !== undefined) ws.getCell(filas.accidentesAT, col).value = campos.accidentes;
+	if (campos.trabajadores !== undefined) ws.getCell(filas.trabajadoresFreq, col).value = campos.trabajadores;
+	if (campos.diasPerdidos !== undefined) ws.getCell(filas.diasPerdidos, col).value = campos.diasPerdidos;
+	if (campos.eventosAusencia !== undefined) ws.getCell(filas.eventosAusencia, col).value = campos.eventosAusencia;
+
+	// Valores anuales (se escriben en todos los meses)
+	if (campos.eventosMortales !== undefined) {
+		for (let m = 1; m <= 12; m++) {
+			ws.getCell(filas.eventosMortales, mesAColumna(m)).value = campos.eventosMortales;
+		}
+	}
+
+	if (campos.prevalenciaEL !== undefined) {
+		for (let m = 1; m <= 12; m++) {
+			ws.getCell(filas.prevalenciaEL, mesAColumna(m)).value = campos.prevalenciaEL;
+		}
+	}
 
   // Guardar IN-PLACE (sobrescribe el archivo original)
   await workbook.xlsx.writeFile(EXCEL_INDICADORES);
@@ -547,20 +612,22 @@ await workbook.xlsx.readFile(ruta);
     if (ws) break;
   }
 
-  if (!ws) {
-    // Usar hoja por defecto
-    ws = workbook.getWorksheet(1);
-  }
+	if (!ws) {
+		// Usar hoja por defecto
+		ws = workbook.getWorksheet(1);
+	}
 
-  const meta = obtenerValor(ws, FILAS_MORTALIDAD.eventosMortales, COLUMNA_META);
-  const trabajadores = obtenerValor(ws, FILAS_MORTALIDAD.trabajadores, 5) || 150;
+	const filas = detectarFilas(ws);
 
-  const eventos = [];
-  for (let mes = 1; mes <= 12; mes++) {
-    const col = mesAColumna(mes);
-    const valor = obtenerValor(ws, FILAS_MORTALIDAD.eventosMortales, col);
-    eventos.push(valor);
-  }
+	const meta = obtenerValor(ws, filas.eventosMortales, COLUMNA_META);
+	const trabajadores = obtenerValor(ws, filas.trabajadoresMortalidad, 5) || 150;
+
+	const eventos = [];
+	for (let mes = 1; mes <= 12; mes++) {
+		const col = mesAColumna(mes);
+		const valor = obtenerValor(ws, filas.eventosMortales, col);
+		eventos.push(valor);
+	}
 
   console.log('[EXCEL-BRIDGE Mortalidad] meta:', meta, 'trabajadores:', trabajadores, 'eventos:', eventos);
 
@@ -602,18 +669,20 @@ await workbook.xlsx.readFile(ruta);
     ws = workbook.getWorksheet(1);
   }
 
-  if (!ws) throw new Error("Hoja no encontrada");
+	if (!ws) throw new Error("Hoja no encontrada");
 
-  // Escribir valores
-  if (campos.eventos !== undefined) {
-    const col = mes ? mesAColumna(mes) : 5;
-    ws.getCell(FILAS_MORTALIDAD.eventosMortales, col).value = campos.eventos;
-  }
+	const filas = detectarFilas(ws);
 
-  if (campos.trabajadores !== undefined) {
-    const col = mes ? mesAColumna(mes) : 5;
-    ws.getCell(FILAS_MORTALIDAD.trabajadores, col).value = campos.trabajadores;
-  }
+	// Escribir valores
+	if (campos.eventos !== undefined) {
+		const col = mes ? mesAColumna(mes) : 5;
+		ws.getCell(filas.eventosMortales, col).value = campos.eventos;
+	}
+
+	if (campos.trabajadores !== undefined) {
+		const col = mes ? mesAColumna(mes) : 5;
+		ws.getCell(filas.trabajadoresMortalidad, col).value = campos.trabajadores;
+	}
 
   // Guardar IN-PLACE
   await workbook.xlsx.writeFile(EXCEL_INDICADORES);

@@ -84,25 +84,25 @@ class GestionSaludHome {
 
         try {
             // Ejecutar peticiones en paralelo (main.js responderá rápido gracias a su caché de archivos)
-const [recursosResult, ausResult, accResult, examResult, segResult, remResult, indicadoresResult] = await Promise.all([
-window.electronAPI.getRecursosStats(company),
-window.electronAPI.getAusentismoStats(company, 'year'),
-window.electronAPI.getAccidentesStats(company),
-window.electronAPI.getExamenesStats(company),
-window.electronAPI.getSaludSeguimientosStats(company),
-window.electronAPI.getRemisionesStats(company),
-window.electronAPI.getIndicadoresSaludStats(company)
-]);
+      const [recursosResult, ausResult, accResult, examResult, segResult, remResult, indicadoresResult] = await Promise.all([
+        window.electronAPI.getRecursosStats(company),
+        window.electronAPI.getAusentismoStats(company, 'year'),
+        window.electronAPI.getAccidentesStats(company),
+        window.electronAPI.getExamenesStats(company),
+        window.electronAPI.getSaludSeguimientosStats(company),
+        window.electronAPI.getRemisionesStats(company),
+        window.electronAPI.getIndicadoresSaludStats(company)
+      ]);
 
-const newData = {
-inducciones: recursosResult.success ? recursosResult.stats.inducciones : null,
-ausentismo: ausResult.success ? ausResult.data : null,
-accidentes: accResult.success ? accResult.data : null,
-examenes: examResult.success ? examResult.data : null,
-seguimientos: segResult.success ? segResult.data : null,
-remisiones: remResult.success ? remResult.data : null,
-indicadores: indicadoresResult.success ? indicadoresResult.data : null
-};
+      const newData = {
+        inducciones: recursosResult.success ? recursosResult.stats.inducciones : null,
+        ausentismo: ausResult.success ? ausResult.data : null,
+        accidentes: accResult.success ? accResult.data : null,
+        examenes: examResult.success ? examResult.data : null,
+        seguimientos: segResult.success ? segResult.data : null,
+        remisiones: remResult.success ? remResult.data : null,
+        indicadores: indicadoresResult.success ? indicadoresResult.data : null
+      };
 
             // Guardar en caché de sesión
             window._saludHomeState.cache.set(company, newData);
@@ -655,9 +655,9 @@ Evaluaciones médicas
                 <div class="kb-amount" style="text-align:center;">
                     <span>${value}</span>
                 </div>
-<div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:4px;">
-Reportes FURAT
-                </div>
+      <div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:4px;">
+        Accidentes de Trabajo (A.T)
+      </div>
                 <div class="kb-footer">
                     <div>
                         <div class="kb-label">Total Año</div>

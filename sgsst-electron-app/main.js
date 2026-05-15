@@ -12636,89 +12636,156 @@ ipcMain.handle('get-salud-seguimientos-stats', async (event, companyName) => {
 });
 
 // ==========================================================================
-// Handler: Estadísticas de Accidentes (FURAT) (Optimizado con Caché)
+// Handler: Estadísticas de Accidentes (desde Registro Estadístico 3.2.3)
 // ==========================================================================
 ipcMain.handle('get-accidentes-stats', async (event, companyName) => {
-  const furatFiles = {
-    "TEMPOACTIVA": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\1. Tempoactiva Est SAS\\3. Gestión de la Salud\\3.2.1 Reporte de los accidentes de trabajo\\GI-FO-015 REPORTE DE ACCIDENTES DE TRABAJO.xlsx",
-    "TEMPOSUM": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\2. Temposum Est SAS\\3. Gestión de la Salud\\3.2.1 Reporte de los accidentes de trabajo\\GI-FO-015 REPORTE DE ACCIDENTES DE TRABAJO.xlsx",
-    "ASEPLUS": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\3. Aseplus\\3. Gestión de la Salud\\3.2.1 Reporte de los accidentes de trabajo\\PI-FO-015 REPORTE DE ACCIDENTES DE TRABAJO (ASEPLUS).xlsx",
-    "ASEL": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\19. Asel S.A.S\\3. Gestión de la Salud\\3.2.1 Reporte de los accidentes de trabajo\\A-FR-02 Reporte de Accidentes.xlsx"
-  };
+  const emptyResult = { totalYear: 0, mesActual: 0, year: new Date().getFullYear(), mes: '---', mensual: Array(12).fill(0) };
 
-  const filePath = furatFiles[companyName.toUpperCase()];
-  if (!filePath || !fs.existsSync(filePath)) {
-    return { success: true, data: { totalYear: 0, mesActual: 0, year: new Date().getFullYear(), mes: '---', mensual: Array(12).fill(0) } };
-  }
+  try {
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
 
-  const cacheKey = `accidentes_${companyName.toUpperCase()}`;
-  
-  const resultData = await getCachedStats(cacheKey, [filePath], async () => {
+    const normalizedInput = (companyName || '').toLowerCase();
+    const companyKey = Object.keys(config.companyPaths || {}).find(
+      key => key.toLowerCase() === normalizedInput
+    );
+    const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+
+    if (!companyConfig || !companyConfig.root) {
+      return { success: true, data: emptyResult };
+    }
+
+    const gestionSaludDir = path.join(companyConfig.root, '3. Gestión de la Salud');
+    let gestionEntries;
     try {
-      const workbook = xlsx.readFile(filePath);
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const rawData = xlsx.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+      gestionEntries = await fsp.readdir(gestionSaludDir);
+    } catch (err) {
+      if (err.code === 'ENOENT') return { success: true, data: emptyResult };
+      throw err;
+    }
 
-      let headerRowIdx = -1, colFecha = -1;
-      for (let i = 0; i < Math.min(rawData.length, 20); i++) {
-        const row = rawData[i];
-        if (!Array.isArray(row)) continue;
-        const fIdx = row.findIndex(c => String(c || '').toUpperCase().includes('FECHA') && (String(c || '').toUpperCase().includes('ACCIDENTE') || String(c || '').toUpperCase().includes('EVENTO')));
-        if (fIdx !== -1) {
-          headerRowIdx = i; colFecha = fIdx;
-          break;
-        }
-      }
-      if (headerRowIdx === -1) { colFecha = 1; headerRowIdx = 0; }
+    const registro323Folder = gestionEntries.find(f => f.startsWith('3.2.3'));
+    if (!registro323Folder) {
+      return { success: true, data: emptyResult };
+    }
 
-      const dataRows = rawData.slice(headerRowIdx + 1);
-      const today = new Date();
-      const currentYear = today.getFullYear();
-      const currentMonth = today.getMonth();
-      const monthNames = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+    const submoduleDir = path.join(gestionSaludDir, registro323Folder);
+    let entries;
+    try {
+      entries = await fsp.readdir(submoduleDir);
+    } catch (err) {
+      if (err.code === 'ENOENT') return { success: true, data: emptyResult };
+      throw err;
+    }
 
-      const monthlyCount = Array(12).fill(0);
-      let totalCount = 0;
-      let monthCount = 0;
+    const excelFile = entries.find(f => f.toLowerCase().endsWith('.xlsx') && !f.startsWith('~$'));
+    if (!excelFile) {
+      return { success: true, data: emptyResult };
+    }
 
-      dataRows.forEach(row => {
-        if (!row || row.length <= colFecha || !row[colFecha]) return;
-        
-        let fecha = null;
-        const val = row[colFecha];
-        if (typeof val === 'number') {
-          fecha = xlsx.SSF.parse_date_code(val);
-          fecha = new Date(fecha.y, fecha.m - 1, fecha.d);
-        } else {
-          fecha = new Date(val);
-        }
+    const filePath = path.join(submoduleDir, excelFile);
 
-        if (fecha && !isNaN(fecha.getTime())) {
-          if (fecha.getFullYear() === currentYear) {
-            totalCount++;
-            monthlyCount[fecha.getMonth()]++;
-            if (fecha.getMonth() === currentMonth) {
-              monthCount++;
-            }
+    const cacheKey = `accidentes_${companyName.toUpperCase()}`;
+
+    const resultData = await getCachedStats(cacheKey, [filePath], async () => {
+      try {
+        const workbook = xlsx.readFile(filePath);
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const rawData = xlsx.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+        let headerRowIdx = -1;
+        for (let i = 0; i < Math.min(10, rawData.length); i++) {
+          const row = rawData[i];
+          if (row && row.some(c => {
+            const s = String(c).trim().toLowerCase();
+            return s === 'ciudad' || s === 'año' || s === 'evento';
+          })) {
+            headerRowIdx = i;
+            break;
           }
         }
-      });
+        if (headerRowIdx === -1) headerRowIdx = 0;
 
-      return {
-        totalYear: totalCount,
-        mesActual: monthCount,
-        year: currentYear,
-        mes: monthNames[currentMonth],
-        mensual: monthlyCount
-      };
-    } catch (err) {
-      console.error('[ACCIDENTES] Error calculando:', err);
-      return { totalYear: 0, mesActual: 0, year: new Date().getFullYear(), mes: 'ERROR', mensual: Array(12).fill(0) };
-    }
-  });
+        const headers = rawData[headerRowIdx].map(h => String(h).trim().replace(/\r\n|\r|\n/g, ''));
+        const idx = (name) => headers.findIndex(h => h.toLowerCase() === name.toLowerCase());
 
-  return { success: true, data: resultData };
+        const iAnio = idx('Año');
+        const iFecha = idx('Fecha del incidente');
+        const iMes = idx('Mes');
+        const iEvento = idx('Evento');
+
+        const MESES_MAP = {
+          'enero':0,'febrero':1,'marzo':2,'abril':3,'mayo':4,'junio':5,
+          'julio':6,'agosto':7,'septiembre':8,'octubre':9,'noviembre':10,'diciembre':11,
+          'ene':0,'feb':1,'mar':2,'abr':3,'may':4,'jun':5,
+          'jul':6,'ago':7,'sep':8,'oct':9,'nov':10,'dic':11
+        };
+
+        const currentYear = new Date().getFullYear();
+        const currentMonth = new Date().getMonth();
+        const monthNames = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+
+        const monthlyCount = Array(12).fill(0);
+        let totalCount = 0;
+        let monthCount = 0;
+
+        for (let r = headerRowIdx + 1; r < rawData.length; r++) {
+          const row = rawData[r];
+          if (!row) continue;
+
+          const anio = parseInt(row[iAnio]);
+          if (!anio || anio !== currentYear) continue;
+
+          const evento = String(row[iEvento] || '').trim().toLowerCase();
+          if (evento !== 'at') continue;
+
+          let mesIdx = -1;
+
+          const fechaVal = row[iFecha];
+          if (fechaVal) {
+            let fecha = null;
+            if (typeof fechaVal === 'number') {
+              const d = xlsx.SSF.parse_date_code(fechaVal);
+              fecha = new Date(d.y, d.m - 1, d.d);
+            } else {
+              fecha = new Date(fechaVal);
+            }
+            if (fecha && !isNaN(fecha.getTime())) {
+              mesIdx = fecha.getMonth();
+            }
+          }
+
+          if (mesIdx === -1 && iMes >= 0) {
+            const mesLabel = String(row[iMes] || '').trim().toLowerCase();
+            mesIdx = MESES_MAP[mesLabel];
+          }
+
+          if (mesIdx >= 0 && mesIdx < 12) {
+            monthlyCount[mesIdx]++;
+            totalCount++;
+            if (mesIdx === currentMonth) monthCount++;
+          }
+        }
+
+        return {
+          totalYear: totalCount,
+          mesActual: monthCount,
+          year: currentYear,
+          mes: monthNames[currentMonth],
+          mensual: monthlyCount
+        };
+      } catch (err) {
+        console.error('[ACCIDENTES] Error calculando:', err);
+        return { totalYear: 0, mesActual: 0, year: new Date().getFullYear(), mes: 'ERROR', mensual: Array(12).fill(0) };
+      }
+    });
+
+    return { success: true, data: resultData };
+  } catch (err) {
+    console.error('[ACCIDENTES] Error resolviendo ruta:', err);
+    return { success: true, data: emptyResult };
+  }
 });
 
 // ==========================================================================
