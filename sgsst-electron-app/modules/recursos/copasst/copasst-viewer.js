@@ -85,8 +85,7 @@ function setupEventListeners() {
 
 // Configurar eventos de drag & drop
 function setupDragAndDrop() {
-    // Se configura dinámicamente en renderFolders() para cada carpeta
-    console.log('[Drag&Drop] Setup completado - se activará por carpeta');
+  console.log('[Drag&Drop] Setup completado - se activará por carpeta');
 }
 
 // Configurar drag & drop en una carpeta específica
@@ -187,11 +186,9 @@ async function uploadFile(file, folderPath) {
         });
 
         // 4. Mostrar resultado
-        if (result.success) {
-            showToast(result.message || 'Archivo subido exitosamente', 'success');
-
-            // 5. Recargar lista de archivos
-            await loadDocuments(destinationPath);
+      if (result.success) {
+        showToast(result.message || 'Archivo subido exitosamente', 'success');
+        await reloadCurrentContent();
         } else {
             showToast(`Error: ${result.error}`, 'error');
         }
@@ -217,38 +214,63 @@ function fileToBase64(file) {
 // ===============================
 
 let currentContextMenuDoc = null;
+let currentContextMenuFolder = null;
 
 // Mostrar menú contextual
 function showContextMenu(x, y, doc) {
-    const menu = document.getElementById('contextMenu');
-    if (!menu) return;
+  hideFolderContextMenu();
+  const menu = document.getElementById('contextMenu');
+  if (!menu) return;
 
-    currentContextMenuDoc = doc;
+  currentContextMenuDoc = doc;
 
-    // Posicionar menú
-    menu.style.display = 'block';
-    menu.style.left = `${x}px`;
-    menu.style.top = `${y}px`;
+  menu.style.display = 'block';
+  menu.style.left = `${x}px`;
+  menu.style.top = `${y}px`;
 
-    // Ajustar si se sale de la pantalla
-    const rect = menu.getBoundingClientRect();
-    if (rect.right > window.innerWidth) {
-        menu.style.left = `${window.innerWidth - rect.width - 10}px`;
-    }
-    if (rect.bottom > window.innerHeight) {
-        menu.style.top = `${window.innerHeight - rect.height - 10}px`;
-    }
-
-    console.log(`[ContextMenu] Mostrando menú para: ${doc.name}`);
+  const rect = menu.getBoundingClientRect();
+  if (rect.right > window.innerWidth) {
+    menu.style.left = `${window.innerWidth - rect.width - 10}px`;
+  }
+  if (rect.bottom > window.innerHeight) {
+    menu.style.top = `${window.innerHeight - rect.height - 10}px`;
+  }
 }
 
-// Ocultar menú contextual
 function hideContextMenu() {
-    const menu = document.getElementById('contextMenu');
-    if (menu) {
-        menu.style.display = 'none';
-    }
-    currentContextMenuDoc = null;
+  const menu = document.getElementById('contextMenu');
+  if (menu) {
+    menu.style.display = 'none';
+  }
+  currentContextMenuDoc = null;
+}
+
+function showFolderContextMenu(x, y, folder) {
+  hideContextMenu();
+  const menu = document.getElementById('folderContextMenu');
+  if (!menu) return;
+
+  currentContextMenuFolder = folder;
+
+  menu.style.display = 'block';
+  menu.style.left = `${x}px`;
+  menu.style.top = `${y}px`;
+
+  const rect = menu.getBoundingClientRect();
+  if (rect.right > window.innerWidth) {
+    menu.style.left = `${window.innerWidth - rect.width - 10}px`;
+  }
+  if (rect.bottom > window.innerHeight) {
+    menu.style.top = `${window.innerHeight - rect.height - 10}px`;
+  }
+}
+
+function hideFolderContextMenu() {
+  const menu = document.getElementById('folderContextMenu');
+  if (menu) {
+    menu.style.display = 'none';
+  }
+  currentContextMenuFolder = null;
 }
 
 // Eliminar documento
@@ -281,11 +303,9 @@ async function deleteDocument() {
 
             console.log('[ContextMenu] Resultado de eliminar:', result);
 
-            if (result.success) {
-                showToast('Archivo eliminado correctamente', 'success');
-                // Recargar lista de archivos
-                console.log('[ContextMenu] Recargando lista de archivos...');
-                await loadDocuments(currentFolderPath);
+      if (result.success) {
+        showToast('Archivo eliminado correctamente', 'success');
+        await reloadCurrentContent();
             } else {
                 console.error('[ContextMenu] Error en respuesta:', result.error);
 
@@ -309,42 +329,181 @@ async function deleteDocument() {
             showToast(`Error al eliminar archivo: ${error.message}`, 'error');
         }
     });
+
+  hideFolderContextMenu();
 }
 
-// Setup de listeners para el menú contextual
-function setupContextMenu() {
-    // Cerrar menú al hacer clic en cualquier parte
-    document.addEventListener('click', () => {
-        hideContextMenu();
-    });
+async function deleteFolder() {
+  if (!currentContextMenuFolder) {
+    showToast('No hay carpeta seleccionada', 'error');
+    return;
+  }
 
-    // Cerrar menú al presionar Escape
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            hideContextMenu();
+  const folder = currentContextMenuFolder;
+  hideFolderContextMenu();
+
+  const titleEl = document.getElementById('confirmModalTitle');
+  const msgEl = document.getElementById('confirmModalMessage');
+  if (titleEl) titleEl.textContent = '¿Eliminar carpeta?';
+  if (msgEl) msgEl.textContent = 'Se eliminará la carpeta y todo su contenido:';
+
+  showConfirmModal(folder.name, async () => {
+    try {
+      const result = await callParentAPI('delete-folder', { folderPath: folder.path });
+
+      if (result.success) {
+        showToast('Carpeta eliminada correctamente', 'success');
+        await reloadCurrentContent();
+      } else {
+        if (result.code === 'ENOENT') {
+          showToast('La carpeta no existe. Puede que ya haya sido eliminada.', 'info');
+          await reloadCurrentContent();
+        } else {
+          showToast(`Error: ${result.error}`, 'error');
         }
+      }
+    } catch (error) {
+      showToast(`Error al eliminar carpeta: ${error.message}`, 'error');
+    }
+
+    if (titleEl) titleEl.textContent = '¿Eliminar?';
+    if (msgEl) msgEl.textContent = 'Estás a punto de eliminar:';
+  });
+}
+
+async function createSubfolder() {
+  if (!currentContextMenuFolder) {
+    showToast('No hay carpeta seleccionada', 'error');
+    return;
+  }
+
+  const parentFolder = currentContextMenuFolder;
+  hideFolderContextMenu();
+
+  const modal = document.getElementById('newFolderModal');
+  const input = document.getElementById('newFolderNameInput');
+  if (!modal || !input) return;
+
+  input.value = '';
+  modal.style.display = 'flex';
+  setTimeout(() => input.focus(), 100);
+
+  const doCreate = async () => {
+    const folderName = input.value.trim();
+    if (!folderName) {
+      showToast('El nombre no puede estar vacío', 'warning');
+      return;
+    }
+
+    modal.style.display = 'none';
+    cleanup();
+
+    try {
+      const result = await callParentAPI('create-folder', {
+        parentPath: parentFolder.path,
+        folderName: folderName
+      });
+
+      if (result.success) {
+        showToast(`Carpeta "${folderName}" creada`, 'success');
+        await reloadCurrentContent();
+      } else {
+        showToast(`Error: ${result.error}`, 'error');
+      }
+    } catch (error) {
+      showToast(`Error al crear carpeta: ${error.message}`, 'error');
+    }
+  };
+
+  const doCancel = () => {
+    modal.style.display = 'none';
+    cleanup();
+  };
+
+  const onKeydown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      doCreate();
+    } else if (e.key === 'Escape') {
+      doCancel();
+    }
+  };
+
+  const onOverlayClick = (e) => {
+    if (e.target === modal) doCancel();
+  };
+
+  const cleanup = () => {
+    input.removeEventListener('keydown', onKeydown);
+    modal.removeEventListener('click', onOverlayClick);
+    document.getElementById('newFolderAcceptBtn').removeEventListener('click', doCreate);
+    document.getElementById('newFolderCancelBtn').removeEventListener('click', doCancel);
+  };
+
+  input.addEventListener('keydown', onKeydown);
+  modal.addEventListener('click', onOverlayClick);
+  document.getElementById('newFolderAcceptBtn').addEventListener('click', doCreate);
+  document.getElementById('newFolderCancelBtn').addEventListener('click', doCancel);
+}
+
+async function reloadCurrentContent() {
+  if (pathHistory.length === 0) {
+    await loadFolders();
+  } else {
+    try {
+      const result = await callParentAPI('get-documents-in-folder', currentFolderPath);
+      renderContent(result.folders || [], result.files || []);
+    } catch (error) {
+      showToast(`Error al recargar: ${error.message}`, 'error');
+    }
+  }
+}
+function setupContextMenu() {
+  document.addEventListener('click', () => {
+    hideContextMenu();
+    hideFolderContextMenu();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      hideContextMenu();
+      hideFolderContextMenu();
+    }
+  });
+
+  setupConfirmModal();
+
+  const deleteBtn = document.getElementById('deleteFileBtn');
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteDocument();
     });
+  }
 
-    // Setup del modal de confirmación
-    setupConfirmModal();
+  const openBtn = document.getElementById('openFileBtn');
+  if (openBtn) {
+    openBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openFile();
+    });
+  }
 
-    // Listener para el botón eliminar
-    const deleteBtn = document.getElementById('deleteFileBtn');
-    if (deleteBtn) {
-        deleteBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Evitar que se cierre inmediatamente
-            deleteDocument();
-        });
-    }
+  const newSubfolderBtn = document.getElementById('newSubfolderBtn');
+  if (newSubfolderBtn) {
+    newSubfolderBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      createSubfolder();
+    });
+  }
 
-    // Listener para el botón abrir archivo
-    const openBtn = document.getElementById('openFileBtn');
-    if (openBtn) {
-        openBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            openFile();
-        });
-    }
+  const deleteFolderBtn = document.getElementById('deleteFolderBtn');
+  if (deleteFolderBtn) {
+    deleteFolderBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteFolder();
+    });
+  }
 }
 
 // ===============================
@@ -491,169 +650,148 @@ async function openFile() {
     hideContextMenu();
 }
 
-// Cargar carpetas
 async function loadFolders() {
-    console.log('VIEWER: Iniciando loadFolders...');
-    showLoading();
+  showLoading();
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const companyName = urlParams.get('company');
-    const moduleName = urlParams.get('module');
-    const submoduleName = urlParams.get('submodule');
+  const urlParams = new URLSearchParams(window.location.search);
+  const companyName = urlParams.get('company');
+  const moduleName = urlParams.get('module');
+  const submoduleName = urlParams.get('submodule');
 
-    if (!companyName || !moduleName || !submoduleName) {
-        showNotification('Faltan parámetros en la URL', 'error');
-        hideLoading();
-        return;
-    }
+  if (!companyName || !moduleName || !submoduleName) {
+    showNotification('Faltan parámetros en la URL', 'error');
+    hideLoading();
+    return;
+  }
 
-    try {
-        const result = await callParentAPI('get-document-folders', { companyName, moduleName, submoduleName });
-        currentFolderPath = result.basePath; 
-        pathHistory = []; 
-        
-        updateNavigationState();
-        
-        renderFolders(result.folders);
-        renderDocuments(result.files); 
-    } catch (error) {
-        showNotification(`Error al cargar contenido: ${error.message}`, 'error');
-    } finally {
-        hideLoading();
-    }
+  try {
+    const result = await callParentAPI('get-document-folders', { companyName, moduleName, submoduleName });
+    currentFolderPath = result.basePath || result.path;
+    pathHistory = [];
+
+    updateNavigationState();
+    renderContent(result.folders || [], result.files || []);
+  } catch (error) {
+    showNotification(`Error al cargar contenido: ${error.message}`, 'error');
+  } finally {
+    hideLoading();
+  }
 }
 
-// Renderizar carpetas
-function renderFolders(folders) {
-    const folderList = document.getElementById('folderList');
-    folderList.innerHTML = '';
+function renderContent(folders, documents) {
+  const contentList = document.getElementById('contentList');
+  contentList.innerHTML = '';
 
-    if (!folders || folders.length === 0) {
-        folderList.innerHTML = '<div style="padding:1rem; color:#999; font-size:0.85rem;">No hay carpetas.</div>';
-        return;
-    }
+  const hasFolders = folders && folders.length > 0;
+  const hasDocuments = documents && documents.length > 0;
 
+  if (!hasFolders && !hasDocuments) {
+    contentList.innerHTML = '<div style="padding:1rem; color:#999; font-size:0.85rem;">Carpeta vacía.</div>';
+    return;
+  }
+
+  if (hasFolders) {
     folders.forEach(folder => {
-        const folderItem = document.createElement('div');
-        folderItem.className = 'list-item folder'; // Agregar clase 'folder' para drag & drop
-        folderItem.dataset.path = folder.path;
+      const folderItem = document.createElement('div');
+      folderItem.className = 'list-item folder';
+      folderItem.dataset.path = folder.path;
 
-        const iconDiv = document.createElement('div');
-        iconDiv.className = 'item-icon folder';
-        iconDiv.innerHTML = '<i class="fas fa-folder"></i>';
+      const iconDiv = document.createElement('div');
+      iconDiv.className = 'item-icon folder';
+      iconDiv.innerHTML = '<i class="fas fa-folder"></i>';
 
-        const infoDiv = document.createElement('div');
-        infoDiv.className = 'item-info';
+      const infoDiv = document.createElement('div');
+      infoDiv.className = 'item-info';
 
-        const nameDiv = document.createElement('div');
-        nameDiv.className = 'item-name';
-        nameDiv.textContent = folder.name;
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'item-name';
+      nameDiv.textContent = folder.name;
 
-        infoDiv.appendChild(nameDiv);
-        folderItem.appendChild(iconDiv);
-        folderItem.appendChild(infoDiv);
+      infoDiv.appendChild(nameDiv);
+      folderItem.appendChild(iconDiv);
+      folderItem.appendChild(infoDiv);
 
-        folderItem.addEventListener('click', () => {
-            selectFolder(folder.path);
-        });
+      folderItem.addEventListener('click', () => {
+        selectFolder(folder.path);
+      });
 
-        // Configurar drag & drop para esta carpeta específica
-        setupFolderDragAndDrop(folderItem, folder.path);
+      folderItem.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        showFolderContextMenu(e.clientX, e.clientY, folder);
+      });
 
-        folderList.appendChild(folderItem);
+      setupFolderDragAndDrop(folderItem, folder.path);
+
+      contentList.appendChild(folderItem);
     });
-}
+  }
 
-// Seleccionar carpeta
-async function selectFolder(path) {
-    try {
-        if (currentFolderPath !== path) {
-            pathHistory.push(currentFolderPath);
-        }
+  if (hasFolders && hasDocuments) {
+    const separator = document.createElement('div');
+    separator.className = 'content-separator';
+    separator.textContent = 'Documentos';
+    contentList.appendChild(separator);
+  }
 
-        currentFolderPath = path;
-
-        document.querySelectorAll('.list-item').forEach(item => {
-            item.classList.remove('active');
-        });
-
-        const selectedItem = document.querySelector(`[data-path="${path}"]`);
-        if (selectedItem) {
-            selectedItem.classList.add('active');
-        }
-
-        await loadDocuments(path);
-        updateNavigationState();
-
-    } catch (error) {
-        showNotification('Error al seleccionar carpeta', 'error');
-    }
-}
-
-// Cargar documentos
-async function loadDocuments(folderPath) {
-    try {
-        const result = await callParentAPI('get-documents-in-folder', folderPath);
-        renderDocuments(result.files); 
-    } catch (error) {
-        showNotification(`Error al cargar documentos: ${error.message}`, 'error');
-    }
-}
-
-// Renderizar documentos
-function renderDocuments(documents) {
-    const documentList = document.getElementById('fileList');
-    const docCount = document.getElementById('docCount');
-
-    documentList.innerHTML = '';
-
-    if (!documents || documents.length === 0) {
-        documentList.innerHTML = '<div style="padding:1rem; color:#999; font-size:0.85rem;">Carpeta vacía.</div>';
-        if(docCount) docCount.innerText = '0';
-        return;
-    }
-
-    if(docCount) docCount.innerText = documents.length;
-
+  if (hasDocuments) {
     documents.forEach(doc => {
-        const docItem = document.createElement('div');
-        docItem.className = 'list-item';
-        docItem.dataset.path = doc.path;
+      const docItem = document.createElement('div');
+      docItem.className = 'list-item';
+      docItem.dataset.path = doc.path;
 
-        const fileTypeInfo = getFileTypeInfo(doc.extension);
+      const fileTypeInfo = getFileTypeInfo(doc.extension);
 
-        const iconDiv = document.createElement('div');
-        iconDiv.className = `item-icon ${fileTypeInfo.className}`;
-        iconDiv.innerHTML = `<i class="fas ${fileTypeInfo.icon}"></i>`;
+      const iconDiv = document.createElement('div');
+      iconDiv.className = `item-icon ${fileTypeInfo.className}`;
+      iconDiv.innerHTML = `<i class="fas ${fileTypeInfo.icon}"></i>`;
 
-        const infoDiv = document.createElement('div');
-        infoDiv.className = 'item-info';
+      const infoDiv = document.createElement('div');
+      infoDiv.className = 'item-info';
 
-        const nameDiv = document.createElement('div');
-        nameDiv.className = 'item-name';
-        nameDiv.textContent = doc.name;
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'item-name';
+      nameDiv.textContent = doc.name;
 
-        const metaDiv = document.createElement('div');
-        metaDiv.className = 'item-meta';
-        metaDiv.innerHTML = `<span class="badge-type">${doc.extension.toUpperCase()}</span>`;
+      const metaDiv = document.createElement('div');
+      metaDiv.className = 'item-meta';
+      metaDiv.innerHTML = `<span class="badge-type">${doc.extension.toUpperCase()}</span>`;
 
-        infoDiv.appendChild(nameDiv);
-        infoDiv.appendChild(metaDiv);
-        docItem.appendChild(iconDiv);
-        docItem.appendChild(infoDiv);
+      infoDiv.appendChild(nameDiv);
+      infoDiv.appendChild(metaDiv);
+      docItem.appendChild(iconDiv);
+      docItem.appendChild(infoDiv);
 
-        docItem.addEventListener('click', () => {
-            selectDocument(doc);
-        });
+      docItem.addEventListener('click', () => {
+        selectDocument(doc);
+      });
 
-        // Agregar evento de clic derecho (context menu)
-        docItem.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            showContextMenu(e.clientX, e.clientY, doc);
-        });
+      docItem.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        showContextMenu(e.clientX, e.clientY, doc);
+      });
 
-        documentList.appendChild(docItem);
+      contentList.appendChild(docItem);
     });
+  }
+}
+
+async function selectFolder(folderPath) {
+  try {
+    if (currentFolderPath !== folderPath) {
+      pathHistory.push(currentFolderPath);
+    }
+
+    currentFolderPath = folderPath;
+    updateNavigationState();
+
+    showLoading();
+    const result = await callParentAPI('get-documents-in-folder', folderPath);
+    renderContent(result.folders || [], result.files || []);
+  } catch (error) {
+        showNotification('Error al seleccionar carpeta: ' + error.message, 'error');
+  } finally {
+    hideLoading();
+  }
 }
 
 function getFileTypeInfo(extension) {
@@ -817,37 +955,71 @@ function enableDocActions(enable) {
 }
 
 function updateNavigationState() {
-    const backBtn = document.getElementById('goBackBtn');
-    if (backBtn) {
-        backBtn.disabled = pathHistory.length === 0;
-        backBtn.style.opacity = backBtn.disabled ? '0.5' : '1';
-        backBtn.style.cursor = backBtn.disabled ? 'not-allowed' : 'pointer';
-    }
+  const backBtn = document.getElementById('goBackBtn');
+  if (backBtn) {
+    backBtn.disabled = pathHistory.length === 0;
+    backBtn.style.opacity = backBtn.disabled ? '0.5' : '1';
+    backBtn.style.cursor = backBtn.disabled ? 'not-allowed' : 'pointer';
+  }
 
-    const breadcrumb = document.getElementById('breadcrumb');
-    let bcHTML = `<div class="crumb-item" onclick="resetToRoot()"><i class="fas fa-hdd"></i> Raíz</div>`;
-    
-    if (pathHistory.length > 0) {
-        const currentFolderName = currentFolderPath.split('\\').pop().split('/').pop(); 
-        bcHTML += `<div class="crumb-separator"><i class="fas fa-chevron-right"></i></div>`;
-        bcHTML += `<div class="crumb-item">${currentFolderName}</div>`;
-    }
-    
-    breadcrumb.innerHTML = bcHTML;
+  const breadcrumb = document.getElementById('breadcrumb');
+  let bcHTML = `<div class="crumb-item" onclick="resetToRoot()"><i class="fas fa-hdd"></i> Raíz</div>`;
+
+  if (pathHistory.length > 0) {
+    const allPaths = [...pathHistory, currentFolderPath];
+    allPaths.forEach((p, idx) => {
+      const name = p.split('\\').pop().split('/').pop();
+      bcHTML += `<div class="crumb-separator"><i class="fas fa-chevron-right"></i></div>`;
+      if (idx < allPaths.length - 1) {
+        bcHTML += `<div class="crumb-item" onclick="navigateToPathIndex(${idx})">${name}</div>`;
+      } else {
+        bcHTML += `<div class="crumb-item active">${name}</div>`;
+      }
+    });
+  }
+
+  breadcrumb.innerHTML = bcHTML;
+}
+
+async function navigateToPathIndex(targetIdx) {
+  const targetPath = pathHistory[targetIdx];
+  pathHistory = pathHistory.slice(0, targetIdx);
+  currentFolderPath = targetPath;
+  updateNavigationState();
+
+  try {
+    showLoading();
+    const result = await callParentAPI('get-documents-in-folder', targetPath);
+    renderContent(result.folders || [], result.files || []);
+  } catch (error) {
+    showNotification('Error al navegar', 'error');
+  } finally {
+    hideLoading();
+  }
 }
 
 async function resetToRoot() {
-    if (pathHistory.length > 0) {
-        loadFolders(); 
-    }
+  if (pathHistory.length > 0) {
+    loadFolders();
+  }
 }
 
 async function goUpLevel() {
-    if (pathHistory.length > 0) {
-        const previousPath = pathHistory.pop();
-        await selectFolder(previousPath);
-        updateNavigationState();
+  if (pathHistory.length > 0) {
+    const previousPath = pathHistory.pop();
+    currentFolderPath = previousPath;
+    updateNavigationState();
+
+    try {
+      showLoading();
+      const result = await callParentAPI('get-documents-in-folder', previousPath);
+      renderContent(result.folders || [], result.files || []);
+    } catch (error) {
+      showNotification('Error al retroceder', 'error');
+    } finally {
+      hideLoading();
     }
+  }
 }
 
 // Utilidades

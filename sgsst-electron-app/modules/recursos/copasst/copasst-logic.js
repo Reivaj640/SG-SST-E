@@ -249,9 +249,9 @@ class CopasstComponent {
         this.container.appendChild(portalContainer);
 
         // Listeners de Navegación
-        document.getElementById('portalBackBtn').onclick = () => this.onBackToModuleHome();
-        document.getElementById('portalExploreBtn').onclick = () => this.showVerActasPage();
-        document.getElementById('portalCreateBtn').onclick = () => this.showRealizarActasInterface();
+    this.container.querySelector('#portalBackBtn').onclick = () => this.onBackToModuleHome();
+    this.container.querySelector('#portalExploreBtn').onclick = () => this.showVerActasPage();
+    this.container.querySelector('#portalCreateBtn').onclick = () => this.showRealizarActasInterface();
         
         window.removeEventListener('message', this.handleIframeMessage);
     }
@@ -283,16 +283,22 @@ class CopasstComponent {
         }
     }
 
-    getApiMap() {
-        return {
-            'get-document-folders': 'getDocumentFolders',
-            'get-documents-in-folder': 'getDocumentsInFolder',
-            'get-pdf-preview': 'getPDFPreview',
-            'get-word-preview': 'getWordPreview',
-            'get-excel-preview': 'getExcelPreview',
-            'download-document': 'downloadDocument'
-        };
-    }
+  getApiMap() {
+    return {
+      'get-document-folders': 'getDocumentFolders',
+      'get-documents-in-folder': 'getDocumentsInFolder',
+      'get-folder-contents': 'getFolderContents',
+      'get-pdf-preview': 'getPDFPreview',
+      'get-word-preview': 'getWordPreview',
+      'get-excel-preview': 'getExcelPreview',
+      'download-document': 'downloadDocument',
+      'upload-document': 'uploadDocument',
+      'delete-document': 'deleteDocument',
+      'delete-folder': 'deleteFolder',
+      'create-folder': 'createFolder',
+      'open-file': 'openFile'
+    };
+  }
 
     async handleStandardRequest(event, apiFunctionName) {
         const { requestId, payload } = event.data;
@@ -302,16 +308,18 @@ class CopasstComponent {
             event.source.postMessage({
                 type: `${event.data.type.replace('-request', '')}-response`,
                 requestId,
-                payload: {
-                    success: result.success,
-                    data: result.data || result, 
-                    files: result.files, 
-                    folders: result.folders,
-                    basePath: result.basePath,
-                    fileName: result.fileName,
-                    base64Data: result.base64Data,
-                    error: result.error
-                }
+      payload: {
+        success: result.success,
+        data: result.data || result,
+        files: result.files,
+        folders: result.folders,
+        basePath: result.basePath,
+        path: result.path,
+        fileName: result.fileName,
+        base64Data: result.base64Data,
+        error: result.error,
+        code: result.code
+      }
             }, '*');
         } catch (error) {
             event.source.postMessage({

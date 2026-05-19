@@ -5681,6 +5681,96 @@ ipcMain.handle('open-file', async (event, filePath) => {
   }
 });
 
+// ===============================
+// Manejador para crear carpeta
+// ===============================
+ipcMain.handle('create-folder', async (event, payload) => {
+  const { parentPath, folderName } = payload;
+
+  sendLog(`[MAIN][create-folder] Solicitud para crear carpeta: "${folderName}" en ${parentPath}`, 'INFO');
+
+  try {
+    if (!parentPath || !folderName) {
+      throw new Error('Ruta padre o nombre de carpeta no proporcionados');
+    }
+
+    const normalizedParent = path.normalize(parentPath);
+    const newFolderPath = path.join(normalizedParent, folderName);
+
+    const exists = await fsp.access(newFolderPath).then(() => true).catch(() => false);
+    if (exists) {
+      throw new Error('Ya existe una carpeta con ese nombre');
+    }
+
+    await fsp.mkdir(newFolderPath, { recursive: true });
+
+    sendLog(`[MAIN][create-folder] Carpeta creada exitosamente: ${newFolderPath}`, 'INFO');
+
+    return {
+      success: true,
+      path: newFolderPath
+    };
+  } catch (error) {
+    sendLog(`[MAIN][create-folder] Error al crear carpeta: ${error.message}`, 'ERROR');
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+});
+
+// ===============================
+// Manejador para eliminar carpeta
+// ===============================
+ipcMain.handle('delete-folder', async (event, payload) => {
+  const { folderPath } = payload;
+
+  sendLog(`[MAIN][delete-folder] Solicitud para eliminar carpeta: ${folderPath}`, 'INFO');
+
+  try {
+    if (!folderPath) {
+      throw new Error('Ruta de carpeta no válida');
+    }
+
+    const normalizedPath = path.normalize(folderPath);
+    sendLog(`[MAIN][delete-folder] Ruta normalizada: ${normalizedPath}`, 'DEBUG');
+
+    const exists = await fsp.access(normalizedPath).then(() => true).catch(() => false);
+    if (!exists) {
+      sendLog(`[MAIN][delete-folder] Carpeta no existe: ${normalizedPath}`, 'ERROR');
+      return { success: false, error: 'La carpeta no existe', code: 'ENOENT' };
+    }
+
+    const stats = await fsp.stat(normalizedPath);
+    if (!stats.isDirectory()) {
+      throw new Error('La ruta no corresponde a una carpeta');
+    }
+
+    try {
+      await shell.trashItem(normalizedPath);
+      sendLog(`[MAIN][delete-folder] Carpeta movida a papelera exitosamente`, 'INFO');
+      return { success: true };
+    } catch (trashError) {
+      sendLog(`[MAIN][delete-folder] trashItem falló: ${trashError.message}, usando fsp.rm`, 'WARN');
+      await fsp.rm(normalizedPath, { recursive: true, force: true });
+      sendLog(`[MAIN][delete-folder] Carpeta eliminada con fsp.rm`, 'INFO');
+      return { success: true };
+    }
+  } catch (error) {
+    sendLog(`[MAIN][delete-folder] Error al eliminar carpeta: ${error.message}`, 'ERROR');
+
+    let errorCode = 'UNKNOWN';
+    if (error.code === 'ENOENT') errorCode = 'ENOENT';
+    else if (error.code === 'EACCES' || error.code === 'EPERM') errorCode = 'EACCES';
+
+    return {
+      success: false,
+      error: error.message,
+      code: errorCode
+    };
+  }
+});
+
 // Manejador para obtener la lista de archivos de presupuesto
 ipcMain.handle('getPresupuestoFiles', async (event, companyName) => {
   sendLog(`[MAIN] Buscando archivos de presupuesto para: ${companyName} en el submódulo 1.1.3.`);
