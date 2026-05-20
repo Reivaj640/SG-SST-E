@@ -1,296 +1,329 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Investigación de Accidentes - K+AIR</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&family=Teko:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="investigacion-accidentes-view.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Investigación de Accidentes - K+AIR</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="investigacion-accidentes-view.css">
 </head>
-<body class="bg-surface min-h-screen font-body text-text-primary">
-    <!-- Header System v2.0 -->
-    <header class="header" style="background: #ffffff; border-bottom: 1px solid #dee2e6; position: sticky; top: 0; z-index: 100;">
-        <div class="header-content" style="display: flex; align-items: center; justify-content: flex-start; gap: 0.75rem; min-height: 52px; padding: 0 1.5rem;">
-            <div class="header-left">
-                <button id="backBtn" class="header-back" aria-label="Volver al módulo anterior" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; color: #5a6378; border-radius: 0.375rem; cursor: pointer; transition: background 0.15s ease; font-size: 1rem;">
-                    <i class="bi bi-arrow-left"></i>
-                </button>
-                <div class="header-divider" style="width: 1px; height: 24px; background: #dee2e6;"></div>
-                <div class="header-title">
-                    <h1 style="font-size: 1.25rem; font-weight: 600; color: #1a1a2e; margin: 0; display: flex; align-items: center; gap: 0.5rem;">
-                        <i class="fas fa-search-plus" style="color: #174ea6;"></i>
-                        Realizar Investigación
-                    </h1>
-                    <ol style="display: flex; align-items: center; gap: 0.375rem; list-style: none; margin: 0; padding: 0; font-size: 0.8125rem; font-weight: 400; color: #5a6378;">
-                        <li><a href="#" onclick="return false;" style="color: #5a6378; text-decoration: none;">Gestión de la Salud</a></li>
-                        <li style="color: #5a6378;">›</li>
-                        <li><a href="#" onclick="return false;" style="color: #5a6378; text-decoration: none;">3.2.2 Investigación</a></li>
-                        <li style="color: #5a6378;">›</li>
-                        <li style="color: #174ea6; font-weight: 500;">Nueva Investigación</li>
-                    </ol>
-                </div>
-            </div>
-            <div class="header-actions" style="margin-left: auto; display: flex; gap: 0.5rem;">
-                <span class="header-company" style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem; color: #5a6378;">
-                    <i class="bi bi-building"></i>
-                    <span id="headerCompanyText">—</span>
-                </span>
-                <div style="width: 1px; height: 24px; background: #dee2e6;"></div>
-                <button id="downloadBtn" class="btn btn-secondary" disabled aria-label="Descargar informe">
-                    <i class="fas fa-download"></i>
-                </button>
-                <button id="printBtn" class="btn btn-secondary" disabled aria-label="Imprimir informe">
-                    <i class="fas fa-print"></i>
-                </button>
-            </div>
-        </div>
-    </header>
+<body>
 
-    <div id="globalProgress" class="global-progress hidden">
-        <div class="global-progress-bar"></div>
+  <!-- ============================================================ -->
+  <!-- HEADER SYSTEM v2.0 — BEM .kair-header__* (Patrón 2)         -->
+  <!-- ============================================================ -->
+  <header class="kair-header">
+    <div class="kair-header__bar">
+      <div class="kair-header__left">
+        <button id="backBtn" class="kair-header__back" aria-label="Volver al módulo anterior">
+          <i class="bi bi-arrow-left"></i>
+        </button>
+        <div class="kair-header__divider"></div>
+        <div class="kair-header__center">
+          <h1 class="kair-header__title">
+            <i class="fas fa-search-plus"></i>
+            Realizar Investigación
+          </h1>
+          <ol class="kair-header__breadcrumb">
+            <li><a href="#" onclick="return false;">Gestión de la Salud</a></li>
+            <li><a href="#" onclick="return false;">3.2.2 Investigación</a></li>
+            <li class="active">Nueva Investigación</li>
+          </ol>
+        </div>
+      </div>
+      <div class="kair-header__right">
+        <button id="downloadBtn" class="kair-header__action" disabled aria-label="Descargar informe">
+          <i class="fas fa-download"></i>
+        </button>
+        <button id="printBtn" class="kair-header__action" disabled aria-label="Imprimir informe">
+          <i class="fas fa-print"></i>
+        </button>
+      </div>
     </div>
+  </header>
 
-    <main class="main-content">
-        <div class="status-badges">
-            <span class="badge badge-primary">
-                <i class="fas fa-circle badge-dot"></i>
-                Modulo: Gestion de la Salud
+  <!-- ============================================================ -->
+  <!-- MAIN WRAPPER — Vertical flow with sticky action bar         -->
+  <!-- ============================================================ -->
+  <div class="inv-main-wrapper">
+    <div class="inv-main-scroll">
+
+      <!-- Context Badges -->
+      <div class="inv-context-badges">
+        <span class="inv-context-badge inv-context-badge--primary">
+          <span class="inv-context-badge-dot"></span>
+          Módulo: Gestión de la Salud
+        </span>
+        <span class="inv-context-badge inv-context-badge--success">
+          <span class="inv-context-badge-dot"></span>
+          Empresa: <span id="companyName">TEMPOACTIVA</span>
+        </span>
+      </div>
+
+      <!-- HORIZONTAL PROGRESS STEPPER -->
+      <div class="inv-stepper" id="stepperBar">
+        <div class="inv-stepper-step" data-step="1">
+          <div class="inv-stepper-badge pending" id="stepperBadge1">1</div>
+          <span class="inv-stepper-label">Configuración</span>
+        </div>
+        <div class="inv-stepper-connector" id="stepperConn1"></div>
+        <div class="inv-stepper-step" data-step="2">
+          <div class="inv-stepper-badge pending" id="stepperBadge2">2</div>
+          <span class="inv-stepper-label">Datos FURAT</span>
+        </div>
+        <div class="inv-stepper-connector" id="stepperConn2"></div>
+        <div class="inv-stepper-step" data-step="3">
+          <div class="inv-stepper-badge pending" id="stepperBadge3">3</div>
+          <span class="inv-stepper-label">Contexto</span>
+        </div>
+        <div class="inv-stepper-connector" id="stepperConn3"></div>
+        <div class="inv-stepper-step" data-step="4">
+          <div class="inv-stepper-badge pending" id="stepperBadge4">4</div>
+          <span class="inv-stepper-label">Análisis</span>
+        </div>
+        <div class="inv-stepper-connector" id="stepperConn4"></div>
+        <div class="inv-stepper-step" data-step="5">
+          <div class="inv-stepper-badge pending" id="stepperBadge5">5</div>
+          <span class="inv-stepper-label">Informe</span>
+        </div>
+      </div>
+
+      <!-- ======================================================== -->
+      <!-- COMBINED CARD: Upload + Datos                            -->
+      <!-- ======================================================== -->
+      <div class="inv-combined-card">
+        <!-- LEFT: Upload / Drop Zone -->
+        <div class="inv-combined-left">
+          <div class="inv-section-header">
+            <div class="inv-step-badge completed" id="step1Badge">1</div>
+            <div>
+              <div class="inv-section-title">Configuración</div>
+              <div class="inv-section-subtitle">Documento PDF</div>
+            </div>
+          </div>
+          <div id="dropZone" class="inv-drop-zone" role="button" tabindex="0" aria-label="Seleccionar archivo PDF">
+            <div id="dropZoneContent">
+              <div class="inv-drop-icon">
+                <i class="fas fa-file-pdf"></i>
+              </div>
+              <p class="inv-drop-title">Selecciona un archivo PDF</p>
+              <p class="inv-drop-subtitle">o arrastra y suelta aquí</p>
+            </div>
+            <input type="file" id="fileInput" class="hidden" accept=".pdf" aria-hidden="true">
+          </div>
+          <div id="selectedFileInfo" class="inv-selected-file hidden">
+            <div class="inv-file-info-content">
+              <div class="inv-file-icon">
+                <i class="fas fa-file-pdf"></i>
+              </div>
+              <div class="inv-file-details">
+                <p id="selectedFileName" class="inv-file-name"></p>
+                <p id="selectedFileSize" class="inv-file-size"></p>
+              </div>
+              <button id="removeFileBtn" class="inv-remove-file-btn" aria-label="Eliminar archivo">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: Extracted Data -->
+        <div class="inv-combined-right">
+          <div class="inv-section-header">
+            <div class="inv-step-badge pending" id="step2Badge">2</div>
+            <div>
+              <div class="inv-section-title">Datos del Accidente</div>
+              <div class="inv-section-subtitle">Información extraída del FURAT</div>
+            </div>
+          </div>
+          <div id="dataContent" class="inv-data-content">
+            <div class="inv-empty-state">
+              <div class="inv-empty-icon">
+                <i class="fas fa-file-medical-alt"></i>
+              </div>
+              <p>Selecciona un PDF para extraer los datos</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================== -->
+      <!-- CONTEXT CARD (Full-width)                                -->
+      <!-- ======================================================== -->
+      <div class="inv-card" id="contextCard">
+        <div class="inv-card-header">
+          <div class="inv-card-header-left">
+            <div class="inv-step-badge pending" id="step3Badge">3</div>
+            <div>
+              <div class="inv-card-title">Contexto Adicional</div>
+              <div class="inv-card-subtitle">Información complementaria para el análisis</div>
+            </div>
+          </div>
+          <div class="inv-card-header-right">
+            <span class="inv-optional-badge">Opcional</span>
+          </div>
+        </div>
+        <div class="inv-card-body">
+          <textarea id="contextInput" class="inv-context-textarea" rows="3" placeholder="Agrega cualquier detalle adicional que no esté presente en el FURAT y que pueda ser relevante para el análisis de causa raíz..."></textarea>
+        </div>
+      </div>
+
+      <!-- ======================================================== -->
+      <!-- ANALYSIS CARD (Full-width)                               -->
+      <!-- ======================================================== -->
+      <div class="inv-card inv-card--analysis" id="analysisCard">
+        <div class="inv-card-header">
+          <div class="inv-card-header-left">
+            <div class="inv-step-badge pending" id="step4Badge">4</div>
+            <div>
+              <div class="inv-card-title">Análisis de Causa Raíz</div>
+              <div class="inv-card-subtitle">Metodología de los 5 Porqués + Ishikawa</div>
+            </div>
+          </div>
+          <div class="inv-card-header-right">
+            <span id="analysisCompletionBadge" class="inv-completion-badge hidden">
+              <i class="fas fa-check-circle"></i>
+              <span id="analysisCompletionTime"></span>
             </span>
-            <span class="badge badge-success">
-                <i class="fas fa-circle badge-dot"></i>
-                Empresa: <span id="companyName">TEMPOACTIVA</span>
-            </span>
+          </div>
         </div>
-
-        <div class="main-grid">
-            <div class="left-column">
-                <section class="step-card stagger-1" id="configCard" data-step="1" aria-labelledby="step1-title">
-                    <div class="card-header">
-                        <div class="step-indicator">
-                            <div class="step-badge pending" id="step1Badge">1</div>
-                            <div class="step-info">
-                                <h2 id="step1-title">Configuracion</h2>
-                                <p>Selecciona el documento a analizar</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div id="dropZone" class="drop-zone" role="button" tabindex="0" aria-label="Seleccionar archivo PDF">
-                            <div id="dropZoneContent">
-                                <div class="drop-icon">
-                                    <i class="fas fa-file-pdf"></i>
-                                </div>
-                                <p class="drop-title">Selecciona un archivo PDF</p>
-                                <p class="drop-subtitle">o arrastra y suelta aqui</p>
-                            </div>
-                            <input type="file" id="fileInput" class="hidden" accept=".pdf" aria-hidden="true">
-                        </div>
-                        <div id="selectedFileInfo" class="selected-file-info hidden">
-                            <div class="file-info-content">
-                                <div class="file-icon">
-                                    <i class="fas fa-file-pdf"></i>
-                                </div>
-                                <div class="file-details">
-                                    <p id="selectedFileName" class="file-name"></p>
-                                    <p id="selectedFileSize" class="file-size"></p>
-                                </div>
-                                <button id="removeFileBtn" class="remove-file-btn" aria-label="Eliminar archivo">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="step-card stagger-2" id="dataCard" data-step="2" aria-labelledby="step2-title">
-                    <div class="card-header">
-                        <div class="step-indicator">
-                            <div class="step-badge pending" id="step2Badge">2</div>
-                            <div class="step-info">
-                                <h2 id="step2-title">Datos del Accidente</h2>
-                                <p>Informacion extraida del FURAT</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div id="dataContent" class="data-content">
-                            <div class="empty-state">
-                                <div class="empty-icon">
-                                    <i class="fas fa-file-medical-alt"></i>
-                                </div>
-                                <p>Selecciona un PDF para extraer los datos</p>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="step-card stagger-5" id="logCard" data-step="5" aria-labelledby="step5-title">
-                    <div class="card-header">
-                        <div class="step-indicator">
-                            <div class="step-badge pending" id="step5Badge">5</div>
-                            <div class="step-info">
-                                <h2 id="step5-title">Registro de Actividad</h2>
-                                <p>Seguimiento del proceso</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div id="activityLog" class="activity-log">
-                            <div class="log-entry">
-                                <span class="log-timestamp">[Esperando]</span>
-                                <span class="log-message">Sistema listo para procesar</span>
-                            </div>
-                        </div>
-                    </div>
-                </section>
+        <div class="inv-card-body">
+          <div id="analysisContent" class="inv-analysis-content">
+            <div class="inv-empty-state">
+              <div class="inv-empty-icon">
+                <i class="fas fa-lightbulb"></i>
+              </div>
+              <p>El análisis de causa raíz se mostrará aquí</p>
+              <p class="inv-empty-subtitle">Procesa un documento PDF para comenzar</p>
             </div>
-
-            <div class="right-column">
-                <section class="step-card stagger-3" id="contextCard" data-step="3" aria-labelledby="step3-title">
-                    <div class="card-header">
-                        <div class="step-indicator">
-                            <div class="step-badge pending" id="step3Badge">3</div>
-                            <div class="step-info">
-                                <div class="step-title-wrapper">
-                                    <h2 id="step3-title">Contexto Adicional</h2>
-                                    <span class="optional-badge">Opcional</span>
-                                </div>
-                                <p>Informacion complementaria para el analisis</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <textarea id="contextInput" class="context-textarea" rows="4" placeholder="Agrega cualquier detalle adicional que no este presente en el FURAT y que pueda ser relevante para el analisis de causa raiz..."></textarea>
-                    </div>
-                </section>
-
-                <section class="step-card stagger-4" id="analysisCard" data-step="4" aria-labelledby="step4-title">
-                    <div class="card-header">
-                        <div class="step-indicator">
-                            <div class="step-badge pending" id="step4Badge">4</div>
-                            <div class="step-info">
-                                <h2 id="step4-title">Analisis de Causa Raiz</h2>
-                                <p>Metodologia de los 5 Porques e Ishikawa</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div id="analysisContent" class="analysis-content">
-                            <div class="empty-state">
-                                <div class="empty-icon">
-                                    <i class="fas fa-lightbulb"></i>
-                                </div>
-                                <p>El analisis de causa raiz se mostrara aqui</p>
-                                <p class="empty-subtitle">Procesa un documento PDF para comenzar</p>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-            </div>
+          </div>
         </div>
+      </div>
 
-        <div class="action-bar">
-            <div id="progressArea" class="progress-area hidden">
-                <div class="progress-wrapper">
-                    <div class="progress-container">
-                        <div id="progressBar" class="progress-bar"></div>
-                    </div>
-                    <span id="progressText" class="progress-text">Procesando...</span>
-                </div>
-            </div>
-            <div class="action-buttons">
-                <button id="clearBtn" class="btn btn-secondary">
-                    <i class="fas fa-trash-alt"></i>
-                    Limpiar
-                </button>
-                <button id="processBtn" class="btn btn-success" disabled>
-                    <i class="fas fa-bolt"></i>
-                    <span id="processBtnText">Iniciar Análisis</span>
-                </button>
-            </div>
+      <!-- ======================================================== -->
+      <!-- LOG PANEL (Collapsible)                                  -->
+      <!-- ======================================================== -->
+      <div class="inv-log-toggle" id="logToggle">
+        <div class="inv-log-toggle-left">
+          <i class="fas fa-terminal"></i>
+          <span class="inv-log-toggle-text">Registro de Actividad</span>
         </div>
-    </main>
+        <i class="fas fa-chevron-down inv-log-toggle-chevron" id="logChevron"></i>
+      </div>
+      <div class="inv-log-panel" id="logPanel">
+        <div id="activityLog" class="inv-activity-log">
+          <div class="inv-log-entry">
+            <span class="inv-log-timestamp">[Esperando]</span>
+            <span class="inv-log-message">Sistema listo para procesar</span>
+          </div>
+        </div>
+      </div>
 
-<div id="toast" class="toast" role="alert" aria-live="polite" style="display:none;">
-<div id="toastIcon" class="toast-icon"></div>
-<div class="toast-content">
-<p id="toastTitle" class="toast-title"></p>
-<p id="toastMessage" class="toast-message"></p>
-</div>
-<button id="toastClose" class="toast-close" aria-label="Cerrar notificacion">
-<i class="fas fa-times"></i>
-</button>
-</div>
+    </div><!-- /inv-main-scroll -->
 
-<!-- Modal de Guardado de Informe -->
-<div id="saveReportModal" class="save-modal hidden">
-  <div class="save-modal-overlay" id="saveModalOverlay"></div>
-  <div class="save-modal-content">
-    <div class="save-modal-header">
-      <h3 class="save-modal-title">
-        <i class="fas fa-save" style="color: var(--primary); margin-right: 0.5rem;"></i>
-        Guardar Informe de Investigacion
-      </h3>
-      <button id="saveModalCloseBtn" class="save-modal-close" aria-label="Cerrar">
-        <i class="fas fa-times"></i>
-      </button>
+    <!-- ======================================================== -->
+    <!-- STICKY BOTTOM ACTION BAR                                 -->
+    <!-- ======================================================== -->
+    <div class="inv-action-bar">
+      <div class="inv-action-bar-left">
+        <div id="progressArea" class="inv-progress-area hidden">
+          <div class="inv-progress-container">
+            <div id="progressBar" class="inv-progress-bar"></div>
+          </div>
+          <span id="progressText" class="inv-progress-text">Procesando...</span>
+        </div>
+      </div>
+      <div class="inv-action-bar-right">
+        <button id="clearBtn" class="inv-btn inv-btn--secondary">
+          <i class="fas fa-trash-alt"></i>
+          Limpiar
+        </button>
+        <button id="processBtn" class="inv-btn inv-btn--success" disabled>
+          <i class="fas fa-bolt"></i>
+          <span id="processBtnText">Iniciar Análisis</span>
+        </button>
+      </div>
     </div>
-    <div class="save-modal-body">
-      <div class="save-modal-path-bar">
-        <button id="saveModalGoUp" class="save-modal-path-btn" aria-label="Subir nivel" title="Directorio padre">
-          <i class="fas fa-level-up-alt"></i>
-        </button>
-        <button id="saveModalBrowseNative" class="save-modal-path-btn" aria-label="Examinar" title="Seleccionar carpeta del sistema">
-          <i class="fas fa-folder-open"></i>
-        </button>
-        <div id="saveModalBreadcrumb" class="save-modal-breadcrumb">
-          <span class="save-modal-breadcrumb-item" data-path="">Cargando...</span>
-        </div>
-      </div>
-      <div id="saveModalFolderList" class="save-modal-folder-list">
-        <div class="save-modal-loading">
-          <i class="fas fa-spinner fa-spin"></i> Cargando directorios...
-        </div>
-      </div>
-      <div class="save-modal-toolbar">
-        <button id="saveModalNewFolderBtn" class="save-modal-toolbar-btn" title="Crear carpeta nueva">
-          <i class="fas fa-folder-plus"></i> Crear Carpeta
-        </button>
-        <button id="saveModalRenameBtn" class="save-modal-toolbar-btn" title="Renombrar elemento seleccionado" disabled>
-          <i class="fas fa-pen"></i> Renombrar
-        </button>
-        <button id="saveModalDeleteBtn" class="save-modal-toolbar-btn save-modal-toolbar-btn--danger" title="Eliminar elemento seleccionado" disabled>
-          <i class="fas fa-trash-alt"></i> Eliminar
-        </button>
-      </div>
-      <div id="saveModalNewItemArea" class="save-modal-new-item hidden">
-        <input type="text" id="saveModalNewItemInput" class="save-modal-input" placeholder="Nombre de la nueva carpeta">
-        <button id="saveModalNewItemConfirm" class="save-modal-toolbar-btn save-modal-toolbar-btn--confirm" title="Confirmar">
-          <i class="fas fa-check"></i>
-        </button>
-        <button id="saveModalNewItemCancel" class="save-modal-toolbar-btn save-modal-toolbar-btn--cancel" title="Cancelar">
+  </div><!-- /inv-main-wrapper -->
+
+  <!-- ============================================================ -->
+  <!-- GLOBAL PROGRESS (thin bar under header)                      -->
+  <!-- ============================================================ -->
+  <div id="globalProgress" class="inv-global-progress hidden">
+    <div class="inv-global-progress-bar"></div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SAVE REPORT MODAL (UNCHANGED — all IDs preserved)           -->
+  <!-- ============================================================ -->
+  <div id="saveReportModal" class="save-modal hidden">
+    <div class="save-modal-overlay" id="saveModalOverlay"></div>
+    <div class="save-modal-content">
+      <div class="save-modal-header">
+        <h3 class="save-modal-title">
+          <i class="fas fa-save" style="color: var(--inv-primary); margin-right: 0.5rem;"></i>
+          Guardar Informe de Investigación
+        </h3>
+        <button id="saveModalCloseBtn" class="save-modal-close" aria-label="Cerrar">
           <i class="fas fa-times"></i>
         </button>
       </div>
-      <div class="save-modal-filename-area">
-        <label for="saveModalFilename" class="save-modal-label">Nombre del archivo:</label>
-        <input type="text" id="saveModalFilename" class="save-modal-input save-modal-filename-input" placeholder="Nombre del informe">
-        <span class="save-modal-filename-ext">.docx</span>
+      <div class="save-modal-body">
+        <div class="save-modal-path-bar">
+          <button id="saveModalGoUp" class="save-modal-path-btn" aria-label="Subir nivel" title="Directorio padre">
+            <i class="fas fa-level-up-alt"></i>
+          </button>
+          <button id="saveModalBrowseNative" class="save-modal-path-btn" aria-label="Examinar" title="Seleccionar carpeta del sistema">
+            <i class="fas fa-folder-open"></i>
+          </button>
+          <div id="saveModalBreadcrumb" class="save-modal-breadcrumb">
+            <span class="save-modal-breadcrumb-item" data-path="">Cargando...</span>
+          </div>
+        </div>
+        <div id="saveModalFolderList" class="save-modal-folder-list">
+          <div class="save-modal-loading">
+            <i class="fas fa-spinner fa-spin"></i> Cargando directorios...
+          </div>
+        </div>
+        <div class="save-modal-toolbar">
+          <button id="saveModalNewFolderBtn" class="save-modal-toolbar-btn" title="Crear carpeta nueva">
+            <i class="fas fa-folder-plus"></i> Crear Carpeta
+          </button>
+          <button id="saveModalRenameBtn" class="save-modal-toolbar-btn" title="Renombrar elemento seleccionado" disabled>
+            <i class="fas fa-pen"></i> Renombrar
+          </button>
+          <button id="saveModalDeleteBtn" class="save-modal-toolbar-btn save-modal-toolbar-btn--danger" title="Eliminar elemento seleccionado" disabled>
+            <i class="fas fa-trash-alt"></i> Eliminar
+          </button>
+        </div>
+        <div id="saveModalNewItemArea" class="save-modal-new-item hidden">
+          <input type="text" id="saveModalNewItemInput" class="save-modal-input" placeholder="Nombre de la nueva carpeta">
+          <button id="saveModalNewItemConfirm" class="save-modal-toolbar-btn save-modal-toolbar-btn--confirm" title="Confirmar">
+            <i class="fas fa-check"></i>
+          </button>
+          <button id="saveModalNewItemCancel" class="save-modal-toolbar-btn save-modal-toolbar-btn--cancel" title="Cancelar">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="save-modal-filename-area">
+          <label for="saveModalFilename" class="save-modal-label">Nombre del archivo:</label>
+          <input type="text" id="saveModalFilename" class="save-modal-input save-modal-filename-input" placeholder="Nombre del informe">
+          <span class="save-modal-filename-ext">.docx</span>
+        </div>
+      </div>
+      <div class="save-modal-footer">
+        <button id="saveModalCancelBtn" class="save-modal-btn save-modal-btn--secondary">Cancelar</button>
+        <button id="saveModalSaveBtn" class="save-modal-btn save-modal-btn--primary" disabled>
+          <i class="fas fa-save"></i> Guardar Informe
+        </button>
       </div>
     </div>
-    <div class="save-modal-footer">
-      <button id="saveModalCancelBtn" class="btn btn-secondary">Cancelar</button>
-      <button id="saveModalSaveBtn" class="btn btn-primary" disabled>
-        <i class="fas fa-save"></i> Guardar Informe
-      </button>
-    </div>
   </div>
-</div>
 
-    <script src="investigacion-accidentes-main.js"></script>
+  <script src="investigacion-accidentes-main.js"></script>
 </body>
 </html>

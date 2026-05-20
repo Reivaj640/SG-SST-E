@@ -141,24 +141,24 @@ document.addEventListener('DOMContentLoaded', function() {
         processBtn.disabled = true;
         updateStepStatus(1, 'pending');
         
-        dataContent.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-icon">
-                    <i class="fas fa-file-medical-alt"></i>
-                </div>
-                <p>Selecciona un PDF para extraer los datos</p>
-            </div>
-        `;
-        
-        // Limpiar también el análisis
-        analysisContent.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-icon">
-                    <i class="fas fa-brain"></i>
-                </div>
-                <p>Los resultados del análisis aparecerán aquí</p>
-            </div>
-        `;
+  dataContent.innerHTML = `
+  <div class="inv-empty-state">
+    <div class="inv-empty-icon">
+      <i class="fas fa-file-medical-alt"></i>
+    </div>
+    <p>Selecciona un PDF para extraer los datos</p>
+  </div>
+  `;
+
+  // Limpiar también el análisis
+  analysisContent.innerHTML = `
+  <div class="inv-empty-state">
+    <div class="inv-empty-icon">
+      <i class="fas fa-lightbulb"></i>
+    </div>
+    <p>El análisis de causa raíz se mostrará aquí</p>
+  </div>
+  `;
         
         // Resetear variables de estado
         extractedData = null;
@@ -187,23 +187,23 @@ document.addEventListener('DOMContentLoaded', function() {
             analysisResult = null;
             
             // Limpiar contenidos
-            dataContent.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">
-                        <i class="fas fa-file-medical-alt"></i>
-                    </div>
-                    <p>Selecciona un PDF para extraer los datos</p>
-                </div>
-            `;
-            
-            analysisContent.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">
-                        <i class="fas fa-brain"></i>
-                    </div>
-                    <p>Los resultados del análisis aparecerán aquí</p>
-                </div>
-            `;
+      dataContent.innerHTML = `
+  <div class="inv-empty-state">
+    <div class="inv-empty-icon">
+      <i class="fas fa-file-medical-alt"></i>
+    </div>
+    <p>Selecciona un PDF para extraer los datos</p>
+  </div>
+  `;
+
+      analysisContent.innerHTML = `
+  <div class="inv-empty-state">
+    <div class="inv-empty-icon">
+      <i class="fas fa-lightbulb"></i>
+    </div>
+    <p>El análisis de causa raíz se mostrará aquí</p>
+  </div>
+  `;
             
             // Resetear botones y pasos
             processBtn.disabled = true;
@@ -215,11 +215,25 @@ document.addEventListener('DOMContentLoaded', function() {
             // Ocultar barra de progreso si está visible
             progressArea.classList.add('hidden');
             
-            showToast('Formulario limpiado', 'Puedes seleccionar un nuevo archivo.', 'info');
-        });
-    }
+    showToast('Formulario limpiado', 'Puedes seleccionar un nuevo archivo.', 'info');
+  });
+  }
 
-    // Botón de procesamiento - Solo ejecuta el análisis si los datos ya están extraídos
+  // Log panel toggle
+  const logToggle = document.getElementById('logToggle');
+  const logPanel = document.getElementById('logPanel');
+  const logChevron = document.getElementById('logChevron');
+  if (logToggle && logPanel) {
+    logToggle.addEventListener('click', function() {
+      const isOpen = logPanel.classList.toggle('open');
+      logToggle.classList.toggle('open', isOpen);
+      if (logChevron) {
+        logChevron.style.transform = isOpen ? 'rotate(180deg)' : '';
+      }
+    });
+  }
+
+  // Botón de procesamiento - Solo ejecuta el análisis si los datos ya están extraídos
     processBtn.addEventListener('click', async function() {
         if (!extractedData) {
             showToast('Error', 'Primero debes seleccionar y procesar un archivo PDF.', 'error');
@@ -283,14 +297,14 @@ return await callParentAPI('generate-accident-report', combinedData);
             updateStepStatus(2, 'active');
             
             // Mostrar estado de procesamiento
-            dataContent.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">
-                        <i class="fas fa-spinner fa-spin"></i>
-                    </div>
-                    <p>Extrayendo datos del PDF...</p>
-                </div>
-            `;
+  dataContent.innerHTML = `
+  <div class="inv-empty-state">
+    <div class="inv-empty-icon">
+      <i class="fas fa-spinner fa-spin"></i>
+    </div>
+    <p>Extrayendo datos del PDF...</p>
+  </div>
+  `;
             
             // Registrar actividad
             logActivity('info', 'Iniciando extracción de datos del PDF');
@@ -341,24 +355,21 @@ return await callParentAPI('generate-accident-report', combinedData);
             updateStepStatus(4, 'active');
 
             // Mostrar estado de análisis con información de carga del modelo
-            analysisContent.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">
-                        <i class="fas fa-brain fa-spin"></i>
-                    </div>
-                    <p id="analysis-status">Iniciando servidor de IA...</p>
-                    <p class="text-muted" id="analysis-substatus" style="font-size: 0.9em; margin-top: 8px;">
-                        La primera ejecución puede tardar 4-5 minutos mientras se carga el modelo
-                    </p>
-                    <div class="progress mt-3" style="max-width: 400px; margin: 15px auto;">
-                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                             role="progressbar" 
-                             id="model-progress"
-                             style="width: 0%"></div>
-                    </div>
-                    <p class="text-muted" id="model-progress-text" style="font-size: 0.85em;"></p>
-                </div>
-            `;
+  analysisContent.innerHTML = `
+  <div class="inv-empty-state">
+    <div class="inv-empty-icon">
+      <i class="fas fa-brain fa-spin"></i>
+    </div>
+    <p id="analysis-status">Iniciando servidor de IA...</p>
+    <p class="inv-empty-subtitle" id="analysis-substatus" style="font-size: 0.9em; margin-top: 8px;">
+      La primera ejecución puede tardar 4-5 minutos mientras se carga el modelo
+    </p>
+    <div class="inv-progress-container" style="max-width: 400px; margin: 15px auto;">
+      <div id="model-progress" class="inv-progress-bar inv-progress-bar--indeterminate" style="width: 0%"></div>
+    </div>
+    <p id="model-progress-text" style="font-size: 0.85em; color: var(--inv-text-muted);"></p>
+  </div>
+  `;
 
             logActivity('info', 'Iniciando análisis de causa raíz con IA');
 
@@ -487,16 +498,16 @@ saveModal.open();
 	} else {
 		errorHint += ' Verifique que el servidor LLM esté funcionando y que CUDA/GPU esté disponible.';
 	}
-	analysisContent.innerHTML = `
-		<div class="empty-state error-state">
-			<div class="empty-icon">
-				<i class="fas fa-exclamation-triangle"></i>
-			</div>
-			<p>Error en el análisis de causa raíz</p>
-			<p class="error-detail">${analysisError.message}</p>
-			<p class="error-hint">${errorHint}</p>
-		</div>
-	`;
+  analysisContent.innerHTML = `
+  <div class="inv-empty-state inv-error-state">
+    <div class="inv-empty-icon">
+      <i class="fas fa-exclamation-triangle"></i>
+    </div>
+    <p>Error en el análisis de causa raíz</p>
+    <p class="inv-error-detail">${analysisError.message}</p>
+    <p class="inv-error-hint">${errorHint}</p>
+  </div>
+  `;
             
             updateStepStatus(4, 'error');
             showToast('Error en análisis', `El análisis falló: ${analysisError.message}`, 'error');
@@ -649,21 +660,21 @@ saveModal.open();
             const errorMsg = actualData.error || 'Error desconocido al procesar el PDF';
             console.error('[INVESTIGACION-ACCIDENTES-MAIN] Error en datos:', errorMsg);
             
-            dataContent.innerHTML = `<div class="empty-state error-state">
-                <div class="empty-icon"><i class="fas fa-exclamation-triangle"></i></div>
-                <p>Error al extraer datos del PDF</p>
-                <p class="error-detail">${escapeHtml(errorMsg)}</p>
-                <p class="error-hint">Verifique que el archivo PDF sea válido y que las dependencias de Python estén instaladas.</p>
-            </div>`;
-            return;
+  dataContent.innerHTML = `<div class="inv-empty-state inv-error-state">
+  <div class="inv-empty-icon"><i class="fas fa-exclamation-triangle"></i></div>
+  <p>Error al extraer datos del PDF</p>
+  <p class="inv-error-detail">${escapeHtml(errorMsg)}</p>
+  <p class="inv-error-hint">Verifique que el archivo PDF sea válido y que las dependencias de Python estén instaladas.</p>
+</div>`;
+  return;
         }
         
         // Verificar si hay datos vacíos
         if (!actualData || Object.keys(actualData).length === 0) {
-            dataContent.innerHTML = `<div class="empty-state">
-                <div class="empty-icon"><i class="fas fa-file-excel"></i></div>
-                <p>No se encontraron datos o el PDF no es compatible.</p>
-            </div>`;
+    dataContent.innerHTML = `<div class="inv-empty-state">
+  <div class="inv-empty-icon"><i class="fas fa-file-excel"></i></div>
+  <p>No se encontraron datos o el PDF no es compatible.</p>
+</div>`;
             return;
         }
         
@@ -683,31 +694,29 @@ saveModal.open();
             { key: 'Mecanismo o Forma del Accidente', label: 'Mecanismo del Accidente' }
         ];
         
-        let htmlContent = '<div class="data-grid">';
-        
-        // Mostrar cada campo
-        fields.forEach(field => {
-            const value = actualData[field.key] || 'N/A';
-            htmlContent += `
-                <div class="data-field">
-                    <label>${field.label}</label>
-                    <div class="value">${escapeHtml(value)}</div>
-                </div>
-            `;
-        });
-        
-        htmlContent += '</div>';
-        
-        // Mostrar descripción del accidente (campo especial, más grande)
-        const descripcion = actualData['Descripcion del Accidente'] || actualData['Descripcion'] || 'N/A';
-        if (descripcion && descripcion !== 'N/A') {
-            htmlContent += `
-                <div class="data-description">
-                    <label>Descripción del Accidente</label>
-                    <p>${escapeHtml(descripcion)}</p>
-                </div>
-            `;
-        }
+  let htmlContent = '<div class="inv-data-grid">';
+
+  fields.forEach(field => {
+    const value = actualData[field.key] || 'N/A';
+    htmlContent += `
+  <div class="inv-data-field">
+    <label>${field.label}</label>
+    <div class="value">${escapeHtml(value)}</div>
+  </div>
+  `;
+  });
+
+  htmlContent += '</div>';
+
+  const descripcion = actualData['Descripcion del Accidente'] || actualData['Descripcion'] || 'N/A';
+  if (descripcion && descripcion !== 'N/A') {
+    htmlContent += `
+  <div class="inv-data-description">
+    <label>Descripción del Accidente</label>
+    <p>${escapeHtml(descripcion)}</p>
+  </div>
+  `;
+  }
         
         dataContent.innerHTML = htmlContent;
     }
@@ -743,17 +752,17 @@ saveModal.open();
 		} else {
 			hint += ' Verifique que el servidor LLM esté funcionando y que CUDA/GPU esté disponible.';
 		}
-		analysisContent.innerHTML = `
-			<div class="empty-state error-state">
-				<div class="empty-icon">
-					<i class="fas fa-exclamation-triangle"></i>
-				</div>
-				<p>Error en el análisis de causa raíz</p>
-				<p class="error-detail">${escapeHtml(errorMsg)}</p>
-				<p class="error-hint">${hint}</p>
-			</div>
-		`;
-            return;
+    analysisContent.innerHTML = `
+      <div class="inv-empty-state inv-error-state">
+        <div class="inv-empty-icon">
+          <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <p>Error en el análisis de causa raíz</p>
+        <p class="inv-error-detail">${escapeHtml(errorMsg)}</p>
+        <p class="inv-error-hint">${hint}</p>
+      </div>
+    `;
+    return;
         }
         
         // Desanidar si es necesario
@@ -794,174 +803,181 @@ saveModal.open();
 
         if (hasPorQueKeys) {
             // Formato del servidor: {"PorQue1": {...}, "PorQue2": {...}, ...}
-            htmlContent += '<div class="five-whys-analysis">';
-            htmlContent += '<h3 style="margin-bottom: 20px; color: #174ea6;"><i class="fas fa-brain" style="margin-right: 10px;"></i>Análisis 5 Por Qués</h3>';
+    htmlContent += '<div class="five-whys-analysis">';
+    htmlContent += '<h3 style="margin-bottom: 20px; color: var(--inv-primary);"><i class="fas fa-brain" style="margin-right: 10px;"></i>Análisis 5 Por Qués</h3>';
 
-            // Iterar sobre las claves ordenadas (PorQue1, PorQue2, etc.)
-            const porQueKeys = allKeys
-                .filter(key => 
-                    key.includes('PorQue') || 
-                    key.includes('Por Qu') || 
-                    key.includes('Porqué') || 
-                    key.includes('Por que')
-                )
-                .sort((a, b) => {
-                    // Extraer números de las claves (PorQue1 -> 1, PorQue2 -> 2, etc.)
-                    const numA = parseInt(a.replace(/[^0-9]/g, '')) || 0;
-                    const numB = parseInt(b.replace(/[^0-9]/g, '')) || 0;
-                    return numA - numB;
-                });
+    const porQueKeys = allKeys
+      .filter(key =>
+        key.includes('PorQue') ||
+        key.includes('Por Qu') ||
+        key.includes('Porqué') ||
+        key.includes('Por que')
+      )
+      .sort((a, b) => {
+        const numA = parseInt(a.replace(/[^0-9]/g, '')) || 0;
+        const numB = parseInt(b.replace(/[^0-9]/g, '')) || 0;
+        return numA - numB;
+      });
 
-            console.log('[INVESTIGACION-ACCIDENTES-MAIN] porQueKeys:', porQueKeys);
+    porQueKeys.forEach((key, index) => {
+      const porQueData = analysisData[key];
 
-            porQueKeys.forEach((key, index) => {
-                const porQueData = analysisData[key];
-                console.log(`[INVESTIGACION-ACCIDENTES-MAIN] ${key}:`, porQueData);
-                
-                // Obtener la pregunta si existe
-                const pregunta = porQueData.Pregunta || `¿Por qué? - Nivel ${index + 1}`;
-                
-                htmlContent += `
-                    <div class="why-card" style="margin-bottom: 20px; border-left: 4px solid #174ea6; background: #f8f9fa; border-radius: 8px; padding: 15px;">
-                        <div class="why-header" style="margin-bottom: 15px;">
-                            <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                                <div style="background: #174ea6; color: white; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 15px; flex-shrink: 0;">${index + 1}</div>
-                                <h4 style="margin: 0; color: #174ea6; font-size: 1.1em;">${escapeHtml(pregunta)}</h4>
-                            </div>
-                        </div>
-                        <div class="m-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
-                            <div class="m-cell" style="background: white; padding: 10px; border-radius: 6px; border: 1px solid #dee2e6;">
-                                <div class="m-category" style="font-weight: bold; color: #495057; margin-bottom: 5px; font-size: 0.9em;">👷 Mano de Obra</div>
-                                <div class="m-content" style="color: #6c757d; font-size: 0.9em;">${escapeHtml(porQueData['Mano de Obra'] || 'N/A')}</div>
-                            </div>
-                            <div class="m-cell" style="background: white; padding: 10px; border-radius: 6px; border: 1px solid #dee2e6;">
-                                <div class="m-category" style="font-weight: bold; color: #495057; margin-bottom: 5px; font-size: 0.9em;">📋 Método</div>
-                                <div class="m-content" style="color: #6c757d; font-size: 0.9em;">${escapeHtml(porQueData['Método'] || porQueData['Metodo'] || 'N/A')}</div>
-                            </div>
-                            <div class="m-cell" style="background: white; padding: 10px; border-radius: 6px; border: 1px solid #dee2e6;">
-                                <div class="m-category" style="font-weight: bold; color: #495057; margin-bottom: 5px; font-size: 0.9em;">⚙️ Maquinaria</div>
-                                <div class="m-content" style="color: #6c757d; font-size: 0.9em;">${escapeHtml(porQueData['Maquinaria'] || 'N/A')}</div>
-                            </div>
-                            <div class="m-cell" style="background: white; padding: 10px; border-radius: 6px; border: 1px solid #dee2e6;">
-                                <div class="m-category" style="font-weight: bold; color: #495057; margin-bottom: 5px; font-size: 0.9em;">🌍 Medio Ambiente</div>
-                                <div class="m-content" style="color: #6c757d; font-size: 0.9em;">${escapeHtml(porQueData['Medio Ambiente'] || 'N/A')}</div>
-                            </div>
-                            <div class="m-cell" style="background: white; padding: 10px; border-radius: 6px; border: 1px solid #dee2e6;">
-                                <div class="m-category" style="font-weight: bold; color: #495057; margin-bottom: 5px; font-size: 0.9em;">📦 Material</div>
-                                <div class="m-content" style="color: #6c757d; font-size: 0.9em;">${escapeHtml(porQueData['Material'] || 'N/A')}</div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
+      const pregunta = porQueData.Pregunta || `¿Por qué? - Nivel ${index + 1}`;
 
-            htmlContent += '</div>';
-            
-            // Agregar causas raíz si existen
-            if (analysisData.causasRaiz || analysisData.CausasRaiz) {
-                const causasRaiz = analysisData.causasRaiz || analysisData.CausasRaiz;
-                htmlContent += `
-                    <div class="root-causes" style="margin-top: 30px; padding: 20px; background: #fff3cd; border-radius: 8px; border-left: 4px solid #ffc107;">
-                        <h4 style="color: #856404; margin-bottom: 15px;"><i class="fas fa-exclamation-triangle" style="margin-right: 10px;"></i>Causas Raíz Identificadas</h4>
-                        <div style="color: #856404;">${escapeHtml(typeof causasRaiz === 'string' ? causasRaiz : JSON.stringify(causasRaiz))}</div>
-                    </div>
-                `;
-            }
-            
-            // Agregar acciones correctivas si existen
-            if (analysisData.accionesCorrectivas || analysisData.AccionesCorrectivas) {
-                const acciones = analysisData.accionesCorrectivas || analysisData.AccionesCorrectivas;
-                htmlContent += `
-                    <div class="corrective-actions" style="margin-top: 20px; padding: 20px; background: #d4edda; border-radius: 8px; border-left: 4px solid #28a745;">
-                        <h4 style="color: #155724; margin-bottom: 15px;"><i class="fas fa-check-circle" style="margin-right: 10px;"></i>Acciones Correctivas Recomendadas</h4>
-                        <div style="color: #155724;">${escapeHtml(typeof acciones === 'string' ? acciones : JSON.stringify(acciones))}</div>
-                    </div>
-                `;
-            }
+      htmlContent += `
+      <div class="inv-why-card" style="margin-bottom: 16px;">
+        <div class="inv-why-header">
+          <div class="inv-why-number">${index + 1}</div>
+          <p>${escapeHtml(pregunta)}</p>
+        </div>
+        <div class="inv-m-grid">
+          <div class="inv-m-cell">
+            <div class="inv-m-category">👷 Mano de Obra</div>
+            <div class="inv-m-content">${escapeHtml(porQueData['Mano de Obra'] || 'N/A')}</div>
+          </div>
+          <div class="inv-m-cell">
+            <div class="inv-m-category">📋 Método</div>
+            <div class="inv-m-content">${escapeHtml(porQueData['Método'] || porQueData['Metodo'] || 'N/A')}</div>
+          </div>
+          <div class="inv-m-cell">
+            <div class="inv-m-category">⚙️ Maquinaria</div>
+            <div class="inv-m-content">${escapeHtml(porQueData['Maquinaria'] || 'N/A')}</div>
+          </div>
+          <div class="inv-m-cell">
+            <div class="inv-m-category">🌍 Medio Ambiente</div>
+            <div class="inv-m-content">${escapeHtml(porQueData['Medio Ambiente'] || 'N/A')}</div>
+          </div>
+          <div class="inv-m-cell">
+            <div class="inv-m-category">📦 Material</div>
+            <div class="inv-m-content">${escapeHtml(porQueData['Material'] || 'N/A')}</div>
+          </div>
+        </div>
+      </div>
+      `;
+    });
+
+    htmlContent += '</div>';
+
+    if (analysisData.causasRaiz || analysisData.CausasRaiz) {
+      const causasRaiz = analysisData.causasRaiz || analysisData.CausasRaiz;
+      htmlContent += `
+      <div class="inv-root-causes" style="margin-top: 1rem;">
+        <h4><i class="fas fa-exclamation-triangle" style="margin-right: 8px;"></i>Causas Raíz Identificadas</h4>
+        <div>${escapeHtml(typeof causasRaiz === 'string' ? causasRaiz : JSON.stringify(causasRaiz))}</div>
+      </div>
+      `;
+    }
+
+    if (analysisData.accionesCorrectivas || analysisData.AccionesCorrectivas) {
+      const acciones = analysisData.accionesCorrectivas || analysisData.AccionesCorrectivas;
+      htmlContent += `
+      <div class="inv-corrective-actions" style="margin-top: 1rem;">
+        <h4><i class="fas fa-check-circle" style="margin-right: 8px;"></i>Acciones Correctivas Recomendadas</h4>
+        <div>${escapeHtml(typeof acciones === 'string' ? acciones : JSON.stringify(acciones))}</div>
+      </div>
+      `;
+    }
         } else if (analysisData.cinco_porques && Array.isArray(analysisData.cinco_porques)) {
             // Formato anterior: {"cinco_porques": [...], "analisis_ishikawa": {...}}
-            htmlContent += '<div class="five-whys">';
-            htmlContent += '<h3 style="margin-bottom: 20px; color: #174ea6;"><i class="fas fa-search" style="margin-right: 10px;"></i>Análisis 5 Por Qués</h3>';
-            
-            analysisData.cinco_porques.forEach((item, index) => {
-                htmlContent += `
-                    <div class="why-card" style="margin-bottom: 20px; border-left: 4px solid #174ea6; background: #f8f9fa; border-radius: 8px; padding: 15px;">
-                        <div class="why-header" style="display: flex; align-items: center; margin-bottom: 15px;">
-                            <div style="background: #174ea6; color: white; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 15px;">${index + 1}</div>
-                            <h4 style="margin: 0; color: #174ea6;">¿Por qué?</h4>
-                        </div>
-                        <div style="color: #6c757d;">${escapeHtml(item.respuesta || item.porque || item.razon || 'No disponible')}</div>
-                    </div>
-                `;
-            });
-            htmlContent += '</div>';
+    htmlContent += '<div class="five-whys">';
+    htmlContent += '<h3 style="margin-bottom: 20px; color: var(--inv-primary);"><i class="fas fa-search" style="margin-right: 10px;"></i>Análisis 5 Por Qués</h3>';
+
+    analysisData.cinco_porques.forEach((item, index) => {
+      htmlContent += `
+      <div class="inv-why-card" style="margin-bottom: 16px;">
+        <div class="inv-why-header">
+          <div class="inv-why-number">${index + 1}</div>
+          <p>¿Por qué?</p>
+        </div>
+        <div style="padding: 0.75rem 1rem; color: var(--inv-text-secondary); font-size: 0.8125rem;">${escapeHtml(item.respuesta || item.porque || item.razon || 'No disponible')}</div>
+      </div>
+      `;
+    });
+    htmlContent += '</div>';
         }
 
         // Mostrar análisis Ishikawa si está disponible (formato anterior)
-        if (analysisData.analisis_ishikawa) {
-            htmlContent += `
-                <div class="ishikawa-analysis" style="margin-top: 30px;">
-                    <h3 style="margin-bottom: 20px; color: #174ea6;"><i class="fas fa-fish" style="margin-right: 10px;"></i>Análisis Ishikawa</h3>
-                    <div class="m-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
-                        <div class="m-cell" style="background: white; padding: 10px; border-radius: 6px; border: 1px solid #dee2e6;">
-                            <div class="m-category" style="font-weight: bold; color: #495057; margin-bottom: 5px;">👷 Mano de Obra</div>
-                            <div class="m-content" style="color: #6c757d;">${escapeHtml(analysisData.analisis_ishikawa.mano_obra || 'No disponible')}</div>
-                        </div>
-                        <div class="m-cell" style="background: white; padding: 10px; border-radius: 6px; border: 1px solid #dee2e6;">
-                            <div class="m-category" style="font-weight: bold; color: #495057; margin-bottom: 5px;">⚙️ Máquinas</div>
-                            <div class="m-content" style="color: #6c757d;">${escapeHtml(analysisData.analisis_ishikawa.maquinas || 'No disponible')}</div>
-                        </div>
-                        <div class="m-cell" style="background: white; padding: 10px; border-radius: 6px; border: 1px solid #dee2e6;">
-                            <div class="m-category" style="font-weight: bold; color: #495057; margin-bottom: 5px;">📦 Materiales</div>
-                            <div class="m-content" style="color: #6c757d;">${escapeHtml(analysisData.analisis_ishikawa.materiales || 'No disponible')}</div>
-                        </div>
-                        <div class="m-cell" style="background: white; padding: 10px; border-radius: 6px; border: 1px solid #dee2e6;">
-                            <div class="m-category" style="font-weight: bold; color: #495057; margin-bottom: 5px;">📋 Métodos</div>
-                            <div class="m-content" style="color: #6c757d;">${escapeHtml(analysisData.analisis_ishikawa.metodos || 'No disponible')}</div>
-                        </div>
-                        <div class="m-cell" style="background: white; padding: 10px; border-radius: 6px; border: 1px solid #dee2e6;">
-                            <div class="m-category" style="font-weight: bold; color: #495057; margin-bottom: 5px;">🌍 Medio Ambiente</div>
-                            <div class="m-content" style="color: #6c757d;">${escapeHtml(analysisData.analisis_ishikawa.medio_ambiente || 'No disponible')}</div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
+  if (analysisData.analisis_ishikawa) {
+    htmlContent += `
+    <div class="inv-fishbone-summary" style="margin-top: 1.5rem;">
+      <div class="inv-fishbone-title"><i class="fas fa-fish"></i> Análisis Ishikawa</div>
+      <div class="inv-m-grid">
+        <div class="inv-m-cell">
+          <div class="inv-m-category">👷 Mano de Obra</div>
+          <div class="inv-m-content">${escapeHtml(analysisData.analisis_ishikawa.mano_obra || 'No disponible')}</div>
+        </div>
+        <div class="inv-m-cell">
+          <div class="inv-m-category">⚙️ Máquinas</div>
+          <div class="inv-m-content">${escapeHtml(analysisData.analisis_ishikawa.maquinas || 'No disponible')}</div>
+        </div>
+        <div class="inv-m-cell">
+          <div class="inv-m-category">📦 Materiales</div>
+          <div class="inv-m-content">${escapeHtml(analysisData.analisis_ishikawa.materiales || 'No disponible')}</div>
+        </div>
+        <div class="inv-m-cell">
+          <div class="inv-m-category">📋 Métodos</div>
+          <div class="inv-m-content">${escapeHtml(analysisData.analisis_ishikawa.metodos || 'No disponible')}</div>
+        </div>
+        <div class="inv-m-cell">
+          <div class="inv-m-category">🌍 Medio Ambiente</div>
+          <div class="inv-m-content">${escapeHtml(analysisData.analisis_ishikawa.medio_ambiente || 'No disponible')}</div>
+        </div>
+      </div>
+    </div>
+    `;
+  }
         
         // Si no hay contenido estructurado, mostrar el raw_text si existe
         if (!htmlContent) {
             console.log('[INVESTIGACION-ACCIDENTES-MAIN] No se encontró formato estructurado, mostrando raw_text');
             
-            if (results.raw_text) {
-                htmlContent = `
-                    <div class="analysis-raw" style="padding: 20px; background: #f8f9fa; border-radius: 8px;">
-                        <h3 style="margin-bottom: 20px; color: #174ea6;"><i class="fas fa-file-alt" style="margin-right: 10px;"></i>Análisis Generado</h3>
-                        <div style="white-space: pre-wrap; color: #333; line-height: 1.6;">${escapeHtml(results.raw_text)}</div>
-                    </div>
-                `;
-            } else {
-                htmlContent = `
-                    <div class="empty-state">
-                        <div class="empty-icon">
-                            <i class="fas fa-info-circle"></i>
-                        </div>
-                        <p>Análisis completado pero sin resultados detallados</p>
-                        <p class="empty-subtitle">Los datos del análisis no contienen información estructurada.</p>
-                    </div>
-                `;
-            }
+    if (results.raw_text) {
+      htmlContent = `
+      <div class="inv-analysis-raw">
+        <h3><i class="fas fa-file-alt" style="margin-right: 8px;"></i>Análisis Generado</h3>
+        <pre>${escapeHtml(results.raw_text)}</pre>
+      </div>
+      `;
+    } else {
+      htmlContent = `
+      <div class="inv-empty-state">
+        <div class="inv-empty-icon">
+          <i class="fas fa-info-circle"></i>
+        </div>
+        <p>Análisis completado pero sin resultados detallados</p>
+        <p class="inv-empty-subtitle">Los datos del análisis no contienen información estructurada.</p>
+      </div>
+      `;
+    }
         }
         
         analysisContent.innerHTML = htmlContent;
     }
 
     // Función para actualizar el estado de un paso
-    function updateStepStatus(stepNumber, status) {
-        const badge = document.getElementById(`step${stepNumber}Badge`);
-        if (badge) {
-            badge.className = 'step-badge ' + status;
-        }
+  function updateStepStatus(stepNumber, status) {
+    const badge = document.getElementById(`step${stepNumber}Badge`);
+    if (badge) {
+      badge.className = 'inv-step-badge ' + status;
     }
+
+    const stepperBadge = document.getElementById(`stepperBadge${stepNumber}`);
+    if (stepperBadge) {
+      stepperBadge.className = 'inv-stepper-badge ' + status;
+      const stepperStep = stepperBadge.closest('.inv-stepper-step');
+      if (stepperStep) {
+        stepperStep.className = 'inv-stepper-step ' + status;
+      }
+    }
+
+    if (status === 'completed') {
+      const connIndex = stepNumber - 1;
+      const connector = document.getElementById(`stepperConn${connIndex}`);
+      if (connector) {
+        connector.classList.add('completed');
+      }
+    }
+  }
 
     // Función para actualizar la barra de progreso
     function updateProgressBar(percent, text) {
@@ -974,22 +990,21 @@ saveModal.open();
     }
 
     // Función para registrar actividad en el log
-    function logActivity(level, message) {
-        const timestamp = new Date().toLocaleTimeString();
-        const logEntry = document.createElement('div');
-        logEntry.className = `log-entry ${level}`;
-        logEntry.innerHTML = `
-            <span class="log-timestamp">[${timestamp}]</span>
-            <span class="log-message">${message}</span>
-        `;
-        
-        activityLog.prepend(logEntry);
-        
-        // Limitar el número de entradas en el log
-        if (activityLog.children.length > 20) {
-            activityLog.removeChild(activityLog.lastChild);
-        }
+  function logActivity(level, message) {
+    const timestamp = new Date().toLocaleTimeString();
+    const logEntry = document.createElement('div');
+    logEntry.className = `inv-log-entry ${level}`;
+    logEntry.innerHTML = `
+    <span class="inv-log-timestamp">[${timestamp}]</span>
+    <span class="inv-log-message">${message}</span>
+    `;
+
+    activityLog.prepend(logEntry);
+
+    if (activityLog.children.length > 20) {
+      activityLog.removeChild(activityLog.lastChild);
     }
+  }
 
 // Función para mostrar notificaciones (toast) - soporta múltiples simultáneos
 let _toastContainer = null;
@@ -999,38 +1014,38 @@ function showToast(title, message, type = 'info') {
 if (!_toastContainer) {
 _toastContainer = document.createElement('div');
 _toastContainer.id = 'toastContainer';
-_toastContainer.style.cssText = 'position:fixed;bottom:1.5rem;right:1.5rem;display:flex;flex-direction:column-reverse;gap:0.5rem;z-index:1000;pointer-events:none;';
+    _toastContainer.style.cssText = 'position:fixed;bottom:5rem;right:1.5rem;display:flex;flex-direction:column-reverse;gap:0.5rem;z-index:1000;pointer-events:none;';
 document.body.appendChild(_toastContainer);
 }
 
 const toastId = 'toast-' + (++_toastCounter);
 const toast = document.createElement('div');
 toast.id = toastId;
-toast.className = `toast ${type}`;
-toast.style.pointerEvents = 'auto';
-toast.setAttribute('role', 'alert');
-toast.setAttribute('aria-live', 'polite');
+  toast.className = `inv-toast ${type}`;
+  toast.style.pointerEvents = 'auto';
+  toast.setAttribute('role', 'alert');
+  toast.setAttribute('aria-live', 'polite');
 
-let iconClass = 'fas fa-info-circle';
-if (type === 'error') iconClass = 'fas fa-exclamation-circle';
-else if (type === 'success') iconClass = 'fas fa-check-circle';
-else if (type === 'warning') iconClass = 'fas fa-exclamation-triangle';
+  let iconClass = 'fas fa-info-circle';
+  if (type === 'error') iconClass = 'fas fa-exclamation-circle';
+  else if (type === 'success') iconClass = 'fas fa-check-circle';
+  else if (type === 'warning') iconClass = 'fas fa-exclamation-triangle';
 
-toast.innerHTML = `
-<div class="toast-icon ${iconClass}"></div>
-<div class="toast-content">
-<p class="toast-title">${escapeHtml(title)}</p>
-<p class="toast-message">${escapeHtml(message)}</p>
-</div>
-<button class="toast-close" aria-label="Cerrar notificacion"><i class="fas fa-times"></i></button>
-`;
+  toast.innerHTML = `
+  <div class="inv-toast-icon ${iconClass}"></div>
+  <div class="inv-toast-content">
+    <p class="inv-toast-title">${escapeHtml(title)}</p>
+    <p class="inv-toast-message">${escapeHtml(message)}</p>
+  </div>
+  <button class="inv-toast-close" aria-label="Cerrar notificacion"><i class="fas fa-times"></i></button>
+  `;
 
-const closeBtn = toast.querySelector('.toast-close');
-const dismissToast = () => {
-toast.classList.add('exit');
-toast.classList.remove('show');
-setTimeout(() => { toast.remove(); }, 350);
-};
+  const closeBtn = toast.querySelector('.inv-toast-close');
+  const dismissToast = () => {
+    toast.classList.add('exit');
+    toast.classList.remove('show');
+    setTimeout(() => { toast.remove(); }, 350);
+  };
 closeBtn.addEventListener('click', dismissToast);
 
 _toastContainer.appendChild(toast);
