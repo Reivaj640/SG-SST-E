@@ -1080,12 +1080,41 @@ document.addEventListener('DOMContentLoaded', async () => {
                   apiCallArgs = [payload.companyName, payload.filter];
                   responseType = 'investigacion-accidentes-list-investigations-response';
                   break;
-              case 'investigacion-accidentes-get-investigation-detail-request':
-                  // Manejar solicitud de detalle de investigación
-                  apiCallFunction = window.electronAPI.getInvestigationDetail;
-                  apiCallArgs = [payload.companyName, payload.investigationName];
-                  responseType = 'investigacion-accidentes-get-investigation-detail-response';
-                  break;
+case 'investigacion-accidentes-get-investigation-detail-request':
+      apiCallFunction = window.electronAPI.getInvestigationDetail;
+      apiCallArgs = [payload.companyName, payload.investigationName];
+      responseType = 'investigacion-accidentes-get-investigation-detail-response';
+      break;
+    case 'investigacion-accidentes-read-directory-request':
+      apiCallFunction = window.electronAPI.readDirectory;
+      apiCallArgs = [payload.directoryPath];
+      responseType = 'investigacion-accidentes-read-directory-request-response';
+      break;
+    case 'investigacion-accidentes-create-folder-request':
+      apiCallFunction = window.electronAPI.createFolder;
+      apiCallArgs = [payload];
+      responseType = 'investigacion-accidentes-create-folder-request-response';
+      break;
+    case 'investigacion-accidentes-delete-folder-request':
+      apiCallFunction = window.electronAPI.deleteFolder;
+      apiCallArgs = [payload];
+      responseType = 'investigacion-accidentes-delete-folder-request-response';
+      break;
+    case 'investigacion-accidentes-delete-document-request':
+      apiCallFunction = window.electronAPI.deleteDocument;
+      apiCallArgs = [payload.filePath];
+      responseType = 'investigacion-accidentes-delete-document-request-response';
+      break;
+    case 'investigacion-accidentes-rename-item-request':
+      apiCallFunction = window.electronAPI.renameItem;
+      apiCallArgs = [payload];
+      responseType = 'investigacion-accidentes-rename-item-request-response';
+      break;
+    case 'investigacion-accidentes-select-directory-request':
+      apiCallFunction = window.electronAPI.selectDirectory;
+      apiCallArgs = [];
+      responseType = 'investigacion-accidentes-select-directory-request-response';
+      break;
               case 'get-investigacion-stats-request':
                   // Portal home solicita estadísticas de investigaciones
                   // Extraer companyName de la URL del iframe (query param ?company=)

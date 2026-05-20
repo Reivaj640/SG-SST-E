@@ -5771,6 +5771,49 @@ ipcMain.handle('delete-folder', async (event, payload) => {
   }
 });
 
+ipcMain.handle('rename-item', async (event, payload) => {
+  const { itemPath, newName } = payload;
+
+  sendLog(`[MAIN][rename-item] Solicitud para renombrar: ${itemPath} -> ${newName}`, 'INFO');
+
+  try {
+    if (!itemPath || !newName) {
+      throw new Error('Ruta del item o nuevo nombre no proporcionados');
+    }
+
+    const normalizedPath = path.normalize(itemPath);
+    const exists = await fsp.access(normalizedPath).then(() => true).catch(() => false);
+    if (!exists) {
+      return { success: false, error: 'El archivo o carpeta no existe', code: 'ENOENT' };
+    }
+
+    const parentDir = path.dirname(normalizedPath);
+    const newPath = path.join(parentDir, newName);
+
+    const targetExists = await fsp.access(newPath).then(() => true).catch(() => false);
+    if (targetExists) {
+      return { success: false, error: 'Ya existe un archivo o carpeta con ese nombre', code: 'EEXIST' };
+    }
+
+    await fsp.rename(normalizedPath, newPath);
+    sendLog(`[MAIN][rename-item] Renombrado exitosamente: ${newPath}`, 'INFO');
+    return { success: true, newPath };
+  } catch (error) {
+    sendLog(`[MAIN][rename-item] Error: ${error.message}`, 'ERROR');
+
+    let errorCode = 'UNKNOWN';
+    if (error.code === 'ENOENT') errorCode = 'ENOENT';
+    else if (error.code === 'EACCES' || error.code === 'EPERM') errorCode = 'EACCES';
+    else if (error.code === 'EEXIST') errorCode = 'EEXIST';
+
+    return {
+      success: false,
+      error: error.message,
+      code: errorCode
+    };
+  }
+});
+
 // Manejador para obtener la lista de archivos de presupuesto
 ipcMain.handle('getPresupuestoFiles', async (event, companyName) => {
   sendLog(`[MAIN] Buscando archivos de presupuesto para: ${companyName} en el submódulo 1.1.3.`);

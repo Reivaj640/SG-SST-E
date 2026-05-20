@@ -539,12 +539,17 @@ ipcMain.handle('investigacion-accidentes-generate-accident-report', (event, comb
             sendLog(`[DEBUG] combinedData keys: ${Object.keys(combinedData || {}).join(', ')}`);
             sendLog(`[DEBUG] combinedData.empresa: ${combinedData?.empresa}`);
             
-            // Obtener empresa del combinedData, o usar TEMPOACTIVA como fallback
-            const empresa = (combinedData?.empresa || 'TEMPOACTIVA').toUpperCase();
-            sendLog(`[DEBUG] Empresa final para informe: ${empresa}`);
-            
-            tempDataPath = path.join(app.getPath('temp'), `accident_report_data_${Date.now()}.json`);
-            const reportData = { combinedData: combinedData, empresa: empresa };
+      // Obtener empresa del combinedData, o usar TEMPOACTIVA como fallback
+      const empresa = (combinedData?.empresa || 'TEMPOACTIVA').toUpperCase();
+      sendLog(`[DEBUG] Empresa final para informe: ${empresa}`);
+
+      const outputDir = combinedData?._outputDir || null;
+      const outputFilename = combinedData?._outputFilename || null;
+      if (outputDir) sendLog(`[DEBUG] Output dir override: ${outputDir}`);
+      if (outputFilename) sendLog(`[DEBUG] Output filename override: ${outputFilename}`);
+
+      tempDataPath = path.join(app.getPath('temp'), `accident_report_data_${Date.now()}.json`);
+      const reportData = { combinedData: combinedData, empresa: empresa, outputDir: outputDir, outputFilename: outputFilename };
             await fsp.writeFile(tempDataPath, JSON.stringify(reportData, null, 2));
 
 	const pythonExecutable = await resolvePython();

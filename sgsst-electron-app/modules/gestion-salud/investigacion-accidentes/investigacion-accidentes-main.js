@@ -261,14 +261,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.log('[INVESTIGACION-ACCIDENTES-MAIN] electronAPI no disponible directamente, intentando comunicación con padre');
                 
                 // Función para llamar a la API del padre
-                api = {
-                    processAccidentPdf: async (pdfPath) => {
-                        return await callParentAPI('process-accident-pdf', { pdfPath });
-                    },
-                    analyzeAccident: async (extractedData, contextoAdicional) => {
-                        return await callParentAPI('analyze-accident', { extractedData, contextoAdicional });
-                    }
-                };
+api = {
+processAccidentPdf: async (pdfPath) => {
+return await callParentAPI('process-accident-pdf', { pdfPath });
+},
+analyzeAccident: async (extractedData, contextoAdicional) => {
+return await callParentAPI('analyze-accident', { extractedData, contextoAdicional });
+},
+generateAccidentReport: async (combinedData) => {
+return await callParentAPI('generate-accident-report', combinedData);
+}
+};
             }
             
             // Verificar que tengamos acceso a la API
@@ -450,69 +453,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
             logActivity('success', `Análisis de causa raíz completado en ${totalMinutes}m ${totalSeconds}s`);
 
-            // ─────────────────────────────────────────────────────────────
-            // GENERACIÓN AUTOMÁTICA DEL INFORME
-            // ─────────────────────────────────────────────────────────────
-            updateProgressBar(80, 'Generando informe de investigación...');
-            logActivity('info', 'Iniciando generación del informe...');
-            
-            try {
-                // Desanidar datos extraídos (pueden tener estructura {success, data: {success, data: {...}}})
-                let actualExtractedData = extractedData;
-                if (extractedData && extractedData.success === true && extractedData.data) {
-                    // Desanidar primer nivel
-                    actualExtractedData = extractedData.data;
-                    // Desanidar segundo nivel si existe
-                    if (actualExtractedData && actualExtractedData.success === true && actualExtractedData.data) {
-                        actualExtractedData = actualExtractedData.data;
-                    }
-                }
-                
-                // Desanidar análisis (puede tener estructura {success, analysis: {...}})
-                let actualAnalysis = analysisResult;
-                if (analysisResult && analysisResult.success === true && analysisResult.analysis) {
-                    actualAnalysis = analysisResult.analysis;
-                }
-                
-                // Usar la empresa detectada al inicio del script (desde URL o window.currentCompany)
-                console.log('[INVESTIGACION-ACCIDENTES-MAIN] Empresa para informe:', currentEmpresa);
-                console.log('[INVESTIGACION-ACCIDENTES-MAIN] Datos extraídos desanidados:', actualExtractedData);
-                console.log('[INVESTIGACION-ACCIDENTES-MAIN] Análisis desanidado:', actualAnalysis);
-                
-                // Combinar datos extraídos con resultados del análisis
-                const combinedData = {
-                    ...actualExtractedData,
-                    analysis: actualAnalysis,
-                    empresa: currentEmpresa
-                };
-                
-                console.log('[INVESTIGACION-ACCIDENTES-MAIN] combinedData final:', combinedData);
-                
-                // Llamar a la generación del informe
-                const reportResult = await api.generateAccidentReport(combinedData);
-                
-                if (reportResult && reportResult.documentPath) {
-                    logActivity('success', `Informe generado: ${reportResult.documentPath}`);
-                    showToast('Informe generado', `El informe de investigación ha sido guardado exitosamente.`, 'success');
-                    
-                    // Habilitar botones de descarga e impresión
-                    const downloadBtn = document.getElementById('downloadBtn');
-                    const printBtn = document.getElementById('printBtn');
-                    if (downloadBtn) downloadBtn.disabled = false;
-                    if (printBtn) printBtn.disabled = false;
-                } else {
-                    logActivity('warn', 'El informe se generó pero no se recibió la ruta del documento');
-                }
-            } catch (reportError) {
-                console.error('[INVESTIGACION-ACCIDENTES-MAIN] Error generando informe:', reportError);
-                logActivity('error', `Error generando informe: ${reportError.message}`);
-                showToast('Error en informe', `El análisis se completó pero hubo un error al generar el informe: ${reportError.message}`, 'warning');
-            }
-            
-            // Actualizar paso 5 (registro de actividad)
-            updateStepStatus(5, 'completed');
-            
-            showToast('Proceso completado', 'El análisis de causa raíz y la generación del informe han sido completados.', 'success');
+// ─────────────────────────────────────────────────────────────
+// MOSTRAR MODAL DE GUARDADO EN LUGAR DE GENERACIÓN AUTOMÁTICA
+// ─────────────────────────────────────────────────────────────
+updateProgressBar(80, 'Preparando guardado del informe...');
+logActivity('info', 'Análisis completado. Seleccione ubicación para guardar el informe.');
+
+showToast('Análisis completado', 'Seleccione la ubicación y nombre del informe.', 'success');
+
+progressArea.classList.add('hidden');
+saveModal.open();
             
         } catch (analysisError) {
             // Error específico del análisis
@@ -1041,34 +991,53 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Función para mostrar notificaciones (toast)
-    function showToast(title, message, type = 'info') {
-        const toast = document.getElementById('toast');
-        const toastTitle = document.getElementById('toastTitle');
-        const toastMessage = document.getElementById('toastMessage');
-        const toastIcon = document.getElementById('toastIcon');
-        
-        if (toast && toastTitle && toastMessage && toastIcon) {
-            toastTitle.textContent = title;
-            toastMessage.textContent = message;
-            
-            // Establecer ícono según el tipo
-            let iconClass = 'fas fa-info-circle';
-            if (type === 'error') iconClass = 'fas fa-exclamation-circle';
-            else if (type === 'success') iconClass = 'fas fa-check-circle';
-            else if (type === 'warning') iconClass = 'fas fa-exclamation-triangle';
-            
-            toastIcon.className = `toast-icon ${iconClass}`;
-            
-            // Establecer clase según el tipo
-            toast.className = `toast show ${type}`;
-            
-            // Auto-ocultar después de 5 segundos
-            setTimeout(() => {
-                toast.classList.remove('show');
-            }, 5000);
-        }
-    }
+// Función para mostrar notificaciones (toast) - soporta múltiples simultáneos
+let _toastContainer = null;
+let _toastCounter = 0;
+
+function showToast(title, message, type = 'info') {
+if (!_toastContainer) {
+_toastContainer = document.createElement('div');
+_toastContainer.id = 'toastContainer';
+_toastContainer.style.cssText = 'position:fixed;bottom:1.5rem;right:1.5rem;display:flex;flex-direction:column-reverse;gap:0.5rem;z-index:1000;pointer-events:none;';
+document.body.appendChild(_toastContainer);
+}
+
+const toastId = 'toast-' + (++_toastCounter);
+const toast = document.createElement('div');
+toast.id = toastId;
+toast.className = `toast ${type}`;
+toast.style.pointerEvents = 'auto';
+toast.setAttribute('role', 'alert');
+toast.setAttribute('aria-live', 'polite');
+
+let iconClass = 'fas fa-info-circle';
+if (type === 'error') iconClass = 'fas fa-exclamation-circle';
+else if (type === 'success') iconClass = 'fas fa-check-circle';
+else if (type === 'warning') iconClass = 'fas fa-exclamation-triangle';
+
+toast.innerHTML = `
+<div class="toast-icon ${iconClass}"></div>
+<div class="toast-content">
+<p class="toast-title">${escapeHtml(title)}</p>
+<p class="toast-message">${escapeHtml(message)}</p>
+</div>
+<button class="toast-close" aria-label="Cerrar notificacion"><i class="fas fa-times"></i></button>
+`;
+
+const closeBtn = toast.querySelector('.toast-close');
+const dismissToast = () => {
+toast.classList.add('exit');
+toast.classList.remove('show');
+setTimeout(() => { toast.remove(); }, 350);
+};
+closeBtn.addEventListener('click', dismissToast);
+
+_toastContainer.appendChild(toast);
+requestAnimationFrame(() => { toast.classList.add('show'); });
+
+setTimeout(dismissToast, 5000);
+}
 
     // Función para formatear tamaño de archivo
     function formatFileSize(bytes) {
@@ -1079,9 +1048,501 @@ document.addEventListener('DOMContentLoaded', function() {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
-    // ── Auto-carga desde "Iniciar Investigación" en el listado ──────────────
-    // Si se llegó aquí desde investigaciones-viewer.js con un caso y/o FURAT
-    // pre-seleccionado, pre-poblar el formulario y disparar el procesamiento.
+    // ── Save Modal ────────────────────────────────────────────────────
+const saveModal = (function() {
+const modal = document.getElementById('saveReportModal');
+const overlay = document.getElementById('saveModalOverlay');
+const closeBtn = document.getElementById('saveModalCloseBtn');
+const cancelBtn = document.getElementById('saveModalCancelBtn');
+const saveBtn = document.getElementById('saveModalSaveBtn');
+const goUpBtn = document.getElementById('saveModalGoUp');
+const browseNativeBtn = document.getElementById('saveModalBrowseNative');
+const breadcrumbEl = document.getElementById('saveModalBreadcrumb');
+const folderListEl = document.getElementById('saveModalFolderList');
+const newFolderBtn = document.getElementById('saveModalNewFolderBtn');
+const renameBtn = document.getElementById('saveModalRenameBtn');
+const deleteBtn = document.getElementById('saveModalDeleteBtn');
+const newItemArea = document.getElementById('saveModalNewItemArea');
+const newItemInput = document.getElementById('saveModalNewItemInput');
+const newItemConfirm = document.getElementById('saveModalNewItemConfirm');
+const newItemCancel = document.getElementById('saveModalNewItemCancel');
+const filenameInput = document.getElementById('saveModalFilename');
+
+let currentPath = '';
+let selectedItem = null;
+let isCreatingFolder = false;
+let isRenaming = false;
+
+function open() {
+modal.classList.remove('hidden');
+selectedItem = null;
+isCreatingFolder = false;
+isRenaming = false;
+newItemArea.classList.add('hidden');
+renameBtn.disabled = true;
+deleteBtn.disabled = true;
+updateSaveBtnState();
+_buildSuggestedFilename();
+_navigateToDefault();
+}
+
+function close() {
+modal.classList.add('hidden');
+selectedItem = null;
+}
+
+async function _navigateToDefault() {
+try {
+const result = await callParentAPI('read-directory', { path: '' });
+if (result && result.success && result.data) {
+const dirs = result.data.folders || [];
+const docsDir = dirs.find(f => f.name === 'Documentos' || f.name === 'Documents');
+if (docsDir) {
+await navigateTo(docsDir.path);
+return;
+}
+}
+const homeDir = (result && result.data && result.data.path) || '';
+if (homeDir) { await navigateTo(homeDir); }
+} catch (err) {
+console.warn('[SaveModal] Default path failed, trying C:', err);
+try { await navigateTo('C:\\'); } catch (e2) {
+folderListEl.innerHTML = '<div class="save-modal-empty"><i class="fas fa-exclamation-circle"></i> No se pudo cargar el directorio</div>';
+}
+}
+}
+
+async function navigateTo(dirPath) {
+currentPath = dirPath;
+selectedItem = null;
+renameBtn.disabled = true;
+deleteBtn.disabled = true;
+folderListEl.innerHTML = '<div class="save-modal-loading"><i class="fas fa-spinner fa-spin"></i> Cargando...</div>';
+
+try {
+const result = await callParentAPI('read-directory', { path: dirPath });
+if (!result || !result.success) {
+folderListEl.innerHTML = '<div class="save-modal-empty"><i class="fas fa-exclamation-circle"></i> Error al leer directorio</div>';
+return;
+}
+const data = result.data;
+_renderBreadcrumb(data.path || dirPath);
+_renderFolderList(data.folders || [], data.files || []);
+} catch (err) {
+console.error('[SaveModal] read-directory error:', err);
+folderListEl.innerHTML = '<div class="save-modal-empty"><i class="fas fa-exclamation-circle"></i> Error al leer directorio</div>';
+}
+}
+
+function _renderBreadcrumb(path) {
+breadcrumbEl.innerHTML = '';
+const parts = path.split(/[/\\]/).filter(Boolean);
+let accumulated = '';
+
+if (/^[A-Za-z]:/.test(path)) {
+accumulated = parts[0] + '\\';
+const rootItem = document.createElement('span');
+rootItem.className = 'save-modal-breadcrumb-item';
+rootItem.textContent = parts[0];
+rootItem.dataset.path = accumulated;
+rootItem.addEventListener('click', () => navigateTo(accumulated));
+breadcrumbEl.appendChild(rootItem);
+
+const sep0 = document.createElement('span');
+sep0.className = 'save-modal-breadcrumb-sep';
+sep0.textContent = '›';
+breadcrumbEl.appendChild(sep0);
+
+for (let i = 1; i < parts.length; i++) {
+accumulated += parts[i] + '\\';
+const isLast = (i === parts.length - 1);
+const item = document.createElement('span');
+item.className = 'save-modal-breadcrumb-item' + (isLast ? ' active' : '');
+item.textContent = parts[i];
+item.dataset.path = accumulated;
+if (!isLast) item.addEventListener('click', () => navigateTo(accumulated));
+breadcrumbEl.appendChild(item);
+
+if (!isLast) {
+const sep = document.createElement('span');
+sep.className = 'save-modal-breadcrumb-sep';
+sep.textContent = '›';
+breadcrumbEl.appendChild(sep);
+}
+}
+} else {
+for (let i = 0; i < parts.length; i++) {
+accumulated += (i > 0 ? '/' : '/') + parts[i];
+const isLast = (i === parts.length - 1);
+const item = document.createElement('span');
+item.className = 'save-modal-breadcrumb-item' + (isLast ? ' active' : '');
+item.textContent = parts[i];
+item.dataset.path = accumulated;
+if (!isLast) item.addEventListener('click', () => navigateTo(accumulated));
+breadcrumbEl.appendChild(item);
+
+if (!isLast) {
+const sep = document.createElement('span');
+sep.className = 'save-modal-breadcrumb-sep';
+sep.textContent = '›';
+breadcrumbEl.appendChild(sep);
+}
+}
+}
+
+breadcrumbEl.scrollLeft = breadcrumbEl.scrollWidth;
+}
+
+function _renderFolderList(folders, files) {
+folderListEl.innerHTML = '';
+
+if (folders.length === 0 && files.length === 0) {
+folderListEl.innerHTML = '<div class="save-modal-empty"><i class="fas fa-folder-open"></i> Carpeta vacía</div>';
+return;
+}
+
+folders.sort((a, b) => a.name.localeCompare(b.name));
+files.sort((a, b) => a.name.localeCompare(b.name));
+
+folders.forEach(f => {
+const el = document.createElement('div');
+el.className = 'save-modal-folder-item';
+el.dataset.path = f.path;
+el.dataset.name = f.name;
+el.dataset.type = 'folder';
+el.innerHTML = `
+<i class="fas fa-folder save-modal-folder-item-icon"></i>
+<span class="save-modal-folder-item-name">${escapeHtml(f.name)}</span>
+`;
+el.addEventListener('click', (e) => _selectItem(el, f));
+el.addEventListener('dblclick', () => navigateTo(f.path));
+folderListEl.appendChild(el);
+});
+
+files.forEach(f => {
+const el = document.createElement('div');
+el.className = 'save-modal-folder-item';
+el.dataset.path = f.path;
+el.dataset.name = f.name;
+el.dataset.type = 'file';
+const sizeStr = f.size ? formatFileSize(f.size) : '';
+el.innerHTML = `
+<i class="fas fa-file save-modal-folder-item-icon file"></i>
+<span class="save-modal-folder-item-name">${escapeHtml(f.name)}</span>
+<span class="save-modal-folder-item-meta">${sizeStr}</span>
+`;
+el.addEventListener('click', (e) => _selectItem(el, f));
+folderListEl.appendChild(el);
+});
+}
+
+function _selectItem(el, itemData) {
+const prev = folderListEl.querySelector('.save-modal-folder-item.selected');
+if (prev) prev.classList.remove('selected');
+el.classList.add('selected');
+selectedItem = { el, ...itemData, isDirectory: itemData.isDirectory !== undefined ? itemData.isDirectory : el.dataset.type === 'folder' };
+renameBtn.disabled = false;
+deleteBtn.disabled = false;
+}
+
+function _buildSuggestedFilename() {
+let workerName = '';
+let fecha = '';
+
+let actualExtractedData = extractedData;
+if (extractedData && extractedData.success === true && extractedData.data) {
+actualExtractedData = extractedData.data;
+if (actualExtractedData && actualExtractedData.success === true && actualExtractedData.data) {
+actualExtractedData = actualExtractedData.data;
+}
+}
+
+if (actualExtractedData) {
+workerName = actualExtractedData['Nombre Completo'] || actualExtractedData.nombre_completo || '';
+fecha = actualExtractedData['Fecha del Accidente'] || actualExtractedData.fecha_accidente || '';
+}
+
+if (workerName) {
+workerName = workerName.trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_áéíóúÁÉÍÓÚñÑ]/g, '');
+}
+
+if (fecha) {
+fecha = fecha.replace(/[\/\\-]/g, '').replace(/\s+/g, '_');
+}
+
+const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+const parts = ['INVESTIGACION'];
+if (workerName) parts.push(workerName);
+parts.push(today);
+filenameInput.value = parts.join('_');
+updateSaveBtnState();
+}
+
+function updateSaveBtnState() {
+const hasFilename = filenameInput.value.trim().length > 0;
+const hasPath = currentPath.length > 0;
+saveBtn.disabled = !(hasFilename && hasPath);
+}
+
+async function _handleGoUp() {
+if (!currentPath) return;
+const sep = currentPath.includes('/') ? '/' : '\\';
+const parts = currentPath.replace(/[/\\]+$/, '').split(sep);
+if (parts.length <= 1) return;
+parts.pop();
+const parentPath = parts.join(sep);
+if (parentPath.length < 3) return;
+await navigateTo(parentPath + (parentPath.match(/^[A-Za-z]:$/) ? '\\' : ''));
+}
+
+async function _handleBrowseNative() {
+try {
+const result = await callParentAPI('select-directory', {});
+if (result && result.success && result.data && result.data.path) {
+await navigateTo(result.data.path);
+}
+} catch (err) {
+showToast('Error', 'No se pudo abrir el selector de carpeta.', 'error');
+}
+}
+
+function _showCreateFolderInput() {
+isCreatingFolder = true;
+isRenaming = false;
+newItemArea.classList.remove('hidden');
+newItemInput.value = '';
+newItemInput.placeholder = 'Nombre de la nueva carpeta';
+newItemInput.focus();
+}
+
+function _hideNewItemArea() {
+isCreatingFolder = false;
+newItemArea.classList.add('hidden');
+newItemInput.value = '';
+}
+
+async function _confirmCreateFolder() {
+const folderName = newItemInput.value.trim();
+if (!folderName) {
+showToast('Error', 'El nombre de la carpeta no puede estar vacío.', 'error');
+return;
+}
+try {
+const result = await callParentAPI('create-folder', { parentPath: currentPath, folderName });
+if (result && result.success) {
+showToast('Carpeta creada', `"${folderName}" creada exitosamente.`, 'success');
+_hideNewItemArea();
+await navigateTo(currentPath);
+} else {
+const errMsg = (result && result.error && result.error.message) || 'No se pudo crear la carpeta.';
+showToast('Error', errMsg, 'error');
+}
+} catch (err) {
+showToast('Error', `No se pudo crear la carpeta: ${err.message}`, 'error');
+}
+}
+
+function _startRename() {
+if (!selectedItem || !selectedItem.el) return;
+isRenaming = true;
+isCreatingFolder = false;
+newItemArea.classList.add('hidden');
+
+const nameSpan = selectedItem.el.querySelector('.save-modal-folder-item-name');
+if (!nameSpan) return;
+
+const currentName = selectedItem.name || nameSpan.textContent;
+const input = document.createElement('input');
+input.type = 'text';
+input.className = 'save-modal-rename-input';
+input.value = currentName;
+
+nameSpan.replaceWith(input);
+input.focus();
+input.select();
+
+const finishRename = async () => {
+const newName = input.value.trim();
+if (!newName || newName === currentName) {
+_cancelRename(input, currentName);
+return;
+}
+try {
+const result = await callParentAPI('rename-item', { itemPath: selectedItem.path, newName });
+if (result && result.success) {
+showToast('Renombrado', `"${currentName}" → "${newName}"`, 'success');
+await navigateTo(currentPath);
+} else if (result && result.error) {
+const code = result.error.code;
+if (code === 'EEXIST') {
+showToast('Error', `Ya existe un elemento llamado "${newName}".`, 'error');
+} else {
+showToast('Error', result.error.message || 'No se pudo renombrar.', 'error');
+}
+_cancelRename(input, currentName);
+}
+} catch (err) {
+showToast('Error', `No se pudo renombrar: ${err.message}`, 'error');
+_cancelRename(input, currentName);
+}
+isRenaming = false;
+};
+
+const cancelRename = () => {
+_cancelRename(input, currentName);
+isRenaming = false;
+};
+
+input.addEventListener('keydown', (e) => {
+if (e.key === 'Enter') { e.preventDefault(); finishRename(); }
+else if (e.key === 'Escape') { e.preventDefault(); cancelRename(); }
+});
+input.addEventListener('blur', finishRename);
+}
+
+function _cancelRename(inputEl, originalName) {
+const span = document.createElement('span');
+span.className = 'save-modal-folder-item-name';
+span.textContent = originalName;
+inputEl.replaceWith(span);
+}
+
+async function _handleDelete() {
+if (!selectedItem) return;
+const name = selectedItem.name || 'este elemento';
+const typeLabel = selectedItem.isDirectory ? 'la carpeta' : 'el archivo';
+showToast('Eliminando', `Moviendo ${typeLabel} "${name}" a la papelera...`, 'warning');
+
+try {
+const apiType = selectedItem.isDirectory ? 'delete-folder' : 'delete-document';
+const payload = selectedItem.isDirectory
+? { folderPath: selectedItem.path }
+: { documentPath: selectedItem.path };
+
+const result = await callParentAPI(apiType, payload);
+if (result && result.success) {
+showToast('Eliminado', `"${name}" movido a la papelera.`, 'success');
+selectedItem = null;
+renameBtn.disabled = true;
+deleteBtn.disabled = true;
+await navigateTo(currentPath);
+} else {
+showToast('Error', 'No se pudo eliminar el elemento.', 'error');
+}
+} catch (err) {
+showToast('Error', `No se pudo eliminar: ${err.message}`, 'error');
+}
+}
+
+async function _handleSave() {
+const filename = filenameInput.value.trim();
+if (!filename) {
+showToast('Error', 'Ingresa un nombre para el informe.', 'error');
+return;
+}
+
+saveBtn.disabled = true;
+saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generando...';
+progressArea.classList.remove('hidden');
+updateProgressBar(80, 'Generando informe de investigación...');
+logActivity('info', 'Generando informe en: ' + currentPath + ' → ' + filename + '.docx');
+
+try {
+let actualExtractedData = extractedData;
+if (extractedData && extractedData.success === true && extractedData.data) {
+actualExtractedData = extractedData.data;
+if (actualExtractedData && actualExtractedData.success === true && actualExtractedData.data) {
+actualExtractedData = actualExtractedData.data;
+}
+}
+
+let actualAnalysis = analysisResult;
+if (analysisResult && analysisResult.success === true && analysisResult.analysis) {
+actualAnalysis = analysisResult.analysis;
+}
+
+const combinedData = {
+...actualExtractedData,
+analysis: actualAnalysis,
+empresa: currentEmpresa,
+_outputDir: currentPath,
+_outputFilename: filename
+};
+
+console.log('[SaveModal] combinedData with output:', { _outputDir: currentPath, _outputFilename: filename });
+
+let api = window.electronAPI;
+if (!api) {
+api = {
+generateAccidentReport: async (combinedData) => {
+return await callParentAPI('generate-accident-report', combinedData);
+}
+};
+}
+
+const reportResult = await api.generateAccidentReport(combinedData);
+
+if (reportResult && reportResult.documentPath) {
+logActivity('success', `Informe generado: ${reportResult.documentPath}`);
+showToast('Informe generado', `Guardado en: ${reportResult.documentPath}`, 'success');
+
+const downloadBtn = document.getElementById('downloadBtn');
+const printBtn = document.getElementById('printBtn');
+if (downloadBtn) downloadBtn.disabled = false;
+if (printBtn) printBtn.disabled = false;
+
+updateStepStatus(5, 'completed');
+close();
+} else {
+logActivity('warn', 'El informe se generó pero no se recibió la ruta del documento');
+showToast('Advertencia', 'El informe se generó pero no se recibió la ruta.', 'warning');
+updateStepStatus(5, 'completed');
+close();
+}
+} catch (reportError) {
+console.error('[SaveModal] Error generando informe:', reportError);
+logActivity('error', `Error generando informe: ${reportError.message}`);
+showToast('Error en informe', `Error al generar: ${reportError.message}`, 'error');
+} finally {
+saveBtn.disabled = false;
+saveBtn.innerHTML = '<i class="fas fa-save"></i> Guardar Informe';
+updateSaveBtnState();
+progressArea.classList.add('hidden');
+}
+}
+
+// ── Event bindings ──
+if (closeBtn) closeBtn.addEventListener('click', close);
+if (cancelBtn) cancelBtn.addEventListener('click', close);
+if (overlay) overlay.addEventListener('click', close);
+if (goUpBtn) goUpBtn.addEventListener('click', _handleGoUp);
+if (browseNativeBtn) browseNativeBtn.addEventListener('click', _handleBrowseNative);
+if (newFolderBtn) newFolderBtn.addEventListener('click', _showCreateFolderInput);
+if (renameBtn) renameBtn.addEventListener('click', _startRename);
+if (deleteBtn) deleteBtn.addEventListener('click', _handleDelete);
+if (saveBtn) saveBtn.addEventListener('click', _handleSave);
+if (newItemConfirm) newItemConfirm.addEventListener('click', _confirmCreateFolder);
+if (newItemCancel) newItemCancel.addEventListener('click', _hideNewItemArea);
+if (filenameInput) filenameInput.addEventListener('input', updateSaveBtnState);
+
+if (newItemInput) {
+newItemInput.addEventListener('keydown', (e) => {
+if (e.key === 'Enter') { e.preventDefault(); _confirmCreateFolder(); }
+else if (e.key === 'Escape') { e.preventDefault(); _hideNewItemArea(); }
+});
+}
+
+document.addEventListener('keydown', (e) => {
+if (modal.classList.contains('hidden')) return;
+if (e.key === 'Escape' && !isRenaming && !isCreatingFolder) { close(); }
+});
+
+return { open, close, navigateTo };
+  })();
+
+  // ── Auto-carga desde "Iniciar Investigación" en el listado ──────────────
+  // Si se llegó aquí desde investigaciones-viewer.js con un caso y/o FURAT
+  // pre-seleccionado, pre-poblar el formulario y disparar el procesamiento.
     if (urlFuratPath) {
         const autoFilename = urlFuratPath.split('\\').pop().split('/').pop();
         selectedPdfPath = urlFuratPath;
