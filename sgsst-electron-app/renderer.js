@@ -1085,9 +1085,9 @@ case 'investigacion-accidentes-get-investigation-detail-request':
       apiCallArgs = [payload.companyName, payload.investigationName];
       responseType = 'investigacion-accidentes-get-investigation-detail-response';
       break;
-    case 'investigacion-accidentes-read-directory-request':
-      apiCallFunction = window.electronAPI.readDirectory;
-      apiCallArgs = [payload.directoryPath];
+case 'investigacion-accidentes-read-directory-request':
+                    apiCallFunction = window.electronAPI.readDirectory;
+                    apiCallArgs = [payload.path];
       responseType = 'investigacion-accidentes-read-directory-request-response';
       break;
     case 'investigacion-accidentes-create-folder-request':
