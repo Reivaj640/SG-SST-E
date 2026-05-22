@@ -4,6 +4,7 @@
 var investigations = [];
 var filteredInvestigations = [];
 var currentFilter = 'todas';
+var currentYear = 'todos';
 var searchQuery = '';
 var companyName = '';
 var moduleName = '';
@@ -129,11 +130,10 @@ loadAllData();
 async function loadAllData() {
 showLoading();
 try {
-var results = await Promise.allSettled([
-loadStats(),
-loadInvestigations(),
-loadCrossReferenceData()
-]);
+    var results = await Promise.allSettled([
+      loadInvestigations(),
+      loadCrossReferenceData()
+    ]);
 results.forEach(function(r, i) {
 if (r.status === 'rejected') {
 console.warn('[INV-MGR] Error parcial (op ' + i + '):', r.reason);
@@ -147,30 +147,18 @@ hideLoading();
 }
 }
 
-async function loadStats() {
-try {
-var result = await callParentAPI('investigacion-accidentes-get-stats', { companyName: companyName });
-if (result && result.data) {
-document.getElementById('statTotal').textContent = result.data.total;
-document.getElementById('statPendientes').textContent = result.data.pendientes;
-document.getElementById('statCompletadas').textContent = result.data.completadas;
-}
-} catch (error) {
-console.warn('[INV-MGR] No se pudieron cargar estadísticas:', error.message);
-}
-}
-
-async function loadInvestigations() {
+  async function loadInvestigations() {
 try {
 var result = await callParentAPI('investigacion-accidentes-list-investigations', {
 companyName: companyName,
 filter: 'todas'
 });
-if (result && result.data) {
-investigations = result.data;
-} else {
-investigations = [];
-}
+    if (result && result.data) {
+      investigations = result.data;
+      populateYearFilter();
+    } else {
+      investigations = [];
+    }
 applyFilters();
 } catch (error) {
 console.error('[INV-MGR] Error cargando investigaciones:', error.message);
@@ -189,24 +177,46 @@ renderXrefPanel(xrefData);
 } catch (error) {
 console.error('[INV-MGR] Error cargando xref:', error.message);
 showToast('Error', 'No se pudieron cargar los datos de referencia cruzada.', 'error');
-}
-}
+  }
+  }
 
-function updateStats() {
-var pendientes = investigations.filter(function(i) { return i.estado === 'pendiente'; }).length;
-var completadas = investigations.filter(function(i) { return i.estado === 'completada'; }).length;
-document.getElementById('statTotal').textContent = investigations.length;
-document.getElementById('statPendientes').textContent = pendientes;
-document.getElementById('statCompletadas').textContent = completadas;
-updateFilterCounts();
-}
+  function populateYearFilter() {
+    var select = document.getElementById('yearFilter');
+    if (!select) return;
+    var years = [];
+    var seen = {};
+    investigations.forEach(function(inv) {
+      if (inv.año != null && !seen[inv.año]) {
+        seen[inv.año] = true;
+        years.push(inv.año);
+      }
+    });
+    years.sort(function(a, b) { return b - a; });
+    var currentVal = select.value;
+    select.innerHTML = '<option value="todos">Todos los años</option>';
+    years.forEach(function(y) {
+      var opt = document.createElement('option');
+      opt.value = y;
+      opt.textContent = y;
+      select.appendChild(opt);
+    });
+    if (currentVal && years.indexOf(parseInt(currentVal, 10)) !== -1) {
+      select.value = currentVal;
+    } else {
+      select.value = 'todos';
+      currentYear = 'todos';
+    }
+  }
 
-function updateFilterCounts() {
-var counts = { todas: investigations.length, pendiente: 0, completada: 0 };
-investigations.forEach(function(inv) {
-if (inv.estado === 'pendiente') counts.pendiente++;
-else if (inv.estado === 'completada') counts.completada++;
-});
+  function updateFilterCounts() {
+  var yearInvestigations = investigations.filter(function(inv) {
+    return currentYear === 'todos' || inv.año === currentYear;
+  });
+  var counts = { todas: yearInvestigations.length, pendiente: 0, completada: 0 };
+  yearInvestigations.forEach(function(inv) {
+    if (inv.estado === 'pendiente') counts.pendiente++;
+    else if (inv.estado === 'completada') counts.completada++;
+  });
 
 document.querySelectorAll('.inv-filter-btn[data-filter]').forEach(function(btn) {
 var filter = btn.dataset.filter;
@@ -225,11 +235,14 @@ btn.appendChild(badge);
 }
 
 function applyFilters() {
-filteredInvestigations = investigations.filter(function(inv) {
-if (currentFilter !== 'todas' && inv.estado !== currentFilter) {
-return false;
-}
-if (searchQuery) {
+  filteredInvestigations = investigations.filter(function(inv) {
+    if (currentFilter !== 'todas' && inv.estado !== currentFilter) {
+      return false;
+    }
+    if (currentYear !== 'todos' && inv.año !== currentYear) {
+      return false;
+    }
+    if (searchQuery) {
 var query = searchQuery.toLowerCase();
 var matchName = inv.nombre.toLowerCase().includes(query);
 var matchFiles = inv.archivos && inv.archivos.some(function(f) {
@@ -239,8 +252,8 @@ return matchName || matchFiles;
 }
 return true;
 });
-renderInvestigations(filteredInvestigations);
-updateStats();
+  renderInvestigations(filteredInvestigations);
+  updateFilterCounts();
 }
 
 function renderInvestigations(items) {
@@ -617,7 +630,7 @@ return labels[estado] || estado;
 
 function setupEventListeners() {
 document.getElementById('backBtn').addEventListener('click', function() {
-window.parent.postMessage({ type: 'back-to-module-request' }, '*');
+    window.parent.postMessage({ type: 'back-to-investigacion-home' }, '*');
 });
 
 document.getElementById('refreshBtn').addEventListener('click', function() {
@@ -638,14 +651,19 @@ showToast('Error', 'No se pudo actualizar la lista.', 'error');
 });
 });
 
-document.querySelectorAll('.inv-filter-btn[data-filter]').forEach(function(btn) {
-btn.addEventListener('click', function() {
-document.querySelectorAll('.inv-filter-btn[data-filter]').forEach(function(b) { b.classList.remove('active'); });
-this.classList.add('active');
-currentFilter = this.dataset.filter;
-applyFilters();
-});
-});
+  document.querySelectorAll('.inv-filter-btn[data-filter]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.inv-filter-btn[data-filter]').forEach(function(b) { b.classList.remove('active'); });
+      this.classList.add('active');
+      currentFilter = this.dataset.filter;
+      applyFilters();
+    });
+  });
+
+  document.getElementById('yearFilter').addEventListener('change', function() {
+    currentYear = this.value === 'todos' ? 'todos' : parseInt(this.value, 10);
+    applyFilters();
+  });
 
 document.getElementById('xrefToggleBtn').addEventListener('click', function() {
 var xrefPanel = document.getElementById('xrefPanel');
@@ -1027,16 +1045,16 @@ return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
 function formatDate(isoString) {
-try {
-var date = new Date(isoString);
-return date.toLocaleDateString('es-CO', {
-day: '2-digit',
-month: 'short',
-year: 'numeric'
-});
-} catch (e) {
-return isoString;
-}
+  try {
+    var date = new Date(isoString);
+    var formatted = date.toLocaleDateString('es-CO', {
+      month: 'long',
+      year: 'numeric'
+    });
+    return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+  } catch (e) {
+    return isoString;
+  }
 }
 
 function escapeHtml(unsafe) {

@@ -707,6 +707,52 @@ transition: var(--inv-transition);
 
 .inv-search-clear:hover { color: var(--inv-danger); }
 
+.inv-year-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.inv-year-icon {
+  position: absolute;
+  left: 0.75rem;
+  color: var(--inv-text-muted);
+  font-size: 0.8125rem;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.inv-year-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0.4375rem 2rem 0.4375rem 2.25rem;
+  border: 1px solid var(--inv-border);
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-family: inherit;
+  background-color: var(--inv-bg-surface);
+  color: var(--inv-text-primary);
+  cursor: pointer;
+  transition: var(--inv-transition);
+  outline: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 5l3 3 3-3' fill='none' stroke='%23718096' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.625rem center;
+  background-size: 12px;
+}
+
+.inv-year-select:focus {
+  border-color: var(--inv-primary);
+  box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.1);
+  background-color: var(--inv-bg-card);
+}
+
+.inv-year-select:hover {
+  border-color: var(--inv-primary);
+  background-color: var(--inv-primary-light);
+}
+
 .inv-view-toggle {
 width: 2.25rem;
 height: 2.25rem;
@@ -1909,25 +1955,26 @@ RESPONSIVE — 768px and 480px breakpoints
 .kair-header__bar { padding: 0 1rem; }
 .kair-header__title { font-size: 1rem; }
 
-.inv-body { padding: 1rem; }
+  .inv-body { padding: 1rem; }
 
-.inv-stats-bar {
-grid-template-columns: repeat(2, 1fr);
-gap: 0.75rem;
-}
-
-.inv-stat-card { padding: 0.875rem 1rem; }
-
-.inv-filter-bar {
+  .inv-filter-bar {
 flex-wrap: wrap;
 gap: 0.5rem;
 }
 
-.inv-filter-buttons {
-width: 100%;
-overflow-x: auto;
-padding-bottom: 0.25rem;
-}
+  .inv-filter-buttons {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+  }
+
+  .inv-year-wrapper {
+    width: 100%;
+  }
+
+  .inv-year-select {
+    width: 100%;
+  }
 
 .inv-search-wrapper {
 width: 100%;
@@ -1971,18 +2018,9 @@ padding: 0.375rem 0.625rem;
 font-size: 0.75rem;
 }
 
-.inv-card__main { padding: 0.75rem; }
+  .inv-card__main { padding: 0.75rem; }
 
-.inv-stats-bar {
-grid-template-columns: 1fr 1fr;
-gap: 0.5rem;
-}
-
-.inv-stat-card { padding: 0.75rem; }
-
-.inv-stat-value { font-size: 1.25rem; }
-
-.inv-card__status-col {
+  .inv-card__status-col {
 min-width: 6rem;
 }
 }

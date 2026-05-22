@@ -908,6 +908,16 @@ function _extractYearFromPath(relativePath) {
   return null;
 }
 
+function _buildDateFromPath(relativePath) {
+  const year = _extractYearFromPath(relativePath);
+  const month = _extractMonthFromPath(relativePath);
+  if (year) {
+    const monthNum = month ? month.number - 1 : 0;
+    return new Date(year, monthNum, 1);
+  }
+  return null;
+}
+
 function _extractMonthFromPath(relativePath) {
   const parts = relativePath.replace(/\\/g, '/').split('/');
   for (const part of parts) {
@@ -1481,7 +1491,7 @@ ipcMain.handle('investigacion-accidentes-list-investigations', async (event, { c
             archivos,
             hasInformeFinal,
             estado: hasInformeFinal ? 'completada' : 'pendiente',
-            fechaReal: _extractFuratDate(inv.name) || (inv.isFolder ? (() => { try { return fs.statSync(inv.fullPath).mtime; } catch(_) { return new Date(); } })() : new Date())
+            fechaReal: _extractFuratDate(inv.name) || _buildDateFromPath(inv.relativePath)
           });
         }
 
@@ -1526,21 +1536,17 @@ ipcMain.handle('investigacion-accidentes-list-investigations', async (event, { c
           const invMatch = invByName.get(key);
           let estado = 'pendiente';
           let allArchivos = [...archivos];
-          let fecha = fechaReal;
+    let fecha = fechaReal || _buildDateFromPath(furat.relativePath);
 
-          if (invMatch) {
-            if (invMatch.hasInformeFinal) {
-              estado = 'completada';
-            }
-            // Agregar archivos de la investigación al FURAT
-            allArchivos = [...allArchivos, ...invMatch.archivos];
-            if (!fecha && invMatch.fechaReal) fecha = invMatch.fechaReal;
-          }
+    if (invMatch) {
+      if (invMatch.hasInformeFinal) {
+        estado = 'completada';
+      }
+      allArchivos = [...allArchivos, ...invMatch.archivos];
+      if (!fecha && invMatch.fechaReal) fecha = invMatch.fechaReal;
+    }
 
-          if (!fecha && allArchivos.length > 0) {
-            fecha = new Date(allArchivos[0].modified);
-          }
-          if (!fecha) fecha = new Date();
+    if (!fecha) fecha = new Date();
 
           investigations.set(key, {
             id: `inv-${furat.name.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}`,
@@ -1560,9 +1566,8 @@ ipcMain.handle('investigacion-accidentes-list-investigations', async (event, { c
         // Segundo: agregar investigaciones que NO tuvieron FURAT (raras, pero posibles)
         for (const [key, inv] of invByName) {
           if (!investigations.has(key)) {
-            let fecha = inv.fechaReal;
-            if (!fecha && inv.archivos.length > 0) fecha = new Date(inv.archivos[0].modified);
-            if (!fecha) fecha = new Date();
+    let fecha = inv.fechaReal || _buildDateFromPath(inv.relativePath);
+    if (!fecha) fecha = new Date();
 
             investigations.set(key, {
               id: `inv-${inv.name.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}`,

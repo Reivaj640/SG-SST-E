@@ -17,9 +17,13 @@ class InvestigacionAccidentesComponent {
         this.openDocument = this.openDocument.bind(this);
     }
 
-    render() {
-        this.container.innerHTML = '';
-        window.currentInvestigacionAccidentesComponent = this;
+  render() {
+    if (this._iframeMessageHandler) {
+      window.removeEventListener('message', this._iframeMessageHandler);
+      this._iframeMessageHandler = null;
+    }
+    this.container.innerHTML = '';
+    window.currentInvestigacionAccidentesComponent = this;
 
         // Crear el contenedor principal
         const mainContainer = document.createElement('div');
@@ -203,8 +207,12 @@ class InvestigacionAccidentesComponent {
         this.showModernInvestigationInterface();
     }
 
-    showModernInvestigationInterface(investigacionNombre, furatPath) {
-        this.container.innerHTML = '';
+  showModernInvestigationInterface(investigacionNombre, furatPath) {
+    if (this._portalMessageHandler) {
+      window.removeEventListener('message', this._portalMessageHandler);
+      this._portalMessageHandler = null;
+    }
+    this.container.innerHTML = '';
 
         const iframe = document.createElement('iframe');
         let src = `./modules/gestion-salud/investigacion-accidentes/investigacion-accidentes-view.html?company=${encodeURIComponent(this.currentCompany)}`;
@@ -237,7 +245,7 @@ class InvestigacionAccidentesComponent {
 
             const { type } = event.data;
 
-            if (type === 'goBack' || type === 'back-to-module-request') {
+            if (type === 'goBack' || type === 'back-to-module-request' || type === 'back-to-investigacion-home') {
                 this.currentView = 'main';
                 this.render();
             } else if (type === 'iniciar-investigacion-desde-viewer') {
@@ -542,7 +550,11 @@ class InvestigacionAccidentesComponent {
 
 // Definir el método showNewDocumentViewer correctamente como método del prototipo
 InvestigacionAccidentesComponent.prototype.showNewDocumentViewer = function() {
-    this.container.innerHTML = '';
+  if (this._portalMessageHandler) {
+    window.removeEventListener('message', this._portalMessageHandler);
+    this._portalMessageHandler = null;
+  }
+  this.container.innerHTML = '';
 
     // Crear un contenedor superior con botón de volver
     const header = document.createElement('div');
@@ -581,8 +593,9 @@ InvestigacionAccidentesComponent.prototype.showNewDocumentViewer = function() {
     const viewerUrl = `./modules/gestion-salud/investigacion-accidentes/investigaciones-view.html?company=${encodeURIComponent(this.currentCompany)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
     iframe.src = viewerUrl;
 
-    this.container.appendChild(header);
-    this.container.appendChild(iframe);
+  this.container.appendChild(header);
+  this.container.appendChild(iframe);
+  this.setupIframeCommunication(iframe);
 };
 
 // Hacer la clase disponible globalmente

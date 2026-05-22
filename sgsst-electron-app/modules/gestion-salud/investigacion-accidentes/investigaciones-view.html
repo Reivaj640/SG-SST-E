@@ -49,25 +49,6 @@ Gestión de Investigaciones
 <!-- Contenido principal con scroll -->
 <div class="inv-body">
 
-<!-- Stats Bar — Total, Pending, Process, Completed -->
-<div class="inv-stats-bar" id="statsBar">
-<div class="inv-stat-card">
-<div class="inv-stat-icon inv-stat-icon--total"><i class="fas fa-folder-open"></i></div>
-<div class="inv-stat-value inv-stat-value--total" id="statTotal">0</div>
-<div class="inv-stat-label">Total FURATs (3.2.1)</div>
-</div>
-<div class="inv-stat-card">
-<div class="inv-stat-icon inv-stat-icon--pending"><i class="fas fa-clock"></i></div>
-<div class="inv-stat-value inv-stat-value--pending" id="statPendientes">0</div>
-<div class="inv-stat-label">Pendientes</div>
-</div>
-<div class="inv-stat-card">
-<div class="inv-stat-icon inv-stat-icon--completed"><i class="fas fa-check-circle"></i></div>
-<div class="inv-stat-value inv-stat-value--completed" id="statCompletadas">0</div>
-<div class="inv-stat-label">Completadas</div>
-</div>
-</div>
-
 <!-- XRef Panel — collapsed by default -->
 <div class="inv-xref-panel" id="xrefPanel">
 <div class="inv-xref-icon"><i class="fas fa-exchange-alt"></i></div>
@@ -104,12 +85,18 @@ Gestión de Investigaciones
 
 <!-- Filter Bar — filter-buttons + search + view-toggle -->
 <div class="inv-filter-bar">
-<div class="inv-filter-buttons" id="filterButtons">
-<button class="inv-filter-btn active" data-filter="todas"><i class="fas fa-layer-group"></i> Todas</button>
-<button class="inv-filter-btn" data-filter="pendiente"><i class="fas fa-clock"></i> Pendientes</button>
-<button class="inv-filter-btn" data-filter="completada"><i class="fas fa-check-double"></i> Completadas</button>
-</div>
-<div class="inv-search-wrapper">
+    <div class="inv-filter-buttons" id="filterButtons">
+      <button class="inv-filter-btn active" data-filter="todas"><i class="fas fa-layer-group"></i> Todas</button>
+      <button class="inv-filter-btn" data-filter="pendiente"><i class="fas fa-clock"></i> Pendientes</button>
+      <button class="inv-filter-btn" data-filter="completada"><i class="fas fa-check-double"></i> Completadas</button>
+    </div>
+    <div class="inv-year-wrapper">
+      <i class="fas fa-calendar-alt inv-year-icon"></i>
+      <select id="yearFilter" class="inv-year-select">
+        <option value="todos">Todos los años</option>
+      </select>
+    </div>
+    <div class="inv-search-wrapper">
 <i class="fas fa-search inv-search-icon"></i>
 <input type="text" id="searchInput" placeholder="Buscar por nombre..." class="inv-search-input">
 <button id="clearSearchBtn" class="inv-search-clear hidden" title="Limpiar"><i class="fas fa-times"></i></button>
