@@ -1041,7 +1041,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                   // Manejar solicitud para guardar archivo PDF temporalmente
                   apiCallFunction = window.electronAPI.saveTempPdfFile;
                   apiCallArgs = [payload.filename, payload.data];
-                  responseType = 'investigacion-accidentes-save-temp-pdf-file-request-response';
+                  responseType = 'investigacion-accidentes-save-temp-pdf-file-response';
                   break;
               case 'investigacion-accidentes-process-accident-pdf-request':
                   // Manejar solicitud para procesar PDF de accidente
@@ -1080,10 +1080,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                   apiCallArgs = [payload.companyName, payload.filter];
                   responseType = 'investigacion-accidentes-list-investigations-response';
                   break;
-case 'investigacion-accidentes-get-investigation-detail-request':
+    case 'investigacion-accidentes-get-investigation-detail-request':
       apiCallFunction = window.electronAPI.getInvestigationDetail;
       apiCallArgs = [payload.companyName, payload.investigationName];
       responseType = 'investigacion-accidentes-get-investigation-detail-response';
+      break;
+    case 'investigacion-accidentes-cross-reference-data-request':
+      apiCallFunction = window.electronAPI.getCrossReferenceData;
+      apiCallArgs = [payload.companyName];
+      responseType = 'investigacion-accidentes-cross-reference-data-response';
       break;
 case 'investigacion-accidentes-read-directory-request':
                     apiCallFunction = window.electronAPI.readDirectory;
@@ -1126,15 +1131,14 @@ case 'investigacion-accidentes-read-directory-request':
                       if (!portalCompany) {
                           targetWindow.postMessage({
                               type: responseType,
-                              payload: { pendientes: 0, completadas: 0, total: 0 },
-                              requestId: requestId
-                          }, '*');
-                          return;
-                      }
+      payload: { pendientes: 0, completadas: 0, total: 0 },
+      requestId: requestId
+    }, '*');
+    return;
+  }
 
-                      // Llamar al handler y unwrap del resultado
-                      const statsResult = await window.electronAPI.getInvestigacionStats(portalCompany);
-                      const statsData = (statsResult && statsResult.data) ? statsResult.data : { pendientes: 0, completadas: 0, total: 0 };
+  const statsResult = await window.electronAPI.getInvestigacionStats(portalCompany);
+  const statsData = (statsResult && statsResult.data) ? statsResult.data : { pendientes: 0, completadas: 0, total: 0 };
 
                       targetWindow.postMessage({
                           type: 'get-investigacion-stats-response',
@@ -1146,12 +1150,12 @@ case 'investigacion-accidentes-read-directory-request':
                       console.error('[RENDERER] Error en get-investigacion-stats:', e);
                       targetWindow.postMessage({
                           type: 'get-investigacion-stats-response',
-                          payload: { pendientes: 0, completadas: 0, total: 0 },
-                          requestId: requestId
-                      }, '*');
-                      return;
-                  }
-                  break;
+      payload: { pendientes: 0, completadas: 0, total: 0 },
+      requestId: requestId
+    }, '*');
+    return;
+  }
+  break;
               case 'iframe-debug-log':
                   // Logs de debug del iframe
                   const { message, data } = payload || {};
@@ -1249,12 +1253,13 @@ case 'investigacion-accidentes-read-directory-request':
                   targetWindowClosed: targetWindow?.closed
               });
               
-              targetWindow.postMessage({
-                  type: responseType,
-                  success: result.success,
-                  payload: result,
-                  requestId: requestId
-              }, '*');
+      targetWindow.postMessage({
+        type: responseType,
+        success: result.success,
+        payload: result,
+        error: result.error || null,
+        requestId: requestId
+      }, '*');
               
               console.log('[DEBUG] Respuesta enviada a iframe');
           } catch (error) {
@@ -1284,11 +1289,13 @@ case 'investigacion-accidentes-read-directory-request':
           // Solo intentar enviar error si el targetWindow está disponible
           try {
               if (targetWindow && !targetWindow.closed) {
-                  targetWindow.postMessage({
-                      type: responseType,
-                      payload: { success: false, error: error.message || 'Error desconocido' },
-                      requestId: requestId
-                  }, '*');
+          targetWindow.postMessage({
+            type: responseType,
+            success: false,
+            error: { code: 'HANDLER_ERROR', message: error.message || 'Error desconocido' },
+            payload: { success: false, error: error.message || 'Error desconocido' },
+            requestId: requestId
+          }, '*');
               }
           } catch (e) {
               console.warn(`RENDERER: No se pudo enviar mensaje de error para ${type}`);

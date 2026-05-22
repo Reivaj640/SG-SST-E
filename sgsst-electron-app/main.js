@@ -2543,19 +2543,45 @@ ipcMain.handle('map-directory', async (event, directoryPath) => {
 // Manejar lectura de contenido de directorio
 ipcMain.handle('read-directory', async (event, directoryPath) => {
   try {
+    if (directoryPath === 'DRIVES') {
+      const { execSync } = require('child_process');
+      const output = execSync('wmic logicaldisk get name,description', { encoding: 'utf8' });
+      const folders = [];
+      const lines = output.trim().split('\n').slice(1);
+      for (const line of lines) {
+        const match = line.trim().match(/^(.+?)\s+([A-Za-z]:)$/);
+        if (match) {
+          const description = match[1].trim();
+          const driveLetter = match[2].trim();
+          folders.push({
+            name: `${driveLetter}  ${description}`,
+            path: driveLetter + '\\',
+            isDrive: true,
+          });
+        }
+      }
+      folders.sort((a, b) => a.path.localeCompare(b.path));
+      console.log('Drives listed successfully');
+      return { success: true, path: 'DRIVES', files: [], folders: folders };
+    }
+
+    if (!directoryPath || directoryPath.trim() === '') {
+      directoryPath = app.getPath('home');
+    }
     console.log('Reading directory:', directoryPath);
     const items = await fsp.readdir(directoryPath, { withFileTypes: true });
 
     const files = [];
     const folders = [];
     for (const item of items) {
-      const itemPath = path.join(directoryPath, item.name);
-      if (item.isDirectory()) {
+      try {
+        const itemPath = path.join(directoryPath, item.name);
+        if (item.isDirectory()) {
           folders.push({
-              name: item.name,
-              path: itemPath,
+            name: item.name,
+            path: itemPath,
           });
-      } else {
+        } else {
           const stats = await fsp.stat(itemPath);
           files.push({
             name: item.name,
@@ -2564,14 +2590,18 @@ ipcMain.handle('read-directory', async (event, directoryPath) => {
             modified: stats.mtime,
             extension: path.extname(item.name).substring(1)
           });
+        }
+      } catch (itemError) {
+        if (itemError.code === 'EPERM' || itemError.code === 'EACCES' || itemError.code === 'ENOENT') continue;
+        throw itemError;
       }
     }
 
     console.log('Directory read successfully');
-    return { success: true, files: files, folders: folders }; // Devolver objeto estructurado
+    return { success: true, path: directoryPath, files: files, folders: folders };
   } catch (error) {
     console.error('Error reading directory:', error);
-    return { success: false, error: error.message }; // Devolver objeto de error
+    return { success: false, error: error.message };
   }
 });
 

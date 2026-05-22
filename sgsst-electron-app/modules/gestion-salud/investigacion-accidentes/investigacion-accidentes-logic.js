@@ -315,7 +315,7 @@ class InvestigacionAccidentesComponent {
             
             // Enviar respuesta al iframe
             iframe.contentWindow.postMessage({
-                type: 'investigacion-accidentes-save-temp-pdf-file-request-response',
+                type: 'investigacion-accidentes-save-temp-pdf-file-response',
                 requestId: requestId,
                 success: true,
                 payload: result
@@ -325,7 +325,7 @@ class InvestigacionAccidentesComponent {
             
             // Enviar error al iframe
             iframe.contentWindow.postMessage({
-                type: 'investigacion-accidentes-save-temp-pdf-file-request-response',
+                type: 'investigacion-accidentes-save-temp-pdf-file-response',
                 requestId: requestId,
                 success: false,
                 error: error.message

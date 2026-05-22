@@ -463,24 +463,24 @@ def main():
         if "combinedData" not in data:
             raise ValueError("No se encontraron 'combinedData' en el archivo JSON")
         combined_data = data["combinedData"]
-    empresa = data.get("empresa", "TEMPOACTIVA").upper()
-    logging.info(f"Procesando para empresa: {empresa}")
-    empresa_config = Config.RUTAS.get(empresa)
-    if not empresa_config:
-        raise ValueError(f"No se encontró configuración para la empresa: {empresa}")
-    template_path = Path(empresa_config.get("plantilla"))
-    preferred_output_dir = empresa_config.get("investigaciones")
+        empresa = data.get("empresa", "TEMPOACTIVA").upper()
+        logging.info(f"Procesando para empresa: {empresa}")
+        empresa_config = Config.RUTAS.get(empresa)
+        if not empresa_config:
+            raise ValueError(f"No se encontró configuración para la empresa: {empresa}")
+        template_path = Path(empresa_config.get("plantilla"))
+        preferred_output_dir = empresa_config.get("investigaciones")
 
-    # Override de ruta de salida si el usuario la eligió desde el modal
-    user_output_dir = data.get("outputDir")
-    user_output_filename = data.get("outputFilename")
-    if user_output_dir:
-        preferred_output_dir = user_output_dir
-        logging.info(f"Output dir override desde modal: {preferred_output_dir}")
-    if user_output_filename:
-        logging.info(f"Output filename override desde modal: {user_output_filename}")
+        # Override de ruta de salida si el usuario la eligió desde el modal
+        user_output_dir = data.get("outputDir")
+        user_output_filename = data.get("outputFilename")
+        if user_output_dir:
+            preferred_output_dir = user_output_dir
+            logging.info(f"Output dir override desde modal: {preferred_output_dir}")
+        if user_output_filename:
+            logging.info(f"Output filename override desde modal: {user_output_filename}")
 
-    if not template_path.exists():
+        if not template_path.exists():
             raise FileNotFoundError(f"Plantilla no encontrada en: {template_path}")
         if not preferred_output_dir:
             raise ValueError(
@@ -512,17 +512,17 @@ def main():
             re.sub(r"[^\w\s.-]", "", nombre_base).replace(" ", "_").replace("__", "_")
         )
 
-    fecha = datetime.now().strftime("%Y%m%d")
+        fecha = datetime.now().strftime("%Y%m%d")
 
-    # Lógica para añadir contador si el archivo ya existe
-    if user_output_filename:
-        output_filename = user_output_filename
-        if not output_filename.lower().endswith(".docx"):
-            output_filename += ".docx"
-        base_filename = output_filename.rsplit(".docx", 1)[0]
-    else:
-        base_filename = f"GI-FO-020_INVESTIGACION_{nombre_sanitizado}_{fecha}"
-        output_filename = f"{base_filename}.docx"
+        # Lógica para añadir contador si el archivo ya existe
+        if user_output_filename:
+            output_filename = user_output_filename
+            if not output_filename.lower().endswith(".docx"):
+                output_filename += ".docx"
+            base_filename = output_filename.rsplit(".docx", 1)[0]
+        else:
+            base_filename = f"GI-FO-020_INVESTIGACION_{nombre_sanitizado}_{fecha}"
+            output_filename = f"{base_filename}.docx"
 
         # Para la comprobación, usamos una ruta normalizada que Path.exists() pueda manejar
         # La función de guardado se encargará del prefijo \\?\ si es necesario

@@ -544,26 +544,27 @@ saveModal.open();
                     }
                     
                     // Manejar el caso especial para save-temp-pdf-file
-                    if (type === 'save-temp-pdf-file' && responseType === 'investigacion-accidentes-save-temp-pdf-file-request-response') {
+                    if (type === 'save-temp-pdf-file' && responseType === 'investigacion-accidentes-save-temp-pdf-file-response') {
                         // Limpiar el listener de eventos
                         window.removeEventListener('message', handleResponse);
                         
-                        if (response.success) {
-                            resolve(response.payload);
-                        } else {
-                            const errorMessage = response.error || 'Error desconocido desde la ventana padre';
-                            reject(new Error(errorMessage));
-                        }
-                    } else if (responseType === expectedResponseType) {
-                        // Limpiar el listener de eventos
-                        window.removeEventListener('message', handleResponse);
-                        
-                        if (response.success) {
-                            resolve(response.payload);
-                        } else {
-                            const errorMessage = response.error || 'Error desconocido desde la ventana padre';
-                            reject(new Error(errorMessage));
-                        }
+      if (response.success) {
+        resolve(response.payload);
+      } else {
+        const errObj = response.error;
+        const errorMessage = typeof errObj === 'string' ? errObj : (errObj?.message || errObj?.code || 'Error desconocido desde la ventana padre');
+        reject(new Error(errorMessage));
+      }
+    } else if (responseType === expectedResponseType) {
+      window.removeEventListener('message', handleResponse);
+
+      if (response.success) {
+        resolve(response.payload);
+      } else {
+        const errObj = response.error;
+        const errorMessage = typeof errObj === 'string' ? errObj : (errObj?.message || errObj?.code || 'Error desconocido desde la ventana padre');
+        reject(new Error(errorMessage));
+      }
                     }
                 } else if (responseType === `${type}-response`) {
                     // Limpiar el timeout si existe
@@ -1107,24 +1108,14 @@ selectedItem = null;
 }
 
 async function _navigateToDefault() {
-try {
-const result = await callParentAPI('read-directory', { path: '' });
-if (result && result.success && result.data) {
-const dirs = result.data.folders || [];
-const docsDir = dirs.find(f => f.name === 'Documentos' || f.name === 'Documents');
-if (docsDir) {
-await navigateTo(docsDir.path);
-return;
-}
-}
-const homeDir = (result && result.data && result.data.path) || '';
-if (homeDir) { await navigateTo(homeDir); }
-} catch (err) {
-console.warn('[SaveModal] Default path failed, trying C:', err);
-try { await navigateTo('C:\\'); } catch (e2) {
-folderListEl.innerHTML = '<div class="save-modal-empty"><i class="fas fa-exclamation-circle"></i> No se pudo cargar el directorio</div>';
-}
-}
+  try {
+    await navigateTo('DRIVES');
+  } catch (err) {
+    console.warn('[SaveModal] Default path failed, trying C:', err);
+    try { await navigateTo('C:\\'); } catch (e2) {
+      folderListEl.innerHTML = '<div class="save-modal-empty"><i class="fas fa-exclamation-circle"></i> No se pudo cargar el directorio</div>';
+    }
+  }
 }
 
 async function navigateTo(dirPath) {
@@ -1140,9 +1131,8 @@ if (!result || !result.success) {
 folderListEl.innerHTML = '<div class="save-modal-empty"><i class="fas fa-exclamation-circle"></i> Error al leer directorio</div>';
 return;
 }
-const data = result.data;
-_renderBreadcrumb(data.path || dirPath);
-_renderFolderList(data.folders || [], data.files || []);
+    _renderBreadcrumb(result.path || dirPath);
+    _renderFolderList(result.folders || [], result.files || []);
 } catch (err) {
 console.error('[SaveModal] read-directory error:', err);
 folderListEl.innerHTML = '<div class="save-modal-empty"><i class="fas fa-exclamation-circle"></i> Error al leer directorio</div>';
@@ -1150,62 +1140,48 @@ folderListEl.innerHTML = '<div class="save-modal-empty"><i class="fas fa-exclama
 }
 
 function _renderBreadcrumb(path) {
-breadcrumbEl.innerHTML = '';
-const parts = path.split(/[/\\]/).filter(Boolean);
-let accumulated = '';
+  breadcrumbEl.innerHTML = '';
 
-if (/^[A-Za-z]:/.test(path)) {
-accumulated = parts[0] + '\\';
-const rootItem = document.createElement('span');
-rootItem.className = 'save-modal-breadcrumb-item';
-rootItem.textContent = parts[0];
-rootItem.dataset.path = accumulated;
-rootItem.addEventListener('click', () => navigateTo(accumulated));
-breadcrumbEl.appendChild(rootItem);
+  function appendItem(text, navPath, isActive) {
+    const item = document.createElement('span');
+    item.className = 'save-modal-breadcrumb-item' + (isActive ? ' active' : '');
+    item.textContent = text;
+    item.dataset.path = navPath;
+    if (!isActive) item.addEventListener('click', () => navigateTo(navPath));
+    breadcrumbEl.appendChild(item);
+  }
 
-const sep0 = document.createElement('span');
-sep0.className = 'save-modal-breadcrumb-sep';
-sep0.textContent = '›';
-breadcrumbEl.appendChild(sep0);
+  function appendSep() {
+    const sep = document.createElement('span');
+    sep.className = 'save-modal-breadcrumb-sep';
+    sep.textContent = '›';
+    breadcrumbEl.appendChild(sep);
+  }
 
-for (let i = 1; i < parts.length; i++) {
-accumulated += parts[i] + '\\';
-const isLast = (i === parts.length - 1);
-const item = document.createElement('span');
-item.className = 'save-modal-breadcrumb-item' + (isLast ? ' active' : '');
-item.textContent = parts[i];
-item.dataset.path = accumulated;
-if (!isLast) item.addEventListener('click', () => navigateTo(accumulated));
-breadcrumbEl.appendChild(item);
+  if (path === 'DRIVES') {
+    appendItem('Este PC', 'DRIVES', true);
+  } else if (/^[A-Za-z]:/.test(path)) {
+    appendItem('Este PC', 'DRIVES', false);
+    appendSep();
+    const parts = path.split(/[/\\]/).filter(Boolean);
+    let accumulated = parts[0] + '\\';
+    appendItem(parts[0], accumulated, parts.length === 1);
+    for (let i = 1; i < parts.length; i++) {
+      accumulated += parts[i] + '\\';
+      appendSep();
+      appendItem(parts[i], accumulated, i === parts.length - 1);
+    }
+  } else {
+    const parts = path.split(/[/\\]/).filter(Boolean);
+    let accumulated = '';
+    for (let i = 0; i < parts.length; i++) {
+      accumulated += '/' + parts[i];
+      appendItem(parts[i], accumulated, i === parts.length - 1);
+      if (i < parts.length - 1) appendSep();
+    }
+  }
 
-if (!isLast) {
-const sep = document.createElement('span');
-sep.className = 'save-modal-breadcrumb-sep';
-sep.textContent = '›';
-breadcrumbEl.appendChild(sep);
-}
-}
-} else {
-for (let i = 0; i < parts.length; i++) {
-accumulated += (i > 0 ? '/' : '/') + parts[i];
-const isLast = (i === parts.length - 1);
-const item = document.createElement('span');
-item.className = 'save-modal-breadcrumb-item' + (isLast ? ' active' : '');
-item.textContent = parts[i];
-item.dataset.path = accumulated;
-if (!isLast) item.addEventListener('click', () => navigateTo(accumulated));
-breadcrumbEl.appendChild(item);
-
-if (!isLast) {
-const sep = document.createElement('span');
-sep.className = 'save-modal-breadcrumb-sep';
-sep.textContent = '›';
-breadcrumbEl.appendChild(sep);
-}
-}
-}
-
-breadcrumbEl.scrollLeft = breadcrumbEl.scrollWidth;
+  breadcrumbEl.scrollLeft = breadcrumbEl.scrollWidth;
 }
 
 function _renderFolderList(folders, files) {
@@ -1219,20 +1195,22 @@ return;
 folders.sort((a, b) => a.name.localeCompare(b.name));
 files.sort((a, b) => a.name.localeCompare(b.name));
 
-folders.forEach(f => {
-const el = document.createElement('div');
-el.className = 'save-modal-folder-item';
-el.dataset.path = f.path;
-el.dataset.name = f.name;
-el.dataset.type = 'folder';
-el.innerHTML = `
-<i class="fas fa-folder save-modal-folder-item-icon"></i>
-<span class="save-modal-folder-item-name">${escapeHtml(f.name)}</span>
-`;
-el.addEventListener('click', (e) => _selectItem(el, f));
-el.addEventListener('dblclick', () => navigateTo(f.path));
-folderListEl.appendChild(el);
-});
+  folders.forEach(f => {
+    const el = document.createElement('div');
+    el.className = 'save-modal-folder-item';
+    el.dataset.path = f.path;
+    el.dataset.name = f.name;
+    el.dataset.type = 'folder';
+    if (f.isDrive) el.dataset.isDrive = 'true';
+    const iconClass = f.isDrive ? 'fas fa-hdd' : 'fas fa-folder';
+    el.innerHTML = `
+      <i class="${iconClass} save-modal-folder-item-icon"></i>
+      <span class="save-modal-folder-item-name">${escapeHtml(f.name)}</span>
+    `;
+    el.addEventListener('click', (e) => _selectItem(el, f));
+    el.addEventListener('dblclick', () => navigateTo(f.path));
+    folderListEl.appendChild(el);
+  });
 
 files.forEach(f => {
 const el = document.createElement('div');
@@ -1294,31 +1272,46 @@ updateSaveBtnState();
 }
 
 function updateSaveBtnState() {
-const hasFilename = filenameInput.value.trim().length > 0;
-const hasPath = currentPath.length > 0;
-saveBtn.disabled = !(hasFilename && hasPath);
+  const hasFilename = filenameInput.value.trim().length > 0;
+  const hasPath = currentPath.length > 0 && currentPath !== 'DRIVES';
+  saveBtn.disabled = !(hasFilename && hasPath);
 }
 
 async function _handleGoUp() {
-if (!currentPath) return;
-const sep = currentPath.includes('/') ? '/' : '\\';
-const parts = currentPath.replace(/[/\\]+$/, '').split(sep);
-if (parts.length <= 1) return;
-parts.pop();
-const parentPath = parts.join(sep);
-if (parentPath.length < 3) return;
-await navigateTo(parentPath + (parentPath.match(/^[A-Za-z]:$/) ? '\\' : ''));
+  if (!currentPath) return;
+  if (currentPath === 'DRIVES') return;
+  if (/^[A-Za-z]:\\$/.test(currentPath)) {
+    await navigateTo('DRIVES');
+    return;
+  }
+  const sep = currentPath.includes('/') ? '/' : '\\';
+  const parts = currentPath.replace(/[/\\]+$/, '').split(sep);
+  if (parts.length <= 1) {
+    await navigateTo('DRIVES');
+    return;
+  }
+  parts.pop();
+  const parentPath = parts.join(sep);
+  if (/^[A-Za-z]:$/.test(parentPath)) {
+    await navigateTo(parentPath + '\\');
+    return;
+  }
+  if (parentPath.length < 3) {
+    await navigateTo('DRIVES');
+    return;
+  }
+  await navigateTo(parentPath + (parentPath.match(/^[A-Za-z]:$/) ? '\\' : ''));
 }
 
 async function _handleBrowseNative() {
-try {
-const result = await callParentAPI('select-directory', {});
-if (result && result.success && result.data && result.data.path) {
-await navigateTo(result.data.path);
-}
-} catch (err) {
-showToast('Error', 'No se pudo abrir el selector de carpeta.', 'error');
-}
+  try {
+    const result = await callParentAPI('select-directory', {});
+    if (result && typeof result === 'string' && result.length > 0) {
+      await navigateTo(result);
+    }
+  } catch (err) {
+    showToast('Error', 'No se pudo abrir el selector de carpeta.', 'error');
+  }
 }
 
 function _showCreateFolderInput() {

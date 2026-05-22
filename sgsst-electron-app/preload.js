@@ -212,6 +212,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getInvestigacionStats: (companyName) => ipcRenderer.invoke('investigacion-accidentes-get-stats', { companyName }),
   listInvestigations: (companyName, filter) => ipcRenderer.invoke('investigacion-accidentes-list-investigations', { companyName, filter }),
   getInvestigationDetail: (companyName, investigationName) => ipcRenderer.invoke('investigacion-accidentes-get-investigation-detail', { companyName, investigationName }),
+  getCrossReferenceData: (companyName) => ipcRenderer.invoke('investigacion-accidentes-cross-reference-data', { companyName }),
 
   // --- Registro Estadístico (3.2.3) ---
   registroEstadisticoCargarDatos: (companyName) =>

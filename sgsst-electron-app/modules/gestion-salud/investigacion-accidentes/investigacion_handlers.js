@@ -566,7 +566,7 @@ ipcMain.handle('investigacion-accidentes-generate-accident-report', (event, comb
 
             pythonProcess.on('close', async (code) => {
                 if (tempDataPath) await fsp.unlink(tempDataPath).catch(err => sendLog(`No se pudo limpiar el archivo temporal: ${err.message}`, 'WARN'));
-                if (code !== 0) return reject(new Error(`El script de Python falló con código ${code}. Revisa los logs de STDERR.`));
+                if (code !== 0) return reject(new Error(`El script de Python falló con código ${code}. STDERR: ${stderrData || '(vacío)'}. Revisa los logs.`));
 
                 try {
                     const finalResult = JSON.parse(stdoutData.match(/^[\s\S]*\{.*\}[\s\S]*$/s)[0]);
@@ -858,25 +858,22 @@ async function _findInvestigacionSubmodulePath(companyName) {
     // Buscar la carpeta que contenga el código "3.2.2" (Investigación de Accidentes)
     // NOTA: Los nodos NO tienen mappedPath, solo tienen name, path y subdirectories
     function searchInStructure(node, targetCode) {
-        if (!node) return null;
-
-        // Buscar por nombre del nodo
-        if (node.name && node.name.includes(targetCode)) {
-            // Construir la ruta completa
-            return node.path || null;
+      if (!node) return null;
+      const codeRegex = new RegExp(targetCode.replace(/\./g, '\\.') + '\\b');
+      if (node.name && codeRegex.test(node.name)) {
+        return node.path || null;
+      }
+      if (node.subdirectories) {
+        for (const childName of Object.keys(node.subdirectories)) {
+          const child = node.subdirectories[childName];
+          if (child.name && codeRegex.test(child.name)) {
+            return child.path || null;
+          }
+          const found = searchInStructure(child, targetCode);
+          if (found) return found;
         }
-
-        if (node.subdirectories) {
-            for (const childName of Object.keys(node.subdirectories)) {
-                const child = node.subdirectories[childName];
-                if (child.name && child.name.includes(targetCode)) {
-                    return child.path || null;
-                }
-                const found = searchInStructure(child, targetCode);
-                if (found) return found;
-            }
-        }
-        return null;
+      }
+      return null;
     }
 
     const submodulePath = searchInStructure(actualCompanyStructure, '3.2.2');
@@ -903,12 +900,32 @@ function _isYearFolder(name) {
  * Retorna el año como número, o null si no se encuentra.
  */
 function _extractYearFromPath(relativePath) {
-    const parts = relativePath.replace(/\\/g, '/').split('/');
-    for (const part of parts) {
-        const m = part.match(/\b((?:19|20)\d{2})\b/);
-        if (m) return parseInt(m[1], 10);
+  const parts = relativePath.replace(/\\/g, '/').split('/');
+  for (const part of parts) {
+    const m = part.match(/\b((?:19|20)\d{2})\b/);
+    if (m) return parseInt(m[1], 10);
+  }
+  return null;
+}
+
+function _extractMonthFromPath(relativePath) {
+  const parts = relativePath.replace(/\\/g, '/').split('/');
+  for (const part of parts) {
+    const m = part.match(/(\d{1,2})[.\-\s]+(\w+)/);
+    if (m) {
+      const monthNames = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      const monthName = m[2].toLowerCase();
+      const idx = monthNames.findIndex(n => monthName.includes(n));
+      if (idx >= 0) return { number: idx + 1, name: monthNames[idx].charAt(0).toUpperCase() + monthNames[idx].slice(1) };
     }
-    return null;
+  }
+  for (const part of parts) {
+    const monthNames = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    const lower = part.toLowerCase().trim();
+    const idx = monthNames.findIndex(n => lower.includes(n));
+    if (idx >= 0) return { number: idx + 1, name: monthNames[idx].charAt(0).toUpperCase() + monthNames[idx].slice(1) };
+  }
+  return null;
 }
 
 /**
@@ -940,24 +957,52 @@ function _isInvestigationFile(filename) {
     );
 }
 
-/**
- * Helper: extrae el nombre de la persona desde el nombre del archivo.
- * Soporta patrones: "InformeATE-Maria Ferrer", "GI-FO-020 INVESTIGACION Cristian Alvarez",
- * "Jose Fernando Lopez - 5-5", "Ramiro Romero Fierro".
- */
 function _extractPersonName(filename) {
-    const noExt = filename.replace(/\.[^.]+$/, '');
-    // "InformeATE-Maria Ferrer" o "InformeATE Maria Ferrer"
-    let m = noExt.match(/InformeATE?[-\s]+(.+)/i);
-    if (m) return m[1].trim();
-    // "GI-FO-020 INVESTIGACION Cristian Alvarez"
-    m = noExt.match(/GI-FO-020\s+INVESTIGACION\s+(.+)/i);
-    if (m) return m[1].trim();
-    // "Jose Fernando Lopez - 5-5" (nombre + fecha separada por " - ")
-    m = noExt.match(/^(.+?)\s*-\s*\d.*$/);
-    if (m) return m[1].trim();
-    // Fallback: nombre de archivo completo sin extensión
+  const noExt = filename.replace(/\.[^.]+$/, '');
+  let m;
+
+  m = noExt.match(/^FURAT\s+(.+)/i);
+  if (m) return m[1].trim();
+
+  m = noExt.match(/^Furat\s+(.+)/i);
+  if (m) return m[1].trim();
+
+  m = noExt.match(/InformeATEmpleadorContratante\s+(.+)/i);
+  if (m) return m[1].trim();
+
+  m = noExt.match(/^InformeATE?[-\s]+(.+)/i);
+  if (m) return m[1].trim();
+
+  m = noExt.match(/GI-FO-020[_\s]+INVESTIGACION(?:\s+DE\s+(?:INCIDENTES|ACCIDENTES))?[._\s]+(.+)/i);
+  if (m) {
+    let name = m[1].trim();
+    const dateSuffix = name.match(/^(.+?)\s+\d{8}(_\d+)?$/);
+    if (dateSuffix) name = dateSuffix[1].trim();
+    const underscoreName = name.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+    const titleCase = underscoreName.replace(/\b\w/g, c => c.toUpperCase());
+    return titleCase;
+  }
+
+  m = noExt.match(/^(.+?)\s+AT\s+\d{2}-\d{2}-\d{4}$/i);
+  if (m) return m[1].trim();
+
+  m = noExt.match(/^\d{6,8}\s*(.+)$/);
+  if (m) {
+    const candidate = m[1].trim();
+    if (candidate.length > 2 && !/^\d+$/.test(candidate)) return candidate;
+  }
+
+  m = noExt.match(/^(.+?)\s*-\s*\d.*$/);
+  if (m) {
+    const candidate = m[1].trim();
+    if (!/^(GI|FURAT|INFORME|REPORTE)/i.test(candidate)) return candidate;
+  }
+
+  if (/^(FURAT|InformeATEmpleadorContratante|InformeATE?\s*$)/i.test(noExt.trim())) {
     return noExt.trim();
+  }
+
+  return noExt.trim();
 }
 
 /**
@@ -1127,8 +1172,10 @@ async function _discoverInvestigations(basePath) {
         if (looseInvFiles.length > 0) {
             const byPerson = new Map();
             for (const f of looseInvFiles) {
-                const personName = _extractPersonName(f.name);
-                const key = personName.toLowerCase().replace(/\s+/g, '_');
+                    const personName = _extractPersonName(f.name);
+                    const key = personName.toLowerCase()
+                        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                        .replace(/\s+/g, '_');
                 if (!byPerson.has(key)) {
                     byPerson.set(key, { personName, files: [], hasFurat: false, hasInforme: false });
                 }
@@ -1166,38 +1213,70 @@ async function _discoverInvestigations(basePath) {
 
 /**
  * Helper: analiza el contenido de una carpeta de investigación y determina
- * su estado (pendiente, en_curso, completada).
+ * su estado (pendiente, completada).
  *
  * Criterios:
  * - PENDIENTE: solo contiene archivos FURAT (PDFs con "FURAT" en el nombre)
- * - EN_CURSO: contiene FURAT + archivos intermedios (evidencias, notas) pero NO informe final
  * - COMPLETADA: contiene un archivo con "Informe_Investigacion" o "informe" en el nombre
  */
 function _analyzeInvestigationState(folderName, files) {
-    const hasFurat = files.some(f =>
-        f.name.toUpperCase().includes('FURAT') && f.name.toLowerCase().endsWith('.pdf')
+  const hasFurat = files.some(f =>
+    f.name.toUpperCase().includes('FURAT') && f.name.toLowerCase().endsWith('.pdf')
+  );
+
+  const hasInforme = files.some(f => {
+    const u = f.name.toUpperCase();
+    const l = f.name.toLowerCase();
+    return (
+      l.includes('informe_investigacion') ||
+      l.includes('informe de investigacion') ||
+      l.includes('informe_accidente') ||
+      u.includes('INFORMEATE') ||
+      u.includes('INFORMEAT ') ||
+      u.includes('GI-FO-020') ||
+      u.includes('PSP-F-005') ||
+      l.includes('leccion') && l.includes('aprendida')
     );
-    const hasInforme = files.some(f =>
-        f.name.toLowerCase().includes('informe_investigacion') ||
-        f.name.toLowerCase().includes('informe de investigacion') ||
-        f.name.toLowerCase().includes('informe_accidente')      ||
-        f.name.toUpperCase().includes('INFORMEATE')             ||
-        f.name.toUpperCase().includes('INFORMEAT ')
-    );
+  });
 
-    if (!hasFurat && !hasInforme) {
-        return { estado: 'pendiente', tipo: 'carpeta', reason: 'Sin FURAT ni informe' };
-    }
+  if (hasInforme) {
+    return { estado: 'completada', tipo: 'carpeta', reason: 'Con informe final' };
+  }
+  if (hasFurat && !hasInforme) {
+    return { estado: 'pendiente', tipo: 'carpeta', reason: 'Solo FURAT, sin informe final' };
+  }
+  return { estado: 'pendiente', tipo: 'carpeta', reason: 'Sin FURAT ni informe' };
+}
 
-    if (hasFurat && hasInforme) {
-        return { estado: 'completada', tipo: 'carpeta', reason: 'Con informe final' };
-    }
+function _isInformeFile(filename) {
+  const u = filename.toUpperCase();
+  const l = filename.toLowerCase();
+  return (
+    u.includes('GI-FO-020') ||
+    u.includes('INFORMEATE') ||
+    u.includes('INFORMEAT ') ||
+    u.includes('PSP-F-005') ||
+    l.includes('informe_investigacion') ||
+    l.includes('informe de investigacion') ||
+    l.includes('informe_accidente') ||
+    (l.includes('leccion') && l.includes('aprendida'))
+  );
+}
 
-    if (hasFurat && !hasInforme) {
-        return { estado: 'pendiente', tipo: 'carpeta', reason: 'FURAT sin informe' };
-    }
+function _analyzeLooseFilesState(files) {
 
-    return { estado: 'pendiente', tipo: 'carpeta', reason: 'Estado desconocido' };
+  const hasFurat = files.some(f =>
+    f.toUpperCase().includes('FURAT') && f.toLowerCase().endsWith('.pdf')
+  );
+  const hasInforme = files.some(f => _isInformeFile(f));
+
+  if (hasInforme) {
+    return { estado: 'completada', reason: 'Con informe final' };
+  }
+  if (hasFurat && !hasInforme) {
+    return { estado: 'pendiente', reason: 'Solo FURAT, sin informe final' };
+  }
+  return { estado: 'pendiente', reason: 'Sin FURAT ni informe' };
 }
 
 /**
@@ -1223,43 +1302,44 @@ ipcMain.handle('investigacion-accidentes-get-stats', async (event, { companyName
         }
 
         // Usar el mismo descubrimiento que el list handler para consistencia
-        const discovered = await _discoverInvestigations(submodulePath);
-        let pendientes = 0;
-        let completadas = 0;
+  const discovered = await _discoverInvestigations(submodulePath);
+  let pendientes = 0;
+  let completadas = 0;
 
         for (const inv of discovered) {
             if (!inv.isFolder) {
-                if (inv._hasInforme) completadas++;
+                const looseState = _analyzeLooseFilesState(inv._filesInMonth || []);
+                if (looseState.estado === 'completada') completadas++;
                 else pendientes++;
                 continue;
             }
-            try {
-                const folderFiles = await fsp.readdir(inv.fullPath, { withFileTypes: true });
-                const fileInfos = folderFiles
-                    .filter(f => f.isFile())
-                    .map(f => ({ name: f.name, path: path.join(inv.fullPath, f.name) }));
-                const state = _analyzeInvestigationState(inv.name, fileInfos);
-                if (state.estado === 'completada') {
-                    completadas++;
-                } else {
-                    pendientes++;
-                }
-            } catch (err) {
-                pendientes++;
-            }
-        }
+     try {
+       const folderFiles = await fsp.readdir(inv.fullPath, { withFileTypes: true });
+       const fileInfos = folderFiles
+         .filter(f => f.isFile())
+         .map(f => ({ name: f.name, path: path.join(inv.fullPath, f.name) }));
+       const state = _analyzeInvestigationState(inv.name, fileInfos);
+       if (state.estado === 'completada') {
+         completadas++;
+       } else {
+         pendientes++;
+       }
+     } catch (err) {
+       pendientes++;
+     }
+   }
 
-        const total = pendientes + completadas;
-        const result = {
-            success: true,
-            data: {
-                pendientes,
-                completadas,
-                total
-            }
-        };
+   const total = pendientes + completadas;
+   const result = {
+     success: true,
+     data: {
+       pendientes,
+       completadas,
+       total
+     }
+   };
 
-        sendLog(`[INV-STATS] Estadísticas para ${companyName}: ${pendientes} pendientes, ${completadas} completadas, ${total} total`, 'INFO');
+   sendLog(`[INV-STATS] Estadísticas para ${companyName}: ${pendientes} pendientes, ${completadas} completadas, ${total} total`, 'INFO');
         return result;
 
     } catch (error) {
@@ -1269,13 +1349,63 @@ ipcMain.handle('investigacion-accidentes-get-stats', async (event, { companyName
 });
 
 /**
- * IPC Handler: investigacion-accidentes-list-investigations
- * Lista todas las investigaciones con su estado, metadata y archivos.
- * Soporta estructura plana y estructura Año > Mes > Investigación.
+ * Helper: extrae la fecha real del evento desde el nombre del archivo FURAT.
+ * Soporta formatos: YYYYMMDD, DDMMYY, YYYY-MM-DD.
+ * Retorna un objeto Date o null.
+ */
+function _extractFuratDate(name) {
+  if (!name) return null;
+  const noExt = name.replace(/\.[^.]+$/, '');
+
+  // Patrón 1: YYYYMMDD (e.g. ...20250609)
+  let m = noExt.match(/(\d{4})(\d{2})(\d{2})(?![\d])/);
+  if (m) {
+    const [_, year, month, day] = m;
+    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    if (date.getFullYear() === parseInt(year)) return date;
+  }
+
+  // Patrón 2: DDMMYY (e.g. ...010625)
+  m = noExt.match(/(\d{2})(\d{2})(\d{2})(?![\d])/);
+  if (m) {
+    const [_, day, month, yearShort] = m;
+    const year = 2000 + parseInt(yearShort);
+    if (year > 2020) {
+      const date = new Date(year, parseInt(month) - 1, parseInt(day));
+      if (date.getFullYear() === year) return date;
+    }
+  }
+
+  // Patrón 3: YYYY-MM-DD
+  m = noExt.match(/(\d{4})[-](\d{2})[-](\d{2})/);
+  if (m) {
+    const [_, year, month, day] = m;
+    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    if (date.getFullYear() === parseInt(year)) return date;
+  }
+
+  return null;
+}
+
+/**
+ * Helper: determina el estado 'completada' si existe un informe final en archivos.
+ */
+function _hasInformeFinal(archivos) {
+  return archivos.some(f => _isInformeFile(f.name));
+}
+
+/**
+ * IPC Handler: investigacion-accidentes-list-investigations (v2)
+ * Lista TODOS los eventos (FURATs + Investigaciones) unificados.
+ * - Fuentes: 3.2.1 (FURATs) y 3.2.2 (Investigaciones).
+ * - Si un FURAT tiene investigación → estado 'completada'.
+ * - Si un FURAT NO tiene investigación → estado 'pendiente'.
+ * - La fecha se extrae del nombre del archivo FURAT si es posible.
  *
  * Input: { companyName: string, filter?: 'todas' | 'pendiente' | 'completada' }
  * Output: { success: true, data: [ { id, nombre, estado, fecha, archivos: [] } ] }
  */
+ if (!ipcMain.listenerCount('investigacion-accidentes-list-investigations')) {
 ipcMain.handle('investigacion-accidentes-list-investigations', async (event, { companyName, filter }) => {
     try {
         sendLog(`[INV-LIST] Solicitud de lista para: ${companyName}, filtro: ${filter || 'todas'}`, 'INFO');
@@ -1284,145 +1414,189 @@ ipcMain.handle('investigacion-accidentes-list-investigations', async (event, { c
             return { success: false, error: { code: 'MISSING_COMPANY', message: 'Nombre de empresa requerido' } };
         }
 
-        const submodulePath = await _findInvestigacionSubmodulePath(companyName);
-
-        if (!fs.existsSync(submodulePath)) {
-            sendLog(`[INV-LIST] La ruta del submódulo no existe: ${submodulePath}`, 'WARN');
-            return { success: true, data: [] };
+        // ============== BLOQUE 1: DESCUBRIR INVESTIGACIONES (3.2.2) ==============
+        let invPath = null;
+        let invDiscovered = [];
+        try {
+          invPath = await _findInvestigacionSubmodulePath(companyName);
+          if (fs.existsSync(invPath)) {
+            invDiscovered = await _discoverInvestigations(invPath);
+            sendLog(`[INV-LIST] Investigaciones descubiertas en 3.2.2: ${invDiscovered.length}`, 'INFO');
+          }
+        } catch (err) {
+          sendLog(`[INV-LIST] Error descubriendo investigaciones: ${err.message}`, 'WARN');
         }
 
-        // Usar descubrimiento inteligente (detecta año/mes o estructura plana)
-        const discovered = await _discoverInvestigations(submodulePath);
-        const investigations = [];
+        // ============== BLOQUE 2: DESCUBRIR FURATS (3.2.1) ==============
+        let furatPath = null;
+        let furatDiscovered = [];
+        try {
+          furatPath = await _findReportesAccidentesSubmodulePath(companyName);
+          if (furatPath && fs.existsSync(furatPath)) {
+            furatDiscovered = await _discoverInvestigations(furatPath);
+            sendLog(`[INV-LIST] FURATs descubiertos en 3.2.1: ${furatDiscovered.length}`, 'INFO');
+          }
+        } catch (err) {
+          sendLog(`[INV-LIST] Error descubriendo FURATs: ${err.message}`, 'WARN');
+        }
 
-        for (const inv of discovered) {
-            // Aplicar filtro si existe
-            if (filter && filter !== 'todas') {
-                // Para filtrar necesitamos analizar el estado
-                if (inv.isFolder) {
-                    const folderFiles = await fsp.readdir(inv.fullPath, { withFileTypes: true });
-                    const fileInfos = folderFiles
-                        .filter(f => f.isFile())
-                        .map(f => {
-                            const filePath = path.join(inv.fullPath, f.name);
-                            const stats = fs.statSync(filePath);
-                            return {
-                                name: f.name,
-                                path: filePath,
-                                extension: path.extname(f.name).substring(1),
-                                size: stats.size,
-                                modified: stats.mtime.toISOString()
-                            };
-                        });
-                    const state = _analyzeInvestigationState(inv.name, fileInfos);
-                    if (state.estado !== filter) continue;
+        // ============== BLOQUE 3: CONSTRUIR MAPA DE INVESTIGACIONES ==============
+        const invByName = new Map();
+        for (const inv of invDiscovered) {
+          const key = inv.name.toLowerCase()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
 
-                    const folderStats = fs.statSync(inv.fullPath);
-                    investigations.push({
-                        id: `inv-${inv.name.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}`,
-                        nombre: inv.name,
-                        estado: state.estado,
-                        tipo: 'carpeta',
-                        fecha: folderStats.mtime.toISOString(),
-                        año: _extractYearFromPath(inv.relativePath),
-                        totalArchivos: fileInfos.length,
-                        archivos: fileInfos,
-                        relativePath: inv.relativePath
-                    });
-                } else {
-                    const invEstado = (inv.hasFurat && inv._hasInforme) ? 'completada' : 'pendiente';
-                    if (filter !== 'todas' && filter !== invEstado) continue;
-                    const folderStats = fs.statSync(inv.fullPath);
-                    const archivos = (inv._filesInMonth || [inv.name]).map(fname => {
-                        const fp = path.join(inv.fullPath, fname);
-                        try {
-                            const s = fs.statSync(fp);
-                            return { name: fname, path: fp, extension: path.extname(fname).substring(1), size: s.size, modified: s.mtime.toISOString() };
-                        } catch (_) {
-                            return { name: fname, path: fp, extension: path.extname(fname).substring(1), size: 0, modified: folderStats.mtime.toISOString() };
-                        }
-                    });
-                    investigations.push({
-                        id: `inv-${inv.name.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}`,
-                        nombre: inv.name,
-                        estado: invEstado,
-                        tipo: 'archivo',
-                        fecha: folderStats.mtime.toISOString(),
-                        año: _extractYearFromPath(inv.relativePath),
-                        totalArchivos: archivos.length,
-                        archivos,
-                        relativePath: inv.relativePath
-                    });
+          let archivos = [];
+          let hasInformeFinal = false;
+          if (inv.isFolder) {
+            try {
+              const folderFiles = await fsp.readdir(inv.fullPath, { withFileTypes: true });
+              archivos = folderFiles.filter(f => f.isFile()).map(f => {
+                const filePath = path.join(inv.fullPath, f.name);
+                try {
+                  const stats = fs.statSync(filePath);
+                  return { name: f.name, path: filePath, extension: path.extname(f.name).substring(1), size: stats.size, modified: stats.mtime.toISOString() };
+                } catch (_) {
+                  return { name: f.name, path: filePath, extension: path.extname(f.name).substring(1), size: 0, modified: new Date().toISOString() };
                 }
-            } else {
-                // Sin filtro, construir entrada completa
-                if (inv.isFolder) {
-                    const folderFiles = await fsp.readdir(inv.fullPath, { withFileTypes: true });
-                    const fileInfos = folderFiles
-                        .filter(f => f.isFile())
-                        .map(f => {
-                            const filePath = path.join(inv.fullPath, f.name);
-                            const stats = fs.statSync(filePath);
-                            return {
-                                name: f.name,
-                                path: filePath,
-                                extension: path.extname(f.name).substring(1),
-                                size: stats.size,
-                                modified: stats.mtime.toISOString()
-                            };
-                        });
-                    const state = _analyzeInvestigationState(inv.name, fileInfos);
-                    const folderStats = fs.statSync(inv.fullPath);
+              });
+              hasInformeFinal = _hasInformeFinal(archivos);
+            } catch (_) {}
+          } else {
+            archivos = (inv._filesInMonth || []).map(fname => {
+              const fp = path.join(inv.fullPath, fname);
+              try {
+                const s = fs.statSync(fp);
+                return { name: fname, path: fp, extension: path.extname(fname).substring(1), size: s.size, modified: s.mtime.toISOString() };
+              } catch (_) {
+                return { name: fname, path: fp, extension: path.extname(fname).substring(1), size: 0, modified: new Date().toISOString() };
+              }
+            });
+            hasInformeFinal = _hasInformeFinal(archivos);
+          }
 
-                    investigations.push({
-                        id: `inv-${inv.name.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}`,
-                        nombre: inv.name,
-                        estado: state.estado,
-                        tipo: 'carpeta',
-                        fecha: folderStats.mtime.toISOString(),
-                        año: _extractYearFromPath(inv.relativePath),
-                        totalArchivos: fileInfos.length,
-                        archivos: fileInfos,
-                        relativePath: inv.relativePath
-                    });
-                } else {
-                    const invEstado = (inv.hasFurat && inv._hasInforme) ? 'completada' : 'pendiente';
-                    const folderStats = fs.statSync(inv.fullPath);
-                    const archivos = (inv._filesInMonth || [inv.name]).map(fname => {
-                        const fp = path.join(inv.fullPath, fname);
-                        try {
-                            const s = fs.statSync(fp);
-                            return { name: fname, path: fp, extension: path.extname(fname).substring(1), size: s.size, modified: s.mtime.toISOString() };
-                        } catch (_) {
-                            return { name: fname, path: fp, extension: path.extname(fname).substring(1), size: 0, modified: folderStats.mtime.toISOString() };
-                        }
-                    });
-                    investigations.push({
-                        id: `inv-${inv.name.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}`,
-                        nombre: inv.name,
-                        estado: invEstado,
-                        tipo: 'archivo',
-                        fecha: folderStats.mtime.toISOString(),
-                        año: _extractYearFromPath(inv.relativePath),
-                        totalArchivos: archivos.length,
-                        archivos,
-                        relativePath: inv.relativePath
-                    });
+          invByName.set(key, {
+            ...inv,
+            archivos,
+            hasInformeFinal,
+            estado: hasInformeFinal ? 'completada' : 'pendiente',
+            fechaReal: _extractFuratDate(inv.name) || (inv.isFolder ? (() => { try { return fs.statSync(inv.fullPath).mtime; } catch(_) { return new Date(); } })() : new Date())
+          });
+        }
+
+        // ============== BLOQUE 4: UNIFICAR CON FURATS ==============
+        const investigations = new Map(); // Usar Map para evitar duplicados por nombre normalizado
+
+        // Primero agregamos todos los FURATs como base
+        for (const furat of furatDiscovered) {
+          const key = furat.name.toLowerCase()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+
+          const fechaReal = _extractFuratDate(furat.name);
+          let archivos = [];
+
+          if (furat.isFolder) {
+            try {
+              const folderFiles = await fsp.readdir(furat.fullPath, { withFileTypes: true });
+              archivos = folderFiles.filter(f => f.isFile()).map(f => {
+                const filePath = path.join(furat.fullPath, f.name);
+                try {
+                  const stats = fs.statSync(filePath);
+                  return { name: f.name, path: filePath, extension: path.extname(f.name).substring(1), size: stats.size, modified: stats.mtime.toISOString() };
+                } catch (_) {
+                  return { name: f.name, path: filePath, extension: path.extname(f.name).substring(1), size: 0, modified: new Date().toISOString() };
                 }
+              });
+            } catch (_) {}
+          } else {
+            archivos = (furat._filesInMonth || []).map(fname => {
+              const fp = path.join(furat.fullPath, fname);
+              try {
+                const s = fs.statSync(fp);
+                return { name: fname, path: fp, extension: path.extname(fname).substring(1), size: s.size, modified: s.mtime.toISOString() };
+              } catch (_) {
+                return { name: fname, path: fp, extension: path.extname(fname).substring(1), size: 0, modified: new Date().toISOString() };
+              }
+            });
+          }
+
+          // Verificar si existe una investigación completa para este FURAT
+          const invMatch = invByName.get(key);
+          let estado = 'pendiente';
+          let allArchivos = [...archivos];
+          let fecha = fechaReal;
+
+          if (invMatch) {
+            if (invMatch.hasInformeFinal) {
+              estado = 'completada';
             }
+            // Agregar archivos de la investigación al FURAT
+            allArchivos = [...allArchivos, ...invMatch.archivos];
+            if (!fecha && invMatch.fechaReal) fecha = invMatch.fechaReal;
+          }
+
+          if (!fecha && allArchivos.length > 0) {
+            fecha = new Date(allArchivos[0].modified);
+          }
+          if (!fecha) fecha = new Date();
+
+          investigations.set(key, {
+            id: `inv-${furat.name.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}`,
+            nombre: furat.name,
+            estado,
+            tipo: 'evento',
+            fecha: fecha.toISOString(),
+      año: _extractYearFromPath(furat.relativePath),
+      mes: _extractMonthFromPath(furat.relativePath),
+      totalArchivos: allArchivos.length,
+      archivos: allArchivos,
+      relativePath: furat.relativePath,
+      hasFurat: true
+          });
         }
 
-        // Ordenar por fecha más reciente primero
-        investigations.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+        // Segundo: agregar investigaciones que NO tuvieron FURAT (raras, pero posibles)
+        for (const [key, inv] of invByName) {
+          if (!investigations.has(key)) {
+            let fecha = inv.fechaReal;
+            if (!fecha && inv.archivos.length > 0) fecha = new Date(inv.archivos[0].modified);
+            if (!fecha) fecha = new Date();
 
-        sendLog(`[INV-LIST] ${investigations.length} investigaciones encontradas`, 'INFO');
-        return { success: true, data: investigations };
+            investigations.set(key, {
+              id: `inv-${inv.name.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}`,
+              nombre: inv.name,
+              estado: inv.estado,
+              tipo: 'only_investigacion',
+              fecha: fecha.toISOString(),
+        año: _extractYearFromPath(inv.relativePath),
+        mes: _extractMonthFromPath(inv.relativePath),
+        totalArchivos: inv.archivos.length,
+        archivos: inv.archivos,
+        relativePath: inv.relativePath,
+        hasFurat: false
+            });
+          }
+        }
+
+        // ============== BLOQUE 5: FILTRAR Y ORDENAR ==============
+        let results = Array.from(investigations.values());
+        if (filter && filter !== 'todas') {
+          results = results.filter(r => r.estado === filter);
+        }
+
+        results.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+        sendLog(`[INV-LIST] ${results.length} eventos encontrados (unificados FURAT + Investigaciones)`, 'INFO');
+      return { success: true, data: results };
 
     } catch (error) {
-        sendLog(`[INV-LIST] Error: ${error.message}`, 'ERROR');
-        return { success: false, error: { code: 'LIST_ERROR', message: error.message } };
+      sendLog(`[INV-LIST] Error: ${error.message}`, 'ERROR');
+      return { success: false, error: { code: 'LIST_ERROR', message: error.message } };
     }
-});
+  });
+}
 
 /**
  * IPC Handler: investigacion-accidentes-get-investigation-detail
@@ -1579,6 +1753,252 @@ ipcMain.handle('investigacion-accidentes-get-investigation-detail', async (event
         sendLog(`[INV-DETAIL] Error: ${error.message}`, 'ERROR');
         return { success: false, error: { code: 'DETAIL_ERROR', message: error.message } };
     }
+});
+
+async function _findReportesAccidentesSubmodulePath(companyName) {
+  const configPath = path.join(app.getPath('userData'), 'config.json');
+  let config;
+  try {
+    const configData = await fsp.readFile(configPath, 'utf8');
+    config = JSON.parse(configData);
+  } catch (err) {
+    sendLog(`[XREF-DEBUG] Error leyendo config.json: ${err.message}`, 'WARN');
+    return null;
+  }
+
+  if (!config.companyPaths || !config.companyPaths[companyName]) {
+    sendLog(`[XREF-DEBUG] No se encontró empresa: ${companyName}`, 'WARN');
+    return null;
+  }
+
+  const actualCompanyStructure = config.companyPaths[companyName]?.structure?.structure;
+  if (!actualCompanyStructure) {
+    sendLog(`[XREF-DEBUG] Estructura inválida para: ${companyName}`, 'WARN');
+    return null;
+  }
+
+  function searchInStructure(node, targetCode) {
+    if (!node) return null;
+    const codeRegex = new RegExp(targetCode.replace(/\./g, '\\.') + '\\b');
+    if (node.name && codeRegex.test(node.name)) {
+      return node.path || null;
+    }
+    if (node.subdirectories) {
+      for (const childName of Object.keys(node.subdirectories)) {
+        const child = node.subdirectories[childName];
+        if (child.name && codeRegex.test(child.name)) {
+          return child.path || null;
+        }
+        const found = searchInStructure(child, targetCode);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  const submodulePath = searchInStructure(actualCompanyStructure, '3.2.1');
+  if (!submodulePath) {
+    sendLog(`[XREF-DEBUG] No se encontró nodo "3.2.1" para ${companyName}`, 'WARN');
+    return null;
+  }
+  sendLog(`[XREF-DEBUG] Ruta 3.2.1 encontrada: ${submodulePath}`, 'INFO');
+  return submodulePath;
+}
+
+function _isSamePerson(nameA, nameB) {
+  const normalize = (s) => s.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const a = normalize(nameA);
+  const b = normalize(nameB);
+
+  if (a === b) return true;
+
+  const tokensA = a.split(' ').filter(t => t.length > 1);
+  const tokensB = b.split(' ').filter(t => t.length > 1);
+
+  if (tokensA.length === 0 || tokensB.length === 0) return false;
+
+  const matchCount = tokensA.filter(tA =>
+    tokensB.some(tB => tA === tB || (tA.length >= 4 && tB.length >= 4 && (tA.includes(tB) || tB.includes(tA))))
+  ).length;
+
+  const minTokens = Math.min(tokensA.length, tokensB.length);
+  const overlap = matchCount / minTokens;
+
+  if (overlap >= 0.6 && minTokens >= 2) return true;
+  if (overlap >= 0.8 && minTokens >= 1) return true;
+
+  if (tokensA.length >= 2 && tokensB.length >= 2) {
+    const sortedA = [...tokensA].sort().join(' ');
+    const sortedB = [...tokensB].sort().join(' ');
+    if (sortedA === sortedB) return true;
+  }
+
+  return false;
+}
+
+ipcMain.handle('investigacion-accidentes-cross-reference-data', async (event, { companyName }) => {
+  try {
+    sendLog(`[XREF] Solicitud cross-reference para: ${companyName}`, 'INFO');
+
+    if (!companyName) {
+      return { success: false, error: { code: 'MISSING_COMPANY', message: 'Nombre de empresa requerido' } };
+    }
+
+    const invPath = await _findInvestigacionSubmodulePath(companyName);
+    const furatPath = await _findReportesAccidentesSubmodulePath(companyName);
+
+    let furatFolders = [];
+    if (furatPath && fs.existsSync(furatPath)) {
+      const furatDiscovered = await _discoverInvestigations(furatPath);
+      furatFolders = furatDiscovered.map(inv => ({
+        name: inv.name,
+        relativePath: inv.relativePath,
+        fullPath: inv.fullPath,
+        isFolder: inv.isFolder,
+        hasFurat: inv.hasFurat,
+        año: _extractYearFromPath(inv.relativePath),
+        mes: _extractMonthFromPath(inv.relativePath)
+      }));
+    }
+
+    let invFolders = [];
+    if (invPath && fs.existsSync(invPath)) {
+      const invDiscovered = await _discoverInvestigations(invPath);
+      for (const inv of invDiscovered) {
+        let estado = 'pendiente';
+        let archivos = [];
+        if (inv.isFolder) {
+          try {
+            const folderFiles = await fsp.readdir(inv.fullPath, { withFileTypes: true });
+            const fileInfos = folderFiles
+              .filter(f => f.isFile())
+              .map(f => ({ name: f.name, path: path.join(inv.fullPath, f.name) }));
+            const state = _analyzeInvestigationState(inv.name, fileInfos);
+            estado = state.estado;
+            archivos = fileInfos.map(f => f.name);
+          } catch (err) {
+            archivos = [];
+          }
+        } else {
+          archivos = inv._filesInMonth || [];
+          const looseState = _analyzeLooseFilesState(archivos);
+          estado = looseState.estado;
+        }
+      invFolders.push({
+        name: inv.name,
+        relativePath: inv.relativePath,
+        fullPath: inv.fullPath,
+        isFolder: inv.isFolder,
+        estado,
+        archivos,
+        año: _extractYearFromPath(inv.relativePath),
+        mes: _extractMonthFromPath(inv.relativePath)
+      });
+      }
+    }
+
+      const matchedInvNames = new Set();
+      const matched = [];
+      const unmatchedFurats = [];
+      const yearMismatchFurats = [];
+
+      for (const furat of furatFolders) {
+        const nameCandidates = invFolders.filter(inv => _isSamePerson(furat.name, inv.name));
+
+        if (nameCandidates.length === 0) {
+          unmatchedFurats.push({
+            nombre: furat.name,
+            furatPath: furat.relativePath,
+            estado: 'sin_investigacion',
+            archivosInvestigacion: [],
+            furatYear: furat.año,
+            furatMonth: furat.mes
+          });
+          continue;
+        }
+
+        let match = null;
+        let matchType = 'exact';
+
+        match = nameCandidates.find(inv =>
+          inv.año === furat.año &&
+          inv.mes && furat.mes &&
+          inv.mes.number === furat.mes.number
+        );
+
+        if (!match) {
+          match = nameCandidates.find(inv => inv.año === furat.año);
+          if (match) matchType = 'partial';
+        }
+
+        if (match) {
+          matchedInvNames.add(match.name + '|' + match.año);
+          matched.push({
+            nombre: furat.name,
+            furatPath: furat.relativePath,
+            investigacionPath: match.relativePath,
+            estado: match.estado,
+            archivosInvestigacion: match.archivos,
+            matchType,
+            furatYear: furat.año,
+            furatMonth: furat.mes,
+            invYear: match.año,
+            invMonth: match.mes
+          });
+        } else {
+          yearMismatchFurats.push({
+            nombre: furat.name,
+            furatPath: furat.relativePath,
+            furatYear: furat.año,
+            furatMonth: furat.mes,
+            existingInvPaths: nameCandidates.map(c => ({
+              investigacionPath: c.relativePath,
+              invYear: c.año,
+              invMonth: c.mes,
+              estado: c.estado
+            }))
+          });
+          nameCandidates.forEach(c => matchedInvNames.add(c.name + '|' + c.año));
+        }
+      }
+
+      const unmatchedInvestigaciones = invFolders.filter(inv => !matchedInvNames.has(inv.name + '|' + inv.año));
+
+      const result = {
+        success: true,
+        data: {
+          furatCount: furatFolders.length,
+          investigacionCount: invFolders.length,
+          matchedCount: matched.length,
+  pendientes: invFolders.filter(i => i.estado === 'pendiente').length,
+  completadas: invFolders.filter(i => i.estado === 'completada').length,
+          matched,
+          unmatchedFurats,
+          yearMismatchFurats,
+          yearMismatchCount: yearMismatchFurats.length,
+          unmatchedInvestigaciones: unmatchedInvestigaciones.map(i => ({
+            nombre: i.name,
+            investigacionPath: i.relativePath,
+            estado: i.estado,
+            archivosInvestigacion: i.archivos,
+            año: i.año,
+            mes: i.mes
+          }))
+        }
+      };
+
+      sendLog(`[XREF] Resultado: ${furatFolders.length} FURATs, ${invFolders.length} investigaciones, ${matched.length} emparejados (${matched.filter(m => m.matchType === 'exact').length} exactos, ${matched.filter(m => m.matchType === 'partial').length} parciales), ${yearMismatchFurats.length} año diferente, ${unmatchedFurats.length} sin investigación, ${unmatchedInvestigaciones.length} inv. sin FURAT`, 'INFO');
+    return result;
+
+  } catch (error) {
+    sendLog(`[XREF] Error: ${error.message}`, 'ERROR');
+    return { success: false, error: { code: 'XREF_ERROR', message: error.message } };
+  }
 });
 
 // Exportar funciones para inicialización desde el exterior

@@ -1,170 +1,198 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestión de Investigaciones - K+AIR</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="investigaciones-view.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestión de Investigaciones - K+AIR</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Lexend:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="investigaciones-view.css">
 </head>
 <body>
 
-    <div class="inv-wrapper">
+<div class="inv-layout">
 
-        <!-- Header System v2.0 -->
-        <header class="inv-header">
-            <div class="inv-header-bar">
-                <div class="inv-header-left">
-                    <button id="backBtn" class="inv-header-back" aria-label="Volver al portal">
-                        <i class="bi bi-arrow-left"></i>
-                    </button>
-                </div>
-                <div class="inv-header-divider"></div>
-                <div class="inv-header-center">
-                    <h1 class="inv-header-title">
-                        <i class="fas fa-folder-open" style="color: #174ea6;"></i>
-                        Gestión de Investigaciones
-                    </h1>
-                    <ol class="inv-header-breadcrumb">
-                        <li><a href="#" onclick="return false;">Gestión de la Salud</a></li>
-                        <li><a href="#" onclick="return false;">3.2.2 Investigación</a></li>
-                        <li class="active">Ver Investigaciones</li>
-                    </ol>
-                </div>
-                <div class="inv-header-right">
-                    <span class="inv-header-company">
-                        <i class="bi bi-building"></i>
-                        <span id="invCompanyName">—</span>
-                    </span>
-                    <div class="inv-header-divider"></div>
-                    <button id="refreshBtn" class="inv-btn inv-btn-secondary" title="Actualizar lista">
-                        <i class="fas fa-sync-alt" id="refreshIcon"></i>
-                    </button>
-                </div>
-            </div>
-        </header>
+<!-- K+AIR Header System v2.0 — BEM -->
+<header class="kair-header">
+<div class="kair-header__bar">
+<div class="kair-header__left">
+<button id="backBtn" class="kair-header__back" aria-label="Volver al portal">
+<i class="bi bi-arrow-left"></i>
+</button>
+</div>
+<div class="kair-header__divider"></div>
+<div class="kair-header__center">
+<h1 class="kair-header__title">
+<i class="fas fa-microscope" style="color: var(--inv-primary);"></i>
+Gestión de Investigaciones
+</h1>
+<ol class="kair-header__breadcrumb">
+<li><a href="#" onclick="return false;">Gestión de la Salud</a></li>
+<li><a href="#" onclick="return false;">3.2.2 Investigación</a></li>
+<li class="active">Ver Investigaciones</li>
+</ol>
+</div>
+<div class="kair-header__right">
+<span class="kair-header__company">
+<i class="bi bi-building"></i>
+<span id="invCompanyName">—</span>
+</span>
+<div class="kair-header__divider"></div>
+<button id="refreshBtn" class="kair-header__action" title="Actualizar lista">
+<i class="fas fa-sync-alt" id="refreshIcon"></i>
+</button>
+</div>
+</div>
+</header>
 
-        <!-- Contenido principal con scroll -->
-        <div class="inv-body">
+<!-- Contenido principal con scroll -->
+<div class="inv-body">
 
-            <!-- Tarjetas de estadísticas -->
-            <div class="inv-stats-row">
-                <div class="inv-stat-card inv-stat-pending">
-                    <div class="inv-stat-icon">
-                        <i class="fas fa-exclamation-triangle"></i>
-                    </div>
-                    <div class="inv-stat-info">
-                        <span class="inv-stat-value" id="statPendientes">0</span>
-                        <span class="inv-stat-label">Pendientes</span>
-                    </div>
-                </div>
-                <div class="inv-stat-card inv-stat-completed">
-                    <div class="inv-stat-icon">
-                        <i class="fas fa-check-circle"></i>
-                    </div>
-                    <div class="inv-stat-info">
-                        <span class="inv-stat-value" id="statCompletadas">0</span>
-                        <span class="inv-stat-label">Completadas</span>
-                    </div>
-                </div>
-                <div class="inv-stat-card inv-stat-total">
-                    <div class="inv-stat-icon">
-                        <i class="fas fa-folder-open"></i>
-                    </div>
-                    <div class="inv-stat-info">
-                        <span class="inv-stat-value" id="statTotal">0</span>
-                        <span class="inv-stat-label">Total</span>
-                    </div>
-                </div>
-            </div>
+<!-- Stats Bar — Total, Pending, Process, Completed -->
+<div class="inv-stats-bar" id="statsBar">
+<div class="inv-stat-card">
+<div class="inv-stat-icon inv-stat-icon--total"><i class="fas fa-folder-open"></i></div>
+<div class="inv-stat-value inv-stat-value--total" id="statTotal">0</div>
+<div class="inv-stat-label">Total FURATs (3.2.1)</div>
+</div>
+<div class="inv-stat-card">
+<div class="inv-stat-icon inv-stat-icon--pending"><i class="fas fa-clock"></i></div>
+<div class="inv-stat-value inv-stat-value--pending" id="statPendientes">0</div>
+<div class="inv-stat-label">Pendientes</div>
+</div>
+<div class="inv-stat-card">
+<div class="inv-stat-icon inv-stat-icon--completed"><i class="fas fa-check-circle"></i></div>
+<div class="inv-stat-value inv-stat-value--completed" id="statCompletadas">0</div>
+<div class="inv-stat-label">Completadas</div>
+</div>
+</div>
 
-            <!-- Barra de filtros -->
-            <div class="inv-filters">
-                <button class="inv-filter-btn active" data-filter="todas">
-                    <i class="fas fa-list"></i> Todas
-                </button>
-                <button class="inv-filter-btn" data-filter="pendiente">
-                    <i class="fas fa-clock"></i> Pendientes
-                </button>
-                <button class="inv-filter-btn" data-filter="completada">
-                    <i class="fas fa-check-double"></i> Completadas
-                </button>
-            </div>
+<!-- XRef Panel — collapsed by default -->
+<div class="inv-xref-panel" id="xrefPanel">
+<div class="inv-xref-icon"><i class="fas fa-exchange-alt"></i></div>
+<div class="inv-xref-content">
+<div class="inv-xref-title">Referencia Cruzada: FURAT (3.2.1) ↔ Investigación (3.2.2)</div>
+<div class="inv-xref-summary" id="xrefSummary">
+<span class="inv-xref-badge inv-xref-badge--furat"><i class="fas fa-file-alt"></i> <span id="xrefFuratCount">0</span> FURATs</span>
+<span class="inv-xref-badge inv-xref-badge--matched"><i class="fas fa-link"></i> <span id="xrefMatchedCount">0</span> Emparejados</span>
+<span class="inv-xref-badge inv-xref-badge--unmatched"><i class="fas fa-unlink"></i> <span id="xrefUnmatchedCount">0</span> Sin Investigación</span>
+<span class="inv-xref-badge inv-xref-badge--mismatch"><i class="fas fa-exclamation-triangle"></i> <span id="xrefMismatchCount">0</span> Año Diferente</span>
+</div>
+</div>
+<button class="inv-xref-toggle" id="xrefToggleBtn" title="Mostrar/ocultar detalles">
+<i class="fas fa-chevron-down" id="xrefToggleIcon"></i>
+</button>
+<div class="inv-xref-detail" id="xrefDetail">
+<div class="inv-xref-diagram">
+<div class="inv-xref-diagram__path inv-xref-diagram__path--furat">
+<i class="fas fa-file-alt"></i>
+<span>3.2.1 Reportes de Accidentes</span>
+<small>FURATs</small>
+</div>
+<div class="inv-xref-diagram__connector"><i class="fas fa-arrows-alt-h"></i></div>
+<div class="inv-xref-diagram__path inv-xref-diagram__path--inv">
+<i class="fas fa-search"></i>
+<span>3.2.2 Investigación</span>
+<small>Accidentes</small>
+</div>
+</div>
+<div id="xrefList" class="inv-xref-list"></div>
+</div>
+<button class="inv-xref-close" id="xrefCloseBtn" title="Cerrar panel"><i class="fas fa-times"></i></button>
+</div>
 
-            <!-- Barra de búsqueda -->
-            <div class="inv-search-bar">
-                <i class="fas fa-search inv-search-icon"></i>
-                <input type="text" id="searchInput" placeholder="Buscar por nombre de investigación..." class="inv-search-input">
-                <button id="clearSearchBtn" class="inv-search-clear hidden" title="Limpiar búsqueda">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
+<!-- Filter Bar — filter-buttons + search + view-toggle -->
+<div class="inv-filter-bar">
+<div class="inv-filter-buttons" id="filterButtons">
+<button class="inv-filter-btn active" data-filter="todas"><i class="fas fa-layer-group"></i> Todas</button>
+<button class="inv-filter-btn" data-filter="pendiente"><i class="fas fa-clock"></i> Pendientes</button>
+<button class="inv-filter-btn" data-filter="completada"><i class="fas fa-check-double"></i> Completadas</button>
+</div>
+<div class="inv-search-wrapper">
+<i class="fas fa-search inv-search-icon"></i>
+<input type="text" id="searchInput" placeholder="Buscar por nombre..." class="inv-search-input">
+<button id="clearSearchBtn" class="inv-search-clear hidden" title="Limpiar"><i class="fas fa-times"></i></button>
+</div>
+<button class="inv-view-toggle" id="viewToggleBtn" title="Cambiar vista">
+<i class="fas fa-th-large" id="viewToggleIcon"></i>
+</button>
+</div>
 
-            <!-- Lista de investigaciones -->
-            <div id="investigationsList" class="inv-list">
-                <!-- Se llena dinámicamente -->
-            </div>
+<!-- Cards container — flat list -->
+<div id="investigationsList" class="inv-cards-list"></div>
 
-            <!-- Sección: Agregar FURAT -->
-            <div class="inv-upload-section">
-                <div class="inv-upload-header">
-                    <h3><i class="fas fa-plus-circle"></i> Agregar Nuevo FURAT</h3>
-                    <p class="inv-upload-desc">Arrastra un archivo FURAT o haz clic para seleccionar. El archivo se guardará automáticamente en la carpeta de la empresa.</p>
-                </div>
-                <div id="dropZone" class="inv-drop-zone">
-                    <div class="inv-drop-content">
-                        <i class="fas fa-cloud-upload-alt inv-drop-icon"></i>
-                        <p class="inv-drop-title">Arrastra un archivo PDF aquí</p>
-                        <p class="inv-drop-subtitle">o haz clic para seleccionar un archivo</p>
-                    </div>
-                    <input type="file" id="fileInput" accept=".pdf" class="hidden">
-                </div>
-                <div id="uploadProgress" class="inv-upload-progress hidden">
-                    <div class="inv-upload-progress-bar">
-                        <div class="inv-upload-progress-fill" id="uploadProgressFill"></div>
-                    </div>
-                    <span class="inv-upload-progress-text" id="uploadProgressText">Guardando FURAT...</span>
-                </div>
-                <div id="uploadSuccess" class="inv-upload-success hidden">
-                    <i class="fas fa-check-circle"></i>
-                    <span id="uploadSuccessText">FURAT guardado exitosamente</span>
-                </div>
-            </div>
+</div>
 
-        </div>
+<!-- Upload FAB -->
+<button id="uploadFab" class="inv-upload-fab" title="Agregar FURAT">
+<i class="fas fa-plus"></i>
+</button>
 
-        <!-- Modal de previsualización -->
-        <div id="previewModal" class="inv-modal hidden">
-            <div class="inv-modal-overlay" id="previewOverlay"></div>
-            <div class="inv-modal-content">
-                <div class="inv-modal-header">
-                    <h3 id="previewTitle">Previsualización</h3>
-                    <button id="closePreviewBtn" class="inv-modal-close" aria-label="Cerrar">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="inv-modal-body" id="previewBody">
-                    <!-- PDF iframe o loading -->
-                </div>
-            </div>
-        </div>
+<!-- Upload Overlay + Modal -->
+<div id="uploadOverlay" class="inv-upload-overlay hidden">
+<div class="inv-upload-modal">
+<div class="inv-upload-modal__header">
+<h3 class="inv-upload-modal__title"><i class="fas fa-cloud-upload-alt"></i> Agregar Nuevo FURAT</h3>
+<button id="closeUploadBtn" class="inv-upload-modal__close" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+</div>
+<div class="inv-upload-modal__body">
+<div class="inv-upload-path-hint" id="uploadPathHint">
+<i class="fas fa-folder-open"></i>
+<span>3.2.1/Reporte de los accidentes de trabajo/</span>
+</div>
+<div id="dropZone" class="inv-drop-zone">
+<div class="inv-drop-zone__content">
+<i class="fas fa-cloud-upload-alt inv-drop-zone__icon"></i>
+<p class="inv-drop-zone__title">Arrastra un archivo PDF aquí</p>
+<p class="inv-drop-zone__subtitle">o haz clic para seleccionar un archivo</p>
+</div>
+<input type="file" id="fileInput" accept=".pdf" class="hidden">
+</div>
+<div id="uploadProgress" class="inv-upload-progress hidden">
+<div class="inv-upload-progress__bar">
+<div class="inv-upload-progress__fill" id="uploadProgressFill"></div>
+</div>
+<span class="inv-upload-progress__text" id="uploadProgressText">Guardando FURAT...</span>
+</div>
+<div id="uploadSuccess" class="inv-upload-success hidden">
+<i class="fas fa-check-circle"></i>
+<span id="uploadSuccessText">FURAT guardado exitosamente</span>
+</div>
+<div id="uploadQueue" class="inv-upload-queue"></div>
+</div>
+<div class="inv-upload-modal__footer">
+<button class="inv-upload-modal__btn inv-upload-modal__btn--cancel" id="uploadCancelBtn">Cancelar</button>
+<button class="inv-upload-modal__btn inv-upload-modal__btn--save" id="uploadSaveBtn" disabled>Guardar</button>
+</div>
+</div>
+</div>
 
-        <!-- Toast -->
-        <div id="toast" class="inv-toast" role="alert">
-            <div id="toastIcon" class="inv-toast-icon"></div>
-            <div class="inv-toast-content">
-                <p id="toastTitle" class="inv-toast-title"></p>
-                <p id="toastMessage" class="inv-toast-message"></p>
-            </div>
-            <button id="toastClose" class="inv-toast-close" aria-label="Cerrar">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
+<!-- Preview Overlay + Modal -->
+<div id="previewOverlay" class="inv-preview-overlay hidden">
+<div class="inv-preview-modal">
+<div class="inv-preview-modal__header">
+<h3 class="inv-preview-modal__title" id="previewTitle">Previsualización</h3>
+<button id="closePreviewBtn" class="inv-preview-modal__close" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+</div>
+<div class="inv-preview-modal__body" id="previewBody">
+<div class="inv-preview-field-grid" id="previewFieldGrid"></div>
+<div id="previewIframeContainer" class="inv-preview-iframe-container"></div>
+</div>
+<div class="inv-preview-modal__footer">
+<button class="inv-preview-modal__btn inv-preview-modal__btn--close" id="previewCloseBtn">Cerrar</button>
+<button class="inv-preview-modal__btn inv-preview-modal__btn--start" id="previewStartBtn" style="display:none;">
+<i class="fas fa-search-plus"></i> Iniciar Investigación
+</button>
+</div>
+</div>
+</div>
 
-    </div>
+<!-- Toast Container — top-right -->
+<div id="toastContainer" class="inv-toast-container"></div>
 
-    <script src="investigaciones-viewer.js"></script>
+</div>
+
+<script src="investigaciones-viewer.js"></script>
 </body>
 </html>
