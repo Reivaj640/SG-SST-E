@@ -4668,12 +4668,12 @@ class MedicionAusentismoComponent {
         // Contenedor principal modernizado
         const mainContent = document.createElement('div');
         mainContent.style.cssText = `
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 20px;
-            width: 100%;
-            min-height: 100%;
-            box-sizing: border-box;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+      width: 100%;
+      min-height: 100%;
+      box-sizing: border-box;
         `;
 
         // Notificación toast
@@ -4804,10 +4804,18 @@ class MedicionAusentismoComponent {
                 grid-template-columns: repeat(2, 1fr);
                 gap: 20px;
             }
-            .form-grid-responsive .full-width {
-                grid-column: span 2;
-            }
-            @media (max-width: 768px) {
+      .form-grid-responsive .full-width {
+        grid-column: span 2;
+      }
+      @media (min-width: 1200px) {
+        .form-grid-responsive {
+          grid-template-columns: repeat(3, 1fr);
+        }
+        .form-grid-responsive .full-width {
+          grid-column: span 3;
+        }
+      }
+      @media (max-width: 768px) {
                 .form-grid-responsive {
                     grid-template-columns: 1fr;
                 }
