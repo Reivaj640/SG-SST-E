@@ -874,7 +874,21 @@ select.k-form-control {
 .gap-2      { gap: 0.5rem; }
 .text-right { text-align: right; }
 .text-center{ text-align: center; }
-.mb-0       { margin-bottom: 0; }
+.mb-0 { margin-bottom: 0; }
+
+.k-table td.k-cell-actions {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 4px;
+	flex-wrap: nowrap;
+	white-space: nowrap;
+}
+
+.k-table td.k-cell-date {
+	white-space: nowrap;
+	min-width: 130px;
+}
 
 /* Formulario legacy (vista Reportes) */
 .form-label   { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; color: var(--k-text-main); }

@@ -9191,9 +9191,13 @@ ipcMain.handle('sync-inducciones-from-forms', async (event, companyName) => {
       // Obtener stats del archivo
     const stats = await fsp.stat(filePath);
     
-    sendLog(`[MAIN] Sincronización completada: ${inducciones.length} registros`, 'INFO');
-    
-    return { 
+	sendLog(`[MAIN] Sincronización completada: ${inducciones.length} registros`, 'INFO');
+
+	const recursosCacheKey = `recursos_${companyName.toUpperCase()}`;
+	statsMemoryCache.delete(recursosCacheKey);
+	sendLog(`[CACHE] Invalidado: ${recursosCacheKey} tras sync inducciones`, 'INFO');
+
+	return {
       success: true, 
       data: inducciones, 
       filePath,
@@ -10665,14 +10669,29 @@ ipcMain.handle('get-recursos-stats', async (event, companyName) => {
     const rootPath = await getCompanyRootPath(companyName);
     if (!rootPath) return { success: true, stats: null };
 
-    const cacheKey = `recursos_${companyName.toUpperCase()}`;
-    
-    // Lista de rutas críticas de las que depende este cálculo
-    // Nota: findFileRecursive es asíncrono, aquí listamos las carpetas principales
-    const deps = [
-        path.join(rootPath, '1. Recursos'),
-        path.join(app.getPath('userData'), 'config.json')
-    ];
+		const cacheKey = `recursos_${companyName.toUpperCase()}`;
+
+		const recursosPath = path.join(rootPath, '1. Recursos');
+		let induccionesFolderPath = null;
+		if (fs.existsSync(recursosPath)) {
+			try {
+				const subs = fs.readdirSync(recursosPath);
+				const normalize = (str) => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+				const indFolder = subs.find(s => {
+					const norm = normalize(s);
+					return norm.includes('induccion') || norm.includes('reinduccion');
+				});
+				if (indFolder) induccionesFolderPath = path.join(recursosPath, indFolder);
+			} catch (e) {
+				sendLog(`[CACHE] Error detectando carpeta inducciones para fingerprint: ${e.message}`, 'WARN');
+			}
+		}
+
+		const deps = [
+			recursosPath,
+			induccionesFolderPath,
+			path.join(app.getPath('userData'), 'config.json')
+		].filter(Boolean);
 
     const stats = await getCachedStats(cacheKey, deps, async () => {
         sendLog(`[MAIN] Recalculando estadísticas de recursos para: ${companyName}`, 'INFO');

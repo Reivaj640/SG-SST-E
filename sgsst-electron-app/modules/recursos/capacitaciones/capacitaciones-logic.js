@@ -667,11 +667,11 @@ class CapacitacionesComponent {
             tr.innerHTML = `
                 <td><strong>${item.nombre}</strong></td>
                 <td><span class="k-badge ${typeBadge}">${item.tipo.toUpperCase()}</span></td>
-                <td>${this.formatDate(item.fechaProgramada)}</td>
+			<td class="k-cell-date">${this.formatDate(item.fechaProgramada)}</td>
                 <td>${item.instructor}</td>
                 <td>${item.duracion}</td>
                 <td><span class="k-badge ${badgeClass}">${statusText}</span></td>
-        <td class="text-right">
+			<td class="text-right k-cell-actions">
           <button class="k-btn k-btn-outline k-btn-icon edit-btn" data-id="${item.id}" title="Editar">
             <i class="bi bi-pencil"></i>
           </button>
