@@ -877,6 +877,10 @@ select.k-form-control {
 .mb-0 { margin-bottom: 0; }
 
 .k-table td.k-cell-actions {
+	vertical-align: middle;
+}
+
+.k-table td.k-cell-actions .k-cell-actions__inner {
 	display: flex;
 	align-items: center;
 	justify-content: flex-end;

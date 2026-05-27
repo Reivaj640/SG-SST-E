@@ -671,7 +671,7 @@ class CapacitacionesComponent {
                 <td>${item.instructor}</td>
                 <td>${item.duracion}</td>
                 <td><span class="k-badge ${badgeClass}">${statusText}</span></td>
-			<td class="text-right k-cell-actions">
+			<td class="text-right k-cell-actions"><div class="k-cell-actions__inner">
           <button class="k-btn k-btn-outline k-btn-icon edit-btn" data-id="${item.id}" title="Editar">
             <i class="bi bi-pencil"></i>
           </button>
@@ -691,6 +691,7 @@ class CapacitacionesComponent {
             data-id="${item.id}" title="Eliminar">
             <i class="bi bi-trash"></i>
           </button>
+        </div>
         </td>
             `;
             tbody.appendChild(tr);
