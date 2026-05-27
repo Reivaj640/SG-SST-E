@@ -613,7 +613,7 @@
     background: var(--k-bg-card);
     border: 1px solid var(--k-border);
     border-radius: var(--k-radius-lg) var(--k-radius-lg) 0 0;
-    padding: 1rem 1.5rem;
+    padding: 0.75rem 1rem;
     display: flex;
     flex-wrap: wrap;
     gap: 1rem;
@@ -663,12 +663,12 @@
     color: var(--k-text-muted);
     font-weight: 600;
     text-align: left;
-    padding: 1rem 1.5rem;
+    padding: 0.75rem 1rem;
     border-bottom: 1px solid var(--k-border);
     white-space: nowrap;
 }
 .k-table td {
-    padding: 1rem 1.5rem;
+    padding: 0.75rem 1rem;
     border-bottom: 1px solid var(--k-border);
     vertical-align: middle;
     color: var(--k-text-main);

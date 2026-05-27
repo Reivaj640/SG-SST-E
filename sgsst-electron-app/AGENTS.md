@@ -31,14 +31,37 @@ python .opencode/skills/ui-ux-pro-max/scripts/search.py "<query>" --stack html-t
 | **code-reviewer** | Review de bugs, seguridad, calidad (confidence >= 80) | Despues de implementar, antes de commit |
 | **code-simplifier** | Simplificar codigo manteniendo funcionalidad | Despues de implementar, antes de commit |
 | **silent-failure-hunter** | Cazar errores silenciosos y error handling deficiente | Despues de escribir try-catch o fallbacks |
+| **security-review** | Review de seguridad: inyeccion, auth bypass, crypto, RCE, data exposure (confidence >= 8) | Despues de implementar, antes de commit, para codigo con input de usuario |
 | **commit-workflow** | Crear commits, push, PRs con mensajes significativos | Al hacer commit o PR |
+
+### Skills de Superpowers (Plugin Global)
+
+Se activan con `skill({ name: "superpowers/<nombre>" })`. El plugin inyecta bootstrap context automaticamente en cada conversacion.
+
+| Skill | Cuando usarlo | Activacion |
+|-------|--------------|------------|
+| **superpowers/brainstorming** | Refinar ideas antes de codificar, diseno socratico | OBLIGATORIO antes de escribir codigo nuevo |
+| **superpowers/writing-plans** | Crear planes de implementacion detallados | Despues de aprobar diseno |
+| **superpowers/executing-plans** | Ejecutar planes en batch con checkpoints | Con plan aprobado |
+| **superpowers/subagent-driven-development** | Desarrollo rapido con subagentes y review en 2 etapas | Alternativa a executing-plans |
+| **superpowers/test-driven-development** | Ciclo RED-GREEN-REFACTOR | OBLIGATORIO durante implementacion |
+| **superpowers/systematic-debugging** | Debugging sistematico en 4 fases, root-cause tracing | Al investigar bugs |
+| **superpowers/verification-before-completion** | Verificar que algo esta realmente arreglado | Antes de declarar un bug como resuelto |
+| **superpowers/requesting-code-review** | Checklist pre-review | Entre tareas del plan |
+| **superpowers/receiving-code-review** | Responder a feedback de review | Al recibir comentarios |
+| **superpowers/using-git-worktrees** | Branches aislados para desarrollo paralelo | Al iniciar feature branch |
+| **superpowers/finishing-a-development-branch** | Verificar tests, decidir merge/PR/keep/discard | Al completar tareas |
+| **superpowers/dispatching-parallel-agents** | Workflows concurrentes con subagentes | Para tareas independientes |
+| **superpowers/writing-skills** | Crear nuevos skills siguiendo mejores practicas | Al crear skills personalizados |
+| **superpowers/using-superpowers** | Introduccion al sistema de skills | Referencia general |
 
 ### Workflow Recomendado para Desarrollo
 
 1. **feature-dev** - Workflow completo (7 fases: discovery, exploration, questions, architecture, implementation, review, summary)
 2. **code-simplifier** - Despues de implementar codigo
 3. **code-reviewer** - Antes de commit
-4. **commit-workflow** - Al hacer commit
+4. **security-review** - Antes de commit, para codigo con input de usuario o superficies de ataque
+5. **commit-workflow** - Al hacer commit
 
 ### Proyecto K+AIR (SG-SST Electron)
 - Stack: Electron + vanilla JS + Python 3.11.9
