@@ -359,14 +359,17 @@ class CopasstComponent {
         </ol>
     </div>
     <div class="kair-header__right">
-        <span class="kair-header__company">
-            <i class="bi bi-building"></i>
-            <span id="header-company-text">${this.currentCompany || '—'}</span>
-        </span>
-        <div class="kair-header__divider"></div>
-        <button class="kair-header__action--ghost" id="btn-save-draft-header" title="Guardar borrador">
-            <i class="bi bi-save"></i> Guardar
-        </button>
+      <span class="kair-header__company">
+        <i class="bi bi-building"></i>
+        <span id="header-company-text">${this.currentCompany || '—'}</span>
+      </span>
+      <div class="kair-header__divider"></div>
+      <button class="kair-header__action--primary" id="btn-auto-fill-header" title="Autollenado inteligente del acta">
+        <i class="bi bi-magic"></i> Autollenado
+      </button>
+      <button class="kair-header__action--ghost" id="btn-save-draft-header" title="Guardar borrador">
+        <i class="bi bi-save"></i> Guardar
+      </button>
         <button class="kair-header__action--ghost" id="btn-export-excel-header" title="Exportar a Excel">
             <i class="bi bi-file-earmark-excel"></i> Exportar
         </button>
@@ -400,6 +403,17 @@ class CopasstComponent {
 .copasst-actas-container .kair-header__company i { font-size: 0.875rem; }
 .copasst-actas-container .kair-header__action--ghost { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.75rem; font-size: 0.8125rem; font-weight: 500; color: #5a6378; background: transparent; border: none; border-radius: 0.375rem; cursor: pointer; transition: background 0.15s ease; }
 .copasst-actas-container .kair-header__action--ghost:hover { background: #f0f2f5; color: #1a1a2e; }
+.copasst-actas-container .kair-header__action--primary { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.875rem; font-size: 0.8125rem; font-weight: 500; color: #ffffff; background: #174ea6; border: none; border-radius: 0.375rem; cursor: pointer; transition: background 0.15s ease; }
+.copasst-actas-container .kair-header__action--primary:hover { background: #185abd; }
+.copasst-actas-container .kair-header__action--primary:disabled { opacity: 0.6; cursor: not-allowed; }
+.copasst-actas-container .kair-header__action--primary--loading { pointer-events: none; position: relative; color: transparent; }
+.copasst-actas-container .kair-header__action--primary--loading::after { content: ''; position: absolute; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: kair-spin 0.6s linear infinite; left: 50%; top: 50%; margin-left: -7px; margin-top: -7px; }
+@keyframes kair-spin { to { transform: rotate(360deg); } }
+.copasst-actas-container .auto-fill-toast { position: fixed; bottom: 1.5rem; right: 1.5rem; padding: 0.75rem 1.25rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 500; z-index: 9999; display: flex; align-items: center; gap: 0.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15); animation: kair-toast-in 0.3s ease-out; }
+.copasst-actas-container .auto-fill-toast--success { background: #28a745; color: #fff; }
+.copasst-actas-container .auto-fill-toast--warning { background: #ffc107; color: #212529; }
+.copasst-actas-container .auto-fill-toast--error { background: #dc3545; color: #fff; }
+@keyframes kair-toast-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
 .copasst-actas-container[data-theme="dark"] .kair-header { background: var(--k-bg-card, #2d3748); border-bottom-color: var(--k-border, #4a5568); }
 .copasst-actas-container[data-theme="dark"] .kair-header__title { color: #e9ecef; }
@@ -469,6 +483,7 @@ class CopasstComponent {
         this.container.appendChild(wrapper);
 
         document.getElementById('btn-back-portal').onclick = () => this.render();
+  document.getElementById('btn-auto-fill-header').onclick = () => this.handleAutoFill();
 
         const agendaList = document.getElementById('agenda-list');
         const desarrolloList = document.getElementById('desarrollo-list');
@@ -511,7 +526,114 @@ class CopasstComponent {
         document.getElementById('btn-export-excel-header').onclick = () => this.handleExportExcel();
     }
 
-    async handleExportExcel() {
+    async handleAutoFill() {
+    const btn = document.getElementById('btn-auto-fill-header');
+    if (!btn) return;
+
+    btn.classList.add('kair-header__action--primary--loading');
+    btn.disabled = true;
+
+    try {
+      const result = await window.electronAPI.getCopasstAutoFillData(this.currentCompany);
+
+      if (!result || !result.success || !result.data) {
+        this._showAutoFillToast('Error al obtener datos para autollenado', 'error');
+        return;
+      }
+
+      const data = result.data;
+
+      // Llenar sección: Información de la Reunión
+      const actaNumberInput = document.getElementById('acta-number');
+      const fechaInput = document.getElementById('fecha');
+      const topicInput = document.getElementById('topic');
+
+      if (actaNumberInput) actaNumberInput.value = data.nextActaNumber || 1;
+      if (fechaInput) fechaInput.value = data.suggestedDate || new Date().toISOString().split('T')[0];
+      if (topicInput) topicInput.value = `Reunión del COPASST - ${data.targetMonth || ''} ${data.targetYear || ''}`;
+
+      // Llenar agenda: limpiar existente y agregar los items
+      const agendaList = document.getElementById('agenda-list');
+      if (agendaList && data.agenda && data.agenda.length > 0) {
+        agendaList.innerHTML = '';
+        data.agenda.forEach(item => {
+          agendaList.appendChild(this._createAgendaItem(item));
+        });
+      }
+
+      // Llenar desarrollo: limpiar existente y agregar los items
+      const desarrolloList = document.getElementById('desarrollo-list');
+      if (desarrolloList && data.desarrollo && data.desarrollo.length > 0) {
+        desarrolloList.innerHTML = '';
+        data.desarrollo.forEach(item => {
+          desarrolloList.appendChild(this._createDesarrolloItem(item));
+        });
+      }
+
+      // Mostrar toast de éxito
+      let toastMsg = `Acta N°${data.nextActaNumber} — ${data.targetMonth} ${data.targetYear} autollenada`;
+      if (data.warnings && data.warnings.length > 0) {
+        toastMsg += ` (${data.warnings.length} aviso(s))`;
+        this._showAutoFillToast(toastMsg, 'warning');
+      } else {
+        this._showAutoFillToast(toastMsg, 'success');
+      }
+
+      // Scroll al inicio del formulario
+      const editorContainer = this.container.querySelector('.acta-editor-container');
+      if (editorContainer) editorContainer.scrollTo({ top: 0, behavior: 'smooth' });
+
+    } catch (error) {
+      this._showAutoFillToast(`Error: ${error.message}`, 'error');
+    } finally {
+      btn.classList.remove('kair-header__action--primary--loading');
+      btn.disabled = false;
+    }
+  }
+
+  _createAgendaItem(data = {}) {
+    const div = document.createElement('div');
+    div.className = 'acta-dynamic-item';
+    div.innerHTML = `<div class="acta-form-grid">
+      <div class="acta-form-group" style="grid-column: span 2"><label>Tema</label><input type="text" class="in-tema" value="${data.tema || ''}"></div>
+      <div class="acta-form-group"><label>Duración</label><input type="text" class="in-duracion" value="${data.duracion || ''}"></div>
+      <div class="acta-form-group"><label>Líder</label><input type="text" class="in-lider" value="${data.lider || ''}"></div>
+    </div><button class="acta-btn-remove">✕</button>`;
+    div.querySelector('.acta-btn-remove').onclick = () => div.remove();
+    return div;
+  }
+
+  _createDesarrolloItem(data = {}) {
+    const div = document.createElement('div');
+    div.className = 'acta-dynamic-item';
+    div.innerHTML = `<div class="acta-form-group"><label>Temas Tratados</label><textarea class="in-tema" rows="9">${data.tema || ''}</textarea></div>
+    <div class="acta-form-group"><label>Compromisos</label><textarea class="in-compromisos" rows="5">${data.compromisos || ''}</textarea></div>
+    <div class="acta-form-grid" style="margin-top:10px;">
+      <div class="acta-form-group"><label>Fecha</label><input type="date" class="in-fecha" value="${data.fecha || ''}"></div>
+      <div class="acta-form-group"><label>Responsable</label><input type="text" class="in-responsable" value="${data.responsable || ''}"></div>
+    </div><button class="acta-btn-remove">✕</button>`;
+    div.querySelector('.acta-btn-remove').onclick = () => div.remove();
+    return div;
+  }
+
+  _showAutoFillToast(message, type = 'success') {
+    const existing = this.container.querySelector('.auto-fill-toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.className = `auto-fill-toast auto-fill-toast--${type}`;
+    const iconMap = { success: 'bi-check-circle-fill', warning: 'bi-exclamation-triangle-fill', error: 'bi-x-circle-fill' };
+    toast.innerHTML = `<i class="bi ${iconMap[type] || iconMap.success}"></i> ${message}`;
+    this.container.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transition = 'opacity 0.3s ease';
+      setTimeout(() => toast.remove(), 300);
+    }, 4000);
+  }
+
+  async handleExportExcel() {
         const data = {
             actaNumber: document.getElementById('acta-number').value,
             fecha: document.getElementById('fecha').value,
@@ -527,9 +649,14 @@ class CopasstComponent {
         document.querySelectorAll('#desarrollo-list .acta-dynamic-item').forEach(item => {
             data.desarrolloItems.push({ tema: item.querySelector('.in-tema').value, compromisos: item.querySelector('.in-compromisos').value, fecha: item.querySelector('.in-fecha').value, responsable: item.querySelector('.in-responsable').value });
         });
-        const changes = this.prepareExcelChanges(data);
-        try {
-            const savePath = await window.electronAPI.showSaveDialog({ title: 'Guardar Acta de COPASST', defaultPath: `ACTA_COPASST_${data.fecha}.xlsx`, filters: [{ name: 'Archivos de Excel', extensions: ['xlsx'] }] });
+    const changes = this.prepareExcelChanges(data);
+    try {
+      const fechaYear = data.fecha ? new Date(data.fecha).getFullYear() : new Date().getFullYear();
+      const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+      const fechaMonth = data.fecha ? MESES[new Date(data.fecha).getMonth()] : MESES[new Date().getMonth()];
+      const saveInfo = await window.electronAPI.getCopasstSavePath(this.currentCompany, fechaYear, fechaMonth, data.actaNumber);
+      const defaultPath = (saveInfo && saveInfo.success && saveInfo.data) ? saveInfo.data.defaultPath : `ACT-FO-029 Acta de Reunión Copasst ${fechaMonth}.xlsx`;
+      const savePath = await window.electronAPI.showSaveDialog({ title: 'Guardar Acta de COPASST', defaultPath, filters: [{ name: 'Archivos de Excel', extensions: ['xlsx'] }] });
             if (!savePath) return;
             const result = await window.electronAPI.generateCopasstActa(changes, savePath);
             if (result.success) alert(`Acta generada en: ${result.documentPath}`);

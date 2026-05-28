@@ -26,10 +26,13 @@
         <span id="header-company-text">—</span>
       </span>
       <div class="kair-header__divider"></div>
+      <button class="kair-header__action--secondary" id="btn-create-period-header" title="Crear periodo para el año siguiente">
+        <i class="bi bi-calendar-plus"></i> Crear Periodo
+      </button>
       <button class="kair-header__action--ghost" id="btn-export-excel" title="Exportar cronograma">
         <i class="bi bi-download"></i> Exportar
       </button>
-  </div>
+    </div>
  </div>
 
  <!-- ======================== -->
@@ -78,72 +81,72 @@
     <!-- 3. CONTENIDO PRINCIPAL -->
     <main class="k-main-content">
 
-        <!-- VISTA: DASHBOARD -->
-        <section id="view-dashboard" class="k-view-section active">
+  <!-- VISTA: DASHBOARD -->
+  <section id="view-dashboard" class="k-view-section active">
 
-            <!-- Métricas -->
-            <div class="k-grid-dashboard">
-                <div class="k-stat-card primary">
-                    <div class="k-stat-label">Total Programadas</div>
-                    <div class="k-stat-value" id="stat-total">0</div>
-                    <div class="k-stat-meta" id="stat-progress-text">0% Completitud</div>
-                </div>
-                <div class="k-stat-card success">
-                    <div class="k-stat-label">Realizadas</div>
-                    <div class="k-stat-value" id="stat-completed">0</div>
-                    <div class="k-stat-meta">En el año actual</div>
-                </div>
-                <div class="k-stat-card warning">
-                    <div class="k-stat-label">Pendientes</div>
-                    <div class="k-stat-value" id="stat-pending">0</div>
-                    <div class="k-stat-meta">Próximos 30 días</div>
-                </div>
-                <div class="k-stat-card danger">
-                    <div class="k-stat-label">Participantes</div>
-                    <div class="k-stat-value" id="stat-participants">0</div>
-                    <div class="k-stat-meta">Histórico acumulado</div>
-                </div>
-            </div>
+  <!-- Franja de estadísticas compacta -->
+  <div class="k-stats-ribbon">
+    <div class="k-stats-ribbon__item">
+      <span class="k-stats-ribbon__icon primary"><i class="bi bi-calendar-check"></i></span>
+      <div class="k-stats-ribbon__data">
+        <span class="k-stats-ribbon__value" id="stat-total">0</span>
+        <span class="k-stats-ribbon__label">Programadas</span>
+      </div>
+      <span class="k-stats-ribbon__pct" id="stat-progress-text">0%</span>
+    </div>
+    <div class="k-stats-ribbon__divider"></div>
+    <div class="k-stats-ribbon__item">
+      <span class="k-stats-ribbon__icon success"><i class="bi bi-check-circle"></i></span>
+      <div class="k-stats-ribbon__data">
+        <span class="k-stats-ribbon__value" id="stat-completed">0</span>
+        <span class="k-stats-ribbon__label">Realizadas</span>
+      </div>
+    </div>
+    <div class="k-stats-ribbon__divider"></div>
+    <div class="k-stats-ribbon__item">
+      <span class="k-stats-ribbon__icon warning"><i class="bi bi-clock-history"></i></span>
+      <div class="k-stats-ribbon__data">
+        <span class="k-stats-ribbon__value" id="stat-pending">0</span>
+        <span class="k-stats-ribbon__label">Pendientes</span>
+      </div>
+    </div>
+    <div class="k-stats-ribbon__divider"></div>
+    <div class="k-stats-ribbon__item">
+      <span class="k-stats-ribbon__icon muted"><i class="bi bi-people"></i></span>
+      <div class="k-stats-ribbon__data">
+        <span class="k-stats-ribbon__value k-stats-ribbon__value--muted" id="stat-participants">N/D</span>
+        <span class="k-stats-ribbon__label">Asistencia</span>
+      </div>
+    </div>
+  </div>
 
-            <!-- Gráfico y Acciones Rápidas -->
-            <div class="dashboard-grid">
-                <div class="k-chart-container">
-                    <div class="k-chart-header">
-                        <div class="k-chart-title">Ejecución Mensual (SST vs PYP)</div>
-                    </div>
-                    <div class="k-chart-body">
-                        <canvas id="trainingChart"></canvas>
-                    </div>
-                </div>
+  <!-- Gráficas -->
+  <div class="k-charts-grid">
+    <div class="k-chart-container">
+      <div class="k-chart-header">
+        <div class="k-chart-title">Actividades SST vs PYP</div>
+      </div>
+      <div class="k-chart-body k-chart-body--donut">
+        <canvas id="typeChart"></canvas>
+      </div>
+    </div>
+    <div class="k-chart-container">
+      <div class="k-chart-header">
+        <div class="k-chart-title">Ejecución Mensual</div>
+      </div>
+      <div class="k-chart-body">
+        <canvas id="trainingChart"></canvas>
+      </div>
+    </div>
+  </div>
 
-                <div class="k-actions-grid k-actions-grid--single">
-                    <button class="k-btn k-btn-primary k-btn-full" id="btn-quick-add">
-                        <i class="bi bi-plus-circle"></i> Nueva Capacitación
-                    </button>
-                    <div class="k-action-card" id="btn-create-period">
-                        <div class="k-action-icon"><i class="bi bi-calendar-plus"></i></div>
-                        <div>
-                            <div class="k-action-card-title">Crear Periodo</div>
-                            <div class="k-action-card-desc">Duplicar a año siguiente</div>
-                        </div>
-                    </div>
-                    <div class="k-action-card">
-                        <div class="k-action-icon"><i class="bi bi-envelope"></i></div>
-                        <div>
-                            <div class="k-action-card-title">Recordatorios</div>
-                            <div class="k-action-card-desc">Enviar notificaciones</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+  <!-- Próximas Capacitaciones -->
+  <div class="k-chart-container k-recent-list-container">
+    <div class="k-chart-title" style="margin-bottom: 1rem;">Próximas Capacitaciones</div>
+    <div id="recent-list"></div>
+  </div>
 
-            <!-- Próximas Capacitaciones -->
-            <div class="k-chart-container k-recent-list-container">
-                <div class="k-chart-title" style="margin-bottom: 1rem;">Próximas Capacitaciones</div>
-                <div id="recent-list"></div>
-            </div>
-
-        </section>
+  </section>
 
         <!-- VISTA: LISTADO -->
         <section id="view-trainings" class="k-view-section">

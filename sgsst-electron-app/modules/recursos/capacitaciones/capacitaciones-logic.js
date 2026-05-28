@@ -15,6 +15,7 @@ class CapacitacionesComponent {
         this.handleFileChange = null;
         this.availableSheets = [];
         this.chartInstance = null;
+    this.typeChartInstance = null;
  this._modalInBody = null;
  this._confirmCallback = null;
  this._confirmModalInBody = null;
@@ -128,9 +129,12 @@ class CapacitacionesComponent {
         if (this.handleFileChange) {
             window.electronAPI.removeIpcMessageListener('capacitaciones-file-changed', this.handleFileChange);
         }
-        if (this.chartInstance) {
-            this.chartInstance.destroy();
-        }
+  if (this.chartInstance) {
+    this.chartInstance.destroy();
+  }
+  if (this.typeChartInstance) {
+    this.typeChartInstance.destroy();
+  }
         // ✏️ NUEVO — remover modal del body al destruir el componente
         // evita que quede huérfano en el DOM si el usuario navega a otro módulo
  if (this._modalInBody && this._modalInBody.parentNode === document.body) {
@@ -167,13 +171,13 @@ class CapacitacionesComponent {
         });
         document.getElementById('btn-clear-filters')?.addEventListener('click', () => this.clearFilters());
 
-        // Botones de Acción del Dashboard
-        document.getElementById('btn-create-period')?.addEventListener('click', () => this.createNewPeriod());
+  // Botones de Acción del Dashboard
+  document.getElementById('btn-create-period')?.addEventListener('click', () => this.createNewPeriod());
+  document.getElementById('btn-create-period-header')?.addEventListener('click', () => this.createNewPeriod());
 
-        // Abrir modal en modo agregar
-        const openAddModal = () => this.openModal('add');
-        document.getElementById('btn-quick-add')?.addEventListener('click', openAddModal);
-        document.getElementById('btn-add-training')?.addEventListener('click', openAddModal);
+  // Abrir modal en modo agregar
+  const openAddModal = () => this.openModal('add');
+  document.getElementById('btn-add-training')?.addEventListener('click', openAddModal);
 
  document.getElementById('btn-export-excel')?.addEventListener('click', () => this.exportToExcel());
 
@@ -634,19 +638,19 @@ class CapacitacionesComponent {
 
     // --- RENDERIZADO UI ---
 
-    updateDashboardStats() {
-        const total        = this.filteredCapacitaciones.length;
-        const completed    = this.filteredCapacitaciones.filter(c => c.estado === 'completed').length;
-        const pending      = this.filteredCapacitaciones.filter(c => c.estado === 'pending').length;
-        const participants = this.filteredCapacitaciones.reduce((sum, c) => sum + (parseInt(c.participantes) || 0), 0);
-        const progress     = total > 0 ? Math.round((completed / total) * 100) : 0;
+  updateDashboardStats() {
+    const total = this.filteredCapacitaciones.length;
+    const completed = this.filteredCapacitaciones.filter(c => c.estado === 'completed').length;
+    const pending = this.filteredCapacitaciones.filter(c => c.estado === 'pending').length;
+    const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-        document.getElementById('stat-total').textContent         = total;
-        document.getElementById('stat-completed').textContent     = completed;
-        document.getElementById('stat-pending').textContent       = pending;
-        document.getElementById('stat-participants').textContent  = participants;
-        document.getElementById('stat-progress-text').textContent = `${progress}% Completitud`;
-    }
+    document.getElementById('stat-total').textContent = total;
+    document.getElementById('stat-completed').textContent = completed;
+    document.getElementById('stat-pending').textContent = pending;
+    document.getElementById('stat-participants').textContent = 'N/D';
+    const progressEl = document.getElementById('stat-progress-text');
+    if (progressEl) progressEl.textContent = `${progress}%`;
+  }
 
     renderTable() {
         const tbody = document.getElementById('trainings-table-body');
@@ -952,55 +956,121 @@ class CapacitacionesComponent {
         window.KAIRToast.show('Exportando archivo... (Simulado)', 'info');
     }
 
-    // --- GRÁFICOS ---
+  // --- GRÁFICOS ---
 
-    initializeCharts() {
-        const ctx = document.getElementById('trainingChart');
-        if (!ctx) { console.warn('[CHART] Canvas no encontrado.'); return; }
-        if (typeof Chart === 'undefined') { console.error('[CHART] Chart.js no cargado.'); return; }
+  initializeCharts() {
+    const isDark = this.container.getAttribute('data-theme') === 'dark';
+    const textColor = isDark ? '#adb5bd' : '#6c757d';
+    const gridColor = isDark ? '#3a3a4a' : '#f0f0f0';
 
-        if (this.chartInstance) this.chartInstance.destroy();
+    this.initializeTypeChart(isDark, textColor);
+    this.initializeBarChart(isDark, textColor, gridColor);
+  }
 
-        this.chartInstance = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'],
-                datasets: [
-                    { label: 'Completadas', data: Array(12).fill(0), backgroundColor: '#174ea6', borderRadius: 4 },
-                    { label: 'Programadas', data: Array(12).fill(0), backgroundColor: '#ffc107', borderRadius: 4 }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                resizeDelay: 200,
-                scales: {
-                    y: { beginAtZero: true, grid: { display: true, color: '#f0f0f0' } },
-                    x: { grid: { display: false } }
-                },
-                plugins: { legend: { position: 'bottom' } }
+  initializeBarChart(isDark, textColor, gridColor) {
+    const ctx = document.getElementById('trainingChart');
+    if (!ctx) { console.warn('[CHART] trainingChart canvas no encontrado.'); return; }
+    if (typeof Chart === 'undefined') { console.error('[CHART] Chart.js no cargado.'); return; }
+
+    if (this.chartInstance) this.chartInstance.destroy();
+
+    this.chartInstance = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'],
+        datasets: [
+          { label: 'Completadas', data: Array(12).fill(0), backgroundColor: '#174ea6', borderRadius: 4 },
+          { label: 'Pendientes', data: Array(12).fill(0), backgroundColor: '#ffc107', borderRadius: 4 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        resizeDelay: 200,
+        scales: {
+          y: { beginAtZero: true, grid: { display: true, color: gridColor }, ticks: { color: textColor } },
+          x: { grid: { display: false }, ticks: { color: textColor } }
+        },
+        plugins: { legend: { position: 'bottom', labels: { color: textColor } } }
+      }
+    });
+  }
+
+  initializeTypeChart(isDark, textColor) {
+    const ctx = document.getElementById('typeChart');
+    if (!ctx) { console.warn('[CHART] typeChart canvas no encontrado.'); return; }
+    if (typeof Chart === 'undefined') { console.error('[CHART] Chart.js no cargado.'); return; }
+
+    if (this.typeChartInstance) this.typeChartInstance.destroy();
+
+    const sstColor = '#174ea6';
+    const pypColor = '#17a2b8';
+
+    this.typeChartInstance = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['SST', 'PYP'],
+        datasets: [{
+          data: [0, 0],
+          backgroundColor: [sstColor, pypColor],
+          borderWidth: 0,
+          hoverOffset: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '65%',
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { color: textColor, padding: 16, usePointStyle: true, pointStyleWidth: 10 }
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                const value = context.parsed;
+                const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+                return ` ${context.label}: ${value} (${pct}%)`;
+              }
             }
-        });
+          }
+        }
+      }
+    });
+  }
+
+  updateCharts() {
+    if (this.chartInstance) {
+      const completedData = Array(12).fill(0);
+      const pendingData = Array(12).fill(0);
+
+      this.filteredCapacitaciones.forEach(cap => {
+        const date = new Date(cap.fechaProgramada);
+        if (!isNaN(date.getTime())) {
+          const month = date.getMonth();
+          if (cap.estado === 'completed') completedData[month]++;
+          else pendingData[month]++;
+        }
+      });
+
+      this.chartInstance.data.datasets[0].data = completedData;
+      this.chartInstance.data.datasets[1].data = pendingData;
+      this.chartInstance.update();
     }
 
-    updateCharts() {
-        if (!this.chartInstance) return;
+    this.updateTypeChart();
+  }
 
-        const completedData = Array(12).fill(0);
-        const pendingData   = Array(12).fill(0);
+  updateTypeChart() {
+    if (!this.typeChartInstance) return;
 
-        this.filteredCapacitaciones.forEach(cap => {
-            const date = new Date(cap.fechaProgramada);
-            if (!isNaN(date.getTime())) {
-                const month = date.getMonth();
-                if (cap.estado === 'completed') completedData[month]++;
-                else pendingData[month]++;
-            }
-        });
+    const sstCount = this.filteredCapacitaciones.filter(c => c.tipo === 'sst').length;
+    const pypCount = this.filteredCapacitaciones.filter(c => c.tipo === 'pyp').length;
 
-        this.chartInstance.data.datasets[0].data = completedData;
-        this.chartInstance.data.datasets[1].data = pendingData;
-        this.chartInstance.update();
+    this.typeChartInstance.data.datasets[0].data = [sstCount, pypCount];
+        this.typeChartInstance.update();
     }
 
   // --- UTILIDADES ---

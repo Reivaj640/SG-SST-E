@@ -1,0 +1,276 @@
+/* =========================================
+   Portal Capacitaciones — CSS Scoped (K+AIR)
+   Prefijo: .cap-portal
+   ========================================= */
+
+.cap-portal {
+  --cp-primary: #174ea6;
+  --cp-primary-hover: #185abd;
+  --cp-primary-light: #e8f0fe;
+  --cp-success: #28a745;
+  --cp-warning: #ffc107;
+  --cp-danger: #dc3545;
+  --cp-info: #17a2b8;
+  --cp-text-dark: #212529;
+  --cp-text-muted: #6c757d;
+  --cp-bg-body: #f0f2f5;
+  --cp-bg-card: #ffffff;
+  --cp-border: #dee2e6;
+  --cp-radius: 0.5rem;
+  --cp-shadow-lg: 0 10px 25px rgba(0,0,0,0.05);
+
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+.cap-portal__card {
+  background: var(--cp-bg-card);
+  width: 100%;
+  max-width: 1100px;
+  border-radius: var(--cp-radius);
+  box-shadow: var(--cp-shadow-lg);
+  padding: 3rem;
+  text-align: center;
+  animation: capPortalFadeIn 0.5s ease-out;
+  margin: auto 0;
+}
+
+@keyframes capPortalFadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.cap-portal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #f1f3f5;
+}
+
+.cap-portal__logo {
+  font-family: 'Lexend', 'Segoe UI', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--cp-primary);
+}
+
+.cap-portal__back-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  color: var(--cp-text-muted);
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s;
+  background: #f8f9fa;
+  border: 1px solid var(--cp-border);
+}
+
+.cap-portal__back-btn:hover {
+  color: var(--cp-primary);
+  background: var(--cp-primary-light);
+  border-color: var(--cp-primary);
+}
+
+.cap-portal__status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 18px;
+  border-radius: 20px;
+  background: #d4edda;
+  color: #155724;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 2rem;
+}
+
+.cap-portal__hero-title {
+  font-family: 'Lexend', 'Segoe UI', sans-serif;
+  font-size: 2.5rem;
+  color: var(--cp-text-dark);
+  margin-bottom: 0.5rem;
+}
+
+.cap-portal__hero-subtitle {
+  color: var(--cp-text-muted);
+  font-size: 1.1rem;
+  margin-bottom: 2.5rem;
+  max-width: 650px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.6;
+}
+
+.cap-portal__main-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.cap-portal__main-action {
+  background: var(--cp-bg-card);
+  border: 2px solid var(--cp-border);
+  border-radius: var(--cp-radius);
+  padding: 2rem;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  text-align: left;
+}
+
+.cap-portal__main-action:hover {
+  border-color: var(--cp-primary);
+  box-shadow: 0 5px 20px rgba(23, 78, 166, 0.1);
+  transform: translateY(-2px);
+}
+
+.cap-portal__main-action--primary {
+  background: linear-gradient(135deg, var(--cp-primary) 0%, #2d5dc7 100%);
+  border-color: var(--cp-primary);
+  color: white;
+}
+
+.cap-portal__main-action--primary:hover {
+  box-shadow: 0 8px 25px rgba(23, 78, 166, 0.35);
+}
+
+.cap-portal__main-action--primary .cap-portal__action-title,
+.cap-portal__main-action--primary .cap-portal__action-desc {
+  color: white;
+}
+
+.cap-portal__main-action--primary .cap-portal__main-action-icon {
+  background: rgba(255,255,255,0.2);
+  color: white;
+}
+
+.cap-portal__main-action-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 10px;
+  background: #f1f3f5;
+  color: var(--cp-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.cap-portal__main-action-icon--success {
+  background: #e8f5e9;
+  color: var(--cp-success);
+}
+
+.cap-portal__main-action-content .cap-portal__action-title {
+  font-size: 1.05rem;
+  margin-bottom: 0.35rem;
+}
+
+.cap-portal__main-action-content .cap-portal__action-desc {
+  font-size: 0.85rem;
+}
+
+.cap-portal__quick-actions {
+  margin-top: 3.5rem;
+  text-align: left;
+}
+
+.cap-portal__quick-actions-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  color: var(--cp-text-dark);
+  border-bottom: 2px solid #f1f3f5;
+  padding-bottom: 0.5rem;
+  display: inline-block;
+}
+
+.cap-portal__actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.25rem;
+}
+
+.cap-portal__action-card {
+  background: #f8f9fa;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius);
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.cap-portal__action-card:hover {
+  border-color: var(--cp-primary);
+  background: white;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+  transform: translateY(-3px);
+}
+
+.cap-portal__action-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  background: white;
+  color: var(--cp-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.cap-portal__action-icon--success { color: var(--cp-success); }
+.cap-portal__action-icon--warning { color: var(--cp-warning); }
+.cap-portal__action-icon--danger { color: var(--cp-danger); }
+.cap-portal__action-icon--info { color: var(--cp-info); }
+.cap-portal__action-icon--muted { color: var(--cp-text-muted); }
+
+.cap-portal__action-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: 0.25rem;
+  color: var(--cp-text-dark);
+}
+
+.cap-portal__action-desc {
+  font-size: 0.8rem;
+  color: var(--cp-text-muted);
+  line-height: 1.4;
+}
+
+@media (max-width: 768px) {
+  .cap-portal__main-actions {
+    grid-template-columns: 1fr;
+  }
+  .cap-portal__hero-title {
+    font-size: 1.8rem;
+  }
+  .cap-portal__card {
+    padding: 2rem 1.5rem;
+  }
+  .cap-portal__header {
+    flex-direction: column;
+    gap: 1rem;
+  }
+}

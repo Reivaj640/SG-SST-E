@@ -2008,10 +2008,16 @@ ipcMain.handle('investigacion-accidentes-cross-reference-data', async (event, { 
 
 // Exportar funciones para inicialización desde el exterior
 module.exports = {
-    initializeLlmServer,
-    checkLlmServerHealth,
-    startLlmServer,
-    analyzeAccidentViaServer
+  initializeLlmServer,
+  checkLlmServerHealth,
+  startLlmServer,
+  analyzeAccidentViaServer,
+  _findInvestigacionSubmodulePath,
+  _discoverInvestigations,
+  _isSamePerson,
+  _analyzeInvestigationState,
+  _extractYearFromPath,
+  _findReportesAccidentesSubmodulePath
 };
 
 // Inicializar servidor automáticamente al cargar el módulo

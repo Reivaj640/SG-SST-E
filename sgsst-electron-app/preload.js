@@ -268,8 +268,10 @@ ipcRenderer.invoke('get-indicadores-salud-stats', companyName),
   // --- Actas ---
   getActaData: () => ipcRenderer.invoke('get-acta-data'),
   getConvivenciaActaData: () => ipcRenderer.invoke('getConvivenciaActaData'),
-  generateCopasstActa: (changes) => ipcRenderer.invoke('generate-copasst-acta', changes),
-  generateConvivenciaActa: (changes) => ipcRenderer.invoke('generate-convivencia-acta', changes),
+  generateCopasstActa: (changes, savePath) => ipcRenderer.invoke('generate-copasst-acta', changes, savePath),
+  generateConvivenciaActa: (changes, savePath) => ipcRenderer.invoke('generate-convivencia-acta', changes, savePath),
+  getCopasstAutoFillData: (companyName) => ipcRenderer.invoke('get-copasst-auto-fill-data', companyName),
+  getCopasstSavePath: (companyName, year, monthName, actaNumber) => ipcRenderer.invoke('get-copasst-save-path', companyName, year, monthName, actaNumber),
 
   // --- Diálogo de guardado ---
   showSaveDialog: (options) => ipcRenderer.invoke('save-file-dialog', options),
