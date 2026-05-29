@@ -8666,7 +8666,7 @@ ipcMain.handle('get-copasst-auto-fill-data', async (event, companyName) => {
         lider: 'Representante del Copasst'
       },
       {
-        tema: 'Revisión Avance del Plan de Trabajo Anual',
+        tema: `Revisión Avance de Cumplimiento del Plan de Trabajo Anual mes de ${previousMonthName} ${previousMonthYear}`,
         duracion: '00:30 Minutos',
         lider: 'Representante del Copasst'
       }

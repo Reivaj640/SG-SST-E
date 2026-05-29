@@ -664,21 +664,21 @@ class CopasstComponent {
         } catch (error) { alert(`Error: ${error.message}`); }
     }
 
-    prepareExcelChanges(data) {
-        const changes = [];
-        changes.push({ row: 4, col: 6, value: data.actaNumber }, { row: 5, col: 6, value: data.topic }, { row: 7, col: 6, value: data.fecha }, { row: 8, col: 6, value: data.lugar }, { row: 9, col: 6, value: data.inicia }, { row: 10, col: 6, value: data.termina });
-        let row = 25;
-        data.agendaItems.forEach(item => {
-            changes.push({ row: row, col: 3, value: item.tema }, { row: row, col: 5, value: item.duracion }, { row: row, col: 6, value: item.lider });
-            row++;
-        });
-        row += 5;
-        data.desarrolloItems.forEach((item, idx) => {
-            changes.push({ row: row, col: 1, value: idx + 1 }, { row: row, col: 2, value: item.tema }, { row: row, col: 4, value: item.compromisos }, { row: row, col: 6, value: item.fecha }, { row: row, col: 7, value: item.responsable });
-            row++;
-        });
-        return changes;
-    }
+  prepareExcelChanges(data) {
+    const changes = [];
+    changes.push({ row: 4, col: 2, value: data.actaNumber }, { row: 5, col: 2, value: data.topic }, { row: 7, col: 2, value: data.fecha }, { row: 8, col: 2, value: data.lugar }, { row: 9, col: 2, value: data.inicia }, { row: 10, col: 2, value: data.termina });
+    let row = 26;
+    data.agendaItems.forEach(item => {
+      changes.push({ row: row, col: 2, value: item.tema }, { row: row, col: 5, value: item.duracion }, { row: row, col: 7, value: item.lider });
+      row++;
+    });
+    row += 5;
+    data.desarrolloItems.forEach((item, idx) => {
+      changes.push({ row: row, col: 1, value: idx + 1 }, { row: row, col: 2, value: item.tema }, { row: row, col: 4, value: item.compromisos }, { row: row, col: 6, value: item.fecha }, { row: row, col: 7, value: item.responsable });
+      row++;
+    });
+    return changes;
+  }
 
     updateHeaderContext() {
         const companyText = document.getElementById('header-company-text');
