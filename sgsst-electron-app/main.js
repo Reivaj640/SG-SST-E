@@ -2587,16 +2587,18 @@ ipcMain.handle('read-directory', async (event, directoryPath) => {
             name: item.name,
             path: itemPath,
           });
-        } else {
-          const stats = await fsp.stat(itemPath);
-          files.push({
-            name: item.name,
-            path: itemPath,
-            size: stats.size,
-            modified: stats.mtime,
-            extension: path.extname(item.name).substring(1)
-          });
-        }
+} else {
+const stats = await fsp.stat(itemPath);
+if (!item.name.startsWith('~$')) {
+files.push({
+name: item.name,
+path: itemPath,
+size: stats.size,
+modified: stats.mtime,
+extension: path.extname(item.name).substring(1)
+});
+}
+}
       } catch (itemError) {
         if (itemError.code === 'EPERM' || itemError.code === 'EACCES' || itemError.code === 'ENOENT') continue;
         throw itemError;
@@ -2940,18 +2942,19 @@ ipcMain.handle('process-excel-data', async (event, { buffer, company, period }) 
                 row[columnMap['diciembre']] || ''
             ];
 
-            processedData[year].push({
-              id: i + 1,
-              name: actividad,
-              level: level,
-              type: type,
-              expanded: true,
-              responsible: row[columnMap['responsable']] || 'Profesional SST',
-              months: months,
-              observations: row[columnMap['observaciones']] || '',
-              avance: row[columnMap['avance']] || '',
-              estado: row[columnMap['estado']] || ''
-            });
+		processedData[year].push({
+					id: processedData[year].length + 1,
+					rowIndex: i + 1,
+					name: actividad,
+					level: level,
+					type: type,
+					expanded: true,
+					responsible: row[columnMap['responsable']] || 'Profesional SST',
+					months: months,
+					observations: row[columnMap['observaciones']] || '',
+					avance: row[columnMap['avance']] || '',
+					estado: row[columnMap['estado']] || ''
+				});
         }
       }
     }
@@ -3079,111 +3082,137 @@ ipcMain.handle('update-plan-trabajo-excel', async (event, { filePath, periodsDat
     let updatedCount = 0;
     let notFoundCount = 0;
 
-    // === ACTUALIZAR FILA POR FILA ===
-    actividades.forEach((actividad, index) => {
-      // Validar que la actividad tenga la estructura esperada
-      if (!actividad || !actividad.name || !Array.isArray(actividad.months)) {
-        sendLog(`[UPDATE-PLAN][WARN] Actividad ${index} sin estructura válida, saltando`, 'WARN');
-        return;
-      }
+// === ACTUALIZAR FILA POR FILA (MATCHING DIRECTO POR rowIndex) ===
+	// Detectar última fila ocupada para insertar nuevas actividades
+	let lastUsedRow = START_ROW;
+	for (let r = worksheet.rowCount; r >= START_ROW; r--) {
+		const cellVal = worksheet.getRow(r).getCell(2).value;
+		if (cellVal) { lastUsedRow = r; break; }
+	}
 
-      let targetRow = null;
-      let foundRowIndex = -1;
+	// Recolectar rowIndex de actividades existentes para detectar eliminadas
+	const activeRowIndices = new Set();
+	actividades.forEach(a => {
+		if (a.rowIndex && a.rowIndex >= START_ROW) activeRowIndices.add(a.rowIndex);
+	});
 
-      // Estrategia 1: Buscar por índice relativo (asumiendo que el orden se mantiene)
-      const expectedRowIndex = START_ROW + index;
-      if (expectedRowIndex <= worksheet.rowCount) {
-        const row = worksheet.getRow(expectedRowIndex);
-        const excelActividad = row.getCell(2).value; // Columna B = ACTIVIDAD
+	actividades.forEach((actividad, index) => {
+		if (!actividad || !actividad.name || !Array.isArray(actividad.months)) {
+			sendLog(`[UPDATE-PLAN][WARN] Actividad ${index} sin estructura válida, saltando`, 'WARN');
+			return;
+		}
 
-        // Verificar coincidencia parcial del nombre (primeros 20 caracteres)
-        if (excelActividad) {
-          const excelActStr = excelActividad.toString().substring(0, 30).toLowerCase();
-          const actNameStr = actividad.name.toString().substring(0, 30).toLowerCase();
+		let targetRow;
+		let foundRowIndex;
 
-          if (excelActStr && actNameStr && (excelActStr.includes(actNameStr) || actNameStr.includes(excelActStr))) {
-            targetRow = row;
-            foundRowIndex = expectedRowIndex;
-            sendLog(`[UPDATE-PLAN][DEBUG] Fila ${expectedRowIndex}: Coincidencia por índice`, 'DEBUG');
-          }
-        }
-      }
+		// rowIndex es el número de fila Excel (1-based). Fallback: usar id si es un número de fila válido (compat con datos cargados antes del fix)
+		const effectiveRowIndex = actividad.rowIndex || (actividad.id >= START_ROW ? actividad.id : null);
 
-      // Estrategia 2: Búsqueda lineal si no se encontró por índice
-      if (!targetRow) {
-        sendLog(`[UPDATE-PLAN][DEBUG] Buscando actividad "${actividad.name.substring(0, 40)}..." en toda la hoja`, 'DEBUG');
+		if (effectiveRowIndex && effectiveRowIndex >= START_ROW && effectiveRowIndex <= worksheet.rowCount) {
+			// Actividad existente: usar rowIndex directamente
+			targetRow = worksheet.getRow(effectiveRowIndex);
+			foundRowIndex = effectiveRowIndex;
 
-        for (let searchRow = START_ROW; searchRow <= worksheet.rowCount; searchRow++) {
-          const searchRowObj = worksheet.getRow(searchRow);
-          const searchActividad = searchRowObj.getCell(2).value;
+			const excelActividad = targetRow.getCell(2).value;
+			if (!excelActividad) {
+				notFoundCount++;
+				sendLog(`[UPDATE-PLAN][WARN] Fila ${actividad.rowIndex} vacía en columna B para: "${actividad.name.substring(0, 50)}"`, 'WARN');
+				return;
+			}
 
-          if (searchActividad) {
-            const searchActStr = searchActividad.toString().toLowerCase();
-            const actNameStr = actividad.name.toString().toLowerCase();
+			sendLog(`[UPDATE-PLAN][DEBUG] Fila ${foundRowIndex}: Match directo por rowIndex`, 'DEBUG');
+		} else {
+			// Actividad nueva: insertar al final del worksheet
+			lastUsedRow++;
+			foundRowIndex = lastUsedRow;
+			targetRow = worksheet.getRow(foundRowIndex);
 
-            // Búsqueda por coincidencia parcial (al menos 20 caracteres)
-            if (searchActStr.length >= 20 && actNameStr.length >= 20) {
-              if (searchActStr.includes(actNameStr.substring(0, 20)) ||
-                  actNameStr.includes(searchActStr.substring(0, 20))) {
-                targetRow = searchRowObj;
-                foundRowIndex = searchRow;
-                sendLog(`[UPDATE-PLAN][DEBUG] Actividad encontrada en fila ${searchRow}`, 'DEBUG');
-                break;
-              }
-            }
-          }
-        }
-      }
+			targetRow.getCell(1).value = actividad.name;
+			targetRow.getCell(2).value = actividad.name;
+			if (actividad.responsible) targetRow.getCell(3).value = actividad.responsible;
 
-      // Si no se encontró la actividad, registrar y continuar
-      if (!targetRow) {
-        notFoundCount++;
-        sendLog(`[UPDATE-PLAN][WARN] Actividad no encontrada: "${actividad.name.substring(0, 50)}..."`, 'WARN');
-        return;
-      }
+			// Actualizar rowIndex en el objeto original para futuras escrituras
+			actividad.rowIndex = foundRowIndex;
+			sendLog(`[UPDATE-PLAN][DEBUG] Nueva actividad insertada en fila ${foundRowIndex}: "${actividad.name.substring(0, 50)}"`, 'DEBUG');
+		}
 
-      // === ACTUALIZAR SOLO COLUMNAS ESPECÍFICAS (D-O, P, Q) ===
-      // Columnas D-O (ENE-DIC) con P/C - SOLO si hay valor
-      const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-                     'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+		// === ACTUALIZAR COLUMNAS D-O (ENE-DIC) CON P/C ===
+		for (let idx = 0; idx < 12; idx++) {
+			const colIndex = idx + 4;
+			const valor = actividad.months[idx] || null;
+			if (valor && (valor === 'P' || valor === 'C')) {
+				targetRow.getCell(colIndex).value = valor;
+			}
+		}
 
-      meses.forEach((mes, idx) => {
-        const colIndex = idx + 4; // Columna D = 4 (1-based)
-        const valor = actividad.months && actividad.months[idx] ? actividad.months[idx] : null;
+		// === ACTUALIZAR RESPONSABLE (COLUMNA C) Y OBSERVACIONES (COLUMNA R) ===
+		if (actividad.responsible) {
+			targetRow.getCell(3).value = actividad.responsible;
+		}
+		if (actividad.observations !== undefined && actividad.observations !== null) {
+			targetRow.getCell(18).value = actividad.observations;
+		}
 
-        // Solo escribir si hay valor (P o C)
-        if (valor && (valor === 'P' || valor === 'C')) {
-          targetRow.getCell(colIndex).value = valor;
-        }
-      });
+		// ⚠️ NO actualizar columna P (% AVANCE) ni Q (ESTADO)
+		// El archivo Excel original tiene fórmulas compartidas en estas columnas
+		// que ExcelJS no puede preservar. Las fórmulas originales calcularán
+		// automáticamente los valores basándose en las columnas D-O (meses).
 
-      // ⚠️ NO actualizar columna P (% AVANCE) ni Q (ESTADO)
-      // El archivo Excel original tiene fórmulas compartidas en estas columnas
-      // que ExcelJS no puede preservar. Las fórmulas originales calcularán
-      // automáticamente los valores basándose en las columnas D-O (meses).
+		updatedCount++;
+		const completadas = actividad.months.filter(m => m === 'C').length;
+		const programadas = actividad.months.filter(m => m === 'P').length;
+		sendLog(`[UPDATE-PLAN][DEBUG] Fila ${foundRowIndex}: Actualizado - ${completadas}C/${programadas}P`, 'DEBUG');
+	});
 
-      updatedCount++;
-      const completadas = actividad.months ? actividad.months.filter(m => m === 'C').length : 0;
-      const programadas = actividad.months ? actividad.months.filter(m => m === 'P').length : 0;
-      sendLog(`[UPDATE-PLAN][DEBUG] Fila ${foundRowIndex}: Actualizado - ${completadas}C/${programadas}P (Fórmulas originales calculan % y Estado)`, 'DEBUG');
-    });
+	// === LIMPIAR FILAS DE ACTIVIDADES ELIMINADAS ===
+	// Recorrer filas de datos y limpiar las que ya no están en actividades
+	const allLevel4Rows = [];
+	for (let r = START_ROW; r <= lastUsedRow; r++) {
+		const row = worksheet.getRow(r);
+		const colA = row.getCell(1).value;
+		const colB = row.getCell(2).value;
+		if (colB && !isNaN(parseFloat(String(colA || '').replace(',', '.')))) {
+			allLevel4Rows.push(r);
+		}
+	}
 
-    sendLog(`[UPDATE-PLAN][MAIN] === RESUMEN DE ACTUALIZACIÓN ===`, 'INFO');
-    sendLog(`[UPDATE-PLAN][MAIN] Total actividades procesadas: ${actividades.length}`, 'INFO');
-    sendLog(`[UPDATE-PLAN][MAIN] Actualizadas exitosamente: ${updatedCount}`, 'INFO');
-    sendLog(`[UPDATE-PLAN][MAIN] No encontradas: ${notFoundCount}`, 'INFO');
+	let deletedCount = 0;
+	for (const rowNum of allLevel4Rows) {
+		if (!activeRowIndices.has(rowNum)) {
+			const row = worksheet.getRow(rowNum);
+			for (let c = 1; c <= 18; c++) {
+				row.getCell(c).value = null;
+			}
+			deletedCount++;
+			sendLog(`[UPDATE-PLAN][DEBUG] Fila ${rowNum}: Actividad eliminada, celdas limpiadas`, 'DEBUG');
+		}
+	}
 
-    // === GUARDAR ARCHIVO CON ExcelJS (PRESERVA FORMATO) ===
-    await workbook.xlsx.writeFile(filePath);
+	sendLog(`[UPDATE-PLAN][MAIN] === RESUMEN DE ACTUALIZACIÓN ===`, 'INFO');
+	sendLog(`[UPDATE-PLAN][MAIN] Total actividades procesadas: ${actividades.length}`, 'INFO');
+	sendLog(`[UPDATE-PLAN][MAIN] Actualizadas exitosamente: ${updatedCount}`, 'INFO');
+	sendLog(`[UPDATE-PLAN][MAIN] No encontradas: ${notFoundCount}`, 'INFO');
+	sendLog(`[UPDATE-PLAN][MAIN] Eliminadas: ${deletedCount}`, 'INFO');
 
-    sendLog(`[UPDATE-PLAN][MAIN] ✅ Archivo guardado exitosamente en: ${filePath}`, 'INFO');
+	// === GUARDAR ARCHIVO CON ExcelJS (PRESERVA FORMATO) ===
+	await workbook.xlsx.writeFile(filePath);
 
-    return {
-      success: true,
-      message: 'Archivo guardado exitosamente',
-      updatedCount: updatedCount,
-      notFoundCount: notFoundCount
-    };
+	sendLog(`[UPDATE-PLAN][MAIN] ✅ Archivo guardado exitosamente en: ${filePath}`, 'INFO');
+
+	// Devolver rowIndex actualizados para actividades nuevas
+	const updatedRowIndices = {};
+	actividades.forEach(a => {
+		if (a.rowIndex) updatedRowIndices[a.id] = a.rowIndex;
+	});
+
+	return {
+		success: true,
+		message: 'Archivo guardado exitosamente',
+		updatedCount: updatedCount,
+		notFoundCount: notFoundCount,
+		deletedCount: deletedCount,
+		updatedRowIndices: updatedRowIndices
+	};
 
   } catch (error) {
     sendLog(`[UPDATE-PLAN][ERROR] Error al actualizar Plan de Trabajo: ${error.message}`, 'ERROR');
@@ -8835,30 +8864,13 @@ ipcMain.handle('get-copasst-auto-fill-data', async (event, companyName) => {
       emptyResult.data.warnings.push('No se pudo leer Plan de Trabajo');
     }
 
-    // Construir desarrollo item 1
-    let desarrolloTema1 = 'Revisión del Acta Anterior, se continúan realizando las inspecciones programadas';
-    if (planActivitiesExecuted.length > 0) {
-      const completedActivities = planActivitiesExecuted.filter(a => a.status === 'Completada');
-      const programmedActivities = planActivitiesExecuted.filter(a => a.status === 'Programada');
-      if (completedActivities.length > 0) {
-        desarrolloTema1 += `. Actividades del Plan de Trabajo ejecutadas en ${targetMonth}: `;
-        desarrolloTema1 += completedActivities.slice(0, 5).map(a => a.name).join('; ');
-        if (completedActivities.length > 5) {
-          desarrolloTema1 += ` y ${completedActivities.length - 5} más`;
-        }
-      }
-      if (programmedActivities.length > 0) {
-        desarrolloTema1 += `. Pendientes por ejecutar: ${programmedActivities.length} actividades`;
-      }
-    }
-    desarrolloTema1 += '...';
-
-    desarrollo.push({
-      tema: desarrolloTema1,
-      compromisos: 'Ninguno',
-      fecha: lastDayOfTargetMonth,
-      responsable: 'Miembros del Copasst'
-    });
+// Desarrollo item 1: Revisión del Acta Anterior
+desarrollo.push({
+tema: 'Revisión del Acta Anterior, se continúan realizando las inspecciones programadas y están acorde, se continua desarrollando las actividades contempladas en el plan de trabajo anual.',
+compromisos: 'Ninguno',
+fecha: lastDayOfTargetMonth,
+responsable: 'Miembros del Copasst'
+});
 
     // ============================================================
     // PASO 5: Barrer accidentalidad para desarrollo item 2
@@ -8998,31 +9010,74 @@ ipcMain.handle('get-copasst-auto-fill-data', async (event, companyName) => {
           sendLog(`[K+AIRSST][COPASST][AUTO_FILL] Error verificación investigaciones: ${invErr.message}`, 'WARN');
         }
 
-        // Generar desarrollo item 2
-        let accidentTema = `Revisión de accidentalidad: Se presentaron ${accidentData.count} accidente(s) de trabajo en el mes de ${previousMonthName}`;
-        const personsWithoutInvestigation = accidentData.persons.filter(p => !p.hasInvestigation);
+// Desarrollo item 2: Accidentalidad del mes anterior
+const personsWithoutInvestigation = accidentData.persons.filter(p => !p.hasInvestigation);
+let accidentTema = `En el mes de ${previousMonthName} ${prevMonthYearForAccidents}, Se presentó(ron) ${accidentData.count} accidente(s) de trabajo de: ${accidentData.persons.map(p => p.nombre).join(', ')}.`;
+const compromisoAccidente = personsWithoutInvestigation.length > 0
+? 'Pendiente investigación'
+: 'Ninguno';
 
-        if (personsWithoutInvestigation.length > 0) {
-          accidentTema += `. Accidente(s) de: ${personsWithoutInvestigation.map(p => p.nombre).join(', ')}`;
-        }
-
-        const compromisoAccidente = personsWithoutInvestigation.length > 0
-          ? 'Pendiente investigación'
-          : 'Ninguno';
-
-        desarrollo.push({
-          tema: accidentTema,
-          compromisos: compromisoAccidente,
-          fecha: lastDayOfTargetMonth,
-          responsable: 'Miembros del Copasst y Asesor SST'
-        });
-      }
+desarrollo.push({
+tema: accidentTema,
+compromisos: compromisoAccidente,
+fecha: lastDayOfTargetMonth,
+responsable: 'Miembros del Copasst y Asesor SST'
+});
+} else {
+desarrollo.push({
+tema: `En el mes de ${previousMonthName} ${prevMonthYearForAccidents}, No se presentaron accidentes laborales.`,
+compromisos: 'Ninguno',
+fecha: lastDayOfTargetMonth,
+responsable: 'Miembros del Copasst'
+});
+}
     } catch (accidentOuterErr) {
       sendLog(`[K+AIRSST][COPASST][AUTO_FILL] Error general accidentalidad: ${accidentOuterErr.message}`, 'WARN');
-      emptyResult.data.warnings.push('No se pudo verificar accidentalidad');
-    }
+emptyResult.data.warnings.push('No se pudo verificar accidentalidad');
+}
 
-    // ============================================================
+// ============================================================
+// Desarrollo item 3: Plan de Trabajo Anual
+// ============================================================
+const completedActs = planActivitiesExecuted.filter(a => a.status === 'Completada');
+const programmedActs = planActivitiesExecuted.filter(a => a.status === 'Programada');
+
+let planTema, planCompromisos, planResponsable;
+if (planActivitiesExecuted.length === 0) {
+planTema = `No se pudo verificar el estado del Plan de Trabajo Anual para el mes de ${targetMonth}.`;
+planCompromisos = 'Verificar cumplimiento del Plan de Trabajo';
+planResponsable = 'Responsable del SG-SST';
+} else {
+if (completedActs.length > 0) {
+planTema = `Actividades del Plan de Trabajo ejecutadas en ${targetMonth}: ${completedActs.map(a => a.name).join('; ')}`;
+} else {
+planTema = `No se ejecutaron actividades del Plan de Trabajo en el mes de ${targetMonth}.`;
+}
+if (programmedActs.length > 0) {
+planTema += `. Observación: Pendientes por ejecutar: ${programmedActs.length} actividades (${programmedActs.map(a => a.name).join('; ')})`;
+}
+planCompromisos = programmedActs.length > 0 ? 'Seguimiento actividades pendientes' : 'Ninguno';
+planResponsable = (completedActs.length > 0 && completedActs[0].responsible) ? completedActs[0].responsible : 'Responsable del SG-SST';
+}
+
+desarrollo.push({
+tema: planTema,
+compromisos: planCompromisos,
+fecha: lastDayOfTargetMonth,
+responsable: planResponsable
+});
+
+// ============================================================
+// Desarrollo item 4: Buzón de Sugerencias
+// ============================================================
+desarrollo.push({
+tema: 'Se revisa el buzón de sugerencias y no se encuentran sugerencias.',
+compromisos: 'Ninguno',
+fecha: lastDayOfTargetMonth,
+responsable: 'Representante del Copasst'
+});
+
+// ============================================================
     // PASO 6: Construir respuesta final
     // ============================================================
     const result = {

@@ -165,7 +165,7 @@ async function findExcelFilesInDirectory(dirPath) {
             if (result.files && Array.isArray(result.files)) {
                 result.files.forEach(item => {
                     const ext = item.name.substring(item.name.lastIndexOf('.')).toLowerCase();
-                    if (excelExtensions.includes(ext)) {
+                    if (excelExtensions.includes(ext) && !item.name.startsWith('~$')) {
                         excelFiles.push({ name: item.name, path: item.path });
                     }
                 });
@@ -670,51 +670,66 @@ function selectActivity(id) {
         </button>
     `;
 
-    // Agregar evento para guardar cambios en responsable
-    document.getElementById('responsibleSelect').addEventListener('change', function() {
-        activity.responsible = this.value;
-    });
+	// Agregar evento para guardar cambios en responsable
+	document.getElementById('responsibleSelect').addEventListener('change', async function() {
+		activity.responsible = this.value;
+		await savePlanTrabajoToExcel();
+	});
 
-    // Agregar evento para guardar observaciones
-    document.getElementById('observationsText').addEventListener('blur', function() {
-        activity.observations = this.value;
-    });
+	// Agregar evento para guardar observaciones
+	document.getElementById('observationsText').addEventListener('blur', async function() {
+		activity.observations = this.value;
+		await savePlanTrabajoToExcel();
+	});
+}
+
+async function savePlanTrabajoToExcel() {
+	try {
+		const result = await callParentAPI('update-plan-trabajo-excel', {
+			filePath: `${currentSubmodulePath}/GI-FO-045 PLAN DE TRABAJO ANUAL ${currentPeriod} SST.xlsx`,
+			periodsData: periodsData,
+			period: currentPeriod
+		});
+		if (result.success && result.updatedRowIndices) {
+			Object.keys(result.updatedRowIndices).forEach(actId => {
+				const idx = periodsData[currentPeriod].findIndex(i => String(i.id) === actId);
+				if (idx !== -1 && !periodsData[currentPeriod][idx].rowIndex) {
+					periodsData[currentPeriod][idx].rowIndex = result.updatedRowIndices[actId];
+				}
+			});
+		}
+		if (!result.success) {
+			console.error('[savePlanTrabajoToExcel] Error:', result.error);
+		}
+		return result;
+	} catch (error) {
+		console.error('[savePlanTrabajoToExcel] Error:', error);
+		return { success: false, error: error.message };
+	}
 }
 
 async function toggleMonthStatus(actId, monthIdx) {
-    const idx = periodsData[currentPeriod].findIndex(i => i.id === actId);
-    if(idx === -1) return;
+	const idx = periodsData[currentPeriod].findIndex(i => i.id === actId);
+	if(idx === -1) return;
 
-    const currentVal = periodsData[currentPeriod][idx].months[monthIdx];
-    let newVal = '';
-    if(currentVal === '') newVal = 'P';
-    else if(currentVal === 'P') newVal = 'C';
-    else newVal = '';
+	const currentVal = periodsData[currentPeriod][idx].months[monthIdx];
+	let newVal = '';
+	if(currentVal === '') newVal = 'P';
+	else if(currentVal === 'P') newVal = 'C';
+	else newVal = '';
 
-    periodsData[currentPeriod][idx].months[monthIdx] = newVal;
+	periodsData[currentPeriod][idx].months[monthIdx] = newVal;
 
-    // GUARDAR CAMBIOS EN EL ARCHIVO EXCEL
-    try {
-        console.log('[toggleMonthStatus] Guardando cambios en Excel...');
+	const result = await savePlanTrabajoToExcel();
+	if (result.success) {
+		console.log(`[toggleMonthStatus] ✅ Cambios guardados: ${result.updatedCount} celdas actualizadas`);
+	} else {
+		console.error(`[toggleMonthStatus] ❌ Error al guardar: ${result.error}`);
+		alert('Error al guardar los cambios. Intente nuevamente.');
+	}
 
-        const result = await callParentAPI('update-plan-trabajo-excel', {
-            filePath: `${currentSubmodulePath}/GI-FO-045 PLAN DE TRABAJO ANUAL ${currentPeriod} SST.xlsx`,
-            periodsData: periodsData,
-            period: currentPeriod
-        });
-
-        if (result.success) {
-            console.log(`[toggleMonthStatus] ✅ Cambios guardados: ${result.updatedCount} celdas actualizadas`);
-        } else {
-            console.error(`[toggleMonthStatus] ❌ Error al guardar: ${result.error}`);
-            alert('Error al guardar los cambios. Intente nuevamente.');
-        }
-    } catch (error) {
-        console.error('[toggleMonthStatus] Error al guardar:', error);
-    }
-
-    selectActivity(actId);
-    updateKPIs();
+	selectActivity(actId);
+	updateKPIs();
 }
 
 function openEvidenceFolder(activityName, activityId) {
@@ -749,38 +764,43 @@ function closeCreateModal() {
 }
 
 function saveNewActivity() {
-    const name = document.getElementById('newActName').value;
-    const parentId = parseInt(document.getElementById('newActParent').value);
-    const resp = document.getElementById('newActResp').value;
+	const name = document.getElementById('newActName').value;
+	const parentId = parseInt(document.getElementById('newActParent').value);
+	const resp = document.getElementById('newActResp').value;
 
-    if(!name) {
-        alert("Ingrese un nombre");
-        return;
-    }
+	if(!name) {
+		alert("Ingrese un nombre");
+		return;
+	}
 
-    const parentIndex = periodsData[currentPeriod].findIndex(i => i.id === parentId);
-    if(parentIndex === -1) {
-        alert("Padre no encontrado");
-        return;
-    }
+	const parentIndex = periodsData[currentPeriod].findIndex(i => i.id === parentId);
+	if(parentIndex === -1) {
+		alert("Padre no encontrado");
+		return;
+	}
 
-    const newAct = {
-        id: Date.now(),
-        name: name,
-        level: 4,
-        type: 'activity',
-        responsible: resp,
-        months: new Array(12).fill(''),
-        observations: ''
-    };
+	const parentActivity = periodsData[currentPeriod][parentIndex];
+	const newRowIndex = parentActivity.rowIndex ? parentActivity.rowIndex + 1 : null;
 
-    periodsData[currentPeriod].splice(parentIndex + 1, 0, newAct);
+	const newAct = {
+		id: Date.now(),
+		rowIndex: newRowIndex,
+		name: name,
+		level: 4,
+		type: 'activity',
+		responsible: resp,
+		months: new Array(12).fill(''),
+		observations: ''
+	};
 
-    closeCreateModal();
-    renderTree();
-    renderGantt();
-    updateKPIs();
-    alert("Actividad creada exitosamente.");
+	periodsData[currentPeriod].splice(parentIndex + 1, 0, newAct);
+
+	closeCreateModal();
+	renderTree();
+	renderGantt();
+	updateKPIs();
+	savePlanTrabajoToExcel();
+	alert("Actividad creada exitosamente.");
 }
 
 function openDeleteModal(id) {
@@ -794,22 +814,23 @@ function closeDeleteModal() {
 }
 
 function confirmDelete() {
-    if(!deleteTargetId) return;
+	if(!deleteTargetId) return;
 
-    periodsData[currentPeriod] = periodsData[currentPeriod].filter(i => i.id !== deleteTargetId);
+	periodsData[currentPeriod] = periodsData[currentPeriod].filter(i => i.id !== deleteTargetId);
 
-    closeDeleteModal();
-    selectedActivityId = null;
+	closeDeleteModal();
+	selectedActivityId = null;
 
-    document.getElementById('inspectorContent').innerHTML = `
-        <div style="text-align: center; color: var(--text-muted); margin-top: 2rem;">
-            <i class="fas fa-mouse-pointer" style="font-size: 2rem; margin-bottom: 10px;"></i>
-            <p>Seleccione una actividad.</p>
-        </div>
-    `;
-    renderTree();
-    renderGantt();
-    updateKPIs();
+	document.getElementById('inspectorContent').innerHTML = `
+	<div style="text-align: center; color: var(--text-muted); margin-top: 2rem;">
+		<i class="fas fa-mouse-pointer" style="font-size: 2rem; margin-bottom: 10px;"></i>
+		<p>Seleccione una actividad.</p>
+	</div>
+	`;
+	renderTree();
+	renderGantt();
+	updateKPIs();
+	savePlanTrabajoToExcel();
 }
 
 /* --- UTILS --- */

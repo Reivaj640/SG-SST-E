@@ -514,7 +514,7 @@ class CopasstComponent {
         };
 
         const initialAgenda = [{ tema: 'Revisión del acta anterior N° 107', duracion: '00:10 Minutos', lider: 'Representante del Copasst' }, { tema: 'Revisión de Accidentes del Mes de Diciembre', duracion: '00:10 Minutos', lider: 'Representante del Copasst' }, { tema: 'Revisión Avance del Plan de Trabajo Anual', duracion: '00:30 Minutos', lider: 'Representante del Copasst' }];
-        const initialDesarrollo = [{ tema: 'Revisión del Acta Anterior, se continúan realizando las inspecciones programadas...', compromisos: 'Ninguno', responsable: 'Ninguno' }, { tema: 'Accidente laboral de Armando Cervantes Perez', compromisos: 'Realizar seguimiento del plan de acción del AT.', responsable: 'Miembros del Copasst y Asesor SST' }];
+        const initialDesarrollo = [{ tema: 'Revisión del Acta Anterior, se continúan realizando las inspecciones programadas y están acorde, se continua desarrollando las actividades contempladas en el plan de trabajo anual.', compromisos: 'Ninguno', responsable: 'Miembros del Copasst' }, { tema: 'En el mes de [MES] [AÑO], No se presentaron accidentes laborales.', compromisos: 'Ninguno', responsable: 'Miembros del Copasst' }, { tema: 'Actividades del Plan de Trabajo ejecutadas en [MES]: [lista]. Observación: Pendientes por ejecutar: N actividades.', compromisos: 'Seguimiento actividades pendientes', responsable: 'Responsable del SG-SST' }, { tema: 'Se revisa el buzón de sugerencias y no se encuentran sugerencias.', compromisos: 'Ninguno', responsable: 'Representante del Copasst' }];
 
         initialAgenda.forEach(d => agendaList.appendChild(createAgendaItem(d)));
         initialDesarrollo.forEach(d => desarrolloList.appendChild(createDesarrolloItem(d)));
