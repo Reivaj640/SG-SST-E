@@ -3136,19 +3136,17 @@ ipcMain.handle('update-plan-trabajo-excel', async (event, { filePath, periodsDat
 			sendLog(`[UPDATE-PLAN][DEBUG] Nueva actividad insertada en fila ${foundRowIndex}: "${actividad.name.substring(0, 50)}"`, 'DEBUG');
 		}
 
-		// === ACTUALIZAR COLUMNAS D-O (ENE-DIC) CON P/C ===
-		for (let idx = 0; idx < 12; idx++) {
-			const colIndex = idx + 4;
-			const valor = actividad.months[idx] || null;
-			if (valor && (valor === 'P' || valor === 'C')) {
-				targetRow.getCell(colIndex).value = valor;
-			}
-		}
+// === ACTUALIZAR COLUMNAS D-O (ENE-DIC) CON P/C ===
+for (let idx = 0; idx < 12; idx++) {
+const colIndex = idx + 4;
+const valor = actividad.months[idx] || '';
+targetRow.getCell(colIndex).value = valor;
+}
 
 		// === ACTUALIZAR RESPONSABLE (COLUMNA C) Y OBSERVACIONES (COLUMNA R) ===
-		if (actividad.responsible) {
-			targetRow.getCell(3).value = actividad.responsible;
-		}
+if (actividad.responsible !== undefined) {
+targetRow.getCell(3).value = actividad.responsible || null;
+}
 		if (actividad.observations !== undefined && actividad.observations !== null) {
 			targetRow.getCell(18).value = actividad.observations;
 		}

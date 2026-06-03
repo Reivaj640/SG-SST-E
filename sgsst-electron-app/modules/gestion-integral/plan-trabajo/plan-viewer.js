@@ -17,6 +17,8 @@ let periodsData = {};
 let availableFilesMap = {}; // Mapa de { año: nombreArchivo }
 let currentCompany = null;
 let currentSubmodulePath = null;
+let _isSaving = false; // Guardia de concurrencia para evitar race conditions en guardado
+let _saveRetryTimer = null; // Timer para reintentar guardado cuando hay concurrencia
 
 // --- START: Refactored Communication Logic ---
 
@@ -230,7 +232,14 @@ async function loadSpecificYearFile(fileName) {
             const result = await callParentAPI('read-excel-file', { filePath: filePathResult.path });
             if (result.success) {
                 const processedData = await processExcelData(result.data);
-                periodsData = processedData;
+                periodsData[currentPeriod] = processedData[currentPeriod] || [];
+                Object.keys(processedData).forEach(y => {
+                    if (y !== currentPeriod) {
+                        if (!periodsData[y] || periodsData[y].length === 0) {
+                            periodsData[y] = processedData[y];
+                        }
+                    }
+                });
                 renderTree();
                 renderGantt();
                 updateKPIs();
@@ -252,16 +261,18 @@ async function processExcelData(excelBuffer) {
                 period: currentPeriod
             });
 
-            if (result.success) {
-                const processedData = {};
-                // Asegurarnos de que el año seleccionado tenga datos, aunque los otros vengan vacíos
-                processedData[currentPeriod] = result.data[currentPeriod] || [];
-                // Preservar otros años si existieran en el objeto result.data
-                Object.keys(result.data).forEach(y => {
-                    if (!processedData[y]) processedData[y] = result.data[y];
-                });
-                return processedData;
-            }
+        if (result.success) {
+            const processedData = {};
+            processedData[currentPeriod] = result.data[currentPeriod] || [];
+            Object.keys(result.data).forEach(y => {
+                if (y !== currentPeriod && result.data[y] && result.data[y].length > 0) {
+                    if (!periodsData[y] || periodsData[y].length === 0) {
+                        processedData[y] = result.data[y];
+                    }
+                }
+            });
+            return processedData;
+        }
         }
         return { [currentPeriod]: [] };
     } catch (error) {
@@ -391,7 +402,14 @@ async function loadSpecificYearFile(fileName) {
             const result = await callParentAPI('read-excel-file', { filePath: filePathResult.path });
             if (result.success) {
                 const processedData = await processExcelData(result.data);
-                periodsData = processedData;
+                periodsData[currentPeriod] = processedData[currentPeriod] || [];
+                Object.keys(processedData).forEach(y => {
+                    if (y !== currentPeriod) {
+                        if (!periodsData[y] || periodsData[y].length === 0) {
+                            periodsData[y] = processedData[y];
+                        }
+                    }
+                });
                 renderTree();
                 renderGantt();
                 updateKPIs();
@@ -684,28 +702,73 @@ function selectActivity(id) {
 }
 
 async function savePlanTrabajoToExcel() {
-	try {
-		const result = await callParentAPI('update-plan-trabajo-excel', {
-			filePath: `${currentSubmodulePath}/GI-FO-045 PLAN DE TRABAJO ANUAL ${currentPeriod} SST.xlsx`,
-			periodsData: periodsData,
-			period: currentPeriod
-		});
-		if (result.success && result.updatedRowIndices) {
-			Object.keys(result.updatedRowIndices).forEach(actId => {
-				const idx = periodsData[currentPeriod].findIndex(i => String(i.id) === actId);
-				if (idx !== -1 && !periodsData[currentPeriod][idx].rowIndex) {
-					periodsData[currentPeriod][idx].rowIndex = result.updatedRowIndices[actId];
-				}
-			});
-		}
-		if (!result.success) {
-			console.error('[savePlanTrabajoToExcel] Error:', result.error);
-		}
-		return result;
-	} catch (error) {
-		console.error('[savePlanTrabajoToExcel] Error:', error);
-		return { success: false, error: error.message };
-	}
+    if (_isSaving) {
+        console.warn('[savePlanTrabajoToExcel] Guardado en progreso, reintentando en 300ms');
+        if (_saveRetryTimer) clearTimeout(_saveRetryTimer);
+        return new Promise((resolve) => {
+            _saveRetryTimer = setTimeout(async () => {
+                const result = await savePlanTrabajoToExcel();
+                resolve(result);
+            }, 300);
+        });
+    }
+    _isSaving = true;
+    try {
+        const result = await callParentAPI('update-plan-trabajo-excel', {
+            filePath: `${currentSubmodulePath}/GI-FO-045 PLAN DE TRABAJO ANUAL ${currentPeriod} SST.xlsx`,
+            periodsData: periodsData,
+            period: currentPeriod
+        });
+        if (result.success && result.updatedRowIndices) {
+            Object.keys(result.updatedRowIndices).forEach(actId => {
+                const idx = periodsData[currentPeriod].findIndex(i => String(i.id) === actId);
+                if (idx !== -1) {
+                    periodsData[currentPeriod][idx].rowIndex = result.updatedRowIndices[actId];
+                }
+            });
+        }
+        if (result.success) {
+            const fileName = availableFilesMap[currentPeriod];
+            if (fileName) {
+                try {
+                    const filePathResult = await callParentAPI('get-file-path', {
+                        directory: currentSubmodulePath,
+                        fileName: fileName
+                    });
+                    if (filePathResult.success) {
+                        const readResult = await callParentAPI('read-excel-file', { filePath: filePathResult.path });
+                        if (readResult.success) {
+const freshData = await processExcelData(readResult.data);
+const freshItems = freshData[currentPeriod] || periodsData[currentPeriod];
+if (freshItems !== periodsData[currentPeriod]) {
+const oldData = periodsData[currentPeriod];
+const rowIndexToOldId = {};
+oldData.forEach(item => {
+if (item.rowIndex) rowIndexToOldId[item.rowIndex] = item.id;
+});
+freshItems.forEach(item => {
+if (rowIndexToOldId[item.rowIndex]) {
+item.id = rowIndexToOldId[item.rowIndex];
+}
+});
+periodsData[currentPeriod] = freshItems;
+}
+                        }
+                    }
+                } catch (reReadError) {
+                    console.warn('[savePlanTrabajoToExcel] No se pudo releer archivo post-save:', reReadError.message);
+                }
+            }
+        } else {
+            console.error('[savePlanTrabajoToExcel] Error:', result.error);
+        }
+        return result;
+    } catch (error) {
+        console.error('[savePlanTrabajoToExcel] Error:', error);
+        return { success: false, error: error.message };
+    } finally {
+        _isSaving = false;
+    }
 }
 
 async function toggleMonthStatus(actId, monthIdx) {
