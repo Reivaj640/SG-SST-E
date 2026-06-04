@@ -2867,8 +2867,56 @@ ipcMain.handle('process-excel-data', async (event, { buffer, company, period }) 
         for (let i = headerRowIndex + 1; i < rawData.length; i++) {
             const row = rawData[i];
             
-            // Obtener nombre de la actividad (columna B, índice 1)
-            const actividad = String(row[columnMap['actividad']] || '').trim();
+      // Obtener nombre de la actividad (columna B, índice 1)
+      let actividadRaw = row[columnMap['actividad']];
+      // Handle hyperlink objects: {text, hyperlink} or rich text arrays
+      if (typeof actividadRaw === 'object' && actividadRaw !== null) {
+        if (actividadRaw.text) {
+          actividadRaw = actividadRaw.text;
+        } else if (Array.isArray(actividadRaw.richText)) {
+          actividadRaw = actividadRaw.richText.map(r => r.text || '').join('');
+        } else {
+          actividadRaw = String(actividadRaw);
+        }
+      }
+      let actividad = String(actividadRaw || '').trim();
+
+      // Obtener responsable (columna C, índice 2)
+      let responsableRaw = row[columnMap['responsable']];
+      if (typeof responsableRaw === 'object' && responsableRaw !== null) {
+        if (responsableRaw.text) {
+          responsableRaw = responsableRaw.text;
+        } else {
+          responsableRaw = String(responsableRaw);
+        }
+      }
+      let responsable = String(responsableRaw || '').trim();
+
+      // Detect corrupted rows from B:C merge on activity rows.
+      // Two scenarios depending on which cell was the merge master:
+      //   Scenario A (2025 file): merge master = B (activity name)
+      //     → SheetJS reads B=activity name, C="" (empty)
+      //     → Activity name is preserved, but responsable is lost
+      //   Scenario B (2026 file): merge master = C (responsable)
+      //     → SheetJS reads B="Profesional SST", C="" (empty)
+      //     → Activity name is overwritten, responsable appears in B
+      const colACheck = String(row[columnMap['numero'] || 0] || '').trim();
+      const isActivityRow = colACheck !== '' && !isNaN(parseFloat(colACheck.replace(',', '.')));
+      const knownResponsables = ['Profesional SST', 'Auxiliar SST', 'Coordinador SST', 'ARL', 'Responsable SST'];
+      const bIsResponsable = knownResponsables.some(rv => actividad === rv);
+
+      if (isActivityRow && bIsResponsable && !responsable) {
+        // Scenario B: Column B shows the responsable value, C is empty
+        // The real activity name is lost — move B to responsable, mark for repair
+        responsable = actividad;
+        actividad = '';
+        sendLog(`[MAIN][WARN] Fila ${i + 1}: Columna B contiene responsable "${responsable}" (merge B:C master=C) — actividad perdida, requiere reparación`, 'WARN');
+      } else if (isActivityRow && !responsable && actividad.length > 2) {
+        // Scenario A: Column C is empty on an activity row, B has the correct activity name
+        // The responsable is lost — default to 'Profesional SST'
+        responsable = 'Profesional SST';
+        sendLog(`[MAIN][WARN] Fila ${i + 1}: Columna C vacía en fila de actividad (merge B:C master=B) - responsable default a "Profesional SST"`, 'WARN');
+      }
             
             // Saltar filas vacías o de totales
             if (!actividad || actividad.length < 2) continue;
@@ -2949,7 +2997,7 @@ ipcMain.handle('process-excel-data', async (event, { buffer, company, period }) 
 					level: level,
 					type: type,
 					expanded: true,
-					responsible: row[columnMap['responsable']] || 'Profesional SST',
+      responsible: responsable || 'Profesional SST',
 					months: months,
 					observations: row[columnMap['observaciones']] || '',
 					avance: row[columnMap['avance']] || '',
@@ -3090,13 +3138,64 @@ ipcMain.handle('update-plan-trabajo-excel', async (event, { filePath, periodsDat
 		if (cellVal) { lastUsedRow = r; break; }
 	}
 
-	// Recolectar rowIndex de actividades existentes para detectar eliminadas
-	const activeRowIndices = new Set();
-	actividades.forEach(a => {
-		if (a.rowIndex && a.rowIndex >= START_ROW) activeRowIndices.add(a.rowIndex);
-	});
+// Recolectar rowIndex de actividades existentes para detectar eliminadas
+const activeRowIndices = new Set();
+actividades.forEach(a => {
+  if (a.rowIndex && a.rowIndex >= START_ROW) activeRowIndices.add(a.rowIndex);
+});
 
-	actividades.forEach((actividad, index) => {
+// ============================================================================
+// FIX: Remove erroneous B:C merges on activity rows
+// Some .xlsx files have horizontal B:C merges on activity rows (not just
+// section headers). This causes column B (ACTIVIDAD) to display the
+// column C (RESPONSABLE) value "Profesional SST", destroying the real
+// activity name. We unmerge these before writing.
+// ============================================================================
+      if (worksheet.model && worksheet.model.merges) {
+        const mergesToRemove = [];
+        const unmergedActivityRows = [];
+        const mergesToCheck = [...worksheet.model.merges];
+        mergesToCheck.forEach(mergeRange => {
+          const match = mergeRange.match(/^B(\d+):C(\d+)$/);
+          if (match && match[1] === match[2]) {
+            const row = parseInt(match[1]);
+            if (row >= START_ROW) {
+              const colA = worksheet.getRow(row).getCell(1).value;
+              if (typeof colA === 'number') {
+                mergesToRemove.push(mergeRange);
+                unmergedActivityRows.push(row);
+              }
+            }
+          }
+        });
+
+        if (mergesToRemove.length > 0) {
+          sendLog(`[UPDATE-PLAN][FIX] Found ${mergesToRemove.length} erroneous B:C merges on activity rows, removing...`, 'INFO');
+          mergesToRemove.forEach(mergeRange => {
+            try {
+              worksheet.unMergeCells(mergeRange);
+              sendLog(`[UPDATE-PLAN][FIX] Removed erroneous merge: ${mergeRange}`, 'INFO');
+            } catch(e) {
+              sendLog(`[UPDATE-PLAN][WARN] Could not unmerge ${mergeRange}: ${e.message}`, 'WARN');
+            }
+          });
+
+          // After unmerge, column C is null on those rows.
+          // Restore responsable for rows not covered by the actividades loop below.
+          for (const mergeRow of unmergedActivityRows) {
+            if (!activeRowIndices.has(mergeRow)) {
+              const row = worksheet.getRow(mergeRow);
+              const currentC = row.getCell(3).value;
+              if (!currentC) {
+                row.getCell(3).value = 'Profesional SST';
+                sendLog(`[UPDATE-PLAN][FIX] Fila ${mergeRow}: C restaurado a "Profesional SST" (post-unmerge, fila no en datos)`, 'INFO');
+              }
+            }
+          }
+        }
+      }
+
+actividades.forEach((actividad, index) => {
 		if (!actividad || !actividad.name || !Array.isArray(actividad.months)) {
 			sendLog(`[UPDATE-PLAN][WARN] Actividad ${index} sin estructura válida, saltando`, 'WARN');
 			return;
@@ -3113,14 +3212,17 @@ ipcMain.handle('update-plan-trabajo-excel', async (event, { filePath, periodsDat
 			targetRow = worksheet.getRow(effectiveRowIndex);
 			foundRowIndex = effectiveRowIndex;
 
-			const excelActividad = targetRow.getCell(2).value;
-			if (!excelActividad) {
-				notFoundCount++;
-				sendLog(`[UPDATE-PLAN][WARN] Fila ${actividad.rowIndex} vacía en columna B para: "${actividad.name.substring(0, 50)}"`, 'WARN');
-				return;
-			}
+      const excelActividadRaw = targetRow.getCell(2).value;
+      const excelActividad = (typeof excelActividadRaw === 'object' && excelActividadRaw !== null && excelActividadRaw.text)
+        ? excelActividadRaw.text
+        : excelActividadRaw;
+      if (!excelActividad) {
+        notFoundCount++;
+        sendLog(`[UPDATE-PLAN][WARN] Fila ${actividad.rowIndex} vacía en columna B para: "${actividad.name.substring(0, 50)}"`, 'WARN');
+        return;
+      }
 
-			sendLog(`[UPDATE-PLAN][DEBUG] Fila ${foundRowIndex}: Match directo por rowIndex`, 'DEBUG');
+      sendLog(`[UPDATE-PLAN][DEBUG] Fila ${foundRowIndex}: Match directo por rowIndex`, 'DEBUG');
 		} else {
 			// Actividad nueva: insertar al final del worksheet
 			lastUsedRow++;
@@ -3143,15 +3245,15 @@ const valor = actividad.months[idx] || '';
 targetRow.getCell(colIndex).value = valor;
 }
 
-		// === ACTUALIZAR RESPONSABLE (COLUMNA C) Y OBSERVACIONES (COLUMNA R) ===
-if (actividad.responsible !== undefined) {
-targetRow.getCell(3).value = actividad.responsible || null;
-}
-		if (actividad.observations !== undefined && actividad.observations !== null) {
-			targetRow.getCell(18).value = actividad.observations;
-		}
+    // === ACTUALIZAR RESPONSABLE (COLUMNA C) Y OBSERVACIONES (COLUMNA R) ===
+    if (actividad.responsible !== undefined) {
+      targetRow.getCell(3).value = actividad.responsible || null;
+    }
+    if (actividad.observations !== undefined && actividad.observations !== null) {
+      targetRow.getCell(18).value = actividad.observations;
+    }
 
-		// ⚠️ NO actualizar columna P (% AVANCE) ni Q (ESTADO)
+        // ⚠️ NO actualizar columna P (% AVANCE) ni Q (ESTADO)
 		// El archivo Excel original tiene fórmulas compartidas en estas columnas
 		// que ExcelJS no puede preservar. Las fórmulas originales calcularán
 		// automáticamente los valores basándose en las columnas D-O (meses).
@@ -3215,6 +3317,182 @@ targetRow.getCell(3).value = actividad.responsible || null;
   } catch (error) {
     sendLog(`[UPDATE-PLAN][ERROR] Error al actualizar Plan de Trabajo: ${error.message}`, 'ERROR');
     sendLog(`[UPDATE-PLAN][ERROR] Stack: ${error.stack}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// ============================================================================
+// Handler para reparar archivo de Plan de Trabajo corrompido por merges B:C
+// Lee la plantilla .xls original y restaura los nombres de actividades perdidos
+// en column B del .xlsx, además de eliminar merges B:C erróneos en filas de
+// actividad.
+// ============================================================================
+ipcMain.handle('repair-plan-trabajo-excel', async (event, { filePath, templatePath }) => {
+  try {
+    sendLog(`[REPAIR-PLAN][MAIN] === INICIO REPARACIÓN PLAN DE TRABAJO ===`, 'INFO');
+    sendLog(`[REPAIR-PLAN][MAIN] Archivo: ${filePath}`, 'INFO');
+
+    // Resolve template path if not provided
+    if (!templatePath) {
+      const templateFile = path.join(__dirname, 'utils', 'GI-FO-045 PLAN DE TRABAJO ANUAL 2025 SST.xls');
+      try { await fsp.access(templateFile); templatePath = templateFile; } catch(e) {}
+    }
+    if (!templatePath) {
+      // Try to find any .xls template in utils/
+      const utilsDir = path.join(__dirname, 'utils');
+      try {
+        const files = await fsp.readdir(utilsDir);
+        const xlsFile = files.find(f => f.endsWith('.xls') && f.toUpperCase().includes('PLAN DE TRABAJO'));
+        if (xlsFile) templatePath = path.join(utilsDir, xlsFile);
+      } catch(e) {}
+    }
+    if (!templatePath) {
+      return { success: false, error: 'No se encontró la plantilla .xls original para restaurar los nombres de actividades' };
+    }
+    sendLog(`[REPAIR-PLAN][MAIN] Plantilla: ${templatePath}`, 'INFO');
+
+    // Step 1: Read template .xls with SheetJS to get original activity names
+    const templateWb = xlsx.readFile(templatePath);
+    let templateSheet = null;
+    for (const sheetName of templateWb.SheetNames) {
+      const normalizedName = sheetName.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      if (normalizedName.includes('PLAN DE TRABAJO')) {
+        templateSheet = templateWb.Sheets[sheetName];
+        break;
+      }
+    }
+    if (!templateSheet && templateWb.SheetNames.length > 0) {
+      templateSheet = templateWb.Sheets[templateWb.SheetNames[0]];
+    }
+    if (!templateSheet) {
+      return { success: false, error: 'No se encontró hoja en la plantilla' };
+    }
+
+    const templateData = xlsx.utils.sheet_to_json(templateSheet, { header: 1, defval: '', range: 0 });
+    sendLog(`[REPAIR-PLAN][MAIN] Plantilla leída: ${templateData.length} filas`, 'INFO');
+
+        // Build map: rowIndex (1-based) → { name, responsable } from template
+        const templateActivityMap = {};
+        for (let i = 0; i < templateData.length; i++) {
+            const row = templateData[i];
+            const colA = String(row[0] || '').trim();
+            const colB = String(row[1] || '').trim();
+            const colC = String(row[2] || '').trim();
+            if (colA && !isNaN(parseFloat(colA.replace(',', '.'))) && colB && colB.length > 2) {
+                templateActivityMap[i + 1] = { name: colB, responsable: colC };
+            }
+        }
+        sendLog(`[REPAIR-PLAN][MAIN] Actividades en plantilla: ${Object.keys(templateActivityMap).length}`, 'INFO');
+
+    // Step 2: Read the corrupted .xlsx with ExcelJS
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const fileBuffer = await fsp.readFile(filePath);
+    await workbook.xlsx.load(fileBuffer);
+
+    let worksheet = null;
+    for (const ws of workbook.worksheets) {
+      if (ws.name && ws.name.toUpperCase().includes('PLAN DE TRABAJO')) {
+        worksheet = ws;
+        break;
+      }
+    }
+    if (!worksheet && workbook.worksheets.length > 0) {
+      worksheet = workbook.worksheets[0];
+    }
+    if (!worksheet) {
+      return { success: false, error: 'No se encontró hoja en el archivo' };
+    }
+
+    const START_ROW = 9;
+    let unmergedCount = 0;
+    let restoredCount = 0;
+
+    // Step 3: Unmerge erroneous B:C merges on activity rows
+    if (worksheet.model && worksheet.model.merges) {
+      const mergesToRemove = [];
+      const mergesToCheck = [...worksheet.model.merges];
+      mergesToCheck.forEach(mergeRange => {
+        const match = mergeRange.match(/^B(\d+):C(\d+)$/);
+        if (match && match[1] === match[2]) {
+          const row = parseInt(match[1]);
+          if (row >= START_ROW) {
+            const colA = worksheet.getRow(row).getCell(1).value;
+            if (typeof colA === 'number') {
+              mergesToRemove.push(mergeRange);
+            }
+          }
+        }
+      });
+
+      mergesToRemove.forEach(mergeRange => {
+        try {
+          worksheet.unMergeCells(mergeRange);
+          unmergedCount++;
+          sendLog(`[REPAIR-PLAN][FIX] Merge eliminado: ${mergeRange}`, 'INFO');
+        } catch(e) {
+          sendLog(`[REPAIR-PLAN][WARN] Error al unmerge ${mergeRange}: ${e.message}`, 'WARN');
+        }
+      });
+    }
+
+        // Step 4: Restore activity names (B) and responsable (C) from template
+        // After unmerge, column B retains the activity name (merge master),
+        // but column C becomes null — the responsable is lost.
+        let restoredNames = 0;
+        let restoredResponsables = 0;
+        const responsableValues = ['Profesional SST', 'Auxiliar SST', 'Coordinador SST', 'ARL', 'Responsable SST'];
+        for (let r = START_ROW; r <= worksheet.rowCount; r++) {
+            const row = worksheet.getRow(r);
+            const colA = row.getCell(1).value;
+            if (typeof colA !== 'number') continue;
+
+            const currentB = row.getCell(2).value;
+            const currentBStr = (typeof currentB === 'object' && currentB !== null && currentB.text)
+                ? currentB.text : String(currentB || '');
+            const currentC = row.getCell(3).value;
+            const currentCStr = (typeof currentC === 'object' && currentC !== null && currentC.text)
+                ? currentC.text : String(currentC || '');
+
+            const templateInfo = templateActivityMap[r];
+
+            // Restore column B if corrupted (rare: B shows responsable value)
+            const isBCorrupted = responsableValues.some(rv => currentBStr.trim() === rv);
+            if (isBCorrupted && templateInfo) {
+                const isBHyperlink = typeof currentB === 'object' && currentB !== null && currentB.hyperlink;
+                if (!isBHyperlink) {
+                    row.getCell(2).value = templateInfo.name;
+                    restoredNames++;
+                    sendLog(`[REPAIR-PLAN][FIX] Fila ${r}: B restaurado de "${currentBStr}" a "${templateInfo.name.substring(0, 50)}"`, 'INFO');
+                }
+            }
+
+            // Restore column C (responsable) if empty after unmerge
+            if (!currentCStr.trim() && templateInfo && templateInfo.responsable) {
+                row.getCell(3).value = templateInfo.responsable;
+                restoredResponsables++;
+                sendLog(`[REPAIR-PLAN][FIX] Fila ${r}: C restaurado a "${templateInfo.responsable}"`, 'INFO');
+            }
+      }
+      restoredCount = restoredNames + restoredResponsables;
+
+      // Step 5: Save
+    await workbook.xlsx.writeFile(filePath);
+
+    sendLog(`[REPAIR-PLAN][MAIN] === RESUMEN REPARACIÓN ===`, 'INFO');
+    sendLog(`[REPAIR-PLAN][MAIN] Merges eliminados: ${unmergedCount}`, 'INFO');
+    sendLog(`[REPAIR-PLAN][MAIN] Nombres restaurados: ${restoredCount}`, 'INFO');
+    sendLog(`[REPAIR-PLAN][MAIN] ✅ Archivo reparado: ${filePath}`, 'INFO');
+
+    return {
+      success: true,
+      message: `Reparación completada: ${unmergedCount} merges eliminados, ${restoredCount} nombres restaurados`,
+      unmergedCount,
+      restoredCount
+    };
+  } catch (error) {
+    sendLog(`[REPAIR-PLAN][ERROR] Error al reparar: ${error.message}`, 'ERROR');
+    sendLog(`[REPAIR-PLAN][ERROR] Stack: ${error.stack}`, 'ERROR');
     return { success: false, error: error.message };
   }
 });

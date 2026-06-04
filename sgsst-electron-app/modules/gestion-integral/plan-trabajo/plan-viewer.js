@@ -391,38 +391,48 @@ async function selectPeriod(year) {
 
 // Cargar un archivo específico seleccionado por el usuario
 async function loadSpecificYearFile(fileName) {
-    showLoading();
-    try {
-        const filePathResult = await callParentAPI('get-file-path', {
-            directory: currentSubmodulePath,
-            fileName: fileName
-        });
+  showLoading();
+  try {
+    const filePathResult = await callParentAPI('get-file-path', {
+      directory: currentSubmodulePath,
+      fileName: fileName
+    });
 
-        if (filePathResult.success) {
-            const result = await callParentAPI('read-excel-file', { filePath: filePathResult.path });
-            if (result.success) {
-                const processedData = await processExcelData(result.data);
-                periodsData[currentPeriod] = processedData[currentPeriod] || [];
-                Object.keys(processedData).forEach(y => {
-                    if (y !== currentPeriod) {
-                        if (!periodsData[y] || periodsData[y].length === 0) {
-                            periodsData[y] = processedData[y];
-                        }
-                    }
-                });
-                renderTree();
-                renderGantt();
-                updateKPIs();
-            }
+      if (filePathResult.success) {
+        // Auto-repair B:C merge corruption BEFORE reading data
+        // This prevents displaying corrupted activity names
+        const repairResult = await callParentAPI('repair-plan-trabajo-excel', {
+          filePath: filePathResult.path
+        });
+        if (repairResult.success && (repairResult.unmergedCount > 0 || repairResult.restoredCount > 0)) {
+          console.log(`[loadSpecificYearFile] Auto-repair: ${repairResult.unmergedCount} merges removed, ${repairResult.restoredCount} values restored`);
         }
-    } catch (error) {
-        console.error('Error al cargar el archivo del año:', error);
-    } finally {
-        hideLoading();
-    }
+
+        const result = await callParentAPI('read-excel-file', { filePath: filePathResult.path });
+        if (result.success) {
+          const processedData = await processExcelData(result.data);
+          periodsData[currentPeriod] = processedData[currentPeriod] || [];
+          Object.keys(processedData).forEach(y => {
+            if (y !== currentPeriod) {
+              if (!periodsData[y] || periodsData[y].length === 0) {
+                periodsData[y] = processedData[y];
+              }
+            }
+          });
+
+          renderTree();
+          renderGantt();
+          updateKPIs();
+        }
+      }
+  } catch (error) {
+    console.error('Error al cargar el archivo del año:', error);
+  } finally {
+    hideLoading();
+  }
 }
 
-function showPeriodSelector() {
+  function showPeriodSelector() {
     document.getElementById('periodSelector').style.display = 'flex';
 }
 
@@ -746,11 +756,17 @@ const rowIndexToOldId = {};
 oldData.forEach(item => {
 if (item.rowIndex) rowIndexToOldId[item.rowIndex] = item.id;
 });
-freshItems.forEach(item => {
-if (rowIndexToOldId[item.rowIndex]) {
-item.id = rowIndexToOldId[item.rowIndex];
-}
-});
+            freshItems.forEach(item => {
+              if (rowIndexToOldId[item.rowIndex]) {
+                item.id = rowIndexToOldId[item.rowIndex];
+              }
+            // Preserve correct name from old data if fresh read lost it
+            // (edge case: B:C merge corruption where activity name in B was replaced)
+            const oldItem = oldData.find(o => o.rowIndex === item.rowIndex);
+            if (oldItem && oldItem.name && (!item.name || item.name.length < 2)) {
+              item.name = oldItem.name;
+            }
+            });
 periodsData[currentPeriod] = freshItems;
 }
                         }

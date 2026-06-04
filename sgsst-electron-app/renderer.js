@@ -997,10 +997,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                   apiCallFunction = window.electronAPI.processExcelData;
                   apiCallArgs = [payload];
                   break;
-              case 'update-plan-trabajo-excel-request':
-                  apiCallFunction = window.electronAPI.updatePlanTrabajoExcel;
-                  apiCallArgs = [payload];
-                  break;
+      case 'update-plan-trabajo-excel-request':
+        apiCallFunction = window.electronAPI.updatePlanTrabajoExcel;
+        apiCallArgs = [payload];
+        break;
+      case 'repair-plan-trabajo-excel-request':
+        apiCallFunction = window.electronAPI.repairPlanTrabajoExcel;
+        apiCallArgs = [payload];
+        break;
               case 'duplicate-budget-file-request':
                   apiCallFunction = window.electronAPI.duplicateBudgetFile;
                   apiCallArgs = [payload];

@@ -93,6 +93,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveProveedoresExcelData: (filePath, data) => ipcRenderer.invoke('save-proveedores-excel-data', filePath, data),
   processExcelData: (payload) => ipcRenderer.invoke('process-excel-data', payload),
   updatePlanTrabajoExcel: (payload) => ipcRenderer.invoke('update-plan-trabajo-excel', payload),
+  repairPlanTrabajoExcel: (payload) => ipcRenderer.invoke('repair-plan-trabajo-excel', payload),
 
   // --- Módulo 2.10.1 Evaluación y Selección de Proveedores y Contratistas ---
   getAsociadosES: () => ipcRenderer.invoke('get-asociados-es'),
