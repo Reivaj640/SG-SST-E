@@ -500,18 +500,20 @@ class CopasstComponent {
             return div;
         };
 
-        const createDesarrolloItem = (data = {}) => {
-            const div = document.createElement('div');
-            div.className = 'acta-dynamic-item';
-            div.innerHTML = `<div class="acta-form-group"><label>Temas Tratados</label><textarea class="in-tema" rows="9">${data.tema || ''}</textarea></div>
-                <div class="acta-form-group"><label>Compromisos</label><textarea class="in-compromisos" rows="5">${data.compromisos || ''}</textarea></div>
-                <div class="acta-form-grid" style="margin-top:10px;">
-                    <div class="acta-form-group"><label>Fecha</label><input type="date" class="in-fecha" value="${data.fecha || ''}"></div>
-                    <div class="acta-form-group"><label>Responsable</label><input type="text" class="in-responsable" value="${data.responsable || ''}"></div>
-                </div><button class="acta-btn-remove">✕</button>`;
-            div.querySelector('.acta-btn-remove').onclick = () => div.remove();
-            return div;
-        };
+const createDesarrolloItem = (data = {}) => {
+const div = document.createElement('div');
+div.className = 'acta-dynamic-item';
+const temaValue = data.tema || '';
+const temaRows = temaValue.includes('\n') ? Math.max(9, temaValue.split('\n').length + 2) : 9;
+div.innerHTML = `<div class="acta-form-group"><label>Temas Tratados</label><textarea class="in-tema" rows="${temaRows}">${temaValue}</textarea></div>
+<div class="acta-form-group"><label>Compromisos</label><textarea class="in-compromisos" rows="5">${data.compromisos || ''}</textarea></div>
+<div class="acta-form-grid" style="margin-top:10px;">
+<div class="acta-form-group"><label>Fecha</label><input type="date" class="in-fecha" value="${data.fecha || ''}"></div>
+<div class="acta-form-group"><label>Responsable</label><input type="text" class="in-responsable" value="${data.responsable || ''}"></div>
+</div><button class="acta-btn-remove">✕</button>`;
+div.querySelector('.acta-btn-remove').onclick = () => div.remove();
+return div;
+};
 
         const initialAgenda = [{ tema: 'Revisión del acta anterior N° 107', duracion: '00:10 Minutos', lider: 'Representante del Copasst' }, { tema: 'Revisión de Accidentes del Mes de Diciembre', duracion: '00:10 Minutos', lider: 'Representante del Copasst' }, { tema: 'Revisión Avance del Plan de Trabajo Anual', duracion: '00:30 Minutos', lider: 'Representante del Copasst' }];
         const initialDesarrollo = [{ tema: 'Revisión del Acta Anterior, se continúan realizando las inspecciones programadas y están acorde, se continua desarrollando las actividades contempladas en el plan de trabajo anual.', compromisos: 'Ninguno', responsable: 'Miembros del Copasst' }, { tema: 'En el mes de [MES] [AÑO], No se presentaron accidentes laborales.', compromisos: 'Ninguno', responsable: 'Miembros del Copasst' }, { tema: 'Actividades del Plan de Trabajo ejecutadas en [MES]: [lista]. Observación: Pendientes por ejecutar: N actividades.', compromisos: 'Seguimiento actividades pendientes', responsable: 'Responsable del SG-SST' }, { tema: 'Se revisa el buzón de sugerencias y no se encuentran sugerencias.', compromisos: 'Ninguno', responsable: 'Representante del Copasst' }];
@@ -603,15 +605,17 @@ class CopasstComponent {
     return div;
   }
 
-  _createDesarrolloItem(data = {}) {
+_createDesarrolloItem(data = {}) {
     const div = document.createElement('div');
     div.className = 'acta-dynamic-item';
-    div.innerHTML = `<div class="acta-form-group"><label>Temas Tratados</label><textarea class="in-tema" rows="9">${data.tema || ''}</textarea></div>
-    <div class="acta-form-group"><label>Compromisos</label><textarea class="in-compromisos" rows="5">${data.compromisos || ''}</textarea></div>
-    <div class="acta-form-grid" style="margin-top:10px;">
-      <div class="acta-form-group"><label>Fecha</label><input type="date" class="in-fecha" value="${data.fecha || ''}"></div>
-      <div class="acta-form-group"><label>Responsable</label><input type="text" class="in-responsable" value="${data.responsable || ''}"></div>
-    </div><button class="acta-btn-remove">✕</button>`;
+    const temaValue = data.tema || '';
+    const temaRows = temaValue.includes('\n') ? Math.max(9, temaValue.split('\n').length + 2) : 9;
+    div.innerHTML = `<div class="acta-form-group"><label>Temas Tratados</label><textarea class="in-tema" rows="${temaRows}">${temaValue}</textarea></div>
+<div class="acta-form-group"><label>Compromisos</label><textarea class="in-compromisos" rows="5">${data.compromisos || ''}</textarea></div>
+<div class="acta-form-grid" style="margin-top:10px;">
+<div class="acta-form-group"><label>Fecha</label><input type="date" class="in-fecha" value="${data.fecha || ''}"></div>
+<div class="acta-form-group"><label>Responsable</label><input type="text" class="in-responsable" value="${data.responsable || ''}"></div>
+</div><button class="acta-btn-remove">✕</button>`;
     div.querySelector('.acta-btn-remove').onclick = () => div.remove();
     return div;
   }
@@ -651,9 +655,10 @@ class CopasstComponent {
         });
     const changes = this.prepareExcelChanges(data);
     try {
-      const fechaYear = data.fecha ? new Date(data.fecha).getFullYear() : new Date().getFullYear();
-      const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-      const fechaMonth = data.fecha ? MESES[new Date(data.fecha).getMonth()] : MESES[new Date().getMonth()];
+const fechaParts = data.fecha ? data.fecha.split('-') : null;
+const fechaYear = fechaParts ? parseInt(fechaParts[0], 10) : new Date().getFullYear();
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const fechaMonth = fechaParts ? MESES[parseInt(fechaParts[1], 10) - 1] : MESES[new Date().getMonth()];
       const saveInfo = await window.electronAPI.getCopasstSavePath(this.currentCompany, fechaYear, fechaMonth, data.actaNumber);
       const defaultPath = (saveInfo && saveInfo.success && saveInfo.data) ? saveInfo.data.defaultPath : `ACT-FO-029 Acta de Reunión Copasst ${fechaMonth}.xlsx`;
       const savePath = await window.electronAPI.showSaveDialog({ title: 'Guardar Acta de COPASST', defaultPath, filters: [{ name: 'Archivos de Excel', extensions: ['xlsx'] }] });

@@ -6,6 +6,23 @@ Este directorio contiene la documentación detallada de cada versión de K+AIR.
 
 ## 📋 Versiones Disponibles
 
+### v0.1.98 - 4 de junio de 2026
+**[v0.1.98-copasst-actas-autofill-mejoras.md](v0.1.98-copasst-actas-autofill-mejoras.md)**
+
+**Cambios principales:**
+- ✅ Fix: Plan de Trabajo lee mes anterior (norma COPASST)
+- ✅ Fix: Bug de mes en nombre de archivo (UTC-5 Colombia)
+- ✅ Mejora: Texto formateado multilinea con numeración e iconos ✓/⏱
+- ✅ Mejora: Accidentalidad enriquecida (nombre, CC, fecha DD/MM/YYYY)
+- ✅ Fix: Eliminado "N°" del nombre de archivo guardado
+
+**Impacto:**
+- Normatividad: Plan de Trabajo ahora revisa mes anterior (correcto per norma)
+- Datos visibles: +200% información en item de accidentalidad
+- Confiabilidad: Mes en filename 100% correcto (sin bug UTC)
+
+---
+
 ### v0.1.91 - 22 de marzo de 2026
 **[v0.1.91-navegacion-home-empresa.md](v0.1.91-navegacion-home-empresa.md)**
 

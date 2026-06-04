@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.98] - 2026-06-04
+
+### Fixed
+- **Plan de Trabajo en actas COPASST** - Lee columna del mes anterior (norma COPASST), no del mes de la reunion
+- **Bug de mes en nombre de archivo** - `parseInt(data.fecha.split('-')[1])` reemplaza `new Date().getMonth()` (bug UTC-5 Colombia)
+- **Nombre de archivo guardado** - Eliminado "N°{actaNumber}" del nombre por defecto
+
+### Changed
+- **Autollenado de actas COPASST** - Plan de Trabajo referencia `previousMonthKey` + `planYearForPrevious` (transicion de ano)
+- **Texto de desarrollo items** - Formato multilinea con `\n`, numeracion, iconos ✓/⏱, agrupacion por estado
+- **Textarea auto-expandible** - `temaRows` calculado dinamicamente segun cantidad de `\n`
+- **Accidentalidad enriquecida** - Lee columnas `Nombre Completo`, `Identificacion`, `Fecha del incidente` con fallbacks
+- **Texto de accidentes** - Formato `Nombre — CC — Fecha DD/MM/YYYY` con numeracion
+
+### Added
+- Busqueda de Plan de Trabajo por `previousMonthYear` cuando el mes anterior cruza ano (Enero → Diciembre)
+- Campos `identificacion` y `fechaEvento` en `accidentData.persons` (aditivo, backward compatible)
+
+---
+
 ## [0.1.94] - 2026-03-26
 
 ### Added

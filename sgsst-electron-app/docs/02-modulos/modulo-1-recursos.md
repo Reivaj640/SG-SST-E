@@ -1,8 +1,8 @@
 # 👥 Módulo 1: Recursos
 
-**Versión:** 2.3
-**Actualizado:** 20 de marzo de 2026
-**Estado:** ✅ Actualizado v0.1.86
+**Versión:** 2.4
+**Actualizado:** 4 de junio de 2026
+**Estado:** ✅ Actualizado v0.1.98
 
 ---
 
@@ -342,7 +342,7 @@ Controla las actividades de trabajo de alto riesgo y los permisos requeridos.
 
 ### Descripción
 
-Gestiona la conformación y documentación del Comité Paritario de Seguridad y Salud en el Trabajo.
+Gestiona la conformación y documentación del Comité Paritario de Seguridad y Salud en el Trabajo. Incluye autollenado de actas de reunión mensual con datos del Plan de Trabajo y accidentalidad.
 
 ### Funcionalidades
 
@@ -351,12 +351,48 @@ Gestiona la conformación y documentación del Comité Paritario de Seguridad y 
 - ✅ Acta de elección
 - ✅ Integrantes principales y suplentes
 - ✅ Vigencia del comité
+- ✅ **Autollenado de actas de reunión** — Datos del Plan de Trabajo (mes anterior) y accidentalidad 🆕
+- ✅ **Texto formateado multilinea** — Numeración, iconos ✓/⏱, agrupación por estado 🆕
+- ✅ **Accidentalidad enriquecida** — Nombre completo, identificación, fecha DD/MM/YYYY 🆕
 
 ### Archivos
 
 - `modules/recursos/copasst/copasst-logic.js`
 - `modules/recursos/copasst/copasst-viewer.js`
 - `modules/recursos/copasst/copasst-view.html`
+
+### Autollenado de Actas (v0.1.98)
+
+El handler IPC `get-copasst-auto-fill-data` genera automáticamente:
+
+| Paso | Contenido | Fuente |
+|------|-----------|--------|
+| PASO 1 | Número de acta, fecha sugerida | `getActasByFileName()` |
+| PASO 2 | Mes objetivo | Cálculo desde fecha |
+| PASO 3 | Agenda estándar COPASST | Hardcodeado (norma) |
+| PASO 4 | Plan de Trabajo del **mes anterior** | `Plan de Trabajo {year}.xlsx` — columna `previousMonthKey` |
+| PASO 5 | Accidentalidad del mes anterior | `Accidentalidad.xlsx` — columnas `Nombre Completo`, `Identificación`, `Fecha del incidente` |
+| PASO 6 | Respuesta final consolidada | Todos los pasos |
+
+**Columnas de accidentalidad (con fallback):**
+
+| Columna principal | Fallback 1 | Fallback 2 |
+|-------------------|------------|------------|
+| `Nombre Completo` | `Nombre` | `Trabajador` |
+| `Identificación` | `Cédula` | — |
+
+**Formato de texto en desarrollo items:**
+
+```
+Plan de Trabajo del mes de Febrero 2026:
+ 1. Actividad A — ✓ Completado
+ 2. Actividad B — ⏱ Programado
+
+En el mes de Febrero 2026, Se presentó(ron) 1 accidente(s) de trabajo:
+ 1. Lilibeth Pérez — CC 22510033 — 15/02/2026
+```
+
+**Transición de año:** Si el acta es de Enero, el mes anterior es Diciembre del año previo. El sistema busca automáticamente en `Plan de Trabajo {previousYear}.xlsx`.
 
 ### Contratos IPC Relacionados
 
@@ -366,6 +402,11 @@ const actaData = await window.electronAPI.getActaData();
 
 // Generar acta de conformación
 const actaPath = await window.electronAPI.generateCopasstActa(changes);
+
+// Autollenado de acta de reunión (v0.1.98+)
+const autoFillData = await window.electronAPI['get-copasst-auto-fill-data']({
+  empresaPath, targetMonth, targetYear, submoduloPath
+});
 ```
 
 ---

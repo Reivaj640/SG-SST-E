@@ -1,7 +1,7 @@
 # K+AIR - Contexto del Proyecto
 
-**Última actualización:** 25 de marzo de 2026
-**Versión actual:** 0.1.93
+**Última actualización:** 4 de junio de 2026
+**Versión actual:** 0.1.98
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 
 ---
@@ -125,7 +125,7 @@ modules/
 
 ---
 
-## 📊 Estado Actual (v0.1.90)
+## 📊 Estado Actual (v0.1.98)
 
 ### ✅ Funcionalidades Operativas
 
@@ -145,6 +145,7 @@ modules/
 - [x] **Espaciado Compacto en Módulo Recursos** - 75% menos espacio entre widgets y gráficas 🆕
 - [x] **Login Modernizado** - Animaciones, logo K+AIR, fondo Vanta.js, íconos en inputs 🆕
 - [x] **Transición Animada Login→Interfaz** - Overlay con spinner, mensajes, progreso y check de éxito 🆕
+- [x] **Autollenado Actas COPASST** - Plan de Trabajo (mes anterior), accidentalidad enriquecida, texto formateado 🆕
 
 ### ️ Limitaciones Temporales
 
@@ -152,7 +153,14 @@ modules/
   - **Razón:** Build de ~800 MB → ~450 MB, tiempo 15-25 min → 8-12 min
   - **Re-habilitar:** Eliminar `!Lib/site-packages/torch/**` de package.json
 
-### 🔧 Mejoras Recientes
+### 🔧 Mejores Recientes
+
+**v0.1.98 (4 de junio de 2026):**
+1. **Fix: Plan de Trabajo en actas COPASST** - Lee columna del mes anterior (norma COPASST)
+2. **Fix: Bug de mes en nombre de archivo** - Parseo directo `parseInt` vs `new Date()` (bug UTC-5)
+3. **Mejora: Texto formateado multilinea** - Numeración, iconos ✓/⏱, agrupación por estado
+4. **Mejora: Accidentalidad enriquecida** - Nombre completo, identificación, fecha DD/MM/YYYY
+5. **Fix: Nombre de archivo** - Eliminado "N°" del nombre por defecto
 
 **v0.1.90 (21 de marzo de 2026):**
 1. **Feature: Transición Animada Login→Interfaz** - Overlay con logo, spinner, mensajes y progreso

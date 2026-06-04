@@ -9010,33 +9010,46 @@ ipcMain.handle('get-copasst-auto-fill-data', async (event, companyName) => {
           }
         }
 
-        if (planFolderPath) {
-          const planFiles = await fsp.readdir(planFolderPath);
-          const planFile = planFiles.find(f =>
-            f.toUpperCase().includes('PLAN DE TRABAJO ANUAL') &&
-            f.includes(targetYear.toString()) &&
-            (f.toLowerCase().endsWith('.xlsx') || f.toLowerCase().endsWith('.xls')) &&
-            !f.startsWith('~$')
-          );
+if (planFolderPath) {
+      const planYearForPrevious = previousMonthYear;
+      const planFiles = await fsp.readdir(planFolderPath);
+      let planFile = planFiles.find(f =>
+        f.toUpperCase().includes('PLAN DE TRABAJO ANUAL') &&
+        f.includes(planYearForPrevious.toString()) &&
+        (f.toLowerCase().endsWith('.xlsx') || f.toLowerCase().endsWith('.xls')) &&
+        !f.startsWith('~$')
+      );
+      if (!planFile && planYearForPrevious !== targetYear) {
+        planFile = planFiles.find(f =>
+          f.toUpperCase().includes('PLAN DE TRABAJO ANUAL') &&
+          f.includes(targetYear.toString()) &&
+          (f.toLowerCase().endsWith('.xlsx') || f.toLowerCase().endsWith('.xls')) &&
+          !f.startsWith('~$')
+        );
+      }
 
-          if (planFile) {
-            const planFilePath = path.join(planFolderPath, planFile);
-            const workbook = xlsx.readFile(planFilePath);
+      if (planFile) {
+        const planFilePath = path.join(planFolderPath, planFile);
+        const workbook = xlsx.readFile(planFilePath);
 
-            let worksheet = null;
-            let targetSheetName = '';
-            const priorityNames = ['PLAN DE TRABAJO', 'CRONOGRAMA', 'MATRIZ', 'ACTIVIDADES', 'PLAN ANUAL'];
-            for (const sheetName of workbook.SheetNames) {
-              const normalizedName = sheetName.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-              if (priorityNames.some(p => normalizedName.includes(p))) {
-                if (normalizedName.includes(targetYear.toString())) {
-                  targetSheetName = sheetName;
-                  break;
-                }
-                if (!targetSheetName) targetSheetName = sheetName;
-              }
+        let worksheet = null;
+        let targetSheetName = '';
+        const priorityNames = ['PLAN DE TRABAJO', 'CRONOGRAMA', 'MATRIZ', 'ACTIVIDADES', 'PLAN ANUAL'];
+        for (const sheetName of workbook.SheetNames) {
+          const normalizedName = sheetName.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          if (priorityNames.some(p => normalizedName.includes(p))) {
+            if (normalizedName.includes(planYearForPrevious.toString())) {
+              targetSheetName = sheetName;
+              break;
             }
-            if (!targetSheetName) targetSheetName = workbook.SheetNames[0];
+            if (normalizedName.includes(targetYear.toString())) {
+              targetSheetName = sheetName;
+              break;
+            }
+            if (!targetSheetName) targetSheetName = sheetName;
+          }
+        }
+        if (!targetSheetName) targetSheetName = workbook.SheetNames[0];
             worksheet = workbook.Sheets[targetSheetName];
 
             const rawData = xlsx.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
@@ -9089,8 +9102,9 @@ ipcMain.handle('get-copasst-auto-fill-data', async (event, companyName) => {
               headerRowIndex = 7;
             }
 
-            const targetMonthKey = MESES_LOWER[targetMonthNumber - 1];
-            const targetCol = columnMap[targetMonthKey];
+const previousMonthIdx = previousMonthNumber < 1 ? 11 : previousMonthNumber - 1;
+const previousMonthKey = MESES_LOWER[previousMonthIdx];
+const targetCol = columnMap[previousMonthKey];
             const actividadCol = columnMap['actividad'] || 1;
             const responsableCol = columnMap['responsable'] || 2;
             const nivel1Keywords = ['MEDICINA PREVENTIVA', 'SEGURIDAD INDUSTRIAL', 'HIGIENE INDUSTRIAL', 'SALUD PUBLICA', 'BIENESTAR', 'VERIFICACION', 'INTEGRAL'];
@@ -9131,7 +9145,7 @@ ipcMain.handle('get-copasst-auto-fill-data', async (event, companyName) => {
               }
             }
 
-            sendLog(`[K+AIRSST][COPASST][AUTO_FILL] Plan de Trabajo: ${planActivitiesExecuted.length} actividades para ${targetMonth}`, 'INFO');
+            sendLog(`[K+AIRSST][COPASST][AUTO_FILL] Plan de Trabajo: ${planActivitiesExecuted.length} actividades para ${previousMonthName} (mes anterior al acta)`, 'INFO');
           }
         }
       }
@@ -9187,12 +9201,14 @@ responsable: 'Miembros del Copasst'
             if (headerRowIdx === -1) headerRowIdx = 0;
 
             const headers = rawData[headerRowIdx].map(h => String(h).trim().replace(/\r\n|\r|\n/g, ''));
-            const idx = (name) => headers.findIndex(h => h.toLowerCase() === name.toLowerCase());
-            const iAnio = idx('Año');
-            const iFecha = idx('Fecha del incidente');
-            const iMes = idx('Mes');
-            const iEvento = idx('Evento');
-            const iNombre = idx('Nombre') !== -1 ? idx('Nombre') : idx('Trabajador');
+const idx = (name) => headers.findIndex(h => h.toLowerCase() === name.toLowerCase());
+const iAnio = idx('Año');
+const iFecha = idx('Fecha del incidente');
+const iMes = idx('Mes');
+const iEvento = idx('Evento');
+const iNombreCompleto = idx('Nombre Completo');
+const iNombre = idx('Nombre') !== -1 ? idx('Nombre') : idx('Trabajador');
+const iIdentificacion = idx('Identificación') !== -1 ? idx('Identificación') : idx('Cédula');
 
             const MESES_MAP = {
               'enero':0,'febrero':1,'marzo':2,'abril':3,'mayo':4,'junio':5,
@@ -9215,28 +9231,37 @@ responsable: 'Miembros del Copasst'
               const evento = String(row[iEvento] || '').trim().toLowerCase();
               if (evento !== 'at') continue;
 
-              let mesIdx = -1;
-              const fechaVal = row[iFecha];
-              if (fechaVal) {
-                let fecha = null;
-                if (typeof fechaVal === 'number') {
-                  const d = xlsx.SSF.parse_date_code(fechaVal);
-                  fecha = new Date(d.y, d.m - 1, d.d);
-                } else {
-                  fecha = new Date(fechaVal);
-                }
-                if (fecha && !isNaN(fecha.getTime())) mesIdx = fecha.getMonth();
-              }
+let mesIdx = -1;
+let fechaParsed = null;
+const fechaVal = row[iFecha];
+if (fechaVal) {
+  let fecha = null;
+  if (typeof fechaVal === 'number') {
+    const d = xlsx.SSF.parse_date_code(fechaVal);
+    fecha = new Date(d.y, d.m - 1, d.d);
+    fechaParsed = `${String(d.d).padStart(2,'0')}/${String(d.m).padStart(2,'0')}/${d.y}`;
+  } else {
+    fecha = new Date(fechaVal);
+    if (!isNaN(fecha.getTime())) {
+      const dd = String(fecha.getDate()).padStart(2,'0');
+      const mm = String(fecha.getMonth() + 1).padStart(2,'0');
+      const yyyy = fecha.getFullYear();
+      fechaParsed = `${dd}/${mm}/${yyyy}`;
+    }
+  }
+  if (fecha && !isNaN(fecha.getTime())) mesIdx = fecha.getMonth();
+}
 
               if (mesIdx === -1 && iMes >= 0) {
                 const mesLabel = String(row[iMes] || '').trim().toLowerCase();
                 mesIdx = MESES_MAP[mesLabel];
               }
 
-              if (mesIdx === prevMonth0Index) {
-                const nombre = iNombre >= 0 ? String(row[iNombre] || '').trim() : 'Trabajador';
-                accidentsInPrevMonth.push({ nombre });
-              }
+if (mesIdx === prevMonth0Index) {
+  const nombre = iNombreCompleto >= 0 ? String(row[iNombreCompleto] || '').trim() : (iNombre >= 0 ? String(row[iNombre] || '').trim() : 'Trabajador');
+  const identificacion = iIdentificacion >= 0 ? String(row[iIdentificacion] || '').trim() : '';
+  accidentsInPrevMonth.push({ nombre, identificacion, fechaEvento: fechaParsed || '' });
+}
             }
 
             accidentData = { count: accidentsInPrevMonth.length, persons: accidentsInPrevMonth };
@@ -9288,7 +9313,15 @@ responsable: 'Miembros del Copasst'
 
 // Desarrollo item 2: Accidentalidad del mes anterior
 const personsWithoutInvestigation = accidentData.persons.filter(p => !p.hasInvestigation);
-let accidentTema = `En el mes de ${previousMonthName} ${prevMonthYearForAccidents}, Se presentó(ron) ${accidentData.count} accidente(s) de trabajo de: ${accidentData.persons.map(p => p.nombre).join(', ')}.`;
+const accidentLines = [];
+accidentLines.push(`En el mes de ${previousMonthName} ${prevMonthYearForAccidents}, Se presentó(ron) ${accidentData.count} accidente(s) de trabajo:`);
+accidentData.persons.forEach((p, i) => {
+  const parts = [p.nombre];
+  if (p.identificacion) parts.push(p.identificacion);
+  if (p.fechaEvento) parts.push(p.fechaEvento);
+  accidentLines.push(`  ${i + 1}. ${parts.join(' — ')}`);
+});
+let accidentTema = accidentLines.join('\n');
 const compromisoAccidente = personsWithoutInvestigation.length > 0
 ? 'Pendiente investigación'
 : 'Ninguno';
@@ -9320,20 +9353,33 @@ const programmedActs = planActivitiesExecuted.filter(a => a.status === 'Programa
 
 let planTema, planCompromisos, planResponsable;
 if (planActivitiesExecuted.length === 0) {
-planTema = `No se pudo verificar el estado del Plan de Trabajo Anual para el mes de ${targetMonth}.`;
-planCompromisos = 'Verificar cumplimiento del Plan de Trabajo';
-planResponsable = 'Responsable del SG-SST';
+  planTema = `No se pudo verificar el estado del Plan de Trabajo Anual para el mes de ${previousMonthName}.`;
+  planCompromisos = 'Verificar cumplimiento del Plan de Trabajo';
+  planResponsable = 'Responsable del SG-SST';
 } else {
-if (completedActs.length > 0) {
-planTema = `Actividades del Plan de Trabajo ejecutadas en ${targetMonth}: ${completedActs.map(a => a.name).join('; ')}`;
-} else {
-planTema = `No se ejecutaron actividades del Plan de Trabajo en el mes de ${targetMonth}.`;
-}
-if (programmedActs.length > 0) {
-planTema += `. Observación: Pendientes por ejecutar: ${programmedActs.length} actividades (${programmedActs.map(a => a.name).join('; ')})`;
-}
-planCompromisos = programmedActs.length > 0 ? 'Seguimiento actividades pendientes' : 'Ninguno';
-planResponsable = (completedActs.length > 0 && completedActs[0].responsible) ? completedActs[0].responsible : 'Responsable del SG-SST';
+  const lines = [];
+  lines.push(`Actividades del Plan de Trabajo — ${previousMonthName}:`);
+  lines.push('');
+  if (completedActs.length > 0) {
+    lines.push(`✓ Completadas (${completedActs.length}):`);
+    completedActs.forEach((a, i) => {
+      lines.push(`  ${i + 1}. ${a.name}`);
+    });
+  }
+  if (programmedActs.length > 0) {
+    if (completedActs.length > 0) lines.push('');
+    lines.push(`⏱ Programadas (${programmedActs.length}):`);
+    const startNum = completedActs.length + 1;
+    programmedActs.forEach((a, i) => {
+      lines.push(`  ${startNum + i}. ${a.name}`);
+    });
+  }
+  if (completedActs.length === 0 && programmedActs.length === 0) {
+    lines.push(`No se ejecutaron actividades del Plan de Trabajo en el mes de ${previousMonthName}.`);
+  }
+  planTema = lines.join('\n');
+  planCompromisos = programmedActs.length > 0 ? 'Seguimiento actividades pendientes' : 'Ninguno';
+  planResponsable = (completedActs.length > 0 && completedActs[0].responsible) ? completedActs[0].responsible : 'Responsable del SG-SST';
 }
 
 desarrollo.push({
@@ -9431,8 +9477,7 @@ ipcMain.handle('get-copasst-save-path', async (event, companyName, year, monthNa
     const targetYear = parseInt(year) || new Date().getFullYear();
     const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
     const resolvedMonth = monthName || MESES[new Date().getMonth()];
-    const numStr = actaNumber ? ` N°${actaNumber}` : '';
-    const defaultFileName = `ACT-FO-029 Acta de Reunión Copasst${numStr} ${resolvedMonth}.xlsx`;
+const defaultFileName = `ACT-FO-029 Acta de Reunión Copasst ${resolvedMonth}.xlsx`;
     const defaultPath = path.join(yearFolderPath, defaultFileName);
 
     sendLog(`[K+AIRSST][COPASST][SAVE_PATH][SUCCESS] Ruta: ${defaultPath}`, 'INFO');
