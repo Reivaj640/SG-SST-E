@@ -348,19 +348,22 @@ class ComiteConvivenciaComponent {
             <li class="kair-header__breadcrumb--active">1.1.8 Generador de Actas</li>
         </ol>
     </div>
-    <div class="kair-header__right">
-        <span class="kair-header__company">
-            <i class="bi bi-building"></i>
-            <span id="header-company-text">${this.currentCompany || '—'}</span>
-        </span>
-        <div class="kair-header__divider"></div>
-        <button class="kair-header__action--ghost" id="btn-save-draft-header" title="Guardar borrador">
-            <i class="bi bi-save"></i> Guardar
-        </button>
-        <button class="kair-header__action--ghost" id="btn-export-excel-header" title="Exportar a Excel">
-            <i class="bi bi-file-earmark-excel"></i> Exportar
-        </button>
-    </div>
+ <div class="kair-header__right">
+ <span class="kair-header__company">
+ <i class="bi bi-building"></i>
+ <span id="header-company-text">${this.currentCompany || '—'}</span>
+ </span>
+ <div class="kair-header__divider"></div>
+ <button class="kair-header__action--primary" id="btn-auto-fill-header" title="Autollenado inteligente del acta">
+ <i class="bi bi-magic"></i> Autollenado
+ </button>
+ <button class="kair-header__action--ghost" id="btn-save-draft-header" title="Guardar borrador">
+ <i class="bi bi-save"></i> Guardar
+ </button>
+ <button class="kair-header__action--ghost" id="btn-export-excel-header" title="Exportar a Excel">
+ <i class="bi bi-file-earmark-excel"></i> Exportar
+ </button>
+ </div>
 </div>
 `;
         wrapper.appendChild(header);
@@ -389,7 +392,13 @@ class ComiteConvivenciaComponent {
 .convivencia-actas-container .kair-header__company { display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem; font-weight: 400; color: #5a6378; }
 .convivencia-actas-container .kair-header__company i { font-size: 0.875rem; }
 .convivencia-actas-container .kair-header__action--ghost { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.75rem; font-size: 0.8125rem; font-weight: 500; color: #5a6378; background: transparent; border: none; border-radius: 0.375rem; cursor: pointer; transition: background 0.15s ease; }
-.convivencia-actas-container .kair-header__action--ghost:hover { background: #f0f2f5; color: #1a1a2e; }
+ .convivencia-actas-container .kair-header__action--ghost:hover { background: #f0f2f5; color: #1a1a2e; }
+ .convivencia-actas-container .kair-header__action--primary { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.875rem; font-size: 0.8125rem; font-weight: 500; color: #ffffff; background: #174ea6; border: none; border-radius: 0.375rem; cursor: pointer; transition: background 0.15s ease; }
+ .convivencia-actas-container .kair-header__action--primary:hover { background: #185abd; }
+ .convivencia-actas-container .kair-header__action--primary:disabled { opacity: 0.6; cursor: not-allowed; }
+ .convivencia-actas-container .kair-header__action--primary--loading { pointer-events: none; position: relative; color: transparent; }
+ .convivencia-actas-container .kair-header__action--primary--loading::after { content: ''; position: absolute; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: kair-spin 0.6s linear infinite; left: 50%; top: 50%; margin-left: -7px; margin-top: -7px; }
+ @keyframes kair-spin { to { transform: rotate(360deg); } }
 
 .convivencia-actas-container[data-theme="dark"] .kair-header { background: var(--k-bg-card, #2d3748); border-bottom-color: var(--k-border, #4a5568); }
 .convivencia-actas-container[data-theme="dark"] .kair-header__title { color: #e9ecef; }
@@ -400,7 +409,9 @@ class ComiteConvivenciaComponent {
 .convivencia-actas-container[data-theme="dark"] .kair-header__back { color: #adb5bd; }
 .convivencia-actas-container[data-theme="dark"] .kair-header__back:hover { background: rgba(77, 166, 255, 0.15); color: var(--k-primary, #4da6ff); }
 .convivencia-actas-container[data-theme="dark"] .kair-header__action--ghost { color: #adb5bd; }
-.convivencia-actas-container[data-theme="dark"] .kair-header__action--ghost:hover { background: rgba(255, 255, 255, 0.08); color: #e9ecef; }
+ .convivencia-actas-container[data-theme="dark"] .kair-header__action--ghost:hover { background: rgba(255, 255, 255, 0.08); color: #e9ecef; }
+ .convivencia-actas-container[data-theme="dark"] .kair-header__action--primary { background: var(--k-primary, #4da6ff); color: #1a1a2e; }
+ .convivencia-actas-container[data-theme="dark"] .kair-header__action--primary:hover { background: var(--k-primary-hover, #6db8ff); }
 
 @media (max-width: 768px) {
     .convivencia-actas-container .kair-header__bar { flex-wrap: wrap; gap: 0.5rem; padding: 0.75rem 1rem; min-height: auto; }
@@ -459,6 +470,7 @@ class ComiteConvivenciaComponent {
         this.container.appendChild(wrapper);
 
         document.getElementById('btn-back-portal').onclick = () => this.render();
+ document.getElementById('btn-auto-fill-header').onclick = () => this.handleAutoFill();
 
         const agendaList = document.getElementById('agenda-list');
         const desarrolloList = document.getElementById('desarrollo-list');
@@ -501,31 +513,125 @@ class ComiteConvivenciaComponent {
         document.getElementById('btn-export-excel-header').onclick = () => this.handleExportExcel();
     }
 
-    async handleExportExcel() {
-        const data = {
-            actaNumber: document.getElementById('acta-number').value,
-            fecha: document.getElementById('fecha').value,
-            inicia: document.getElementById('inicia').value,
-            termina: document.getElementById('termina').value,
-            topic: document.getElementById('topic').value,
-            lugar: document.getElementById('ciudad-lugar').value,
-            agendaItems: [], desarrolloItems: []
-        };
-        document.querySelectorAll('#agenda-list .acta-dynamic-item').forEach(item => {
-            data.agendaItems.push({ tema: item.querySelector('.in-tema').value, duracion: item.querySelector('.in-duracion').value, lider: item.querySelector('.in-lider').value });
-        });
-        document.querySelectorAll('#desarrollo-list .acta-dynamic-item').forEach(item => {
-            data.desarrolloItems.push({ tema: item.querySelector('.in-tema').value, compromisos: item.querySelector('.in-compromisos').value, fecha: item.querySelector('.in-fecha').value, responsable: item.querySelector('.in-responsable').value });
-        });
-        const changes = this.prepareExcelChanges(data);
-        try {
-            const savePath = await window.electronAPI.showSaveDialog({ title: 'Guardar Acta de Convivencia', defaultPath: `ACTA_CONVIVENCIA_${data.fecha}.xlsx`, filters: [{ name: 'Archivos de Excel', extensions: ['xlsx'] }] });
-            if (!savePath) return;
-            const result = await window.electronAPI.generateConvivenciaActa(changes, savePath);
-            if (result.success) alert(`Acta generada en: ${result.documentPath}`);
-            else alert(`Error: ${result.error}`);
-        } catch (error) { alert(`Error: ${error.message}`); }
-    }
+    async handleAutoFill() {
+ const btn = document.getElementById('btn-auto-fill-header');
+ if (!btn) return;
+
+ btn.classList.add('kair-header__action--primary--loading');
+ btn.disabled = true;
+
+ try {
+ const result = await window.electronAPI.getConvivenciaAutoFillData(this.currentCompany);
+
+ if (!result || !result.success || !result.data) {
+ window.KAIRToast && window.KAIRToast.show('Error al obtener datos para autollenado', 'error');
+ return;
+ }
+
+ const data = result.data;
+
+ const actaNumberInput = document.getElementById('acta-number');
+ const fechaInput = document.getElementById('fecha');
+ const topicInput = document.getElementById('topic');
+
+ if (actaNumberInput) actaNumberInput.value = data.nextActaNumber || 1;
+ if (fechaInput) fechaInput.value = data.suggestedDate || new Date().toISOString().split('T')[0];
+ if (topicInput) topicInput.value = `Reunión del Comité de Convivencia - ${data.targetMonth || ''} ${data.targetYear || ''}`;
+
+ const agendaList = document.getElementById('agenda-list');
+ if (agendaList && data.agenda && data.agenda.length > 0) {
+ agendaList.innerHTML = '';
+ data.agenda.forEach(item => {
+ agendaList.appendChild(this._createAgendaItem(item));
+ });
+ }
+
+ const desarrolloList = document.getElementById('desarrollo-list');
+ if (desarrolloList && data.desarrollo && data.desarrollo.length > 0) {
+ desarrolloList.innerHTML = '';
+ data.desarrollo.forEach(item => {
+ desarrolloList.appendChild(this._createDesarrolloItem(item));
+ });
+ }
+
+ let toastMsg = `Acta N°${data.nextActaNumber} — ${data.targetMonth} ${data.targetYear} autollenada`;
+ if (data.warnings && data.warnings.length > 0) {
+ toastMsg += ` (${data.warnings.length} aviso(s))`;
+ window.KAIRToast && window.KAIRToast.show(toastMsg, 'warning');
+ } else {
+ window.KAIRToast && window.KAIRToast.show(toastMsg, 'success');
+ }
+
+ const editorContainer = this.container.querySelector('.acta-editor-container');
+ if (editorContainer) editorContainer.scrollTo({ top: 0, behavior: 'smooth' });
+
+ } catch (error) {
+ window.KAIRToast && window.KAIRToast.show(`Error: ${error.message}`, 'error');
+ } finally {
+ btn.classList.remove('kair-header__action--primary--loading');
+ btn.disabled = false;
+ }
+ }
+
+ _createAgendaItem(data = {}) {
+ const div = document.createElement('div');
+ div.className = 'acta-dynamic-item';
+ div.innerHTML = `<div class="acta-form-grid">
+ <div class="acta-form-group" style="grid-column: span 2"><label>Tema</label><input type="text" class="in-tema" value="${data.tema || ''}"></div>
+ <div class="acta-form-group"><label>Duración</label><input type="text" class="in-duracion" value="${data.duracion || ''}"></div>
+ <div class="acta-form-group"><label>Líder</label><input type="text" class="in-lider" value="${data.lider || ''}"></div>
+ </div><button class="acta-btn-remove">✕</button>`;
+ div.querySelector('.acta-btn-remove').onclick = () => div.remove();
+ return div;
+ }
+
+ _createDesarrolloItem(data = {}) {
+ const div = document.createElement('div');
+ div.className = 'acta-dynamic-item';
+ const temaValue = data.tema || '';
+ const temaRows = temaValue.includes('\n') ? Math.max(9, temaValue.split('\n').length + 2) : 9;
+ div.innerHTML = `<div class="acta-form-group"><label>Temas Tratados</label><textarea class="in-tema" rows="${temaRows}">${temaValue}</textarea></div>
+ <div class="acta-form-group"><label>Compromisos</label><textarea class="in-compromisos" rows="5">${data.compromisos || ''}</textarea></div>
+ <div class="acta-form-grid" style="margin-top:10px;">
+ <div class="acta-form-group"><label>Fecha</label><input type="date" class="in-fecha" value="${data.fecha || ''}"></div>
+ <div class="acta-form-group"><label>Responsable</label><input type="text" class="in-responsable" value="${data.responsable || ''}"></div>
+ </div><button class="acta-btn-remove">✕</button>`;
+ div.querySelector('.acta-btn-remove').onclick = () => div.remove();
+ return div;
+ }
+
+ async handleExportExcel() {
+ const data = {
+ actaNumber: document.getElementById('acta-number').value,
+ fecha: document.getElementById('fecha').value,
+ inicia: document.getElementById('inicia').value,
+ termina: document.getElementById('termina').value,
+ topic: document.getElementById('topic').value,
+ lugar: document.getElementById('ciudad-lugar').value,
+ agendaItems: [],
+ desarrolloItems: []
+ };
+ document.querySelectorAll('#agenda-list .acta-dynamic-item').forEach(item => {
+ data.agendaItems.push({ tema: item.querySelector('.in-tema').value, duracion: item.querySelector('.in-duracion').value, lider: item.querySelector('.in-lider').value });
+ });
+ document.querySelectorAll('#desarrollo-list .acta-dynamic-item').forEach(item => {
+ data.desarrolloItems.push({ tema: item.querySelector('.in-tema').value, compromisos: item.querySelector('.in-compromisos').value, fecha: item.querySelector('.in-fecha').value, responsable: item.querySelector('.in-responsable').value });
+ });
+ const changes = this.prepareExcelChanges(data);
+ try {
+ const fechaParts = data.fecha ? data.fecha.split('-') : null;
+ const fechaYear = fechaParts ? parseInt(fechaParts[0], 10) : new Date().getFullYear();
+ const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+ const fechaMonth = fechaParts ? MESES[parseInt(fechaParts[1], 10) - 1] : MESES[new Date().getMonth()];
+ const saveInfo = await window.electronAPI.getConvivenciaSavePath(this.currentCompany, fechaYear, fechaMonth);
+ const defaultPath = (saveInfo && saveInfo.success && saveInfo.data) ? saveInfo.data.defaultPath : `GI-FO-029 ACTA DE REUNION CONVIVENCIA ${fechaMonth}.xlsx`;
+ const savePath = await window.electronAPI.showSaveDialog({ title: 'Guardar Acta de Convivencia', defaultPath, filters: [{ name: 'Archivos de Excel', extensions: ['xlsx'] }] });
+ if (!savePath) return;
+ const result = await window.electronAPI.generateConvivenciaActa(changes, savePath);
+ if (result.success) window.KAIRToast && window.KAIRToast.show('Acta generada exitosamente', 'success', { subtitle: result.documentPath });
+ else window.KAIRToast && window.KAIRToast.show('Error al generar acta', 'error', { subtitle: result.error });
+ } catch (error) { window.KAIRToast && window.KAIRToast.show('Error inesperado', 'error', { subtitle: error.message }); }
+ }
 
     prepareExcelChanges(data) {
         const changes = [];

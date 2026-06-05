@@ -9532,6 +9532,489 @@ const defaultFileName = `ACT-FO-029 Acta de Reunión Copasst ${resolvedMonth}.xl
   }
 });
 
+// ==========================================================================
+// Handler: Auto-fill datos para Acta de Convivencia
+// ==========================================================================
+ipcMain.handle('get-convivencia-auto-fill-data', async (event, companyName) => {
+  sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL][START] Empresa: ${companyName}`, 'INFO');
+
+  const MESES_CAPITALIZED = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const currentYear = new Date().getFullYear();
+
+  const emptyResult = {
+    success: true,
+    data: {
+      nextActaNumber: 1,
+      lastActaNumber: 0,
+      lastActaMonth: null,
+      lastActaMonthNumber: 0,
+      lastActaYear: currentYear,
+      targetMonth: MESES_CAPITALIZED[new Date().getMonth()],
+      targetMonthNumber: new Date().getMonth() + 1,
+      targetYear: currentYear,
+      suggestedDate: new Date().toISOString().split('T')[0],
+      agenda: [],
+      desarrollo: [],
+      acosoData: { totalComplaints: 0, recentComplaints: [] },
+      climaData: { totalCumplimiento: 0, calificacion: 'Sin datos', dimensiones: [] },
+      warnings: []
+    }
+  };
+
+  try {
+    // ============================================================
+    // Resolucion de rutas de la empresa
+    // ============================================================
+    const basePath = await getCompanyRootPath(companyName);
+    if (!basePath) {
+      emptyResult.data.warnings.push('Empresa no configurada');
+      return emptyResult;
+    }
+
+    const recursosPath = path.join(basePath, '1. Recursos');
+    if (!fs.existsSync(recursosPath)) {
+      emptyResult.data.warnings.push('Carpeta 1. Recursos no encontrada');
+      return emptyResult;
+    }
+
+    const recursosEntries = await fsp.readdir(recursosPath);
+    const convivenciaDir = recursosEntries.find(e => {
+      const lower = e.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return (e.includes('1.1.8') || lower.includes('1.1.8')) && lower.includes('convivencia');
+    });
+
+    if (!convivenciaDir) {
+      emptyResult.data.warnings.push('Carpeta Comite de Convivencia no encontrada');
+      return emptyResult;
+    }
+
+    const convivenciaFullPath = path.join(recursosPath, convivenciaDir);
+    sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL] Carpeta Convivencia: ${convivenciaFullPath}`, 'INFO');
+
+    // ============================================================
+    // PASO 1: Encontrar ultima acta y calcular consecutivo
+    // ============================================================
+    let lastActaNumber = 0;
+    let lastActaMonth = null;
+    let lastActaMonthNumber = 0;
+    let lastActaYear = 0;
+    let latestActa = null;
+
+    const yearFoldersToScan = [currentYear, currentYear - 1];
+    const allActas = [];
+
+    for (const year of yearFoldersToScan) {
+      const yearFolderPath = path.join(convivenciaFullPath, `CONVIVENCIA ${year}`);
+      if (!fs.existsSync(yearFolderPath)) continue;
+
+      const actasInYear = getActasInYearFolder(yearFolderPath);
+      for (const acta of actasInYear) {
+        allActas.push({ ...acta, year });
+      }
+    }
+
+    if (allActas.length > 0) {
+      allActas.sort((a, b) => {
+        if (b.year !== a.year) return b.year - a.year;
+        return monthToNumber(b.month) - monthToNumber(a.month);
+      });
+
+      latestActa = allActas[0];
+      lastActaMonth = latestActa.month;
+      lastActaMonthNumber = monthToNumber(latestActa.month);
+      lastActaYear = latestActa.year;
+
+      const lastActaFilePath = path.join(
+        convivenciaFullPath,
+        `CONVIVENCIA ${latestActa.year}`,
+        latestActa.fileName
+      );
+
+      if (fs.existsSync(lastActaFilePath) && lastActaFilePath.toLowerCase().endsWith('.xlsx')) {
+        try {
+          const ExcelJS = require('exceljs');
+          const workbook = new ExcelJS.Workbook();
+          const fileBuffer = await fsp.readFile(lastActaFilePath);
+          await workbook.xlsx.load(fileBuffer);
+          const worksheet = workbook.worksheets[0];
+
+          if (worksheet) {
+            const actaNumCell = worksheet.getCell(7, 5); // E7 en Excel = row 7, col 5
+            const cellValue = actaNumCell.value;
+            if (cellValue !== null && cellValue !== undefined) {
+              const parsed = parseInt(String(cellValue).trim());
+              if (!isNaN(parsed) && parsed > 0) {
+                lastActaNumber = parsed;
+                sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL] Consecutivo leido: ${lastActaNumber} de ${latestActa.fileName}`, 'INFO');
+              }
+            }
+          }
+        } catch (excelErr) {
+          sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL] Error leyendo Excel: ${excelErr.message}`, 'WARN');
+          emptyResult.data.warnings.push('No se pudo leer consecutivo del Excel anterior');
+        }
+      }
+    }
+
+ const nextActaNumber = lastActaNumber + 1;
+
+ // ============================================================
+ // PASO 2: Calcular mes objetivo y fecha sugerida
+ //          Ciclo de reuniones: Feb(2), May(5), Aug(8), Nov(11)
+ // ============================================================
+ const CONVIVENCIA_CYCLE_MONTHS = [2, 5, 8, 11];
+ let targetMonthNumber, targetYear;
+
+ function getNextConvivenciaMonth(refMonth, refYear) {
+ const idx = CONVIVENCIA_CYCLE_MONTHS.indexOf(refMonth);
+ if (idx !== -1) {
+ const nextIdx = (idx + 1) % CONVIVENCIA_CYCLE_MONTHS.length;
+ const nextYear = nextIdx === 0 ? refYear + 1 : refYear;
+ return { month: CONVIVENCIA_CYCLE_MONTHS[nextIdx], year: nextYear };
+ }
+ const next = CONVIVENCIA_CYCLE_MONTHS.find(m => m > refMonth);
+ if (next) return { month: next, year: refYear };
+ return { month: CONVIVENCIA_CYCLE_MONTHS[0], year: refYear + 1 };
+ }
+
+ if (lastActaMonthNumber > 0 && lastActaYear > 0) {
+ const next = getNextConvivenciaMonth(lastActaMonthNumber, lastActaYear);
+ targetMonthNumber = next.month;
+ targetYear = next.year;
+ } else {
+ const currentMonth = new Date().getMonth() + 1;
+ const next = getNextConvivenciaMonth(currentMonth - 1, currentYear);
+ if (next.month >= currentMonth) {
+ targetMonthNumber = next.month;
+ targetYear = next.year;
+ } else {
+ const nextAfter = getNextConvivenciaMonth(currentMonth, currentYear);
+ targetMonthNumber = nextAfter.month;
+ targetYear = nextAfter.year;
+ }
+ }
+
+    const targetMonth = numberToMonth(targetMonthNumber);
+    const suggestedDate = getFirstBusinessDay(targetYear, targetMonthNumber);
+    const lastDayOfTargetMonth = getLastDayOfMonth(targetYear, targetMonthNumber);
+
+    function getFirstBusinessDay(year, month) {
+      for (let day = 1; day <= 5; day++) {
+        const date = new Date(year, month - 1, day);
+        const dayOfWeek = date.getDay();
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+          return date.toISOString().split('T')[0];
+        }
+      }
+      return new Date(year, month - 1, 6).toISOString().split('T')[0];
+    }
+
+    function getLastDayOfMonth(year, month) {
+      const date = new Date(year, month, 0);
+      return date.toISOString().split('T')[0];
+    }
+
+    // ============================================================
+    // PASO 3: Construir agenda (4 items fijos)
+    // ============================================================
+    const previousMonthName = numberToMonth(targetMonthNumber === 1 ? 12 : targetMonthNumber - 1);
+    const previousMonthYear = targetMonthNumber === 1 ? targetYear - 1 : targetYear;
+
+    const agenda = [
+      {
+        tema: 'Verificacion del Quorum',
+        duracion: '00:10 Minutos',
+        lider: 'Representante del Comite'
+      },
+      {
+        tema: 'Saludos e inicio de reunion',
+        duracion: '00:10 Minutos',
+        lider: 'Representante del Comite'
+      },
+      {
+        tema: 'Programa de bienestar y Temas Varios',
+        duracion: '00:30 Minutos',
+        lider: 'Representante del Comite'
+      },
+      {
+        tema: 'Varios',
+        duracion: '00:10 Minutos',
+        lider: 'Representante del Comite'
+      }
+    ];
+
+    // ============================================================
+    // PASO 4: Leer datos del SVE Psicosocial (.xlsb)
+    // ============================================================
+    let acosoData = { totalComplaints: 0, recentComplaints: [] };
+    let climaData = { totalCumplimiento: 0, calificacion: 'Sin datos', dimensiones: [] };
+
+    try {
+      const saludPath = path.join(basePath, '3. Gestion de la Salud');
+      const normalize = (str) => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+      let sveFolderPath = null;
+      if (fs.existsSync(saludPath)) {
+        const saludEntries = await fsp.readdir(saludPath);
+        const medicinaFolder = saludEntries.find(e => normalize(e).includes('3.1.2') || normalize(e).includes('medicina preventiva'));
+
+        if (medicinaFolder) {
+          const medicinaPath = path.join(saludPath, medicinaFolder);
+          const medicinaEntries = await fsp.readdir(medicinaPath);
+          const sveFolder = medicinaEntries.find(e => normalize(e).includes('sve') && normalize(e).includes('psicosocial'));
+
+          if (sveFolder) {
+            sveFolderPath = path.join(medicinaPath, sveFolder);
+          }
+        }
+      }
+
+      if (sveFolderPath && fs.existsSync(sveFolderPath)) {
+        const sveFiles = await fsp.readdir(sveFolderPath);
+        const xlsbFile = sveFiles.find(f =>
+          !f.startsWith('~$') &&
+          f.toLowerCase().endsWith('.xlsb') &&
+          (normalize(f).includes('psicosicla') || normalize(f).includes('psicosocial'))
+        );
+
+        if (xlsbFile) {
+          const xlsbPath = path.join(sveFolderPath, xlsbFile);
+          sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL] SVE Psicosocial encontrado: ${xlsbPath}`, 'INFO');
+
+          // Paso 4a: Refresh de Power Query
+          try {
+            await refreshExcelPowerQuery(xlsbPath);
+            sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL] Power Query actualizado`, 'INFO');
+          } catch (pqErr) {
+            sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL] Power Query refresh falló (continuando sin refresh): ${pqErr.message}`, 'WARN');
+            emptyResult.data.warnings.push('No se pudo actualizar Power Query del SVE Psicosocial');
+          }
+
+          // Paso 4b: Ejecutar script Python para leer .xlsb
+          const pythonPath = getPython();
+          const scriptPath = getPythonScriptPath('read_sve_psicosocial.py');
+          const tempDir = app.getPath('temp');
+          const outputJsonPath = path.join(tempDir, `sve_psicosocial_${Date.now()}.json`);
+
+          const { stdout, stderr } = await execFilePromise(pythonPath, [scriptPath, xlsbPath, outputJsonPath]);
+
+          if (stderr) {
+            sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL] Python stderr: ${stderr}`, 'WARN');
+          }
+
+          if (fs.existsSync(outputJsonPath)) {
+            try {
+              const rawData = await fsp.readFile(outputJsonPath, 'utf8');
+              const parsed = JSON.parse(rawData);
+
+              if (parsed && parsed.payload && parsed.payload.success) {
+                acosoData = parsed.payload.acosoData || acosoData;
+                climaData = parsed.payload.climaData || climaData;
+                sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL] Datos SVE leidos: ${acosoData.totalComplaints} quejas, Clima: ${climaData.calificacion} ${climaData.totalCumplimiento}%`, 'INFO');
+              }
+            } finally {
+              try { fs.unlinkSync(outputJsonPath); } catch (_) {}
+            }
+          }
+        } else {
+          sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL] Archivo .xlsb no encontrado en SVE Psicosocial`, 'WARN');
+          emptyResult.data.warnings.push('Archivo SVE Psicosocial .xlsb no encontrado');
+        }
+      } else {
+        sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL] Carpeta SVE PSICOSOCIAL no encontrada`, 'WARN');
+        emptyResult.data.warnings.push('Carpeta SVE PSICOSOCIAL no encontrada');
+      }
+    } catch (sveErr) {
+      sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL] Error leyendo SVE Psicosocial: ${sveErr.message}`, 'ERROR');
+      emptyResult.data.warnings.push('No se pudieron leer datos del SVE Psicosocial');
+    }
+
+    // ============================================================
+    // PASO 5: Construir items de desarrollo (5 items)
+    // ============================================================
+    const desarrollo = [];
+
+    // Item 1: Revision del Acta Anterior
+    desarrollo.push({
+      tema: 'Revision del Acta Anterior, se continuan con las actividades contempladas en el plan de trabajo del SVE Psicosocial.',
+      compromisos: 'Ninguno',
+      fecha: lastDayOfTargetMonth,
+      responsable: 'Miembros del Comite de Convivencia'
+    });
+
+    // Item 2: Reporte de Quejas de Acoso Laboral
+    const recentComplaints = acosoData.recentComplaints || [];
+    if (recentComplaints.length > 0) {
+      let temaAcoso = `Se revisan las quejas registradas en el link de Reporte de Queja por Presunto Acoso. Se evidencian ${recentComplaints.length} queja(s) registrada(s):\n`;
+      recentComplaints.forEach((c, idx) => {
+        temaAcoso += `${idx + 1}. ${c.tipoSituacion || 'Sin tipo'} - ${c.nombre || 'Denunciante anonimo'}`;
+        if (c.involucrado) temaAcoso += ` (Presunto involucrado: ${c.involucrado})`;
+        temaAcoso += '\n';
+      });
+      desarrollo.push({
+        tema: temaAcoso.trim(),
+        compromisos: 'Activar protocolo de prevencion de acoso laboral, brindar apoyo y soporte psicologico con la ARL',
+        fecha: lastDayOfTargetMonth,
+        responsable: 'Presidente del Comite de Convivencia'
+      });
+    } else {
+      desarrollo.push({
+        tema: 'Se revisan las quejas registradas en el link de Reporte de Queja por Presunto Acoso. No se evidencian quejas registradas en el periodo.',
+        compromisos: 'Ninguno',
+        fecha: lastDayOfTargetMonth,
+        responsable: 'Presidente del Comite de Convivencia'
+      });
+    }
+
+    // Item 3: Resultados Encuesta de Clima Laboral
+    const climaDims = climaData.dimensiones || [];
+    const totalCumpl = climaData.totalCumplimiento || 0;
+    const califGeneral = climaData.calificacion || 'Sin datos';
+
+    if (totalCumpl > 0) {
+      let temaClima = `Resultados Encuesta de Clima Laboral: ${califGeneral} (${totalCumpl}%).\nDimensiones evaluadas:\n`;
+      const dimsDeficienteRegular = [];
+      climaDims.forEach(d => {
+        temaClima += `- ${d.nombre}: ${d.cumplimiento}% (${d.calificacion})\n`;
+        if (d.calificacion === 'Deficiente' || d.calificacion === 'Regular') {
+          dimsDeficienteRegular.push(d.nombre);
+        }
+      });
+      const compromisoClima = dimsDeficienteRegular.length > 0
+        ? `Seguimiento a dimensiones con calificacion Regular/Deficiente: ${dimsDeficienteRegular.join(', ')}`
+        : 'Ninguno';
+      desarrollo.push({
+        tema: temaClima.trim(),
+        compromisos: compromisoClima,
+        fecha: lastDayOfTargetMonth,
+        responsable: 'Coordinador SST'
+      });
+    } else {
+      desarrollo.push({
+        tema: 'No se pudieron verificar los resultados de la Encuesta de Clima Laboral. Se recomienda realizar la encuesta y registrar los resultados en el SVE Psicosocial.',
+        compromisos: 'Realizar encuesta de clima laboral',
+        fecha: lastDayOfTargetMonth,
+        responsable: 'Coordinador SST'
+      });
+    }
+
+    // Item 4: Programa de Bienestar
+    desarrollo.push({
+      tema: 'Se revisa el Programa de Bienestar Laboral, se continuan desarrollando las actividades programadas.',
+      compromisos: 'Ninguno',
+      fecha: lastDayOfTargetMonth,
+      responsable: 'Coordinador SST'
+    });
+
+    // Item 5: Temas Varios
+    if (recentComplaints.length > 0) {
+      desarrollo.push({
+        tema: 'Temas Varios: Se revisan la existencia de solicitudes o quejas sobre Acoso Laboral, se evidencia(n) queja(s) registrada(s) en el link de Reporte de Queja por Presunto Acoso. Se procedio en activar el protocolo de prevencion de acoso laboral, se brindo apoyo y soporte psicologico con la Asesoria de la ARL y se brindo orientacion sobre el debido proceso.',
+        compromisos: 'Solicitar a la profesional de la ARL soporte de atencion y orientacion sobre el caso presentado.',
+        fecha: lastDayOfTargetMonth,
+        responsable: 'Presidente del Comite de Convivencia'
+      });
+    } else {
+      desarrollo.push({
+        tema: 'Temas Varios: Se revisan la existencia de solicitudes o quejas sobre Acoso Laboral, no se evidencian quejas registradas en el periodo.',
+        compromisos: 'Ninguno',
+        fecha: lastDayOfTargetMonth,
+        responsable: 'Presidente del Comite de Convivencia'
+      });
+    }
+
+    // ============================================================
+    // PASO 6: Construir respuesta final
+    // ============================================================
+    const result = {
+      success: true,
+      data: {
+        nextActaNumber,
+        lastActaNumber,
+        lastActaMonth,
+        lastActaMonthNumber,
+        lastActaYear,
+        targetMonth,
+        targetMonthNumber,
+        targetYear,
+        suggestedDate,
+        agenda,
+        desarrollo,
+        acosoData,
+        climaData,
+        warnings: emptyResult.data.warnings
+      }
+    };
+
+    sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL][SUCCESS] Acta N${nextActaNumber} - ${targetMonth} ${targetYear}`, 'INFO');
+    return result;
+
+  } catch (error) {
+    sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL][ERROR] ${error.message}`, 'ERROR');
+    emptyResult.data.warnings.push(`Error: ${error.message}`);
+    return emptyResult;
+  }
+});
+
+// ==========================================================================
+// Handler: Ruta de guardado para Acta de Convivencia
+// ==========================================================================
+ipcMain.handle('get-convivencia-save-path', async (event, companyName, year, monthName) => {
+  sendLog(`[K+AIRSST][CONVIVENCIA][SAVE_PATH][START] Empresa: ${companyName}, Ano: ${year}, Mes: ${monthName}`, 'INFO');
+
+  try {
+    const basePath = await getCompanyRootPath(companyName);
+    if (!basePath) {
+      return { success: false, error: { code: 'NO_COMPANY', message: 'Empresa no configurada' } };
+    }
+
+    const recursosPath = path.join(basePath, '1. Recursos');
+    if (!fs.existsSync(recursosPath)) {
+      return { success: false, error: { code: 'NO_RECURSOS', message: 'Carpeta 1. Recursos no encontrada' } };
+    }
+
+    const recursosEntries = await fsp.readdir(recursosPath);
+    const normalize = (str) => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const convivenciaDir = recursosEntries.find(e => {
+      const lower = normalize(e);
+      return (e.includes('1.1.8') || lower.includes('1.1.8')) && lower.includes('convivencia');
+    });
+
+    if (!convivenciaDir) {
+      return { success: false, error: { code: 'NO_CONVIVENCIA', message: 'Submodulo 1.1.8 Comite de Convivencia no encontrado' } };
+    }
+
+    const convivenciaFullPath = path.join(recursosPath, convivenciaDir);
+    const yearFolderName = `CONVIVENCIA ${year}`;
+    const yearFolderPath = path.join(convivenciaFullPath, yearFolderName);
+
+    if (!fs.existsSync(yearFolderPath)) {
+      await fsp.mkdir(yearFolderPath, { recursive: true });
+      sendLog(`[K+AIRSST][CONVIVENCIA][SAVE_PATH] Carpeta creada: ${yearFolderPath}`, 'INFO');
+    }
+
+    const targetYear = parseInt(year) || new Date().getFullYear();
+    const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const resolvedMonth = monthName || MESES[new Date().getMonth()];
+    const defaultFileName = `GI-FO-029 ACTA DE REUNION CONVIVENCIA ${resolvedMonth}.xlsx`;
+    const defaultPath = path.join(yearFolderPath, defaultFileName);
+
+    sendLog(`[K+AIRSST][CONVIVENCIA][SAVE_PATH][SUCCESS] Ruta: ${defaultPath}`, 'INFO');
+
+    return {
+      success: true,
+      data: {
+        yearFolderPath,
+        defaultFileName,
+        defaultPath
+      }
+    };
+  } catch (error) {
+    sendLog(`[K+AIRSST][CONVIVENCIA][SAVE_PATH][ERROR] ${error.message}`, 'ERROR');
+    return { success: false, error: { code: 'INTERNAL', message: error.message } };
+  }
+});
+
 // --- Manejador para reiniciar la aplicación ---
 
 
