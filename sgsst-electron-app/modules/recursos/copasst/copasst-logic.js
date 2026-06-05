@@ -221,7 +221,7 @@ class CopasstComponent {
                         </div>
 
                         <!-- OPCIÓN: MIEMBROS -->
-                        <div class="action-card" onclick="alert('Funcionalidad: Gestión de Miembros')">
+                        <div class="action-card" onclick="window.KAIRToast&&window.KAIRToast.show('Funcionalidad: Gestión de Miembros','info',{subtitle:'Próximamente'})">
                             <div class="action-icon">
                                 <i class="fas fa-users-cog"></i>
                             </div>
@@ -232,7 +232,7 @@ class CopasstComponent {
                         </div>
 
                         <!-- OPCIÓN: NORMATIVA -->
-                        <div class="action-card" onclick="alert('Cargando base legal COPASST...')">
+                        <div class="action-card" onclick="window.KAIRToast&&window.KAIRToast.show('Marco Normativo COPASST','info',{subtitle:'Próximamente'})">
                             <div class="action-icon" style="color: #ffc107;">
                                 <i class="fas fa-balance-scale"></i>
                             </div>
@@ -409,11 +409,6 @@ class CopasstComponent {
 .copasst-actas-container .kair-header__action--primary--loading { pointer-events: none; position: relative; color: transparent; }
 .copasst-actas-container .kair-header__action--primary--loading::after { content: ''; position: absolute; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: kair-spin 0.6s linear infinite; left: 50%; top: 50%; margin-left: -7px; margin-top: -7px; }
 @keyframes kair-spin { to { transform: rotate(360deg); } }
-.copasst-actas-container .auto-fill-toast { position: fixed; bottom: 1.5rem; right: 1.5rem; padding: 0.75rem 1.25rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 500; z-index: 9999; display: flex; align-items: center; gap: 0.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15); animation: kair-toast-in 0.3s ease-out; }
-.copasst-actas-container .auto-fill-toast--success { background: #28a745; color: #fff; }
-.copasst-actas-container .auto-fill-toast--warning { background: #ffc107; color: #212529; }
-.copasst-actas-container .auto-fill-toast--error { background: #dc3545; color: #fff; }
-@keyframes kair-toast-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
 .copasst-actas-container[data-theme="dark"] .kair-header { background: var(--k-bg-card, #2d3748); border-bottom-color: var(--k-border, #4a5568); }
 .copasst-actas-container[data-theme="dark"] .kair-header__title { color: #e9ecef; }
@@ -522,9 +517,9 @@ return div;
         initialDesarrollo.forEach(d => desarrolloList.appendChild(createDesarrolloItem(d)));
         document.getElementById('add-agenda-btn').onclick = () => agendaList.appendChild(createAgendaItem());
         document.getElementById('add-desarrollo-btn').onclick = () => desarrolloList.appendChild(createDesarrolloItem());
-        document.getElementById('save-draft-btn').onclick = () => alert('Borrador guardado');
-        document.getElementById('export-excel-btn').onclick = () => this.handleExportExcel();
-        document.getElementById('btn-save-draft-header').onclick = () => alert('Borrador guardado');
+document.getElementById('save-draft-btn').onclick = () => window.KAIRToast&&window.KAIRToast.show('Borrador guardado', 'success');
+			document.getElementById('export-excel-btn').onclick = () => this.handleExportExcel();
+			document.getElementById('btn-save-draft-header').onclick = () => window.KAIRToast&&window.KAIRToast.show('Borrador guardado', 'success');
         document.getElementById('btn-export-excel-header').onclick = () => this.handleExportExcel();
     }
 
@@ -574,19 +569,19 @@ return div;
 
       // Mostrar toast de éxito
       let toastMsg = `Acta N°${data.nextActaNumber} — ${data.targetMonth} ${data.targetYear} autollenada`;
-      if (data.warnings && data.warnings.length > 0) {
-        toastMsg += ` (${data.warnings.length} aviso(s))`;
-        this._showAutoFillToast(toastMsg, 'warning');
-      } else {
-        this._showAutoFillToast(toastMsg, 'success');
-      }
+if (data.warnings && data.warnings.length > 0) {
+				toastMsg += ` (${data.warnings.length} aviso(s))`;
+				window.KAIRToast && window.KAIRToast.show(toastMsg, 'warning');
+			} else {
+				window.KAIRToast && window.KAIRToast.show(toastMsg, 'success');
+			}
 
-      // Scroll al inicio del formulario
-      const editorContainer = this.container.querySelector('.acta-editor-container');
-      if (editorContainer) editorContainer.scrollTo({ top: 0, behavior: 'smooth' });
+			// Scroll al inicio del formulario
+			const editorContainer = this.container.querySelector('.acta-editor-container');
+			if (editorContainer) editorContainer.scrollTo({ top: 0, behavior: 'smooth' });
 
-    } catch (error) {
-      this._showAutoFillToast(`Error: ${error.message}`, 'error');
+		} catch (error) {
+			window.KAIRToast && window.KAIRToast.show(`Error: ${error.message}`, 'error');
     } finally {
       btn.classList.remove('kair-header__action--primary--loading');
       btn.disabled = false;
@@ -617,27 +612,10 @@ _createDesarrolloItem(data = {}) {
 <div class="acta-form-group"><label>Responsable</label><input type="text" class="in-responsable" value="${data.responsable || ''}"></div>
 </div><button class="acta-btn-remove">✕</button>`;
     div.querySelector('.acta-btn-remove').onclick = () => div.remove();
-    return div;
-  }
+return div;
+	}
 
-  _showAutoFillToast(message, type = 'success') {
-    const existing = this.container.querySelector('.auto-fill-toast');
-    if (existing) existing.remove();
-
-    const toast = document.createElement('div');
-    toast.className = `auto-fill-toast auto-fill-toast--${type}`;
-    const iconMap = { success: 'bi-check-circle-fill', warning: 'bi-exclamation-triangle-fill', error: 'bi-x-circle-fill' };
-    toast.innerHTML = `<i class="bi ${iconMap[type] || iconMap.success}"></i> ${message}`;
-    this.container.appendChild(toast);
-
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      toast.style.transition = 'opacity 0.3s ease';
-      setTimeout(() => toast.remove(), 300);
-    }, 4000);
-  }
-
-  async handleExportExcel() {
+	async handleExportExcel() {
         const data = {
             actaNumber: document.getElementById('acta-number').value,
             fecha: document.getElementById('fecha').value,
@@ -664,9 +642,9 @@ const fechaMonth = fechaParts ? MESES[parseInt(fechaParts[1], 10) - 1] : MESES[n
       const savePath = await window.electronAPI.showSaveDialog({ title: 'Guardar Acta de COPASST', defaultPath, filters: [{ name: 'Archivos de Excel', extensions: ['xlsx'] }] });
             if (!savePath) return;
             const result = await window.electronAPI.generateCopasstActa(changes, savePath);
-            if (result.success) alert(`Acta generada en: ${result.documentPath}`);
-            else alert(`Error: ${result.error}`);
-        } catch (error) { alert(`Error: ${error.message}`); }
+if (result.success) window.KAIRToast&&window.KAIRToast.show('Acta generada exitosamente', 'success', { subtitle: result.documentPath });
+			else window.KAIRToast&&window.KAIRToast.show('Error al generar acta', 'error', { subtitle: result.error });
+		} catch (error) { window.KAIRToast&&window.KAIRToast.show('Error inesperado', 'error', { subtitle: error.message }); }
     }
 
   prepareExcelChanges(data) {
