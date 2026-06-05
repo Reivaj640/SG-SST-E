@@ -8666,9 +8666,27 @@ ipcMain.handle('generate-copasst-acta', async (event, changes, savePath = null) 
       throw new Error(`El archivo de salida no se creó correctamente en: ${outputPath}`);
     }
 
-    sendLog(`[MAIN][generate-copasst-acta] Acta generada exitosamente en: ${outputPath}`, 'INFO');
+            sendLog(`[MAIN][generate-copasst-acta] Acta generada exitosamente en: ${outputPath}`, 'INFO');
 
-    // Limpiar el archivo temporal
+            // Invalidar cache de recursos para que se recalculen estadisticas de actas
+            try {
+                const savedConfigPath = path.join(app.getPath('userData'), 'config.json');
+                const savedConfig = JSON.parse(fs.readFileSync(savedConfigPath, 'utf8') || '{}');
+                const normalizedOutput = outputPath.toLowerCase().replace(/\\/g, '/');
+                for (const [cName, cData] of Object.entries(savedConfig.companyPaths || {})) {
+                    const companyRoot = (cData.root || cData.ruta_base || '').toLowerCase().replace(/\\/g, '/');
+                    if (companyRoot && normalizedOutput.includes(companyRoot)) {
+                        const cacheKey = `recursos_${cName.toUpperCase()}`;
+                        statsMemoryCache.delete(cacheKey);
+                        sendLog(`[CACHE] Invalidado: ${cacheKey} tras generar acta COPASST`, 'INFO');
+                        break;
+                    }
+                }
+            } catch (cacheErr) {
+                sendLog(`[CACHE] Error invalidando cache tras acta COPASST: ${cacheErr.message}`, 'WARN');
+            }
+
+            // Limpiar el archivo temporal
     try {
       await fsp.unlink(tempJsonPath);
       sendLog(`[MAIN][generate-copasst-acta] Archivo temporal eliminado: ${tempJsonPath}`, 'INFO');
@@ -8762,9 +8780,27 @@ ipcMain.handle('generate-convivencia-acta', async (event, changes, savePath = nu
       throw new Error(`El archivo de salida no se creó correctamente en: ${outputPath}`);
     }
 
-    sendLog(`[MAIN][generate-convivencia-acta] Acta generada exitosamente en: ${outputPath}`, 'INFO');
+            sendLog(`[MAIN][generate-convivencia-acta] Acta generada exitosamente en: ${outputPath}`, 'INFO');
 
-    // Limpiar el archivo temporal
+            // Invalidar cache de recursos para que se recalculen estadisticas de actas
+            try {
+                const savedConfigPath = path.join(app.getPath('userData'), 'config.json');
+                const savedConfig = JSON.parse(fs.readFileSync(savedConfigPath, 'utf8') || '{}');
+                const normalizedOutput = outputPath.toLowerCase().replace(/\\/g, '/');
+                for (const [cName, cData] of Object.entries(savedConfig.companyPaths || {})) {
+                    const companyRoot = (cData.root || cData.ruta_base || '').toLowerCase().replace(/\\/g, '/');
+                    if (companyRoot && normalizedOutput.includes(companyRoot)) {
+                        const cacheKey = `recursos_${cName.toUpperCase()}`;
+                        statsMemoryCache.delete(cacheKey);
+                        sendLog(`[CACHE] Invalidado: ${cacheKey} tras generar acta Convivencia`, 'INFO');
+                        break;
+                    }
+                }
+            } catch (cacheErr) {
+                sendLog(`[CACHE] Error invalidando cache tras acta Convivencia: ${cacheErr.message}`, 'WARN');
+            }
+
+            // Limpiar el archivo temporal
     try {
       await fsp.unlink(tempJsonPath);
       sendLog(`[MAIN][generate-convivencia-acta] Archivo temporal eliminado: ${tempJsonPath}`, 'INFO');
@@ -11692,27 +11728,56 @@ ipcMain.handle('get-recursos-stats', async (event, companyName) => {
 
 		const cacheKey = `recursos_${companyName.toUpperCase()}`;
 
-		const recursosPath = path.join(rootPath, '1. Recursos');
-		let induccionesFolderPath = null;
-		if (fs.existsSync(recursosPath)) {
-			try {
-				const subs = fs.readdirSync(recursosPath);
-				const normalize = (str) => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-				const indFolder = subs.find(s => {
-					const norm = normalize(s);
-					return norm.includes('induccion') || norm.includes('reinduccion');
-				});
-				if (indFolder) induccionesFolderPath = path.join(recursosPath, indFolder);
-			} catch (e) {
-				sendLog(`[CACHE] Error detectando carpeta inducciones para fingerprint: ${e.message}`, 'WARN');
-			}
-		}
+        const recursosPath = path.join(rootPath, '1. Recursos');
+        let induccionesFolderPath = null;
+        let copasstFolderPath = null;
+        let copasstYearFolderPath = null;
+        let convivenciaFolderPath = null;
+        if (fs.existsSync(recursosPath)) {
+            try {
+                const subs = fs.readdirSync(recursosPath);
+                const normalize = (str) => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                const indFolder = subs.find(s => {
+                    const norm = normalize(s);
+                    return norm.includes('induccion') || norm.includes('reinduccion');
+                });
+                if (indFolder) induccionesFolderPath = path.join(recursosPath, indFolder);
+            } catch (e) {
+                sendLog(`[CACHE] Error detectando carpeta inducciones para fingerprint: ${e.message}`, 'WARN');
+            }
+            try {
+                const subs = fs.readdirSync(recursosPath);
+                const normalize = (str) => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                const copFolder = subs.find(s => {
+                    const norm = normalize(s);
+                    return norm.includes('1.1.6') && norm.includes('copasst');
+                });
+                if (copFolder) {
+                    copasstFolderPath = path.join(recursosPath, copFolder);
+                    const currentYear = new Date().getFullYear();
+                    const yearCandidate = path.join(copasstFolderPath, `COPASST ${currentYear}`);
+                    if (fs.existsSync(yearCandidate)) {
+                        copasstYearFolderPath = yearCandidate;
+                    }
+                }
+                const cvFolder = subs.find(s => {
+                    const norm = normalize(s);
+                    return (norm.includes('1.1.8') && norm.includes('convivencia'));
+                });
+                if (cvFolder) convivenciaFolderPath = path.join(recursosPath, cvFolder);
+            } catch (e) {
+                sendLog(`[CACHE] Error detectando carpetas COPASST/Convivencia para fingerprint: ${e.message}`, 'WARN');
+            }
+        }
 
-		const deps = [
-			recursosPath,
-			induccionesFolderPath,
-			path.join(app.getPath('userData'), 'config.json')
-		].filter(Boolean);
+        const deps = [
+            recursosPath,
+            induccionesFolderPath,
+            copasstFolderPath,
+            copasstYearFolderPath,
+            convivenciaFolderPath,
+            path.join(app.getPath('userData'), 'config.json')
+        ].filter(Boolean);
 
     const stats = await getCachedStats(cacheKey, deps, async () => {
         sendLog(`[MAIN] Recalculando estadísticas de recursos para: ${companyName}`, 'INFO');
