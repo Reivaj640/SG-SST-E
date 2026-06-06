@@ -9743,14 +9743,22 @@ ipcMain.handle('get-convivencia-auto-fill-data', async (event, companyName) => {
       }
     ];
 
-    // ============================================================
-    // PASO 4: Leer datos del SVE Psicosocial (.xlsb)
-    // ============================================================
-    let acosoData = { totalComplaints: 0, recentComplaints: [] };
-    let climaData = { totalCumplimiento: 0, calificacion: 'Sin datos', dimensiones: [] };
+// ============================================================
+// PASO 4: Leer datos del SVE Psicosocial (.xlsb)
+// ============================================================
+let acosoData = { totalComplaints: 0, recentComplaints: [], periodComplaints: [] };
+let climaData = { totalCumplimiento: 0, calificacion: 'Sin datos', dimensiones: [] };
+let planSveData = { activities: [], totalProgramadas: 0, totalEjecutadas: 0 };
+
+const CONVIVENCIA_PERIOD_MAP = { 2: [12, 1], 5: [3, 4], 8: [6, 7], 11: [9, 10] };
+const [periodStartMonth, periodEndMonth] = CONVIVENCIA_PERIOD_MAP[targetMonthNumber] || [targetMonthNumber === 1 ? 12 : targetMonthNumber - 1, targetMonthNumber === 1 ? 12 : targetMonthNumber - 1];
+const periodStartMonthYear = periodStartMonth > targetMonthNumber ? targetYear - 1 : targetYear;
+const periodEndMonthYear = periodEndMonth < periodStartMonth ? (periodEndMonth >= targetMonthNumber ? targetYear - 1 : targetYear) : targetYear;
+const dateFrom = `${periodStartMonthYear}-${String(periodStartMonth).padStart(2, '0')}-01`;
+const dateTo = getLastDayOfMonth(periodEndMonthYear, periodEndMonth);
 
     try {
-      const saludPath = path.join(basePath, '3. Gestion de la Salud');
+      const saludPath = path.join(basePath, '3. Gestión de la Salud');
       const normalize = (str) => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
       let sveFolderPath = null;
@@ -9791,12 +9799,12 @@ ipcMain.handle('get-convivencia-auto-fill-data', async (event, companyName) => {
           }
 
           // Paso 4b: Ejecutar script Python para leer .xlsb
-          const pythonPath = getPython();
-          const scriptPath = getPythonScriptPath('read_sve_psicosocial.py');
+const pythonPath = await getPython();
+    const scriptPath = getPythonScriptPath('read_sve_psicosocial.py');
           const tempDir = app.getPath('temp');
           const outputJsonPath = path.join(tempDir, `sve_psicosocial_${Date.now()}.json`);
 
-          const { stdout, stderr } = await execFilePromise(pythonPath, [scriptPath, xlsbPath, outputJsonPath]);
+          const { stdout, stderr } = await execFilePromise(pythonPath, [scriptPath, xlsbPath, outputJsonPath, String(periodStartMonth), String(periodEndMonth), dateFrom, dateTo]);
 
           if (stderr) {
             sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL] Python stderr: ${stderr}`, 'WARN');
@@ -9807,10 +9815,11 @@ ipcMain.handle('get-convivencia-auto-fill-data', async (event, companyName) => {
               const rawData = await fsp.readFile(outputJsonPath, 'utf8');
               const parsed = JSON.parse(rawData);
 
-              if (parsed && parsed.payload && parsed.payload.success) {
-                acosoData = parsed.payload.acosoData || acosoData;
-                climaData = parsed.payload.climaData || climaData;
-                sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL] Datos SVE leidos: ${acosoData.totalComplaints} quejas, Clima: ${climaData.calificacion} ${climaData.totalCumplimiento}%`, 'INFO');
+if (parsed && parsed.payload && parsed.payload.success) {
+                    acosoData = parsed.payload.acosoData || acosoData;
+                    climaData = parsed.payload.climaData || climaData;
+                    planSveData = parsed.payload.planData || planSveData;
+                    sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL] Datos SVE leidos: ${acosoData.totalComplaints} quejas, Clima: ${climaData.calificacion} ${climaData.totalCumplimiento}%, Plan SVE: ${planSveData.activities.length} actividades, Quejas periodo: ${(acosoData.periodComplaints || []).length}`, 'INFO');
               }
             } finally {
               try { fs.unlinkSync(outputJsonPath); } catch (_) {}
@@ -9834,19 +9843,55 @@ ipcMain.handle('get-convivencia-auto-fill-data', async (event, companyName) => {
     // ============================================================
     const desarrollo = [];
 
-    // Item 1: Revision del Acta Anterior
-    desarrollo.push({
-      tema: 'Revision del Acta Anterior, se continuan con las actividades contempladas en el plan de trabajo del SVE Psicosocial.',
-      compromisos: 'Ninguno',
-      fecha: lastDayOfTargetMonth,
-      responsable: 'Miembros del Comite de Convivencia'
-    });
+// Item 1: Revision del Acta Anterior + Actividades del Plan SVE Psicosocial
+const planSveActivities = planSveData.activities || [];
+const executedActs = planSveActivities.filter(a => a.ae === 1);
+const programmedActs = planSveActivities.filter(a => a.ap === 1 && a.ae === 0);
+const periodStartMonthName = numberToMonth(periodStartMonth);
+const periodEndMonthName = numberToMonth(periodEndMonth);
+const periodLabel = periodStartMonth === periodEndMonth ? periodStartMonthName : `${periodStartMonthName} a ${periodEndMonthName}`;
 
-    // Item 2: Reporte de Quejas de Acoso Laboral
-    const recentComplaints = acosoData.recentComplaints || [];
-    if (recentComplaints.length > 0) {
-      let temaAcoso = `Se revisan las quejas registradas en el link de Reporte de Queja por Presunto Acoso. Se evidencian ${recentComplaints.length} queja(s) registrada(s):\n`;
-      recentComplaints.forEach((c, idx) => {
+if (planSveActivities.length > 0) {
+const lines = [];
+lines.push(`Actividades del Plan SVE Psicosocial — Periodo: ${periodLabel}:`);
+lines.push('');
+if (executedActs.length > 0) {
+lines.push(`✓ Ejecutadas (${executedActs.length}):`);
+executedActs.forEach((a, i) => {
+lines.push(` ${i + 1}. ${a.name}`);
+});
+}
+if (programmedActs.length > 0) {
+if (executedActs.length > 0) lines.push('');
+lines.push(`⏱ Programadas (${programmedActs.length}):`);
+const startNum = executedActs.length + 1;
+programmedActs.forEach((a, i) => {
+lines.push(` ${startNum + i}. ${a.name}`);
+});
+}
+if (executedActs.length === 0 && programmedActs.length === 0) {
+lines.push(`No se ejecutaron actividades del Plan SVE Psicosocial en el periodo ${periodLabel}.`);
+}
+    desarrollo.push({
+        tema: lines.join('\n'),
+        compromisos: programmedActs.length > 0 ? 'Seguimiento actividades pendientes' : 'Ninguno',
+        fecha: lastDayOfTargetMonth,
+        responsable: (executedActs.length > 0 && executedActs[0].responsable) ? executedActs[0].responsable : 'Coordinador SST'
+    });
+} else {
+    desarrollo.push({
+        tema: 'Revision del Acta Anterior, se continuan con las actividades contempladas en el plan de trabajo del SVE Psicosocial.',
+        compromisos: 'Ninguno',
+        fecha: lastDayOfTargetMonth,
+        responsable: 'Miembros del Comite de Convivencia'
+    });
+}
+
+// Item 2: Reporte de Quejas de Acoso Laboral
+const periodComplaints = acosoData.periodComplaints || [];
+if (periodComplaints.length > 0) {
+let temaAcoso = `Se revisan las quejas registradas en el link de Reporte de Queja por Presunto Acoso. Se evidencian ${periodComplaints.length} queja(s) registrada(s) en el periodo:\n`;
+periodComplaints.forEach((c, idx) => {
         temaAcoso += `${idx + 1}. ${c.tipoSituacion || 'Sin tipo'} - ${c.nombre || 'Denunciante anonimo'}`;
         if (c.involucrado) temaAcoso += ` (Presunto involucrado: ${c.involucrado})`;
         temaAcoso += '\n';
@@ -9906,8 +9951,8 @@ ipcMain.handle('get-convivencia-auto-fill-data', async (event, companyName) => {
       responsable: 'Coordinador SST'
     });
 
-    // Item 5: Temas Varios
-    if (recentComplaints.length > 0) {
+// Item 5: Temas Varios
+if (periodComplaints.length > 0) {
       desarrollo.push({
         tema: 'Temas Varios: Se revisan la existencia de solicitudes o quejas sobre Acoso Laboral, se evidencia(n) queja(s) registrada(s) en el link de Reporte de Queja por Presunto Acoso. Se procedio en activar el protocolo de prevencion de acoso laboral, se brindo apoyo y soporte psicologico con la Asesoria de la ARL y se brindo orientacion sobre el debido proceso.',
         compromisos: 'Solicitar a la profesional de la ARL soporte de atencion y orientacion sobre el caso presentado.',
@@ -9942,6 +9987,7 @@ ipcMain.handle('get-convivencia-auto-fill-data', async (event, companyName) => {
         desarrollo,
         acosoData,
         climaData,
+        planSveActivities,
         warnings: emptyResult.data.warnings
       }
     };
