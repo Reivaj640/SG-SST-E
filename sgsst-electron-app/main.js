@@ -9891,8 +9891,13 @@ lines.push(`No se ejecutaron actividades del Plan SVE Psicosocial en el periodo 
 const periodComplaints = acosoData.periodComplaints || [];
 if (periodComplaints.length > 0) {
 let temaAcoso = `Se revisan las quejas registradas en el link de Reporte de Queja por Presunto Acoso. Se evidencian ${periodComplaints.length} queja(s) registrada(s) en el periodo:\n`;
-periodComplaints.forEach((c, idx) => {
+      periodComplaints.forEach((c, idx) => {
         temaAcoso += `${idx + 1}. ${c.tipoSituacion || 'Sin tipo'} - ${c.nombre || 'Denunciante anonimo'}`;
+        if (c.fechaOcurrencia) {
+          const parts = c.fechaOcurrencia.split('-');
+          const formatted = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : c.fechaOcurrencia;
+          temaAcoso += ` [Fecha: ${formatted}]`;
+        }
         if (c.involucrado) temaAcoso += ` (Presunto involucrado: ${c.involucrado})`;
         temaAcoso += '\n';
       });
