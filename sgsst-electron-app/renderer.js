@@ -867,23 +867,28 @@ document.addEventListener('DOMContentLoaded', async () => {
                   showHomePage();
                   return;
       case 'back-to-module-request':
-      if (window.copasstPortalComponent) {
-        console.log('[RENDERER] Delegando back-to-module al portal COPASST');
+        if (window.copasstPortalComponent) {
+          console.log('[RENDERER] Delegando back-to-module al portal COPASST');
+          return;
+        }
+        if (window.comiteConvivenciaPortalComponent) {
+          console.log('[RENDERER] Delegando back-to-module al portal Comité de Convivencia');
+          return;
+        }
+            if (window.planPortalComponent) {
+              console.log('[RENDERER] Delegando back-to-module al portal Plan de Trabajo');
+              window.planPortalComponent.goBackToHome();
+              return;
+            }
+            // Volver al módulo actual
+            console.log('RENDERER: Received back-to-module-request from iframe.');
+            if (typeof currentModule !== 'undefined' && currentModule) {
+          currentSubmodule = null;
+          showModuleContent(currentModule);
+        } else {
+          showHomePage();
+        }
         return;
-      }
-      if (window.comiteConvivenciaPortalComponent) {
-        console.log('[RENDERER] Delegando back-to-module al portal Comité de Convivencia');
-        return;
-      }
-      // Volver al módulo actual
-      console.log('RENDERER: Received back-to-module-request from iframe.');
-      if (typeof currentModule !== 'undefined' && currentModule) {
-        currentSubmodule = null;
-        showModuleContent(currentModule);
-                  } else {
-                      showHomePage();
-                  }
-                  return;
               case 'back-to-submodule-home':
                   // Volver al home del submódulo actual (Evaluaciones Médicas 3.1.4)
                   console.log('RENDERER: Received back-to-submodule-home from iframe.');
@@ -1186,18 +1191,23 @@ case 'investigacion-accidentes-read-directory-request':
                   showHomePage();
                   return;
       case 'back-to-module-request':
-      if (window.copasstPortalComponent) {
-        console.log('[RENDERER] Delegando back-to-module al portal COPASST');
+        if (window.copasstPortalComponent) {
+          console.log('[RENDERER] Delegando back-to-module al portal COPASST');
+          return;
+        }
+        if (window.comiteConvivenciaPortalComponent) {
+          console.log('[RENDERER] Delegando back-to-module al portal Comité de Convivencia');
+          return;
+        }
+            if (window.planPortalComponent) {
+              console.log('[RENDERER] Delegando back-to-module al portal Plan de Trabajo');
+              window.planPortalComponent.goBackToHome();
+              return;
+            }
+            // Volver al home del módulo actual (ej. Gestión de la Salud)
+        console.log(`[RENDERER] Solicitud de regreso al módulo: ${currentModule || 'Gestión de la Salud'}`);
+        showModuleContent(currentModule || 'Gestión de la Salud');
         return;
-      }
-      if (window.comiteConvivenciaPortalComponent) {
-        console.log('[RENDERER] Delegando back-to-module al portal Comité de Convivencia');
-        return;
-      }
-      // Volver al home del módulo actual (ej. Gestión de la Salud)
-      console.log(`[RENDERER] Solicitud de regreso al módulo: ${currentModule || 'Gestión de la Salud'}`);
-      showModuleContent(currentModule || 'Gestión de la Salud');
-      return;
               case 'ausentismo-home-action':
                   // Acción desde home de ausentismo - ya se maneja internamente en el módulo
                   console.log('[RENDERER] Ausentismo home action recibida, procesando...');

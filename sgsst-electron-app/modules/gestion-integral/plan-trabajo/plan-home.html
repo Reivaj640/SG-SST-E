@@ -102,11 +102,14 @@
             border: 1px solid var(--border);
         }
 
-        .back-btn-internal:hover {
-            color: var(--primary);
-            background: var(--primary-light);
-            border-color: var(--primary);
-        }
+.back-btn-internal:hover,
+.back-btn-internal:focus,
+.back-btn-internal:active {
+  color: var(--primary);
+  background: var(--primary-light);
+  border-color: var(--primary);
+  text-decoration: none;
+}
 
         .back-btn-internal i {
             font-size: 0.85rem;

@@ -5,6 +5,90 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.99] - 2026-06-09
+
+### Added
+- **📊 Dashboard Plan de Trabajo 2.4.1** 🆕
+- KPIs estandarizados con `k-stats-ribbon` canónico (KPI Strip Enterprise v1.0)
+- Nomenclatura alineada a Capacitaciones: Programadas/Realizadas/Pendientes/Vencidas
+- KPI Avance % integrado como pill badge en primer item
+- Tabs-header con empresa y periodo activo (BEM `.k-tabs-header`)
+- Charts-grid 3x2 con 6 gráficas:
+  - **Estado** (bar) — Programadas vs Realizadas vs Pendientes vs Vencidas
+  - **Progreso Mensual** (line) — Evolución mes a mes
+  - **Cumplimiento Trimestral** (bar agrupado) — Q1-Q4 Programadas vs Ejecutadas
+  - **Estado Mensual** (stacked bar) — Distribución por mes
+  - **Categoría** (horizontal bar) — Cumplimiento por grupo padre (level===1)
+  - **Radar Anual** (radar) — Distribución 12 meses
+- Colores K+AIR canónicos (`K_COLORS = { primary, success, warning, danger, info, gray, text }`)
+
+- **🪟 Modal Selector de Periodo** 🆕
+- Cierra con botón X (esquina superior derecha, `.period-card__close`)
+- Cierra con clic en fondo (patrón UX estándar)
+- Función `hidePeriodSelector()` expuesta en `window`
+
+- **🧹 PlanTrabajoComponent.destroy()** 🆕
+- Patrón consistente con COPASST (`copasstPortalComponent.destroy()`)
+- Null refs: `window.planPortalComponent`, `window.planPortalContainer`
+- Cleanup: remueve script dinámico del DOM
+- Limpia container: `this.container.innerHTML = ''`
+
+- **🔄 goBackToModuleHome()** 🆕
+- Método directo sin postMessage (evita loop del renderer)
+- Llama `destroy()` + `onBackToModuleHome()` → navega a menú Gestión Integral
+- Separa flujos de navegación: portal home vs cronograma
+
+### Changed
+- **plan-trabajo/plan-view.html** — Dashboard HTML con tabs-header, k-stats-ribbon, 6 chart-cards, canvas ids actualizados
+- **plan-trabajo/plan-view.css** — ~1080 líneas, k-stats-ribbon, tabs-header BEM, charts-grid 3 cols, period-card__close
+- **plan-trabajo/plan-viewer.js** — ~1573 líneas, 6 funciones render chart, updateKPIs(), hidePeriodSelector(), K_COLORS
+- **plan-trabajo/plan-trabajo-logic.js** — `destroy()`, `goBackToModuleHome()`, `portalScript` ref almacenado desde `initPortalJS()`
+- **plan-trabajo/plan-home.js** — `goBackToModule()` → llamada directa a `planPortalComponent.goBackToModuleHome()` (antes: postMessage)
+- **plan-trabajo/plan-home.html** — `.back-btn-internal:hover/focus/active` con `text-decoration: none`
+- **renderer.js** — 2 handlers `back-to-module-request` (líneas ~878 y ~1202) con delegación `goBackToHome()` restaurada
+
+### Fixed
+- **Navegación "Volver" del cronograma** — Antes: postMessage `back-to-submodule-home` no funcionaba (requería 3 args). Ahora: postMessage → renderer → `planPortalComponent.goBackToHome()` → portal home
+- **Navegación "Volver al Menú" del portal home** — Antes: postMessage → renderer delegaba a `goBackToHome()` → recargaba el mismo home (loop). Ahora: llamada directa a `goBackToModuleHome()` → `destroy()` + `onBackToModuleHome()` → menú Gestión Integral
+- **Subrayado en botón "Volver al Menú"** — `text-decoration: none` en `:hover`, `:focus`, `:active` de `.back-btn-internal`
+
+### Technical Details
+- **Archivos modificados:**
+  - `modules/gestion-integral/plan-trabajo/plan-view.html` — Dashboard HTML
+  - `modules/gestion-integral/plan-trabajo/plan-view.css` — CSS completo (~1080 líneas)
+  - `modules/gestion-integral/plan-trabajo/plan-viewer.js` — JS completo (~1573 líneas)
+  - `modules/gestion-integral/plan-trabajo/plan-trabajo-logic.js` — Componente con `destroy()`, `goBackToModuleHome()`
+  - `modules/gestion-integral/plan-trabajo/plan-home.js` — Navegación directa
+  - `modules/gestion-integral/plan-trabajo/plan-home.html` — Fix subrayado
+  - `renderer.js` — 2 handlers de delegación restaurados
+
+- **Flujos de navegación:**
+  ```
+  Cronograma (iframe):
+    backBtn → postMessage('back-to-module-request')
+    → renderer → planPortalComponent.goBackToHome()
+    → recarga portal home ✓
+
+  Portal Home:
+    goBackToModule() → planPortalComponent.goBackToModuleHome()
+    → destroy() + onBackToModuleHome()
+    → menú Gestión Integral ✓
+  ```
+
+- **Contratos IPC:** Sin cambios (mismos handlers existentes)
+- **Backend:** Sin cambios (0 modificaciones en main.js)
+
+### Impacto
+- **UX:** Dashboard profesional con 6 gráficas y KPIs estandarizados
+- **Navegación:** 2 flujos claros y separados, sin loops ni estados atascados
+- **Consistencia:** Patrón destroy igual a COPASST y Comité de Convivencia
+- **Visual:** Botones de navegación sin subrayado espurio
+
+### Breaking Changes
+- **Ninguno** — Funcionalidad puramente aditiva y correctiva, contratos sin cambios
+
+---
+
 ## [0.1.98] - 2026-06-04
 
 ### Fixed

@@ -432,8 +432,12 @@ async function loadSpecificYearFile(fileName) {
   }
 }
 
-  function showPeriodSelector() {
-    document.getElementById('periodSelector').style.display = 'flex';
+function showPeriodSelector() {
+  document.getElementById('periodSelector').style.display = 'flex';
+}
+
+function hidePeriodSelector() {
+  document.getElementById('periodSelector').style.display = 'none';
 }
 
 async function clonePeriod() {
@@ -924,8 +928,10 @@ function switchMainView(view) {
 // Variables para almacenar instancias de gráficos
 let chartStatus = null;
 let chartMonthlyProgress = null;
-let chartByResponsible = null;
+let chartQuarterly = null;
 let chartMonthlyStatus = null;
+let chartByCategory = null;
+let chartAnnualRadar = null;
 
 // Configuración global de Chart.js para aplicar el estilo K+AIR
 Chart.defaults.font.family = "'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif";
@@ -945,51 +951,49 @@ const K_COLORS = {
 
 // Actualizar KPIs
 function updateKPIs() {
-    const data = periodsData[currentPeriod];
-    const activities = data.filter(item => item.type === 'activity');
+const data = periodsData[currentPeriod];
+const activities = data.filter(item => item.type === 'activity');
 
-    // Total de actividades
-    document.getElementById('kpiTotal').textContent = activities.length;
+let totalMonths = 0;
+let completedMonths = 0;
+let scheduledCount = 0;
+let overdueCount = 0;
 
-    // Calcular avance general
-    let totalMonths = 0;
-    let completedMonths = 0;
-    let scheduledCount = 0;
-    let overdueCount = 0; // En este contexto, podríamos considerar como vencidas las que están programadas pero no completadas
+activities.forEach(activity => {
+activity.months.forEach(month => {
+if (month) {
+totalMonths++;
+if (month === 'C') {
+completedMonths++;
+} else if (month === 'P') {
+scheduledCount++;
+}
+}
+});
+});
 
-    activities.forEach(activity => {
-        activity.months.forEach(month => {
-            if (month) {
-                totalMonths++;
-                if (month === 'C') {
-                    completedMonths++;
-                } else if (month === 'P') {
-                    scheduledCount++;
-                }
-            }
-        });
-    });
+const progressPercentage = totalMonths > 0 ? Math.round((completedMonths / totalMonths) * 100) : 0;
+const pendingCount = scheduledCount;
 
-    const progressPercentage = totalMonths > 0 ? Math.round((completedMonths / totalMonths) * 100) : 0;
-    document.getElementById('kpiProgress').textContent = `${progressPercentage}%`;
-    document.getElementById('kpiScheduled').textContent = scheduledCount;
+document.getElementById('stat-total').textContent = activities.length;
+document.getElementById('stat-progress-text').textContent = `${progressPercentage}%`;
+document.getElementById('stat-completed').textContent = completedMonths;
+document.getElementById('stat-pending').textContent = pendingCount;
+document.getElementById('stat-overdue').textContent = overdueCount;
 
-    // Para calcular vencidas, necesitamos lógica adicional basada en fechas
-    // Por ahora, simplemente mostramos 0
-    document.getElementById('kpiOverdue').textContent = '0';
-
-    // Actualizar gráficos
-    updateCharts();
+updateCharts();
 }
 
 // Función para actualizar los gráficos
 function updateCharts() {
-    if (currentPeriod && periodsData[currentPeriod]) {
-        renderChartStatus();
-        renderChartMonthlyProgress();
-        renderChartByResponsible();
-        renderChartMonthlyStatus();
-    }
+if (currentPeriod && periodsData[currentPeriod]) {
+renderChartStatus();
+renderChartMonthlyProgress();
+renderChartQuarterly();
+renderChartMonthlyStatus();
+renderChartByCategory();
+renderChartAnnualRadar();
+}
 }
 
 // Gráfico: Actividades por Estado
@@ -1161,64 +1165,99 @@ function renderChartMonthlyProgress() {
     });
 }
 
-// Gráfico: Distribución por Responsable
-function renderChartByResponsible() {
-    const ctx = document.getElementById('chartByResponsible').getContext('2d');
+// Gráfico: Cumplimiento Trimestral
+function renderChartQuarterly() {
+const ctx = document.getElementById('chartQuarterly').getContext('2d');
 
-    // Destruir instancia anterior si existe
-    if (chartByResponsible) {
-        chartByResponsible.destroy();
-    }
+if (chartQuarterly) {
+chartQuarterly.destroy();
+}
 
-    const data = periodsData[currentPeriod];
-    const activities = data.filter(item => item.type === 'activity');
+const data = periodsData[currentPeriod];
+const activities = data.filter(item => item.type === 'activity');
 
-    // Agrupar actividades por responsable
-    const responsibleCount = {};
+const quarters = [
+{ label: 'Q1', months: [0, 1, 2] },
+{ label: 'Q2', months: [3, 4, 5] },
+{ label: 'Q3', months: [6, 7, 8] },
+{ label: 'Q4', months: [9, 10, 11] }
+];
 
-    activities.forEach(activity => {
-        const responsible = activity.responsible || 'Sin Asignar';
-        responsibleCount[responsible] = (responsibleCount[responsible] || 0) + 1;
-    });
+const planned = [];
+const executed = [];
 
-    const labels = Object.keys(responsibleCount);
-    const values = Object.values(responsibleCount);
+quarters.forEach(q => {
+let qPlanned = 0;
+let qExecuted = 0;
+activities.forEach(activity => {
+q.months.forEach(m => {
+if (activity.months && activity.months[m] === 'P') qPlanned++;
+if (activity.months && activity.months[m] === 'C') qExecuted++;
+});
+});
+planned.push(qPlanned);
+executed.push(qExecuted);
+});
 
-    // Generar paleta basada en el color primario y variaciones
-    const bgColors = labels.map((_, i) => {
-        const hues = [210, 150, 40, 340, 180]; // Azul, Verde, Naranja, Rojo, Cyan
-        const hue = hues[i % hues.length];
-        return `hsl(${hue}, 70%, 50%)`;
-    });
-
-    chartByResponsible = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: values,
-                backgroundColor: bgColors,
-                borderWidth: 2,
-                borderColor: '#ffffff',
-                hoverOffset: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '65%', // Más fino para estilo moderno
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        usePointStyle: true,
-                        padding: 20,
-                        font: { size: 11 }
-                    }
-                }
-            }
-        }
-    });
+chartQuarterly = new Chart(ctx, {
+type: 'bar',
+data: {
+labels: quarters.map(q => q.label),
+datasets: [
+{
+label: 'Programadas',
+data: planned,
+backgroundColor: K_COLORS.warning,
+borderRadius: 4,
+barPercentage: 0.7,
+categoryPercentage: 0.6
+},
+{
+label: 'Ejecutadas',
+data: executed,
+backgroundColor: K_COLORS.success,
+borderRadius: 4,
+barPercentage: 0.7,
+categoryPercentage: 0.6
+}
+]
+},
+options: {
+responsive: true,
+maintainAspectRatio: false,
+plugins: {
+legend: {
+position: 'bottom',
+labels: {
+usePointStyle: true,
+padding: 20,
+font: { size: 11 }
+}
+},
+tooltip: {
+callbacks: {
+afterBody: function(tooltipItems) {
+const idx = tooltipItems[0].dataIndex;
+const p = planned[idx];
+const e = executed[idx];
+const pct = p > 0 ? Math.round((e / p) * 100) : 0;
+return `Cumplimiento: ${pct}%`;
+}
+}
+}
+},
+scales: {
+x: {
+grid: { display: false }
+},
+y: {
+beginAtZero: true,
+ticks: { stepSize: 1 },
+grid: { color: 'rgba(0,0,0,0.06)' }
+}
+}
+}
+});
 }
 
 // Gráfico: Actividades por Mes y Estado
@@ -1295,6 +1334,177 @@ function renderChartMonthlyStatus() {
     });
 }
 
+// Gráfico: Cumplimiento por Categoría (Horizontal Bar)
+function renderChartByCategory() {
+const ctx = document.getElementById('chartByCategory').getContext('2d');
+
+if (chartByCategory) {
+chartByCategory.destroy();
+}
+
+const data = periodsData[currentPeriod];
+const groups = data.filter(item => item.type === 'header' && item.level === 1);
+
+const categories = [];
+const plannedCounts = [];
+const completedCounts = [];
+
+groups.forEach(group => {
+const groupIndex = data.indexOf(group);
+let childActivities = [];
+for (let i = groupIndex + 1; i < data.length; i++) {
+if (data[i].level <= group.level) break;
+if (data[i].type === 'activity') childActivities.push(data[i]);
+}
+
+let planned = 0;
+let completed = 0;
+childActivities.forEach(activity => {
+activity.months.forEach(month => {
+if (month === 'P') planned++;
+else if (month === 'C') completed++;
+});
+});
+
+if (childActivities.length > 0) {
+const shortName = group.name.length > 30 ? group.name.substring(0, 27) + '...' : group.name;
+categories.push(shortName);
+plannedCounts.push(planned);
+completedCounts.push(completed);
+}
+});
+
+chartByCategory = new Chart(ctx, {
+type: 'bar',
+data: {
+labels: categories,
+datasets: [
+{
+label: 'Ejecutadas',
+data: completedCounts,
+backgroundColor: K_COLORS.success,
+borderRadius: 2,
+barPercentage: 0.7,
+},
+{
+label: 'Programadas',
+data: plannedCounts,
+backgroundColor: K_COLORS.warning,
+borderRadius: 2,
+barPercentage: 0.7,
+}
+]
+},
+options: {
+indexAxis: 'y',
+responsive: true,
+maintainAspectRatio: false,
+plugins: {
+legend: {
+position: 'top',
+align: 'end',
+labels: { font: { size: 11 }, usePointStyle: true, padding: 12 }
+}
+},
+scales: {
+x: {
+stacked: false,
+beginAtZero: true,
+grid: { color: K_COLORS.gray, borderDash: [5, 5] },
+ticks: { precision: 0 }
+},
+y: {
+stacked: false,
+grid: { display: false },
+ticks: { font: { size: 10 } }
+}
+}
+}
+});
+}
+
+// Gráfico: Distribución Anual (Radar)
+function renderChartAnnualRadar() {
+const ctx = document.getElementById('chartAnnualRadar').getContext('2d');
+
+if (chartAnnualRadar) {
+chartAnnualRadar.destroy();
+}
+
+const data = periodsData[currentPeriod];
+const activities = data.filter(item => item.type === 'activity');
+
+const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const plannedPerMonth = new Array(12).fill(0);
+const completedPerMonth = new Array(12).fill(0);
+
+activities.forEach(activity => {
+activity.months.forEach((month, index) => {
+if (month === 'P') plannedPerMonth[index]++;
+else if (month === 'C') completedPerMonth[index]++;
+});
+});
+
+chartAnnualRadar = new Chart(ctx, {
+type: 'radar',
+data: {
+labels: months,
+datasets: [
+{
+label: 'Ejecutadas',
+data: completedPerMonth,
+backgroundColor: 'rgba(40, 167, 69, 0.15)',
+borderColor: K_COLORS.success,
+borderWidth: 2,
+pointBackgroundColor: '#fff',
+pointBorderColor: K_COLORS.success,
+pointBorderWidth: 2,
+pointRadius: 3,
+pointHoverRadius: 5,
+},
+{
+label: 'Programadas',
+data: plannedPerMonth,
+backgroundColor: 'rgba(255, 193, 7, 0.1)',
+borderColor: K_COLORS.warning,
+borderWidth: 2,
+pointBackgroundColor: '#fff',
+pointBorderColor: K_COLORS.warning,
+pointBorderWidth: 2,
+pointRadius: 3,
+pointHoverRadius: 5,
+}
+]
+},
+options: {
+responsive: true,
+maintainAspectRatio: false,
+plugins: {
+legend: {
+position: 'top',
+align: 'end',
+labels: { font: { size: 11 }, usePointStyle: true, padding: 12 }
+}
+},
+scales: {
+r: {
+beginAtZero: true,
+grid: { color: K_COLORS.gray },
+angleLines: { color: K_COLORS.gray },
+pointLabels: { font: { size: 11 }, color: '#6c757d' },
+ticks: {
+display: true,
+precision: 0,
+backdropColor: 'transparent',
+font: { size: 9 },
+color: '#adb5bd'
+}
+}
+}
+}
+});
+}
+
 // Cargar datos iniciales
 function loadInitialData() {
     // Esta función se llama después de que se haya establecido la comunicación con el padre
@@ -1355,6 +1565,7 @@ window.openDeleteModal = openDeleteModal;
 window.closeDeleteModal = closeDeleteModal;
 window.confirmDelete = confirmDelete;
 window.showPeriodSelector = showPeriodSelector;
+window.hidePeriodSelector = hidePeriodSelector;
 window.selectPeriod = selectPeriod;
 window.clonePeriod = clonePeriod;
 

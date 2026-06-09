@@ -1,7 +1,7 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.93
-**Última actualización:** 25 de marzo de 2026
+**Versión:** 0.1.99
+**Última actualización:** 9 de junio de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
 ---
@@ -490,7 +490,7 @@ Menú Principal → 1.2.1 Programa de Capacitaciones
 | 2.1.1  | Política del SG-SST            | `politica-logic.js`, `viewer.js`, `onlyoffice-bridge.js` |
 | 2.2.1  | Objetivos SST                  | `objetivos-sst-logic.js`, `viewer.js`                    |
 | 2.3.1  | Evaluación Inicial SG-SST      | `evaluacion-inicial-sg-sst-logic.js`, `test.html`        |
-| 2.4.1  | Plan de Trabajo Anual          | `plan-trabajo-logic.js`, `plan-home.js`                  |
+| 2.4.1 | Plan de Trabajo Anual | `plan-trabajo-logic.js`, `plan-home.js`, `plan-home.html`, `plan-viewer.js`, `plan-view.html`, `plan-view.css` |
 | 2.5.1  | Archivo y Retención Documental | En `renderer.js`                                         |
 | 2.6.1  | Rendición de Cuentas           | `rendicion-logic.js`, `viewer.js`                        |
 
@@ -1188,6 +1188,50 @@ Este software es propietario y confidencial. No se permite la reproducción, dis
 ---
 
 ## 📝 Cambios Recientes
+
+### v0.1.99 - 9 Jun 2026 🆕
+
+#### Módulo 2.4.1 - Plan de Trabajo Anual: Dashboard y Navegación
+
+**1. KPIs Estandarizados** 🆕
+- Migrado `.kpi-grid`/`.kpi-card` → `k-stats-ribbon` canónico (KPI Strip Enterprise v1.0)
+- Nomenclatura alineada a Capacitaciones: Programadas/Realizadas/Pendientes/Vencidas
+- KPI Avance % integrado como pill badge en primer item
+
+**2. Dashboard Reestructurado** 🎨
+- Eliminado page-header legacy
+- Tabs-header con empresa y periodo activo
+- Charts-grid 3x2 con 6 gráficas:
+  - Estado (bar) — Programadas vs Realizadas vs Pendientes vs Vencidas
+  - Progreso Mensual (line) — Evolución mes a mes
+  - Cumplimiento Trimestral (bar agrupado) — Q1-Q4 Programadas vs Ejecutadas
+  - Estado Mensual (stacked bar) — Distribución por mes
+  - Categoría (horizontal bar) — Cumplimiento por grupo padre (level===1)
+  - Radar Anual (radar) — Distribución 12 meses
+
+**3. Modal Selector de Periodo** 🆕
+- Cierra con botón X (esquina superior derecha)
+- Cierra con clic en fondo (patrón UX estándar)
+- Función `hidePeriodSelector()` expuesta en `window`
+
+**4. Navegación Corregida** 🔧
+- **Cronograma → Volver**: postMessage → renderer → `planPortalComponent.goBackToHome()` → portal home
+- **Portal Home → Volver al Menú**: `goBackToModule()` → `planPortalComponent.goBackToModuleHome()` → `destroy()` + `onBackToModuleHome()` → menú Gestión Integral
+- Patrón destroy consistente con COPASST (`window.planPortalComponent = null`, cleanup script, clear container)
+
+**5. Fix Visual** 🎨
+- Eliminado subrayado en hover/focus/active del botón "Volver al Menú" (`.back-btn-internal`)
+
+**Archivos Modificados:**
+| Archivo | Cambios |
+|---------|---------|
+| `plan-trabajo/plan-view.html` | Dashboard HTML con tabs-header, k-stats-ribbon, 6 chart-cards, canvas ids |
+| `plan-trabajo/plan-view.css` | ~1080 líneas, k-stats-ribbon, tabs-header BEM, charts-grid 3 cols, period-card__close |
+| `plan-trabajo/plan-viewer.js` | ~1573 líneas, 6 funciones render chart, updateKPIs(), hidePeriodSelector(), K_COLORS |
+| `plan-trabajo/plan-trabajo-logic.js` | `destroy()`, `goBackToModuleHome()`, `portalScript` ref |
+| `plan-trabajo/plan-home.js` | `goBackToModule()` → `planPortalComponent.goBackToModuleHome()` directo |
+| `plan-trabajo/plan-home.html` | `.back-btn-internal:hover/focus/active` text-decoration: none |
+| `renderer.js` | 2 handlers `back-to-module-request` con delegación `goBackToHome()` |
 
 ### v0.1.53 - 4 Mar 2026 🆕
 

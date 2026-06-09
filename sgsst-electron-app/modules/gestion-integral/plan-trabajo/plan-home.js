@@ -59,9 +59,9 @@ async function detectAvailableYears() {
  * Navegar hacia atrás al módulo principal
  */
 function goBackToModule() {
-    if (window.parent && window.parent.postMessage) {
-        window.parent.postMessage({ type: 'back-to-module-request' }, '*');
-    }
+  if (window.planPortalComponent) {
+    window.planPortalComponent.goBackToModuleHome();
+  }
 }
 
 /**
