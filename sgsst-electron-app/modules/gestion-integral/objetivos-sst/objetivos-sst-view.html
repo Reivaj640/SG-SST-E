@@ -149,37 +149,66 @@
             gap: 1rem;
         }
 
-        /* Stats Row */
-        .k-stats-row {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 0.75rem;
-        }
-        .k-stat-card {
-            display: flex;
-            align-items: center;
-            gap: 0.65rem;
-            padding: 0.65rem 0.85rem;
-            background: var(--k-bg-card);
-            border: 1px solid var(--k-border);
-            border-radius: var(--k-radius-lg);
-            box-shadow: var(--k-shadow-sm);
-        }
-        .k-stat-icon {
-            width: 36px; height: 36px;
-            border-radius: var(--k-radius-md);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1rem;
-        }
-        .k-stat-primary { background: var(--k-primary-light); color: var(--k-primary); }
-        .k-stat-success { background: var(--k-success-light); color: var(--k-success); }
-        .k-stat-danger { background: var(--k-danger-light); color: var(--k-danger); }
-        .k-stat-warning { background: var(--k-warning-light); color: #856404; }
-        .k-stat-info { background: var(--k-info-light); color: var(--k-info); }
-        .k-stat-value { font-size: 1.1rem; font-weight: 700; color: var(--k-text-main); }
-        .k-stat-label { font-size: 0.6rem; color: var(--k-text-muted); text-transform: uppercase; }
+/* =========================================
+   STATS RIBBON (compacto)
+   ========================================= */
+.k-stats-ribbon {
+display: flex;
+align-items: center;
+gap: 0;
+background: var(--k-bg-card);
+border: 1px solid var(--k-border);
+border-radius: var(--k-radius-lg);
+padding: 0;
+margin-bottom: 1.5rem;
+box-shadow: var(--k-shadow-sm);
+overflow: hidden;
+}
+.k-stats-ribbon__item {
+display: flex;
+align-items: center;
+gap: 0.625rem;
+padding: 0.75rem 1.25rem;
+flex: 1;
+min-width: 0;
+}
+.k-stats-ribbon__icon {
+width: 32px;
+height: 32px;
+border-radius: 50%;
+display: flex;
+align-items: center;
+justify-content: center;
+font-size: 0.875rem;
+flex-shrink: 0;
+}
+.k-stats-ribbon__icon.primary { background: var(--k-primary-light); color: var(--k-primary); }
+.k-stats-ribbon__icon.success { background: var(--k-success-light); color: var(--k-success); }
+.k-stats-ribbon__icon.danger { background: var(--k-danger-light); color: var(--k-danger); }
+.k-stats-ribbon__data {
+display: flex;
+flex-direction: column;
+min-width: 0;
+}
+.k-stats-ribbon__value {
+font-size: 1.25rem;
+font-weight: 700;
+color: var(--k-text-main);
+line-height: 1.2;
+}
+.k-stats-ribbon__label {
+font-size: 0.6875rem;
+color: var(--k-text-muted);
+text-transform: uppercase;
+letter-spacing: 0.5px;
+white-space: nowrap;
+}
+.k-stats-ribbon__divider {
+width: 1px;
+height: 32px;
+background: var(--k-border);
+flex-shrink: 0;
+}
 
         /* ═══════════════════════════════════════════════════════════════════════════
            LEYENDA DE COLORES (VINCULACIÓN)
@@ -783,33 +812,40 @@
         /* ═══════════════════════════════════════════════════════════════════════════
            TEMAS (DARK / DARK-LEGACY)
            ═══════════════════════════════════════════════════════════════════════════ */
-        [data-theme="dark"] body {
-            --k-primary: #4da6ff;
-            --k-primary-light: rgba(77, 166, 255, 0.15);
-            --k-success: #5cb85c;
-            --k-success-light: rgba(92, 184, 92, 0.15);
-            --k-warning: #f0ad4e;
-            --k-warning-light: rgba(240, 173, 78, 0.15);
-            --k-danger: #d9534f;
-            --k-danger-light: rgba(217, 83, 79, 0.15);
-            --k-info: #5bc0de;
-            --k-info-light: rgba(91, 192, 222, 0.15);
-            --k-p1: #ff6b6b;
-            --k-p1-light: rgba(255, 107, 107, 0.1);
-            --k-p2: #69db7c;
-            --k-p2-light: rgba(105, 219, 124, 0.1);
-            --k-p3: #b197fc;
-            --k-p3-light: rgba(177, 151, 252, 0.1);
-            --k-p4: #ffa94d;
-            --k-p4-light: rgba(255, 169, 77, 0.1);
-            --k-bg-app: #1a202c;
-            --k-bg-card: #2d3748;
-            --k-bg-hover: #3a4556;
-            --k-border: #4a5568;
-            --k-text-main: #e9ecef;
-            --k-text-secondary: #cbd5e0;
-            --k-text-muted: #a0aec0;
-        }
+[data-theme="dark"] body {
+--k-primary: #4da6ff;
+--k-primary-light: rgba(77, 166, 255, 0.15);
+--k-success: #5cb85c;
+--k-success-light: rgba(92, 184, 92, 0.15);
+--k-warning: #f0ad4e;
+--k-warning-light: rgba(240, 173, 78, 0.15);
+--k-danger: #d9534f;
+--k-danger-light: rgba(217, 83, 79, 0.15);
+--k-info: #5bc0de;
+--k-info-light: rgba(91, 192, 222, 0.15);
+--k-p1: #ff6b6b;
+--k-p1-light: rgba(255, 107, 107, 0.1);
+--k-p2: #69db7c;
+--k-p2-light: rgba(105, 219, 124, 0.1);
+--k-p3: #b197fc;
+--k-p3-light: rgba(177, 151, 252, 0.1);
+--k-p4: #ffa94d;
+--k-p4-light: rgba(255, 169, 77, 0.1);
+--k-bg-app: #1a202c;
+--k-bg-card: #2d3748;
+--k-bg-hover: #3a4556;
+--k-border: #4a5568;
+--k-text-main: #e9ecef;
+--k-text-secondary: #cbd5e0;
+--k-text-muted: #a0aec0;
+}
+[data-theme="dark"] .k-stats-ribbon { background: #1e1e2e; border-color: #3a3a4a; }
+[data-theme="dark"] .k-stats-ribbon__icon.primary { background: rgba(77, 166, 255, 0.15); color: var(--k-primary); }
+[data-theme="dark"] .k-stats-ribbon__icon.success { background: rgba(92, 184, 92, 0.15); color: var(--k-success); }
+[data-theme="dark"] .k-stats-ribbon__icon.danger { background: rgba(217, 83, 79, 0.15); color: var(--k-danger); }
+[data-theme="dark"] .k-stats-ribbon__value { color: #e0e0e0; }
+[data-theme="dark"] .k-stats-ribbon__label { color: #8a8a9a; }
+[data-theme="dark"] .k-stats-ribbon__divider { background: #3a3a4a; }
 
         [data-theme="dark-legacy"] body {
             --k-primary: #9e9e9e;
@@ -845,16 +881,17 @@
         @media (max-width: 1400px) {
             .k-split-layout { grid-template-columns: 340px 1fr; }
         }
-        @media (max-width: 1200px) {
-            .k-stats-row { grid-template-columns: repeat(3, 1fr); }
-            .k-split-layout { grid-template-columns: 1fr; }
-        }
-        @media (max-width: 768px) {
-            .k-module-header { flex-direction: column; height: auto; padding: 0.5rem 1rem; gap: 0.5rem; }
-            .k-header-left, .k-header-right { width: 100%; justify-content: space-between; }
-            .k-stats-row { grid-template-columns: repeat(2, 1fr); }
-            .k-main-content { padding: 0.75rem; }
-        }
+@media (max-width: 1200px) {
+.k-split-layout { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+.k-module-header { flex-direction: column; height: auto; padding: 0.5rem 1rem; gap: 0.5rem; }
+.k-header-left, .k-header-right { width: 100%; justify-content: space-between; }
+.k-stats-ribbon { flex-wrap: wrap; }
+.k-stats-ribbon__item { flex: 1 1 45%; }
+.k-stats-ribbon__divider { display: none; }
+.k-main-content { padding: 0.75rem; }
+}
     </style>
 </head>
 <body>
@@ -890,44 +927,32 @@
     <!-- Main Content -->
     <main class="k-main-content">
 
-        <!-- Stats Row -->
-        <div class="k-stats-row">
-            <div class="k-stat-card">
-                <div class="k-stat-icon k-stat-primary"><i class="bi bi-bullseye"></i></div>
-                <div>
-                    <div class="k-stat-value" id="stat-objectives">6</div>
-                    <div class="k-stat-label">Objetivos</div>
-                </div>
-            </div>
-            <div class="k-stat-card">
-                <div class="k-stat-icon k-stat-success"><i class="bi bi-list-check"></i></div>
-                <div>
-                    <div class="k-stat-value" id="stat-indicators">11</div>
-                    <div class="k-stat-label">Indicadores</div>
-                </div>
-            </div>
-            <div class="k-stat-card">
-                <div class="k-stat-icon k-stat-danger"><i class="bi bi-shield-check"></i></div>
-                <div>
-                    <div class="k-stat-value">5</div>
-                    <div class="k-stat-label">Seguridad</div>
-                </div>
-            </div>
-            <div class="k-stat-card">
-                <div class="k-stat-icon k-stat-warning"><i class="bi bi-clock"></i></div>
-                <div>
-                    <div class="k-stat-value">Mensual</div>
-                    <div class="k-stat-label">Frecuencia</div>
-                </div>
-            </div>
-            <div class="k-stat-card">
-                <div class="k-stat-icon k-stat-info"><i class="bi bi-file-earmark-excel"></i></div>
-                <div>
-                    <div class="k-stat-value" style="font-size: 0.7rem;">GI-FO-044</div>
-                    <div class="k-stat-label">Archivo</div>
-                </div>
-            </div>
-        </div>
+<!-- Franja de estadísticas compacta -->
+<div class="k-stats-ribbon">
+<div class="k-stats-ribbon__item">
+<span class="k-stats-ribbon__icon primary"><i class="bi bi-bullseye"></i></span>
+<div class="k-stats-ribbon__data">
+<span class="k-stats-ribbon__value" id="stat-objectives">0</span>
+<span class="k-stats-ribbon__label">Objetivos</span>
+</div>
+</div>
+<div class="k-stats-ribbon__divider"></div>
+<div class="k-stats-ribbon__item">
+<span class="k-stats-ribbon__icon success"><i class="bi bi-list-check"></i></span>
+<div class="k-stats-ribbon__data">
+<span class="k-stats-ribbon__value" id="stat-indicators">0</span>
+<span class="k-stats-ribbon__label">Indicadores</span>
+</div>
+</div>
+<div class="k-stats-ribbon__divider"></div>
+<div class="k-stats-ribbon__item">
+<span class="k-stats-ribbon__icon danger"><i class="bi bi-shield-check"></i></span>
+<div class="k-stats-ribbon__data">
+<span class="k-stats-ribbon__value" id="stat-security">0</span>
+<span class="k-stats-ribbon__label">Seguridad</span>
+</div>
+</div>
+</div>
 
         <!-- Leyenda -->
         <div class="k-legend-bar">

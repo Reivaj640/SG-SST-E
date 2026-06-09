@@ -68,10 +68,7 @@
       Registro
       <span class="kair-header__tab-badge" id="badge-list" style="display:none;">0</span>
     </button>
-    <button class="kair-header__tab" data-view="reports">
-      <i class="bi bi-graph-up"></i>
-      Análisis y Equidad
-    </button>
+
   </div>
 </header>
 
@@ -81,71 +78,132 @@
         <!-- =========================
              VISTA 1: DASHBOARD
              ========================= -->
-        <section id="view-dashboard" class="k-view-section active">
-            
-            <!-- KPIs Generales -->
-            <div class="k-grid-dashboard">
-                <div class="k-stat-card primary">
-                    <div class="k-stat-label">Total Inducciones</div>
-                    <div class="k-stat-value" id="stat-total">0</div>
-                    <div class="k-stat-meta" id="stat-meta-total">Registros filtrados</div>
-                </div>
-                <div class="k-stat-card success">
-                    <div class="k-stat-label">Aprobadas</div>
-                    <div class="k-stat-value" id="stat-approved">0</div>
-                    <div class="k-stat-meta" id="stat-rate">0% Tasa de éxito</div>
-                </div>
-                <div class="k-stat-card danger">
-                    <div class="k-stat-label">Reprobadas</div>
-                    <div class="k-stat-value" id="stat-failed">0</div>
-                    <div class="k-stat-meta">Requieren reinducción</div>
-                </div>
-                <div class="k-stat-card warning">
-                    <div class="k-stat-label">Promedio Puntaje</div>
-                    <div class="k-stat-value" id="stat-score">0.0</div>
-                    <div class="k-stat-meta">Sobre 22.0 puntos</div>
-                </div>
-            </div>
+<section id="view-dashboard" class="k-view-section active">
 
-            <!-- KPIs Género (Normativa SST) -->
-            <div style="margin-bottom: 2rem;">
-                <h4 style="font-size: 0.9rem; font-weight: 600; color: var(--k-text-muted); text-transform: uppercase; margin-bottom: 1rem; letter-spacing: 0.5px;">Indicadores de Equidad de Género</h4>
-                <div class="k-grid-dashboard" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
-                    <div class="k-stat-card" style="border-left: 4px solid #e91e63;">
-                        <div class="k-stat-label">Mujeres Inducidas</div>
-                        <div class="k-stat-value" id="stat-gender-f">0</div>
-                        <div class="k-stat-meta" id="stat-rate-f">0% Aprobación</div>
-                    </div>
-                    <div class="k-stat-card" style="border-left: 4px solid #0f9d58;">
-                        <div class="k-stat-label">Hombres Inducidos</div>
-                        <div class="k-stat-value" id="stat-gender-m">0</div>
-                        <div class="k-stat-meta" id="stat-rate-m">0% Aprobación</div>
-                    </div>
-                </div>
-            </div>
+  <!-- Franja de estadísticas compacta -->
+  <div class="k-stats-ribbon">
+    <div class="k-stats-ribbon__item">
+      <span class="k-stats-ribbon__icon primary"><i class="bi bi-clipboard-check"></i></span>
+      <div class="k-stats-ribbon__data">
+        <span class="k-stats-ribbon__value" id="stat-total">0</span>
+        <span class="k-stats-ribbon__label">Total Inducciones</span>
+      </div>
+      <span class="k-stats-ribbon__pct" id="stat-progress-text">0%</span>
+    </div>
+    <div class="k-stats-ribbon__divider"></div>
+    <div class="k-stats-ribbon__item">
+      <span class="k-stats-ribbon__icon success"><i class="bi bi-check-circle"></i></span>
+      <div class="k-stats-ribbon__data">
+        <span class="k-stats-ribbon__value" id="stat-approved">0</span>
+        <span class="k-stats-ribbon__label">Aprobadas</span>
+      </div>
+    </div>
+    <div class="k-stats-ribbon__divider"></div>
+    <div class="k-stats-ribbon__item">
+      <span class="k-stats-ribbon__icon danger"><i class="bi bi-x-circle"></i></span>
+      <div class="k-stats-ribbon__data">
+        <span class="k-stats-ribbon__value" id="stat-failed">0</span>
+        <span class="k-stats-ribbon__label">Reprobadas</span>
+      </div>
+    </div>
+    <div class="k-stats-ribbon__divider"></div>
+    <div class="k-stats-ribbon__item">
+      <span class="k-stats-ribbon__icon warning"><i class="bi bi-star"></i></span>
+      <div class="k-stats-ribbon__data">
+        <span class="k-stats-ribbon__value" id="stat-score">0.0</span>
+        <span class="k-stats-ribbon__label">Promedio Puntaje</span>
+      </div>
+    </div>
+    <div class="k-stats-ribbon__divider"></div>
+    <div class="k-stats-ribbon__item">
+      <span class="k-stats-ribbon__icon pink"><i class="bi bi-gender-female"></i></span>
+      <div class="k-stats-ribbon__data">
+        <span class="k-stats-ribbon__value" id="stat-gender-f">0</span>
+        <span class="k-stats-ribbon__value k-stats-ribbon__value--sm" id="stat-rate-f">0% Aprobación</span>
+      </div>
+    </div>
+    <div class="k-stats-ribbon__divider"></div>
+    <div class="k-stats-ribbon__item">
+      <span class="k-stats-ribbon__icon mint"><i class="bi bi-gender-male"></i></span>
+      <div class="k-stats-ribbon__data">
+        <span class="k-stats-ribbon__value" id="stat-gender-m">0</span>
+        <span class="k-stats-ribbon__value k-stats-ribbon__value--sm" id="stat-rate-m">0% Aprobación</span>
+      </div>
+    </div>
+  </div>
 
-            <!-- Gráficos Dashboard -->
-            <div class="grid-2-1">
-                <div class="k-chart-container">
-                    <div class="k-chart-header">
-                        <div class="k-chart-title">Ejecución Mensual (Realizadas vs Aprobadas)</div>
-                    </div>
-                    <!-- BUG FIX: .k-chart-body usado aquí -->
-                    <div class="k-chart-body">
-                        <canvas id="mainChart"></canvas>
-                    </div>
-                </div>
-                <div class="k-chart-container">
-                    <div class="k-chart-header">
-                        <div class="k-chart-title">Top Cargos Inducidos</div>
-                    </div>
-                    <!-- BUG FIX: .k-chart-body usado aquí -->
-                    <div class="k-chart-body">
-                        <canvas id="positionChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </section>
+  <!-- Filtros del Dashboard -->
+  <div class="k-dashboard-filters">
+    <div class="k-dashboard-filters__group">
+      <span class="k-dashboard-filters__label">Año:</span>
+      <select id="filter-year-dashboard" class="k-dashboard-filters__select">
+        <option value="">Cargando...</option>
+      </select>
+    </div>
+    <div class="k-dashboard-filters__divider"></div>
+    <div class="k-dashboard-filters__group">
+      <span class="k-dashboard-filters__label">Género:</span>
+      <select id="filter-gender-dashboard" class="k-dashboard-filters__select">
+        <option value="">Todos</option>
+        <option value="Hombre">Hombre</option>
+        <option value="Mujer">Mujer</option>
+      </select>
+    </div>
+    <span class="k-dashboard-filters__count" id="dashboard-filter-count">0 registros</span>
+  </div>
+
+  <!-- Gráficos Grid Unificado 3 columnas -->
+  <div class="k-charts-grid">
+  <div class="k-chart-container">
+    <div class="k-chart-header">
+      <div class="k-chart-title">Ejecución Mensual (Realizadas vs Aprobadas)</div>
+    </div>
+    <div class="k-chart-body">
+      <canvas id="mainChart"></canvas>
+    </div>
+  </div>
+  <div class="k-chart-container">
+    <div class="k-chart-header">
+      <div class="k-chart-title">Tasa de Aprobación por Mes (%)</div>
+    </div>
+    <div class="k-chart-body">
+      <canvas id="approvalRateChart"></canvas>
+    </div>
+  </div>
+  <div class="k-chart-container">
+    <div class="k-chart-header">
+      <div class="k-chart-title">Distribución por Género</div>
+    </div>
+    <div class="k-chart-body">
+      <canvas id="genderDistChart"></canvas>
+    </div>
+  </div>
+  <div class="k-chart-container">
+    <div class="k-chart-header">
+      <div class="k-chart-title">Top Cargos Inducidos</div>
+    </div>
+    <div class="k-chart-body">
+      <canvas id="positionChart"></canvas>
+    </div>
+  </div>
+  <div class="k-chart-container">
+    <div class="k-chart-header">
+      <div class="k-chart-title">Aprobación por Género (Aprobados vs Reprobados)</div>
+    </div>
+    <div class="k-chart-body">
+      <canvas id="genderStackChart"></canvas>
+    </div>
+  </div>
+  <div class="k-chart-container">
+    <div class="k-chart-header">
+      <div class="k-chart-title">Distribución de Puntajes por Rango</div>
+    </div>
+    <div class="k-chart-body">
+      <canvas id="scoreDistChart"></canvas>
+    </div>
+  </div>
+  </div>
+</section>
 
         <!-- =========================
              VISTA 2: REGISTRO (LISTADO)
@@ -195,77 +253,9 @@
                     </tbody>
                 </table>
             </div>
-        </section>
+</section>
 
-        <!-- =========================
-             VISTA 3: ANÁLISIS Y EQUIDAD
-             ========================= -->
-        <section id="view-reports" class="k-view-section">
-            
-            <!-- Filtros de Reporte -->
-            <div class="k-filter-group">
-                <div style="display: flex; align-items: center; gap: 0.5rem; border-right: 1px solid var(--k-border); padding-right: 1rem;">
-                    <label style="font-size: 0.9rem; font-weight: 500;">Periodo de Análisis:</label>
-                    <select id="filter-year-report" class="k-form-select" style="width: auto;">
-                        <!-- JS -->
-                    </select>
-                </div>
-                <div style="margin-left: auto;">
-                    <button class="k-btn k-btn-outline" id="btn-download-report">
-                        <i class="bi bi-file-earmark-pdf"></i> Descargar Informe
-                    </button>
-                </div>
-            </div>
-
-            <!-- Gráfico 1: Tasa de Aprobación Mensual -->
-            <div class="k-chart-container">
-                <div class="k-chart-header">
-                    <div class="k-chart-title">Tasa de Aprobación por Mes (%)</div>
-                    <div style="font-size:0.8rem; color:var(--k-text-muted)">Visualiza la efectividad de las inducciones en el tiempo</div>
-                </div>
-                <div class="k-chart-body">
-                    <canvas id="approvalRateChart"></canvas>
-                </div>
-            </div>
-
-            <!-- Grilla Inferior de Análisis -->
-            <div class="grid-1-2">
-                <!-- Gráfico 2: Preguntas Críticas -->
-                <div class="k-chart-container">
-                    <div class="k-chart-header">
-                        <div class="k-chart-title">Preguntas con Mayor Tasa de Error</div>
-                    </div>
-                    <div class="k-chart-body">
-                        <canvas id="errorRateChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Gráfico 3: Aprobación por Género (Stacked) -->
-                <div class="k-chart-container">
-                    <div class="k-chart-header">
-                        <div class="k-chart-title">Aprobación por Género (Aprobados vs Reprobados)</div>
-                    </div>
-                    <div class="k-chart-body">
-                        <canvas id="genderStackChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Gráfico 4: Distribución de Género -->
-            <div class="grid-1-1" style="margin-bottom: 0;">
-                <div class="k-chart-container">
-                    <div class="k-chart-header">
-                        <div class="k-chart-title">Distribución General de Participantes por Género</div>
-                    </div>
-                    <div class="k-chart-body">
-                        <canvas id="genderDistChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-        </section>
-
-    </main>
+  </main>
 </div>
 
 <!-- MODAL: AGREGAR INDUCCIÓN -->

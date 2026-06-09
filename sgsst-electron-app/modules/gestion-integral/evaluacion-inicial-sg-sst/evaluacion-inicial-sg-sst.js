@@ -22,9 +22,10 @@ class EvaluacionInicialSgSst {
         this.findingsBase = {};
         this.dataBase = {};
         
-        // Datos de planes de acción
-        this.actionPlans = [];
-        this.actionPlanIdCounter = 1;
+// Datos de planes de acción
+this.actionPlans = [];
+this.actionPlanIdCounter = 1;
+this.lastScore = 0;
     }
 
     async render() {
@@ -94,50 +95,33 @@ class EvaluacionInicialSgSst {
                 <!-- VISTA: DASHBOARD -->
                 <section id="view-dashboard" class="k-view active">
 
-                    <!-- KPIs Principales -->
-                    <div class="k-grid-metrics">
-                        <div class="k-card k-card-metric k-card-metric-primary">
-                            <div class="k-metric-header">
-                                <span>CUMPLIMIENTO</span>
-                                <i class="bi bi-pie-chart-fill text-primary"></i>
-                            </div>
-                            <div class="k-metric-body">
-                                <span class="k-value text-primary" id="kpi-score">0%</span>
-                                <span class="k-trend">Global</span>
-                            </div>
-                            <div class="k-mini-chart">
-                                <canvas id="gaugeKpi" height="40"></canvas>
-                            </div>
-                        </div>
-
-                        <div class="k-card k-card-metric k-card-metric-danger">
-                            <div class="k-metric-header">
-                                <span>HALLAZGOS CRÍTICOS</span>
-                                <i class="bi bi-exclamation-triangle-fill text-danger"></i>
-                            </div>
-                            <div class="k-metric-body">
-                                <span class="k-value text-danger" id="kpi-gaps">0</span>
-                                <span class="k-trend">Items "No Cumple"</span>
-                            </div>
-                            <div class="k-mini-chart">
-                                <canvas id="bulletGaps" height="30"></canvas>
-                            </div>
-                        </div>
-
-                        <div class="k-card k-card-metric k-card-metric-warning">
-                            <div class="k-metric-header">
-                                <span>PLANES PENDIENTES</span>
-                                <i class="bi bi-hourglass-split text-warning"></i>
-                            </div>
-                            <div class="k-metric-body">
-                                <span class="k-value text-warning" id="kpi-pending">0</span>
-                                <span class="k-trend">Acciones abiertas</span>
-                            </div>
-                            <div class="k-mini-chart">
-                                <canvas id="bulletPending" height="30"></canvas>
-                            </div>
-                        </div>
-                    </div>
+<!-- Franja de estadísticas compacta -->
+<div class="k-stats-ribbon">
+<div class="k-stats-ribbon__item">
+<span class="k-stats-ribbon__icon primary"><i class="bi bi-pie-chart-fill"></i></span>
+<div class="k-stats-ribbon__data">
+<span class="k-stats-ribbon__value" id="kpi-score">0%</span>
+<span class="k-stats-ribbon__label">Cumplimiento</span>
+</div>
+<span class="k-stats-ribbon__pct" id="kpi-score-pct">0%</span>
+</div>
+<div class="k-stats-ribbon__divider"></div>
+<div class="k-stats-ribbon__item">
+<span class="k-stats-ribbon__icon danger"><i class="bi bi-exclamation-triangle-fill"></i></span>
+<div class="k-stats-ribbon__data">
+<span class="k-stats-ribbon__value" id="kpi-gaps">0</span>
+<span class="k-stats-ribbon__label">Hallazgos Críticos</span>
+</div>
+</div>
+<div class="k-stats-ribbon__divider"></div>
+<div class="k-stats-ribbon__item">
+<span class="k-stats-ribbon__icon warning"><i class="bi bi-hourglass-split"></i></span>
+<div class="k-stats-ribbon__data">
+<span class="k-stats-ribbon__value" id="kpi-pending">0</span>
+<span class="k-stats-ribbon__label">Planes Pendientes</span>
+</div>
+</div>
+</div>
 
                     <!-- Gráficos Principales -->
                     <div class="k-grid-charts">
@@ -306,7 +290,7 @@ class EvaluacionInicialSgSst {
             // Redibujar gráficos si se entra al dashboard para asegurar renderizado correcto
             if (tabId === 'dashboard' && this.currentFindings.length > 0) {
                 // Pequeño delay para que el canvas tenga dimensiones
-                setTimeout(() => this.updateDashboardWithRealData({ cumplimiento: parseInt(document.getElementById('kpi-score').textContent) }), 50);
+                setTimeout(() => this.updateDashboardWithRealData({ cumplimiento: this.lastScore || 0 }), 50);
             }
         } else {
             console.error('[EvaluacionInicialSgSst] switchTab() - Vista no encontrada:', `#view-${tabId}`);
@@ -790,23 +774,30 @@ class EvaluacionInicialSgSst {
         `}).join('');
     }
 
-    updateDashboardWithRealData(metrics) {
-        if (!metrics) return;
+updateDashboardWithRealData(metrics) {
+if (!metrics) return;
 
-        // Actualizar Textos
-        const score = metrics.cumplimiento || 0;
-        const noCumplidos = metrics.noCumplidos || 0;
+// Actualizar Textos
+const score = metrics.cumplimiento || 0;
+const noCumplidos = metrics.noCumplidos || 0;
+const pendingCount = this.actionPlans.filter(p => p.estado !== 'completado').length;
 
-        const scoreEl = document.getElementById('kpi-score');
-        const gapsEl = document.getElementById('kpi-gaps');
-        const chartLabel = document.getElementById('chart-score-label');
+this.lastScore = score;
 
-        if (scoreEl) scoreEl.textContent = score + '%';
-        if (chartLabel) chartLabel.textContent = score + '%';
-        if (gapsEl) gapsEl.textContent = noCumplidos;
+const scoreEl = document.getElementById('kpi-score');
+const scorePctEl = document.getElementById('kpi-score-pct');
+const gapsEl = document.getElementById('kpi-gaps');
+const pendingEl = document.getElementById('kpi-pending');
+const chartLabel = document.getElementById('chart-score-label');
 
-        // Actualizar Gráficos
-        this.drawGauge(score);
+if (scoreEl) scoreEl.textContent = score + '%';
+if (scorePctEl) scorePctEl.textContent = score + '%';
+if (chartLabel) chartLabel.textContent = score + '%';
+if (gapsEl) gapsEl.textContent = noCumplidos;
+if (pendingEl) pendingEl.textContent = pendingCount;
+
+// Actualizar Gráficos
+this.drawGauge(score);
 
         // Simular PHVA si no hay datos detallados
         const phvaContainer = document.getElementById('phva-chart-container');
@@ -1862,14 +1853,19 @@ if (!document.getElementById('k-air-eval-styles')) {
         .k-select-sm { padding: 0.3rem 0.6rem; border-radius: 4px; border: 1px solid var(--border); font-size: 0.9rem; }
         .k-loading-badge { font-size: 0.85rem; color: var(--primary); font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
 
-        /* METRICS GRID */
-        .k-grid-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem; }
-        .k-card-metric { padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; }
-        .k-metric-header { display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); letter-spacing: 0.5px; margin-bottom: 0.5rem; }
-        .k-metric-body { z-index: 2; }
-        .k-value { font-size: 2.2rem; font-weight: 700; line-height: 1; display: block; font-family: 'Teko', sans-serif; }
-        .k-trend { font-size: 0.85rem; color: var(--text-muted); }
-        .k-mini-chart { position: absolute; right: 1rem; bottom: 1rem; opacity: 0.5; }
+/* STATS RIBBON */
+.k-stats-ribbon { display: flex; align-items: center; gap: 0; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 0; margin-bottom: 1.5rem; box-shadow: var(--shadow-sm); overflow: hidden; }
+.k-stats-ribbon__item { display: flex; align-items: center; gap: 0.625rem; padding: 0.75rem 1.25rem; flex: 1; min-width: 0; }
+.k-stats-ribbon__icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.875rem; flex-shrink: 0; }
+.k-stats-ribbon__icon.primary { background: var(--primary-light); color: var(--primary); }
+.k-stats-ribbon__icon.danger { background: rgba(220, 53, 69, 0.1); color: var(--danger); }
+.k-stats-ribbon__icon.warning { background: rgba(255, 193, 7, 0.1); color: var(--warning); }
+.k-stats-ribbon__data { display: flex; flex-direction: column; min-width: 0; }
+.k-stats-ribbon__value { font-size: 1.25rem; font-weight: 700; color: var(--text-dark); line-height: 1.2; }
+.k-stats-ribbon__label { font-size: 0.6875rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+.k-stats-ribbon__pct { margin-left: auto; font-size: 0.75rem; font-weight: 600; color: var(--primary); background: var(--primary-light); padding: 0.125rem 0.5rem; border-radius: 10px; white-space: nowrap; flex-shrink: 0; }
+.k-stats-ribbon__divider { width: 1px; height: 32px; background: var(--border); flex-shrink: 0; }
+@media (max-width: 768px) { .k-stats-ribbon { flex-wrap: wrap; } .k-stats-ribbon__item { flex: 1 1 45%; } .k-stats-ribbon__divider { display: none; } }
 
         /* CHARTS GRID */
         .k-grid-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }

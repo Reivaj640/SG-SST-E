@@ -1,0 +1,277 @@
+/* =========================================
+   Portal Comité de Convivencia — CSS Scoped (K+AIR)
+   Prefijo: .cc-portal
+   ========================================= */
+
+.cc-portal {
+  --cc-primary: #174ea6;
+  --cc-primary-hover: #185abd;
+  --cc-primary-light: #e8f0fe;
+  --cc-success: #28a745;
+  --cc-warning: #ffc107;
+  --cc-danger: #dc3545;
+  --cc-info: #17a2b8;
+  --cc-text-dark: #212529;
+  --cc-text-muted: #6c757d;
+  --cc-bg-body: #f0f2f5;
+  --cc-bg-card: #ffffff;
+  --cc-border: #dee2e6;
+  --cc-radius: 0.5rem;
+  --cc-shadow-lg: 0 10px 25px rgba(0,0,0,0.05);
+
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+.cc-portal__card {
+  background: var(--cc-bg-card);
+  width: 100%;
+  max-width: 1100px;
+  border-radius: var(--cc-radius);
+  box-shadow: var(--cc-shadow-lg);
+  padding: 3rem;
+  text-align: center;
+  animation: ccPortalFadeIn 0.5s ease-out;
+  margin: auto 0;
+}
+
+@keyframes ccPortalFadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.cc-portal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #f1f3f5;
+}
+
+.cc-portal__logo {
+  font-family: 'Lexend', 'Segoe UI', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--cc-primary);
+}
+
+.cc-portal__back-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  color: var(--cc-text-muted);
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s;
+  background: #f8f9fa;
+  border: 1px solid var(--cc-border);
+}
+
+.cc-portal__back-btn:hover {
+  color: var(--cc-primary);
+  background: var(--cc-primary-light);
+  border-color: var(--cc-primary);
+  text-decoration: none;
+}
+
+.cc-portal__status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 18px;
+  border-radius: 20px;
+  background: #d4edda;
+  color: #155724;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 2rem;
+}
+
+.cc-portal__hero-title {
+  font-family: 'Lexend', 'Segoe UI', sans-serif;
+  font-size: 2.5rem;
+  color: var(--cc-text-dark);
+  margin-bottom: 0.5rem;
+}
+
+.cc-portal__hero-subtitle {
+  color: var(--cc-text-muted);
+  font-size: 1.1rem;
+  margin-bottom: 2.5rem;
+  max-width: 650px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.6;
+}
+
+.cc-portal__main-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.cc-portal__main-action {
+  background: var(--cc-bg-card);
+  border: 2px solid var(--cc-border);
+  border-radius: var(--cc-radius);
+  padding: 2rem;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  text-align: left;
+}
+
+.cc-portal__main-action:hover {
+  border-color: var(--cc-primary);
+  box-shadow: 0 5px 20px rgba(23, 78, 166, 0.1);
+  transform: translateY(-2px);
+}
+
+.cc-portal__main-action--primary {
+  background: linear-gradient(135deg, var(--cc-primary) 0%, #2d5dc7 100%);
+  border-color: var(--cc-primary);
+  color: white;
+}
+
+.cc-portal__main-action--primary:hover {
+  box-shadow: 0 8px 25px rgba(23, 78, 166, 0.35);
+}
+
+.cc-portal__main-action--primary .cc-portal__action-title,
+.cc-portal__main-action--primary .cc-portal__action-desc {
+  color: white;
+}
+
+.cc-portal__main-action--primary .cc-portal__main-action-icon {
+  background: rgba(255,255,255,0.2);
+  color: white;
+}
+
+.cc-portal__main-action-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 10px;
+  background: #f1f3f5;
+  color: var(--cc-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.cc-portal__main-action-icon--success {
+  background: #e8f5e9;
+  color: var(--cc-success);
+}
+
+.cc-portal__main-action-content .cc-portal__action-title {
+  font-size: 1.05rem;
+  margin-bottom: 0.35rem;
+}
+
+.cc-portal__main-action-content .cc-portal__action-desc {
+  font-size: 0.85rem;
+}
+
+.cc-portal__quick-actions {
+  margin-top: 3.5rem;
+  text-align: left;
+}
+
+.cc-portal__quick-actions-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  color: var(--cc-text-dark);
+  border-bottom: 2px solid #f1f3f5;
+  padding-bottom: 0.5rem;
+  display: inline-block;
+}
+
+.cc-portal__actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.25rem;
+}
+
+.cc-portal__action-card {
+  background: #f8f9fa;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius);
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.cc-portal__action-card:hover {
+  border-color: var(--cc-primary);
+  background: white;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+  transform: translateY(-3px);
+}
+
+.cc-portal__action-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  background: white;
+  color: var(--cc-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.cc-portal__action-icon--success { color: var(--cc-success); }
+.cc-portal__action-icon--warning { color: var(--cc-warning); }
+.cc-portal__action-icon--danger { color: var(--cc-danger); }
+.cc-portal__action-icon--info { color: var(--cc-info); }
+.cc-portal__action-icon--muted { color: var(--cc-text-muted); }
+
+.cc-portal__action-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: 0.25rem;
+  color: var(--cc-text-dark);
+}
+
+.cc-portal__action-desc {
+  font-size: 0.8rem;
+  color: var(--cc-text-muted);
+  line-height: 1.4;
+}
+
+@media (max-width: 768px) {
+  .cc-portal__main-actions {
+    grid-template-columns: 1fr;
+  }
+  .cc-portal__hero-title {
+    font-size: 1.8rem;
+  }
+  .cc-portal__card {
+    padding: 2rem 1.5rem;
+  }
+  .cc-portal__header {
+    flex-direction: column;
+    gap: 1rem;
+  }
+}

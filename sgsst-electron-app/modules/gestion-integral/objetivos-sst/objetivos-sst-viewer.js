@@ -303,13 +303,15 @@ class ObjetivosSSTViewer {
         console.log('[objetivos-sst-viewer.js][updateUIWithData] Actualización de UI completada');
     }
 
-    updateStats() {
-        const totalObjectives = this.groups.length;
-        const totalIndicators = this.groups.reduce((s, g) => s + g.indicators.length, 0);
-        const el = (id) => document.getElementById(id);
-        if (el('stat-objectives')) el('stat-objectives').textContent = totalObjectives;
-        if (el('stat-indicators')) el('stat-indicators').textContent = totalIndicators;
-    }
+updateStats() {
+const totalObjectives = this.groups.length;
+const totalIndicators = this.groups.reduce((s, g) => s + g.indicators.length, 0);
+const securityCount = this.groups.filter(g => g.principleId === 1).length;
+const el = (id) => document.getElementById(id);
+if (el('stat-objectives')) el('stat-objectives').textContent = totalObjectives;
+if (el('stat-indicators')) el('stat-indicators').textContent = totalIndicators;
+if (el('stat-security')) el('stat-security').textContent = securityCount;
+}
 
     // ═══════════════════════════════════════════════════════════════════════════
     // RENDERIZADO: PANEL IZQUIERDO DE POLÍTICA

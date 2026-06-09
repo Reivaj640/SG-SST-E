@@ -866,12 +866,20 @@ document.addEventListener('DOMContentLoaded', async () => {
                   // Volver al home principal
                   showHomePage();
                   return;
-              case 'back-to-module-request':
-                  // Volver al módulo actual
-                  console.log('RENDERER: Received back-to-module-request from iframe.');
-                  if (typeof currentModule !== 'undefined' && currentModule) {
-                      currentSubmodule = null;
-                      showModuleContent(currentModule);
+      case 'back-to-module-request':
+      if (window.copasstPortalComponent) {
+        console.log('[RENDERER] Delegando back-to-module al portal COPASST');
+        return;
+      }
+      if (window.comiteConvivenciaPortalComponent) {
+        console.log('[RENDERER] Delegando back-to-module al portal Comité de Convivencia');
+        return;
+      }
+      // Volver al módulo actual
+      console.log('RENDERER: Received back-to-module-request from iframe.');
+      if (typeof currentModule !== 'undefined' && currentModule) {
+        currentSubmodule = null;
+        showModuleContent(currentModule);
                   } else {
                       showHomePage();
                   }
@@ -1177,11 +1185,19 @@ case 'investigacion-accidentes-read-directory-request':
                   // Volver al home principal
                   showHomePage();
                   return;
-              case 'back-to-module-request':
-                  // Volver al home del módulo actual (ej. Gestión de la Salud)
-                  console.log(`[RENDERER] Solicitud de regreso al módulo: ${currentModule || 'Gestión de la Salud'}`);
-                  showModuleContent(currentModule || 'Gestión de la Salud');
-                  return;
+      case 'back-to-module-request':
+      if (window.copasstPortalComponent) {
+        console.log('[RENDERER] Delegando back-to-module al portal COPASST');
+        return;
+      }
+      if (window.comiteConvivenciaPortalComponent) {
+        console.log('[RENDERER] Delegando back-to-module al portal Comité de Convivencia');
+        return;
+      }
+      // Volver al home del módulo actual (ej. Gestión de la Salud)
+      console.log(`[RENDERER] Solicitud de regreso al módulo: ${currentModule || 'Gestión de la Salud'}`);
+      showModuleContent(currentModule || 'Gestión de la Salud');
+      return;
               case 'ausentismo-home-action':
                   // Acción desde home de ausentismo - ya se maneja internamente en el módulo
                   console.log('[RENDERER] Ausentismo home action recibida, procesando...');
@@ -3956,14 +3972,14 @@ if (mainContainerSub) mainContainerSub.classList.remove('vanta-fullscreen');
 
     } else if (submoduleName === "1.1.8 Conformación de Comite de Convivencia") {
       if (window.ComiteConvivenciaComponent) {
-        const convivenciaComponent = new window.ComiteConvivenciaComponent(
-          submoduleContentDiv,
-          currentCompany,
-          moduleName,
-          submoduleName,
-          backToModuleCallback
-        );
-        convivenciaComponent.render();
+      const convivenciaComponent = new window.ComiteConvivenciaComponent(
+        submoduleContentDiv,
+        currentCompany,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback
+      );
+      convivenciaComponent.render();
       } else {
         console.error('❌ ComiteConvivenciaComponent no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);

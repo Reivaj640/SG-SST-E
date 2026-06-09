@@ -1,0 +1,68 @@
+<link rel="stylesheet" href="./modules/recursos/copasst/copasst-home.css">
+
+<div class="copasst-portal">
+<div class="copasst-portal__card">
+
+<div class="copasst-portal__header">
+<div class="copasst-portal__logo">K+<span>AIR</span></div>
+<a class="copasst-portal__back-btn" onclick="goBackToModule()">
+<i class="bi bi-arrow-left"></i>
+<span>Volver al Menú</span>
+</a>
+</div>
+
+<div class="copasst-portal__status-pill">
+<i class="bi bi-check-circle"></i> Comité Paritario de SST Vigente
+</div>
+
+<h1 class="copasst-portal__hero-title">Gestión del COPASST</h1>
+<p class="copasst-portal__hero-subtitle">
+Bienvenido al módulo de gestión del Comité Paritario de Seguridad y Salud en el Trabajo. Desde aquí puedes explorar el repositorio de actas, generar nuevas actas de reunión y consultar el marco normativo vigente.
+</p>
+
+<div class="copasst-portal__main-actions">
+
+<div class="copasst-portal__main-action copasst-portal__main-action--primary" onclick="enterRepositorioActas()">
+<div class="copasst-portal__main-action-icon">
+<i class="bi bi-folder2-open"></i>
+</div>
+<div class="copasst-portal__main-action-content">
+<div class="copasst-portal__action-title">Explorar Repositorio de Actas</div>
+<div class="copasst-portal__action-desc">Acceder al repositorio documental con todas las actas de reunión del comité.</div>
+</div>
+</div>
+
+<div class="copasst-portal__main-action" onclick="realizarNuevaActa()">
+<div class="copasst-portal__main-action-icon copasst-portal__main-action-icon--success">
+<i class="bi bi-file-earmark-text"></i>
+</div>
+<div class="copasst-portal__main-action-content">
+<div class="copasst-portal__action-title">Realizar Nueva Acta</div>
+<div class="copasst-portal__action-desc">Generar acta de reunión mensual utilizando la plantilla oficial en Excel.</div>
+</div>
+</div>
+
+</div>
+
+<div class="copasst-portal__quick-actions">
+<div class="copasst-portal__quick-actions-title">Herramientas y Operaciones</div>
+
+<div class="copasst-portal__actions-grid">
+
+<div class="copasst-portal__action-card" onclick="openMiembrosRoles()">
+<div class="copasst-portal__action-icon"><i class="bi bi-people"></i></div>
+<div class="copasst-portal__action-title">Miembros y Roles</div>
+<div class="copasst-portal__action-desc">Consultar y actualizar la lista de representantes de la empresa y trabajadores.</div>
+</div>
+
+<div class="copasst-portal__action-card" onclick="openMarcoNormativo()">
+<div class="copasst-portal__action-icon copasst-portal__action-icon--warning"><i class="bi bi-scale"></i></div>
+<div class="copasst-portal__action-title">Marco Normativo</div>
+<div class="copasst-portal__action-desc">Acceso rápido a la Resolución 2013 de 1986 y normatividad vigente.</div>
+</div>
+
+</div>
+</div>
+
+</div>
+</div>
