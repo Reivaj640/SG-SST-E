@@ -6,6 +6,25 @@ Este directorio contiene la documentación detallada de cada versión de K+AIR.
 
 ## 📋 Versiones Disponibles
 
+### v0.1.99 - 9 de junio de 2026
+**v0.1.99-dashboard-kpi-graficas.md** *(pendiente de crear)*
+
+**Cambios principales:**
+- ✅ Feature: Dashboard con 6 gráficas (barras, líneas, radar, doughnut, polar, barras apiladas)
+- ✅ Feature: KPI Strip Enterprise (.k-stats-ribbon) con 5 indicadores
+- ✅ Feature: Modal periodo con selector de rango y año
+- ✅ Feature: Navegación corregida (Home Empresa, destroy pattern)
+- ✅ Fix: Subrayado tabs-header eliminado
+- ✅ Fix: Plan Trabajo lee mes anterior (norma COPASST)
+
+**Impacto:**
+- Dashboard: 0 gráficas → 6 gráficas interactivas
+- KPIs: Sin indicadores → 5 indicadores clave en ribbon
+- UX: Navegación fluida entre módulos y dashboard
+- Normatividad: Cumplimiento Resolución 0312/2019
+
+---
+
 ### v0.1.98 - 4 de junio de 2026
 **[v0.1.98-copasst-actas-autofill-mejoras.md](v0.1.98-copasst-actas-autofill-mejoras.md)**
 
@@ -212,4 +231,4 @@ Cada archivo de actualización debe incluir:
 
 ---
 
-**Última actualización:** 21 de marzo de 2026
+**Última actualización:** 9 de junio de 2026

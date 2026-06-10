@@ -1,8 +1,8 @@
 # 🔌 Guía de Contratos Backend K+AIR
 
-**Versión:** 1.0  
-**Actualizado:** 17 de marzo de 2026  
-**Estado:** ✅ Nueva guía de mejores prácticas
+**Versión:** 1.1
+**Actualizado:** 9 de junio de 2026
+**Estado:** ✅ Actualizado v0.1.99
 
 ---
 
@@ -824,8 +824,8 @@ ipcMain.handle('handler-name', async (event, param) => {
 
 | Documento | Propósito |
 |-----------|-----------|
-| `docs/01-arquitectura/ipc-contratos.md` | Lista completa de contratos |
-| `docs/01-arquitectura/resumen-arquitectura-v0.1.75.md` | Resumen de arquitectura |
+| `docs/02-architecture/ipc-contratos.md` | Lista completa de contratos |
+| `docs/02-architecture/resumen-arquitectura-v0.1.75.md` | Resumen de arquitectura |
 | `main.js` | Implementación de handlers |
 | `preload.js` | Exposición de contratos |
 
@@ -837,7 +837,7 @@ ipcMain.handle('handler-name', async (event, param) => {
 
 ---
 
-**Mantenido por:** Backend Architecture Team  
-**Última actualización:** 17 de marzo de 2026  
-**Versión:** 1.0 (v0.1.75)  
+**Mantenido por:** Backend Architecture Team
+**Última actualización:** 9 de junio de 2026
+**Versión:** 1.1 (v0.1.99)
 **Próxima revisión:** Al agregar 10+ handlers nuevos

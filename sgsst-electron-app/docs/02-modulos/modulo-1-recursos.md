@@ -1,8 +1,8 @@
 # 👥 Módulo 1: Recursos
 
-**Versión:** 2.4
+**Versión:** 2.5
 **Actualizado:** 4 de junio de 2026
-**Estado:** ✅ Actualizado v0.1.98
+**Estado:** ✅ Actualizado v0.1.99
 
 ---
 
@@ -20,6 +20,7 @@
 10. [1.2.1 Programa de Capacitación 🆕](#121-programa-de-capacitación)
 11. [1.2.2 Inducción y Reinducción 🆕](#122-inducción-y-reinducción)
 12. [1.2.3 Curso Virtual 50 Horas](#123-curso-virtual-50-horas)
+13. [1.2.4 Manual SST Proveedores](#124-manual-sst-proveedores)
 
 ---
 
@@ -44,6 +45,7 @@ El módulo de **Recursos** gestiona todos los aspectos relacionados con la asign
 | 1.2.1 | Programa de Capacitación | `capacitaciones-logic.js`, `capacitaciones-viewer.js`, `capacitaciones-portal-logic.js` 🆕 | ✅ |
 | 1.2.2 | Inducción y Reinducción | `inducciones-logic.js`, `inducciones-viewer.js` 🆕 | ✅ |
 | 1.2.3 | Curso Virtual 50 Horas | `curso-virtual-logic.js`, `viewer.js` | ✅ |
+| 1.2.4 | Manual SST Proveedores | `manual-proveedores-logic.js`, `manual-proveedores-viewer.js` 🆕 | ✅ |
 
 ### 1.3 Archivos del Módulo
 
@@ -626,7 +628,38 @@ Gestiona el curso virtual de 50 horas en seguridad y salud en el trabajo.
 
 ---
 
+## 1.2.4 Manual SST Proveedores
+
+### Descripción
+
+Gestiona el manual de seguridad y salud en el trabajo dirigido a proveedores y contratistas, cumpliendo con la obligación de informar sobre las políticas SST de la empresa.
+
+### Funcionalidades
+
+- ✅ Visualización del manual SST para proveedores
+- ✅ Registro de entrega a proveedores/contratistas
+- ✅ Control de versiones del manual
+- ✅ Firma de acuse de recibo
+
+### Archivos
+
+- `modules/recursos/manual-proveedores/manual-proveedores-logic.js`
+- `modules/recursos/manual-proveedores/manual-proveedores-viewer.js`
+- `modules/recursos/manual-proveedores/manual-proveedores-view.html`
+
+---
+
 ## 2. Cambios Recientes
+
+### Versión 0.1.99 (9 junio 2026)
+
+- ✅ Submódulo 1.2.4 Manual SST Proveedores documentado
+- ✅ Curso Virtual 50 Horas (1.2.3) documentado
+
+### Versión 0.1.98 (4 junio 2026)
+
+- ✅ Autollenado de actas COPASST (`get-copasst-auto-fill-data`)
+- ✅ Autollenado de actas Convivencia (`get-convivencia-auto-fill-data`)
 
 ### Versión 0.1.70 (6 marzo 2026)
 
@@ -641,5 +674,5 @@ Gestiona el curso virtual de 50 horas en seguridad y salud en el trabajo.
 ---
 
 **Mantenido por:** Product Architect & Full-Stack Team  
-**Última actualización:** 6 de marzo de 2026  
-**Versión:** 0.1.70
+**Última actualización:** 9 de junio de 2026  
+**Versión:** 0.1.99

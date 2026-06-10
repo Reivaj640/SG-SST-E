@@ -1,8 +1,14 @@
 # 📋 Módulos Restantes K+AIR
 
-**Versión:** 1.0  
-**Actualizado:** 6 de marzo de 2026  
-**Estado:** ✅ Documentado
+**Versión:** 1.1
+**Actualizado:** 9 de junio de 2026
+**Estado:** ✅ Documentado v0.1.99
+
+> **Nota:** Los módulos 4-7 ahora tienen documentación dedicada:
+> - [modulo-4-gestion-peligros.md](modulo-4-gestion-peligros.md)
+> - [modulo-5-gestion-amenazas.md](modulo-5-gestion-amenazas.md)
+> - [modulo-6-verificacion.md](modulo-6-verificacion.md)
+> - [modulo-7-mejoramiento.md](modulo-7-mejoramiento.md)
 
 ---
 
@@ -28,9 +34,13 @@ El módulo de **Gestión Integral** agrupa los componentes fundamentales para la
 |--------|-----------|---------------------|--------|
 | 2.1.1 | Política del SG-SST | `politica-logic.js` | ✅ |
 | 2.2.1 | Objetivos SST | `objetivos-sst-logic.js` | ✅ |
-| 2.3.1 | Evaluación Inicial SG-SST | `evaluacion-inicial-sg-sst-logic.js` | ✅ |
+| 2.3.1 | Evaluación Inicial SG-SST | `evaluacion-inicial-sg-sst-logic.js` | ✅ [📄](modulo-2-3-1-evaluacion-inicial-sg-sst.md) |
 | 2.4.1 | Plan de Trabajo Anual | `plan-trabajo-logic.js`, `plan-home.js`, `plan-viewer.js` | ✅ |
 | 2.6.1 | Rendición de Cuentas | `rendicion-logic.js` | ✅ |
+| 2.9.1 | Evaluación de Proveedores | `evaluacion-proveedores-logic.js` | ✅ |
+| 2.5.1 | Archivo y Retención Documental | `archivo-retencion.js` + `archivo-retencion-main.js` | ✅ [📄](modulo-2-5-1-archivo-retencion.md) |
+| 2.10.1 | Evaluación y Selección | `evaluacion-seleccion-logic.js` | ✅ [📄](modulo-2-10-1-evaluacion-seleccion.md) |
+| 2.11.1 | Gestión del Cambio | `gestion-del-cambio-logic.js` | ✅ [📄](modulo-2-11-1-gestion-del-cambio.md) |
 
 ### Archivos del Módulo
 
@@ -50,7 +60,10 @@ modules/gestion-integral/
 │   ├── plan-view.html           # Dashboard HTML (k-stats-ribbon, charts-grid)
 │   └── plan-view.css            # CSS BEM (~1080 líneas)
 ├── politica/
-└── rendicion-cuentas/
+├── rendicion-cuentas/
+├── evaluacion-proveedores/
+├── evaluacion-seleccion/
+└── gestion-del-cambio/
 ```
 
 ---
@@ -192,6 +205,55 @@ Portal Home:
 **Archivos:**
 - `modules/gestion-integral/rendicion-cuentas/rendicion-logic.js`
 - `modules/gestion-integral/rendicion-cuentas/rendicion-viewer.js`
+
+---
+
+### 2.9.1 Evaluación de Proveedores
+
+**Descripción:** Evalúa y califica a los proveedores y contratistas en materia de SST.
+
+**Funcionalidades:**
+- ✅ Evaluación de desempeño SST de proveedores
+- ✅ Calificación y clasificación de contratistas
+- ✅ Seguimiento a compromisos SST
+- ✅ Integración con contratos backend
+
+**Archivos:**
+- `modules/gestion-integral/evaluacion-proveedores/evaluacion-proveedores-logic.js`
+- `modules/gestion-integral/evaluacion-proveedores/evaluacion-proveedores-viewer.js`
+
+---
+
+### 2.10.1 Evaluación y Selección
+
+**Descripción:** Gestiona los procesos de evaluación y selección de personal con enfoque SST.
+
+**Funcionalidades:**
+- ✅ Criterios de selección con componentes SST
+- ✅ Evaluaciones de aptitud laboral
+- ✅ Seguimiento post-ingreso
+- ✅ Registro de evaluaciones
+
+**Archivos:**
+- `modules/gestion-integral/evaluacion-seleccion/evaluacion-seleccion-logic.js`
+- `modules/gestion-integral/evaluacion-seleccion/evaluacion-seleccion-viewer.js`
+
+---
+
+### 2.11.1 Gestión del Cambio
+
+**Descripción:** Gestiona los cambios que pueden afectar el SG-SST (instalaciones, procesos, personal).
+
+**Funcionalidades:**
+- ✅ Identificación de cambios significativos
+- ✅ Evaluación de impacto en SST
+- ✅ Plan de acción para cambios
+- ✅ Seguimiento a medidas de control
+- ✅ Aprobación por responsable designado
+
+**Archivos:**
+- `modules/gestion-integral/gestion-del-cambio/gestion-del-cambio-logic.js`
+- `modules/gestion-integral/gestion-del-cambio/gestion-del-cambio-viewer.js`
 
 ---
 
@@ -381,6 +443,9 @@ window.PoliticaComponent
 window.ObjetivosSSTComponent
 window.PlanTrabajoComponent
 window.RendicionCuentasComponent
+window.EvaluacionProveedoresComponent
+window.EvaluacionSeleccionComponent
+window.GestionDelCambioComponent
 window.GestionIntegralHome
 
 // Módulo 3: Gestión de la Salud

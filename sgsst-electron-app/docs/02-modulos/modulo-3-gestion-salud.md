@@ -1,8 +1,8 @@
 # 🏥 Módulo 3: Gestión de la Salud
 
-**Versión:** 1.0  
-**Actualizado:** 6 de marzo de 2026  
-**Estado:** ✅ Actualizado
+**Versión:** 2.0
+**Actualizado:** 9 de junio de 2026
+**Estado:** ✅ Actualizado v0.1.99
 
 ---
 
@@ -10,11 +10,23 @@
 
 1. [Visión General](#1-visión-general)
 2. [3.1.1 Diagnóstico Sociodemográfico](#311-diagnóstico-sociodemográfico)
-3. [3.1.4 Evaluaciones Médicas](#314-evaluaciones-médicas)
-4. [3.1.6 Restricciones Médicas](#316-restricciones-médicas)
-5. [3.2.1 Reporte de Accidentes](#321-reporte-de-accidentes)
-6. [3.2.2 Investigación de Accidentes con IA 🤖](#322-investigación-de-accidentes-con-ia)
-7. [3.3.6 Medición del Ausentismo](#336-medición-del-ausentismo)
+3. [3.1.2 Actividades de Medicina Preventiva](#312-actividades-de-medicina-preventiva)
+4. [3.1.3 Perfil de Cargo y Profesiograma](#313-perfil-de-cargo-y-profesiograma)
+5. [3.1.4 Evaluaciones Médicas](#314-evaluaciones-médicas)
+6. [3.1.5 Custodia Médica Ocupacional](#315-custodia-médica-ocupacional)
+7. [3.1.6 Restricciones Médicas](#316-restricciones-médicas)
+8. [3.1.7 Estilos de Vida Saludables](#317-estilos-de-vida-saludables)
+9. [3.1.8 Servicios de Higiene](#318-servicios-de-higiene)
+10. [3.1.9 Manejo de Residuos](#319-manejo-de-residuos)
+11. [3.2.1 Reporte de Accidentes](#321-reporte-de-accidentes)
+12. [3.2.2 Investigación de Accidentes con IA 🤖](#322-investigación-de-accidentes-con-ia)
+13. [3.2.3 Registro Estadístico](#323-registro-estadístico)
+14. [3.3.1 Frecuencia de Accidentalidad](#331-frecuencia-de-accidentalidad)
+15. [3.3.2 Severidad de Accidentalidad](#332-severidad-de-accidentalidad)
+16. [3.3.3 Proporción de AT Mortales](#333-proporción-de-at-mortales)
+17. [3.3.4 Prevalencia de Enfermedad Laboral](#334-prevalencia-de-enfermedad-laboral)
+18. [3.3.5 Incidencia de Enfermedad Laboral](#335-incidencia-de-enfermedad-laboral)
+19. [3.3.6 Medición del Ausentismo](#336-medición-del-ausentismo)
 
 ---
 
@@ -35,10 +47,22 @@ El módulo de **Gestión de la Salud** agrupa todos los componentes relacionados
 | Código | Submódulo | Archivos Principales | Estado |
 |--------|-----------|---------------------|--------|
 | 3.1.1 | Diagnóstico Sociodemográfico | `sociodemografica-component.js` | ✅ |
+| 3.1.2 | Actividades de Medicina Preventiva | `sociodemografica-component.js` (compartido) | ✅ |
+| 3.1.3 | Perfil de Cargo y Profesiograma | `sociodemografica-component.js` (compartido) | ✅ |
 | 3.1.4 | Evaluaciones Médicas | `evaluaciones-medicas-logic.js` | ✅ |
+| 3.1.5 | Custodia Médica Ocupacional | `sociodemografica-component.js` (compartido) | ✅ |
 | 3.1.6 | Restricciones Médicas | `restricciones-medicas-logic.js` | ✅ |
+| 3.1.7 | Estilos de Vida Saludables | `sociodemografica-component.js` (compartido) | ✅ |
+| 3.1.8 | Servicios de Higiene | `sociodemografica-component.js` (compartido) | ✅ |
+| 3.1.9 | Manejo de Residuos | `sociodemografica-component.js` (compartido) | ✅ |
 | 3.2.1 | Reporte de Accidentes | `reportes-accidentes-logic.js` | ✅ |
 | 3.2.2 | Investigación de Accidentes | `investigacion-accidentes-logic.js` 🤖 | ✅ |
+| 3.2.3 | Registro Estadístico | `registro-estadistico.js` | ✅ |
+| 3.3.1 | Frecuencia de Accidentalidad | `frecuencia-accidentalidad.js` | ✅ |
+| 3.3.2 | Severidad de Accidentalidad | `severidad-accidentalidad.js` | ✅ |
+| 3.3.3 | Proporción de AT Mortales | `indice-mortalidad.js` | ✅ |
+| 3.3.4 | Prevalencia de Enfermedad Laboral | `sociodemografica-component.js` (compartido) | ✅ |
+| 3.3.5 | Incidencia de Enfermedad Laboral | `sociodemografica-component.js` (compartido) | ✅ |
 | 3.3.6 | Medición del Ausentismo | `medicion-ausentismo.js` | ✅ |
 
 ### 1.3 Archivos del Módulo
@@ -96,6 +120,44 @@ await window.electronAPI.processExcelData(payload);
 
 ---
 
+## 3.1.2 Actividades de Medicina Preventiva
+
+### Descripción
+
+Registra y da seguimiento a las actividades de medicina preventiva y del trabajo realizadas en la empresa, conforme a los lineamientos de la Resolución 0312 de 2019.
+
+### Funcionalidades
+
+- ✅ Registro de actividades de prevención (vacunación, tamizajes, charlas)
+- ✅ Programación de jornadas de salud
+- ✅ Seguimiento de cobertura por actividad
+
+### Componente Renderer
+
+- Ruta en renderer.js: `gestion-salud/actividades-medicina-preventiva`
+- Componente: → Redirige a `sociodemografica` (componente compartido)
+
+---
+
+## 3.1.3 Perfil de Cargo y Profesiograma
+
+### Descripción
+
+Permite construir y gestionar los perfiles de cargo y profesiogramas que describen las exigencias laborales y los factores de riesgo asociados a cada cargo, según la Resolución 0312 de 2019.
+
+### Funcionalidades
+
+- ✅ Registro de perfiles de cargo con factores de riesgo
+- ✅ Elaboración de profesiogramas por cargo
+- ✅ Asociación de cargos con riesgos ocupacionales
+
+### Componente Renderer
+
+- Ruta en renderer.js: `gestion-salud/perfil-cargo-profesiograma`
+- Componente: → Redirige a `sociodemografica` (componente compartido)
+
+---
+
 ## 3.1.4 Evaluaciones Médicas
 
 ### Descripción
@@ -132,6 +194,25 @@ const resultado = await window.electronAPI.processExcelData({
 
 ---
 
+## 3.1.5 Custodia Médica Ocupacional
+
+### Descripción
+
+Gestiona la custodia y confidencialidad de las historias clínicas ocupacionales, garantizando el cumplimiento de los estándares de reserva médica establecidos por la normatividad colombiana.
+
+### Funcionalidades
+
+- ✅ Control de acceso a historias clínicas ocupacionales
+- ✅ Registro de custodia de documentos médicos
+- ✅ Trazabilidad de consultas y autorizaciones de acceso
+
+### Componente Renderer
+
+- Ruta en renderer.js: `gestion-salud/custodia-medica-ocupacional`
+- Componente: → Redirige a `sociodemografica` (componente compartido)
+
+---
+
 ## 3.1.6 Restricciones Médicas
 
 ### Descripción
@@ -164,6 +245,63 @@ await window.electronAPI.processExcelData({
   data: { ...restriccion, estado: 'VENCIDA' }
 });
 ```
+
+---
+
+## 3.1.7 Estilos de Vida Saludables
+
+### Descripción
+
+Registra y hace seguimiento a los programas de promoción de estilos de vida saludable en la empresa, incluyendo hábitos, actividad física y alimentación, conforme a la Resolución 0312 de 2019.
+
+### Funcionalidades
+
+- ✅ Registro de programas de bienestar y estilos de vida
+- ✅ Seguimiento de indicadores de salud de los trabajadores
+- ✅ Evaluación de hábitos y factores de riesgo cardiovascular
+
+### Componente Renderer
+
+- Ruta en renderer.js: `gestion-salud/estilos-vida-saludables`
+- Componente: → Redirige a `sociodemografica` (componente compartido)
+
+---
+
+## 3.1.8 Servicios de Higiene
+
+### Descripción
+
+Documenta y gestiona los servicios de higiene industrial disponibles en la empresa, incluyendo evaluaciones de factores de riesgo higiénico (ruido, iluminación, calor, químicos).
+
+### Funcionalidades
+
+- ✅ Registro de mediciones higiénicas
+- ✅ Inventario de factores de riesgo higiénico
+- ✅ Seguimiento de resultados de mediciones ambientales
+
+### Componente Renderer
+
+- Ruta en renderer.js: `gestion-salud/servicios-higiene`
+- Componente: → Redirige a `sociodemografica` (componente compartido)
+
+---
+
+## 3.1.9 Manejo de Residuos
+
+### Descripción
+
+Gestiona el programa de manejo de residuos de la empresa, incluyendo la clasificación, disposición y seguimiento de residuos sólidos y peligrosos generados en las actividades laborales.
+
+### Funcionalidades
+
+- ✅ Registro de tipos de residuos generados
+- ✅ Clasificación y disposición de residuos
+- ✅ Seguimiento de indicadores de gestión de residuos
+
+### Componente Renderer
+
+- Ruta en renderer.js: `gestion-salud/manejo-residuos`
+- Componente: → Redirige a `sociodemografica` (componente compartido)
 
 ---
 
@@ -358,7 +496,27 @@ async function investigarAccidente() {
 
 ### Documentación Completa
 
-- 📖 [01-arquitectura/ipc-contratos.md](../01-arquitectura/ipc-contratos.md#25-investigación-de-accidentes--6-contratos)
+- 📖 [02-architecture/ipc-contratos.md](../02-architecture/ipc-contratos.md#25-investigación-de-accidentes--6-contratos)
+
+---
+
+## 3.2.3 Registro Estadístico
+
+### Descripción
+
+Consolida y presenta los registros estadísticos de accidentes de trabajo, enfermedades laborales e incidentes, permitiendo el análisis de tendencias y la generación de reportes según la Resolución 0312 de 2019.
+
+### Funcionalidades
+
+- ✅ Consolidación de datos estadísticos de accidentes e incidentes
+- ✅ Generación de reportes por periodo, tipo y severidad
+- ✅ Análisis de tendencias y comparativas históricas
+
+### Componente Renderer
+
+- Ruta en renderer.js: `gestion-salud/registro-estadistico`
+- Componente: `modules/gestion-salud/registro-estadistico/registro-estadistico.js`
+- IPC: `registro-estadistico:cargar-datos`
 
 ---
 
@@ -695,12 +853,116 @@ El módulo se basa en los lineamientos de la **Resolución 0312 de 2019**:
 
 ### Documentación Completa
 
-- 📖 [01-arquitectura/ipc-contratos.md](../01-arquitectura/ipc-contratos.md#24-ausentismo-4-contratos)
-- 📖 [01-arquitectura/ipc-contratos.md](../01-arquitectura/ipc-contratos.md#212-seguimiento-de-incapacidades-5-contratos)
+- 📖 [02-architecture/ipc-contratos.md](../02-architecture/ipc-contratos.md#24-ausentismo-4-contratos)
+- 📖 [02-architecture/ipc-contratos.md](../02-architecture/ipc-contratos.md#212-seguimiento-de-incapacidades-5-contratos)
+
+---
+
+## 3.3.1 Frecuencia de Accidentalidad
+
+### Descripción
+
+Calcula y presenta el índice de frecuencia de accidentalidad (IF), que mide la relación entre el número de accidentes de trabajo y las horas hombre trabajadas, conforme a los indicadores de la Resolución 0312 de 2019.
+
+### Funcionalidades
+
+- ✅ Cálculo automático del índice de frecuencia (IF = N° AT × 200,000 / HHT)
+- ✅ Visualización de tendencias por periodo
+- ✅ Comparación con estándares del sector
+
+### Componente Renderer
+
+- Ruta en renderer.js: `gestion-salud/frecuencia-accidentalidad`
+- Componente: `modules/gestion-salud/frecuencia-accidentalidad/frecuencia-accidentalidad.js`
+- IPC: `frecuencia-accidentalidad:*` handlers
+
+---
+
+## 3.3.2 Severidad de Accidentalidad
+
+### Descripción
+
+Calcula y presenta el índice de severidad de accidentalidad (IS), que mide la gravedad de los accidentes de trabajo según los días de incapacidad y las horas hombre trabajadas, según la Resolución 0312 de 2019.
+
+### Funcionalidades
+
+- ✅ Cálculo automático del índice de severidad (IS = Días perdidos × 200,000 / HHT)
+- ✅ Visualización de tendencias por periodo
+- ✅ Análisis comparativo con índice de frecuencia
+
+### Componente Renderer
+
+- Ruta en renderer.js: `gestion-salud/severidad-accidentalidad`
+- Componente: `modules/gestion-salud/severidad-accidentalidad/severidad-accidentalidad.js`
+- IPC: `severidad-accidentalidad:*` handlers
+
+---
+
+## 3.3.3 Proporción de AT Mortales
+
+### Descripción
+
+Calcula y presenta la proporción de accidentes de trabajo mortales respecto al total de accidentes registrados, como indicador crítico de seguridad según la Resolución 0312 de 2019.
+
+### Funcionalidades
+
+- ✅ Cálculo de la proporción de AT mortales (AT mortales / Total AT × 100)
+- ✅ Historial de accidentalidad mortal por periodo
+- ✅ Alertas y seguimiento de casos mortales
+
+### Componente Renderer
+
+- Ruta en renderer.js: `gestion-salud/proporcion-at-mortales`
+- Componente: `modules/gestion-salud/indice-mortalidad/indice-mortalidad.js`
+- IPC: `mortalidad:*` handlers
+
+---
+
+## 3.3.4 Prevalencia de Enfermedad Laboral
+
+### Descripción
+
+Calcula y presenta la prevalencia de enfermedad laboral en la empresa, midiendo la proporción de trabajadores que padecen una enfermedad ocupacional en un momento determinado, según la Resolución 0312 de 2019.
+
+### Funcionalidades
+
+- ✅ Cálculo de prevalencia de enfermedad laboral
+- ✅ Registro y seguimiento de enfermedades laborales diagnosticadas
+- ✅ Reportes por tipo de enfermedad y periodo
+
+### Componente Renderer
+
+- Ruta en renderer.js: `gestion-salud/prevalencia-enfermedad-laboral`
+- Componente: → Redirige a `sociodemografica` (componente compartido)
+
+---
+
+## 3.3.5 Incidencia de Enfermedad Laboral
+
+### Descripción
+
+Calcula y presenta la incidencia de enfermedad laboral, midiendo los nuevos casos diagnosticados durante un periodo determinado, conforme a los indicadores de la Resolución 0312 de 2019.
+
+### Funcionalidades
+
+- ✅ Cálculo de incidencia de enfermedad laboral
+- ✅ Registro de nuevos casos por periodo
+- ✅ Análisis de tendencias de incidencia
+
+### Componente Renderer
+
+- Ruta en renderer.js: `gestion-salud/incidencia-enfermedad-laboral`
+- Componente: → Redirige a `sociodemografica` (componente compartido)
 
 ---
 
 ## 2. Cambios Recientes
+
+### Versión 0.1.99 (9 junio 2026)
+
+- ✅ 13 submódulos faltantes documentados (3.1.2-3.1.9, 3.2.3, 3.3.1-3.3.5)
+- ✅ Indicadores de accidentalidad (frecuencia, severidad, mortalidad) con componentes dedicados
+- ✅ Registro estadístico con IPC propio
 
 ### Versión 0.1.70 (6 marzo 2026)
 
@@ -724,6 +986,6 @@ El módulo se basa en los lineamientos de la **Resolución 0312 de 2019**:
 
 ---
 
-**Mantenido por:** Product Architect & Full-Stack Team  
-**Última actualización:** 6 de marzo de 2026  
-**Versión:** 0.1.70
+**Mantenido por:** Product Architect & Full-Stack Team
+**Última actualización:** 9 de junio de 2026
+**Versión:** 2.0 (v0.1.99)

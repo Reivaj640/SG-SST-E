@@ -1,7 +1,7 @@
 # Alertas del Dashboard - Módulo de Recursos
 
-**Versión:** 0.1.91  
-**Fecha:** 22 de marzo de 2026  
+**Versión:** 0.1.99
+**Fecha:** 9 de junio de 2026
 **Módulo:** Recursos (Módulo 1)
 
 ---
@@ -338,7 +338,7 @@ python Portear/python-embed/python-scripts/dashboard_scanner.py "C:\Empresas\Tem
 ## 🔗 Referencias Cruzadas
 
 ### Documentos Relacionados
-- `docs/02-modules/modulo-1-recursos.md`
+- `docs/02-modulos/modulo-1-recursos.md`
 - `docs/05-updates/v0.1.91-navegacion-home-empresa.md`
 
 ### Archivos Clave

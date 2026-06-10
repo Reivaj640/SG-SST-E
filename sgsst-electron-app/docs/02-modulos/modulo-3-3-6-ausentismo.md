@@ -1,8 +1,8 @@
 # 🏥 Módulo 3.3.6: Medición del Ausentismo 🆕
 
 **Versión:** 3.0  
-**Actualizado:** 17 de marzo de 2026  
-**Estado:** ✅ Actualizado v0.1.75  
+**Actualizado:** 9 de junio de 2026
+**Estado:** ✅ Actualizado v0.1.99
 **Crítico:** 🔴 SI - Módulo con cambios mayores
 
 ---
@@ -648,6 +648,6 @@ async function registrarYDarSeguimiento(formData, empresa) {
 ---
 
 **Mantenido por:** Full-Stack Team & SST Specialist  
-**Última actualización:** 17 de marzo de 2026  
-**Versión:** 3.0 (v0.1.75)  
+**Última actualización:** 9 de junio de 2026
+**Versión:** 3.0 (v0.1.99)
 **Próxima revisión:** Al modificar estructura de PRI.xlsx o PI-FO-076

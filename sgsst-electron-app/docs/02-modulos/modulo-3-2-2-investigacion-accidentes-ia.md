@@ -1,8 +1,8 @@
 # 🤖 Módulo 3.2.2: Investigación de Accidentes con IA
 
 **Versión:** 2.0  
-**Actualizado:** 17 de marzo de 2026  
-**Estado:** ✅ Actualizado v0.1.75  
+**Actualizado:** 9 de junio de 2026
+**Estado:** ✅ Actualizado v0.1.99
 **Crítico:** 🔴 SI - Módulo con IA integrada
 
 ---
@@ -727,6 +727,6 @@ El informe generado incluye:
 ---
 
 **Mantenido por:** AI Integration Team & SST Specialists  
-**Última actualización:** 17 de marzo de 2026  
-**Versión:** 2.0 (v0.1.75)  
+**Última actualización:** 9 de junio de 2026
+**Versión:** 2.0 (v0.1.99)
 **Próxima revisión:** Al actualizar modelo de IA o metodología
