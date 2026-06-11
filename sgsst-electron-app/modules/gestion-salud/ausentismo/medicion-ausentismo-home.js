@@ -1,19 +1,19 @@
-// medicion-ausentismo-home.js - Lógica del portal de Medición del Ausentismo
+// medicion-ausentismo-home.js - Logica del portal de Medicion del Ausentismo
 
 /**
  * Espera a que un elemento exista en el DOM con retry logic y backoff exponencial
  * @param {string} selector - Selector CSS del elemento a esperar (ID, clase, etc.)
- * @param {number} timeout - Tiempo máximo de espera en ms (default: 5000)
- * @param {number} maxRetries - Número máximo de reintentos (default: 10)
+ * @param {number} timeout - Tiempo maximo de espera en ms (default: 5000)
+ * @param {number} maxRetries - Numero maximo de reintentos (default: 10)
  * @param {number} baseDelay - Retraso base en ms para backoff exponencial (default: 100)
- * @returns {Promise<Element|null>} - El elemento encontrado o null si se agotó el tiempo
+ * @returns {Promise<Element|null>} - El elemento encontrado o null si se agoto el tiempo
  */
 function waitForElement(selector, timeout = 5000, maxRetries = 10, baseDelay = 100) {
     return new Promise(async (resolve) => {
         const startTime = Date.now();
         let retries = 0;
         
-        // Función para verificar si el elemento existe
+        // Funcion para verificar si el elemento existe
         const checkElement = () => {
             const element = typeof selector === 'string' 
                 ? document.querySelector(selector) 
@@ -38,7 +38,7 @@ function waitForElement(selector, timeout = 5000, maxRetries = 10, baseDelay = 1
             const element = checkElement();
             if (element) {
                 obs.disconnect();
-                console.log(`[waitForElement] Elemento '${selector}' encontrado después de ${Date.now() - startTime}ms`);
+                console.log(`[waitForElement] Elemento '${selector}' encontrado despues de ${Date.now() - startTime}ms`);
                 resolve(element);
             }
         });
@@ -57,7 +57,7 @@ function waitForElement(selector, timeout = 5000, maxRetries = 10, baseDelay = 1
                 const element = checkElement();
                 if (element) {
                     observer.disconnect();
-                    console.log(`[waitForElement] Elemento '${selector}' encontrado en retry ${retries} después de ${Date.now() - startTime}ms`);
+                    console.log(`[waitForElement] Elemento '${selector}' encontrado en retry ${retries} despues de ${Date.now() - startTime}ms`);
                     resolve(element);
                     return;
                 }
@@ -65,19 +65,19 @@ function waitForElement(selector, timeout = 5000, maxRetries = 10, baseDelay = 1
                 // Verificar si excedimos el timeout
                 if (Date.now() - startTime >= timeout) {
                     observer.disconnect();
-                    console.warn(`[waitForElement] Timeout después de ${timeout}ms y ${retries} reintentos para '${selector}'`);
+                    console.warn(`[waitForElement] Timeout despues de ${timeout}ms y ${retries} reintentos para '${selector}'`);
                     resolve(null);
                     return;
                 }
             }
             
-            // Último intento
+            // Ultimo intento
             const finalElement = checkElement();
             observer.disconnect();
             if (finalElement) {
-                console.log(`[waitForElement] Elemento '${selector}' encontrado en último intento`);
+                console.log(`[waitForElement] Elemento '${selector}' encontrado en ultimo intento`);
             } else {
-                console.warn(`[waitForElement] Elemento '${selector}' no encontrado después de ${maxRetries} reintentos`);
+                console.warn(`[waitForElement] Elemento '${selector}' no encontrado despues de ${maxRetries} reintentos`);
             }
             resolve(finalElement);
         };
@@ -94,29 +94,29 @@ async function initializePortal() {
     try {
         console.log('[medicion-ausentismo-home] Iniciando portal, esperando elementos del DOM...');
         
-        // Esperar a que los elementos del DOM estén disponibles con retry logic
+        // Esperar a que los elementos del DOM esten disponibles con retry logic
         const pendientesElement = await waitForElement('#ausentismoPendientes', 8000, 15, 100);
         const activosElement = await waitForElement('#ausentismoActivos', 8000, 15, 100);
 
         if (!pendientesElement || !activosElement) {
-            console.warn('[medicion-ausentismo-home] ⚠️ Algunos elementos no se encontraron después de 8 segundos');
+            console.warn('[medicion-ausentismo-home] Algunos elementos no se encontraron despues de 8 segundos');
             console.warn('[medicion-ausentismo-home] pendientes:', !!pendientesElement, 'activos:', !!activosElement);
         } else {
-            console.log('[medicion-ausentismo-home] ✅ Elementos del DOM encontrados, cargando stats...');
+            console.log('[medicion-ausentismo-home] Elementos del DOM encontrados, cargando stats...');
         }
 
         await loadStats();
     } catch (error) {
-        console.error('[medicion-ausentismo-home] Error crítico inicializando:', error);
+        console.error('[medicion-ausentismo-home] Error critico inicializando:', error);
     }
 }
 
 /**
- * Función auxiliar segura para establecer textContent
+ * Funcion auxiliar segura para establecer textContent
  * @param {string} elementId - ID del elemento
  * @param {string} value - Valor a establecer
  * @param {boolean} warnOnMissing - Si true, muestra warning si no existe (default: true)
- * @returns {boolean} - true si se estableció, false si no se encontró
+ * @returns {boolean} - true si se establecio, false si no se encontro
  */
 function safeSetTextContent(elementId, value, warnOnMissing = true) {
     const element = document.getElementById(elementId);
@@ -132,7 +132,7 @@ function safeSetTextContent(elementId, value, warnOnMissing = true) {
 
 async function loadStats() {
     try {
-        // Intentar obtener estadísticas desde la API de Electron si está disponible
+        // Intentar obtener estadisticas desde la API de Electron si esta disponible
         if (window.electronAPI && window.electronAPI.getAusentismoStats) {
             const companyName = getCompanyName();
             const stats = await window.electronAPI.getAusentismoStats(companyName);
@@ -148,7 +148,7 @@ async function loadStats() {
             safeSetTextContent('ausentismoActivos', '0', false);
         }
     } catch (error) {
-        console.log('[medicion-ausentismo-home] Error cargando estadísticas:', error.message);
+        console.log('[medicion-ausentismo-home] Error cargando estadisticas:', error.message);
         // En caso de error, mostrar 0
         safeSetTextContent('ausentismoPendientes', '0', false);
         safeSetTextContent('ausentismoActivos', '0', false);
@@ -213,7 +213,7 @@ function verEstadisticas() {
 }
 
 /**
- * 🆕 Abre el constructor de informes PRI multicaso DENTRO de la misma ventana
+ * Abre el constructor de informes PRI multicaso DENTRO de la misma ventana
  */
 function generarInforme() {
     console.log('[HOME] Abriendo constructor de informes PRI en la misma ventana...');
@@ -234,7 +234,7 @@ function generarInforme() {
 }
 
 /**
- * Carga el constructor de informes PRI en el área de contenido principal
+ * Carga el constructor de informes PRI en el area de contenido principal
  */
 function loadInformePriBuilder() {
     console.log('[HOME] Cargando informe PRI builder directamente...');
@@ -242,8 +242,8 @@ function loadInformePriBuilder() {
     // Buscar el content-area
     const contentArea = document.getElementById('content-area');
     if (!contentArea) {
-        console.error('[HOME] No se encontró content-area');
-        alert('❌ Error: No se pudo cargar la vista del informe');
+        console.error('[HOME] No se encontro content-area');
+        alert('Error: No se pudo cargar la vista del informe');
         return;
     }
     
@@ -261,13 +261,13 @@ function loadInformePriBuilder() {
         })
         .catch(error => {
             console.error('[HOME] Error cargando informe:', error);
-            alert('❌ Error al cargar el constructor de informes: ' + error.message);
+            alert('Error al cargar el constructor de informes: ' + error.message);
         });
 }
 
 /**
  * Abre la Consulta de Trabajadores
- * Envía mensaje al padre para que cargue la vista de consulta
+ * Envia mensaje al padre para que cargue la vista de consulta
  */
 function consultaTrabajadores() {
     console.log('[HOME] Abriendo consulta de trabajadores...');

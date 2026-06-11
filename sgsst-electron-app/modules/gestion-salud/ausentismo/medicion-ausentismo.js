@@ -6102,6 +6102,174 @@ class MedicionAusentismoComponent {
         console.log('[DEBUG] renderEstadisticasView: Iniciando renderizado de dashboard de estadísticas.');
         container.innerHTML = '';
 
+        // ================================================================
+        // CSS KPI RIBBON — Patrón Canónico K+AIR (aislado via scope)
+        // ================================================================
+        if (!document.getElementById('kpi-stats-ribbon-css')) {
+            const styleEl = document.createElement('style');
+            styleEl.id = 'kpi-stats-ribbon-css';
+      styleEl.textContent = `
+      .estadisticas-dashboard .k-stats-ribbon {
+        display: flex;
+        align-items: center;
+        gap: 0;
+        background: #ffffff;
+        border: 1px solid #dee2e6;
+        border-radius: 0.625rem;
+        padding: 0;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        overflow: hidden;
+      }
+      .estadisticas-dashboard .k-stats-ribbon__item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1rem 1.5rem;
+        flex: 1;
+        min-width: 0;
+      }
+      .estadisticas-dashboard .k-stats-ribbon__icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        flex-shrink: 0;
+      }
+      .estadisticas-dashboard .k-stats-ribbon__icon.primary { background: #e8f0fe; color: #174ea6; }
+      .estadisticas-dashboard .k-stats-ribbon__icon.success { background: #d4edda; color: #28a745; }
+      .estadisticas-dashboard .k-stats-ribbon__icon.warning { background: #fff3cd; color: #856404; }
+      .estadisticas-dashboard .k-stats-ribbon__icon.muted { background: #f0f2f5; color: #6c757d; }
+      .estadisticas-dashboard .k-stats-ribbon__data {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+      .estadisticas-dashboard .k-stats-ribbon__value {
+        font-family: 'Lexend', sans-serif;
+        font-size: 1.375rem;
+        font-weight: 700;
+        color: #1a1a2e;
+        line-height: 1.2;
+      }
+      .estadisticas-dashboard .k-stats-ribbon__value--muted {
+        font-size: 1rem;
+        color: #6c757d;
+      }
+      .estadisticas-dashboard .k-stats-ribbon__label {
+        font-size: 0.6875rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+      }
+      .estadisticas-dashboard .k-stats-ribbon__divider {
+        width: 1px;
+        height: 36px;
+        background: #e5e7eb;
+        flex-shrink: 0;
+      }
+      .estadisticas-dashboard .k-section-card {
+        background: #ffffff;
+        border: 1px solid #dee2e6;
+        border-radius: 0.625rem;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        margin-bottom: 1.5rem;
+      }
+      .estadisticas-dashboard .k-charts-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.5rem;
+        margin-bottom: 1.5rem;
+      }
+      .estadisticas-dashboard .k-chart-card {
+        background: #ffffff;
+        border: 1px solid #dee2e6;
+        border-radius: 0.625rem;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+      }
+      .estadisticas-dashboard .k-chart-card__title {
+        margin: 0 0 1rem 0;
+        font-size: 0.9375rem;
+        font-weight: 600;
+        color: #1E293B;
+      }
+      .estadisticas-dashboard .k-chart-card__body {
+        position: relative;
+        flex: 1;
+        min-height: 260px;
+      }
+      .estadisticas-dashboard .k-filters-bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: 0.75rem;
+        padding: 1.25rem 1.5rem;
+      }
+      .estadisticas-dashboard .k-filter-group {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        flex: 1 1 140px;
+      }
+      .estadisticas-dashboard .k-filter-label {
+        display: block;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        color: #64748B;
+        margin-bottom: 0.375rem;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+      }
+      .estadisticas-dashboard .k-filter-select {
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        color: #1E293B;
+        background: #ffffff;
+        transition: border-color 0.2s;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' stroke='%2364748B' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 0.75rem center;
+        padding-right: 2rem;
+      }
+      .estadisticas-dashboard .k-filter-select:focus {
+        outline: none;
+        border-color: #174ea6;
+        box-shadow: 0 0 0 3px rgba(23,78,166,0.1);
+      }
+      .estadisticas-dashboard .k-filter-actions {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        flex-shrink: 0;
+      }
+      @media (max-width: 992px) {
+        .estadisticas-dashboard .k-charts-grid { grid-template-columns: 1fr 1fr; }
+      }
+      @media (max-width: 768px) {
+        .estadisticas-dashboard .k-stats-ribbon { flex-wrap: wrap; }
+        .estadisticas-dashboard .k-stats-ribbon__item { flex: 1 1 45%; }
+        .estadisticas-dashboard .k-stats-ribbon__divider { display: none; }
+        .estadisticas-dashboard .k-charts-grid { grid-template-columns: 1fr; }
+        .estadisticas-dashboard .k-filters-bar { flex-direction: column; }
+        .estadisticas-dashboard .k-filter-group { flex: 1 1 100%; }
+        .estadisticas-dashboard .k-filter-actions { width: 100%; }
+        .estadisticas-dashboard .k-filter-actions button { flex: 1; }
+      }
+      `;
+            document.head.appendChild(styleEl);
+        }
+
         // Contenedor wrapper con scroll condicional
         const scrollWrapper = document.createElement('div');
         scrollWrapper.id = 'estadisticas-ausentismo-scroll-wrapper';
@@ -6122,325 +6290,247 @@ class MedicionAusentismoComponent {
             console.log('[DEBUG] FontAwesome agregado dinámicamente');
         }
 
-        // Contenedor principal
-        const mainContent = document.createElement('div');
-        mainContent.style.cssText = `
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-            width: 100%;
-            min-height: 100%;
-            box-sizing: border-box;
-        `;
+    // Contenedor principal — Full-width, fondo gris
+    const mainContent = document.createElement('div');
+    mainContent.className = 'estadisticas-dashboard';
+    mainContent.style.cssText = `
+      padding: 1.5rem;
+      width: 100%;
+      min-height: 100%;
+      box-sizing: border-box;
+      background: #f8f9fa;
+    `;
 
-        // Notificación toast
-        const notificationDiv = document.createElement('div');
-        notificationDiv.id = 'notification-toast-stats';
-        notificationDiv.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 25px;
-            background: white;
-            border-left: 4px solid #28a745;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            border-radius: 4px;
-            z-index: 2000;
-            transform: translateX(120%);
-            transition: transform 0.3s ease;
-            font-weight: 500;
-            color: #1E293B;
-        `;
-        mainContent.appendChild(notificationDiv);
+    // Notificación toast
+    const notificationDiv = document.createElement('div');
+    notificationDiv.id = 'notification-toast-stats';
+    notificationDiv.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 15px 25px;
+      background: white;
+      border-left: 4px solid #28a745;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      border-radius: 4px;
+      z-index: 2000;
+      transform: translateX(120%);
+      transition: transform 0.3s ease;
+      font-weight: 500;
+      color: #1E293B;
+    `;
+    mainContent.appendChild(notificationDiv);
 
-        // Contenedor del dashboard
-        const dashboardContainer = document.createElement('div');
-        dashboardContainer.className = 'estadisticas-dashboard';
-        dashboardContainer.style.cssText = `
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-            border: 1px solid #dee2e6;
-        `;
+    // ================================================================
+    // 1. HEADER — Card independiente
+    // ================================================================
+    const headerCard = document.createElement('div');
+    headerCard.className = 'k-section-card';
+    headerCard.style.cssText = `
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1.25rem 1.5rem;
+    `;
 
-        // Header del dashboard
-        const dashboardHeader = document.createElement('div');
-        dashboardHeader.style.cssText = `
-            padding: 20px 25px;
-            border-bottom: 1px solid #dee2e6;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 15px;
-        `;
+    const leftSection = document.createElement('div');
+    leftSection.style.cssText = `
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    `;
 
-        const leftSection = document.createElement('div');
-        leftSection.style.cssText = `
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        `;
+    const dashboardIcon = document.createElement('i');
+    dashboardIcon.className = 'fas fa-chart-line';
+    dashboardIcon.style.cssText = `color: #174ea6; font-size: 1.25rem;`;
 
-        const dashboardIcon = document.createElement('i');
-        dashboardIcon.className = 'fas fa-chart-line';
-        dashboardIcon.style.cssText = `color: #174ea6; font-size: 20px;`;
+    const dashboardTitleContainer = document.createElement('div');
+    const dashboardTitle = document.createElement('h3');
+    dashboardTitle.textContent = 'Estadísticas de Ausentismo';
+    dashboardTitle.style.cssText = `font-size: 1.125rem; font-weight: 600; margin: 0; color: #1E293B;`;
 
-        const dashboardTitleContainer = document.createElement('div');
-        const dashboardTitle = document.createElement('h3');
-        dashboardTitle.textContent = 'Estadísticas de Ausentismo';
-        dashboardTitle.style.cssText = `font-size: 18px; font-weight: 600; margin: 0; color: #1E293B;`;
+    const dashboardSubtitle = document.createElement('p');
+    dashboardSubtitle.textContent = 'Métricas y tendencias del ausentismo por causa médica.';
+    dashboardSubtitle.style.cssText = `font-size: 0.8125rem; color: #64748B; margin: 0.25rem 0 0 0;`;
 
-        const dashboardSubtitle = document.createElement('p');
-        dashboardSubtitle.textContent = 'Métricas y tendencias del ausentismo por causa médica.';
-        dashboardSubtitle.style.cssText = `font-size: 14px; color: #64748B; margin: 4px 0 0 0;`;
+    dashboardTitleContainer.appendChild(dashboardTitle);
+    dashboardTitleContainer.appendChild(dashboardSubtitle);
+    leftSection.appendChild(dashboardIcon);
+    leftSection.appendChild(dashboardTitleContainer);
 
-        dashboardTitleContainer.appendChild(dashboardTitle);
-        dashboardTitleContainer.appendChild(dashboardSubtitle);
-        leftSection.appendChild(dashboardIcon);
-        leftSection.appendChild(dashboardTitleContainer);
+    const backBtn = document.createElement('button');
+    backBtn.innerHTML = '<i class="fas fa-arrow-left"></i> Volver';
+    backBtn.style.cssText = `
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      border: 1px solid #dee2e6;
+      background-color: #f8f9fa;
+      color: #64748B;
+      transition: all 0.2s;
+      white-space: nowrap;
+    `;
+    backBtn.onmouseover = function() {
+      this.style.backgroundColor = '#e2e8f0';
+      this.style.color = '#174ea6';
+      this.style.borderColor = '#174ea6';
+    };
+    backBtn.onmouseout = function() {
+      this.style.backgroundColor = '#f8f9fa';
+      this.style.color = '#64748B';
+      this.style.borderColor = '#dee2e6';
+    };
+    backBtn.onclick = () => {
+      this.currentView = 'main';
+      this.render();
+    };
 
-        // Botón Volver
-        const backBtn = document.createElement('button');
-        backBtn.innerHTML = '<i class="fas fa-arrow-left"></i> Volver';
-        backBtn.style.cssText = `
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 500;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            border: 1px solid #dee2e6;
-            background-color: #f8f9fa;
-            color: #64748B;
-            transition: all 0.2s;
-            white-space: nowrap;
-        `;
-        backBtn.onmouseover = function() {
-            this.style.backgroundColor = '#e2e8f0';
-            this.style.color = '#174ea6';
-            this.style.borderColor = '#174ea6';
-        };
-        backBtn.onmouseout = function() {
-            this.style.backgroundColor = '#f8f9fa';
-            this.style.color = '#64748B';
-            this.style.borderColor = '#dee2e6';
-        };
-        backBtn.onclick = () => {
-            this.currentView = 'main';
-            this.render();
-        };
+    headerCard.appendChild(leftSection);
+    headerCard.appendChild(backBtn);
+    mainContent.appendChild(headerCard);
 
-        dashboardHeader.appendChild(leftSection);
-        dashboardHeader.appendChild(backBtn);
-        dashboardContainer.appendChild(dashboardHeader);
+    // ================================================================
+    // 2. KPI RIBBON — Card independiente
+    // ================================================================
+    const ribbon = document.createElement('div');
+    ribbon.className = 'k-stats-ribbon';
 
-        // Grid de métricas (4 tarjetas) - Diseño actualizado
-        const metricsGrid = document.createElement('div');
-        metricsGrid.style.cssText = `
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-            gap: 20px;
-            padding: 25px;
-            border-bottom: 1px solid #dee2e6;
-        `;
+    const createRibbonItem = (id, value, label, iconClass, colorClass) => {
+      const item = document.createElement('div');
+      item.className = 'k-stats-ribbon__item';
 
-        // Función auxiliar para crear tarjetas
-        const createMetricCard = (id, title, value, description, iconClass, borderColor) => {
-            const card = document.createElement('div');
-            card.style.cssText = `
-                background: white;
-                border-radius: 12px;
-                padding: 20px;
-                border-left: 4px solid ${borderColor};
-                box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-                min-height: 140px;
-            `;
+      const iconSpan = document.createElement('span');
+      iconSpan.className = `k-stats-ribbon__icon ${colorClass}`;
+      const iconI = document.createElement('i');
+      iconI.className = `bi ${iconClass}`;
+      iconSpan.appendChild(iconI);
 
-            const headerDiv = document.createElement('div');
-            headerDiv.style.cssText = `
-                display: flex;
-                justify-content: space-between;
-                align-items: flex-start;
-                margin-bottom: 12px;
-            `;
+      const dataDiv = document.createElement('div');
+      dataDiv.className = 'k-stats-ribbon__data';
 
-            const titleSpan = document.createElement('span');
-            titleSpan.textContent = title;
-            titleSpan.style.cssText = `
-                font-size: 12px;
-                font-weight: 600;
-                color: #64748B;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-                line-height: 1.3;
-                max-width: 70%;
-            `;
+      const valueSpan = document.createElement('span');
+      valueSpan.className = 'k-stats-ribbon__value';
+      valueSpan.id = id;
+      valueSpan.textContent = value;
 
-            const icon = document.createElement('i');
-            icon.className = iconClass;
-            icon.style.cssText = `
-                font-size: 22px;
-                color: ${borderColor};
-                opacity: 0.8;
-                flex-shrink: 0;
-            `;
+      const labelSpan = document.createElement('span');
+      labelSpan.className = 'k-stats-ribbon__label';
+      labelSpan.textContent = label;
 
-            headerDiv.appendChild(titleSpan);
-            headerDiv.appendChild(icon);
+      dataDiv.appendChild(valueSpan);
+      dataDiv.appendChild(labelSpan);
+      item.appendChild(iconSpan);
+      item.appendChild(dataDiv);
 
-            const valueDiv = document.createElement('div');
-            valueDiv.id = id;
-            valueDiv.textContent = value;
-            valueDiv.style.cssText = `
-                font-size: 32px;
-                font-weight: 700;
-                color: #1E293B;
-                margin-bottom: 4px;
-                line-height: 1.2;
-            `;
+      return item;
+    };
 
-            const descDiv = document.createElement('div');
-            descDiv.textContent = description;
-            descDiv.style.cssText = `
-                font-size: 12px;
-                color: #64748B;
-                line-height: 1.3;
-            `;
+    const divider = () => {
+      const d = document.createElement('div');
+      d.className = 'k-stats-ribbon__divider';
+      return d;
+    };
 
-            card.appendChild(headerDiv);
-            card.appendChild(valueDiv);
-            card.appendChild(descDiv);
+    ribbon.appendChild(createRibbonItem('metricTotalIncapacidades', '-', 'Total Incapacidades', 'bi-calendar-check', 'primary'));
+    ribbon.appendChild(divider());
+    ribbon.appendChild(createRibbonItem('metricTotalDias', '-', 'Días Perdidos', 'bi-calendar3', 'success'));
+    ribbon.appendChild(divider());
+    ribbon.appendChild(createRibbonItem('metricTotalEPS', '-', 'Enf. General', 'bi-hospital', 'warning'));
+    ribbon.appendChild(divider());
+    ribbon.appendChild(createRibbonItem('metricTotalARL', '-', 'Acc. Laborales', 'bi-exclamation-triangle', 'muted'));
 
-            return card;
-        };
+    mainContent.appendChild(ribbon);
 
-        // Crear las 4 tarjetas
-        metricsGrid.appendChild(createMetricCard(
-            'metricTotalIncapacidades',
-            'Total Incapacidades',
-            '-',
-            'Registros en el sistema',
-            'fas fa-calendar-check',
-            '#174ea6'
-        ));
+    // ================================================================
+    // 3. FILTROS — Card independiente
+    // ================================================================
+    const filtersCard = document.createElement('div');
+    filtersCard.className = 'k-section-card';
 
-        metricsGrid.appendChild(createMetricCard(
-            'metricTotalDias',
-            'Días Perdidos',
-            '-',
-            'Días acumulados',
-            'fas fa-calendar-day',
-            '#28a745'
-        ));
+    const filtersBar = document.createElement('div');
+    filtersBar.className = 'k-filters-bar';
 
-        metricsGrid.appendChild(createMetricCard(
-            'metricTotalEPS',
-            'Enfermedad General',
-            '-',
-            'Incapacidades EPS',
-            'fas fa-hospital',
-            '#ffc107'
-        ));
+    filtersBar.innerHTML = `
+      <div class="k-filter-group">
+        <label class="k-filter-label">Año</label>
+        <select id="statsYearFilter" class="k-filter-select">
+          <option value="">Cargando años...</option>
+        </select>
+      </div>
+      <div class="k-filter-group">
+        <label class="k-filter-label">Mes</label>
+        <select id="statsMonthFilter" class="k-filter-select">
+          <option value="">Cargando meses...</option>
+        </select>
+      </div>
+      <div class="k-filter-group">
+        <label class="k-filter-label">Género</label>
+        <select id="statsGenderFilter" class="k-filter-select">
+          <option value="">Todos</option>
+          <option value="FEMENINO">Femenino</option>
+          <option value="MASCULINO">Masculino</option>
+        </select>
+      </div>
+      <div class="k-filter-group">
+        <label class="k-filter-label">Clase</label>
+        <select id="statsClassFilter" class="k-filter-select">
+          <option value="">Cargando tipos...</option>
+        </select>
+      </div>
+      <div class="k-filter-actions">
+        <button id="applyStatsFiltersBtn" style="padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer; border: none; background-color: #174ea6; color: white; transition: all 0.2s; white-space: nowrap;">
+          <i class="fas fa-filter"></i> Filtrar
+        </button>
+        <button id="clearStatsFiltersBtn" style="padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer; border: 1px solid #dee2e6; background-color: #f8f9fa; color: #64748B; transition: all 0.2s; white-space: nowrap;">
+          <i class="fas fa-times"></i> Limpiar
+        </button>
+      </div>
+    `;
 
-        metricsGrid.appendChild(createMetricCard(
-            'metricTotalARL',
-            'Accidentes Laborales',
-            '-',
-            'Incapacidades ARL',
-            'fas fa-hard-hat',
-            '#dc3545'
-        ));
+    filtersCard.appendChild(filtersBar);
+    mainContent.appendChild(filtersCard);
 
-        dashboardContainer.appendChild(metricsGrid);
+    // ================================================================
+    // 4. GRÁFICOS — Grid de cards independientes
+    // ================================================================
+    const chartsGrid = document.createElement('div');
+    chartsGrid.className = 'k-charts-grid';
 
-        // Barra de filtros
-        const filtersBar = document.createElement('div');
-        filtersBar.style.cssText = `
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            padding: 20px 25px;
-            background: #f8f9fa;
-            border-bottom: 1px solid #dee2e6;
-            align-items: end;
-        `;
+    const chartConfigs = [
+      { id: 'monthlyChart', title: 'Distribución Mensual' },
+      { id: 'typeChart', title: 'Tipos de Incapacidad' },
+      { id: 'genderChart', title: 'Distribución por Género' }
+    ];
 
-        filtersBar.innerHTML = `
-            <div class="filter-group">
-                <label style="display: block; font-size: 12px; font-weight: 500; color: #64748B; margin-bottom: 4px;">Año</label>
-                <select id="statsYearFilter" style="width: 100%; padding: 8px 12px; border: 1px solid #dee2e6; border-radius: 6px; font-size: 14px;">
-                    <option value="">Cargando años...</option>
-                </select>
-            </div>
-            <div class="filter-group">
-                <label style="display: block; font-size: 12px; font-weight: 500; color: #64748B; margin-bottom: 4px;">Mes</label>
-                <select id="statsMonthFilter" style="width: 100%; padding: 8px 12px; border: 1px solid #dee2e6; border-radius: 6px; font-size: 14px;">
-                    <option value="">Cargando meses...</option>
-                </select>
-            </div>
-            <div class="filter-group">
-                <label style="display: block; font-size: 12px; font-weight: 500; color: #64748B; margin-bottom: 4px;">Género</label>
-                <select id="statsGenderFilter" style="width: 100%; padding: 8px 12px; border: 1px solid #dee2e6; border-radius: 6px; font-size: 14px;">
-                    <option value="">Todos</option>
-                    <option value="FEMENINO">Femenino</option>
-                    <option value="MASCULINO">Masculino</option>
-                </select>
-            </div>
-            <div class="filter-group">
-                <label style="display: block; font-size: 12px; font-weight: 500; color: #64748B; margin-bottom: 4px;">Clase</label>
-                <select id="statsClassFilter" style="width: 100%; padding: 8px 12px; border: 1px solid #dee2e6; border-radius: 6px; font-size: 14px;">
-                    <option value="">Cargando tipos...</option>
-                </select>
-            </div>
-            <div style="display: flex; gap: 10px; align-items: center;">
-                <button id="applyStatsFiltersBtn" style="padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; background-color: #174ea6; color: white; transition: all 0.2s;">
-                    <i class="fas fa-filter"></i> Filtrar
-                </button>
-                <button id="clearStatsFiltersBtn" style="padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid #dee2e6; background-color: #f8f9fa; color: #64748B; transition: all 0.2s;">
-                    <i class="fas fa-times"></i> Limpiar
-                </button>
-            </div>
-        `;
+    chartConfigs.forEach(cfg => {
+      const card = document.createElement('div');
+      card.className = 'k-chart-card';
 
-        dashboardContainer.appendChild(filtersBar);
+      const title = document.createElement('h4');
+      title.className = 'k-chart-card__title';
+      title.textContent = cfg.title;
 
-        // Contenedor de gráficos con altura controlada
-        const chartsContainer = document.createElement('div');
-        chartsContainer.style.cssText = `
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-            padding: 25px;
-            max-height: 450px;
-        `;
+      const body = document.createElement('div');
+      body.className = 'k-chart-card__body';
 
-        chartsContainer.innerHTML = `
-            <div style="background: #f8f9fa; border-radius: 10px; padding: 20px; height: 380px; overflow: hidden;">
-                <h4 style="margin: 0 0 15px 0; font-size: 16px; color: #1E293B;">Distribución Mensual</h4>
-                <div style="position: relative; height: 310px; width: 100%;">
-                    <canvas id="monthlyChart"></canvas>
-                </div>
-            </div>
-            <div style="background: #f8f9fa; border-radius: 10px; padding: 20px; height: 380px; overflow: hidden;">
-                <h4 style="margin: 0 0 15px 0; font-size: 16px; color: #1E293B;">Tipos de Incapacidad</h4>
-                <div style="position: relative; height: 310px; width: 100%;">
-                    <canvas id="typeChart"></canvas>
-                </div>
-            </div>
-            <div style="background: #f8f9fa; border-radius: 10px; padding: 20px; height: 380px; overflow: hidden;">
-                <h4 style="margin: 0 0 15px 0; font-size: 16px; color: #1E293B;">Distribución por Género</h4>
-                <div style="position: relative; height: 310px; width: 100%;">
-                    <canvas id="genderChart"></canvas>
-                </div>
-            </div>
-        `;
+      const canvas = document.createElement('canvas');
+      canvas.id = cfg.id;
+      body.appendChild(canvas);
 
-        dashboardContainer.appendChild(chartsContainer);
-        mainContent.appendChild(dashboardContainer);
-        scrollWrapper.appendChild(mainContent);
-        container.appendChild(scrollWrapper);
+      card.appendChild(title);
+      card.appendChild(body);
+      chartsGrid.appendChild(card);
+    });
+
+    mainContent.appendChild(chartsGrid);
+    scrollWrapper.appendChild(mainContent);
+    container.appendChild(scrollWrapper);
 
         // Cargar datos y renderizar gráficos
         this.loadEstadisticasData(notificationDiv);
