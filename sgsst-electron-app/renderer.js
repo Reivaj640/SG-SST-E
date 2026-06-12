@@ -2850,7 +2850,7 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
     { id: 'kpi-accidents', icon: 'fa-shield-alt', label: 'Accidentes (Año)', colorClass: 'warning' },
     { id: 'kpi-pric', icon: 'fa-user-injured', label: 'Casos PRIC Activos', colorClass: 'primary' },
     { id: 'kpi-overdue', icon: 'fa-calendar-times', label: 'Documentos Vencidos', colorClass: 'danger' },
-    { id: 'kpi-compliance', icon: 'fa-chart-line', label: 'Cumplimiento', colorClass: 'success' }
+    { id: 'kpi-compliance', icon: 'fa-chart-line', label: 'Plan de Trabajo', colorClass: 'success' }
   ];
 
   kpiItems.forEach((kpi, index) => {

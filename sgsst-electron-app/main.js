@@ -1471,7 +1471,13 @@ async function getDashboardAlertas(rootPath, companyName) {
     
     // Actualizar KPIs
     dashboard_data.kpis.overdue_docs = vencidas.length;
-    dashboard_data.kpis.compliance = capacitacionesStats.porcentajeCumplimiento;
+    
+    // ========================================================================
+    // 1b. PLAN DE TRABAJO - Calcular cumplimiento
+    // ========================================================================
+    const planTrabajoStats = await calculatePlanTrabajoStats(rootPath, currentYear);
+    dashboard_data.kpis.compliance = planTrabajoStats.porcentajeAvance;
+    sendLog(`[DASHBOARD] 📊 Plan de Trabajo: ${planTrabajoStats.porcentajeAvance}% (${planTrabajoStats.actividadesEjecutadas}/${planTrabajoStats.totalActividades})`, 'INFO');
 
     // REGLA DE ORO ACTUALIZADA: Alertas de recursos = Vencidas + Pendientes de gestión
     // Esto asegura que el badge del home coincida con lo que el usuario ve dentro del módulo.
@@ -1828,7 +1834,6 @@ async function getDashboardAlertas(rootPath, companyName) {
     // 6. VERIFICAR ACTAS COPASST Y COMITÉ DE CONVIVENCIA
     // ========================================================================
     const actasPath = path.join(rootPath, '1. Recursos');
-    const currentYear = new Date().getFullYear();
 
     // ------------------------------------------------------------------------
     // 6.1 VERIFICAR COPASST
@@ -12769,8 +12774,8 @@ async function calculatePlanTrabajoStats(basePath, currentYear) {
 
         row.forEach(cell => {
             const val = normalize(cell);
-            if (['ene', 'feb', 'mar', 'abr', 'may', 'jun'].every(m => val.includes(m))) {
-                monthCount = 6;
+            if (['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'set', 'oct', 'nov', 'dic'].includes(val)) {
+                monthCount++;
             }
             if (val.includes('actividad') || val.includes('actividades')) {
                 hasActividades = true;
