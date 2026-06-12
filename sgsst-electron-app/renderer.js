@@ -2882,6 +2882,7 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
     flex: 1;
     display: grid;
     grid-template-columns: 280px 1fr;
+    grid-template-rows: 1fr;
     gap: 20px;
     padding: 10px 30px 20px;
     min-height: 0;
@@ -2983,6 +2984,8 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
     border: 1px solid #e2e8f0;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
   `;
 
   const tasksHeader = document.createElement('div');

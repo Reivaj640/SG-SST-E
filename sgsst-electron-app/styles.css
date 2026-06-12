@@ -5306,12 +5306,10 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 
 /* Paneles del dashboard - Altura máxima para activar scroll */
-/* Cálculo: 100vh - Header (70px) - KPIs (80px) - Padding/Gaps (50px) = 100vh - 200px */
 aside:has([data-module-list]),
 aside:has([data-module-list]) > [data-module-list],
 #tasks-container {
   max-height: calc(100vh - 200px);
-  overflow: hidden;
 }
 
 /* Fallback para navegadores sin :has() - Usar selectores directos */
@@ -5322,9 +5320,9 @@ aside:has([data-module-list]) > [data-module-list],
 }
 
 #tasks-container {
-  max-height: calc(100vh - 200px);
-  overflow-y: auto !important;
   min-height: 0 !important;
+  overflow-y: auto !important;
+  padding-bottom: 20px;
 }
 
 /* Contenedores principales (fuera del dashboard) */
