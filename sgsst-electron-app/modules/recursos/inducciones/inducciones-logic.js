@@ -107,7 +107,7 @@ class InduccionesComponent {
   init() {}
 
   initializeEventListeners() {
-    document.querySelectorAll('.kair-header__tab').forEach(item => {
+    document.querySelectorAll('.inducciones-tab').forEach(item => {
       item.addEventListener('click', () => {
         const view = item.getAttribute('data-view');
         this.switchView(view);
@@ -146,8 +146,8 @@ class InduccionesComponent {
   }
 
   switchView(viewId) {
-    document.querySelectorAll('.kair-header__tab').forEach(i => i.classList.remove('active'));
-    const activeTab = document.querySelector(`.kair-header__tab[data-view="${viewId}"]`);
+    document.querySelectorAll('.inducciones-tab').forEach(i => i.classList.remove('active'));
+    const activeTab = document.querySelector(`.inducciones-tab[data-view="${viewId}"]`);
     if(activeTab) activeTab.classList.add('active');
 
     document.querySelectorAll('.k-view-section').forEach(s => s.classList.remove('active'));

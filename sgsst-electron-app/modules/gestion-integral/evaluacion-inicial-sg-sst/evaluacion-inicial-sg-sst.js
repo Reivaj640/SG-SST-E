@@ -41,52 +41,50 @@ this.lastScore = 0;
         mainLayout.className = 'k-module-layout ev-inicial-sgsst';
 
         mainLayout.innerHTML = `
-            <!-- 1. HEADER DEL MÓDULO (Patrón K+AIR: blanco, sticky) -->
-            <header class="k-module-header">
-                <div class="k-header-left">
-                    <button class="k-btn-back" id="btn-back-eval" title="Volver al panel principal">
-                        <i class="bi bi-arrow-left"></i>
-                    </button>
-                    <div class="k-header-title-group">
-                        <div class="k-header-main-title">
-                            <i class="bi bi-clipboard-pulse"></i>
-                            Evaluación Inicial del SG-SST
-                        </div>
-                        <div class="k-breadcrumb">
-                            <span>Gestión Integral</span>
-                            <span>/</span>
-                            <span class="k-bc-active">2.3.1 Evaluación Inicial</span>
-                        </div>
-                    </div>
+            <!-- 1. HEADER — Card k-section-card (tabs integrados) -->
+            <div class="k-section-card" style="padding:0; margin-bottom:1.5rem; flex-shrink:0; flex-grow:0;">
+              <!-- Fila 1: contenido principal -->
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
+                <div style="display:flex; align-items:center; gap:0.75rem;">
+                  <i class="bi bi-clipboard-pulse" style="color:#174ea6; font-size:1.25rem;"></i>
+                  <div>
+                    <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Evaluación Inicial del SG-SST</h3>
+                    <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Evaluación del cumplimiento normativo SG-SST.</p>
+                  </div>
                 </div>
-                <div class="k-header-right">
-                    <select class="k-select-sm" id="sourceSelect" onchange="window.currentEvaluacionInstance.updateSource()">
-                        <option value="ministerio">🏛️ Ministerio de Trabajo</option>
-                        <option value="arl">🛡️ Informe ARL</option>
-                    </select>
-                    <button class="k-btn k-btn-sm k-btn-outline" id="btn-change-pdf" onclick="window.currentEvaluacionInstance.showPdfSelectorModal()" title="Cambiar archivo PDF">
-                        <i class="bi bi-file-earmark-pdf"></i> Cambiar Archivo
-                    </button>
-                    <div id="loading-indicator" class="k-loading-badge" style="display:none;">
-                        <span class="spinner-border spinner-border-sm"></span> Procesando...
-                    </div>
+                <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+                  <select class="header-select" id="sourceSelect" onchange="window.currentEvaluacionInstance.updateSource()">
+                    <option value="ministerio">🏛️ Ministerio de Trabajo</option>
+                    <option value="arl">🛡️ Informe ARL</option>
+                  </select>
+                  <button class="header-action--outline" id="btn-change-pdf" onclick="window.currentEvaluacionInstance.showPdfSelectorModal()" title="Cambiar archivo PDF">
+                    <i class="bi bi-file-earmark-pdf"></i> Cambiar Archivo
+                  </button>
+                  <div id="loading-indicator" class="k-loading-badge" style="display:none;">
+                    <span class="spinner-border spinner-border-sm"></span> Procesando...
+                  </div>
+                  <div style="width:1px; height:24px; background:#dee2e6;"></div>
+                  <button class="header-back-btn" id="btn-back-eval" title="Volver al panel principal">
+                    <i class="bi bi-arrow-left"></i> Volver
+                  </button>
                 </div>
-            </header>
+              </div>
 
-            <!-- 2. BARRA DE TABS (separada del header) -->
-            <div class="k-tab-bar">
-                <button class="k-nav-item active" data-tab="dashboard" onclick="window.currentEvaluacionInstance.switchTab('dashboard')">
-                    <i class="bi bi-speedometer2"></i> Dashboard
+              <!-- Fila 2: tabs (dentro del card) -->
+              <div class="evaluacion-tabs">
+                <button class="evaluacion-tab active" data-tab="dashboard" onclick="window.currentEvaluacionInstance.switchTab('dashboard')">
+                  <i class="bi bi-speedometer2"></i> Dashboard
                 </button>
-                <button class="k-nav-item" data-tab="hallazgos" onclick="window.currentEvaluacionInstance.switchTab('hallazgos')">
-                    <i class="bi bi-list-check"></i> Hallazgos
+                <button class="evaluacion-tab" data-tab="hallazgos" onclick="window.currentEvaluacionInstance.switchTab('hallazgos')">
+                  <i class="bi bi-list-check"></i> Hallazgos
                 </button>
-                <button class="k-nav-item" data-tab="actions" onclick="window.currentEvaluacionInstance.switchTab('actions')">
-                    <i class="bi bi-clipboard-check"></i> Planes de Acción
+                <button class="evaluacion-tab" data-tab="actions" onclick="window.currentEvaluacionInstance.switchTab('actions')">
+                  <i class="bi bi-clipboard-check"></i> Planes de Acción
                 </button>
-                <button class="k-nav-item" data-tab="history" onclick="window.currentEvaluacionInstance.switchTab('history')">
-                    <i class="bi bi-clock-history"></i> Historial
+                <button class="evaluacion-tab" data-tab="history" onclick="window.currentEvaluacionInstance.switchTab('history')">
+                  <i class="bi bi-clock-history"></i> Historial
                 </button>
+              </div>
             </div>
 
             <!-- 3. CONTENIDO SCROLLABLE -->
@@ -266,7 +264,7 @@ this.lastScore = 0;
         console.log('[EvaluacionInicialSgSst] switchTab() - Cambiando a pestaña:', tabId);
         
         // 1. Actualizar botones de navegación
-        const navItems = this.container.querySelectorAll('.k-nav-item');
+        const navItems = this.container.querySelectorAll('.evaluacion-tab');
         navItems.forEach(btn => {
             if (btn.dataset.tab === tabId) btn.classList.add('active');
             else btn.classList.remove('active');
@@ -1820,25 +1818,19 @@ if (!document.getElementById('k-air-eval-styles')) {
         .k-module-container { height: 100%; width: 100%; background: var(--bg-body); font-family: 'Segoe UI', Roboto, sans-serif; overflow: hidden; }
         .k-module-layout { display: flex; flex-direction: column; height: 100%; }
 
-        /* HEADER */
-        .k-module-header { background: var(--bg-card); border-bottom: 1px solid var(--border); flex-shrink: 0; box-shadow: var(--shadow-sm); z-index: 10; }
-        .k-header-top { display: flex; align-items: center; justify-content: space-between; padding: 1rem 2rem; height: 70px; }
+        /* HEADER — Card k-section-card */
+        .k-section-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        .header-back-btn { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.75rem; font-size: 0.8125rem; font-weight: 500; color: #5a6378; background: transparent; border: 1px solid #dee2e6; border-radius: 0.375rem; cursor: pointer; transition: all 0.15s ease; }
+        .header-back-btn:hover { background: #e8f0fe; color: #174ea6; border-color: #174ea6; }
+        .header-action--outline { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.75rem; font-size: 0.8125rem; font-weight: 500; color: #5a6378; background: transparent; border: 1px solid #dee2e6; border-radius: 0.375rem; cursor: pointer; transition: all 0.15s ease; }
+        .header-action--outline:hover { background: #f0f2f5; color: #1a1a2e; }
+        .header-select { padding: 0.375rem 0.75rem; border: 1px solid #dee2e6; border-radius: 0.375rem; font-size: 0.8125rem; font-weight: 500; color: #1E293B; background: #fff; cursor: pointer; }
 
-        .k-title-group { display: flex; align-items: center; gap: 1rem; }
-        .k-btn-back { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: white; border: 1px solid var(--border); border-radius: 8px; color: var(--text-dark); cursor: pointer; transition: 0.2s; }
-        .k-btn-back:hover { border-color: var(--primary); color: var(--primary); background: #f0f7ff; }
-
-        .k-title-text { display: flex; flex-direction: column; }
-        .k-main-title { margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--primary); font-family: 'Lexend', sans-serif; }
-        .k-breadcrumb { font-size: 0.8rem; color: var(--text-muted); font-weight: 500; }
-
-        .k-context-selector select { padding: 0.4rem 0.8rem; border: 1px solid var(--border); border-radius: 6px; font-weight: 600; color: var(--text-dark); cursor: pointer; }
-
-        /* NAVEGACIÓN TABS */
-        .k-module-nav { display: flex; padding: 0 2rem; gap: 2rem; border-top: 1px solid #f8f9fa; }
-        .k-nav-item { background: none; border: none; padding: 0.8rem 0; font-size: 0.9rem; font-weight: 600; color: var(--text-muted); border-bottom: 3px solid transparent; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 0.5rem; }
-        .k-nav-item:hover { color: var(--primary); }
-        .k-nav-item.active { color: var(--primary); border-bottom-color: var(--primary); }
+        /* TABS — dentro del card */
+        .evaluacion-tabs { display: flex; gap: 0; margin: 0 -1.5rem; padding: 0 1.5rem; border-top: 1px solid #dee2e6; overflow-x: auto; }
+        .evaluacion-tab { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.75rem 1rem; font-size: 0.875rem; font-weight: 500; color: #5a6378; background: transparent; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: color 0.15s ease, border-color 0.15s ease; white-space: nowrap; }
+        .evaluacion-tab:hover { color: #174ea6; }
+        .evaluacion-tab.active { color: #174ea6; font-weight: 600; border-bottom-color: #174ea6; }
 
         /* CONTENIDO */
         .k-module-content { flex: 1; overflow-y: auto; padding: 2rem; position: relative; }

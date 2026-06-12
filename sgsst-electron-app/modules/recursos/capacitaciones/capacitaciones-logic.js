@@ -149,7 +149,7 @@ class CapacitacionesComponent {
 
     initializeEventListeners() {
         // Navegación (Tabs)
-    document.querySelectorAll('.kair-header__tab').forEach(item => {
+    document.querySelectorAll('.capacitaciones-tab').forEach(item => {
       item.addEventListener('click', () => {
         this.switchView(item.getAttribute('data-view'));
       });
@@ -197,7 +197,7 @@ class CapacitacionesComponent {
     }
 
     switchView(viewId) {
-    document.querySelectorAll('.kair-header__tab').forEach(el => {
+    document.querySelectorAll('.capacitaciones-tab').forEach(el => {
       el.classList.toggle('active', el.getAttribute('data-view') === viewId);
     });
         document.querySelectorAll('.k-view-section').forEach(el => el.classList.remove('active'));

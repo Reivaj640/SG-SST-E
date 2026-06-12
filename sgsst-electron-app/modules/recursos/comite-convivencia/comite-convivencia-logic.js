@@ -91,40 +91,32 @@ class ComiteConvivenciaComponent {
         wrapper.className = 'convivencia-actas-container';
         wrapper.style.cssText = 'display:flex; flex-direction:column; height:100%; overflow:hidden;';
 
-        const header = document.createElement('header');
-        header.className = 'kair-header';
+        const header = document.createElement('div');
         header.innerHTML = `
-<div class="kair-header__bar">
-    <div class="kair-header__left">
-        <button class="kair-header__back" id="btn-back-portal" title="Volver al Portal Comité de Convivencia">
-            <i class="bi bi-arrow-left"></i>
-        </button>
+<div class="k-section-card" style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem; margin-bottom:1.5rem; flex-shrink:0; flex-grow:0;">
+  <div style="display:flex; align-items:center; gap:0.75rem;">
+    <i class="fas fa-people-arrows" style="color:#174ea6; font-size:1.25rem;"></i>
+    <div>
+      <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Generador de Actas Convivencia</h3>
+      <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Formulario de creación de actas del comité de convivencia.</p>
     </div>
-    <div class="kair-header__divider"></div>
-    <div class="kair-header__center">
-        <h1 class="kair-header__title">
-            <i class="bi bi-file-earmark-text"></i>
-            Generador de Actas Convivencia
-        </h1>
-        <ol class="kair-header__breadcrumb">
-            <li><a href="#" onclick="return false;">Recursos</a></li>
-            <li><a href="#" onclick="return false;">Comité de Convivencia</a></li>
-            <li class="kair-header__breadcrumb--active">1.1.8 Generador de Actas</li>
-        </ol>
-    </div>
- <div class="kair-header__right">
- <span class="kair-header__company">
- <i class="bi bi-building"></i>
- <span id="header-company-text">${this.currentCompany || '—'}</span>
- </span>
- <div class="kair-header__divider"></div>
-        <button class="kair-header__action--primary" id="btn-auto-fill-header" title="Autollenado inteligente del acta">
-          <i class="bi bi-magic"></i> Autollenado
-        </button>
-        <button class="kair-header__action--success" id="btn-export-excel-header" title="Guardar acta en Excel">
-          <i class="bi bi-save"></i> Guardar
-        </button>
- </div>
+  </div>
+  <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+    <span style="display:flex; align-items:center; gap:0.375rem; font-size:0.8125rem; color:#64748B;">
+      <i class="fas fa-building" style="font-size:0.875rem;"></i>
+      <span id="header-company-text">${this.currentCompany || '—'}</span>
+    </span>
+    <div style="width:1px; height:24px; background:#dee2e6;"></div>
+    <button id="btn-back-portal" class="header-back-btn" title="Volver al Portal Comité de Convivencia">
+      <i class="fas fa-arrow-left"></i> Volver
+    </button>
+    <button id="btn-auto-fill-header" class="header-action--primary" title="Autollenado inteligente del acta">
+      <i class="fas fa-magic"></i> Autollenado
+    </button>
+    <button id="btn-export-excel-header" class="header-action--success" title="Guardar acta en Excel">
+      <i class="fas fa-save"></i> Guardar
+    </button>
+  </div>
 </div>
 `;
         wrapper.appendChild(header);
@@ -135,55 +127,82 @@ class ComiteConvivenciaComponent {
 
         const style = document.createElement('style');
         style.textContent = `
-.convivencia-actas-container .kair-header { background: #ffffff; border-bottom: 1px solid #dee2e6; flex-shrink: 0; position: sticky; top: 0; z-index: 100; }
-.convivencia-actas-container .kair-header__bar { display: flex; align-items: center; justify-content: flex-start; gap: 0.75rem; min-height: 52px; padding: 0 1.5rem; }
-.convivencia-actas-container .kair-header__left { display: flex; align-items: center; gap: 0.5rem; }
-.convivencia-actas-container .kair-header__back { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; color: #5a6378; border-radius: 0.375rem; cursor: pointer; transition: background 0.15s ease; font-size: 1rem; }
-.convivencia-actas-container .kair-header__back:hover { background: #e8f0fe; color: #174ea6; }
-.convivencia-actas-container .kair-header__divider { width: 1px; height: 24px; background: #dee2e6; }
-.convivencia-actas-container .kair-header__center { display: flex; flex-direction: column; gap: 0.125rem; }
-.convivencia-actas-container .kair-header__title { font-size: 1.25rem; font-weight: 600; color: #1a1a2e; margin: 0; display: flex; align-items: center; gap: 0.5rem; }
-.convivencia-actas-container .kair-header__title i { color: #174ea6; }
-.convivencia-actas-container .kair-header__breadcrumb { display: flex; align-items: center; gap: 0.375rem; list-style: none; margin: 0; padding: 0; font-size: 0.8125rem; font-weight: 400; color: #5a6378; }
-.convivencia-actas-container .kair-header__breadcrumb li + li::before { content: '›'; margin-right: 0.375rem; color: #adb5bd; }
-.convivencia-actas-container .kair-header__breadcrumb a { color: #5a6378; text-decoration: none; }
-.convivencia-actas-container .kair-header__breadcrumb a:hover { color: #174ea6; }
-.convivencia-actas-container .kair-header__breadcrumb--active { color: #174ea6; font-weight: 500; }
-.convivencia-actas-container .kair-header__right { display: flex; align-items: center; gap: 0.75rem; margin-left: auto; }
-.convivencia-actas-container .kair-header__company { display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem; font-weight: 400; color: #5a6378; }
-.convivencia-actas-container .kair-header__company i { font-size: 0.875rem; }
-.convivencia-actas-container .kair-header__action--ghost { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.75rem; font-size: 0.8125rem; font-weight: 500; color: #5a6378; background: transparent; border: none; border-radius: 0.375rem; cursor: pointer; transition: background 0.15s ease; }
- .convivencia-actas-container .kair-header__action--ghost:hover { background: #f0f2f5; color: #1a1a2e; }
- .convivencia-actas-container .kair-header__action--primary { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.875rem; font-size: 0.8125rem; font-weight: 500; color: #ffffff; background: #174ea6; border: none; border-radius: 0.375rem; cursor: pointer; transition: background 0.15s ease; }
- .convivencia-actas-container .kair-header__action--primary:hover { background: #185abd; }
- .convivencia-actas-container .kair-header__action--primary:disabled { opacity: 0.6; cursor: not-allowed; }
-.convivencia-actas-container .kair-header__action--primary--loading { pointer-events: none; position: relative; color: transparent; }
-.convivencia-actas-container .kair-header__action--primary--loading::after { content: ''; position: absolute; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: kair-spin 0.6s linear infinite; left: 50%; top: 50%; margin-left: -7px; margin-top: -7px; }
-.convivencia-actas-container .kair-header__action--success { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.875rem; font-size: 0.8125rem; font-weight: 500; color: #ffffff; background: #28a745; border: none; border-radius: 0.375rem; cursor: pointer; transition: background 0.15s ease; }
-.convivencia-actas-container .kair-header__action--success:hover { background: #218838; }
-.convivencia-actas-container .kair-header__action--success:disabled { opacity: 0.6; cursor: not-allowed; }
-.convivencia-actas-container .kair-header__action--success--loading { pointer-events: none; position: relative; color: transparent; }
-.convivencia-actas-container .kair-header__action--success--loading::after { content: ''; position: absolute; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: kair-spin 0.6s linear infinite; left: 50%; top: 50%; margin-left: -7px; margin-top: -7px; }
- @keyframes kair-spin { to { transform: rotate(360deg); } }
+.convivencia-actas-container .k-section-card {
+  background: #ffffff;
+  border: 1px solid #dee2e6;
+  border-radius: 0.5rem;
+  box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.05);
+  overflow: hidden;
+}
 
-.convivencia-actas-container[data-theme="dark"] .kair-header { background: var(--k-bg-card, #2d3748); border-bottom-color: var(--k-border, #4a5568); }
-.convivencia-actas-container[data-theme="dark"] .kair-header__title { color: #e9ecef; }
-.convivencia-actas-container[data-theme="dark"] .kair-header__breadcrumb, .convivencia-actas-container[data-theme="dark"] .kair-header__breadcrumb a { color: #adb5bd; }
-.convivencia-actas-container[data-theme="dark"] .kair-header__breadcrumb--active { color: var(--k-primary, #4da6ff); }
-.convivencia-actas-container[data-theme="dark"] .kair-header__company { color: #adb5bd; }
-.convivencia-actas-container[data-theme="dark"] .kair-header__divider { background: var(--k-border, #4a5568); }
-.convivencia-actas-container[data-theme="dark"] .kair-header__back { color: #adb5bd; }
-.convivencia-actas-container[data-theme="dark"] .kair-header__back:hover { background: rgba(77, 166, 255, 0.15); color: var(--k-primary, #4da6ff); }
-.convivencia-actas-container[data-theme="dark"] .kair-header__action--ghost { color: #adb5bd; }
- .convivencia-actas-container[data-theme="dark"] .kair-header__action--ghost:hover { background: rgba(255, 255, 255, 0.08); color: #e9ecef; }
-.convivencia-actas-container[data-theme="dark"] .kair-header__action--primary { background: var(--k-primary, #4da6ff); color: #1a1a2e; }
-.convivencia-actas-container[data-theme="dark"] .kair-header__action--primary:hover { background: var(--k-primary-hover, #6db8ff); }
-.convivencia-actas-container[data-theme="dark"] .kair-header__action--success { background: var(--k-success, #28a745); color: #1a1a2e; }
-.convivencia-actas-container[data-theme="dark"] .kair-header__action--success:hover { background: var(--k-success-hover, #34ce57); }
+.convivencia-actas-container .header-back-btn {
+  padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.8125rem;
+  font-weight: 500; cursor: pointer; display: inline-flex; align-items: center;
+  gap: 0.375rem; border: 1px solid #dee2e6; background-color: #f8f9fa;
+  color: #6c757d; transition: all 0.2s; white-space: nowrap;
+  font-family: 'Segoe UI', 'Roboto', sans-serif;
+}
+.convivencia-actas-container .header-back-btn:hover {
+  background-color: #e2e8f0; color: #174ea6; border-color: #174ea6;
+}
+.convivencia-actas-container .header-back-btn:disabled {
+  opacity: 0.3; cursor: not-allowed;
+}
+.convivencia-actas-container .header-back-btn:disabled:hover {
+  background-color: #f8f9fa; color: #6c757d; border-color: #dee2e6;
+}
+
+.convivencia-actas-container .header-action--primary {
+  display: inline-flex; align-items: center; gap: 0.375rem;
+  padding: 0.5rem 1rem; font-size: 0.8125rem; font-weight: 500;
+  color: #fff; background: #174ea6; border: 1px solid #174ea6;
+  border-radius: 0.5rem; cursor: pointer; transition: background 0.15s ease;
+  font-family: 'Segoe UI', 'Roboto', sans-serif; white-space: nowrap;
+}
+.convivencia-actas-container .header-action--primary:hover { background: #185abd; }
+.convivencia-actas-container .header-action--primary:disabled { opacity: 0.6; cursor: not-allowed; }
+.convivencia-actas-container .header-action--primary--loading {
+  pointer-events: none; position: relative; color: transparent;
+}
+.convivencia-actas-container .header-action--primary--loading::after {
+  content: ''; position: absolute; width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff;
+  border-radius: 50%; animation: kair-spin 0.6s linear infinite;
+  left: 50%; top: 50%; margin-left: -7px; margin-top: -7px;
+}
+
+.convivencia-actas-container .header-action--success {
+  display: inline-flex; align-items: center; gap: 0.375rem;
+  padding: 0.5rem 1rem; font-size: 0.8125rem; font-weight: 500;
+  color: #fff; background: #28a745; border: 1px solid #28a745;
+  border-radius: 0.5rem; cursor: pointer; transition: background 0.15s ease;
+  font-family: 'Segoe UI', 'Roboto', sans-serif; white-space: nowrap;
+}
+.convivencia-actas-container .header-action--success:hover { background: #218838; }
+.convivencia-actas-container .header-action--success:disabled { opacity: 0.6; cursor: not-allowed; }
+.convivencia-actas-container .header-action--success--loading {
+  pointer-events: none; position: relative; color: transparent;
+}
+.convivencia-actas-container .header-action--success--loading::after {
+  content: ''; position: absolute; width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff;
+  border-radius: 50%; animation: kair-spin 0.6s linear infinite;
+  left: 50%; top: 50%; margin-left: -7px; margin-top: -7px;
+}
+
+@keyframes kair-spin { to { transform: rotate(360deg); } }
+
+.convivencia-actas-container[data-theme="dark"] .k-section-card { background: var(--k-bg-card, #2d3748); border-color: var(--k-border, #4a5568); }
+.convivencia-actas-container[data-theme="dark"] .header-back-btn { color: #adb5bd; border-color: var(--k-border, #4a5568); background-color: transparent; }
+.convivencia-actas-container[data-theme="dark"] .header-back-btn:hover { background: rgba(77, 166, 255, 0.15); color: var(--k-primary, #4da6ff); }
+.convivencia-actas-container[data-theme="dark"] .header-action--primary { background: var(--k-primary, #4da6ff); color: #1a1a2e; }
+.convivencia-actas-container[data-theme="dark"] .header-action--primary:hover { background: var(--k-primary-hover, #6db8ff); }
+.convivencia-actas-container[data-theme="dark"] .header-action--success { background: var(--k-success, #28a745); color: #1a1a2e; }
+.convivencia-actas-container[data-theme="dark"] .header-action--success:hover { background: var(--k-success-hover, #34ce57); }
 
 @media (max-width: 768px) {
-    .convivencia-actas-container .kair-header__bar { flex-wrap: wrap; gap: 0.5rem; padding: 0.75rem 1rem; min-height: auto; }
-    .convivencia-actas-container .kair-header__right { width: 100%; justify-content: flex-end; margin-left: 0; }
+    .convivencia-actas-container .k-section-card { flex-wrap: wrap; gap: 0.5rem; padding: 0.75rem 1rem; }
+    .convivencia-actas-container .k-section-card > div:last-child { width: 100%; justify-content: flex-end; }
 }
 
 :root { --primary-color: #206A5D; --primary-hover-color: #1A564B; --bg-color: #f8f9fa; --widget-bg-color: #ffffff; --border-color: #dee2e6; }
@@ -274,7 +293,7 @@ class ComiteConvivenciaComponent {
  const btn = document.getElementById('btn-auto-fill-header');
  if (!btn) return;
 
- btn.classList.add('kair-header__action--primary--loading');
+ btn.classList.add('header-action--primary--loading');
  btn.disabled = true;
 
  try {
@@ -325,7 +344,7 @@ class ComiteConvivenciaComponent {
  } catch (error) {
  window.KAIRToast && window.KAIRToast.show(`Error: ${error.message}`, 'error');
  } finally {
- btn.classList.remove('kair-header__action--primary--loading');
+  btn.classList.remove('header-action--primary--loading');
  btn.disabled = false;
  }
  }
@@ -360,7 +379,7 @@ class ComiteConvivenciaComponent {
   async handleExportExcel() {
     const btn = document.getElementById('btn-export-excel-header');
     if (btn) {
-      btn.classList.add('kair-header__action--success--loading');
+      btn.classList.add('header-action--success--loading');
       btn.disabled = true;
     }
     const data = {
@@ -395,7 +414,7 @@ class ComiteConvivenciaComponent {
     } catch (error) { window.KAIRToast && window.KAIRToast.show('Error inesperado', 'error', { subtitle: error.message }); }
     finally {
       if (btn) {
-        btn.classList.remove('kair-header__action--success--loading');
+        btn.classList.remove('header-action--success--loading');
         btn.disabled = false;
       }
     }
