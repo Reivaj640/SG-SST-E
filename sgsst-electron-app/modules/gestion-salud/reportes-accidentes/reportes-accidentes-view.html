@@ -11,49 +11,67 @@
 </head>
 <body>
     <div class="furat-app">
-        <!-- HEADER System v2.0 -->
-        <header class="kair-header">
-            <div class="kair-header__bar">
-                <div class="kair-header__left">
-                    <button class="kair-header__back" id="backBtn" title="Volver a Gestión de la Salud">
-                        <i class="bi bi-arrow-left"></i>
-                    </button>
+        <!-- Header + Tabs + KPIs -->
+        <div class="k-section-card" style="padding:0; margin-bottom:1rem;">
+            <!-- Fila 1: contenido principal -->
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
+                <div style="display:flex; align-items:center; gap:0.75rem;">
+                    <i class="fas fa-shield-alt" style="color:#174ea6; font-size:1.25rem;"></i>
+                    <div>
+                        <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Reportes de Accidentes</h3>
+                        <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión de la Salud — 3.2.1</p>
+                    </div>
                 </div>
-                <div class="kair-header__divider"></div>
-                <div class="kair-header__center">
-                    <h1 class="kair-header__title">
-                        <i class="fas fa-shield-alt" style="color: #174ea6;"></i>
-                        Reportes de Accidentes
-                    </h1>
-                    <ol class="kair-header__breadcrumb">
-                        <li><a href="#" onclick="return false;">Gestión de la Salud</a></li>
-                        <li class="kair-header__breadcrumb--active">3.2.1 Reporte de los accidentes de trabajo</li>
-                    </ol>
-                </div>
-                <div class="kair-header__right">
-                    <span class="kair-header__company">
+                <div style="display:flex; align-items:center; gap:0.75rem;">
+                    <span class="k-section-card__company">
                         <i class="bi bi-building"></i>
                         <span id="header-company-text">—</span>
                     </span>
+                    <div class="k-section-card__divider"></div>
+                    <button class="header-back-btn" id="backBtn" title="Volver a Gestión de la Salud">
+                        <i class="fas fa-arrow-left"></i> Volver
+                    </button>
                 </div>
             </div>
-        </header>
+            <!-- Fila 2: tabs integrados -->
+            <nav class="furat-tabs">
+                <button class="furat-tab furat-tab--active" data-view="dashboard">
+                    <i class="fas fa-chart-pie"></i>
+                    <span>Resumen</span>
+                </button>
+                <button class="furat-tab" data-view="library">
+                    <i class="fas fa-folder-open"></i>
+                    <span>Biblioteca</span>
+                </button>
+                <button class="furat-tab" data-view="viewer" id="tabViewer" style="display:none;">
+                    <i class="fas fa-file-pdf"></i>
+                    <span>Visor de Documento</span>
+                </button>
+            </nav>
+        </div>
 
-        <!-- TABS -->
-        <nav class="furat-tabs">
-            <button class="furat-tab furat-tab--active" data-view="dashboard">
-                <i class="fas fa-chart-pie"></i>
-                <span>Resumen</span>
-            </button>
-            <button class="furat-tab" data-view="library">
-                <i class="fas fa-folder-open"></i>
-                <span>Biblioteca</span>
-            </button>
-            <button class="furat-tab" data-view="viewer" id="tabViewer" style="display:none;">
-                <i class="fas fa-file-pdf"></i>
-                <span>Visor de Documento</span>
-            </button>
-        </nav>
+        <!-- KPIs -->
+        <div class="k-stats-ribbon" style="display:flex;gap:0;background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);padding:1rem 1.5rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem">
+            <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
+                <div style="width:40px;height:40px;border-radius:10px;background:rgba(23,78,166,.08);display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:#174ea6"><i class="fas fa-file-alt"></i></div>
+                <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d">Total FURAT</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="statTotal">—</span></div>
+            </div>
+            <div style="width:1px;height:40px;background:#dee2e6;margin:0 1rem"></div>
+            <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
+                <div style="width:40px;height:40px;border-radius:10px;background:rgba(23,162,184,.08);display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:#17a2b8"><i class="fas fa-calendar-alt"></i></div>
+                <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d" id="statYearLabel">Este Año</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="statCurrentYear">—</span></div>
+            </div>
+            <div style="width:1px;height:40px;background:#dee2e6;margin:0 1rem"></div>
+            <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
+                <div style="width:40px;height:40px;border-radius:10px;background:rgba(255,193,7,.1);display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:#b8860b"><i class="fas fa-calendar-day"></i></div>
+                <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d" id="statMonthLabel">Este Mes</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="statCurrentMonth">—</span></div>
+            </div>
+            <div style="width:1px;height:40px;background:#dee2e6;margin:0 1rem"></div>
+            <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
+                <div style="width:40px;height:40px;border-radius:10px;background:rgba(40,167,69,.08);display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:#28a745"><i class="fas fa-folder"></i></div>
+                <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d">Carpetas</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="statFolders">—</span></div>
+            </div>
+        </div>
 
         <!-- MAIN -->
         <main class="kair-container">
@@ -61,36 +79,6 @@
             <!-- DASHBOARD -->
             <section class="furat-view furat-view--active" id="viewDashboard">
                 <div class="furat-dashboard">
-                    <div class="furat-stats-grid">
-                        <div class="furat-stat-card furat-stat-card--primary">
-                            <div class="furat-stat-card__icon"><i class="fas fa-file-alt"></i></div>
-                            <div class="furat-stat-card__content">
-                                <span class="furat-stat-card__value" id="statTotal">—</span>
-                                <span class="furat-stat-card__label">Total FURAT</span>
-                            </div>
-                        </div>
-                        <div class="furat-stat-card furat-stat-card--year">
-                            <div class="furat-stat-card__icon"><i class="fas fa-calendar-alt"></i></div>
-                            <div class="furat-stat-card__content">
-                                <span class="furat-stat-card__value" id="statCurrentYear">—</span>
-                                <span class="furat-stat-card__label" id="statYearLabel">Este Año</span>
-                            </div>
-                        </div>
-                        <div class="furat-stat-card furat-stat-card--month">
-                            <div class="furat-stat-card__icon"><i class="fas fa-calendar-day"></i></div>
-                            <div class="furat-stat-card__content">
-                                <span class="furat-stat-card__value" id="statCurrentMonth">—</span>
-                                <span class="furat-stat-card__label" id="statMonthLabel">Este Mes</span>
-                            </div>
-                        </div>
-                        <div class="furat-stat-card furat-stat-card--info">
-                            <div class="furat-stat-card__icon"><i class="fas fa-folder"></i></div>
-                            <div class="furat-stat-card__content">
-                                <span class="furat-stat-card__value" id="statFolders">—</span>
-                                <span class="furat-stat-card__label">Carpetas</span>
-                            </div>
-                        </div>
-                    </div>
 
                     <div class="furat-dashboard__sections">
                         <div class="furat-dashboard__section furat-dashboard__section--wide">

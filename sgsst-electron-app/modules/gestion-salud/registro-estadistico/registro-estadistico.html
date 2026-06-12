@@ -12,47 +12,41 @@
 
 <div class="kair-s323" id="kairS323App">
 
-  <!-- HEADER DEL MÓDULO (Header System v2.0 — Patrón 2: breadcrumb + company + tabs) -->
-  <header class="kair-s323-header">
-    <div class="kair-s323-header-bar">
-      <div class="kair-s323-header-left">
-        <button type="button" id="kBtnBack" class="kair-s323-header-back" aria-label="Volver al módulo">
-          <i class="bi bi-arrow-left"></i>
-        </button>
+  <!-- ============================================================ -->
+  <!-- HEADER — Card Pattern (k-section-card) + Tabs inside        -->
+  <!-- ============================================================ -->
+  <div class="k-section-card" style="padding:0; margin-bottom:0;">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
+      <div style="display:flex; align-items:center; gap:0.75rem;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#174ea6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <div>
+          <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Registro y Análisis Estadístico</h3>
+          <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión de la Salud — 3.2.3 Registro Estadístico</p>
+        </div>
       </div>
-      <div class="kair-header__divider"></div>
-      <div class="kair-s323-header-center">
-        <h1 class="kair-s323-header-title">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          Registro y Análisis Estadístico
-        </h1>
-        <ol class="kair-header__breadcrumb" style="display: flex; align-items: center; gap: 0.375rem; list-style: none; margin: 0; padding: 0; font-size: 0.8125rem; font-weight: 400; color: #5a6378;">
-          <li><a href="#" onclick="return false;" style="color: #5a6378; text-decoration: none;">Gestión de la Salud</a></li>
-          <li style="color: #174ea6; font-weight: 500;">3.2.3 Registro y Análisis Estadístico</li>
-        </ol>
-      </div>
-      <div class="kair-s323-header-right">
-        <span class="kair-s323-header-company">
+      <div style="display:flex; align-items:center; gap:0.75rem;">
+        <span class="k-section-card__company">
           <i class="bi bi-building"></i>
           <span id="kCompanyName">—</span>
         </span>
+        <div class="k-section-card__divider"></div>
+        <button class="header-back-btn" id="kBtnBack" title="Volver al módulo">
+          <i class="fas fa-arrow-left"></i> Volver
+        </button>
       </div>
     </div>
-  </header>
-
-  <!-- ==================== TABS ==================== -->
-  <nav class="kair-s323-tabs">
-    <button class="kair-s323-tab active" data-tab="datos">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-      Vista de Datos
-      <span class="k-tab-badge" id="kTabBadgeDatos">0</span>
-    </button>
-    <button class="kair-s323-tab" data-tab="tablero">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-      Tablero Estadístico
-      <span class="k-tab-badge" id="kTabBadgeTablero">0</span>
-    </button>
-  </nav>
+    <!-- Tabs integrated inside the card -->
+    <div class="kair-s323-tabs" style="border-top:1px solid #dee2e6; padding:0 1.5rem;">
+      <button class="kair-s323-tab active" data-tab="datos">
+        <i class="fas fa-table" style="margin-right:0.375rem;"></i> Vista de Datos
+        <span class="k-tab-badge" id="kTabBadgeDatos">0</span>
+      </button>
+      <button class="kair-s323-tab" data-tab="tablero">
+        <i class="fas fa-chart-bar" style="margin-right:0.375rem;"></i> Tablero Estadístico
+        <span class="k-tab-badge" id="kTabBadgeTablero">0</span>
+      </button>
+    </div>
+  </div>
 
   <!-- ==================== PANEL: VISTA DE DATOS ==================== -->
   <section class="kair-s323-panel active" id="panelDatos">

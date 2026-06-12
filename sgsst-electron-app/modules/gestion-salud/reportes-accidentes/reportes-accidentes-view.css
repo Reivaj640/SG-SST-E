@@ -83,120 +83,107 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
-/* Header System v2.0 */
-.kair-header {
+/* ==========================================================================
+   HEADER — Card Pattern (k-section-card)
+   ========================================================================== */
+
+/* Card container */
+.furat-app .k-section-card {
     background: #ffffff;
-    border-bottom: 1px solid #dee2e6;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
     flex-shrink: 0;
-    position: sticky;
-    top: 0;
-    z-index: 100;
 }
 
-.kair-header__bar {
-    display: flex;
+/* Back button */
+.furat-app .header-back-btn {
+    display: inline-flex;
     align-items: center;
-    justify-content: flex-start;
-    gap: 0.75rem;
-    min-height: 52px;
-    padding: 0 1.5rem;
-}
-
-.kair-header__left {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.kair-header__back {
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: none;
-    background: transparent;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
     color: #5a6378;
+    background: transparent;
+    border: none;
     border-radius: 0.375rem;
     cursor: pointer;
     transition: background 0.15s ease;
-    font-size: 1rem;
+    font-family: inherit;
 }
 
-.kair-header__back:hover {
+.furat-app .header-back-btn:hover {
     background: #e8f0fe;
     color: #174ea6;
 }
 
-.kair-header__divider {
+/* Company & divider inside card */
+.furat-app .k-section-card__company {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.8125rem;
+    font-weight: 400;
+    color: #5a6378;
+    white-space: nowrap;
+}
+
+.furat-app .k-section-card__company i {
+    font-size: 0.875rem;
+}
+
+.furat-app .k-section-card__divider {
     width: 1px;
     height: 24px;
     background: #dee2e6;
+    flex-shrink: 0;
 }
 
-.kair-header__center {
+/* Tabs inside card */
+.furat-app .furat-tabs {
     display: flex;
-    flex-direction: column;
-    gap: 0.125rem;
+    gap: 0;
+    border-top: 1px solid #dee2e6;
+    padding: 0 1.5rem;
+    overflow-x: auto;
 }
 
-.kair-header__title {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: #1a1a2e;
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.kair-header__breadcrumb {
+.furat-app .furat-tab {
     display: flex;
     align-items: center;
     gap: 0.375rem;
-    list-style: none;
-    margin: 0;
-    padding: 0;
+    padding: 0.75rem 1rem;
     font-size: 0.8125rem;
-    font-weight: 400;
-    color: #5a6378;
-}
-
-.kair-header__breadcrumb li + li::before {
-    content: '\203A';
-    margin-right: 0.375rem;
-    color: #adb5bd;
-}
-
-.kair-header__breadcrumb a {
-    color: #5a6378;
-    text-decoration: none;
-}
-
-.kair-header__breadcrumb a:hover {
-    color: #174ea6;
-}
-
-.kair-header__breadcrumb--active {
-    color: #174ea6;
     font-weight: 500;
-}
-
-.kair-header__right {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-left: auto;
-}
-
-.kair-header__company {
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-    font-size: 0.8125rem;
-    font-weight: 400;
     color: #5a6378;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 0.15s ease, border-color 0.15s ease;
 }
+
+.furat-app .furat-tab:hover { color: #174ea6; }
+
+.furat-app .furat-tab--active {
+    color: #174ea6;
+    font-weight: 600;
+    border-bottom-color: #174ea6;
+}
+
+/* Dark Theme */
+[data-theme="dark"] .furat-app .k-section-card { background: #1e1e2f; border-color: #3a3a4d; }
+[data-theme="dark"] .furat-app .k-section-card h3 { color: #e0e0e0; }
+[data-theme="dark"] .furat-app .k-section-card p { color: #9e9e9e; }
+[data-theme="dark"] .furat-app .k-section-card__company { color: #9e9e9e; }
+[data-theme="dark"] .furat-app .k-section-card__divider { background: #3a3a4d; }
+[data-theme="dark"] .furat-app .header-back-btn { color: #9e9e9e; }
+[data-theme="dark"] .furat-app .header-back-btn:hover { background: #2a2a4d; color: #8ab4f8; }
+[data-theme="dark"] .furat-app .furat-tab { color: #9e9e9e; }
+[data-theme="dark"] .furat-app .furat-tab:hover { color: #8ab4f8; }
+[data-theme="dark"] .furat-app .furat-tab--active { color: #8ab4f8; border-bottom-color: #8ab4f8; }
 
 /* Container & Main Content */
 .kair-container {
@@ -335,49 +322,7 @@ body {
 }
 
 /* TABS */
-.furat-tabs {
-    display: flex;
-    align-items: center;
-    background-color: var(--furat-bg-card);
-    padding: 0 24px;
-    border-bottom: 1px solid var(--furat-border);
-    flex-shrink: 0;
-    gap: 0;
-}
-.furat-tab {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 14px 20px;
-    border: none;
-    background: none;
-    font-family: var(--furat-font);
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--furat-text-secondary);
-    cursor: pointer;
-    transition: var(--furat-transition);
-    position: relative;
-    white-space: nowrap;
-}
-.furat-tab:hover {
-    color: var(--furat-primary);
-    background-color: var(--furat-primary-subtle);
-}
-.furat-tab--active {
-    color: var(--furat-primary);
-    font-weight: 600;
-}
-.furat-tab--active::after {
-    content: '';
-    position: absolute;
-    bottom: -1px;
-    left: 20px;
-    right: 20px;
-    height: 3px;
-    background-color: var(--furat-primary);
-    border-radius: 3px 3px 0 0;
-}
+/* Old standalone tab styles removed — now scoped under .furat-app in HEADER section */
 
 /* MAIN */
 .furat-main {
@@ -430,88 +375,7 @@ body {
 .furat-card__body { padding: 20px; }
 
 /* STAT CARDS */
-.furat-stats-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-    margin-bottom: 24px;
-}
-.furat-stat-card {
-    background-color: var(--furat-bg-card);
-    border-radius: var(--furat-radius-lg);
-    border: 1px solid var(--furat-border-light);
-    box-shadow: var(--furat-shadow-sm);
-    padding: 20px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    transition: var(--furat-transition-slow);
-    position: relative;
-    overflow: hidden;
-}
-.furat-stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--furat-shadow-md);
-}
-.furat-stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 4px;
-    height: 100%;
-}
-.furat-stat-card--primary::before { background-color: var(--furat-primary); }
-.furat-stat-card--year::before { background-color: var(--furat-info); }
-.furat-stat-card--month::before { background-color: var(--furat-warning); }
-.furat-stat-card--info::before { background-color: var(--furat-success); }
-
-.furat-stat-card__icon {
-    width: 48px;
-    height: 48px;
-    border-radius: var(--furat-radius-md);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
-    flex-shrink: 0;
-}
-.furat-stat-card--primary .furat-stat-card__icon {
-    background-color: var(--furat-primary-light);
-    color: var(--furat-primary);
-}
-.furat-stat-card--year .furat-stat-card__icon {
-    background-color: var(--furat-info-light);
-    color: var(--furat-info);
-}
-.furat-stat-card--month .furat-stat-card__icon {
-    background-color: var(--furat-warning-light);
-    color: #b8860b;
-}
-[data-theme="dark"] .furat-stat-card--month .furat-stat-card__icon {
-    color: var(--furat-warning);
-}
-.furat-stat-card--info .furat-stat-card__icon {
-    background-color: var(--furat-success-light);
-    color: var(--furat-success);
-}
-.furat-stat-card__content {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-}
-.furat-stat-card__value {
-    font-size: 28px;
-    font-weight: 700;
-    color: var(--furat-text-primary);
-    line-height: 1.1;
-}
-.furat-stat-card__label {
-    font-size: 13px;
-    color: var(--furat-text-secondary);
-    font-weight: 400;
-    margin-top: 2px;
-}
+/* Old stat card styles removed — now using k-stats-ribbon inline pattern */
 
 /* DASHBOARD */
 .furat-dashboard__sections {
@@ -1146,17 +1010,15 @@ body {
 
 /* Responsive */
 @media (max-width: 1024px) {
-    .furat-stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .furat-app .k-stats-ribbon { flex-wrap: wrap; gap: .5rem; }
+    .furat-app .k-stats-ribbon > div[style*="width:1px"] { display: none; }
     .furat-dashboard__sections { grid-template-columns: 1fr; }
     .furat-dashboard__section--wide { grid-column: auto; }
 }
 @media (max-width: 768px) {
-    .furat-header { padding: 0 16px; height: 56px; }
-    .furat-header__logo h1 { font-size: 18px; }
-    .furat-header__logo span { display: none; }
-    .furat-tabs { padding: 0 16px; }
-    .furat-tab { padding: 12px 14px; font-size: 13px; }
-    .furat-tab span { display: none; }
+    .furat-app .furat-tabs { padding: 0 16px; }
+    .furat-app .furat-tab { padding: 12px 14px; font-size: 13px; }
+    .furat-app .furat-tab span { display: none; }
     .furat-view { padding: 16px; }
     .furat-library__toolbar { flex-direction: column; align-items: stretch; }
     .furat-library__search { max-width: none; }

@@ -14,37 +14,31 @@
 <body>
 
   <!-- ============================================================ -->
-  <!-- HEADER SYSTEM v2.0 — BEM .kair-header__* (Patrón 2)         -->
+  <!-- HEADER — Card Pattern (k-section-card)                      -->
   <!-- ============================================================ -->
-  <header class="kair-header">
-    <div class="kair-header__bar">
-      <div class="kair-header__left">
-        <button id="backBtn" class="kair-header__back" aria-label="Volver al módulo anterior">
-          <i class="bi bi-arrow-left"></i>
-        </button>
-        <div class="kair-header__divider"></div>
-        <div class="kair-header__center">
-          <h1 class="kair-header__title">
-            <i class="fas fa-search-plus"></i>
-            Realizar Investigación
-          </h1>
-          <ol class="kair-header__breadcrumb">
-            <li><a href="#" onclick="return false;">Gestión de la Salud</a></li>
-            <li><a href="#" onclick="return false;">3.2.2 Investigación</a></li>
-            <li class="active">Nueva Investigación</li>
-          </ol>
+  <div class="k-section-card" style="padding:0; margin-bottom:0;">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
+      <div style="display:flex; align-items:center; gap:0.75rem;">
+        <i class="fas fa-search-plus" style="color:#174ea6; font-size:1.25rem;"></i>
+        <div>
+          <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Realizar Investigación</h3>
+          <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión de la Salud — 3.2.2 Nueva Investigación</p>
         </div>
       </div>
-      <div class="kair-header__right">
-        <button id="downloadBtn" class="kair-header__action" disabled aria-label="Descargar informe">
-          <i class="fas fa-download"></i>
+      <div style="display:flex; align-items:center; gap:0.75rem;">
+        <button class="header-action--ghost" id="downloadBtn" disabled title="Descargar informe">
+          <i class="fas fa-download"></i> Descargar
         </button>
-        <button id="printBtn" class="kair-header__action" disabled aria-label="Imprimir informe">
-          <i class="fas fa-print"></i>
+        <button class="header-action--ghost" id="printBtn" disabled title="Imprimir informe">
+          <i class="fas fa-print"></i> Imprimir
+        </button>
+        <div class="k-section-card__divider"></div>
+        <button class="header-back-btn" id="backBtn" title="Volver al módulo anterior">
+          <i class="fas fa-arrow-left"></i> Volver
         </button>
       </div>
     </div>
-  </header>
+  </div>
 
   <!-- ============================================================ -->
   <!-- MAIN WRAPPER — Vertical flow with sticky action bar         -->

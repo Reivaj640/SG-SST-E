@@ -5,6 +5,82 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.100] - 2026-06-11
+
+### Added
+- **🎯 Header Card Pattern (`k-section-card`)** 🆕
+- Patrón canónico de header para todos los módulos K+AIR
+- Estructura: card container → Fila 1 (icon + title + subtitle) + actions (company, dividers, buttons)
+- Clases: `.k-section-card`, `.header-back-btn`, `.header-action--ghost`, `.header-action--success`, `.k-section-card__company`, `.k-section-card__divider`
+- Responsive: flex-wrap en mobile, company oculta en breakpoints bajos
+- Dark theme: todos los componentes soportan `[data-theme="dark"]`
+- Loading states: `header-action--primary--loading`, `header-action--success--loading`
+
+- **📋 Migración Masiva de Headers** 🆕
+- 22 submódulos migrados de BEM `kair-header` a `k-section-card`
+- Módulo 1 (Recursos): Presupuesto Selector, COPASST Actas, Comité Actas, Capacitaciones, Inducciones
+- Módulo 2 (Gestión Integral): Objetivos, Evaluación Inicial, Plan de Trabajo, Archivo, Rendición, Proveedores, Selección, Cambio
+- Módulo 3 (Gestión Salud): Evaluaciones Médicas, Remisiones, Reportes, Investigación, Registro, Frecuencia, Severidad, Mortalidad
+
+### Changed
+- **Header System** — Eliminado BEM `kair-header__*` de 22 módulos, reemplazado por `k-section-card`
+- **CSS Consolidation** — Cada módulo ahora scope sus estilos card bajo su namespace (`.modulo .k-section-card`)
+- **Tabs Integration** — Módulos con tabs ahora los integran DENTRO del card (no como elemento separado)
+- **Responsive Patterns** — Todos los módulos migrados usan `flex-wrap: wrap` y `padding: 1rem` en mobile
+- **Print Styles** — Referencias `.kair-header` reemplazadas por `.k-section-card` en media queries de impresión
+
+### Fixed
+- **Header sticky en mobile** — Eliminado `position: sticky` del header BEM que causaba overlap en scroll
+- **Breadcrumb overflow** — Subtítulos reemplazan breadcrumb para mejor legibilidad en mobile
+- **Button consistency** — Todos los botones de acción usan mismas clases (ghost/success/primary)
+
+### Technical Details
+- **Archivos modificados (22 submódulos, 42 archivos):**
+  - `modules/recursos/presupuesto/presupuesto-selector.html`
+  - `modules/recursos/copasst/copasst-logic.js`
+  - `modules/recursos/comite-convivencia/comite-convivencia-logic.js`
+  - `modules/recursos/capacitaciones/capacitaciones-view.{html,css}`
+  - `modules/recursos/capacitaciones/capacitaciones-logic.js`
+  - `modules/recursos/inducciones/inducciones-view.{html,css}`
+  - `modules/recursos/inducciones/inducciones-logic.js`
+  - `modules/gestion-integral/objetivos-sst/objetivos-sst-view.html`
+  - `modules/gestion-integral/evaluacion-inicial-sg-sst/evaluacion-inicial-sg-sst.{js,css}`
+  - `modules/gestion-integral/plan-trabajo/plan-view.{html,css}`
+  - `modules/gestion-integral/plan-trabajo/plan-viewer.js`
+  - `modules/gestion-integral/archivo-retencion/index.html`
+  - `modules/gestion-integral/archivo-retencion/archivo-retencion-dashboard.html`
+  - `modules/gestion-integral/rendicion-cuentas/rendicion-cuentas.html`
+  - `modules/gestion-integral/rendicion-cuentas/rendicion-viewer.js`
+  - `modules/gestion-integral/evaluacion-proveedores/evaluacion-proveedores.{js,css}`
+  - `modules/gestion-integral/evaluacion-seleccion/evaluacion-seleccion-component.js`
+  - `modules/gestion-integral/evaluacion-seleccion/evaluacion-seleccion.css`
+  - `modules/gestion-integral/evaluacion-seleccion/dashboard.js`
+  - `modules/gestion-integral/gestion-del-cambio/gestion-cambio-view.{html,css}`
+  - `modules/gestion-salud/evaluaciones-medicas/evaluaciones-medicas-view.{html,css}`
+  - `modules/gestion-salud/evaluaciones-medicas/evaluaciones-view.html`
+  - `modules/gestion-salud/restricciones-medicas/remisiones-view.{html,css}`
+  - `modules/gestion-salud/reportes-accidentes/reportes-accidentes-view.{html,css}`
+  - `modules/gestion-salud/investigacion-accidentes/investigacion-accidentes-view.{html,css}`
+  - `modules/gestion-salud/investigacion-accidentes/investigaciones-view.{html,css}`
+  - `modules/gestion-salud/registro-estadistico/registro-estadistico.{html,css}`
+  - `modules/gestion-salud/frecuencia-accidentalidad/frecuencia-accidentalidad.{html,css}`
+  - `modules/gestion-salud/severidad-accidentalidad/severidad-accidentalidad.{html,css}`
+  - `modules/gestion-salud/indice-mortalidad/indice-mortalidad.{html,css}`
+
+- **Patrón de migración:**
+  1. Header BEM (`<header class="kair-header">`) → Card (`<div class="k-section-card">`)
+  2. Breadcrumb → Subtitle (`<p style="...">`)
+  3. Back button icon-only → Back button with text ("Volver")
+  4. Company chip → `.k-section-card__company`
+  5. Action buttons → `.header-action--ghost` / `.header-action--success`
+  6. CSS BEM eliminated, card styles added scoped under module namespace
+  7. Responsive: `flex-wrap: wrap`, company hidden, padding reduced
+  8. Print: `.kair-header` → `.k-section-card`
+
+- **IDs preservados en todos los módulos:** Ningún ID de elemento fue modificado, garantizando compatibilidad con JavaScript existente
+
+---
+
 ## [0.1.99] - 2026-06-09
 
 ### Added

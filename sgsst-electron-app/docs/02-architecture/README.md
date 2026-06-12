@@ -68,6 +68,7 @@ Este directorio contiene documentación sobre la arquitectura del sistema.
 - Auto-Update (6 eventos, doble registro)
 - Loading System (2 fases: ventana + overlay)
 - KPI Stats Ribbon (`.k-stats-ribbon` BEM, diseño canónico)
+- Header Card Pattern (`.k-section-card` v0.1.100, 22 módulos migrados)
 
 ---
 

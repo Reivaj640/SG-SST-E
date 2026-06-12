@@ -11,40 +11,39 @@
 
 <div class="frecuencia-container">
 
-  <!-- HEADER DEL MÓDULO (Header System v2.0 — Patrón 2: breadcrumb + company + action--ghost) -->
-  <header class="kair-header">
-    <div class="kair-header__bar">
-      <div class="kair-header__left">
-        <button class="kair-header__back" id="btnVolver" title="Volver a Gestión de la Salud">
-          <i class="bi bi-arrow-left"></i>
+  <!-- ============================================================ -->
+  <!-- HEADER — Card Pattern (k-section-card)                      -->
+  <!-- ============================================================ -->
+  <div class="k-section-card" style="padding:0; margin-bottom:1rem;">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
+      <div style="display:flex; align-items:center; gap:0.75rem;">
+        <i class="fas fa-chart-line" style="color:#174ea6; font-size:1.25rem;"></i>
+        <div>
+          <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Frecuencia de la Accidentalidad</h3>
+          <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión de la Salud — 3.3.1 Frecuencia</p>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:0.75rem;">
+        <span class="k-section-card__company">
+          <i class="bi bi-building"></i>
+          <span id="header-company-text">—</span>
+        </span>
+        <div class="k-section-card__divider"></div>
+        <label style="font-size:0.75rem;color:#64748B;margin-right:4px;">Año:</label>
+        <select id="yearFilter" style="font-size:0.8rem;padding:2px 6px;border:1px solid #dee2e6;border-radius:4px;background:#ffffff;color:#212529;cursor:pointer;"></select>
+        <button id="btnCloneYear" title="Clonar a año siguiente" style="background:none;border:1px solid #dee2e6;border-radius:4px;padding:2px 8px;cursor:pointer;color:#5a6378;font-size:0.8rem;">
+          <i class="bi bi-copy"></i>
+        </button>
+        <div class="k-section-card__divider"></div>
+        <button class="header-action--ghost" id="btnRefrescar" title="Refrescar datos">
+          <i class="bi bi-arrow-clockwise"></i> Refrescar
+        </button>
+        <button class="header-back-btn" id="btnVolver" title="Volver a Gestión de la Salud">
+          <i class="fas fa-arrow-left"></i> Volver
         </button>
       </div>
-      <div class="kair-header__divider"></div>
-      <div class="kair-header__center">
-        <h1 class="kair-header__title">Frecuencia de la Accidentalidad</h1>
-        <ol class="kair-header__breadcrumb">
-          <li><a href="#" onclick="return false;">Gestión de la Salud</a></li>
-          <li class="kair-header__breadcrumb--active">3.3.1 Frecuencia de la Accidentalidad</li>
-        </ol>
-      </div>
-<div class="kair-header__right">
-      <span class="kair-header__company">
-        <i class="bi bi-building"></i>
-        <span id="header-company-text">—</span>
-      </span>
-      <div class="kair-header__divider"></div>
-      <label style="font-size:0.75rem;color:var(--kair-text-sec);margin-right:4px;">Año:</label>
-      <select id="yearFilter" style="font-size:0.8rem;padding:2px 6px;border:1px solid var(--kair-border);border-radius:4px;background:var(--kair-bg-card);color:var(--kair-text-main);cursor:pointer;"></select>
-      <button id="btnCloneYear" title="Clonar a año siguiente" style="background:none;border:1px solid var(--kair-border);border-radius:4px;padding:2px 8px;cursor:pointer;color:var(--kair-text-sec);font-size:0.8rem;">
-        <i class="bi bi-copy"></i>
-      </button>
-      <div class="kair-header__divider"></div>
-      <button class="kair-header__action--ghost" id="btnRefrescar" title="Refrescar datos">
-        <i class="bi bi-arrow-clockwise"></i> Refrescar
-      </button>
     </div>
-    </div>
-  </header>
+  </div>
 
   <main class="kair-container" id="app">
     <div class="k-main-content">

@@ -4,7 +4,7 @@
    K+AIR — SG-SST Enterprise Application
 
    LAYOUT: Vertical flow con stepper horizontal
-   - Header BEM .kair-header__* (Patrón 2: breadcrumb + actions)
+   - Header card pattern (k-section-card)
    - Stepper horizontal de progreso
    - Card combinada Upload+Datos (340px + 1fr)
    - Cards full-width para Contexto y Análisis
@@ -131,147 +131,99 @@ body {
 }
 
 /* ================================================================
-   HEADER SYSTEM v2.0 — BEM .kair-header__*
-   Pattern 2: breadcrumb + company + actions (primary/success/ghost)
+   HEADER — Card Pattern (k-section-card)
    ================================================================ */
-.kair-header {
-  background-color: var(--inv-surface-card);
-  border-bottom: 1px solid var(--inv-border);
+
+/* Card container */
+body .k-section-card {
+  background: #ffffff;
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
   flex-shrink: 0;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  box-shadow: var(--inv-shadow-sm);
 }
 
-.kair-header__bar {
-  display: flex;
+/* Back button */
+body .header-back-btn {
+  display: inline-flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 0.75rem;
-  min-height: 52px;
-  padding: 0 1.5rem;
-}
-
-.kair-header__left {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.kair-header__back {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
   color: #5a6378;
+  background: transparent;
+  border: none;
   border-radius: 0.375rem;
   cursor: pointer;
   transition: background 0.15s ease;
-  font-size: 1rem;
+  font-family: inherit;
 }
 
-.kair-header__back:hover {
-  background: var(--inv-primary-light);
-  color: var(--inv-primary);
+body .header-back-btn:hover {
+  background: #e8f0fe;
+  color: #174ea6;
 }
 
-.kair-header__divider {
-  width: 1px;
-  height: 24px;
-  background: var(--inv-border);
-}
-
-.kair-header__center {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-}
-
-.kair-header__title {
-  font-family: var(--inv-font-display);
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--inv-text-primary);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 0;
-}
-
-.kair-header__title i {
-  color: var(--inv-primary);
-}
-
-.kair-header__breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  list-style: none;
-  font-size: 0.8125rem;
-  font-weight: 400;
-  color: #5a6378;
-  margin: 0;
-  padding: 0;
-}
-
-.kair-header__breadcrumb li + li::before {
-  content: '\203A';
-  margin-right: 0.375rem;
-  color: #adb5bd;
-}
-
-.kair-header__breadcrumb a {
-  color: #5a6378;
-  text-decoration: none;
-}
-
-.kair-header__breadcrumb a:hover {
-  color: var(--inv-primary);
-}
-
-.kair-header__breadcrumb .active {
-  color: var(--inv-primary);
-  font-weight: 500;
-}
-
-.kair-header__right {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-left: auto;
-}
-
-.kair-header__action {
-  width: 32px;
-  height: 32px;
+/* Ghost action buttons */
+body .header-action--ghost {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  font-size: 0.875rem;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 500;
+  color: #5a6378;
+  background: transparent;
+  border: none;
   border-radius: 0.375rem;
-  border: 1px solid var(--inv-border);
-  background: var(--inv-surface-card);
-  color: var(--inv-text-secondary);
   cursor: pointer;
-  transition: var(--inv-transition);
-  padding: 0;
+  transition: background 0.15s ease;
+  font-family: inherit;
 }
 
-.kair-header__action:hover:not(:disabled) {
-  background: var(--inv-primary-light);
-  color: var(--inv-primary);
-  border-color: var(--inv-primary);
+body .header-action--ghost:hover:not(:disabled) {
+  background: #f0f2f5;
+  color: #1a1a2e;
 }
 
-.kair-header__action:disabled {
+body .header-action--ghost:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* Company & divider inside card */
+body .k-section-card__company {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: #5a6378;
+  white-space: nowrap;
+}
+
+body .k-section-card__company i {
+  font-size: 0.875rem;
+}
+
+body .k-section-card__divider {
+  width: 1px;
+  height: 24px;
+  background: #dee2e6;
+  flex-shrink: 0;
+}
+
+/* Dark Theme */
+[data-theme="dark"] body .k-section-card { background: #1e1e2f; border-color: #3a3a4d; }
+[data-theme="dark"] body .k-section-card h3 { color: #e0e0e0; }
+[data-theme="dark"] body .k-section-card p { color: #9e9e9e; }
+[data-theme="dark"] body .k-section-card__company { color: #9e9e9e; }
+[data-theme="dark"] body .k-section-card__divider { background: #3a3a4d; }
+[data-theme="dark"] body .header-back-btn { color: #9e9e9e; }
+[data-theme="dark"] body .header-back-btn:hover { background: #2a2a4d; color: #8ab4f8; }
+[data-theme="dark"] body .header-action--ghost { color: #9e9e9e; }
+[data-theme="dark"] body .header-action--ghost:hover:not(:disabled) { background: #2a2a3d; color: #e0e0e0; }
 
 /* ================================================================
    MAIN WRAPPER — Vertical layout with sticky action bar

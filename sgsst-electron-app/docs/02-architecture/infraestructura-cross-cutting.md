@@ -263,6 +263,136 @@ Flujo:
 
 ---
 
+## 6. Header Card Pattern (`.k-section-card`)
+
+### Definición Canónica
+
+Patrón estándar de header para todos los módulos K+AIR. Reemplaza el BEM `kair-header__*` legacy con un diseño de card compacta.
+
+| Propiedad | Valor |
+|---|---|
+| **Introduced** | v0.1.100 (11 junio 2026) |
+| **Pattern** | Card container + Fila 1 (icon/title/subtitle) + Actions |
+| **Modules** | 22 submódulos, 42 archivos |
+| **Scope** | Scoped bajo namespace de cada módulo |
+
+### Estructura HTML
+
+```html
+<div class="k-section-card" style="padding:0; margin-bottom:1rem;">
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
+    <!-- Left: Icon + Title + Subtitle -->
+    <div style="display:flex; align-items:center; gap:0.75rem;">
+      <i class="fas fa-icon" style="color:#174ea6; font-size:1.25rem;"></i>
+      <div>
+        <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Module Title</h3>
+        <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Module Subtitle</p>
+      </div>
+    </div>
+    <!-- Right: Company + Dividers + Actions -->
+    <div style="display:flex; align-items:center; gap:0.75rem;">
+      <span class="k-section-card__company">
+        <i class="bi bi-building"></i>
+        <span id="company-id">—</span>
+      </span>
+      <div class="k-section-card__divider"></div>
+      <button class="header-action--ghost" id="btnAction">
+        <i class="fas fa-icon"></i> Action Text
+      </button>
+      <button class="header-back-btn" id="btnBack">
+        <i class="fas fa-arrow-left"></i> Volver
+      </button>
+    </div>
+  </div>
+</div>
+```
+
+### Clases CSS
+
+| Clase | Propósito | Key Styles |
+|---|---|---|
+| `.k-section-card` | Card container | `background: #fff`, `border: 1px solid #dee2e6`, `border-radius: 0.375rem`, `box-shadow: 0 1px 3px rgba(0,0,0,.08)` |
+| `.header-back-btn` | Back button with text | `display: inline-flex`, `gap: 0.375rem`, `padding: 0.375rem 0.75rem`, `color: #5a6378` |
+| `.header-action--ghost` | Ghost action button | Same as back-btn, transparent background |
+| `.header-action--success` | Success action button | `background: #28a745`, `color: #fff`, `border: 1px solid #28a745` |
+| `.header-action--primary` | Primary action button | `background: #174ea6`, `color: #fff`, `border: 1px solid #174ea6` |
+| `.k-section-card__company` | Company chip | `display: flex`, `gap: 0.375rem`, `font-size: 0.8125rem`, `color: #5a6378` |
+| `.k-section-card__divider` | Vertical divider | `width: 1px`, `height: 24px`, `background: #dee2e6` |
+
+### Variantes de Loading
+
+| Clase | Uso |
+|---|---|
+| `.header-action--primary--loading` | Primary button en estado de carga |
+| `.header-action--success--loading` | Success button en estado de carga |
+
+### Dark Theme
+
+```css
+[data-theme="dark"] .k-section-card { background: #1e1e2f; border-color: #3a3a4d; }
+[data-theme="dark"] .k-section-card h3 { color: #e0e0e0; }
+[data-theme="dark"] .k-section-card p { color: #9e9e9e; }
+[data-theme="dark"] .k-section-card__company { color: #9e9e9e; }
+[data-theme="dark"] .k-section-card__divider { background: #3a3a4d; }
+[data-theme="dark"] .header-back-btn { color: #9e9e9e; }
+[data-theme="dark"] .header-back-btn:hover { background: #2a2a4d; color: #8ab4f8; }
+```
+
+### Responsive
+
+```css
+@media (max-width: 768px) {
+  .modulo .k-section-card > div:first-child {
+    flex-wrap: wrap;
+    padding: 1rem !important;
+  }
+  .modulo .k-section-card__company {
+    display: none;
+  }
+}
+```
+
+### Módulos Migrados (v0.1.100)
+
+| Módulo | Submódulo | Archivos |
+|---|---|---|
+| 1. Recursos | Presupuesto Selector | `.html` |
+| 1. Recursos | COPASST Actas 1.1.6 | `copasst-logic.js` |
+| 1. Recursos | Comité Actas 1.1.8 | `comite-convivencia-logic.js` |
+| 1. Recursos | Capacitaciones 1.2.1 | `.html`, `.css`, `.js` |
+| 1. Recursos | Inducciones 1.2.2 | `.html`, `.css`, `.js` |
+| 2. Gestión Integral | Objetivos 2.2.1 | `.html` |
+| 2. Gestión Integral | Evaluación Inicial 2.3.1 | `.js`, `.css` |
+| 2. Gestión Integral | Plan de Trabajo 2.4.1 | `.html`, `.css`, `.js` |
+| 2. Gestión Integral | Archivo Retención 2.5.1 | `index.html`, `dashboard.html` |
+| 2. Gestión Integral | Rendición Cuentas 2.6.1 | `.html`, `.js` |
+| 2. Gestión Integral | Evaluación Proveedores 2.9.1 | `.js`, `.css` |
+| 2. Gestión Integral | Evaluación Selección 2.10.1 | `.js`, `.css`, `dashboard.js` |
+| 2. Gestión Integral | Gestión Cambio 2.11.1 | `.html`, `.css` |
+| 3. Gestión Salud | Evaluaciones Médicas 3.1.4 | `.html`, `.css` |
+| 3. Gestión Salud | Remisiones 3.1.6 | `.html`, `.css` |
+| 3. Gestión Salud | Reportes Accidentes 3.2.1 | `.html`, `.css` |
+| 3. Gestión Salud | Investigación 3.2.2 | `.html`, `.css` (×2) |
+| 3. Gestión Salud | Registro Estadístico 3.2.3 | `.html`, `.css` |
+| 3. Gestión Salud | Frecuencia 3.3.1 | `.html`, `.css` |
+| 3. Gestión Salud | Severidad 3.3.2 | `.html`, `.css` |
+| 3. Gestión Salud | Mortalidad 3.3.3 | `.html`, `.css` |
+
+### Migration Pattern
+
+1. Header BEM (`<header class="kair-header">`) → Card (`<div class="k-section-card">`)
+2. Breadcrumb → Subtitle (`<p style="...">`)
+3. Back button icon-only → Back button with text ("Volver")
+4. Company chip → `.k-section-card__company`
+5. Action buttons → `.header-action--ghost` / `.header-action--success`
+6. CSS BEM eliminated, card styles added scoped under module namespace
+7. Responsive: `flex-wrap: wrap`, company hidden, padding reduced
+8. Print: `.kair-header` → `.k-section-card`
+
+⚠️ **Nota:** CSS del card está duplicado en cada módulo (scoped). No hay versión global canónica.
+
+---
+
 **Mantenido por:** Architecture Team
-**Última actualización:** 9 de junio de 2026
-**Versión doc:** 1.0 (v0.1.99)
+**Última actualización:** 11 de junio de 2026
+**Versión doc:** 1.1 (v0.1.100)

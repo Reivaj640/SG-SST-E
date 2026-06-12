@@ -158,6 +158,13 @@ modules/
 
 ### 🔧 Mejores Recientes
 
+**v0.1.100 (11 de junio de 2026):**
+1. **Header Card Pattern (`k-section-card`)** - Patrón canónico de header para todos los módulos K+AIR
+2. **Migración Masiva de Headers** - 22 submódulos migrados de BEM `kair-header` a `k-section-card`
+3. **Tabs Integration** - Módulos con tabs ahora los integran DENTRO del card
+4. **Responsive Consistency** - `flex-wrap: wrap`, company oculta en mobile, padding reducido
+5. **IDs Preservados** - Ningún ID de elemento fue modificado, compatibilidad total con JS existente
+
 **v0.1.99 (9 de junio de 2026):**
 1. **Dashboard Plan de Trabajo 2.4.1** - KPIs `k-stats-ribbon` canónico, 6 gráficas (Estado, Progreso Mensual, Cumplimiento Trimestral, Estado Mensual, Categoría, Radar Anual)
 2. **Tabs-header empresa+periodo** - Reemplaza page-header legacy con BEM `.k-tabs-header`

@@ -1,8 +1,8 @@
 # 🏥 Módulo 3: Gestión de la Salud
 
-**Versión:** 2.0
-**Actualizado:** 9 de junio de 2026
-**Estado:** ✅ Actualizado v0.1.99
+**Versión:** 2.1
+**Actualizado:** 11 de junio de 2026
+**Estado:** ✅ Actualizado v0.1.100
 
 ---
 
@@ -958,6 +958,15 @@ Calcula y presenta la incidencia de enfermedad laboral, midiendo los nuevos caso
 
 ## 2. Cambios Recientes
 
+### Versión 0.1.100 (11 junio 2026)
+
+- ✅ **Header Card Pattern** - 9 submódulos migrados de BEM `kair-header` a `k-section-card`
+- ✅ Migrados: 3.1.4 Evaluaciones Médicas, 3.1.6 Remisiones, 3.2.1 Reportes, 3.2.2 Investigación (×2), 3.2.3 Registro, 3.3.1 Frecuencia, 3.3.2 Severidad, 3.3.3 Mortalidad
+- ✅ Tabs integrados dentro del card en módulos con navegación por tabs
+- ✅ Responsive optimizado: company oculta en mobile, padding reducido
+- ✅ Dark theme soportado para todos los componentes del header
+- ✅ Todos los IDs de elementos preservados (compatibilidad JS)
+
 ### Versión 0.1.99 (9 junio 2026)
 
 - ✅ 13 submódulos faltantes documentados (3.1.2-3.1.9, 3.2.3, 3.3.1-3.3.5)
@@ -987,5 +996,5 @@ Calcula y presenta la incidencia de enfermedad laboral, midiendo los nuevos caso
 ---
 
 **Mantenido por:** Product Architect & Full-Stack Team
-**Última actualización:** 9 de junio de 2026
-**Versión:** 2.0 (v0.1.99)
+**Última actualización:** 11 de junio de 2026
+**Versión:** 2.1 (v0.1.100)

@@ -1,7 +1,7 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.99
-**Última actualización:** 9 de junio de 2026
+**Versión:** 0.1.100
+**Última actualización:** 11 de junio de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
 ---
@@ -1189,6 +1189,38 @@ Este software es propietario y confidencial. No se permite la reproducción, dis
 
 ## 📝 Cambios Recientes
 
+### v0.1.100 - 11 Jun 2026 🆕
+
+#### Estandarización de Headers - Patrón k-section-card
+
+**1. Header Card Pattern** 🎯
+- Patrón canónico `k-section-card` para todos los módulos K+AIR
+- Reemplaza BEM `kair-header__*` legacy
+- Estructura: card → icon + title + subtitle + actions
+
+**2. Migración Masiva** 📋
+- 22 submódulos migrados (42 archivos)
+- Módulo 1: Presupuesto, COPASST, Comité, Capacitaciones, Inducciones
+- Módulo 2: Objetivos, Evaluación Inicial, Plan de Trabajo, Archivo, Rendición, Proveedores, Selección, Cambio
+- Módulo 3: Evaluaciones Médicas, Remisiones, Reportes, Investigación, Registro, Frecuencia, Severidad, Mortalidad
+
+**3. Beneficios** ✅
+- Tabs integrados dentro del card
+- Responsive: company oculta en mobile
+- Dark theme soportado
+- IDs preservados (compatibilidad JS)
+
+**Archivos Modificados:**
+
+| Módulo | Archivos |
+|--------|----------|
+| 1. Recursos | 10 archivos |
+| 2. Gestión Integral | 14 archivos |
+| 3. Gestión Salud | 18 archivos |
+| **Total** | **42 archivos** |
+
+---
+
 ### v0.1.99 - 9 Jun 2026 🆕
 
 #### Módulo 2.4.1 - Plan de Trabajo Anual: Dashboard y Navegación
@@ -1442,9 +1474,9 @@ Se agregaron 4 columnas adicionales entre "Entidad" y "Descripción":
 
 ---
 
-**Última actualización:** 19 de marzo de 2026  
-**Versión del documento:** 2.4 (Optimización de Python y Recursos Locales - v0.1.83)  
-**Versión de la aplicación:** 0.1.83
+**Última actualización:** 11 de junio de 2026  
+**Versión del documento:** 2.5 (Estandarización de Headers - v0.1.100)  
+**Versión de la aplicación:** 0.1.100
 
 ---
 

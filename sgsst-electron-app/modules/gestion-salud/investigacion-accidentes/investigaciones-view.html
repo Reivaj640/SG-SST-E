@@ -13,38 +13,31 @@
 
 <div class="inv-layout">
 
-<!-- K+AIR Header System v2.0 — BEM -->
-<header class="kair-header">
-<div class="kair-header__bar">
-<div class="kair-header__left">
-<button id="backBtn" class="kair-header__back" aria-label="Volver al portal">
-<i class="bi bi-arrow-left"></i>
-</button>
+<!-- Header -->
+<div class="k-section-card" style="padding:0; margin-bottom:1rem;">
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
+    <div style="display:flex; align-items:center; gap:0.75rem;">
+      <i class="fas fa-microscope" style="color:#174ea6; font-size:1.25rem;"></i>
+      <div>
+        <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Gestión de Investigaciones</h3>
+        <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión de la Salud — 3.2.2 Ver Investigaciones</p>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:0.75rem;">
+      <span class="k-section-card__company">
+        <i class="bi bi-building"></i>
+        <span id="invCompanyName">—</span>
+      </span>
+      <div class="k-section-card__divider"></div>
+      <button class="header-action--ghost" id="refreshBtn" title="Actualizar lista">
+        <i class="fas fa-sync-alt" id="refreshIcon"></i> Actualizar
+      </button>
+      <button class="header-back-btn" id="backBtn" title="Volver al portal">
+        <i class="fas fa-arrow-left"></i> Volver
+      </button>
+    </div>
+  </div>
 </div>
-<div class="kair-header__divider"></div>
-<div class="kair-header__center">
-<h1 class="kair-header__title">
-<i class="fas fa-microscope" style="color: var(--inv-primary);"></i>
-Gestión de Investigaciones
-</h1>
-<ol class="kair-header__breadcrumb">
-<li><a href="#" onclick="return false;">Gestión de la Salud</a></li>
-<li><a href="#" onclick="return false;">3.2.2 Investigación</a></li>
-<li class="active">Ver Investigaciones</li>
-</ol>
-</div>
-<div class="kair-header__right">
-<span class="kair-header__company">
-<i class="bi bi-building"></i>
-<span id="invCompanyName">—</span>
-</span>
-<div class="kair-header__divider"></div>
-<button id="refreshBtn" class="kair-header__action" title="Actualizar lista">
-<i class="fas fa-sync-alt" id="refreshIcon"></i>
-</button>
-</div>
-</div>
-</header>
 
 <!-- Contenido principal con scroll -->
 <div class="inv-body">
