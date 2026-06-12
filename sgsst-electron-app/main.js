@@ -1391,6 +1391,7 @@ async function getDashboardAlertas(rootPath, companyName) {
   const dashboard_data = {
     kpis: {
       accidents_month: 0,
+      accidents_year: 0,
       pric_active: 0,
       overdue_docs: 0,
       compliance: 0,
@@ -1614,6 +1615,87 @@ async function getDashboardAlertas(rootPath, companyName) {
     } else {
       // LOG DE DEPURACIÓN: Sin alertas de inducciones
       console.log(`[DASHBOARD] ✅ [INDUCCIONES] Sin alertas - ${induccionesStats.pendientes} pendientes`);
+    }
+
+    // ========================================================================
+    // 2.5 ACCIDENTES AÑO ACTUAL (Registro Estadístico 3.2.3)
+    // ========================================================================
+    try {
+      const gestionSaludDir = path.join(rootPath, '3. Gestión de la Salud');
+      if (!fs.existsSync(gestionSaludDir)) {
+        sendLog(`[DASHBOARD] ℹ️ Carpeta "3. Gestión de la Salud" no encontrada`, 'INFO');
+      } else {
+        const subDirs = fs.readdirSync(gestionSaludDir);
+        const registroDir = subDirs.find(d => d.startsWith('3.2.3'));
+        
+        if (!registroDir) {
+          sendLog(`[DASHBOARD] ℹ️ Subcarpeta 3.2.3 no encontrada en Gestión de la Salud`, 'INFO');
+        } else {
+          const registroPath = path.join(gestionSaludDir, registroDir);
+          const files = fs.readdirSync(registroPath);
+          const excelFile = files.find(f => f.toLowerCase().endsWith('.xlsx') && !f.startsWith('~$'));
+          
+          if (!excelFile) {
+            sendLog(`[DASHBOARD] ℹ️ No se encontró archivo Excel en ${registroDir}`, 'INFO');
+          } else {
+            const excelPath = path.join(registroPath, excelFile);
+            const workbook = xlsx.readFile(excelPath);
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const rawData = xlsx.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+            // Buscar fila de headers (como get-accidentes-stats)
+            let headerRowIdx = -1;
+            for (let i = 0; i < Math.min(10, rawData.length); i++) {
+              const row = rawData[i];
+              if (row && row.some(c => {
+                const s = String(c).trim().toLowerCase();
+                return s === 'ciudad' || s === 'año' || s === 'evento';
+              })) {
+                headerRowIdx = i;
+                break;
+              }
+            }
+            if (headerRowIdx === -1) headerRowIdx = 0;
+
+            const headers = rawData[headerRowIdx].map(h => 
+              String(h).trim().replace(/\r\n|\r|\n/g, '')
+            );
+            const idx = (name) => headers.findIndex(h => h.toLowerCase() === name.toLowerCase());
+
+            const iAnio = idx('Año');
+            const iFecha = idx('Fecha del incidente');
+            const iEvento = idx('Evento');
+
+            sendLog(`[DASHBOARD] 📋 Accidentes headers: Año=${iAnio}, Fecha=${iFecha}, Evento=${iEvento} (archivo: ${excelFile})`, 'INFO');
+
+            let count = 0;
+            for (let r = headerRowIdx + 1; r < rawData.length; r++) {
+              const row = rawData[r];
+              if (!row || row.length === 0) continue;
+
+              // Filtrar por año
+              if (iAnio >= 0) {
+                const anio = parseInt(row[iAnio]);
+                if (!anio || anio !== today.getFullYear()) continue;
+              }
+
+              // Filtrar por evento AT
+              if (iEvento >= 0) {
+                const evento = String(row[iEvento] || '').trim().toLowerCase();
+                if (evento !== 'at') continue;
+              }
+
+              count++;
+            }
+
+            dashboard_data.kpis.accidents_year = count;
+            sendLog(`[DASHBOARD] 📊 Accidentes año ${today.getFullYear()}: ${count} (fuente: ${excelFile})`, 'INFO');
+          }
+        }
+      }
+    } catch (error) {
+      sendLog(`[DASHBOARD] ⚠️ Error leyendo datos de accidentes: ${error.message}`, 'WARN');
     }
 
     // ========================================================================

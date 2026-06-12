@@ -2841,50 +2841,40 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
 
 
 
-  // --- KPIs ---
-  const kpiRow = document.createElement('section');
-  kpiRow.style.cssText = `
-    padding: 20px 30px 10px;
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 15px;
-    background: #f8fafc;
-  `;
+  // --- KPIs: k-stats-ribbon (estandar Capacitaciones/Inducciones) ---
+  const kpiRibbon = document.createElement('section');
+  kpiRibbon.className = 'k-stats-ribbon dashboard-kpi-ribbon';
+  kpiRibbon.style.cssText = 'margin: 20px 30px 0;';
 
-  const kpiCards = [
-    { id: 'kpi-accidents', icon: 'fa-shield-alt', value: '-', label: 'Accidentes (Mes)', color: '#f59e0b' },
-    { id: 'kpi-pric', icon: 'fa-user-injured', value: '-', label: 'Casos PRIC Activos', color: '#174ea6' },
-    { id: 'kpi-overdue', icon: 'fa-calendar-times', value: '-', label: 'Documentos Vencidos', color: '#ef4444' },
-    { id: 'kpi-compliance', icon: 'fa-chart-line', value: '-%', label: 'Cumplimiento', color: '#10b981' }
+  const kpiItems = [
+    { id: 'kpi-accidents', icon: 'fa-shield-alt', label: 'Accidentes (Año)', colorClass: 'warning' },
+    { id: 'kpi-pric', icon: 'fa-user-injured', label: 'Casos PRIC Activos', colorClass: 'primary' },
+    { id: 'kpi-overdue', icon: 'fa-calendar-times', label: 'Documentos Vencidos', colorClass: 'danger' },
+    { id: 'kpi-compliance', icon: 'fa-chart-line', label: 'Cumplimiento', colorClass: 'success' }
   ];
 
-  kpiCards.forEach(kpi => {
-    const card = document.createElement('div');
-    card.id = kpi.id;
-    card.style.cssText = `
-      background: white;
-      padding: 15px;
-      border-radius: 8px;
-      border: 1px solid #e2e8f0;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      position: relative;
-      overflow: hidden;
-    `;
-    card.innerHTML = `
-      <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: ${kpi.color};"></div>
-      <div style="width: 42px; height: 42px; border-radius: 8px; background: #f1f5f9; color: #64748b; display: flex; align-items: center; justify-content: center; font-size: 18px;">
+  kpiItems.forEach((kpi, index) => {
+    const item = document.createElement('div');
+    item.className = 'k-stats-ribbon__item';
+    item.innerHTML = `
+      <span class="k-stats-ribbon__icon ${kpi.colorClass}">
         <i class="fas ${kpi.icon}"></i>
-      </div>
-      <div>
-        <h3 style="font-size: 20px; font-weight: 700; color: #1e293b; margin-bottom: 2px;">${kpi.value}</h3>
-        <span style="font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">${kpi.label}</span>
+      </span>
+      <div class="k-stats-ribbon__data">
+        <span class="k-stats-ribbon__value" id="${kpi.id}">-</span>
+        <span class="k-stats-ribbon__label">${kpi.label}</span>
       </div>
     `;
-    kpiRow.appendChild(card);
+    kpiRibbon.appendChild(item);
+
+    if (index < kpiItems.length - 1) {
+      const divider = document.createElement('div');
+      divider.className = 'k-stats-ribbon__divider';
+      kpiRibbon.appendChild(divider);
+    }
   });
-  dashboardContainer.appendChild(kpiRow);
+
+  dashboardContainer.appendChild(kpiRibbon);
 
   // --- MAIN GRID ---
   const mainGrid = document.createElement('div');
@@ -3075,35 +3065,16 @@ async function loadDashboardData() {
       console.log('🔍 [DASHBOARD] Module Status:', data.module_status);
       console.log('🔍 [DASHBOARD] Recursos Alerts:', data.kpis?.recursos_alerts);
 
-      // Actualizar KPIs (SOLO si los elementos existen en el DOM)
+      // Actualizar KPIs (k-stats-ribbon)
       const kpiAccidents = document.getElementById('kpi-accidents');
       const kpiPric = document.getElementById('kpi-pric');
       const kpiOverdue = document.getElementById('kpi-overdue');
       const kpiCompliance = document.getElementById('kpi-compliance');
-      
-      console.log('🔍 [DASHBOARD] Elementos KPI:', {
-        kpiAccidents: !!kpiAccidents,
-        kpiPric: !!kpiPric,
-        kpiOverdue: !!kpiOverdue,
-        kpiCompliance: !!kpiCompliance
-      });
 
-      if (kpiAccidents) {
-        console.log('🔍 [DASHBOARD] Actualizando kpi-accidents:', data.kpis.accidents_month || '0');
-        kpiAccidents.querySelector('h3').textContent = data.kpis.accidents_month || '0';
-      }
-      if (kpiPric) {
-        console.log('🔍 [DASHBOARD] Actualizando kpi-pric:', data.kpis.pric_active || '0');
-        kpiPric.querySelector('h3').textContent = data.kpis.pric_active || '0';
-      }
-      if (kpiOverdue) {
-        console.log('🔍 [DASHBOARD] Actualizando kpi-overdue:', data.kpis.overdue_docs || '0');
-        kpiOverdue.querySelector('h3').textContent = data.kpis.overdue_docs || '0';
-      }
-      if (kpiCompliance) {
-        console.log('🔍 [DASHBOARD] Actualizando kpi-compliance:', (data.kpis.compliance || '0') + '%');
-        kpiCompliance.querySelector('h3').textContent = (data.kpis.compliance || '0') + '%';
-      }
+      if (kpiAccidents) kpiAccidents.textContent = data.kpis.accidents_year || '0';
+      if (kpiPric) kpiPric.textContent = data.kpis.pric_active || '0';
+      if (kpiOverdue) kpiOverdue.textContent = data.kpis.overdue_docs || '0';
+      if (kpiCompliance) kpiCompliance.textContent = (data.kpis.compliance || '0') + '%';
 
       // Actualizar badge de notificaciones
         const totalTasks = data.tasks ? data.tasks.length : 0;
