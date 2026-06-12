@@ -365,61 +365,70 @@
             mainLayout.id = 'ep-list-view-container';
 
  mainLayout.innerHTML = `
-<!-- 1. Encabezado kair-header v2.0 — Patrón Simple -->
-<header class="kair-header">
-<div class="kair-header__bar">
-<div class="kair-header__left">
-<button class="kair-header__back" id="ep-btn-back-module" title="Volver al módulo principal">
-<i class="bi bi-arrow-left"></i>
-</button>
+<!-- 1. Encabezado — Card Pattern (k-section-card) -->
+<div class="k-section-card" style="padding:0; margin-bottom:0;">
+  <!-- Fila 1: contenido principal -->
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
+    <div style="display:flex; align-items:center; gap:0.75rem;">
+      <i class="bi bi-box-seam" style="color:#174ea6; font-size:1.25rem;"></i>
+      <div>
+        <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Identificación y Evaluación de Bienes y Servicios</h3>
+        <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión de proveedores y evaluación de bienes y servicios SG-SST.</p>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:0.75rem;">
+      <span class="k-section-card__company">
+        <i class="bi bi-building"></i>
+        <span id="ep-header-company">${this.companyName || ''}</span>
+      </span>
+      <div class="k-section-card__divider"></div>
+      <button class="header-back-btn" id="ep-btn-back-module" title="Volver al módulo principal">
+        <i class="fas fa-arrow-left"></i> Volver
+      </button>
+      <button class="header-action--ghost" id="ep-btn-export-header" title="Exportar">
+        <i class="bi bi-file-earmark-excel"></i> Exportar
+      </button>
+      <button class="header-action--ghost" id="ep-btn-new-provider-header" title="Nuevo Proveedor">
+        <i class="bi bi-plus-lg"></i> Nuevo
+      </button>
+    </div>
+  </div>
 </div>
-<div class="kair-header__divider"></div>
-<div class="kair-header__center">
-<h1 class="kair-header__title">
-<i class="bi bi-box-seam"></i>
-Identificación y Evaluación de Bienes y Servicios
-</h1>
-<ol class="kair-header__breadcrumb">
-<li>Gestión Integral</li>
-<li>2.9.1</li>
-<li class="kair-header__breadcrumb--active" id="ep-breadcrumb-active">Proveedores</li>
-</ol>
-</div>
-<div class="kair-header__right">
-<span class="kair-header__company">
-<i class="bi bi-building"></i>
-<span id="ep-header-company">${this.companyName || ''}</span>
-</span>
-<div class="kair-header__divider"></div>
-<button class="kair-header__action--ghost" id="ep-btn-export-header" title="Exportar">
-<i class="bi bi-file-earmark-excel"></i> Exportar
-</button>
-<button class="kair-header__action--ghost" id="ep-btn-new-provider-header" title="Nuevo Proveedor">
-<i class="bi bi-plus-lg"></i> Nuevo
-</button>
-</div>
-</div>
-</header>
 
 <div class="ep-content-scroll">
-<!-- 2. Métricas -->
-<div class="ep-metrics-row">
-<div class="ep-metric-card" style="border-color: var(--ep-primary);">
-<div class="ep-metric-value" id="ep-total-suppliers">0</div>
-<div class="ep-metric-label">Total Evaluados</div>
-</div>
-<div class="ep-metric-card" style="border-color: var(--ep-success);">
-<div class="ep-metric-value" id="ep-approved-suppliers" style="color: var(--ep-success);">0</div>
-<div class="ep-metric-label">Aprobados</div>
-</div>
-<div class="ep-metric-card" style="border-color: var(--ep-warning);">
-<div class="ep-metric-value" id="ep-pending-suppliers" style="color: #b68b00;">0</div>
-<div class="ep-metric-label">Pendientes</div>
-</div>
-<div class="ep-metric-card" style="border-color: var(--ep-danger);">
-<div class="ep-metric-value" id="ep-rejected-suppliers" style="color: var(--ep-danger);">0</div>
-<div class="ep-metric-label">Rechazados</div>
-</div>
+<!-- 2. Métricas — Stats Ribbon -->
+<div class="k-stats-ribbon">
+  <div class="k-stats-ribbon__item">
+    <span class="k-stats-ribbon__icon primary"><i class="bi bi-box-seam"></i></span>
+    <div class="k-stats-ribbon__data">
+      <span class="k-stats-ribbon__value" id="ep-total-suppliers">0</span>
+      <span class="k-stats-ribbon__label">Total Evaluados</span>
+    </div>
+  </div>
+  <div class="k-stats-ribbon__divider"></div>
+  <div class="k-stats-ribbon__item">
+    <span class="k-stats-ribbon__icon success"><i class="bi bi-check-circle"></i></span>
+    <div class="k-stats-ribbon__data">
+      <span class="k-stats-ribbon__value" id="ep-approved-suppliers">0</span>
+      <span class="k-stats-ribbon__label">Aprobados</span>
+    </div>
+  </div>
+  <div class="k-stats-ribbon__divider"></div>
+  <div class="k-stats-ribbon__item">
+    <span class="k-stats-ribbon__icon warning"><i class="bi bi-clock-history"></i></span>
+    <div class="k-stats-ribbon__data">
+      <span class="k-stats-ribbon__value" id="ep-pending-suppliers">0</span>
+      <span class="k-stats-ribbon__label">Pendientes</span>
+    </div>
+  </div>
+  <div class="k-stats-ribbon__divider"></div>
+  <div class="k-stats-ribbon__item">
+    <span class="k-stats-ribbon__icon muted"><i class="bi bi-x-circle"></i></span>
+    <div class="k-stats-ribbon__data">
+      <span class="k-stats-ribbon__value" id="ep-rejected-suppliers">0</span>
+      <span class="k-stats-ribbon__label">Rechazados</span>
+    </div>
+  </div>
 </div>
 
 <!-- 3. Barra de Herramientas -->

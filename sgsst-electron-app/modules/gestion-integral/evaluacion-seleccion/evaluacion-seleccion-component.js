@@ -71,9 +71,9 @@ EvaluacionSeleccionComponent.prototype.renderUI = function () {
   var tabsHtml = views.map(function (v) {
     var badge = '';
     if (v.key === 'noconformidades' && ncCount > 0) {
-      badge = '<span class="kair-header__tab-badge">' + ncCount + '</span>';
+      badge = '<span class="es-tab__badge">' + ncCount + '</span>';
     }
-    return '<button class="kair-header__tab' + (this.currentView === v.key ? ' active' : '') + '" data-view="' + v.key + '">' +
+    return '<button class="es-tab' + (this.currentView === v.key ? ' active' : '') + '" data-view="' + v.key + '">' +
       '<i class="bi ' + v.icon + '"></i>' +
       '<span>' + v.label + '</span>' +
       badge +
@@ -87,43 +87,38 @@ EvaluacionSeleccionComponent.prototype.renderUI = function () {
   }.bind(this)).join('');
 
   var headerHtml =
-    '<header class="kair-header">' +
-      '<div class="kair-header__bar">' +
-        '<div class="kair-header__left">' +
-          '<button class="kair-header__back" id="btn-back-es" title="Volver al módulo Gestión Integral">' +
-            '<i class="bi bi-arrow-left"></i>' +
-          '</button>' +
+    '<div class="k-section-card" style="padding:0; margin-bottom:0;">' +
+      '<!-- Fila 1: contenido principal -->' +
+      '<div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">' +
+        '<div style="display:flex; align-items:center; gap:0.75rem;">' +
+          '<i class="bi bi-people" style="color:#174ea6; font-size:1.25rem;"></i>' +
+          '<div>' +
+            '<h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Evaluación y Selección de Proveedores y Contratistas</h3>' +
+            '<p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión de asociados y evaluación de proveedores y contratistas SG-SST.</p>' +
+          '</div>' +
         '</div>' +
-        '<div class="kair-header__divider"></div>' +
-        '<div class="kair-header__center">' +
-          '<h1 class="kair-header__title">' +
-            '<i class="bi bi-people"></i>' +
-            'Evaluación y Selección' +
-          '</h1>' +
-          '<ol class="kair-header__breadcrumb">' +
-            '<li>Gestión Integral</li>' +
-            '<li>2.10.1</li>' +
-            '<li class="kair-header__breadcrumb--active" id="kair-es-breadcrumb-active">Dashboard</li>' +
-          '</ol>' +
-        '</div>' +
-        '<div class="kair-header__right">' +
-          '<span class="kair-header__company">' +
+        '<div style="display:flex; align-items:center; gap:0.75rem;">' +
+          '<span class="k-section-card__company">' +
             '<i class="bi bi-building"></i>' +
             '<span id="kair-es-header-company">' + (this.currentCompany || '') + '</span>' +
           '</span>' +
-          '<div class="kair-header__divider"></div>' +
-          '<button class="kair-header__action--ghost" id="kair-es-action-registro" style="display:none;" title="Nuevo Asociado">' +
+          '<div class="k-section-card__divider"></div>' +
+          '<button class="header-back-btn" id="btn-back-es" title="Volver al módulo Gestión Integral">' +
+            '<i class="fas fa-arrow-left"></i> Volver' +
+          '</button>' +
+          '<button class="header-action--ghost" id="kair-es-action-registro" style="display:none;" title="Nuevo Asociado">' +
             '<i class="bi bi-plus-lg"></i> Nuevo' +
           '</button>' +
-          '<button class="kair-header__action--ghost" id="kair-es-action-nc" style="display:none;" title="Reportar NC">' +
+          '<button class="header-action--ghost" id="kair-es-action-nc" style="display:none;" title="Reportar NC">' +
             '<i class="bi bi-exclamation-triangle"></i> Reportar NC' +
           '</button>' +
         '</div>' +
       '</div>' +
-      '<div class="kair-header__tabs">' +
+      '<!-- Fila 2: tabs integrados -->' +
+      '<div class="es-tabs">' +
         tabsHtml +
       '</div>' +
-    '</header>';
+    '</div>';
 
   this.container.innerHTML =
     '<div class="kair-es-wrapper">' +
@@ -283,7 +278,7 @@ EvaluacionSeleccionComponent.prototype.getNCModal = function () {
 EvaluacionSeleccionComponent.prototype.initNavigation = function () {
   var self = this;
 
-  this.container.querySelectorAll('.kair-header__tab').forEach(function (btn) {
+  this.container.querySelectorAll('.es-tab').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var view = btn.getAttribute('data-view');
       self.navigate(view);
@@ -329,7 +324,7 @@ EvaluacionSeleccionComponent.prototype.navigate = function (viewName) {
   var self = this;
   this.currentView = viewName;
 
-  this.container.querySelectorAll('.kair-header__tab').forEach(function (btn) {
+  this.container.querySelectorAll('.es-tab').forEach(function (btn) {
     btn.classList.toggle('active', btn.getAttribute('data-view') === viewName);
   });
 

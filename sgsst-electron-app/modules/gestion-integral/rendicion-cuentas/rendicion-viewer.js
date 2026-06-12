@@ -521,7 +521,7 @@ function switchSection(sectionId, navElement) {
     // Ocultar todas las secciones
     document.querySelectorAll('.section-view').forEach(el => el.classList.remove('active'));
     // Quitar clase active de botones
-    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.rendicion-tab').forEach(el => el.classList.remove('active'));
 
     // Mostrar sección seleccionada
     document.getElementById(sectionId).classList.add('active');

@@ -19,40 +19,37 @@
       if (!container) return;
 
       container.innerHTML =
-        '<div class="kair-dashboard__card">' +
-          '<div class="kair-dashboard__card-icon kair-dashboard__card-icon--primary">' +
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>' +
+        '<div class="k-stats-ribbon">' +
+          '<div class="k-stats-ribbon__item">' +
+            '<span class="k-stats-ribbon__icon primary"><i class="bi bi-people"></i></span>' +
+            '<div class="k-stats-ribbon__data">' +
+              '<span class="k-stats-ribbon__value">' + stats.totalAsociados + '</span>' +
+              '<span class="k-stats-ribbon__label">Asociados Registrados</span>' +
+            '</div>' +
           '</div>' +
-          '<div class="kair-dashboard__card-info">' +
-            '<div class="kair-dashboard__card-value">' + stats.totalAsociados + '</div>' +
-            '<div class="kair-dashboard__card-label">Asociados Registrados</div>' +
+          '<div class="k-stats-ribbon__divider"></div>' +
+          '<div class="k-stats-ribbon__item">' +
+            '<span class="k-stats-ribbon__icon warning"><i class="bi bi-clock-history"></i></span>' +
+            '<div class="k-stats-ribbon__data">' +
+              '<span class="k-stats-ribbon__value">' + stats.evaluacionesPendientes + '</span>' +
+              '<span class="k-stats-ribbon__label">Evaluaciones Pendientes</span>' +
+            '</div>' +
           '</div>' +
-        '</div>' +
-        '<div class="kair-dashboard__card">' +
-          '<div class="kair-dashboard__card-icon kair-dashboard__card-icon--warning">' +
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>' +
+          '<div class="k-stats-ribbon__divider"></div>' +
+          '<div class="k-stats-ribbon__item">' +
+            '<span class="k-stats-ribbon__icon primary"><i class="bi bi-arrow-repeat"></i></span>' +
+            '<div class="k-stats-ribbon__data">' +
+              '<span class="k-stats-ribbon__value">' + stats.reevaluacionesMes + '</span>' +
+              '<span class="k-stats-ribbon__label">Reevaluaciones del Mes</span>' +
+            '</div>' +
           '</div>' +
-          '<div class="kair-dashboard__card-info">' +
-            '<div class="kair-dashboard__card-value" style="color:' + (stats.evaluacionesPendientes > 0 ? 'var(--kair-warning-dark)' : 'inherit') + '">' + stats.evaluacionesPendientes + '</div>' +
-            '<div class="kair-dashboard__card-label">Evaluaciones Pendientes</div>' +
-          '</div>' +
-        '</div>' +
-        '<div class="kair-dashboard__card">' +
-          '<div class="kair-dashboard__card-icon kair-dashboard__card-icon--info">' +
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>' +
-          '</div>' +
-          '<div class="kair-dashboard__card-info">' +
-            '<div class="kair-dashboard__card-value">' + stats.reevaluacionesMes + '</div>' +
-            '<div class="kair-dashboard__card-label">Reevaluaciones del Mes</div>' +
-          '</div>' +
-        '</div>' +
-        '<div class="kair-dashboard__card">' +
-          '<div class="kair-dashboard__card-icon kair-dashboard__card-icon--danger">' +
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' +
-          '</div>' +
-          '<div class="kair-dashboard__card-info">' +
-            '<div class="kair-dashboard__card-value" style="color:' + (stats.ncActivas > 0 ? 'var(--kair-danger)' : 'inherit') + '">' + stats.ncActivas + '</div>' +
-            '<div class="kair-dashboard__card-label">No Conformidades Activas</div>' +
+          '<div class="k-stats-ribbon__divider"></div>' +
+          '<div class="k-stats-ribbon__item">' +
+            '<span class="k-stats-ribbon__icon muted"><i class="bi bi-exclamation-triangle"></i></span>' +
+            '<div class="k-stats-ribbon__data">' +
+              '<span class="k-stats-ribbon__value">' + stats.ncActivas + '</span>' +
+              '<span class="k-stats-ribbon__label">No Conformidades Activas</span>' +
+            '</div>' +
           '</div>' +
         '</div>';
     },

@@ -5,49 +5,39 @@
 
 <div class="kair-gc-container kair-gc-fade-in" id="kairGcDashboard">
 
-  <!-- ── Header ─────────────────────────────────── -->
-  <header class="kair-gc-module-header">
-    <div class="kair-gc-module-title">
-      <button class="kair-gc-btn-back" id="kairGcBackBtn" title="Volver al módulo" aria-label="Volver">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-             fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M19 12H5M12 5l-7 7 7 7"/>
-        </svg>
-      </button>
-      <span class="kair-gc-header-name">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-             style="margin-right:.375rem;vertical-align:-2px;" aria-hidden="true">
-          <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-          <path d="m15 5 4 4"/>
-        </svg>Gestión del Cambio
-      </span>
-      <span class="kair-gc-module-subtitle">Gestión Integral — 2.11.1</span>
+  <!-- ── Header + KPIs ────────────────────────────── -->
+  <div class="k-section-card" style="background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem">
+    <div style="display:flex;align-items:center;gap:.75rem">
+      <button class="header-back-btn" id="kairGcBackBtn" title="Volver al módulo" aria-label="Volver">‹</button>
+      <div style="display:flex;flex-direction:column">
+        <span style="font-size:1.1rem;font-weight:600;color:#174ea6">Gestión del Cambio</span>
+        <span style="font-size:.8375rem;color:#6c757d;margin-top:2px">Gestión Integral — 2.11.1</span>
+      </div>
     </div>
-    <div class="kair-gc-module-actions">
-      <button class="kair-gc-btn kair-gc-btn-primary" id="kairGcNewChangeBtn">
-        + Nuevo Cambio
-      </button>
+    <div style="display:flex;align-items:center;gap:.5rem">
+      <button class="header-action--primary" id="kairGcNewChangeBtn">+ Nuevo Cambio</button>
     </div>
-  </header>
+  </div>
 
-  <!-- ── KPI Cards ───────────────────────────────── -->
-  <div class="kair-gc-metrics-grid" id="kairGcMetricsGrid">
-    <div class="kair-gc-metric-card kair-gc-pending">
-      <div class="kair-gc-metric-label">Aprobaciones Pendientes</div>
-      <div class="kair-gc-metric-value" id="kairGcMetricPending">—</div>
+  <div class="k-stats-ribbon" id="kairGcMetricsGrid" style="display:flex;gap:0;background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);padding:1rem 1.5rem;align-items:center;flex-wrap:wrap">
+    <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
+      <div style="width:40px;height:40px;border-radius:10px;background:#fff3cd;display:flex;align-items:center;justify-content:center;font-size:1.2rem">⏳</div>
+      <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d">Pendientes</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="kairGcMetricPending">—</span></div>
     </div>
-    <div class="kair-gc-metric-card kair-gc-high-risk">
-      <div class="kair-gc-metric-label">Cambios Alto Riesgo</div>
-      <div class="kair-gc-metric-value" id="kairGcMetricHighRisk">—</div>
+    <div style="width:1px;height:40px;background:#dee2e6;margin:0 1rem"></div>
+    <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
+      <div style="width:40px;height:40px;border-radius:10px;background:#f8d7da;display:flex;align-items:center;justify-content:center;font-size:1.2rem">🔴</div>
+      <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d">Alto Riesgo</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="kairGcMetricHighRisk">—</span></div>
     </div>
-    <div class="kair-gc-metric-card kair-gc-active">
-      <div class="kair-gc-metric-label">Cambios Activos</div>
-      <div class="kair-gc-metric-value" id="kairGcMetricActive">—</div>
+    <div style="width:1px;height:40px;background:#dee2e6;margin:0 1rem"></div>
+    <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
+      <div style="width:40px;height:40px;border-radius:10px;background:#d4edda;display:flex;align-items:center;justify-content:center;font-size:1.2rem">🔄</div>
+      <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d">Activos</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="kairGcMetricActive">—</span></div>
     </div>
-    <div class="kair-gc-metric-card">
-      <div class="kair-gc-metric-label">Cambios este Mes</div>
-      <div class="kair-gc-metric-value" id="kairGcMetricMonth">—</div>
+    <div style="width:1px;height:40px;background:#dee2e6;margin:0 1rem"></div>
+    <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
+      <div style="width:40px;height:40px;border-radius:10px;background:#e2e3e5;display:flex;align-items:center;justify-content:center;font-size:1.2rem">📅</div>
+      <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d">Este Mes</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="kairGcMetricMonth">—</span></div>
     </div>
   </div>
 

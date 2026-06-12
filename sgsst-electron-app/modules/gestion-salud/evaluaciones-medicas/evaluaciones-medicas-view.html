@@ -11,50 +11,67 @@
 <body>
     <div class="em-app">
 
-        <!-- Header System v2.0 -->
-        <header class="kair-header" style="background: #ffffff; border-bottom: 1px solid #dee2e6; position: sticky; top: 0; z-index: 100;">
-            <div style="display: flex; align-items: center; justify-content: flex-start; gap: 0.75rem; min-height: 52px; padding: 0 1.5rem;">
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <button id="backBtn" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; color: #5a6378; border-radius: 0.375rem; cursor: pointer;">
-                        <i class="fas fa-arrow-left" style="font-size: 1.25rem; line-height: 1; color: #5a6378;"></i>
-                    </button>
+        <!-- Header + Tabs + KPIs -->
+        <div class="k-section-card" style="padding:0; margin-bottom:1rem;">
+            <!-- Fila 1: contenido principal -->
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
+                <div style="display:flex; align-items:center; gap:0.75rem;">
+                    <i class="fas fa-file-medical" style="color:#174ea6; font-size:1.25rem;"></i>
+                    <div>
+                        <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Evaluaciones Médicas Ocupacionales</h3>
+                        <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión de la Salud — 3.1.4</p>
+                    </div>
                 </div>
-                <div style="width: 1px; height: 24px; background: #dee2e6;"></div>
-                <div style="display: flex; flex-direction: column; gap: 0.125rem;">
-                    <h1 style="font-size: 1.25rem; font-weight: 600; color: #1a1a2e; margin: 0;">
-                        <i class="fas fa-file-medical" style="color: #174ea6;"></i>
-                        Evaluaciones Médicas Ocupacionales
-                    </h1>
-                    <ol style="display: flex; align-items: center; gap: 0.375rem; list-style: none; margin: 0; padding: 0; font-size: 0.8125rem; color: #5a6378;">
-                        <li><a href="#" style="color: #5a6378; text-decoration: none;">Gestión de la Salud</a></li>
-                        <li>›</li>
-                        <li style="color: #174ea6; font-weight: 500;">3.1.4 Evaluaciones Médicas</li>
-                    </ol>
-                </div>
-                <div style="margin-left: auto; display: flex; align-items: center; gap: 0.75rem;">
-                    <span style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem; color: #5a6378;">
+                <div style="display:flex; align-items:center; gap:0.75rem;">
+                    <span class="k-section-card__company">
                         <i class="bi bi-building"></i>
                         <span id="header-company-text">—</span>
                     </span>
+                    <div class="k-section-card__divider"></div>
+                    <button class="header-back-btn" id="backBtn" title="Volver al módulo">
+                        <i class="fas fa-arrow-left"></i> Volver
+                    </button>
                 </div>
             </div>
-        </header>
+            <!-- Fila 2: tabs integrados -->
+            <nav class="em-tabs">
+                <button class="em-tab em-tab--active" data-view="dashboard">
+                    <i class="fas fa-chart-pie"></i>
+                    <span>Resumen</span>
+                </button>
+                <button class="em-tab" data-view="library">
+                    <i class="fas fa-folder-open"></i>
+                    <span>Biblioteca</span>
+                </button>
+                <button class="em-tab" data-view="viewer" id="tabViewer" style="display:none;">
+                    <i class="fas fa-file-medical"></i>
+                    <span>Visor de Evaluación</span>
+                </button>
+            </nav>
+        </div>
 
-        <!-- TABS -->
-        <nav class="em-tabs">
-            <button class="em-tab em-tab--active" data-view="dashboard">
-                <i class="fas fa-chart-pie"></i>
-                <span>Resumen</span>
-            </button>
-            <button class="em-tab" data-view="library">
-                <i class="fas fa-folder-open"></i>
-                <span>Biblioteca</span>
-            </button>
-            <button class="em-tab" data-view="viewer" id="tabViewer" style="display:none;">
-                <i class="fas fa-file-medical"></i>
-                <span>Visor de Evaluación</span>
-            </button>
-        </nav>
+        <!-- KPIs -->
+        <div class="k-stats-ribbon" style="display:flex;gap:0;background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);padding:1rem 1.5rem;align-items:center;flex-wrap:wrap">
+            <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
+                <div style="width:40px;height:40px;border-radius:10px;background:rgba(23,78,166,.08);display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:#174ea6"><i class="fas fa-file-medical"></i></div>
+                <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d">Total Evaluaciones</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="statTotal">—</span></div>
+            </div>
+            <div style="width:1px;height:40px;background:#dee2e6;margin:0 1rem"></div>
+            <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
+                <div style="width:40px;height:40px;border-radius:10px;background:rgba(23,162,184,.08);display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:#17a2b8"><i class="fas fa-calendar-alt"></i></div>
+                <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d" id="statYearLabel">Este Año</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="statCurrentYear">—</span></div>
+            </div>
+            <div style="width:1px;height:40px;background:#dee2e6;margin:0 1rem"></div>
+            <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
+                <div style="width:40px;height:40px;border-radius:10px;background:rgba(255,193,7,.1);display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:#b8860b"><i class="fas fa-calendar-day"></i></div>
+                <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d" id="statMonthLabel">Este Mes</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="statCurrentMonth">—</span></div>
+            </div>
+            <div style="width:1px;height:40px;background:#dee2e6;margin:0 1rem"></div>
+            <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
+                <div style="width:40px;height:40px;border-radius:10px;background:rgba(40,167,69,.08);display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:#28a745"><i class="fas fa-folder"></i></div>
+                <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d">Carpetas</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="statFolders">—</span></div>
+            </div>
+        </div>
 
         <!-- MAIN -->
         <main class="em-main">
@@ -62,36 +79,6 @@
             <!-- DASHBOARD -->
             <section class="em-view em-view--active" id="viewDashboard">
                 <div class="em-dashboard">
-                    <div class="em-stats-grid">
-                        <div class="em-stat-card em-stat-card--primary">
-                            <div class="em-stat-card__icon"><i class="fas fa-file-medical"></i></div>
-                            <div class="em-stat-card__content">
-                                <span class="em-stat-card__value" id="statTotal">—</span>
-                                <span class="em-stat-card__label">Total Evaluaciones</span>
-                            </div>
-                        </div>
-                        <div class="em-stat-card em-stat-card--year">
-                            <div class="em-stat-card__icon"><i class="fas fa-calendar-alt"></i></div>
-                            <div class="em-stat-card__content">
-                                <span class="em-stat-card__value" id="statCurrentYear">—</span>
-                                <span class="em-stat-card__label" id="statYearLabel">Este Año</span>
-                            </div>
-                        </div>
-                        <div class="em-stat-card em-stat-card--month">
-                            <div class="em-stat-card__icon"><i class="fas fa-calendar-day"></i></div>
-                            <div class="em-stat-card__content">
-                                <span class="em-stat-card__value" id="statCurrentMonth">—</span>
-                                <span class="em-stat-card__label" id="statMonthLabel">Este Mes</span>
-                            </div>
-                        </div>
-                        <div class="em-stat-card em-stat-card--info">
-                            <div class="em-stat-card__icon"><i class="fas fa-folder"></i></div>
-                            <div class="em-stat-card__content">
-                                <span class="em-stat-card__value" id="statFolders">—</span>
-                                <span class="em-stat-card__label">Carpetas</span>
-                            </div>
-                        </div>
-                    </div>
 
                     <div class="em-dashboard__sections">
                         <div class="em-dashboard__section em-dashboard__section--wide">
