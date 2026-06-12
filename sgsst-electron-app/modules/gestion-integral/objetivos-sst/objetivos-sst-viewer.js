@@ -54,10 +54,14 @@ class ObjetivosSSTViewer {
         this.excelFilePath         = null;
         this.policyText            = '';
         this.groups                = [];   // [{objective, principleId, principleSource, confidence, matchedWords, autoDetectedId, indicators}]
+        this.resultados            = {};   // { "groupIdx-indicatorIdx": { resultado, porcentajeReal, source, fechaActualizacion } }
+        this.autoResultados        = {};   // Mapa de resultados auto-calculados { keyword: { resultado, porcentajeReal, source } }
         this.isDataLoaded          = false;
         this.activePrinciple       = null;
         this.activePopoverGroupIdx = null;
         this.editModalState        = { groupIdx: null, indicatorIdx: null };
+        this._resultadoModalGroupIdx    = null;
+        this._resultadoModalIndicatorIdx = null;
 
         this.extractParamsFromURL();
         this.init();
@@ -102,6 +106,32 @@ class ObjetivosSSTViewer {
             const data       = await this.loadExcelData();
             this.policyText  = data.policyText || '';
             this.groups      = this.buildGroups(data.objectivesData || []);
+
+            // Cargar resultados (JSON en Google Drive)
+            await this.loadResultados();
+
+            // Cargar resultados auto-calculados desde submódulos
+            await this.loadAutoResultados();
+
+            // Aplicar auto-resultados a indicadores sin resultado manual
+            this.groups.forEach((group, groupIdx) => {
+                group.indicators.forEach((ind, indIdx) => {
+                    const key = `${groupIdx}-${indIdx}`;
+                    const manualRes = this.resultados[key];
+                    if (!manualRes || !manualRes.resultado) {
+                        const autoMatch = this.matchIndicatorToAutoData(ind);
+                        if (autoMatch) {
+                            this.resultados[key] = {
+                                resultado: autoMatch.resultado,
+                                porcentajeReal: autoMatch.porcentajeReal,
+                                source: 'auto',
+                                keyword: autoMatch.keyword,
+                                fechaActualizacion: new Date().toISOString().split('T')[0]
+                            };
+                        }
+                    }
+                });
+            });
 
             console.log('[objetivos-sst-viewer.js] Datos procesados, esperando DOM para renderizar...');
             
@@ -405,6 +435,14 @@ if (el('stat-security')) el('stat-security').textContent = securityCount;
                 tr.dataset.pid      = p.id;
                 tr.dataset.groupIdx = groupIdx;
 
+                const indRes = this.getIndicatorResultado(groupIdx, idx);
+                const indIsAuto = indRes.source === 'auto';
+                const resDisplay = indRes.resultado
+                    ? `<span class="k-cell-resultado ${indIsAuto ? 'k-res-auto' : 'k-res-manual'}" title="${indIsAuto ? 'Auto-calculado' : 'Manual'} — Actualizado: ${indRes.fechaActualizacion}">
+                        <span class="k-res-badge">${indIsAuto ? '🤖' : '✏️'}</span> ${indRes.resultado} (${indRes.porcentajeReal}%)
+                       </span>`
+                    : `<button class="k-btn-add-resultado" onclick="openResultadoModal(${groupIdx}, ${idx})" title="Agregar resultado"><i class="bi bi-plus-circle"></i> Agregar</button>`;
+
                 if (idx === 0) {
                     const badgeSrcClass = isAuto ? 'k-psb-auto' : 'k-psb-manual';
                     const badgePClass   = `k-psb-p${p.id}`;
@@ -435,6 +473,7 @@ if (el('stat-security')) el('stat-security').textContent = securityCount;
                         <td><span class="k-cell-goal">${ind.goal}</span></td>
                         <td><span class="k-cell-frequency">${ind.frequency}</span></td>
                         <td><span class="k-cell-responsible">${ind.responsible}</span></td>
+                        <td class="k-col-resultado">${resDisplay}</td>
                         <td class="k-col-actions">
                             <button class="k-btn-icon" title="Editar indicador"
                                 onclick="openEditModal(${groupIdx}, ${idx})">
@@ -455,6 +494,7 @@ if (el('stat-security')) el('stat-security').textContent = securityCount;
                         <td><span class="k-cell-goal">${ind.goal}</span></td>
                         <td><span class="k-cell-frequency">${ind.frequency}</span></td>
                         <td><span class="k-cell-responsible">${ind.responsible}</span></td>
+                        <td class="k-col-resultado">${resDisplay}</td>
                         <td class="k-col-actions">
                             <button class="k-btn-icon" title="Editar indicador"
                                 onclick="openEditModal(${groupIdx}, ${idx})">
@@ -777,6 +817,57 @@ if (el('stat-security')) el('stat-security').textContent = securityCount;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // MODAL DE RESULTADOS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    openResultadoModal(groupIdx, indicatorIdx) {
+        if (groupIdx === null || groupIdx === undefined || !this.groups[groupIdx]) return;
+        if (indicatorIdx === null || indicatorIdx === undefined) indicatorIdx = 0;
+
+        this._resultadoModalGroupIdx = groupIdx;
+        this._resultadoModalIndicatorIdx = indicatorIdx;
+        const group = this.groups[groupIdx];
+        const ind = group.indicators[indicatorIdx];
+        const res = this.getIndicatorResultado(groupIdx, indicatorIdx);
+
+        const el = (id) => document.getElementById(id);
+        if (el('resultadoObjective')) el('resultadoObjective').textContent = group.objective;
+        if (el('resultadoIndicator')) el('resultadoIndicator').textContent = ind ? ind.indicator : '';
+        if (el('resultadoFormula')) el('resultadoFormula').value = ind ? ind.formula : '';
+        if (el('resultadoGoal')) el('resultadoGoal').value = ind ? ind.goal : '';
+        if (el('resultadoInput')) el('resultadoInput').value = res.resultado;
+        if (el('resultadoPorcentaje')) el('resultadoPorcentaje').value = res.porcentajeReal || '';
+
+        const backdrop = el('resultadoModalBackdrop');
+        if (backdrop) {
+            backdrop.classList.remove('hidden');
+            setTimeout(() => el('resultadoInput')?.focus(), 80);
+        }
+    }
+
+    closeResultadoModal() {
+        const backdrop = document.getElementById('resultadoModalBackdrop');
+        if (backdrop) backdrop.classList.add('hidden');
+        this._resultadoModalGroupIdx = null;
+        this._resultadoModalIndicatorIdx = null;
+    }
+
+    saveResultadoModal() {
+        const groupIdx = this._resultadoModalGroupIdx;
+        const indicatorIdx = this._resultadoModalIndicatorIdx;
+        if (groupIdx === null || groupIdx === undefined) return;
+        if (indicatorIdx === null || indicatorIdx === undefined) return;
+
+        const el = (id) => document.getElementById(id);
+        const resultado = el('resultadoInput')?.value.trim() || '';
+        const porcentajeReal = el('resultadoPorcentaje')?.value || 0;
+
+        this.updateIndicatorResultado(groupIdx, indicatorIdx, resultado, porcentajeReal);
+        this.closeResultadoModal();
+        this.showToast('Resultado actualizado correctamente.');
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // HIGHLIGHT DE PRINCIPIO
     // ═══════════════════════════════════════════════════════════════════════════
 
@@ -916,6 +1007,152 @@ if (el('stat-security')) el('stat-security').textContent = securityCount;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // CARGA Y GUARDADO DE RESULTADOS (JSON en Google Drive)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    async loadResultados() {
+        return new Promise((resolve) => {
+            const requestId = `load-resultados-${Date.now()}`;
+            const handleMessage = (event) => {
+                if (event.data?.action === 'load-resultados-response' && event.data.requestId === requestId) {
+                    window.removeEventListener('message', handleMessage);
+                    if (event.data.success && event.data.data) {
+                        const raw = event.data.data.resultados || {};
+                        this.resultados = {};
+                        // Migrar formato antiguo (group-level) a nuevo (indicator-level)
+                        for (const [key, value] of Object.entries(raw)) {
+                            if (key.includes('-')) {
+                                // Formato nuevo: "groupIdx-indicatorIdx"
+                                this.resultados[key] = value;
+                            } else {
+                                // Formato antiguo: "groupIdx" → expandir a todos los indicadores
+                                const groupIdx = parseInt(key);
+                                const group = this.groups[groupIdx];
+                                if (group) {
+                                    group.indicators.forEach((_, indIdx) => {
+                                        this.resultados[`${groupIdx}-${indIdx}`] = { ...value };
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    resolve();
+                }
+            };
+            window.addEventListener('message', handleMessage);
+            window.parent.postMessage({
+                action: 'load-resultados-request', requestId,
+                payload: { excelFilePath: this.excelFilePath }
+            }, '*');
+        });
+    }
+
+    async loadAutoResultados() {
+        return new Promise((resolve) => {
+            const requestId = `load-auto-resultados-${Date.now()}`;
+            const handleMessage = (event) => {
+                if (event.data?.action === 'load-auto-resultados-response' && event.data.requestId === requestId) {
+                    window.removeEventListener('message', handleMessage);
+                    if (event.data.success && event.data.data) {
+                        this.autoResultados = event.data.data;
+                        console.log('[objetivos-sst-viewer.js][loadAutoResultados] Auto-resultados cargados:', Object.keys(this.autoResultados).length, 'keywords');
+                    }
+                    resolve();
+                }
+            };
+            window.addEventListener('message', handleMessage);
+            window.parent.postMessage({
+                action: 'load-auto-resultados-request', requestId,
+                payload: { companyName: this.companyName }
+            }, '*');
+        });
+    }
+
+    matchIndicatorToAutoData(indicator) {
+        const text = `${indicator.indicator} ${indicator.formula} ${indicator.goal}`.toLowerCase();
+        const best = { keyword: null, resultado: null, score: 0 };
+
+        for (const [keyword, data] of Object.entries(this.autoResultados)) {
+            if (!data || !data.resultado) continue;
+            const score = keyword.length;
+            if (text.includes(keyword.toLowerCase()) && score > best.score) {
+                best.keyword = keyword;
+                best.resultado = data;
+                best.score = score;
+            }
+        }
+
+        return best.resultado ? {
+            resultado: best.resultado.resultado,
+            porcentajeReal: best.resultado.porcentajeReal,
+            source: 'auto',
+            keyword: best.keyword
+        } : null;
+    }
+
+    async refreshAutoResultados() {
+        await this.loadAutoResultados();
+        // Re-aplicar auto-resultados a indicadores sin resultado manual
+        this.groups.forEach((group, groupIdx) => {
+            group.indicators.forEach((ind, indIdx) => {
+                const key = `${groupIdx}-${indIdx}`;
+                const manualRes = this.resultados[key];
+                if (!manualRes || !manualRes.resultado) {
+                    const autoMatch = this.matchIndicatorToAutoData(ind);
+                    if (autoMatch) {
+                        this.resultados[key] = {
+                            resultado: autoMatch.resultado,
+                            porcentajeReal: autoMatch.porcentajeReal,
+                            source: 'auto',
+                            keyword: autoMatch.keyword,
+                            fechaActualizacion: new Date().toISOString().split('T')[0]
+                        };
+                    }
+                }
+            });
+        });
+        this.renderTable();
+        this.showToast('Resultados auto-calculados actualizados.');
+    }
+
+    async saveResultados() {
+        return new Promise((resolve) => {
+            const requestId = `save-resultados-${Date.now()}`;
+            const handleMessage = (event) => {
+                if (event.data?.action === 'save-resultados-response' && event.data.requestId === requestId) {
+                    window.removeEventListener('message', handleMessage);
+                    resolve(event.data);
+                }
+            };
+            window.addEventListener('message', handleMessage);
+            window.parent.postMessage({
+                action: 'save-resultados-request', requestId,
+                payload: {
+                    excelFilePath: this.excelFilePath,
+                    data: { companyName: this.companyName, resultados: this.resultados }
+                }
+            }, '*');
+        });
+    }
+
+    updateIndicatorResultado(groupIdx, indicatorIdx, resultado, porcentajeReal) {
+        const key = `${groupIdx}-${indicatorIdx}`;
+        this.resultados[key] = {
+            resultado: resultado || '',
+            porcentajeReal: parseInt(porcentajeReal) || 0,
+            source: 'manual',
+            fechaActualizacion: new Date().toISOString().split('T')[0]
+        };
+        this.saveResultados();
+        this.renderTable();
+    }
+
+    getIndicatorResultado(groupIdx, indicatorIdx) {
+        const key = `${groupIdx}-${indicatorIdx}`;
+        return this.resultados[key] || { resultado: '', porcentajeReal: 0, source: '', fechaActualizacion: '' };
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // UTILIDADES UI
     // ═══════════════════════════════════════════════════════════════════════════
 
@@ -966,6 +1203,10 @@ function resetToAuto()                  { if (objetivosSSTViewer) objetivosSSTVi
 function openEditModal(gIdx, iIdx)      { if (objetivosSSTViewer) objetivosSSTViewer.openEditModal(gIdx, iIdx); }
 function closeEditModal()               { if (objetivosSSTViewer) objetivosSSTViewer.closeEditModal(); }
 function saveEditModal()                { if (objetivosSSTViewer) objetivosSSTViewer.saveEditModal(); }
+function openResultadoModal(gIdx, iIdx)    { if (objetivosSSTViewer) objetivosSSTViewer.openResultadoModal(gIdx, iIdx); }
+function closeResultadoModal()          { if (objetivosSSTViewer) objetivosSSTViewer.closeResultadoModal(); }
+function saveResultadoModal()           { if (objetivosSSTViewer) objetivosSSTViewer.saveResultadoModal(); }
+function refreshAutoResultados()        { if (objetivosSSTViewer) objetivosSSTViewer.refreshAutoResultados(); }
 function backToModule()                 { window.parent.postMessage({ action: 'backToModule' }, '*'); }
 function resetToAutoFromUI()            { if (objetivosSSTViewer) objetivosSSTViewer.resetToAuto(objetivosSSTViewer.activePopoverGroupIdx); }
 
@@ -981,8 +1222,11 @@ function handleGlobalError(error, context) {
 document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || !objetivosSSTViewer) return;
     try {
-        const backdrop = document.getElementById('editModalBackdrop');
-        if (backdrop && !backdrop.classList.contains('hidden')) {
+        const editBackdrop = document.getElementById('editModalBackdrop');
+        const resBackdrop = document.getElementById('resultadoModalBackdrop');
+        if (resBackdrop && !resBackdrop.classList.contains('hidden')) {
+            objetivosSSTViewer.closeResultadoModal();
+        } else if (editBackdrop && !editBackdrop.classList.contains('hidden')) {
             objetivosSSTViewer.closeEditModal();
         } else {
             objetivosSSTViewer.closePopover();

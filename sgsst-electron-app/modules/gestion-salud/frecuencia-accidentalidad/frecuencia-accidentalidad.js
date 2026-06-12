@@ -169,15 +169,21 @@ function cargarDatos() {
       console.log('[FrecuenciaAccidentalidad] Llamando a api.leerIndicadores() y api.leerCaracterizacion()...');
       console.log('[FrecuenciaAccidentalidad] api.leerIndicadores existe:', typeof api.leerIndicadores);
       console.log('[FrecuenciaAccidentalidad] api.leerCaracterizacion existe:', typeof api.leerCaracterizacion);
+      console.log('[FrecuenciaAccidentalidad] api.contarATPorMes existe:', typeof api.contarATPorMes);
+      console.log('[FrecuenciaAccidentalidad] api.leerMetaObjetivo existe:', typeof api.leerMetaObjetivo);
       
       Promise.all([
         api.leerIndicadores(),
-        api.leerCaracterizacion()
+        api.leerCaracterizacion(),
+        api.contarATPorMes(currentYear, companyName),
+        api.leerMetaObjetivo(companyName)
       ]).then(function(results) {
         console.log('[FrecuenciaAccidentalidad] Resultados completos:', results);
         
         var resInd = results[0];
         var resCar = results[1];
+        var resAtAuto = results[2];
+        var resMeta = results[3];
         
         console.log('[FrecuenciaAccidentalidad] leerIndicadores response:', resInd);
         
@@ -198,6 +204,24 @@ function cargarDatos() {
         } else {
           console.log('[FrecuenciaAccidentalidad] WARN leerCaracterizacion:', resCar.error);
           caracterizacion = null;
+        }
+        
+        if (indicadores && resAtAuto && resAtAuto.success && resAtAuto.data && resAtAuto.data.mensual) {
+          var autoMensual = resAtAuto.data.mensual;
+          console.log('[FrecuenciaAccidentalidad] Auto AT por mes:', autoMensual);
+          indicadores.frecuenciaMensual.forEach(function(row) {
+            var autoCount = autoMensual[row.mes] || 0;
+            if (autoCount > 0) {
+              row.accidentesOriginal = row.accidentes;
+              row.accidentes = autoCount;
+              row.isAuto = true;
+            }
+          });
+        }
+        
+        if (indicadores && resMeta && resMeta.success && resMeta.data && resMeta.data.meta) {
+          console.log('[FrecuenciaAccidentalidad] Meta desde Objetivos SST:', resMeta.data.meta, '(' + resMeta.data.metaTexto + ')');
+          indicadores.config.metaFrecuencia = resMeta.data.meta;
         }
         
         renderizar();
@@ -371,7 +395,8 @@ if (chartContainer) {
       
       html += '<tr>';
       html += '<td>' + row.mesLabel + '</td>';
-      html += '<td><span class="kair-editable" data-mes="' + row.mes + '" data-campo="accidentes" tabindex="0">' + row.accidentes + '</span></td>';
+      var badge = row.isAuto ? '<span class="freq-badge-auto" title="Auto desde Caracterizacion">🤖</span>' : '';
+      html += '<td><span class="kair-editable" data-mes="' + row.mes + '" data-campo="accidentes" tabindex="0">' + badge + row.accidentes + '</span></td>';
       html += '<td><span class="kair-editable" data-mes="' + row.mes + '" data-campo="trabajadores" tabindex="0">' + row.trabajadores + '</span></td>';
       html += '<td style="font-weight:700;color:' + (exc ? '#dc3545' : '#28a745') + '">' + fmt(row.indiceFrecuencia, 4) + '</td>';
       html += '<td><span class="kair-editable" data-mes="' + row.mes + '" data-campo="diasPerdidos" tabindex="0">' + (sev.diasPerdidos || 0) + '</span></td>';

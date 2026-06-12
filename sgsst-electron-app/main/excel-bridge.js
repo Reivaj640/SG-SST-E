@@ -696,6 +696,103 @@ await workbook.xlsx.readFile(ruta);
   };
 }
 
+// ============================================================
+// CONTAR AT POR MES desde Registro Estadístico 3.2.3 (para auto-fill)
+// ============================================================
+
+function _mesToNumber(mesStr) {
+  var s = String(mesStr).trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  var mapa = {
+    'enero': 1, 'feb': 2, 'febrero': 2, 'mar': 3, 'marzo': 3,
+    'abr': 4, 'abril': 4, 'may': 5, 'mayo': 5, 'jun': 6, 'junio': 6,
+    'jul': 7, 'julio': 7, 'ago': 8, 'agosto': 8, 'sep': 9, 'septiembre': 9,
+    'oct': 10, 'octubre': 10, 'nov': 11, 'noviembre': 11, 'dic': 12, 'diciembre': 12
+  };
+  if (mapa[s]) return mapa[s];
+  var n = parseInt(s);
+  return (n >= 1 && n <= 12) ? n : 0;
+}
+
+async function contarATPorMes(year, rutaRegistro) {
+  if (!rutaRegistro) {
+    console.warn('[EXCEL-BRIDGE] contarATPorMes: no se proporcionó ruta de registro');
+    return { success: true, data: { mensual: {}, total: 0 } };
+  }
+
+  if (!fs.existsSync(rutaRegistro)) {
+    console.warn('[EXCEL-BRIDGE] contarATPorMes: archivo no encontrado:', rutaRegistro);
+    return { success: true, data: { mensual: {}, total: 0 } };
+  }
+
+  const XLSX = require('xlsx');
+  const wb = XLSX.readFile(rutaRegistro);
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  if (!ws) return { success: true, data: { mensual: {}, total: 0 } };
+
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  if (rows.length < 2) return { success: true, data: { mensual: {}, total: 0 } };
+
+  // Detectar fila de encabezados (buscar "Año", "Evento", "Mes" en primeras 10 filas)
+  var headerIdx = 0;
+  for (var i = 0; i < Math.min(10, rows.length); i++) {
+    var row = rows[i];
+    if (row.some(function(c) {
+      var s = String(c).trim().toLowerCase();
+      return s === 'año' || s === 'evento' || s === 'mes';
+    })) {
+      headerIdx = i;
+      break;
+    }
+  }
+
+  var headers = rows[headerIdx].map(function(h) { return String(h).trim(); });
+  var iAnio = headers.findIndex(function(h) { return h.toLowerCase() === 'año'; });
+  var iEvento = headers.findIndex(function(h) { return h.toLowerCase() === 'evento'; });
+  var iMes = headers.findIndex(function(h) { return h.toLowerCase() === 'mes'; });
+  var iFecha = headers.findIndex(function(h) { return h.toLowerCase().indexOf('fecha') >= 0; });
+
+  var mensual = {};
+  var total = 0;
+
+  for (var r = headerIdx + 1; r < rows.length; r++) {
+    var row = rows[r];
+    var anioVal = parseInt(String(row[iAnio] || '').trim());
+    if (!anioVal || anioVal < 2000) continue;
+
+    var evento = String(row[iEvento] || '').trim().toLowerCase();
+    if (evento !== 'at') continue;
+
+    // Intentar por columna "Mes" primero
+    var mesNum = 0;
+    if (iMes >= 0) {
+      mesNum = _mesToNumber(row[iMes]);
+    }
+    // Si no hay mes o es 0, intentar extraer de la fecha
+    if (mesNum === 0 && iFecha >= 0) {
+      var fechaVal = row[iFecha];
+      if (typeof fechaVal === 'number') {
+        var d = XLSX.SSF.parse_date_code(Math.floor(fechaVal));
+        if (d) mesNum = d.m;
+      } else if (fechaVal) {
+        var parsed = new Date(String(fechaVal));
+        if (!isNaN(parsed.getMonth())) mesNum = parsed.getMonth() + 1;
+      }
+    }
+
+    // Filtrar por año
+    if (anioVal !== year) continue;
+
+    if (mesNum >= 1 && mesNum <= 12) {
+      mensual[mesNum] = (mensual[mesNum] || 0) + 1;
+      total++;
+    }
+  }
+
+  console.log('[EXCEL-BRIDGE] contarATPorMes year=' + year + ' total=' + total, mensual);
+  return { success: true, data: { mensual: mensual, total: total } };
+}
+
 // ── Exportar para usar en main.js ──
 module.exports = {
   configurarRutas,
@@ -703,6 +800,7 @@ module.exports = {
   listarIndicadoresFiles,
   leerIndicadores,
   leerCaracterizacion,
+  contarATPorMes,
   escribirEnExcel,
   leerIndicadoresMortalidad,
   escribirEnExcelMortalidad

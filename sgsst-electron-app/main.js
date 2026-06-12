@@ -665,6 +665,30 @@ const createWindow = () => {
     isWindowCreated = false;
   });
 
+  // Eventos de pantalla completa
+  mainWindow.on('enter-full-screen', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('fullscreen-changed', true);
+    }
+  });
+  mainWindow.on('leave-full-screen', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('fullscreen-changed', false);
+    }
+  });
+
+  // Eventos de maximizar/restaurar
+  mainWindow.on('maximize', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('fullscreen-changed', true);
+    }
+  });
+  mainWindow.on('unmaximize', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('fullscreen-changed', false);
+    }
+  });
+
   // Cargar el archivo HTML principal
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
 
@@ -4897,6 +4921,553 @@ ipcMain.handle('save-objetivos-excel-data', async (event, filePath, data) => {
   } catch (error) {
     sendLog(`[MAIN][Objetivos][GUARDADO] ERROR: ${error.message}`, 'ERROR');
     return { success: false, error: error.message };
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RESULTADOS DE OBJETIVOS SST (JSON en Google Drive)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function getResultadosFilePath(excelFilePath) {
+  // Guardar el JSON en la misma carpeta que el Excel (Google Drive)
+  const dir = path.dirname(excelFilePath);
+  return path.join(dir, 'resultados-objetivos.json');
+}
+
+ipcMain.handle('get-objetivos-resultados', async (event, excelFilePath) => {
+  try {
+    const jsonPath = getResultadosFilePath(excelFilePath);
+    if (!fs.existsSync(jsonPath)) {
+      return { success: true, data: { resultados: {} } };
+    }
+    const content = await fsp.readFile(jsonPath, 'utf8');
+    const data = JSON.parse(content);
+    return { success: true, data };
+  } catch (error) {
+    sendLog(`[MAIN][Objetivos][RESULTADOS] Error leyendo resultados: ${error.message}`, 'WARN');
+    return { success: true, data: { resultados: {} } };
+  }
+});
+
+ipcMain.handle('save-objetivos-resultados', async (event, excelFilePath, resultadosData) => {
+  try {
+    const jsonPath = getResultadosFilePath(excelFilePath);
+    const data = {
+      companyName: resultadosData.companyName || '',
+      sourceFile: path.basename(excelFilePath),
+      lastModified: new Date().toISOString(),
+      resultados: resultadosData.resultados || {}
+    };
+    await fsp.writeFile(jsonPath, JSON.stringify(data, null, 2), 'utf8');
+    sendLog(`[MAIN][Objetivos][RESULTADOS] Guardados en: ${jsonPath}`, 'INFO');
+    return { success: true };
+  } catch (error) {
+    sendLog(`[MAIN][Objetivos][RESULTADOS] Error guardando: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// OBJETIVOS SST - RESULTADOS AUTOMÁTICOS (desde submódulos existentes)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Calcula resultados automáticamente desde los datos de los submódulos.
+ * Retorna un mapa normalizado: { [keyword]: { resultado, porcentajeReal, source } }
+ */
+async function calculateAutoResultados(companyName) {
+  const resultado = {};
+  let rootPath = null;
+  try {
+    rootPath = await getCompanyRootPath(companyName);
+  } catch (e) {
+    sendLog(`[AUTO-RESULTADOS] No se pudo obtener rootPath: ${e.message}`, 'WARN');
+    return resultado;
+  }
+  if (!rootPath) return resultado;
+
+  const currentYear = new Date().getFullYear();
+  const today = new Date();
+
+  // Ejecutar todas las fuentes en paralelo
+  const [capStats, indStats, presStats, evalStats, planStats] = await Promise.all([
+    calculateCapacitacionesStats(rootPath).catch(() => null),
+    calculateInduccionesStats(rootPath, companyName).catch(() => null),
+    calculatePresupuestoStats(rootPath, companyName).catch(() => null),
+    calculateEvaluacionInicialStats(rootPath).catch(() => null),
+    calculatePlanTrabajoStats(rootPath, currentYear).catch(() => null)
+  ]);
+
+  // ── 1. CAPACITACIONES ──────────────────────────────────────────────────────
+  if (capStats && capStats.totalCapacitaciones > 0) {
+    const total = capStats.totalCapacitaciones;
+    const realizadas = capStats.realizadas;
+    const pct = capStats.porcentajeCumplimiento;
+    resultado['capacitacion'] = {
+      resultado: `${realizadas}/${total} capacitaciones completadas`,
+      porcentajeReal: pct,
+      source: 'auto'
+    };
+    resultado['capacitaciones'] = resultado['capacitacion'];
+  }
+
+  // ── 2. INDUCCIONES ─────────────────────────────────────────────────────────
+  if (indStats && indStats.totalTrabajadores > 0) {
+    const total = indStats.totalTrabajadores;
+    const completadas = indStats.completadas;
+    const pendientes = indStats.pendientes;
+    const pct = indStats.porcentajeCompletado;
+    resultado['induccion'] = {
+      resultado: `${completadas}/${total} inducciones completadas (${pendientes} pendientes)`,
+      porcentajeReal: pct,
+      source: 'auto'
+    };
+    resultado['reinduccion'] = resultado['induccion'];
+  }
+
+  // ── 3. PRESUPUESTO ─────────────────────────────────────────────────────────
+  if (presStats && presStats.totalAsignado > 0) {
+    const ejecutado = presStats.totalEjecutado;
+    const asignado = presStats.totalAsignado;
+    const pct = presStats.porcentajeEjecucion;
+    resultado['presupuesto'] = {
+      resultado: `$${(ejecutado / 1000000).toFixed(1)}M ejecutados de $${(asignado / 1000000).toFixed(1)}M`,
+      porcentajeReal: pct,
+      source: 'auto'
+    };
+    resultado['recurso'] = resultado['presupuesto'];
+    resultado['recursos'] = resultado['presupuesto'];
+    resultado['asignacion'] = resultado['presupuesto'];
+  }
+
+  // ── 4. EVALUACIÓN INICIAL ──────────────────────────────────────────────────
+  if (evalStats && evalStats.disponible) {
+    const cum = evalStats.combinado;
+    const hallazgos = cum.totalHallazgos || 0;
+    const cumplidos = cum.hallazgosCumplidos || 0;
+    const pct = cum.cumplimiento || 0;
+    resultado['evaluacion'] = {
+      resultado: `${cumplidos}/${hallazgos} hallazgos cumplidos (${pct}%)`,
+      porcentajeReal: pct,
+      source: 'auto'
+    };
+    resultado['hallazgo'] = resultado['evaluacion'];
+    resultado['hallazgos'] = resultado['evaluacion'];
+  }
+
+  // ── 5. PLAN DE TRABAJO ─────────────────────────────────────────────────────
+  if (planStats && planStats.totalActividades > 0) {
+    const total = planStats.totalActividades;
+    const ejecutadas = planStats.actividadesEjecutadas;
+    const pct = planStats.porcentajeAvance;
+    resultado['plan'] = {
+      resultado: `${ejecutadas}/${total} actividades ejecutadas`,
+      porcentajeReal: pct,
+      source: 'auto'
+    };
+    resultado['trabajo'] = resultado['plan'];
+    resultado['actividad'] = resultado['plan'];
+    resultado['plan de trabajo'] = resultado['plan'];
+  }
+
+  // ── 6. INSPECCIONES ────────────────────────────────────────────────────────
+  try {
+    const inspResult = await require('./main/inspecciones-bridge').getInspeccionesStats
+      ? null
+      : null;
+    // Inspecciones están en módulo separado, intentar vía IPC no es posible aquí.
+    // Usar cálculo directo leyendo archivos.
+    const recursosPath = path.join(rootPath, '1. Recursos');
+    if (fs.existsSync(recursosPath)) {
+      const subs = await fsp.readdir(recursosPath);
+      const inspFolder = subs.find(s => s.startsWith('4.2') || s.toLowerCase().includes('inspecc'));
+      if (inspFolder) {
+        const inspPath = path.join(recursosPath, inspFolder);
+        const inspFiles = await fsp.readdir(inspPath);
+        const programmaFile = inspFiles.find(f => f.toLowerCase().includes('programa') && (f.endsWith('.xlsx') || f.endsWith('.xls')));
+        if (programmaFile) {
+          const wb = xlsx.readFile(path.join(inspPath, programmaFile));
+          const sheet = wb.Sheets[wb.SheetNames[0]];
+          const data = xlsx.utils.sheet_to_json(sheet, { header: 1 });
+          let totalAct = 0, completadas = 0;
+          for (let r = 1; r < data.length; r++) {
+            const row = data[r];
+            if (!row || row.length < 2) continue;
+            const nombre = row[1] || row[0];
+            if (!nombre || typeof nombre !== 'string') continue;
+            if (nombre.toLowerCase().includes('total')) break;
+            totalAct++;
+            // Verificar si tiene mark en mes actual (col del mes)
+            const mesCol = today.getMonth() + 3; // Columna C=mes1, D=mes2...
+            if (mesCol < row.length && (row[mesCol] === 'c' || row[mesCol] === 'C' || row[mesCol] === 'x' || row[mesCol] === 'X')) {
+              completadas++;
+            }
+          }
+          if (totalAct > 0) {
+            const pct = Math.round((completadas / totalAct) * 100);
+            resultado['inspeccion'] = {
+              resultado: `${completadas}/${totalAct} inspecciones completadas este mes`,
+              porcentajeReal: pct,
+              source: 'auto'
+            };
+            resultado['inspecciones'] = resultado['inspeccion'];
+          }
+        }
+      }
+    }
+  } catch (e) {
+    sendLog(`[AUTO-RESULTADOS] Error calculando inspecciones: ${e.message}`, 'WARN');
+  }
+
+  // ── 7. IDENTIFICACIÓN DE PELIGROS ──────────────────────────────────────────
+  try {
+    const matrizBridge = require('./main/identificacion-peligros-bridge');
+    // No se puede llamar directamente, leer JSON de la matriz
+    const normalize = (str) => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+    const companyCfg = config.companyPaths?.[companyName];
+    if (companyCfg?.path) {
+      const empresaPath = companyCfg.path;
+      const peligrosDir = path.join(empresaPath, '4. Gestión de los Peligros');
+      if (fs.existsSync(peligrosDir)) {
+        const subDirs = await fsp.readdir(peligrosDir);
+        const ipDir = subDirs.find(d => d.startsWith('4.1') || normalize(d).includes('identificacion'));
+        if (ipDir) {
+          const ipPath = path.join(peligrosDir, ipDir);
+          const ipFiles = await fsp.readdir(ipPath);
+          const matrizFile = ipFiles.find(f => f.toLowerCase().includes('matriz') && (f.endsWith('.json') || f.endsWith('.xlsx')));
+          if (matrizFile && matrizFile.endsWith('.json')) {
+            const matrizData = JSON.parse(await fsp.readFile(path.join(ipPath, matrizFile), 'utf8'));
+            let total = 0, evaluados = 0, inaceptables = 0;
+            if (matrizData.sedes) {
+              for (const sede of matrizData.sedes) {
+                for (const proc of (sede.procesos || [])) {
+                  for (const cargo of (proc.cargos || [])) {
+                    for (const pel of (cargo.peligros || [])) {
+                      total++;
+                      if (pel.nd != null && pel.ne != null && pel.nc != null) evaluados++;
+                      const nr = pel.nrNivel || 'I';
+                      if (nr === 'III' || nr === 'IV' || nr === 'V') inaceptables++;
+                    }
+                  }
+                }
+              }
+            }
+            if (total > 0) {
+              const tasaEval = Math.round((evaluados / total) * 100);
+              const tasaInac = Math.round((inaceptables / total) * 100);
+              resultado['peligro'] = {
+                resultado: `${evaluados}/${total} peligros evaluados (${inaceptables} inaceptables)`,
+                porcentajeReal: tasaEval,
+                source: 'auto'
+              };
+              resultado['riesgo'] = resultado['peligro'];
+              resultado['nr'] = resultado['peligro'];
+              resultado['peligros'] = resultado['peligro'];
+              resultado['riesgos'] = resultado['peligro'];
+            }
+          }
+        }
+      }
+    }
+  } catch (e) {
+    sendLog(`[AUTO-RESULTADOS] Error calculando peligros: ${e.message}`, 'WARN');
+  }
+
+  // ── 8. ACCIDENTES / FRECUENCIA / SEVERIDAD (leerIndicadores) ────────────────
+  try {
+    // Buscar archivo INDICADORES: primero en 3.2.3, luego fallback a 6.1.1
+    let indicadoresFullPath = null;
+
+    // Intento 1: 3. Gestión de la Salud / 3.2.3*
+    const gestionSaludDir = path.join(rootPath, '3. Gestión de la Salud');
+    if (fs.existsSync(gestionSaludDir)) {
+      const subDirs = fs.readdirSync(gestionSaludDir);
+      const registroDir = subDirs.find(d => d.startsWith('3.2.3'));
+      if (registroDir) {
+        const registroPath = path.join(gestionSaludDir, registroDir);
+        const files = fs.readdirSync(registroPath);
+        const indicadoresFile = files.find(f => f.toLowerCase().includes('indicadores') && f.endsWith('.xlsx') && !f.startsWith('~$'));
+        if (indicadoresFile) indicadoresFullPath = path.join(registroPath, indicadoresFile);
+      }
+    }
+
+    // Intento 2: 6. Verificación / 6.1.1*
+    if (!indicadoresFullPath) {
+      const verifDir = path.join(rootPath, '6. Verificación');
+      if (fs.existsSync(verifDir)) {
+        const verifSubDirs = fs.readdirSync(verifDir);
+        const folder611 = verifSubDirs.find(d => d.startsWith('6.1.1'));
+        if (folder611) {
+          const verifPath = path.join(verifDir, folder611);
+          const verifFiles = fs.readdirSync(verifPath);
+          const indFile = verifFiles.find(f => f.toLowerCase().includes('indicadores') && f.endsWith('.xlsx') && !f.startsWith('~$'));
+          if (indFile) indicadoresFullPath = path.join(verifPath, indFile);
+        }
+      }
+    }
+
+    sendLog(`[AUTO-RESULTADOS] INDICADORES ruta: ${indicadoresFullPath || 'NO ENCONTRADO'}`, 'INFO');
+
+    if (indicadoresFullPath) {
+      const indResult = await excelBridge.leerIndicadores(indicadoresFullPath);
+      if (indResult.success && indResult.data) {
+        const ind = indResult.data;
+
+            // ── Leer meta de Objetivos SST (2.2.1) ──
+            let metaObjetivo = null;
+            try {
+              const giDir = path.join(rootPath, '2. Gestión Integral del SG-SST');
+              if (fs.existsSync(giDir)) {
+                const giEntries = fs.readdirSync(giDir);
+                const folder221 = giEntries.find(f => f.startsWith('2.2.1'));
+                if (folder221) {
+                  const objDir = path.join(giDir, folder221);
+                  const objFiles = fs.readdirSync(objDir);
+                  const objXlsx = objFiles.find(f => f.toLowerCase().endsWith('.xlsx') && !f.startsWith('~$'));
+                  if (objXlsx) {
+                    const objWb = xlsx.readFile(path.join(objDir, objXlsx));
+                    const objWs = objWb.Sheets[objWb.SheetNames[0]];
+                    if (objWs) {
+                      const objRows = xlsx.utils.sheet_to_json(objWs, { header: 1, defval: '' });
+                      for (let r = 0; r < objRows.length; r++) {
+                        const colC = String(objRows[r][2] || '').trim().toLowerCase();
+                        if (colC.indexOf('frecuencia') >= 0 && colC.indexOf('accidentalidad') >= 0) {
+                          const metaRaw = String(objRows[r][4] || '').trim();
+                          const match = metaRaw.match(/[\d.]+/);
+                          if (match) {
+                            metaObjetivo = parseFloat(match[0]);
+                            sendLog(`[AUTO-RESULTADOS] Meta Objetivos SST: ${metaRaw} → ${metaObjetivo}`, 'INFO');
+                          }
+                          break;
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            } catch (eObj) {
+              sendLog(`[AUTO-RESULTADOS] No se pudo leer meta de Objetivos SST: ${eObj.message}`, 'WARN');
+            }
+
+            // Usar meta de Objetivos SST si existe, si no usar la del INDICADORES
+            const metaFrec = metaObjetivo || ind.config.metaFrecuencia;
+
+            // ── Frecuencia (IF) ──
+            const mesesConAT = ind.frecuenciaMensual.filter(m => m.accidentes > 0);
+            const promIF = mesesConAT.length > 0
+              ? (mesesConAT.reduce((s, m) => s + m.indiceFrecuencia, 0) / mesesConAT.length).toFixed(2)
+              : 0;
+
+            resultado['frecuencia'] = {
+              resultado: `IF promedio: ${promIF} (meta: ${metaFrec})`,
+              porcentajeReal: metaFrec > 0
+                ? Math.min(100, Math.round((1 - promIF / metaFrec) * 100))
+                : 0,
+              source: 'auto'
+            };
+
+            // ── Severidad (IS) ──
+            const mesesConDias = ind.severidadMensual.filter(m => m.diasPerdidos > 0);
+            const promIS = mesesConDias.length > 0
+              ? (mesesConDias.reduce((s, m) => s + m.indiceSeveridad, 0) / mesesConDias.length).toFixed(2)
+              : 0;
+
+            resultado['severidad'] = {
+              resultado: `IS promedio: ${promIS} (meta: ${ind.config.metaSeveridad})`,
+              porcentajeReal: ind.config.metaSeveridad > 0
+                ? Math.min(100, Math.round((1 - promIS / ind.config.metaSeveridad) * 100))
+                : 0,
+              source: 'auto'
+            };
+
+            // ── Total AT ──
+            const totalAT = ind.totalAT2024;
+            const totalMortal = ind.eventosMortalesMensual.reduce((s, m) => s + m.eventosMortales, 0);
+            const totalDiasPerdidos = ind.severidadMensual.reduce((s, m) => s + m.diasPerdidos, 0);
+
+            resultado['accidente'] = {
+              resultado: `${totalAT} AT en ${currentYear} | Mortales: ${totalMortal} | Días perdidos: ${totalDiasPerdidos}`,
+              porcentajeReal: 0,
+              source: 'auto'
+            };
+            resultado['at'] = resultado['accidente'];
+            resultado['accidentalidad'] = resultado['frecuencia'];
+
+            // ── Mortalidad ──
+            resultado['mortalidad'] = {
+              resultado: `${totalMortal} eventos mortales en ${currentYear} (meta: ${ind.config.metaMortalidad || 0})`,
+              porcentajeReal: ind.config.metaMortalidad > 0 ? (totalMortal <= ind.config.metaMortalidad ? 100 : 0) : 0,
+              source: 'auto'
+            };
+
+            // ── Ausentismo ──
+            const promAusentismo = ind.ausentismoMensual.length > 0
+              ? (ind.ausentismoMensual.reduce((s, m) => s + m.tasaAusentismo, 0) / ind.ausentismoMensual.length).toFixed(2)
+              : 0;
+
+            resultado['ausentismo'] = {
+              resultado: `Tasa ausentismo promedio: ${promAusentismo}%`,
+              porcentajeReal: 0,
+              source: 'auto'
+            };
+            resultado['incapacidad'] = resultado['ausentismo'];
+
+            // ── Prevalencia EL ──
+            if (ind.config.prevalenciaEL > 0) {
+              resultado['prevalencia'] = {
+                resultado: `Prevalencia EL: ${ind.config.prevalenciaEL}`,
+                porcentajeReal: 0,
+                source: 'auto'
+              };
+            }
+
+            // ── IFA / IG (índices del registro estadístico) ──
+            resultado['ifa'] = {
+              resultado: `IF promedio: ${promIF} | IS promedio: ${promIS}`,
+              porcentajeReal: 0,
+              source: 'auto'
+            };
+          }
+      }
+  } catch (e) {
+    sendLog(`[AUTO-RESULTADOS] Error calculando frecuencia/severidad: ${e.message}`, 'WARN');
+  }
+
+  // ── 9. AUSENTISMO ─────────────────────────────────────────────────────────
+  try {
+    const configData2 = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config2 = JSON.parse(configData2);
+    const companyCfg2 = config2.companyPaths?.[companyName];
+    if (companyCfg2?.path) {
+      const empresaPath = companyCfg2.path;
+      const saludDir = path.join(empresaPath, '3. Gestión de la Salud');
+      if (fs.existsSync(saludDir)) {
+        const subDirs = await fsp.readdir(saludDir);
+        const ausDir = subDirs.find(d => d.startsWith('3.3.6') || d.toLowerCase().includes('ausentismo'));
+        if (ausDir) {
+          const ausPath = path.join(saludDir, ausDir);
+          const ausFiles = await fsp.readdir(ausPath);
+          const ausFile = ausFiles.find(f => f.toLowerCase().includes('ausentismo') && (f.endsWith('.xlsx') || f.endsWith('.xls')));
+          if (ausFile) {
+            const wb = xlsx.readFile(path.join(ausPath, ausFile));
+            const sheet = wb.Sheets[wb.SheetNames[0]];
+            const data = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+            let headerIdx = 0;
+            for (let i = 0; i < Math.min(5, data.length); i++) {
+              const row = data[i];
+              if (row && row.some(c => String(c).toLowerCase().includes('cedula'))) { headerIdx = i; break; }
+            }
+            const hdrs = data[headerIdx].map(h => String(h).trim().toLowerCase());
+            const iDias = hdrs.findIndex(h => h.includes('dias') || h.includes('incapacidad'));
+            const iInicio = hdrs.findIndex(h => h.includes('inicio'));
+            const iFin = hdrs.findIndex(h => h.includes('fin'));
+            const iClase = hdrs.findIndex(h => h.includes('clase'));
+
+            let totalDias = 0, casos = 0, arlCases = 0;
+            for (let r = headerIdx + 1; r < data.length; r++) {
+              const row = data[r];
+              if (!row || row.length < 2) continue;
+              const dias = parseInt(row[iDias]) || 0;
+              if (dias > 0) {
+                totalDias += dias;
+                casos++;
+                const clase = iClase >= 0 ? String(row[iClase] || '').toLowerCase() : '';
+                if (clase.includes('arl')) arlCases++;
+              }
+            }
+            if (casos > 0) {
+              resultado['ausentismo'] = {
+                resultado: `${casos} casos activos (${totalDias} días, ${arlCases} PRIC)`,
+                porcentajeReal: 0,
+                source: 'auto'
+              };
+              resultado['incapacidad'] = resultado['ausentismo'];
+            }
+          }
+        }
+      }
+    }
+  } catch (e) {
+    sendLog(`[AUTO-RESULTADOS] Error calculando ausentismo: ${e.message}`, 'WARN');
+  }
+
+  // ── 10. INVESTIGACIÓN DE ACCIDENTES ────────────────────────────────────────
+  try {
+    const configData3 = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config3 = JSON.parse(configData3);
+    const companyCfg3 = config3.companyPaths?.[companyName];
+    if (companyCfg3?.path) {
+      const empresaPath = companyCfg3.path;
+      const saludDir = path.join(empresaPath, '3. Gestión de la Salud');
+      if (fs.existsSync(saludDir)) {
+        const subDirs = await fsp.readdir(saludDir);
+        const invDir = subDirs.find(d => d.startsWith('3.2.2') || d.toLowerCase().includes('investigacion'));
+        if (invDir) {
+          const invPath = path.join(saludDir, invDir);
+          const invFiles = await fsp.readdir(invPath);
+          const investigations = invFiles.filter(f => f.endsWith('.pdf') || f.endsWith('.html'));
+          if (investigations.length > 0) {
+            resultado['investigacion'] = {
+              resultado: `${investigations.length} investigaciones realizadas`,
+              porcentajeReal: 0,
+              source: 'auto'
+            };
+          }
+        }
+      }
+    }
+  } catch (e) {
+    sendLog(`[AUTO-RESULTADOS] Error calculando investigaciones: ${e.message}`, 'WARN');
+  }
+
+  // ── 11. POLÍTICA SST ──────────────────────────────────────────────────────
+  try {
+    const politicaStats = await calculatePoliticaStats(rootPath);
+    if (politicaStats.documento_encontrado) {
+      const estado = politicaStats.actualizada ? 'Actualizada' : 'Por actualizar';
+      const fecha = politicaStats.fecha ? new Date(politicaStats.fecha).toLocaleDateString('es-CO') : 'N/D';
+      resultado['politica'] = {
+        resultado: `Política ${estado} (última: ${fecha})`,
+        porcentajeReal: politicaStats.actualizada ? 100 : 50,
+        source: 'auto'
+      };
+    }
+  } catch (e) {
+    sendLog(`[AUTO-RESULTADOS] Error calculando política: ${e.message}`, 'WARN');
+  }
+
+  // ── 12. COPASST / COMITÉ (desde dashboard alertas) ────────────────────────
+  try {
+    const copasstPath = path.join(rootPath, '1. Recursos', '1.1.6 Conformación de Copasst');
+    if (fs.existsSync(copasstPath)) {
+      const currentYear2 = new Date().getFullYear();
+      const reunionFiles = fs.readdirSync(copasstPath).filter(f => f.endsWith('.pdf') || f.endsWith('.docx'));
+      const yearFiles = reunionFiles.filter(f => f.includes(currentYear2.toString()));
+      resultado['copasst'] = {
+        resultado: `${yearFiles.length} actas de COPASST en ${currentYear2}`,
+        porcentajeReal: Math.min(100, Math.round((yearFiles.length / 12) * 100)),
+        source: 'auto'
+      };
+      resultado['comite'] = resultado['copasst'];
+    }
+  } catch (e) {
+    sendLog(`[AUTO-RESULTADOS] Error calculando COPASST: ${e.message}`, 'WARN');
+  }
+
+  return resultado;
+}
+
+ipcMain.handle('get-objetivos-resultados-auto', async (event, companyName) => {
+  try {
+    sendLog(`[MAIN][AUTO-RESULTADOS] Calculando resultados auto para: ${companyName}`, 'INFO');
+    const autoData = await calculateAutoResultados(companyName);
+    sendLog(`[MAIN][AUTO-RESULTADOS] Resultados calculados: ${Object.keys(autoData).length} keywords`, 'INFO');
+    return { success: true, data: autoData };
+  } catch (error) {
+    sendLog(`[MAIN][AUTO-RESULTADOS] Error: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message, data: {} };
   }
 });
 
@@ -12445,7 +13016,12 @@ ipcMain.handle('get-gestion-integral-stats', async (event, companyName) => {
                 objetivos: { total: 0, cumplidos: 0, porcentaje: 0 },
                 plan_trabajo: { tareas_pendientes: 0, tareas_realizadas: 0, total: 0 },
                 rendicion_cuentas: { actas_realizadas: 0, proxima_fecha: null },
-                evaluacion_inicial: { disponible: false, cumplimiento: 0, hallazgosCriticos: 0 }
+                evaluacion_inicial: {
+                    disponible: false,
+                    combinado: { cumplimiento: 0, hallazgosCriticos: 0, hallazgosParciales: 0, hallazgosCumplidos: 0, totalHallazgos: 0 },
+                    ministerio: { disponible: false, cumplimiento: 0, hallazgosCriticos: 0, hallazgosParciales: 0, hallazgosCumplidos: 0, totalHallazgos: 0, ultimoInforme: null },
+                    arl: { disponible: false, cumplimiento: 0, hallazgosCriticos: 0, hallazgosParciales: 0, hallazgosCumplidos: 0, totalHallazgos: 0, ultimoInforme: null }
+                }
             }
         };
     }
@@ -12555,7 +13131,13 @@ async function calculateObjetivosStats(basePath) {
     total: 0,
     cumplidos: 0,
     porcentaje: 0,
-    vencidos: 0
+    vencidos: 0,
+    porPrincipio: {
+      1: { total: 0, cumplidos: 0, porcentaje: 0 },
+      2: { total: 0, cumplidos: 0, porcentaje: 0 },
+      3: { total: 0, cumplidos: 0, porcentaje: 0 },
+      4: { total: 0, cumplidos: 0, porcentaje: 0 }
+    }
   };
 
   try {
@@ -12600,7 +13182,9 @@ async function calculateObjetivosStats(basePath) {
         const worksheet = workbook.Sheets[sheetName];
         const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
 
-        // Asumir que hay columnas: Objetivo, Estado/Cumplimiento, Fecha
+        // Estructura Excel:
+        // B(1): Objetivo, C(2): Indicador, D(3): Fórmula, E(4): Meta,
+        // F(5): Frecuencia, G(6): Responsable, H(7): Principle ID (1-4)
         for (let i = 1; i < data.length; i++) {
             const row = data[i];
             if (!row || row.length < 2) continue;
@@ -12611,15 +13195,32 @@ async function calculateObjetivosStats(basePath) {
 
             stats.total++;
 
+            // Determinar principleId (columna H, índice 7)
+            let principleId = parseInt(row[7]) || null;
+            if (!principleId || principleId < 1 || principleId > 4) {
+                principleId = 1; // Default a principio 1
+            }
+
+            stats.porPrincipio[principleId].total++;
+
             // Verificar estado de cumplimiento
             const estado = (row[2] || row[3] || '').toString().toLowerCase();
-            if (estado.includes('cumplido') || estado.includes('realizado') || estado.includes('completado') || estado === 'si') {
+            const cumplido = estado.includes('cumplido') || estado.includes('realizado') || estado.includes('completado') || estado === 'si';
+            if (cumplido) {
                 stats.cumplidos++;
+                stats.porPrincipio[principleId].cumplidos++;
             }
         }
 
+        // Calcular porcentajes
         if (stats.total > 0) {
             stats.porcentaje = Math.round((stats.cumplidos / stats.total) * 100);
+        }
+        for (const pid of [1, 2, 3, 4]) {
+            const p = stats.porPrincipio[pid];
+            if (p.total > 0) {
+                p.porcentaje = Math.round((p.cumplidos / p.total) * 100);
+            }
         }
     }
   } catch (error) {
@@ -13167,6 +13768,7 @@ async function calculateEvaluacionInicialStats(basePath) {
         // Si solo hay uno, usar sus datos como combinado
         if (!stats.ministerio.disponible && stats.arl.disponible) {
             stats.combinado = {
+                disponible: true,
                 cumplimiento: stats.arl.cumplimiento,
                 hallazgosCriticos: stats.arl.hallazgosCriticos,
                 hallazgosParciales: stats.arl.hallazgosParciales,
@@ -13175,6 +13777,7 @@ async function calculateEvaluacionInicialStats(basePath) {
             };
         } else if (stats.ministerio.disponible && !stats.arl.disponible) {
             stats.combinado = {
+                disponible: true,
                 cumplimiento: stats.ministerio.cumplimiento,
                 hallazgosCriticos: stats.ministerio.hallazgosCriticos,
                 hallazgosParciales: stats.ministerio.hallazgosParciales,
@@ -13182,13 +13785,16 @@ async function calculateEvaluacionInicialStats(basePath) {
                 totalHallazgos: stats.ministerio.totalHallazgos
             };
         } else {
-            // Ambos disponibles - promediar cumplimiento, sumar hallazgos
+            // Ambos disponibles - calcular cumplimiento desde totales sumados
+            const totalCumplidos = stats.ministerio.hallazgosCumplidos + stats.arl.hallazgosCumplidos;
+            const totalItems = stats.ministerio.totalHallazgos + stats.arl.totalHallazgos;
             stats.combinado = {
-                cumplimiento: Math.round((stats.ministerio.cumplimiento + stats.arl.cumplimiento) / 2),
+                disponible: true,
+                cumplimiento: totalItems > 0 ? Math.round((totalCumplidos / totalItems) * 100) : 0,
                 hallazgosCriticos: stats.ministerio.hallazgosCriticos + stats.arl.hallazgosCriticos,
                 hallazgosParciales: stats.ministerio.hallazgosParciales + stats.arl.hallazgosParciales,
-                hallazgosCumplidos: stats.ministerio.hallazgosCumplidos + stats.arl.hallazgosCumplidos,
-                totalHallazgos: stats.ministerio.totalHallazgos + stats.arl.totalHallazgos
+                hallazgosCumplidos: totalCumplidos,
+                totalHallazgos: totalItems
             };
         }
     }
@@ -15243,6 +15849,142 @@ return await excelBridge.leerCaracterizacion(rutas && rutas.caracterizacion);
         code: 'EXCEL_READ_ERROR', 
         message: error.message 
       } 
+    };
+  }
+});
+
+// Contar AT por mes desde Registro Estadístico 3.2.3 (auto-fill)
+ipcMain.handle('frecuencia-accidentalidad:contar-at-por-mes', async (event, year, companyName) => {
+  try {
+    // Buscar el Excel de 3.2.3 (Registro Estadístico)
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+    const normalizedInput = (companyName || '').toLowerCase();
+    const companyKey = Object.keys(config.companyPaths || {}).find(
+      key => key.toLowerCase() === normalizedInput
+    );
+    const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+
+    var rutaRegistro = null;
+    if (companyConfig && companyConfig.root) {
+      try {
+        const gsDir = path.join(companyConfig.root, '3. Gestión de la Salud');
+        const gsEntries = await fsp.readdir(gsDir);
+        const folder323 = gsEntries.find(function(f) { return f.startsWith('3.2.3'); });
+        if (folder323) {
+          const subDir = path.join(gsDir, folder323);
+          const subEntries = await fsp.readdir(subDir);
+          const xlsxFile = subEntries.find(function(f) {
+            return f.toLowerCase().endsWith('.xlsx') && !f.startsWith('~$');
+          });
+          if (xlsxFile) rutaRegistro = path.join(subDir, xlsxFile);
+        }
+      } catch (e) {
+        console.warn('[FrecuenciaAccidentalidad] Error buscando 3.2.3:', e.message);
+      }
+    }
+
+    console.log('[FrecuenciaAccidentalidad] Ruta registro 3.2.3:', rutaRegistro);
+    return await excelBridge.contarATPorMes(year, rutaRegistro);
+  } catch (error) {
+    console.error('[FrecuenciaAccidentalidad] Error contando AT por mes:', error);
+    return {
+      success: false,
+      error: {
+        code: 'EXCEL_READ_ERROR',
+        message: error.message
+      }
+    };
+  }
+});
+
+// Leer meta de Objetivos SST para frecuencia
+ipcMain.handle('frecuencia-accidentalidad:leer-meta-objetivo', async (event, companyName) => {
+  try {
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+    const normalizedInput = (companyName || '').toLowerCase();
+    const companyKey = Object.keys(config.companyPaths || {}).find(
+      key => key.toLowerCase() === normalizedInput
+    );
+    const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+
+    if (!companyConfig || !companyConfig.root) {
+      return { success: true, data: null };
+    }
+
+    // Buscar carpeta "2. Gestión Integral del SG-SST" → "2.2.1 Objetivos SST"
+    var rutaObjetivos = null;
+    try {
+      const giDir = path.join(companyConfig.root, '2. Gestión Integral del SG-SST');
+      const giEntries = await fsp.readdir(giDir);
+      const folder221 = giEntries.find(function(f) { return f.startsWith('2.2.1'); });
+      if (folder221) {
+        const subDir = path.join(giDir, folder221);
+        const subEntries = await fsp.readdir(subDir);
+        const xlsxFile = subEntries.find(function(f) {
+          return f.toLowerCase().endsWith('.xlsx') && !f.startsWith('~$');
+        });
+        if (xlsxFile) rutaObjetivos = path.join(subDir, xlsxFile);
+      }
+    } catch (e) {
+      console.warn('[FrecuenciaAccidentalidad] Error buscando 2.2.1:', e.message);
+    }
+
+    if (!rutaObjetivos) {
+      console.log('[FrecuenciaAccidentalidad] No se encontró Excel de objetivos');
+      return { success: true, data: null };
+    }
+
+    console.log('[FrecuenciaAccidentalidad] Leyendo meta desde:', rutaObjetivos);
+
+    const XLSX = require('xlsx');
+    const wb = XLSX.readFile(rutaObjetivos);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    if (!ws) return { success: true, data: null };
+
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    if (rows.length < 2) return { success: true, data: null };
+
+    // Buscar fila donde Col C contenga "frecuencia" y "accidentalidad"
+    var metaFrecuencia = null;
+    var metaTextoFrecuencia = '';
+    var formulaFrecuencia = '';
+
+    for (var r = 0; r < rows.length; r++) {
+      var colC = String(rows[r][2] || '').trim().toLowerCase();
+      if (colC.indexOf('frecuencia') >= 0 && colC.indexOf('accidentalidad') >= 0) {
+        var metaRaw = String(rows[r][4] || '').trim();
+        formulaFrecuencia = String(rows[r][3] || '').trim();
+        metaTextoFrecuencia = metaRaw;
+
+        // Parsear: extraer número de "<1", "< 1", "1.5", etc.
+        var match = metaRaw.match(/[\d.]+/);
+        if (match) {
+          metaFrecuencia = parseFloat(match[0]);
+        }
+        console.log('[FrecuenciaAccidentalidad] Meta encontrada:', metaRaw, '→', metaFrecuencia);
+        break;
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        meta: metaFrecuencia,
+        metaTexto: metaTextoFrecuencia,
+        formula: formulaFrecuencia,
+        fuente: rutaObjetivos
+      }
+    };
+  } catch (error) {
+    console.error('[FrecuenciaAccidentalidad] Error leyendo meta objetivo:', error);
+    return {
+      success: false,
+      error: {
+        code: 'EXCEL_READ_ERROR',
+        message: error.message
+      }
     };
   }
 });

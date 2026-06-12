@@ -585,6 +585,93 @@ flex-shrink: 0;
             font-size: 0.7rem;
         }
 
+        .k-cell-resultado {
+            font-size: 0.68rem;
+            line-height: 1.3;
+            color: var(--k-text);
+            max-width: 140px;
+        }
+
+        .k-cell-resultado .resultado-text {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            margin-bottom: 4px;
+        }
+
+        .k-cell-resultado .resultado-porcentaje {
+            font-weight: 600;
+            font-size: 0.65rem;
+        }
+
+        .k-cell-resultado .resultado-porcentaje.bueno { color: var(--k-green); }
+        .k-cell-resultado .resultado-porcentaje.medio { color: var(--k-amber); }
+        .k-cell-resultado .resultado-porcentaje.malo  { color: var(--k-red); }
+
+        .k-cell-resultado .resultado-empty {
+            color: var(--k-text-muted);
+            font-style: italic;
+            font-size: 0.65rem;
+        }
+
+        .k-btn-add-resultado {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 2px 6px;
+            border-radius: var(--k-radius-sm);
+            border: 1px solid var(--k-border);
+            background: var(--k-bg-surface);
+            color: var(--k-text-muted);
+            font-size: 0.6rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .k-btn-add-resultado:hover {
+            background: var(--k-primary-subtle);
+            border-color: var(--k-primary);
+            color: var(--k-primary);
+        }
+
+        .k-res-auto {
+            background: #e3f2fd;
+            border-left: 2px solid #1976d2;
+            padding-left: 4px;
+        }
+
+        .k-res-manual {
+            background: #e8f5e9;
+            border-left: 2px solid #388e3c;
+            padding-left: 4px;
+        }
+
+        .k-res-badge {
+            font-size: 0.7rem;
+            margin-right: 2px;
+        }
+
+        .k-refresh-auto-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            border-radius: var(--k-radius-sm);
+            border: 1px solid var(--k-border);
+            background: var(--k-bg-surface);
+            color: var(--k-text-muted);
+            font-size: 0.65rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .k-refresh-auto-btn:hover {
+            background: var(--k-primary-subtle);
+            color: var(--k-primary);
+            border-color: var(--k-primary);
+        }
+
         .k-col-actions { text-align: center; width: 40px; }
 
         .k-btn-icon {
@@ -910,6 +997,9 @@ flex-shrink: 0;
         </div>
       </div>
       <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+        <button class="k-refresh-auto-btn" onclick="refreshAutoResultados()" title="Recalcular resultados desde submódulos">
+          <i class="bi bi-arrow-clockwise"></i> Recalcular
+        </button>
         <span id="syncStatus" class="k-sync-badge k-sync-synced">
           <i class="bi bi-check-circle-fill"></i> Sincronizado
         </span>
@@ -1007,12 +1097,13 @@ flex-shrink: 0;
                     <table class="k-data-table">
                         <thead>
                             <tr>
-                                <th style="width: 24%">Objetivo Estratégico</th>
-                                <th style="width: 20%">Indicador</th>
-                                <th style="width: 18%">Fórmula</th>
-                                <th style="width: 8%">Meta</th>
-                                <th style="width: 10%">Frecuencia</th>
-                                <th style="width: 14%">Responsable</th>
+                                <th style="width: 22%">Objetivo Estratégico</th>
+                                <th style="width: 18%">Indicador</th>
+                                <th style="width: 15%">Fórmula</th>
+                                <th style="width: 7%">Meta</th>
+                                <th style="width: 9%">Frecuencia</th>
+                                <th style="width: 12%">Responsable</th>
+                                <th style="width: 12%">Resultados</th>
                                 <th class="k-col-actions"></th>
                             </tr>
                         </thead>
@@ -1061,6 +1152,63 @@ flex-shrink: 0;
                 <i class="bi bi-arrow-counterclockwise"></i>
                 Restaurar Auto-detección
             </button>
+        </div>
+    </div>
+
+    <!-- Modal de Resultados -->
+    <div class="k-modal-backdrop hidden" id="resultadoModalBackdrop">
+        <div class="k-modal" id="resultadoModal">
+            <div class="k-modal-header accent-p3">
+                <div class="k-modal-header-left">
+                    <div class="k-modal-icon icon-p3">
+                        <i class="bi bi-clipboard-check"></i>
+                    </div>
+                    <div>
+                        <div class="k-modal-title">Registrar Resultado</div>
+                        <div class="k-modal-subtitle" id="resultadoObjective">Objetivo</div>
+                        <div class="k-modal-subtitle" id="resultadoIndicator" style="font-weight:600;margin-top:2px;">Indicador</div>
+                    </div>
+                </div>
+                <button class="k-modal-close" onclick="closeResultadoModal()">
+                    <i class="bi bi-lg"></i>
+                </button>
+            </div>
+            <div class="k-modal-body">
+                <div class="k-form-section">
+                    <div class="k-form-group">
+                        <label class="k-form-label">Fórmula</label>
+                        <input type="text" class="k-form-control" id="resultadoFormula" readonly style="background:#f8f9fa;font-size:0.75rem;">
+                    </div>
+                    <div class="k-form-group">
+                        <label class="k-form-label">Meta</label>
+                        <input type="text" class="k-form-control" id="resultadoGoal" readonly style="background:#f8f9fa;font-size:0.75rem;">
+                    </div>
+                    <div class="k-form-section-label">
+                        <i class="bi bi-pencil-square"></i> Resultado Obtenido
+                    </div>
+                    <div class="k-form-group">
+                        <label class="k-form-label">Descripción del resultado <span class="k-required">*</span></label>
+                        <textarea class="k-form-control" id="resultadoInput" rows="3"
+                            placeholder="Ej: IF promedio 0.50 (meta 5.0), 1 AT este año..."></textarea>
+                    </div>
+                    <div class="k-form-group">
+                        <label class="k-form-label">Porcentaje real de cumplimiento (%)</label>
+                        <input type="number" class="k-form-control" id="resultadoPorcentaje"
+                            min="0" max="100" placeholder="Ej: 80">
+                    </div>
+                </div>
+            </div>
+            <div class="k-modal-footer">
+                <div class="k-modal-footer-meta">
+                    <i class="bi bi-info-circle"></i> Este dato se guarda en JSON (Google Drive), no en el Excel
+                </div>
+                <div class="k-modal-footer-actions">
+                    <button class="k-btn k-btn-sm" onclick="closeResultadoModal()">Cancelar</button>
+                    <button class="k-btn k-btn-primary" onclick="saveResultadoModal()">
+                        <i class="bi bi-save"></i> Guardar Resultado
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 

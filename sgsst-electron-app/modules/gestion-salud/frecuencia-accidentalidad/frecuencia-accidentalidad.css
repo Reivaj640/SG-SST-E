@@ -910,3 +910,10 @@ body {
   border-radius: var(--kair-radius);
   font-size: 0.85rem;
 }
+
+/* ── Badge Auto AT ── */
+.freq-badge-auto {
+  font-size: 11px;
+  margin-right: 2px;
+  cursor: help;
+}

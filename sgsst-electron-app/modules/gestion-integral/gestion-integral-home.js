@@ -64,6 +64,16 @@ class GestionIntegralHome {
         contentContainer.appendChild(mainArea);
         layout.appendChild(contentContainer);
         this.container.appendChild(layout);
+
+        // Listen for fullscreen changes to update chart texts
+        if (window.electronAPI?.onFullscreenChanged) {
+            this._removeFullscreenListener = window.electronAPI.onFullscreenChanged((isFullscreen) => {
+                this.updateChartTexts(isFullscreen);
+            });
+        }
+
+        // Set initial text state (windowed = abbreviated)
+        this.updateChartTexts(false);
     }
 
     injectStyles() {
@@ -234,8 +244,17 @@ overflow-y: auto;
                 font-weight: 700;
                 color: var(--k-text-main);
                 margin-bottom: 0.75rem;
+                text-align: center;
                 overflow-wrap: break-word;
                 word-wrap: break-word;
+            }
+
+            /* Descripción del widget (estilo estándar) */
+            .kb-description {
+                font-size: 0.72rem;
+                color: var(--k-text-muted);
+                text-align: center;
+                margin-bottom: 4px;
             }
 
             /* Barra de Progreso */
@@ -298,7 +317,40 @@ overflow-y: auto;
                 background-color: var(--k-danger) !important;
             }
 
+            /* Toggle Buttons (estilo estándar Gestión de la Salud) */
+            .ausentismo-toggles {
+                display: flex;
+                gap: 4px;
+                margin: 4px 0;
+                background: #f1f3f4;
+                padding: 3px;
+                border-radius: 6px;
+            }
+            .ausentismo-toggle {
+                flex: 1;
+                border: none;
+                background: transparent;
+                font-size: 0.7rem;
+                padding: 2px 6px;
+                border-radius: var(--k-radius-md);
+                cursor: pointer;
+                color: var(--k-text-muted);
+                transition: all 0.2s;
+            }
+            .ausentismo-toggle.active {
+                background: white;
+                color: var(--k-primary);
+                box-shadow: var(--k-shadow-sm);
+                font-weight: 600;
+            }
+
             /* Secciones de Gráficos y Listas */
+            .charts-grid {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 1.25rem;
+            }
+
             .chart-container {
                 background: var(--k-bg-card);
                 border: 1px solid var(--k-border);
@@ -427,9 +479,10 @@ overflow-y: auto;
             
             .chart-legend {
                 flex: 1;
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-                gap: 0.75rem;
+                display: flex;
+                flex-direction: column;
+                gap: 0.6rem;
+                justify-content: center;
             }
             
             .legend-item {
@@ -491,14 +544,25 @@ overflow-y: auto;
                 flex-shrink: 0;
             }
 
+            /* =========================================
+               GRÁFICA DE OBJETIVOS SST (BARRAS)
+               ========================================= */
+            .objetivos-chart-wrapper {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                min-height: 0;
+                padding: 0.5rem 0;
+            }
+            .objetivos-chart-wrapper canvas {
+                flex: 1;
+                min-height: 220px;
+            }
+
             /* Responsive para la gráfica */
             .chart-container {
                 overflow-x: hidden;
                 max-width: 100%;
-            }
-            
-            .chart-content {
-                flex-wrap: wrap;
             }
             
             .donut-chart-wrapper {
@@ -506,28 +570,24 @@ overflow-y: auto;
             }
             
             @media (max-width: 992px) {
+                .charts-grid {
+                    grid-template-columns: 1fr;
+                }
                 .chart-content {
                     gap: 1.5rem;
                 }
-                
-                .chart-legend {
-                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                }
-                
                 .legend-item {
                     padding: 0.6rem 0.85rem;
                 }
             }
             
             @media (max-width: 768px) {
+                .charts-grid {
+                    grid-template-columns: 1fr;
+                }
                 .chart-content {
                     flex-direction: column;
                     align-items: center;
-                }
-
-                .chart-legend {
-                    width: 100%;
-                    grid-template-columns: 1fr;  /* 1 columna en móvil */
                 }
                 
                 .chart-stats {
@@ -890,8 +950,16 @@ gap: 1rem;
         container.appendChild(widgetsContainer);
 
         // === NUEVA GRÁFICA DE DONA PARA AVANCE DEL PLAN ANUAL ===
+        const chartsGrid = document.createElement('div');
+        chartsGrid.className = 'charts-grid';
         const chartContainer = this.createAnnualPlanChart(plan_trabajo);
-        container.appendChild(chartContainer);
+        chartsGrid.appendChild(chartContainer);
+
+        // === GRÁFICA DE OBJETIVOS SST POR PRINCIPIO ===
+        const objetivosChartContainer = this.createObjetivosChart(objetivos);
+        chartsGrid.appendChild(objetivosChartContainer);
+
+        container.appendChild(chartsGrid);
 
         const submodulesContainer = document.createElement('div');
         submodulesContainer.className = 'submodules-container';
@@ -914,11 +982,13 @@ gap: 1rem;
     
     createWidget(title, value, description) {
         const widget = document.createElement('div');
-        widget.className = 'widget';
+        widget.className = 'widget k-budget-card';
         widget.innerHTML = `
-            <h4>${title}</h4>
-            <div class="widget-value">${value}</div>
-            <div class="widget-description">${description}</div>
+            <div class="kb-header">
+                <span class="kb-title">${title}</span>
+            </div>
+            <div class="kb-amount">${value}</div>
+            <div class="kb-description">${description}</div>
         `;
         return widget;
     }
@@ -950,6 +1020,7 @@ gap: 1rem;
             <div class="kb-amount" style="font-size: 1.4rem;">
                 ${stats.actividadesEjecutadas} / ${stats.actividadesProgramadas}
             </div>
+            <div class="kb-description">Actividades del plan anual ejecutadas</div>
 
             <div class="kb-progress-track">
                 <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};"></div>
@@ -1003,6 +1074,7 @@ gap: 1rem;
             <div class="kb-amount" style="font-size: 1.4rem;">
                 ${stats.vigentes} / ${stats.total}
             </div>
+            <div class="kb-description">Documentos con vigencia verificada</div>
 
             <div class="kb-progress-track">
                 <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};"></div>
@@ -1093,7 +1165,6 @@ gap: 1rem;
 
         console.log('[EvaluacionWidget] Filtro:', this.evaluacionFilter, 'Datos a mostrar:', data);
 
-        const disponible = data.disponible || false;
         const cumplimiento = data.cumplimiento || 0;
         const hallazgosCriticos = data.hallazgosCriticos || 0;
         const totalHallazgos = data.totalHallazgos || 0;
@@ -1114,43 +1185,30 @@ gap: 1rem;
         w.className = 'widget k-budget-card';
         w.id = 'evaluacion-inicial-widget';
 
-        // Función para actualizar el filtro
-        const updateFilter = (newFilter) => {
-            this.evaluacionFilter = newFilter;
-            // Re-renderizar el widget
-            const container = w.parentElement;
-            if (container) {
-                const newWidget = this.createEvaluacionInicialWidget(stats);
-                container.replaceChild(newWidget, w);
-            }
-        };
-
         w.innerHTML = `
             <div class="kb-header">
                 <span class="kb-title">📋 Evaluación Inicial</span>
                 <span class="kb-badge ${colorClass}">${cumplimiento}%</span>
             </div>
 
-            <div class="eval-filter-group" style="display: flex; gap: 4px; margin-top: 8px;">
-                <button class="eval-filter-btn ${this.evaluacionFilter === 'combinado' ? 'active' : ''}" 
-                        onclick="window.currentGestionIntegralHome.updateEvaluacionFilter('combinado')"
-                        style="flex: 1; padding: 4px 8px; font-size: 0.7rem; border: 1px solid var(--k-border); border-radius: 4px; background: ${this.evaluacionFilter === 'combinado' ? 'var(--k-primary)' : 'var(--k-bg-card)'}; color: ${this.evaluacionFilter === 'combinado' ? 'white' : 'var(--k-text-muted)'}; cursor: pointer;">
+            <div class="ausentismo-toggles">
+                <button class="ausentismo-toggle ${this.evaluacionFilter === 'combinado' ? 'active' : ''}" 
+                        onclick="window.currentGestionIntegralHome.updateEvaluacionFilter('combinado')">
                     Todo
                 </button>
-                <button class="eval-filter-btn ${this.evaluacionFilter === 'ministerio' ? 'active' : ''}" 
-                        onclick="window.currentGestionIntegralHome.updateEvaluacionFilter('ministerio')"
-                        style="flex: 1; padding: 4px 8px; font-size: 0.7rem; border: 1px solid var(--k-border); border-radius: 4px; background: ${this.evaluacionFilter === 'ministerio' ? 'var(--k-primary)' : 'var(--k-bg-card)'}; color: ${this.evaluacionFilter === 'ministerio' ? 'white' : 'var(--k-text-muted)'}; cursor: pointer;">
+                <button class="ausentismo-toggle ${this.evaluacionFilter === 'ministerio' ? 'active' : ''}" 
+                        onclick="window.currentGestionIntegralHome.updateEvaluacionFilter('ministerio')">
                     🏛️ Min
                 </button>
-                <button class="eval-filter-btn ${this.evaluacionFilter === 'arl' ? 'active' : ''}" 
-                        onclick="window.currentGestionIntegralHome.updateEvaluacionFilter('arl')"
-                        style="flex: 1; padding: 4px 8px; font-size: 0.7rem; border: 1px solid var(--k-border); border-radius: 4px; background: ${this.evaluacionFilter === 'arl' ? 'var(--k-primary)' : 'var(--k-bg-card)'}; color: ${this.evaluacionFilter === 'arl' ? 'white' : 'var(--k-text-muted)'}; cursor: pointer;">
+                <button class="ausentismo-toggle ${this.evaluacionFilter === 'arl' ? 'active' : ''}" 
+                        onclick="window.currentGestionIntegralHome.updateEvaluacionFilter('arl')">
                     🛡️ ARL
                 </button>
             </div>
 
             <div class="kb-amount" style="font-size: 1.4rem; margin-top: 12px;">
             </div>
+            <div class="kb-description">Cumplimiento de estándares del SG-SST</div>
 
             <div class="kb-progress-track">
                 <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};"></div>
@@ -1199,12 +1257,19 @@ gap: 1rem;
             const evaluacionStats = this.gestionIntegralStats.evaluacion_inicial || {};
             const newWidget = this.createEvaluacionInicialWidget(evaluacionStats);
             
-            // Insertar en la posición correcta (después del widget de Plan de Trabajo)
-            const planTrabajoWidget = container.children[2];
-            if (planTrabajoWidget) {
-                container.insertBefore(newWidget, planTrabajoWidget.nextSibling);
+            // Insertar después del widget de Evaluación Inicial original (o al final)
+            const evalWidget = document.getElementById('evaluacion-inicial-widget');
+            if (evalWidget && evalWidget.parentElement === container) {
+                // Re-insertar en la misma posición que el widget original
+                container.insertBefore(newWidget, evalWidget.nextSibling);
             } else {
-                container.appendChild(newWidget);
+                // Fallback: insertar después del 3er widget (Plan de Trabajo)
+                const planTrabajoWidget = container.children[2];
+                if (planTrabajoWidget) {
+                    container.insertBefore(newWidget, planTrabajoWidget.nextSibling);
+                } else {
+                    container.appendChild(newWidget);
+                }
             }
         }
     }
@@ -1238,10 +1303,20 @@ gap: 1rem;
             statusText = 'Progreso moderado';
             progressColor = 'var(--k-warning)';
         }
+
+        // Store metadata for fullscreen/windowed text switching
+        this._chartMeta = {
+            currentYear,
+            lastUpdatedText: this.getLastUpdatedText(stats.ultimoMesRegistrado),
+            statusText,
+            statusClass,
+            percentage,
+            expectedProgress
+        };
         
         // SVG Parameters
-        const size = 200;
-        const strokeWidth = 20;
+        const size = 160;
+        const strokeWidth = 18;
         const radius = (size - strokeWidth) / 2;
         const circumference = 2 * Math.PI * radius;
         const offset = circumference - (percentage / 100) * circumference;
@@ -1252,16 +1327,16 @@ gap: 1rem;
         container.innerHTML = `
             <div class="chart-header">
                 <div>
-                    <h3 class="chart-title">📈 Avance del Plan Anual SST</h3>
-                    <p class="chart-subtitle">Plan de Trabajo ${currentYear} • Actualizado ${this.getLastUpdatedText(stats.ultimoMesRegistrado)}</p>
+                    <h3 class="chart-title" id="chart-title">📈 Avance del Plan Anual SST</h3>
+                    <p class="chart-subtitle" id="chart-subtitle">Plan de Trabajo ${currentYear} • Actualizado ${this.getLastUpdatedText(stats.ultimoMesRegistrado)}</p>
                 </div>
-                <div class="chart-badge ${statusClass}">
+                <div class="chart-badge ${statusClass}" id="chart-badge">
                     <i class="bi bi-${percentage >= expectedProgress ? 'check-circle-fill' : 'exclamation-triangle-fill'}"></i>
                     ${statusText}
                 </div>
             </div>
             
-            <div class="chart-content">
+            <div class="chart-content" id="plan-chart-content">
                 <div class="donut-chart-wrapper">
                     <svg class="donut-chart-svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
                         <circle 
@@ -1293,7 +1368,7 @@ gap: 1rem;
                     <div class="legend-item">
                         <div class="legend-dot" style="background: var(--k-success);"></div>
                         <div class="legend-info">
-                            <div class="legend-title">Actividades Ejecutadas</div>
+                            <div class="legend-title" id="legend-title-1">Act. Ejec.</div>
                             <div class="legend-description">Completadas satisfactoriamente</div>
                         </div>
                         <div class="legend-value" style="color: var(--k-success);">${executed}</div>
@@ -1302,7 +1377,7 @@ gap: 1rem;
                     <div class="legend-item">
                         <div class="legend-dot" style="background: var(--k-warning);"></div>
                         <div class="legend-info">
-                            <div class="legend-title">Actividades Pendientes</div>
+                            <div class="legend-title" id="legend-title-2">Act. Pend.</div>
                             <div class="legend-description">En proceso o por iniciar</div>
                         </div>
                         <div class="legend-value" style="color: var(--k-warning);">${pending}</div>
@@ -1311,7 +1386,7 @@ gap: 1rem;
                     <div class="legend-item">
                         <div class="legend-dot" style="background: var(--k-info);"></div>
                         <div class="legend-info">
-                            <div class="legend-title">Total Programadas</div>
+                            <div class="legend-title" id="legend-title-3">Total Prog.</div>
                             <div class="legend-description">Plan anual completo</div>
                         </div>
                         <div class="legend-value">${total}</div>
@@ -1342,6 +1417,179 @@ gap: 1rem;
         }, 100);
         
         this.animateCounter(percentageText, 0, percentage, 1500, '%');
+    }
+
+    /**
+     * Crea la gráfica de barras horizontales para Objetivos SST por principio
+     */
+    createObjetivosChart(objetivos) {
+        const porPrincipio = objetivos.porPrincipio || {
+            1: { total: 0, cumplidos: 0, porcentaje: 0 },
+            2: { total: 0, cumplidos: 0, porcentaje: 0 },
+            3: { total: 0, cumplidos: 0, porcentaje: 0 },
+            4: { total: 0, cumplidos: 0, porcentaje: 0 }
+        };
+
+        const container = document.createElement('div');
+        container.className = 'chart-container';
+
+        const statusClass = objetivos.porcentaje >= 70 ? 'chart-badge-success'
+            : objetivos.porcentaje >= 40 ? 'chart-badge-warning'
+            : 'chart-badge-danger';
+
+        container.innerHTML = `
+            <div class="chart-header">
+                <div>
+                    <h3 class="chart-title" id="obj-chart-title">📊 Objetivos SST</h3>
+                    <p class="chart-subtitle" id="obj-chart-subtitle">${objetivos.cumplidos}/${objetivos.total} cumplidos</p>
+                </div>
+                <div class="chart-badge ${statusClass}" id="obj-chart-badge">
+                    <i class="bi bi-${objetivos.porcentaje >= 70 ? 'check-circle-fill' : 'exclamation-triangle-fill'}"></i>
+                    ${objetivos.porcentaje}% cumplimiento
+                </div>
+            </div>
+            <div class="objetivos-chart-wrapper">
+                <canvas id="objetivosChart"></canvas>
+            </div>
+        `;
+
+        // Guardar textos para switching fullscreen
+        this._objChartMeta = {
+            total: objetivos.total,
+            cumplidos: objetivos.cumplidos,
+            porcentaje: objetivos.porcentaje
+        };
+
+        // Renderizar Chart.js después de insertar en DOM
+        setTimeout(() => {
+            this._renderObjetivosBarChart(porPrincipio, objetivos);
+        }, 100);
+
+        return container;
+    }
+
+    /**
+     * Renderiza la gráfica de barras horizontales con Chart.js
+     */
+    _renderObjetivosBarChart(porPrincipio, objetivos) {
+        if (typeof Chart === 'undefined') return;
+        const canvas = document.getElementById('objetivosChart');
+        if (!canvas) return;
+
+        const existingChart = Chart.getChart(canvas);
+        if (existingChart) existingChart.destroy();
+
+        const labels = ['Principio 1', 'Principio 2', 'Principio 3', 'Principio 4'];
+        const cumplidos = [1, 2, 3, 4].map(pid => porPrincipio[pid].cumplidos);
+        const pendientes = [1, 2, 3, 4].map(pid => porPrincipio[pid].total - porPrincipio[pid].cumplidos);
+
+        new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Cumplidos',
+                        data: cumplidos,
+                        backgroundColor: 'rgba(23, 78, 166, 0.8)',
+                        borderColor: '#174ea6',
+                        borderWidth: 1,
+                        borderRadius: 3
+                    },
+                    {
+                        label: 'Pendientes',
+                        data: pendientes,
+                        backgroundColor: 'rgba(200, 200, 200, 0.4)',
+                        borderColor: '#c8c8c8',
+                        borderWidth: 1,
+                        borderRadius: 3
+                    }
+                ]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        stacked: true,
+                        beginAtZero: true,
+                        ticks: { stepSize: 1, precision: 0, font: { size: 11 } },
+                        title: { display: true, text: 'Cantidad', font: { size: 10 } }
+                    },
+                    y: {
+                        stacked: true,
+                        ticks: { font: { size: 11, weight: '500' } }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { padding: 15, usePointStyle: true, pointStyle: 'rectRounded', font: { size: 11 } }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => {
+                                const pid = ctx.dataIndex + 1;
+                                const p = porPrincipio[pid];
+                                return ` ${ctx.dataset.label}: ${ctx.raw} (${p.total > 0 ? Math.round((ctx.raw / p.total) * 100) : 0}%)`;
+                            },
+                            afterBody: (tooltipItems) => {
+                                const pid = tooltipItems[0].dataIndex + 1;
+                                const p = porPrincipio[pid];
+                                return `Total: ${p.cumplidos}/${p.total} (${p.porcentaje}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * Actualiza textos del chart según modo ventana/pantalla completa
+     */
+    updateChartTexts(isFullscreen) {
+        const meta = this._chartMeta;
+        if (!meta) return;
+
+        const title = document.getElementById('chart-title');
+        const subtitle = document.getElementById('chart-subtitle');
+        const badge = document.getElementById('chart-badge');
+        const legend1 = document.getElementById('legend-title-1');
+        const legend2 = document.getElementById('legend-title-2');
+        const legend3 = document.getElementById('legend-title-3');
+
+        if (title) {
+            title.textContent = isFullscreen
+                ? '📈 Avance del Plan Anual SST'
+                : '📈 Plan Anual SST';
+        }
+
+        if (subtitle) {
+            subtitle.textContent = isFullscreen
+                ? `Plan de Trabajo ${meta.currentYear} • Actualizado ${meta.lastUpdatedText}`
+                : `Plan ${meta.currentYear} • ${meta.lastUpdatedText}`;
+        }
+
+        if (badge) {
+            const statusMap = {
+                'Requiere atención urgente': { full: 'Requiere atención urgente', short: 'Atención urgente' },
+                'Progreso moderado': { full: 'Progreso moderado', short: 'Moderado' },
+                'En buen camino': { full: 'En buen camino', short: 'En buen camino' }
+            };
+            const mapped = statusMap[meta.statusText];
+            if (mapped) {
+                const icon = meta.percentage >= meta.expectedProgress
+                    ? 'check-circle-fill'
+                    : 'exclamation-triangle-fill';
+                badge.innerHTML = `<i class="bi bi-${icon}"></i> ${isFullscreen ? mapped.full : mapped.short}`;
+            }
+        }
+
+        if (legend1) legend1.textContent = isFullscreen ? 'Actividades Ejecutadas' : 'Act. Ejec.';
+        if (legend2) legend2.textContent = isFullscreen ? 'Actividades Pendientes' : 'Act. Pend.';
+        if (legend3) legend3.textContent = isFullscreen ? 'Total Programadas' : 'Total Prog.';
     }
 
     /**

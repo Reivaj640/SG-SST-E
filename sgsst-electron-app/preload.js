@@ -41,6 +41,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('system-theme-changed', listener);
     return () => ipcRenderer.removeListener('system-theme-changed', listener);
   },
+  onFullscreenChanged: (callback) => {
+    const listener = (event, isFullscreen) => callback(isFullscreen);
+    ipcRenderer.on('fullscreen-changed', listener);
+    return () => ipcRenderer.removeListener('fullscreen-changed', listener);
+  },
 
   // --- Manejo de archivos y directorios ---
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
@@ -291,6 +296,9 @@ ipcRenderer.invoke('get-indicadores-salud-stats', companyName),
   getObjetivosExcelPath: (companyName) => ipcRenderer.invoke('get-objetivos-excel-path', companyName),
   loadObjetivosExcelData: (filePath) => ipcRenderer.invoke('load-objetivos-excel-data', filePath),
   saveObjetivosExcelData: (filePath, data) => ipcRenderer.invoke('save-objetivos-excel-data', filePath, data),
+  getObjetivosResultados: (excelFilePath) => ipcRenderer.invoke('get-objetivos-resultados', excelFilePath),
+  saveObjetivosResultados: (excelFilePath, data) => ipcRenderer.invoke('save-objetivos-resultados', excelFilePath, data),
+  getObjetivosResultadosAuto: (companyName) => ipcRenderer.invoke('get-objetivos-resultados-auto', companyName),
 
   // --- Evaluación Inicial SG-SST ---
   processEvaluacionPdf: (pdfPath, sourceType) => ipcRenderer.invoke('process-evaluacion-pdf', pdfPath, sourceType),
@@ -318,6 +326,8 @@ frecuenciaAccidentalidad: {
   configurarRutas: (companyName, year) => ipcRenderer.invoke('frecuencia-accidentalidad:configurar-rutas', companyName, year),
   leerIndicadores: () => ipcRenderer.invoke('frecuencia-accidentalidad:leer-indicadores'),
   leerCaracterizacion: () => ipcRenderer.invoke('frecuencia-accidentalidad:leer-caracterizacion'),
+  contarATPorMes: (year, companyName) => ipcRenderer.invoke('frecuencia-accidentalidad:contar-at-por-mes', year, companyName),
+  leerMetaObjetivo: (companyName) => ipcRenderer.invoke('frecuencia-accidentalidad:leer-meta-objetivo', companyName),
   escribirEnExcel: (mes, campos) => ipcRenderer.invoke('frecuencia-accidentalidad:escribir-excel', mes, campos),
 },
 

@@ -65,6 +65,18 @@ class ObjetivosSSTComponent {
                 console.log('[objetivos-sst-logic.js][handleIframeMessage] Acción: save-excel-data-request');
                 this.handleSaveExcelDataRequest(event);
                 break;
+            case 'load-resultados-request':
+                console.log('[objetivos-sst-logic.js][handleIframeMessage] Acción: load-resultados-request');
+                this.handleLoadResultadosRequest(event);
+                break;
+            case 'save-resultados-request':
+                console.log('[objetivos-sst-logic.js][handleIframeMessage] Acción: save-resultados-request');
+                this.handleSaveResultadosRequest(event);
+                break;
+            case 'load-auto-resultados-request':
+                console.log('[objetivos-sst-logic.js][handleIframeMessage] Acción: load-auto-resultados-request');
+                this.handleLoadAutoResultadosRequest(event);
+                break;
             // Puedes añadir más casos para otras funcionalidades si es necesario
             default:
                 console.warn('[objetivos-sst-logic.js][handleIframeMessage] Mensaje no reconocido:', event.data.action);
@@ -164,6 +176,90 @@ class ObjetivosSSTComponent {
                 action: 'save-excel-data-response',
                 requestId,
                 success: false,
+                error: error.message
+            }, '*');
+        }
+    }
+
+    async handleLoadResultadosRequest(event) {
+        const { requestId, payload } = event.data;
+        const { excelFilePath } = payload;
+        console.log(`[objetivos-sst-logic.js][handleLoadResultadosRequest] Cargando resultados. requestId: ${requestId}`);
+
+        try {
+            if (!window.electronAPI || typeof window.electronAPI.getObjetivosResultados !== 'function') {
+                throw new Error('electronAPI.getObjetivosResultados no está disponible.');
+            }
+            const result = await window.electronAPI.getObjetivosResultados(excelFilePath);
+            event.source.postMessage({
+                action: 'load-resultados-response',
+                requestId,
+                success: result.success,
+                data: result.data,
+                error: result.error
+            }, '*');
+        } catch (error) {
+            console.error(`[objetivos-sst-logic.js][handleLoadResultadosRequest] Error:`, error);
+            event.source.postMessage({
+                action: 'load-resultados-response',
+                requestId,
+                success: false,
+                error: error.message
+            }, '*');
+        }
+    }
+
+    async handleSaveResultadosRequest(event) {
+        const { requestId, payload } = event.data;
+        const { excelFilePath, data } = payload;
+        console.log(`[objetivos-sst-logic.js][handleSaveResultadosRequest] Guardando resultados. requestId: ${requestId}`);
+
+        try {
+            if (!window.electronAPI || typeof window.electronAPI.saveObjetivosResultados !== 'function') {
+                throw new Error('electronAPI.saveObjetivosResultados no está disponible.');
+            }
+            const result = await window.electronAPI.saveObjetivosResultados(excelFilePath, data);
+            event.source.postMessage({
+                action: 'save-resultados-response',
+                requestId,
+                success: result.success,
+                error: result.error
+            }, '*');
+        } catch (error) {
+            console.error(`[objetivos-sst-logic.js][handleSaveResultadosRequest] Error:`, error);
+            event.source.postMessage({
+                action: 'save-resultados-response',
+                requestId,
+                success: false,
+                error: error.message
+            }, '*');
+        }
+    }
+
+    async handleLoadAutoResultadosRequest(event) {
+        const { requestId, payload } = event.data;
+        const companyName = payload?.companyName;
+        console.log(`[objetivos-sst-logic.js][handleLoadAutoResultadosRequest] Cargando auto-resultados. requestId: ${requestId}, company: ${companyName}`);
+
+        try {
+            if (!window.electronAPI || typeof window.electronAPI.getObjetivosResultadosAuto !== 'function') {
+                throw new Error('electronAPI.getObjetivosResultadosAuto no está disponible.');
+            }
+            const result = await window.electronAPI.getObjetivosResultadosAuto(companyName);
+            event.source.postMessage({
+                action: 'load-auto-resultados-response',
+                requestId,
+                success: result.success,
+                data: result.data,
+                error: result.error
+            }, '*');
+        } catch (error) {
+            console.error(`[objetivos-sst-logic.js][handleLoadAutoResultadosRequest] Error:`, error);
+            event.source.postMessage({
+                action: 'load-auto-resultados-response',
+                requestId,
+                success: false,
+                data: {},
                 error: error.message
             }, '*');
         }
