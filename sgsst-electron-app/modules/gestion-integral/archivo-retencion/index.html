@@ -43,131 +43,77 @@
     }
 
 /* ═══════════════════════════════════════════════════════════
- HEADER K+AIR v2.0 — Patrón Simple (sin tabs)
+ HEADER — Card Pattern (k-section-card)
  ═══════════════════════════════════════════════════════════ */
-.kair-ar-header.kair-header {
- background: #ffffff;
- border-bottom: 1px solid #dee2e6;
- flex-shrink: 0;
- position: sticky;
- top: 0;
- z-index: 100;
-}
-
-.kair-ar-header .kair-header__bar {
+.k-section-card {
+ background: var(--kair-card);
+ border: 1px solid var(--kair-border);
+ border-radius: var(--kair-radius);
+ padding: 1rem 1.5rem;
+ margin-bottom: 1rem;
+ box-shadow: var(--kair-shadow);
  display: flex;
  align-items: center;
- justify-content: flex-start;
- gap: 0.75rem;
- min-height: 52px;
- padding: 0 1.5rem;
+ gap: 1rem;
+ flex-wrap: wrap;
 }
 
-.kair-ar-header .kair-header__left {
+.k-section-card__title {
  display: flex;
  align-items: center;
  gap: 0.5rem;
-}
-
-.kair-ar-header .kair-header__back {
- width: 32px;
- height: 32px;
- display: flex;
- align-items: center;
- justify-content: center;
- border: none;
- background: transparent;
- color: #5a6378;
- border-radius: 0.375rem;
- cursor: pointer;
- transition: background 0.15s ease;
- font-size: 1rem;
-}
-
-.kair-ar-header .kair-header__back:hover {
- background: #e8f0fe;
- color: #174ea6;
-}
-
-.kair-ar-header .kair-header__divider {
- width: 1px;
- height: 24px;
- background: #dee2e6;
-}
-
-.kair-ar-header .kair-header__center {
- display: flex;
- flex-direction: column;
- gap: 0.125rem;
-}
-
-.kair-ar-header .kair-header__title {
- font-size: 1.25rem;
+ font-size: 1.125rem;
  font-weight: 600;
  color: #1a1a2e;
  margin: 0;
+ white-space: nowrap;
+}
+
+.k-section-card__title svg {
+ width: 20px;
+ height: 20px;
+ color: var(--kair-primary);
+ flex-shrink: 0;
+}
+
+.k-section-card__subtitle {
+ font-size: 0.8125rem;
+ color: #5a6378;
+ font-weight: 400;
+ margin: 0;
+}
+
+.k-section-card__divider {
+ width: 1px;
+ height: 24px;
+ background: var(--kair-border);
+ flex-shrink: 0;
+}
+
+.k-section-card__company {
+ display: flex;
+ align-items: center;
+ gap: 0.375rem;
+ font-size: 0.8125rem;
+ font-weight: 400;
+ color: #5a6378;
+ white-space: nowrap;
+}
+
+.k-section-card__company svg {
+ width: 14px;
+ height: 14px;
+ flex-shrink: 0;
+}
+
+.k-section-card__actions {
  display: flex;
  align-items: center;
  gap: 0.5rem;
-}
-
-.kair-ar-header .kair-header__title i {
- color: #174ea6;
-}
-
-.kair-ar-header .kair-header__breadcrumb {
- display: flex;
- align-items: center;
- gap: 0.375rem;
- list-style: none;
- margin: 0;
- padding: 0;
- font-size: 0.8125rem;
- font-weight: 400;
- color: #5a6378;
-}
-
-.kair-ar-header .kair-header__breadcrumb li + li::before {
- content: '\203A';
- margin-right: 0.375rem;
- color: #adb5bd;
-}
-
-.kair-ar-header .kair-header__breadcrumb a {
- color: #5a6378;
- text-decoration: none;
-}
-
-.kair-ar-header .kair-header__breadcrumb a:hover {
- color: #174ea6;
-}
-
-.kair-ar-header .kair-header__breadcrumb--active {
- color: #174ea6;
- font-weight: 500;
-}
-
-.kair-ar-header .kair-header__right {
- display: flex;
- align-items: center;
- gap: 0.75rem;
  margin-left: auto;
 }
 
-.kair-ar-header .kair-header__company {
- display: flex;
- align-items: center;
- gap: 0.375rem;
- font-size: 0.8125rem;
- font-weight: 400;
- color: #5a6378;
-}
-
-.kair-ar-header .kair-header__company i {
- font-size: 0.875rem;
-}
-
-.kair-ar-header .kair-header__action--ghost {
+.header-back-btn {
  display: inline-flex;
  align-items: center;
  gap: 0.375rem;
@@ -180,81 +126,102 @@
  border-radius: 0.375rem;
  cursor: pointer;
  transition: background 0.15s ease;
- font-family: inherit;
+ font-family: var(--kair-font);
 }
 
-.kair-ar-header .kair-header__action--ghost:hover {
+.header-back-btn:hover {
+ background: #e8f0fe;
+ color: var(--kair-primary);
+}
+
+.header-back-btn svg {
+ width: 16px;
+ height: 16px;
+}
+
+.header-action--ghost {
+ display: inline-flex;
+ align-items: center;
+ gap: 0.375rem;
+ padding: 0.375rem 0.75rem;
+ font-size: 0.8125rem;
+ font-weight: 500;
+ color: #5a6378;
+ background: transparent;
+ border: none;
+ border-radius: 0.375rem;
+ cursor: pointer;
+ transition: background 0.15s ease;
+ font-family: var(--kair-font);
+}
+
+.header-action--ghost:hover {
  background: #f0f2f5;
  color: #1a1a2e;
 }
 
-/* Dark theme — Header v2.0 */
-[data-theme="dark"] .kair-ar-header.kair-header {
+.header-action--ghost svg {
+ width: 14px;
+ height: 14px;
+}
+
+/* Dark theme — Card Pattern */
+[data-theme="dark"] .k-section-card {
  background: #2d3748;
- border-bottom-color: #4a5568;
+ border-color: #4a5568;
 }
 
-[data-theme="dark"] .kair-ar-header .kair-header__title {
+[data-theme="dark"] .k-section-card__title {
  color: #e9ecef;
 }
 
-[data-theme="dark"] .kair-ar-header .kair-header__breadcrumb,
-[data-theme="dark"] .kair-ar-header .kair-header__breadcrumb a {
+[data-theme="dark"] .k-section-card__subtitle {
  color: #a0aec0;
 }
 
-[data-theme="dark"] .kair-ar-header .kair-header__breadcrumb--active {
- color: #90cdf4;
-}
-
-[data-theme="dark"] .kair-ar-header .kair-header__company {
+[data-theme="dark"] .k-section-card__company {
  color: #a0aec0;
 }
 
-[data-theme="dark"] .kair-ar-header .kair-header__divider {
+[data-theme="dark"] .k-section-card__divider {
  background: #4a5568;
 }
 
-[data-theme="dark"] .kair-ar-header .kair-header__back {
+[data-theme="dark"] .header-back-btn {
  color: #a0aec0;
 }
 
-[data-theme="dark"] .kair-ar-header .kair-header__back:hover {
+[data-theme="dark"] .header-back-btn:hover {
  background: #4a5568;
  color: #90cdf4;
 }
 
-[data-theme="dark"] .kair-ar-header .kair-header__action--ghost {
+[data-theme="dark"] .header-action--ghost {
  color: #a0aec0;
 }
 
-[data-theme="dark"] .kair-ar-header .kair-header__action--ghost:hover {
+[data-theme="dark"] .header-action--ghost:hover {
  background: #4a5568;
  color: #e9ecef;
 }
 
-/* Responsive — Header v2.0 */
+/* Responsive — Card Pattern */
 @media (max-width: 900px) {
- .kair-ar-header .kair-header__bar {
- min-height: 48px;
- padding: 0 1rem;
+ .k-section-card {
+   padding: 0.75rem 1rem;
+   gap: 0.5rem;
  }
 
- .kair-ar-header .kair-header__center {
- flex-direction: column;
- gap: 0;
+ .k-section-card__title {
+   font-size: 1rem;
  }
 
- .kair-ar-header .kair-header__title {
- font-size: 1rem;
+ .k-section-card__company {
+   display: none;
  }
 
- .kair-ar-header .kair-header__right {
- gap: 0.5rem;
- }
-
- .kair-ar-header .kair-header__company {
- display: none;
+ .k-section-card__actions {
+   gap: 0.375rem;
  }
 }
 
@@ -398,97 +365,128 @@
  padding: 1.5rem 1.5rem 2.5rem;
  }
 
-    /* ── Title Section ───────────────────────────────────────── */
-    .kair-ar-title-section {
-      margin-bottom: 20px;
-    }
-
-    .kair-ar-title {
-      font-size: 20px;
-      font-weight: 700;
-      color: #212529;
-      margin-bottom: 4px;
-    }
-
-    .kair-ar-subtitle {
-      font-size: 13px;
-      color: #6c757d;
-      font-weight: 400;
-    }
-
-    /* ── Stats Cards ─────────────────────────────────────────── */
-.kair-ar-stats {
- display: grid;
- grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
- gap: 16px;
- margin-bottom: 20px;
- }
-
-    .kair-ar-stat-card {
+    /* ── Stats Ribbon ──────────────────────────────────────────── */
+    .k-stats-ribbon {
+      display: flex;
+      align-items: center;
+      gap: 0;
       background: var(--kair-card);
       border: 1px solid var(--kair-border);
       border-radius: var(--kair-radius);
-      padding: 16px 20px;
+      padding: 0;
+      margin-bottom: 1rem;
       box-shadow: var(--kair-shadow);
+      overflow: hidden;
+    }
+
+    .k-stats-ribbon__item {
       display: flex;
       align-items: center;
-      gap: 14px;
-      transition: var(--kair-transition);
+      gap: 0.625rem;
+      padding: 0.75rem 1.25rem;
+      flex: 1;
+      min-width: 0;
     }
 
-    .kair-ar-stat-card:hover {
-      box-shadow: var(--kair-shadow-lg);
-      transform: translateY(-1px);
-    }
-
-    .kair-ar-stat-icon {
-      width: 42px;
-      height: 42px;
-      border-radius: var(--kair-radius);
+    .k-stats-ribbon__icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
     }
 
-    .kair-ar-stat-icon svg {
-      width: 22px;
-      height: 22px;
+    .k-stats-ribbon__icon svg {
+      width: 16px;
+      height: 16px;
     }
 
-    .kair-ar-stat-icon-primary {
+    .k-stats-ribbon__icon.primary {
       background: rgba(23,78,166,.1);
       color: var(--kair-primary);
     }
 
-    .kair-ar-stat-icon-blue {
-      background: rgba(23,78,166,.1);
-      color: var(--kair-primary);
-    }
-
-    .kair-ar-stat-icon-green {
+    .k-stats-ribbon__icon.success {
       background: rgba(40,167,69,.1);
       color: var(--kair-success);
     }
 
-    .kair-ar-stat-icon-gray {
-      background: rgba(108,117,125,.1);
+    .k-stats-ribbon__icon.warning {
+      background: rgba(255,193,7,.15);
+      color: #856404;
+    }
+
+    .k-stats-ribbon__icon.muted {
+      background: #f0f2f5;
       color: #6c757d;
     }
 
-    .kair-ar-stat-value {
-      font-size: 24px;
+    .k-stats-ribbon__data {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .k-stats-ribbon__value {
+      font-size: 1.25rem;
       font-weight: 700;
       color: #212529;
       line-height: 1.2;
     }
 
-    .kair-ar-stat-label {
-      font-size: 12px;
+    .k-stats-ribbon__label {
+      font-size: 0.6875rem;
       color: #6c757d;
-      font-weight: 500;
       text-transform: uppercase;
-      letter-spacing: .4px;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+
+    .k-stats-ribbon__divider {
+      width: 1px;
+      height: 32px;
+      background: var(--kair-border);
+      flex-shrink: 0;
+    }
+
+    /* Dark theme — Stats Ribbon */
+    [data-theme="dark"] .k-stats-ribbon {
+      background: #2d3748;
+      border-color: #4a5568;
+    }
+
+    [data-theme="dark"] .k-stats-ribbon__value {
+      color: #e9ecef;
+    }
+
+    [data-theme="dark"] .k-stats-ribbon__label {
+      color: #a0aec0;
+    }
+
+    [data-theme="dark"] .k-stats-ribbon__divider {
+      background: #4a5568;
+    }
+
+    [data-theme="dark"] .k-stats-ribbon__icon.muted {
+      background: #4a5568;
+      color: #a0aec0;
+    }
+
+    /* Responsive — Stats Ribbon */
+    @media (max-width: 900px) {
+      .k-stats-ribbon {
+        flex-wrap: wrap;
+      }
+
+      .k-stats-ribbon__item {
+        flex: 1 1 45%;
+      }
+
+      .k-stats-ribbon__divider {
+        display: none;
+      }
     }
 
     /* ── Filters Bar ─────────────────────────────────────────── */
@@ -1282,62 +1280,49 @@
 <body class="kair-ar-body">
 
 <!-- ═══════════════════════════════════════════════════════════
-HEADER K+AIR v2.0 — Patrón Simple
-═══════════════════════════════════════════════════════════ -->
-<header class="kair-ar-header kair-header">
- <div class="kair-header__bar">
- <div class="kair-header__left">
- <button class="kair-header__back" id="btnVolver" title="Volver al módulo principal">
- <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
- </button>
+HEADER — Card Pattern (k-section-card)
+════════════════════════════════════════════════════════════ -->
+<div class="k-section-card">
+ <div style="display:flex; align-items:center; gap:0.75rem;">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#174ea6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+  <div>
+   <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Archivo y Retención Documental</h3>
+   <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión documental y retención de registros SG-SST.</p>
+  </div>
  </div>
- <div class="kair-header__divider"></div>
- <div class="kair-header__center">
- <h1 class="kair-header__title">
- <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#174ea6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
- Archivo y Retención Documental
- </h1>
- <ol class="kair-header__breadcrumb">
- <li>Gestión Integral</li>
- <li>2.5.1</li>
- <li class="kair-header__breadcrumb--active">Archivo y Retención</li>
- </ol>
+ <div class="k-section-card__actions">
+  <span class="k-section-card__company">
+   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><path d="M9 22V2h6v20"/></svg>
+   <span id="ar-header-company"></span>
+  </span>
+  <div class="k-section-card__divider"></div>
+  <button class="header-back-btn" id="btnVolver" title="Volver al módulo principal">
+   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+   Volver
+  </button>
+  <button class="header-action--ghost" id="btnGuardar" style="display:none" title="Guardar cambios en el Excel">
+   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+   Guardar
+  </button>
+  <button class="header-action--ghost" id="btnExportar" title="Exportar CSV">
+   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+   Exportar
+  </button>
+  <button class="header-action--ghost" id="btnActualizar" title="Actualizar datos">
+   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+   Actualizar
+  </button>
  </div>
- <div class="kair-header__right">
- <span class="kair-header__company">
- <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><path d="M9 22V2h6v20"/></svg>
- <span id="ar-header-company"></span>
- </span>
- <div class="kair-header__divider"></div>
- <button class="kair-header__action--ghost" id="btnGuardar" style="display:none" title="Guardar cambios en el Excel">
- <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
- Guardar
- </button>
- <button class="kair-header__action--ghost" id="btnExportar" title="Exportar CSV">
- <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
- Exportar
- </button>
- <button class="kair-header__action--ghost" id="btnActualizar" title="Actualizar datos">
- <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
- Actualizar
- </button>
- </div>
- </div>
-</header>
+</div>
 
-  <!-- ═══════════════════════════════════════════════════════════
-       MAIN CONTENT
-       ═══════════════════════════════════════════════════════════ -->
+   <!-- ═══════════════════════════════════════════════════════════
+        MAIN CONTENT
+        ═══════════════════════════════════════════════════════════ -->
   <main class="kair-ar-main">
 
-    <section class="kair-ar-title-section">
-      <h1 class="kair-ar-title">Listado Maestro de Control de Documentos y Registros</h1>
-      <p class="kair-ar-subtitle">GI-FO-010 | Rev. 02 — Marzo 26 del 2025</p>
-    </section>
-
-    <section class="kair-ar-stats" id="statsContainer">
-      <div class="kair-ar-stat-card">
-        <div class="kair-ar-stat-icon kair-ar-stat-icon-primary">
+    <div class="k-stats-ribbon">
+      <div class="k-stats-ribbon__item">
+        <span class="k-stats-ribbon__icon primary">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
             <polyline points="14 2 14 8 20 8"/>
@@ -1345,50 +1330,53 @@ HEADER K+AIR v2.0 — Patrón Simple
             <line x1="16" y1="17" x2="8" y2="17"/>
             <polyline points="10 9 9 9 8 9"/>
           </svg>
-        </div>
-        <div>
-          <div class="kair-ar-stat-value" id="statTotal">0</div>
-          <div class="kair-ar-stat-label">Total</div>
+        </span>
+        <div class="k-stats-ribbon__data">
+          <span class="k-stats-ribbon__value" id="statTotal">0</span>
+          <span class="k-stats-ribbon__label">Total</span>
         </div>
       </div>
-      <div class="kair-ar-stat-card">
-        <div class="kair-ar-stat-icon kair-ar-stat-icon-blue">
+      <div class="k-stats-ribbon__divider"></div>
+      <div class="k-stats-ribbon__item">
+        <span class="k-stats-ribbon__icon primary">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
             <polyline points="14 2 14 8 20 8"/>
           </svg>
-        </div>
-        <div>
-          <div class="kair-ar-stat-value" id="statDocumentos">0</div>
-          <div class="kair-ar-stat-label">Documentos</div>
+        </span>
+        <div class="k-stats-ribbon__data">
+          <span class="k-stats-ribbon__value" id="statDocumentos">0</span>
+          <span class="k-stats-ribbon__label">Documentos</span>
         </div>
       </div>
-      <div class="kair-ar-stat-card">
-        <div class="kair-ar-stat-icon kair-ar-stat-icon-green">
+      <div class="k-stats-ribbon__divider"></div>
+      <div class="k-stats-ribbon__item">
+        <span class="k-stats-ribbon__icon success">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
             <line x1="9" y1="3" x2="9" y2="21"/>
             <line x1="3" y1="9" x2="21" y2="9"/>
           </svg>
-        </div>
-        <div>
-          <div class="kair-ar-stat-value" id="statRegistros">0</div>
-          <div class="kair-ar-stat-label">Registros</div>
+        </span>
+        <div class="k-stats-ribbon__data">
+          <span class="k-stats-ribbon__value" id="statRegistros">0</span>
+          <span class="k-stats-ribbon__label">Registros</span>
         </div>
       </div>
-      <div class="kair-ar-stat-card">
-        <div class="kair-ar-stat-icon kair-ar-stat-icon-gray">
+      <div class="k-stats-ribbon__divider"></div>
+      <div class="k-stats-ribbon__item">
+        <span class="k-stats-ribbon__icon muted">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"/>
             <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
           </svg>
-        </div>
-        <div>
-          <div class="kair-ar-stat-value" id="statMuerto">0</div>
-          <div class="kair-ar-stat-label">Archivo Muerto</div>
+        </span>
+        <div class="k-stats-ribbon__data">
+          <span class="k-stats-ribbon__value" id="statMuerto">0</span>
+          <span class="k-stats-ribbon__label">Archivo Muerto</span>
         </div>
       </div>
-    </section>
+    </div>
 
     <section class="kair-ar-filters">
       <div class="kair-ar-input-group">

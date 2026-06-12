@@ -48,60 +48,140 @@
             padding: 1.5rem;
         }
 
-        /* ── Page Header ── */
-        .page-header {
+        /* ── Card Pattern (k-section-card) ── */
+        .k-section-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 1rem 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: var(--shadow-sm);
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            margin-bottom: 1.5rem;
-        }
-        .page-header h1 {
-            font-size: 1.5rem;
-            font-weight: 600;
-        }
-        .page-header p {
-            color: var(--text-muted);
-            font-size: 0.9rem;
-        }
-
-        /* ── KPI Grid ── */
-        .kpi-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
             gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-        @media (max-width: 900px) {
-            .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+            flex-wrap: wrap;
         }
 
-        .kpi-card {
+        .k-section-card__title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin: 0;
+            white-space: nowrap;
+        }
+
+        .k-section-card__title svg {
+            width: 20px;
+            height: 20px;
+            color: var(--primary);
+            flex-shrink: 0;
+        }
+
+        .k-section-card__subtitle {
+            font-size: 0.8125rem;
+            color: var(--text-muted);
+            font-weight: 400;
+            margin: 0;
+        }
+
+        /* ── Stats Ribbon ── */
+        .k-stats-ribbon {
+            display: flex;
+            align-items: center;
+            gap: 0;
             background: var(--bg-card);
+            border: 1px solid var(--border);
             border-radius: var(--radius-md);
+            padding: 0;
+            margin-bottom: 1.5rem;
             box-shadow: var(--shadow-sm);
-            padding: 1.25rem;
-            border-left: 4px solid var(--primary);
+            overflow: hidden;
         }
-        .kpi-card.kpi-success { border-left-color: var(--success); }
-        .kpi-card.kpi-warning { border-left-color: var(--warning); }
-        .kpi-card.kpi-danger { border-left-color: var(--danger); }
 
-        .kpi-label {
-            font-size: 0.78rem;
+        .k-stats-ribbon__item {
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+            padding: 0.75rem 1.25rem;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .k-stats-ribbon__icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .k-stats-ribbon__icon svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .k-stats-ribbon__icon.primary {
+            background: rgba(23,78,166,.1);
+            color: var(--primary);
+        }
+
+        .k-stats-ribbon__icon.success {
+            background: rgba(40,167,69,.1);
+            color: var(--success);
+        }
+
+        .k-stats-ribbon__icon.warning {
+            background: rgba(255,193,7,.15);
+            color: #856404;
+        }
+
+        .k-stats-ribbon__icon.muted {
+            background: #f0f2f5;
+            color: var(--text-muted);
+        }
+
+        [data-theme="dark"] .k-stats-ribbon__icon.muted {
+            background: #3d4250;
+            color: #adb5bd;
+        }
+
+        .k-stats-ribbon__data {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .k-stats-ribbon__value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-dark);
+            line-height: 1.2;
+        }
+
+        .k-stats-ribbon__label {
+            font-size: 0.6875rem;
             color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-bottom: 0.25rem;
+            white-space: nowrap;
         }
-        .kpi-value {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: var(--text-dark);
+
+        .k-stats-ribbon__divider {
+            width: 1px;
+            height: 32px;
+            background: var(--border);
+            flex-shrink: 0;
         }
-        .kpi-sub {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            margin-top: 0.25rem;
+
+        @media (max-width: 900px) {
+            .k-stats-ribbon { flex-wrap: wrap; }
+            .k-stats-ribbon__item { flex: 1 1 45%; }
+            .k-stats-ribbon__divider { display: none; }
         }
 
         /* ── Charts Grid ── */
@@ -162,10 +242,13 @@
     </style>
 </head>
 <body>
-    <div class="page-header">
-        <div>
-            <h1>📊 Dashboard — Gestión Documental</h1>
-            <p>Submódulo 2.5.1 · Archivo y Retención Documental del SG-SST</p>
+    <div class="k-section-card">
+        <div style="display:flex; align-items:center; gap:0.75rem;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#174ea6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <div>
+                <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:var(--text-dark);">Dashboard — Gestión Documental</h3>
+                <p style="font-size:0.8125rem; color:var(--text-muted); margin:0.25rem 0 0 0;">Submódulo 2.5.1 · Archivo y Retención Documental del SG-SST</p>
+            </div>
         </div>
     </div>
 
@@ -175,29 +258,64 @@
     </div>
 
     <div id="dashboard-content" style="display:none;">
-        <!-- KPI Cards -->
-        <div class="kpi-grid">
-            <div class="kpi-card">
-                <div class="kpi-label">Total Documentos</div>
-                <div class="kpi-value" id="kpi-total">—</div>
-                <div class="kpi-sub">Registrados en el listado maestro</div>
+        <!-- Stats Ribbon -->
+        <div class="k-stats-ribbon">
+            <div class="k-stats-ribbon__item">
+                <span class="k-stats-ribbon__icon primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                </span>
+                <div class="k-stats-ribbon__data">
+                    <span class="k-stats-ribbon__value" id="kpi-total">—</span>
+                    <span class="k-stats-ribbon__label">Total Documentos</span>
+                </div>
             </div>
-            <div class="kpi-card kpi-success">
-                <div class="kpi-label">% Vigentes</div>
-                <div class="kpi-value" id="kpi-vigencia">—</div>
-                <div class="kpi-sub" id="kpi-vigentes-sub">Documentos activos</div>
+            <div class="k-stats-ribbon__divider"></div>
+            <div class="k-stats-ribbon__item">
+                <span class="k-stats-ribbon__icon success">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                        <polyline points="22 4 12 14.01 9 11.01"/>
+                    </svg>
+                </span>
+                <div class="k-stats-ribbon__data">
+                    <span class="k-stats-ribbon__value" id="kpi-vigencia">—</span>
+                    <span class="k-stats-ribbon__label">% Vigentes</span>
+                </div>
             </div>
-            <div class="kpi-card kpi-warning">
-                <div class="kpi-label">Externos</div>
-                <div class="kpi-value" id="kpi-externos">—</div>
-                <div class="kpi-sub">Normativa y leyes aplicables</div>
+            <div class="k-stats-ribbon__divider"></div>
+            <div class="k-stats-ribbon__item">
+                <span class="k-stats-ribbon__icon warning">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+                        <path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/>
+                    </svg>
+                </span>
+                <div class="k-stats-ribbon__data">
+                    <span class="k-stats-ribbon__value" id="kpi-externos">—</span>
+                    <span class="k-stats-ribbon__label">Externos</span>
+                </div>
             </div>
-            <div class="kpi-card kpi-danger">
-                <div class="kpi-label">Obsoletos</div>
-                <div class="kpi-value" id="kpi-obsoletos">—</div>
-                <div class="kpi-sub" id="kpi-sin-actualizar">Sin actualizar en +2 años</div>
+            <div class="k-stats-ribbon__divider"></div>
+            <div class="k-stats-ribbon__item">
+                <span class="k-stats-ribbon__icon muted">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+                    </svg>
+                </span>
+                <div class="k-stats-ribbon__data">
+                    <span class="k-stats-ribbon__value" id="kpi-obsoletos">—</span>
+                    <span class="k-stats-ribbon__label">Obsoletos</span>
+                </div>
             </div>
         </div>
+
+        <!-- Hidden elements for JS compatibility -->
+        <span id="kpi-vigentes-sub" style="display:none"></span>
+        <span id="kpi-sin-actualizar" style="display:none"></span>
 
         <!-- Charts -->
         <div class="charts-grid">

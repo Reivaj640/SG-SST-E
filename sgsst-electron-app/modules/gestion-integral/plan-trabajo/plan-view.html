@@ -16,39 +16,46 @@
 <body>
 
   <div class="app-container">
-<!-- HEADER (FULL WIDTH) -->
-<header class="header">
-  <button class="btn btn-ghost" id="backBtn" style="display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; cursor: pointer; font-family: 'Roboto', sans-serif; font-size: 14px; color: #212529;">
-    <i class="fas fa-arrow-left"></i> Volver
-  </button>
-  <div class="breadcrumb">Gestión Integral <i class="fas fa-chevron-right" style="font-size: 0.7rem; margin: 0 5px;"></i> <strong>Plan de Trabajo Anual</strong></div>
-</header>
-
-<!-- WORKSPACE -->
-<div class="workspace">
-  <div class="tabs-header">
-    <div class="tabs-header__left">
-      <button class="tab-btn" onclick="switchMainView('dashboard')">
-        <i class="fas fa-chart-pie"></i> Dashboard de Avance
-      </button>
-      <button class="tab-btn active" onclick="switchMainView('plan')">
-        <i class="fas fa-stream"></i> Cronograma
-      </button>
+<!-- HEADER — Card k-section-card (tabs integrados) -->
+<div class="k-section-card" style="padding:0; margin-bottom:0; flex-shrink:0; flex-grow:0;">
+  <!-- Fila 1: contenido principal -->
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
+    <div style="display:flex; align-items:center; gap:0.75rem;">
+      <i class="fas fa-tasks" style="color:#174ea6; font-size:1.25rem;"></i>
+      <div>
+        <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Plan de Trabajo Anual SST</h3>
+        <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión y seguimiento del plan de trabajo anual SG-SST.</p>
+      </div>
     </div>
-    <div class="tabs-header__right">
+    <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
       <div class="tabs-header__company">
         <i class="bi bi-building"></i>
         <span id="companyName">...</span>
       </div>
       <span class="tabs-header__role" id="userRole">Responsable SST</span>
-      <div class="tabs-header__divider"></div>
+      <div style="width:1px; height:24px; background:#dee2e6;"></div>
       <button class="btn-period" onclick="showPeriodSelector()">
         <i class="bi bi-calendar3"></i>
         <span id="currentPeriodLabel">2026</span>
         <i class="bi bi-chevron-down"></i>
       </button>
+      <div style="width:1px; height:24px; background:#dee2e6;"></div>
+      <button class="header-back-btn" id="backBtn" title="Volver">
+        <i class="fas fa-arrow-left"></i> Volver
+      </button>
     </div>
   </div>
+
+  <!-- Fila 2: tabs (dentro del card) -->
+  <div class="plan-tabs">
+    <button class="plan-tab" onclick="switchMainView('dashboard')">
+      <i class="fas fa-chart-pie"></i> Dashboard de Avance
+    </button>
+    <button class="plan-tab active" onclick="switchMainView('plan')">
+      <i class="fas fa-stream"></i> Cronograma
+    </button>
+  </div>
+</div>
 
 <!-- VIEW 1: DASHBOARD -->
 <div id="view-dashboard" class="dashboard-view">

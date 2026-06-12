@@ -918,7 +918,7 @@ function confirmDelete() {
 
 /* --- UTILS --- */
 function switchMainView(view) {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.plan-tab').forEach(b => b.classList.remove('active'));
     document.querySelector(`button[onclick="switchMainView('${view}')"]`).classList.add('active');
     document.getElementById('view-dashboard').classList.remove('active');
     document.getElementById('view-plan').classList.remove('active');
