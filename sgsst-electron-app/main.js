@@ -5217,6 +5217,7 @@ async function calculateAutoResultados(companyName) {
 
             // ── Leer meta de Objetivos SST (2.2.1) ──
             let metaObjetivo = null;
+            let metaSeveridadObjetivo = null;
             try {
               const giDir = path.join(rootPath, '2. Gestión Integral del SG-SST');
               if (fs.existsSync(giDir)) {
@@ -5238,10 +5239,18 @@ async function calculateAutoResultados(companyName) {
                           const match = metaRaw.match(/[\d.]+/);
                           if (match) {
                             metaObjetivo = parseFloat(match[0]);
-                            sendLog(`[AUTO-RESULTADOS] Meta Objetivos SST: ${metaRaw} → ${metaObjetivo}`, 'INFO');
+                            sendLog(`[AUTO-RESULTADOS] Meta Objetivos SST (Frecuencia): ${metaRaw} → ${metaObjetivo}`, 'INFO');
                           }
-                          break;
                         }
+                        if (colC.indexOf('severidad') >= 0 && colC.indexOf('accidentalidad') >= 0) {
+                          const metaRaw = String(objRows[r][4] || '').trim();
+                          const match = metaRaw.match(/[\d.]+/);
+                          if (match) {
+                            metaSeveridadObjetivo = parseFloat(match[0]);
+                            sendLog(`[AUTO-RESULTADOS] Meta Objetivos SST (Severidad): ${metaRaw} → ${metaSeveridadObjetivo}`, 'INFO');
+                          }
+                        }
+                        if (metaObjetivo && metaSeveridadObjetivo) break;
                       }
                     }
                   }
@@ -5253,11 +5262,64 @@ async function calculateAutoResultados(companyName) {
 
             // Usar meta de Objetivos SST si existe, si no usar la del INDICADORES
             const metaFrec = metaObjetivo || ind.config.metaFrecuencia;
+            const metaSev = metaSeveridadObjetivo || ind.config.metaSeveridad;
 
-            // ── Frecuencia (IF) ──
-            const mesesConAT = ind.frecuenciaMensual.filter(m => m.accidentes > 0);
-            const promIF = mesesConAT.length > 0
-              ? (mesesConAT.reduce((s, m) => s + m.indiceFrecuencia, 0) / mesesConAT.length).toFixed(2)
+            // ── Auto-fill AT desde 3.2.3 (igual que en renderer) ──
+            try {
+              const gsDirAuto = path.join(rootPath, '3. Gestión de la Salud');
+              if (fs.existsSync(gsDirAuto)) {
+                const gsEntriesAuto = fs.readdirSync(gsDirAuto);
+                const folder323Auto = gsEntriesAuto.find(f => f.startsWith('3.2.3'));
+                if (folder323Auto) {
+                  const subDirAuto = path.join(gsDirAuto, folder323Auto);
+                  const subEntriesAuto = fs.readdirSync(subDirAuto);
+                  const xlsxAuto = subEntriesAuto.find(f => f.toLowerCase().endsWith('.xlsx') && !f.startsWith('~$'));
+                  if (xlsxAuto) {
+                    const rutaAuto = path.join(subDirAuto, xlsxAuto);
+                    const resAutoAT = await excelBridge.contarATPorMes(currentYear, rutaAuto);
+                    if (resAutoAT.success && resAutoAT.data && resAutoAT.data.mensual) {
+                      const autoAT = resAutoAT.data.mensual;
+                      sendLog(`[AUTO-RESULTADOS] Auto AT desde 3.2.3: ${JSON.stringify(autoAT)}`, 'INFO');
+                      ind.frecuenciaMensual.forEach(row => {
+                        const autoCount = autoAT[row.mes] || 0;
+                        if (autoCount > 0) {
+                          row.accidentes = autoCount;
+                          row.indiceFrecuencia = row.trabajadores > 0
+                            ? Math.round(((autoCount / row.trabajadores) * 100) * 10000) / 10000
+                            : 0;
+                        }
+                      });
+                    }
+                  }
+                }
+              }
+            } catch (eAuto) {
+              sendLog(`[AUTO-RESULTADOS] No se pudo auto-fill AT: ${eAuto.message}`, 'WARN');
+            }
+
+            // ── Cargar diasCargados desde severidad-data.json ──
+            try {
+              const jsonSevPath = path.join(rootPath, 'severidad-data.json');
+              if (fs.existsSync(jsonSevPath)) {
+                const rawSev = fs.readFileSync(jsonSevPath, 'utf8');
+                const allSevData = JSON.parse(rawSev);
+                const yearSevData = allSevData[String(currentYear)] || {};
+                ind.severidadMensual.forEach(row => {
+                  const mesData = yearSevData[String(row.mes)] || {};
+                  row.diasCargados = mesData.diasCargados || 0;
+                  row.indiceSeveridad = row.trabajadores > 0
+                    ? Math.round((((row.diasPerdidos + row.diasCargados) / row.trabajadores) * 100) * 10000) / 10000
+                    : 0;
+                });
+                sendLog(`[AUTO-RESULTADOS] diasCargados cargados desde JSON para severidad`, 'INFO');
+              }
+            } catch (eSevJson) {
+              sendLog(`[AUTO-RESULTADOS] No se pudo cargar diasCargados: ${eSevJson.message}`, 'WARN');
+            }
+
+            // ── Frecuencia (IF) - Promedio anual entre 12 meses ──
+            const promIF = ind.frecuenciaMensual.length > 0
+              ? (ind.frecuenciaMensual.reduce((s, m) => s + m.indiceFrecuencia, 0) / 12).toFixed(4)
               : 0;
 
             resultado['frecuencia'] = {
@@ -5268,19 +5330,19 @@ async function calculateAutoResultados(companyName) {
               source: 'auto'
             };
 
-            // ── Severidad (IS) ──
-            const mesesConDias = ind.severidadMensual.filter(m => m.diasPerdidos > 0);
-            const promIS = mesesConDias.length > 0
-              ? (mesesConDias.reduce((s, m) => s + m.indiceSeveridad, 0) / mesesConDias.length).toFixed(2)
+            // ── Severidad (IS) - Promedio anual entre 12 meses ──
+            const promIS = ind.severidadMensual.length > 0
+              ? (ind.severidadMensual.reduce((s, m) => s + m.indiceSeveridad, 0) / 12).toFixed(4)
               : 0;
 
             resultado['severidad'] = {
-              resultado: `IS promedio: ${promIS} (meta: ${ind.config.metaSeveridad})`,
-              porcentajeReal: ind.config.metaSeveridad > 0
-                ? Math.min(100, Math.round((1 - promIS / ind.config.metaSeveridad) * 100))
+              resultado: `IS promedio: ${promIS} (meta: ${metaSev})`,
+              porcentajeReal: metaSev > 0
+                ? Math.min(100, Math.round((1 - promIS / metaSev) * 100))
                 : 0,
               source: 'auto'
             };
+            resultado['severidad de accidentalidad'] = resultado['severidad'];
 
             // ── Total AT ──
             const totalAT = ind.totalAT2024;
@@ -15654,8 +15716,8 @@ ipcMain.handle('send-remision-by-email', async (event, docPath, extractedData, e
 
 var _indicadoresRutas = {};
 
-function _setRuta(submodulo, rutaIndicadores, rutaCaracterizacion) {
-  _indicadoresRutas[submodulo] = { indicadores: rutaIndicadores, caracterizacion: rutaCaracterizacion || null };
+function _setRuta(submodulo, rutaIndicadores, rutaCaracterizacion, companyRoot, year) {
+  _indicadoresRutas[submodulo] = { indicadores: rutaIndicadores, caracterizacion: rutaCaracterizacion || null, companyRoot: companyRoot || null, year: year || null };
 }
 
 function _getRuta(submodulo) {
@@ -16134,7 +16196,7 @@ var ubicacionesAPrueba = [
 const rutas = excelBridge.configurarRutasConRuta(indicadoresPath.path, year);
 console.log('[SeveridadAccidentalidad][MAIN] rutas result:', rutas);
 
-_setRuta('severidad', rutas.indicadores, rutas.caracterizacion);
+_setRuta('severidad', rutas.indicadores, rutas.caracterizacion, companyConfig.root, year);
 
 return {
         success: true,
@@ -16162,7 +16224,35 @@ return {
 ipcMain.handle('severidad-accidentalidad:leer-indicadores', async () => {
 try {
 var rutas = _getRuta('severidad');
-return await excelBridge.leerIndicadores(rutas && rutas.indicadores);
+var result = await excelBridge.leerIndicadores(rutas && rutas.indicadores);
+
+// Cargar diasCargados desde JSON si existe
+if (result.success && result.data && result.data.severidadMensual) {
+  var companyRoot = rutas && rutas.companyRoot;
+  var year = rutas && rutas.year || new Date().getFullYear();
+  if (companyRoot) {
+    var jsonPath = path.join(companyRoot, 'severidad-data.json');
+    if (fs.existsSync(jsonPath)) {
+      try {
+        var rawData = await fsp.readFile(jsonPath, 'utf8');
+        var allData = JSON.parse(rawData);
+        var yearData = allData[String(year)] || {};
+        result.data.severidadMensual.forEach(function(row) {
+          var mesData = yearData[String(row.mes)] || {};
+          row.diasCargados = mesData.diasCargados || 0;
+          row.indiceSeveridad = row.trabajadores > 0
+            ? Math.round((((row.diasPerdidos + row.diasCargados) / row.trabajadores) * 100) * 10000) / 10000
+            : 0;
+        });
+        console.log('[SeveridadAccidentalidad] diasCargados cargados desde JSON');
+      } catch (jsonErr) {
+        console.error('[SeveridadAccidentalidad] Error leyendo JSON diasCargados:', jsonErr);
+      }
+    }
+  }
+}
+
+return result;
   } catch (error) {
     console.error('[SeveridadAccidentalidad] Error leyendo indicadores:', error);
     return {
@@ -16179,6 +16269,30 @@ return await excelBridge.leerIndicadores(rutas && rutas.indicadores);
 ipcMain.handle('severidad-accidentalidad:escribir-excel', async (event, mes, campos) => {
 try {
 var rutas = _getRuta('severidad');
+
+// Si solo tiene diasCargados, guardar en JSON (no en Excel)
+if (campos && 'diasCargados' in campos && Object.keys(campos).length === 1) {
+  var companyRoot = rutas && rutas.companyRoot;
+  var year = rutas && rutas.year || new Date().getFullYear();
+  if (!companyRoot) {
+    return { success: false, error: { code: 'NO_COMPANY_ROOT', message: 'No se encontró ruta de empresa' } };
+  }
+  var jsonPath = path.join(companyRoot, 'severidad-data.json');
+  var allData = {};
+  if (fs.existsSync(jsonPath)) {
+    var rawData = await fsp.readFile(jsonPath, 'utf8');
+    allData = JSON.parse(rawData);
+  }
+  var yearStr = String(year);
+  var mesStr = String(mes);
+  if (!allData[yearStr]) allData[yearStr] = {};
+  if (!allData[yearStr][mesStr]) allData[yearStr][mesStr] = {};
+  allData[yearStr][mesStr].diasCargados = campos.diasCargados;
+  await fsp.writeFile(jsonPath, JSON.stringify(allData, null, 2), 'utf8');
+  console.log('[SeveridadAccidentalidad] Guardado diasCargados:', yearStr, mesStr, campos.diasCargados);
+  return { success: true };
+}
+
 return await excelBridge.escribirEnExcel(mes, campos, rutas && rutas.indicadores);
   } catch (error) {
     console.error('[SeveridadAccidentalidad] Error escribiendo en Excel:', error);

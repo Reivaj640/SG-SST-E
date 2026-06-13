@@ -437,9 +437,11 @@ if (el('stat-security')) el('stat-security').textContent = securityCount;
 
                 const indRes = this.getIndicatorResultado(groupIdx, idx);
                 const indIsAuto = indRes.source === 'auto';
+                const isFrecSev = indRes.keyword === 'frecuencia' || indRes.keyword === 'severidad' || indRes.keyword === 'accidentalidad' || indRes.keyword === 'severidad de accidentalidad';
+                const porcentajeDisplay = indRes.porcentajeReal > 0 && !isFrecSev ? ` (${indRes.porcentajeReal}%)` : '';
                 const resDisplay = indRes.resultado
                     ? `<span class="k-cell-resultado ${indIsAuto ? 'k-res-auto' : 'k-res-manual'}" title="${indIsAuto ? 'Auto-calculado' : 'Manual'} — Actualizado: ${indRes.fechaActualizacion}">
-                        <span class="k-res-badge">${indIsAuto ? '🤖' : '✏️'}</span> ${indRes.resultado} (${indRes.porcentajeReal}%)
+                        <span class="k-res-badge">${indIsAuto ? '🤖' : '✏️'}</span> ${indRes.resultado}${porcentajeDisplay}
                        </span>`
                     : `<button class="k-btn-add-resultado" onclick="openResultadoModal(${groupIdx}, ${idx})" title="Agregar resultado"><i class="bi bi-plus-circle"></i> Agregar</button>`;
 

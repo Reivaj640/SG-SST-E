@@ -72,11 +72,6 @@
         <div class="kair-kpi-sub">Histórico: <span id="kpiHist">-</span></div>
       </div>
       <div class="kair-kpi">
-        <div class="kair-kpi-label">Índice Severidad Prom.</div>
-        <div class="kair-kpi-value primary" id="kpiIS">-</div>
-        <div class="kair-kpi-sub">Meta: <span id="kpiMetaS">-</span></div>
-      </div>
-      <div class="kair-kpi">
         <div class="kair-kpi-label">Meses Exceden Meta</div>
         <div class="kair-kpi-value danger" id="kpiExceden">-</div>
         <div class="kair-kpi-sub">Frecuencia</div>
@@ -152,8 +147,6 @@
               <th>AT</th>
               <th>Trabajadores</th>
               <th>Índice Frecuencia</th>
-              <th>Días Perdidos</th>
-              <th>Índice Severidad</th>
               <th>Meta</th>
               <th>Estado</th>
             </tr>
@@ -175,12 +168,12 @@
       <div class="kair-ref-title">Referencia del Indicador</div>
       <div class="kair-ref-grid">
         <div><strong>Tipo:</strong> <span id="refType">RESULTADO</span></div>
-        <div><strong>Frecuencia:</strong> <span id="refFormula">(AT × 200,000) / (Horas-Trab. × 1,000,000)</span></div>
+        <div><strong>Frecuencia:</strong> <span id="refFormula">(AT / Trabajadores) × 100</span></div>
         <div><strong>Frecuencia:</strong> <span id="refFreq">MENSUAL</span></div>
         <div><strong>Meta Frecuencia:</strong> <span id="refTargetF">0</span></div>
       </div>
       <div class="kair-ref-calc">
-        <strong>Cálculo:</strong> Índice de Frecuencia = (AT × 200,000) / (Horas-Trabajadas × 1,000,000)
+        <strong>Cálculo:</strong> Índice de Frecuencia = (AT / Trabajadores) × 100
       </div>
     </div>
 
@@ -201,19 +194,18 @@
       <div class="kair-methodology">
         <p><strong>Índice de Frecuencia (IF):</strong></p>
         <p class="kair-method-formula">
-          IF = (Número de AT × 200,000) / (Total Horas-Trabajadas × 1,000,000)
+          IF = (AT / Trabajadores) × 100
         </p>
-        <p><strong>Índice de Severidad (IS):</strong></p>
+        <p style="font-size: 0.8rem; color: var(--kair-text-sec); margin-top: 0.5rem;">
+          Resultado por cada 100 trabajadores (Resolución 0312 de 2019)
+        </p>
+        <p style="margin-top: 1rem;"><strong>Flujo de datos bidireccional:</strong></p>
         <p class="kair-method-formula">
-          IS = (Total Días Perdidos × 200,000) / (Total Horas-Trabajadas × 1,000,000)
+          Excel de origen (<span id="methodFileName">—</span>) ↔ Interfaz K+AIR - Sincronización directa, sin copias intermedias
         </p>
-        <p><strong>Flujo de datos bidireccional:</strong></p>
-<p class="kair-method-formula">
-      Excel de origen (<span id="methodFileName">—</span>) ↔ Interfaz K+AIR - Sincronización directa, sin copias intermedias
-      </p>
-      <p style="font-size: 0.8rem; color: var(--kair-text-sec); margin-top: 1rem;">
-        <strong>Fuentes:</strong> <span id="methodSources">—</span>. Resolución 2851 de 2015.
-      </p>
+        <p style="font-size: 0.8rem; color: var(--kair-text-sec); margin-top: 1rem;">
+          <strong>Fuentes:</strong> <span id="methodSources">—</span>. Resolución 0312 de 2019.
+        </p>
       </div>
     </div>
 

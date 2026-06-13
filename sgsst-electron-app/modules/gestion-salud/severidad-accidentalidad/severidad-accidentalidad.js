@@ -181,6 +181,7 @@ function cargarDatos() {
           indicadores = null;
         }
         
+        // diasCargados ya viene cargado desde leerIndicadores()
         renderizar();
       })['catch'](function(e) {
         showToast('Error de conexion: ' + e.message, 'error');
@@ -218,14 +219,16 @@ if (chartContainer) {
     var config = indicadores.config || {};
     var meta = config.metaSeveridad || 0;
     
-    // Calcular estadísticas
-    var sNZ = sM.filter(function(s) { return s.indiceSeveridad > 0; });
-    var promIS = sNZ.length ? sNZ.reduce(function(s, f) { return s + f.indiceSeveridad; }, 0) / sNZ.length : 0;
-    
-    var totalDias = sM.reduce(function(s, f) { return s + f.diasPerdidos; }, 0);
+    // Calcular estadísticas con nueva fórmula: (Días Incap + Días Cargados) / Trabajadores × 100
+    var totalDiasIncap = sM.reduce(function(s, f) { return s + (f.diasPerdidos || 0); }, 0);
+    var totalDiasCarg = sM.reduce(function(s, f) { return s + (f.diasCargados || 0); }, 0);
+    var totalDiasBase = totalDiasIncap + totalDiasCarg;
     
     var tNZ = sM.filter(function(s) { return s.trabajadores > 0; });
     var promTrab = tNZ.length ? Math.round(sM.reduce(function(s, f) { return s + f.trabajadores; }, 0) / tNZ.length) : 0;
+    
+    // Promedio IS anual (suma / 12)
+    var promIS = sM.reduce(function(s, f) { return s + f.indiceSeveridad; }, 0) / 12;
     
     var exceden = sM.filter(function(s) { return s.indiceSeveridad > meta; }).length;
     
@@ -240,7 +243,7 @@ if (chartContainer) {
     });
     
     // Meses sin AT (días perdidos = 0)
-    var sinAT = sM.filter(function(s) { return s.diasPerdidos === 0; }).length;
+    var sinAT = sM.filter(function(s) { return s.diasPerdidos === 0 && s.diasCargados === 0; }).length;
     
     // Renderizar KPIs
     var kpiIS = getElement('kpiIS');
@@ -253,7 +256,7 @@ if (chartContainer) {
     if (kpiMeta) kpiMeta.textContent = fmt(meta, 4);
     
     var kpiDias = getElement('kpiDias');
-    if (kpiDias) kpiDias.textContent = totalDias;
+    if (kpiDias) kpiDias.textContent = totalDiasIncap + totalDiasCarg;
     
     var kpiTrab = getElement('kpiTrab');
     if (kpiTrab) kpiTrab.textContent = promTrab;
@@ -355,7 +358,8 @@ if (chartContainer) {
       
       html += '<tr>';
       html += '<td>' + row.mesLabel + '</td>';
-      html += '<td><span class="kair-editable" data-mes="' + row.mes + '" data-campo="diasPerdidos" tabindex="0">' + row.diasPerdidos + '</span></td>';
+      html += '<td><span class="kair-editable" data-mes="' + row.mes + '" data-campo="diasPerdidos" tabindex="0">' + (row.diasPerdidos || 0) + '</span></td>';
+      html += '<td><span class="kair-editable" data-mes="' + row.mes + '" data-campo="diasCargados" tabindex="0">' + (row.diasCargados || 0) + '</span></td>';
       html += '<td><span class="kair-editable" data-mes="' + row.mes + '" data-campo="trabajadores" tabindex="0">' + row.trabajadores + '</span></td>';
       html += '<td style="font-weight:700;color:' + (exceed ? '#dc3545' : '#28a745') + '">' + fmt(row.indiceSeveridad, 4) + '</td>';
       html += '<td style="color:#6c757d">' + fmt(meta, 4) + '</td>';
@@ -374,14 +378,15 @@ if (chartContainer) {
     });
     
     // Totales
-    var totalDias = sM.reduce(function(s, f) { return s + f.diasPerdidos; }, 0);
+    var totalDiasIncap = sM.reduce(function(s, f) { return s + (f.diasPerdidos || 0); }, 0);
+    var totalDiasCarg = sM.reduce(function(s, f) { return s + (f.diasCargados || 0); }, 0);
     var tNZ = sM.filter(function(s) { return s.trabajadores > 0; });
     var promTrab = tNZ.length ? Math.round(sM.reduce(function(s, f) { return s + f.trabajadores; }, 0) / tNZ.length) : 0;
     var promIS = sM.reduce(function(s, f) { return s + f.indiceSeveridad; }, 0) / 12;
     
     var tablaFoot = getElement('tablaFoot');
     if (tablaFoot) {
-      tablaFoot.innerHTML = '<tr><td>TOTAL</td><td>' + totalDias + '</td><td>' + promTrab + '</td><td style="color:#174ea6">' + fmt(promIS, 4) + '</td><td>' + fmt(meta, 4) + '</td><td>-</td></tr>';
+      tablaFoot.innerHTML = '<tr><td>TOTAL</td><td>' + totalDiasIncap + '</td><td>' + totalDiasCarg + '</td><td>' + promTrab + '</td><td style="color:#174ea6">' + fmt(promIS, 4) + '</td><td>' + fmt(meta, 4) + '</td><td>-</td></tr>';
     }
   }
   
@@ -406,15 +411,15 @@ if (chartContainer) {
       var val = parseInt(input.value) || 0;
       if (val !== actual) {
         api.escribirEnExcel(mes, (function() { var o = {}; o[campo] = val; return o; })()).then(function(res) {
-          if (res.success) {
-            showToast('Excel actualizado: ' + campo + ' -> ' + val);
-            cargarDatos();
-          } else {
-            showToast(res.error && res.error.message || 'Error al guardar', 'error');
-          }
-        })['catch'](function(e) {
-          showToast('Error: ' + e.message, 'error');
-        });
+            if (res.success) {
+              showToast(campo === 'diasCargados' ? 'Días Cargados actualizados: ' + val : 'Excel actualizado: ' + campo + ' -> ' + val);
+              cargarDatos();
+            } else {
+              showToast(res.error && res.error.message || 'Error al guardar', 'error');
+            }
+          })['catch'](function(e) {
+            showToast('Error: ' + e.message, 'error');
+          });
       } else {
         cargarDatos();
       }
@@ -438,11 +443,11 @@ input.addEventListener('blur', commit);
     var meta = config.metaSeveridad || 0;
     var sM = indicadores.severidadMensual;
 
-    var sNZ = sM.filter(function(s) { return s.indiceSeveridad > 0; });
-    var promIS = sNZ.length ? sNZ.reduce(function(s, f) { return s + f.indiceSeveridad; }, 0) / sNZ.length : 0;
+    // Promedio IS anual (suma / 12)
+    var promIS = sM.reduce(function(s, f) { return s + f.indiceSeveridad; }, 0) / 12;
 
     var targetValue = getElement('targetValue');
-    if (targetValue) targetValue.textContent = meta;
+    if (targetValue) targetValue.textContent = fmt(meta, 4);
 
     var targetBadge = getElement('targetBadge');
     if (targetBadge) {
@@ -469,7 +474,7 @@ input.addEventListener('blur', commit);
       html += '<div class="kair-month-card" style="border-top: 3px solid ' + statusColor + '">';
       html += '<div class="kair-month-card-name">' + month.mesLabel + '</div>';
       html += '<div class="kair-month-card-value" style="color:' + statusColor + '">' + fmt(month.indiceSeveridad, 4) + '</div>';
-      html += '<div class="kair-month-card-detail">' + month.diasPerdidos + ' días / ' + month.trabajadores + ' trab.</div>';
+      html += '<div class="kair-month-card-detail">' + (month.diasPerdidos || 0) + ' incap. + ' + (month.diasCargados || 0) + ' carg. / ' + month.trabajadores + ' trab.</div>';
       html += '<span class="kair-badge-status kair-badge-' + (status === 'success' ? 'cumple' : 'excede') + '">' + statusLabel + '</span>';
       html += '</div>';
     });
@@ -484,13 +489,13 @@ input.addEventListener('blur', commit);
     if (refType) refType.textContent = 'RESULTADO';
 
     var refFormula = getElement('refFormula');
-    if (refFormula) refFormula.textContent = '(Días Perdidos / Nº Trabajadores) × 100';
+    if (refFormula) refFormula.textContent = '(Días Incap. + Días Cargados) / Trabajadores × 100';
 
     var refFreq = getElement('refFreq');
     if (refFreq) refFreq.textContent = 'MENSUAL';
 
     var refTarget = getElement('refTarget');
-    if (refTarget) refTarget.textContent = fmt(config.metaSeveridad || 0, 2);
+    if (refTarget) refTarget.textContent = fmt(config.metaSeveridad || 0, 4);
   }
 
   // Init

@@ -314,7 +314,7 @@ await workbook.xlsx.readFile(ruta);
 			: 0;
 
 		const indiceSeveridad = trabajadores > 0
-			? Math.round(((diasPerdidos / trabajadores) * 100) * 10000) / 10000
+			? Math.round((((diasPerdidos + 0) / trabajadores) * 100) * 10000) / 10000
 			: 0;
 
 		const diasProgramados = obtenerValor(ws, filas.diasProgramados, col);
@@ -336,6 +336,7 @@ await workbook.xlsx.readFile(ruta);
 			mes,
 			mesLabel: MESES_LABELS[mes-1],
 			diasPerdidos,
+			diasCargados: 0,
 			trabajadores,
 			indiceSeveridad
 		});

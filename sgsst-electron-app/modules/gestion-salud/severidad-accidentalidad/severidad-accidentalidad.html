@@ -149,7 +149,8 @@
           <thead>
             <tr>
               <th>Mes</th>
-              <th>Días Perdidos</th>
+              <th>Días Incapacidad</th>
+              <th>Días Cargados</th>
               <th>Trabajadores</th>
               <th>Índice Severidad</th>
               <th>Meta</th>
@@ -173,12 +174,12 @@
       <div class="kair-ref-title">Referencia del Indicador</div>
       <div class="kair-ref-grid">
         <div><strong>Tipo:</strong> <span id="refType">RESULTADO</span></div>
-        <div><strong>Fórmula:</strong> <span id="refFormula">(Días Perdidos / Nº Trabajadores) × 100</span></div>
+        <div><strong>Fórmula:</strong> <span id="refFormula">(Días Incap. + Días Cargados) / Trabajadores × 100</span></div>
         <div><strong>Frecuencia:</strong> <span id="refFreq">MENSUAL</span></div>
         <div><strong>Meta:</strong> <span id="refTarget">0</span></div>
       </div>
       <div class="kair-ref-calc">
-        <strong>Cálculo:</strong> Índice de Severidad = (Días Perdidos / Nº Trabajadores) × 100
+        <strong>Cálculo:</strong> Índice de Severidad = (Días Incapacidad + Días Cargados) / Trabajadores × 100
       </div>
     </div>
 
@@ -196,15 +197,22 @@
       <div class="kair-methodology">
         <p><strong>Índice de Severidad (IS):</strong></p>
         <p class="kair-method-formula">
-          IS = (Días Perdidos / Nº Trabajadores) × 100
+          IS = (Días Incapacidad + Días Cargados) / Trabajadores × 100
         </p>
-        <p><strong>Flujo de datos bidireccional:</strong></p>
-<p class="kair-method-formula">
-      Excel de origen (<span id="methodFileName">—</span>) ↔ Interfaz K+AIR - Sincronización directa
-      </p>
-      <p style="font-size: 0.8rem; color: var(--kair-text-sec); margin-top: 1rem;">
-        <strong>Fuentes:</strong> <span id="methodSources">—</span>. Resolución 2851 de 2015.
-      </p>
+        <p style="font-size: 0.8rem; color: var(--kair-text-sec); margin-top: 0.5rem;">
+          Resultado por cada 100 trabajadores (Resolución 0312 de 2019)
+        </p>
+        <p style="margin-top: 1rem;"><strong>Días Cargados (NTC 3701):</strong></p>
+        <p style="font-size: 0.8rem; color: var(--kair-text-sec); margin-top: 0.5rem;">
+          Muerte: 6,000 | Incapacidad Total Permanente: 6,000 | PCL Parcial: 6,000 × %PCL
+        </p>
+        <p style="margin-top: 1rem;"><strong>Flujo de datos bidireccional:</strong></p>
+        <p class="kair-method-formula">
+          Excel de origen (<span id="methodFileName">—</span>) ↔ Interfaz K+AIR - Sincronización directa
+        </p>
+        <p style="font-size: 0.8rem; color: var(--kair-text-sec); margin-top: 1rem;">
+          <strong>Fuentes:</strong> <span id="methodSources">—</span>. Resolución 0312 de 2019. NTC 3701.
+        </p>
       </div>
     </div>
 

@@ -37,7 +37,7 @@ function getModuleInfo() {
   return {
     id: '3.3.1',
     name: 'Frecuencia de la Accidentalidad',
-    description: 'Dashboard de indicadores de frecuencia y severidad de accidentes de trabajo',
+    description: 'Dashboard de indicadores de frecuencia de accidentes de trabajo',
     category: 'Gestión de la Salud',
     version: '1.0.0',
     excelSync: true, // Indica que tiene sincronización bidireccional con Excel

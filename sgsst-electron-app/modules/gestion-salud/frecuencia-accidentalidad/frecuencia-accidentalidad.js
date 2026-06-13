@@ -214,6 +214,9 @@ function cargarDatos() {
             if (autoCount > 0) {
               row.accidentesOriginal = row.accidentes;
               row.accidentes = autoCount;
+              row.indiceFrecuencia = row.trabajadores > 0
+                ? Math.round(((autoCount / row.trabajadores) * 100) * 10000) / 10000
+                : 0;
               row.isAuto = true;
             }
           });
@@ -259,15 +262,10 @@ if (chartContainer) {
   
   function renderKPIs() {
     var fM = indicadores.frecuenciaMensual;
-    var sM = indicadores.severidadMensual;
     var meta = indicadores.config.metaFrecuencia;
-    var metaS = indicadores.config.metaSeveridad;
     
     var fNZ = fM.filter(function(f) { return f.indiceFrecuencia > 0; });
     var promIF = fNZ.length ? fNZ.reduce(function(s, f) { return s + f.indiceFrecuencia; }, 0) / fNZ.length : 0;
-    
-    var sNZ = sM.filter(function(s) { return s.indiceSeveridad > 0; });
-    var promIS = sNZ.length ? sNZ.reduce(function(s, f) { return s + f.indiceSeveridad; }, 0) / sNZ.length : 0;
     
     var exceden = fM.filter(function(f) { return f.indiceFrecuencia > meta; }).length;
     
@@ -285,15 +283,6 @@ if (chartContainer) {
     
     var kpiHist = getElement('kpiHist');
     if (kpiHist) kpiHist.textContent = caracterizacion ? caracterizacion.totalGeneral : '-';
-    
-    var kpiIS = getElement('kpiIS');
-    if (kpiIS) {
-      kpiIS.textContent = fmt(promIS, 4);
-      kpiIS.className = 'kair-kpi-value ' + (promIS > metaS ? 'danger' : 'success');
-    }
-    
-    var kpiMetaS = getElement('kpiMetaS');
-    if (kpiMetaS) kpiMetaS.textContent = fmt(metaS, 4);
     
     var kpiExceden = getElement('kpiExceden');
     if (kpiExceden) kpiExceden.textContent = exceden + '/' + fM.length;
@@ -379,9 +368,7 @@ if (chartContainer) {
   
   function renderTabla() {
     var fM = indicadores.frecuenciaMensual;
-    var sM = indicadores.severidadMensual;
     var meta = indicadores.config.metaFrecuencia;
-    var metaS = indicadores.config.metaSeveridad;
     
     var tbody = getElement('tablaBody');
     if (!tbody) return;
@@ -389,9 +376,7 @@ if (chartContainer) {
     var html = '';
     
     fM.forEach(function(row, i) {
-      var sev = sM[i] || {};
       var exc = row.indiceFrecuencia > meta;
-      var excSev = (sev.indiceSeveridad || 0) > metaS;
       
       html += '<tr>';
       html += '<td>' + row.mesLabel + '</td>';
@@ -399,8 +384,6 @@ if (chartContainer) {
       html += '<td><span class="kair-editable" data-mes="' + row.mes + '" data-campo="accidentes" tabindex="0">' + badge + row.accidentes + '</span></td>';
       html += '<td><span class="kair-editable" data-mes="' + row.mes + '" data-campo="trabajadores" tabindex="0">' + row.trabajadores + '</span></td>';
       html += '<td style="font-weight:700;color:' + (exc ? '#dc3545' : '#28a745') + '">' + fmt(row.indiceFrecuencia, 4) + '</td>';
-      html += '<td><span class="kair-editable" data-mes="' + row.mes + '" data-campo="diasPerdidos" tabindex="0">' + (sev.diasPerdidos || 0) + '</span></td>';
-      html += '<td style="font-weight:700;color:' + (excSev ? '#dc3545' : '#28a745') + '">' + fmt(sev.indiceSeveridad, 4) + '</td>';
       html += '<td style="color:#6c757d">' + meta + '</td>';
       html += '<td><span class="kair-badge-status ' + (exc ? 'kair-badge-excede' : 'kair-badge-cumple') + '">' + (exc ? 'EXCEDE' : 'CUMPLE') + '</span></td>';
       html += '</tr>';
@@ -417,15 +400,13 @@ if (chartContainer) {
     });
     
     var totalAT = fM.reduce(function(s, f) { return s + f.accidentes; }, 0);
-    var totalDias = sM.reduce(function(s, f) { return s + (f.diasPerdidos || 0); }, 0);
     var tNZ = fM.filter(function(f) { return f.trabajadores > 0; });
     var promTrab = tNZ.length ? Math.round(fM.reduce(function(s, f) { return s + f.trabajadores; }, 0) / tNZ.length) : 0;
     var promIF = fM.reduce(function(s, f) { return s + f.indiceFrecuencia; }, 0) / 12;
-    var promIS = sM.reduce(function(s, f) { return s + (f.indiceSeveridad || 0); }, 0) / 12;
     
     var tablaFoot = getElement('tablaFoot');
     if (tablaFoot) {
-      tablaFoot.innerHTML = '<tr><td>TOTAL</td><td>' + totalAT + '</td><td>' + promTrab + '</td><td style="color:#174ea6">' + fmt(promIF, 4) + '</td><td>' + totalDias + '</td><td style="color:#174ea6">' + fmt(promIS, 4) + '</td><td>' + meta + '</td><td>-</td></tr>';
+      tablaFoot.innerHTML = '<tr><td>TOTAL</td><td>' + totalAT + '</td><td>' + promTrab + '</td><td style="color:#174ea6">' + fmt(promIF, 4) + '</td><td>' + meta + '</td><td>-</td></tr>';
     }
   }
   
@@ -490,8 +471,7 @@ if (chartContainer) {
       { title: 'Evolucion Historica por Ano', data: caracterizacion.historialAnual, key: 'anio', val: 'total' },
       { title: 'Distribucion por Empresa', data: caracterizacion.empresaDesglose, key: 'empresa', val: 'total' },
       { title: 'Tipo de Evento', data: caracterizacion.tipoEvento, key: 'tipo', val: 'total' },
-      { title: 'Distribucion Mensual Historica', data: caracterizacion.mesHistorico, key: 'mes', val: 'total' },
-      { title: 'Severidad de Accidentes', data: caracterizacion.severidadDesglose, key: 'severidad', val: 'total' }
+      { title: 'Distribucion Mensual Historica', data: caracterizacion.mesHistorico, key: 'mes', val: 'total' }
     ].filter(function(s) { return s.data && s.data.length > 0; });
     
     var colors = ['#174ea6', '#28a745', '#ffc107', '#dc3545', '#6f42c1', '#20c997', '#fd7e14', '#6610f2'];
@@ -604,7 +584,7 @@ if (chartContainer) {
     if (refType) refType.textContent = 'RESULTADO';
 
     var refFormula = getElement('refFormula');
-    if (refFormula) refFormula.textContent = '(AT × 200,000) / (Horas-Trab. × 1,000,000)';
+    if (refFormula) refFormula.textContent = '(AT / Trabajadores) × 100';
 
     var refFreq = getElement('refFreq');
     if (refFreq) refFreq.textContent = 'MENSUAL';
