@@ -356,7 +356,17 @@ await workbook.xlsx.readFile(ruta);
 	}
 
 	const mortalidad = obtenerValor(ws, filas.eventosMortales, 5);
-	const prevalenciaEL = obtenerValor(ws, filas.prevalenciaEL, 5);
+
+	let prevalenciaEL = 0;
+	for (let mes = 1; mes <= 12; mes++) {
+		prevalenciaEL += obtenerValor(ws, filas.prevalenciaEL, mesAColumna(mes));
+	}
+
+	let incidenciaEL = 0;
+	for (let mes = 1; mes <= 12; mes++) {
+		incidenciaEL += obtenerValor(ws, filas.incidenciaEL, mesAColumna(mes));
+	}
+
 	const metaMortalidad = obtenerValor(ws, filas.eventosMortales, COLUMNA_META);
 
   return {
@@ -371,7 +381,8 @@ await workbook.xlsx.readFile(ruta);
         metaSeveridad,
         metaMortalidad,
         mortalidad,
-        prevalenciaEL
+        prevalenciaEL,
+        incidenciaEL
       },
       totalAT2024: totalAT,
     }
@@ -722,6 +733,304 @@ await workbook.xlsx.readFile(ruta);
 }
 
 // ============================================================
+// PREVALENCIA DE ENFERMEDAD LABORAL (Submódulo 3.3.4)
+// ============================================================
+
+async function leerIndicadoresPrevalencia(rutaOverride) {
+  var ruta = rutaOverride || EXCEL_INDICADORES;
+  var emptyMonthly = [];
+  for (var i = 0; i < 12; i++) {
+    emptyMonthly.push({ mes: i + 1, mesLabel: MESES_LABELS[i], prevalenciaEL: 0, trabajadores: 0 });
+  }
+
+  if (!ruta) {
+    return {
+      success: true,
+      data: {
+        prevalenciaMensual: emptyMonthly,
+        meta: 0,
+        totalCasosEL: 0,
+        totalTrabajadores: 0,
+        promedioTrabajadores: 0
+      }
+    };
+  }
+
+  if (!fs.existsSync(ruta)) {
+    return {
+      success: true,
+      data: {
+        prevalenciaMensual: emptyMonthly,
+        meta: 0,
+        totalCasosEL: 0,
+        totalTrabajadores: 0,
+        promedioTrabajadores: 0
+      }
+    };
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.readFile(ruta);
+
+  var hojaNombres = [
+    "TASA DE MORTALIDAD",
+    "DATOS Y GRÁFICOS RESULTADO",
+    "DATOS Y GRAFICOS RESULTADO",
+    "Mortalidad",
+    "Hoja1"
+  ];
+  var ws = null;
+
+  for (var i = 0; i < hojaNombres.length; i++) {
+    ws = workbook.getWorksheet(hojaNombres[i]);
+    if (ws) break;
+  }
+
+  if (!ws) {
+    ws = workbook.getWorksheet(1);
+  }
+
+  const filas = detectarFilas(ws);
+
+  const meta = obtenerValor(ws, filas.prevalenciaEL, COLUMNA_META);
+
+  const prevalenciaMensual = [];
+  let totalCasosEL = 0;
+  let totalTrabajadores = 0;
+  for (let mes = 1; mes <= 12; mes++) {
+    const col = mesAColumna(mes);
+    const casosEL = obtenerValor(ws, filas.prevalenciaEL, col);
+    const trabMes = obtenerValor(ws, filas.trabajadoresFreq, col);
+    totalCasosEL += casosEL;
+    totalTrabajadores += trabMes;
+    prevalenciaMensual.push({
+      mes: mes,
+      mesLabel: MESES_LABELS[mes - 1],
+      prevalenciaEL: casosEL,
+      trabajadores: trabMes
+    });
+  }
+
+  const promedioTrabajadores = totalTrabajadores > 0
+    ? Math.round(totalTrabajadores / 12)
+    : 0;
+
+  console.log('[EXCEL-BRIDGE Prevalencia] meta:', meta, 'totalCasosEL:', totalCasosEL, 'promedioTrab:', promedioTrabajadores);
+
+  return {
+    success: true,
+    data: {
+      prevalenciaMensual: prevalenciaMensual,
+      meta: meta,
+      totalCasosEL: totalCasosEL,
+      totalTrabajadores: totalTrabajadores,
+      promedioTrabajadores: promedioTrabajadores
+    }
+  };
+}
+
+async function escribirEnExcelPrevalencia(mes, campos, rutaOverride) {
+  var ruta = rutaOverride || EXCEL_INDICADORES;
+  if (!ruta) {
+    throw new Error("Ruta de INDICADORES no configurada");
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.readFile(ruta);
+
+  var hojaNombres = [
+    "TASA DE MORTALIDAD",
+    "DATOS Y GRÁFICOS RESULTADO",
+    "DATOS Y GRAFICOS RESULTADO",
+    "Mortalidad",
+    "Hoja1"
+  ];
+  var ws = null;
+
+  for (var i = 0; i < hojaNombres.length; i++) {
+    ws = workbook.getWorksheet(hojaNombres[i]);
+    if (ws) break;
+  }
+
+  if (!ws) {
+    ws = workbook.getWorksheet(1);
+  }
+
+  if (!ws) throw new Error("Hoja no encontrada");
+
+  const filas = detectarFilas(ws);
+
+  if (campos.prevalenciaEL !== undefined) {
+    const col = mes ? mesAColumna(mes) : 5;
+    ws.getCell(filas.prevalenciaEL, col).value = campos.prevalenciaEL;
+  }
+
+  if (campos.trabajadores !== undefined) {
+    const col = mes ? mesAColumna(mes) : 5;
+    ws.getCell(filas.trabajadoresFreq, col).value = campos.trabajadores;
+  }
+
+  await workbook.xlsx.writeFile(EXCEL_INDICADORES);
+
+  return {
+    success: true,
+    data: {
+      mensaje: "Excel actualizado correctamente",
+      archivo: path.basename(EXCEL_INDICADORES)
+    }
+  };
+}
+
+// ============================================================
+// INCIDENCIA DE ENFERMEDAD LABORAL (Submódulo 3.3.5)
+// ============================================================
+
+async function leerIndicadoresIncidencia(rutaOverride) {
+  var ruta = rutaOverride || EXCEL_INDICADORES;
+  var emptyMonthly = [];
+  for (var i = 0; i < 12; i++) {
+    emptyMonthly.push({ mes: i + 1, mesLabel: MESES_LABELS[i], incidenciaEL: 0, trabajadores: 0 });
+  }
+
+  if (!ruta) {
+    return {
+      success: true,
+      data: {
+        incidenciaMensual: emptyMonthly,
+        meta: 0,
+        totalCasosNuevosEL: 0,
+        totalTrabajadores: 0,
+        promedioTrabajadores: 0
+      }
+    };
+  }
+
+  if (!fs.existsSync(ruta)) {
+    return {
+      success: true,
+      data: {
+        incidenciaMensual: emptyMonthly,
+        meta: 0,
+        totalCasosNuevosEL: 0,
+        totalTrabajadores: 0,
+        promedioTrabajadores: 0
+      }
+    };
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.readFile(ruta);
+
+  var hojaNombres = [
+    "TASA DE MORTALIDAD",
+    "DATOS Y GRÁFICOS RESULTADO",
+    "DATOS Y GRAFICOS RESULTADO",
+    "Mortalidad",
+    "Hoja1"
+  ];
+  var ws = null;
+
+  for (var i = 0; i < hojaNombres.length; i++) {
+    ws = workbook.getWorksheet(hojaNombres[i]);
+    if (ws) break;
+  }
+
+  if (!ws) {
+    ws = workbook.getWorksheet(1);
+  }
+
+  const filas = detectarFilas(ws);
+
+  const meta = obtenerValor(ws, filas.incidenciaEL, COLUMNA_META);
+
+  const incidenciaMensual = [];
+  let totalCasosNuevosEL = 0;
+  let totalTrabajadores = 0;
+  for (let mes = 1; mes <= 12; mes++) {
+    const col = mesAColumna(mes);
+    const casosNuevos = obtenerValor(ws, filas.incidenciaEL, col);
+    const trabMes = obtenerValor(ws, filas.trabajadoresFreq, col);
+    totalCasosNuevosEL += casosNuevos;
+    totalTrabajadores += trabMes;
+    incidenciaMensual.push({
+      mes: mes,
+      mesLabel: MESES_LABELS[mes - 1],
+      incidenciaEL: casosNuevos,
+      trabajadores: trabMes
+    });
+  }
+
+  const promedioTrabajadores = totalTrabajadores > 0
+    ? Math.round(totalTrabajadores / 12)
+    : 0;
+
+  console.log('[EXCEL-BRIDGE Incidencia] meta:', meta, 'totalCasosNuevosEL:', totalCasosNuevosEL, 'promedioTrab:', promedioTrabajadores);
+
+  return {
+    success: true,
+    data: {
+      incidenciaMensual: incidenciaMensual,
+      meta: meta,
+      totalCasosNuevosEL: totalCasosNuevosEL,
+      totalTrabajadores: totalTrabajadores,
+      promedioTrabajadores: promedioTrabajadores
+    }
+  };
+}
+
+async function escribirEnExcelIncidencia(mes, campos, rutaOverride) {
+  var ruta = rutaOverride || EXCEL_INDICADORES;
+  if (!ruta) {
+    throw new Error("Ruta de INDICADORES no configurada");
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.readFile(ruta);
+
+  var hojaNombres = [
+    "TASA DE MORTALIDAD",
+    "DATOS Y GRÁFICOS RESULTADO",
+    "DATOS Y GRAFICOS RESULTADO",
+    "Mortalidad",
+    "Hoja1"
+  ];
+  var ws = null;
+
+  for (var i = 0; i < hojaNombres.length; i++) {
+    ws = workbook.getWorksheet(hojaNombres[i]);
+    if (ws) break;
+  }
+
+  if (!ws) {
+    ws = workbook.getWorksheet(1);
+  }
+
+  if (!ws) throw new Error("Hoja no encontrada");
+
+  const filas = detectarFilas(ws);
+
+  if (campos.incidenciaEL !== undefined) {
+    const col = mes ? mesAColumna(mes) : 5;
+    ws.getCell(filas.incidenciaEL, col).value = campos.incidenciaEL;
+  }
+
+  if (campos.trabajadores !== undefined) {
+    const col = mes ? mesAColumna(mes) : 5;
+    ws.getCell(filas.trabajadoresFreq, col).value = campos.trabajadores;
+  }
+
+  await workbook.xlsx.writeFile(EXCEL_INDICADORES);
+
+  return {
+    success: true,
+    data: {
+      mensaje: "Excel actualizado correctamente",
+      archivo: path.basename(EXCEL_INDICADORES)
+    }
+  };
+}
+
+// ============================================================
 // CONTAR AT POR MES desde Registro Estadístico 3.2.3 (para auto-fill)
 // ============================================================
 
@@ -828,5 +1137,9 @@ module.exports = {
   contarATPorMes,
   escribirEnExcel,
   leerIndicadoresMortalidad,
-  escribirEnExcelMortalidad
+  escribirEnExcelMortalidad,
+  leerIndicadoresPrevalencia,
+  escribirEnExcelPrevalencia,
+  leerIndicadoresIncidencia,
+  escribirEnExcelIncidencia
 };

@@ -61,8 +61,8 @@ El módulo de **Gestión de la Salud** agrupa todos los componentes relacionados
 | 3.3.1 | Frecuencia de Accidentalidad | `frecuencia-accidentalidad.js` | ✅ |
 | 3.3.2 | Severidad de Accidentalidad | `severidad-accidentalidad.js` | ✅ |
 | 3.3.3 | Proporción de AT Mortales | `indice-mortalidad.js` | ✅ |
-| 3.3.4 | Prevalencia de Enfermedad Laboral | `sociodemografica-component.js` (compartido) | ✅ |
-| 3.3.5 | Incidencia de Enfermedad Laboral | `sociodemografica-component.js` (compartido) | ✅ |
+| 3.3.4 | Prevalencia de Enfermedad Laboral | `prevalencia-enfermedad-laboral/` (dedicado) | ✅ |
+| 3.3.5 | Incidencia de Enfermedad Laboral | `incidencia-enfermedad-laboral/` (dedicado) | ✅ |
 | 3.3.6 | Medición del Ausentismo | `medicion-ausentismo.js` | ✅ |
 
 ### 1.3 Archivos del Módulo
@@ -924,16 +924,39 @@ Calcula y presenta la proporción de accidentes de trabajo mortales respecto al 
 
 Calcula y presenta la prevalencia de enfermedad laboral en la empresa, midiendo la proporción de trabajadores que padecen una enfermedad ocupacional en un momento determinado, según la Resolución 0312 de 2019.
 
+### Fórmula
+
+```
+Prevalencia EL = (Casos nuevos y antiguos de EL / Promedio de Trabajadores) × 100,000
+```
+
 ### Funcionalidades
 
-- ✅ Cálculo de prevalencia de enfermedad laboral
-- ✅ Registro y seguimiento de enfermedades laborales diagnosticadas
-- ✅ Reportes por tipo de enfermedad y periodo
+- ✅ Cálculo de prevalencia de enfermedad laboral (fórmula ×100,000)
+- ✅ Tabla editable con 12 meses de datos
+- ✅ Gráfico Chart.js con líneas de meta y promedio
+- ✅ 5 KPIs: Prevalencia EL Prom., Total Casos EL, Trabajadores Prom., Meta, Estado
+- ✅ Sincronización directa con Excel de origen
+- ✅ Notificaciones toast para confirmación de cambios
 
-### Componente Renderer
+### Backend
 
-- Ruta en renderer.js: `gestion-salud/prevalencia-enfermedad-laboral`
-- Componente: → Redirige a `sociodemografica` (componente compartido)
+- **IPC Handlers:** `prevalencia:configurar-rutas`, `prevalencia:leer-indicadores`, `prevalencia:escribir-excel`
+- **Excel Bridge:** `leerIndicadoresPrevalencia()` — lee 12 columnas mensuales de fila 15 (prevalenciaEL) + trabajadores fila 10 + meta columna 30
+- **Escritura:** `escribirEnExcelPrevalencia(mes, campos)` — escribe meses 1–12 en fila 15
+
+### Componente Frontend
+
+- **Directorio:** `modules/gestion-salud/prevalencia-enfermedad-laboral/`
+- **Archivos:** `index.js`, `prevalencia-enfermedad-laboral.html`, `prevalencia-enfermedad-laboral.js`, `prevalencia-enfermedad-laboral.css`
+- **Namespace API:** `window.electronAPI.prevalencia`
+- **Routing:** `renderer.js` → `showPrevalenciaContent()`
+- **CSS Scope:** `.prevalencia-container` (124 selectores)
+
+### Integración Objetivos SST
+
+- Keyword automática: `'prevalencia'` — se crea siempre en `calculateAutoResultados()`
+- El viewer muestra el resultado calculado automáticamente en lugar de "Agregar"
 
 ---
 
@@ -943,16 +966,47 @@ Calcula y presenta la prevalencia de enfermedad laboral en la empresa, midiendo 
 
 Calcula y presenta la incidencia de enfermedad laboral, midiendo los nuevos casos diagnosticados durante un periodo determinado, conforme a los indicadores de la Resolución 0312 de 2019.
 
+### Fórmula
+
+```
+Incidencia EL = (Casos nuevos de EL / Promedio de Trabajadores) × 100,000
+```
+
+**Meta:** <5 por 100,000 trabajadores — Evaluada por Coordinador SST
+
 ### Funcionalidades
 
-- ✅ Cálculo de incidencia de enfermedad laboral
-- ✅ Registro de nuevos casos por periodo
-- ✅ Análisis de tendencias de incidencia
+- ✅ Cálculo de incidencia de enfermedad laboral (fórmula ×100,000)
+- ✅ Tabla editable con 12 meses de datos
+- ✅ Gráfico Chart.js con líneas de meta y promedio
+- ✅ 5 KPIs: Incidencia EL Prom., Casos Nuevos EL, Trabajadores Prom., Meta, Estado
+- ✅ Sincronización directa con Excel de origen
+- ✅ Notificaciones toast para confirmación de cambios
 
-### Componente Renderer
+### Backend
 
-- Ruta en renderer.js: `gestion-salud/incidencia-enfermedad-laboral`
-- Componente: → Redirige a `sociodemografica` (componente compartido)
+- **IPC Handlers:** `incidencia:configurar-rutas`, `incidencia:leer-indicadores`, `incidencia:escribir-excel`
+- **Excel Bridge:** `leerIndicadoresIncidencia()` — lee 12 columnas mensuales de fila 17 (incidenciaEL) + trabajadores fila 10 + meta columna 30
+- **Escritura:** `escribirEnExcelIncidencia(mes, campos)` — escribe meses 1–12 en fila 17
+
+### Componente Frontend
+
+- **Directorio:** `modules/gestion-salud/incidencia-enfermedad-laboral/`
+- **Archivos:** `index.js`, `incidencia-enfermedad-laboral.html`, `incidencia-enfermedad-laboral.js`, `incidencia-enfermedad-laboral.css`
+- **Namespace API:** `window.electronAPI.incidencia`
+- **Routing:** `renderer.js` → `showIncidenciaContent()`
+- **CSS Scope:** `.incidencia-container` (124 selectores)
+
+### Integración Objetivos SST
+
+- Keyword automática: `'incidencia'` — se crea siempre en `calculateAutoResultados()`
+- El viewer muestra el resultado calculado automáticamente en lugar de "Agregar"
+
+### Nota Importante
+
+- Ambos submódulos (3.3.4 y 3.3.5) tienen sus propios handlers IPC independientes
+- `leerIndicadores()` en `excel-bridge.js` suma los 12 meses para `prevalenciaEL` e `incidenciaEL`
+- Las keywords `'prevalencia'` e `'incidencia'` se crean siempre en `calculateAutoResultados()` sin condición `> 0`
 
 ---
 

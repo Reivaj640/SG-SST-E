@@ -4236,6 +4236,12 @@ showDevelopmentMessage(submoduleContentDiv, submoduleName);
     } else if (submoduleName === "3.3.3 Proporción de accidentes de trabajo mortales") {
       showIndiceMortalidadContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
 
+    } else if (submoduleName === "3.3.4 Medición de la prevalencia de enfermedades laborales") {
+      showPrevalenciaContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
+
+    } else if (submoduleName === "3.3.5 Medición de la incidencia de enfermedades laborales") {
+      showIncidenciaContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
+
     } else if (submoduleName === "3.3.6 Medición del ausentismo por causa médica") {
       showMedicionAusentismoContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
 
@@ -4924,6 +4930,111 @@ function showIndiceMortalidadContent(container, currentCompany, moduleName, subm
     })
     .catch(error => {
       console.error('[IndiceMortalidad] Error al cargar:', error);
+      showDevelopmentMessage(container, submoduleName);
+    });
+}
+
+function showPrevalenciaContent(container, currentCompany, moduleName, submoduleName) {
+  console.log('[PrevalenciaEL] showPrevalenciaContent INICIADO');
+
+  const BASE = './modules/gestion-salud/prevalencia-enfermedad-laboral/';
+
+  // Cargar CSS si no está cargado
+  if (!document.querySelector(`link[href="${BASE}prevalencia-enfermedad-laboral.css"]`)) {
+    const cssLink = document.createElement('link');
+    cssLink.rel = 'stylesheet';
+    cssLink.href = BASE + 'prevalencia-enfermedad-laboral.css';
+    document.head.appendChild(cssLink);
+  }
+
+  // Cargar HTML y luego el script
+  const htmlUrl = BASE + 'prevalencia-enfermedad-laboral.html';
+
+  fetch(htmlUrl)
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.text();
+    })
+    .then(html => {
+      var parser = new DOMParser();
+      var doc = parser.parseFromString(html, 'text/html');
+
+      var sourceBody = doc.body;
+      var elements = sourceBody.children;
+      while (elements.length > 0) {
+        container.appendChild(elements[0]);
+      }
+
+      // Cargar Chart.js si no está disponible
+      if (typeof Chart === 'undefined') {
+        var chartScript = document.createElement('script');
+        chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+        document.head.appendChild(chartScript);
+      }
+
+      // Guardar empresa seleccionada para que el módulo la use
+      localStorage.setItem('selectedCompany', currentCompany);
+
+      // Cargar el script del módulo
+      var ts = Date.now();
+      var scriptUrl = BASE + 'prevalencia-enfermedad-laboral.js?_t=' + ts;
+
+      var s = document.createElement('script');
+      s.src = scriptUrl;
+      document.body.appendChild(s);
+    })
+    .catch(error => {
+      console.error('[PrevalenciaEL] Error al cargar:', error);
+      showDevelopmentMessage(container, submoduleName);
+    });
+}
+
+function showIncidenciaContent(container, currentCompany, moduleName, submoduleName) {
+  console.log('[IncidenciaEL] showIncidenciaContent INICIADO');
+
+  const BASE = './modules/gestion-salud/incidencia-enfermedad-laboral/';
+
+  if (!document.querySelector(`link[href="${BASE}incidencia-enfermedad-laboral.css"]`)) {
+    const cssLink = document.createElement('link');
+    cssLink.rel = 'stylesheet';
+    cssLink.href = BASE + 'incidencia-enfermedad-laboral.css';
+    document.head.appendChild(cssLink);
+  }
+
+  const htmlUrl = BASE + 'incidencia-enfermedad-laboral.html';
+
+  fetch(htmlUrl)
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.text();
+    })
+    .then(html => {
+      var parser = new DOMParser();
+      var doc = parser.parseFromString(html, 'text/html');
+
+      var sourceBody = doc.body;
+      var elements = sourceBody.children;
+      while (elements.length > 0) {
+        container.appendChild(elements[0]);
+      }
+
+      if (typeof Chart === 'undefined') {
+        var chartScript = document.createElement('script');
+        chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+        document.head.appendChild(chartScript);
+      }
+
+      localStorage.setItem('selectedCompany', currentCompany);
+
+      var ts = Date.now();
+      var scriptUrl = BASE + 'incidencia-enfermedad-laboral.js?_t=' + ts;
+
+      var s = document.createElement('script');
+      s.src = scriptUrl;
+      document.body.appendChild(s);
+    })
+    .catch(error => {
+      console.error('[IncidenciaEL] Error al cargar:', error);
       showDevelopmentMessage(container, submoduleName);
     });
 }

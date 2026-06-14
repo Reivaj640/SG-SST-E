@@ -1,7 +1,7 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.100
-**Última actualización:** 11 de junio de 2026
+**Versión:** 0.1.101
+**Última actualización:** 14 de junio de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
 ---
@@ -15,7 +15,7 @@
 - ✅ **Multi-empresa**: Gestión de múltiples empresas con una sola experiencia UX/UI
 - ✅ **Motor Normativo Inteligente**: Escenarios normativos basados en tamaño y riesgo
 - ✅ **7 Módulos Principales**: Recursos, Gestión Integral, Salud, Peligros, Amenazas, Verificación, Mejoramiento
-- ✅ **27+ Submódulos**: Cada uno con su propia lógica y vistas especializadas
+- ✅ **29+ Submódulos**: Cada uno con su propia lógica y vistas especializadas
 - ✅ **IA Integrada**: Análisis de accidentes con LLM (Mistral 3 3B)
 - ✅ **Seguimiento PRIC**: Gestión completa de casos de incapacidad y rehabilitación
 - ✅ **Calificación PCL Dual**: Secciones separadas para Calificación Regional y Nacional (14 campos)
@@ -55,15 +55,15 @@
 ├─────────────────────────────────────────────────────────┤
 │  RENDERER (Frontend)                                    │
 │  ├── index.html (Estructura principal)                  │
-│  ├── renderer.js (Lógica de UI - 3170 líneas)           │
+│  ├── renderer.js (Lógica de UI - 5869 líneas)           │
 │  ├── styles.css (Sistema Visual Oficial)                │
 │  └── modules/ (27 submódulos organizados)               │
 ├─────────────────────────────────────────────────────────┤
 │  PRELOAD (Puente Seguro)                                │
-│  └── preload.js (78 contratos IPC expuestos)            │
+│  └── preload.js (143 contratos IPC expuestos)           │
 ├─────────────────────────────────────────────────────────┤
 │  MAIN (Backend Electron)                                │
-│  └── main.js (78 handlers IPC - 4766 líneas)            │
+│  └── main.js (143 handlers IPC - 17254 líneas)          │
 ├─────────────────────────────────────────────────────────┤
 │  DATABASE                                                │
 │  └── SQLite (kair.db) en app.getPath('userData')         │
@@ -84,9 +84,9 @@
 | Archivo                  | Líneas | Propósito                  |
 |--------------------------|--------|----------------------------|
 | `index.html`             | 143    | Punto de entrada HTML      |
-| `main.js`                | 4766   | Proceso principal Electron |
-| `preload.js`             | ~180   | Puente IPC seguro          |
-| `renderer.js`            | 3170   | Lógica de renderizado      |
+| `main.js`                | 17254  | Proceso principal Electron |
+| `preload.js`             | 445    | Puente IPC seguro          |
+| `renderer.js`            | 5869   | Lógica de renderizado      |
 | `styles.css`             | ~2500  | Estilos globales           |
 | `development-styles.css` | ~500   | Estilos desarrollo         |
 | `package.json`           | 85     | Configuración npm          |
@@ -128,7 +128,9 @@ modules/
 │   ├── index.js
 │   ├── ausentismo/            # 3.3.6 Medición del ausentismo
 │   ├── evaluaciones-medicas/  # 3.1.4 Evaluaciones médicas
+│   ├── incidencia-enfermedad-laboral/ # 3.3.5 Incidencia de enf. laboral 🆕
 │   ├── investigacion-accidentes/ # 3.2.2 Investigación accidentes
+│   ├── prevalencia-enfermedad-laboral/ # 3.3.4 Prevalencia de enf. laboral 🆕
 │   ├── reportes-accidentes/   # 3.2.1 Reporte accidentes
 │   ├── restricciones-medicas/ # 3.1.6 Restricciones médicas
 │   └── sociodemografica/      # 3.1.1 Diagnóstico sociodemográfico
@@ -494,7 +496,7 @@ Menú Principal → 1.2.1 Programa de Capacitaciones
 | 2.5.1  | Archivo y Retención Documental | En `renderer.js`                                         |
 | 2.6.1  | Rendición de Cuentas           | `rendicion-logic.js`, `viewer.js`                        |
 
-### Módulo 3: Gestión de la Salud (6 submódulos)
+### Módulo 3: Gestión de la Salud (8 submódulos)
 
 | Código | Submódulo                    | Archivos Principales                                   |
 |--------|------------------------------|--------------------------------------------------------|
@@ -503,6 +505,8 @@ Menú Principal → 1.2.1 Programa de Capacitaciones
 | 3.1.6  | Restricciones Médicas        | `restricciones-medicas-logic.js`, `component.js`       |
 | 3.2.1  | Reporte de Accidentes        | `reportes-accidentes-logic.js`, `viewer.js`            |
 | 3.2.2  | Investigación de Accidentes  | `investigacion-accidentes-logic.js`, `handlers.js`  🤖|
+| 3.3.4  | Prevalencia de Enf. Laboral  | `prevalencia-enfermedad-laboral/` (4 archivos) 🆕      |
+| 3.3.5  | Incidencia de Enf. Laboral   | `incidencia-enfermedad-laboral/` (4 archivos) 🆕       |
 | 3.3.6  | Medición del Ausentismo      | `medicion-ausentismo.js`, `registrar-ausentismo.js`    |
 
 ### Módulos 4-7 (Resumen)

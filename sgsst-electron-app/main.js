@@ -5218,6 +5218,7 @@ async function calculateAutoResultados(companyName) {
             // ── Leer meta de Objetivos SST (2.2.1) ──
             let metaObjetivo = null;
             let metaSeveridadObjetivo = null;
+            let metaMortalidadObjetivo = null;
             try {
               const giDir = path.join(rootPath, '2. Gestión Integral del SG-SST');
               if (fs.existsSync(giDir)) {
@@ -5250,7 +5251,15 @@ async function calculateAutoResultados(companyName) {
                             sendLog(`[AUTO-RESULTADOS] Meta Objetivos SST (Severidad): ${metaRaw} → ${metaSeveridadObjetivo}`, 'INFO');
                           }
                         }
-                        if (metaObjetivo && metaSeveridadObjetivo) break;
+                        if (colC.indexOf('mortalidad') >= 0 || (colC.indexOf('proporcion') >= 0 && colC.indexOf('mortal') >= 0)) {
+                          const metaRaw = String(objRows[r][4] || '').trim();
+                          const match = metaRaw.match(/[\d.]+/);
+                          if (match) {
+                            metaMortalidadObjetivo = parseFloat(match[0]);
+                            sendLog(`[AUTO-RESULTADOS] Meta Objetivos SST (Mortalidad): ${metaRaw} → ${metaMortalidadObjetivo}`, 'INFO');
+                          }
+                        }
+                        if (metaObjetivo && metaSeveridadObjetivo && metaMortalidadObjetivo) break;
                       }
                     }
                   }
@@ -5311,7 +5320,14 @@ async function calculateAutoResultados(companyName) {
                     ? Math.round((((row.diasPerdidos + row.diasCargados) / row.trabajadores) * 100) * 10000) / 10000
                     : 0;
                 });
-                sendLog(`[AUTO-RESULTADOS] diasCargados cargados desde JSON para severidad`, 'INFO');
+                // ── Override eventosMortalesMensual con severidad: diasCargados === 6000 → 1 mortal ──
+                ind.eventosMortalesMensual.forEach(row => {
+                  const mesData = yearSevData[String(row.mes)] || {};
+                  const diasCargados = mesData.diasCargados || 0;
+                  row.diasCargados = diasCargados;
+                  row.eventosMortales = diasCargados === 6000 ? 1 : 0;
+                });
+                sendLog(`[AUTO-RESULTADOS] diasCargados cargados desde JSON para severidad + mortalidad`, 'INFO');
               }
             } catch (eSevJson) {
               sendLog(`[AUTO-RESULTADOS] No se pudo cargar diasCargados: ${eSevJson.message}`, 'WARN');
@@ -5345,9 +5361,43 @@ async function calculateAutoResultados(companyName) {
             resultado['severidad de accidentalidad'] = resultado['severidad'];
 
             // ── Total AT ──
-            const totalAT = ind.totalAT2024;
-            const totalMortal = ind.eventosMortalesMensual.reduce((s, m) => s + m.eventosMortales, 0);
             const totalDiasPerdidos = ind.severidadMensual.reduce((s, m) => s + m.diasPerdidos, 0);
+
+            // Total AT para mortalidad: auto-fill desde 3.2.3
+            let totalATMortal = ind.totalAT2024;
+            try {
+              const gsDirMort = path.join(rootPath, '3. Gestión de la Salud');
+              if (fs.existsSync(gsDirMort)) {
+                const gsEntriesMort = fs.readdirSync(gsDirMort);
+                const folder323Mort = gsEntriesMort.find(f => f.startsWith('3.2.3'));
+                if (folder323Mort) {
+                  const subDirMort = path.join(gsDirMort, folder323Mort);
+                  const subEntriesMort = fs.readdirSync(subDirMort);
+                  const xlsxMort = subEntriesMort.find(f => f.toLowerCase().endsWith('.xlsx') && !f.startsWith('~$'));
+                  if (xlsxMort) {
+                    const rutaMort = path.join(subDirMort, xlsxMort);
+                    const resMortAT = await excelBridge.contarATPorMes(currentYear, rutaMort);
+                    if (resMortAT.success && resMortAT.data && resMortAT.data.mensual) {
+                      const autoATMort = resMortAT.data.mensual;
+                      let sumAT = 0;
+                      ind.eventosMortalesMensual.forEach(row => {
+                        const autoCount = autoATMort[row.mes] || 0;
+                        if (autoCount > 0) row.totalATMes = autoCount;
+                        sumAT += row.totalATMes;
+                      });
+                      totalATMortal = sumAT;
+                      sendLog(`[AUTO-RESULTADOS] Total AT mortalidad desde 3.2.3: ${totalATMortal}`, 'INFO');
+                    }
+                  }
+                }
+              }
+            } catch (eMortAT) {
+              sendLog(`[AUTO-RESULTADOS] Error auto-fill AT mortalidad: ${eMortAT.message}`, 'WARN');
+            }
+
+            // Total AT general (para accidente/AT)
+            const totalAT = ind.frecuenciaMensual.reduce((s, m) => s + m.accidentes, 0);
+            const totalMortal = ind.eventosMortalesMensual.reduce((s, m) => s + m.eventosMortales, 0);
 
             resultado['accidente'] = {
               resultado: `${totalAT} AT en ${currentYear} | Mortales: ${totalMortal} | Días perdidos: ${totalDiasPerdidos}`,
@@ -5358,9 +5408,11 @@ async function calculateAutoResultados(companyName) {
             resultado['accidentalidad'] = resultado['frecuencia'];
 
             // ── Mortalidad ──
+            const metaMortal = metaMortalidadObjetivo || ind.config.metaMortalidad || 0;
+            const proporcionMortal = totalATMortal > 0 ? ((totalMortal / totalATMortal) * 100).toFixed(2) : '0.00';
             resultado['mortalidad'] = {
-              resultado: `${totalMortal} eventos mortales en ${currentYear} (meta: ${ind.config.metaMortalidad || 0})`,
-              porcentajeReal: ind.config.metaMortalidad > 0 ? (totalMortal <= ind.config.metaMortalidad ? 100 : 0) : 0,
+              resultado: `Proporción mortalidad: ${proporcionMortal}% (${totalMortal} mortales / ${totalATMortal} AT en ${currentYear})`,
+              porcentajeReal: metaMortal > 0 ? (parseFloat(proporcionMortal) <= metaMortal ? 100 : 0) : 0,
               source: 'auto'
             };
             resultado['mortal'] = resultado['mortalidad'];
@@ -5378,9 +5430,26 @@ async function calculateAutoResultados(companyName) {
             resultado['incapacidad'] = resultado['ausentismo'];
 
             // ── Prevalencia EL ──
-            if (ind.config.prevalenciaEL > 0) {
+            {
+              const totalTrab = ind.frecuenciaMensual.reduce((s, m) => s + m.trabajadores, 0);
+              const promTrab = ind.frecuenciaMensual.length > 0 ? Math.round(totalTrab / ind.frecuenciaMensual.length) : 0;
+              const totalCasosEL = ind.config.prevalenciaEL || 0;
+              const prevalenciaCalc = promTrab > 0 ? ((totalCasosEL / promTrab) * 100000).toFixed(2) : '0.00';
               resultado['prevalencia'] = {
-                resultado: `Prevalencia EL: ${ind.config.prevalenciaEL}`,
+                resultado: `Prevalencia EL: ${prevalenciaCalc} por 100.000 trabajadores (${totalCasosEL} casos / ${promTrab} prom. trabajadores)`,
+                porcentajeReal: 0,
+                source: 'auto'
+              };
+            }
+
+            // ── Incidencia EL ──
+            {
+              const totalTrabInc = ind.frecuenciaMensual.reduce((s, m) => s + m.trabajadores, 0);
+              const promTrabInc = ind.frecuenciaMensual.length > 0 ? Math.round(totalTrabInc / ind.frecuenciaMensual.length) : 0;
+              const totalCasosNuevos = ind.config.incidenciaEL || 0;
+              const incidenciaCalc = promTrabInc > 0 ? ((totalCasosNuevos / promTrabInc) * 100000).toFixed(2) : '0.00';
+              resultado['incidencia'] = {
+                resultado: `Incidencia EL: ${incidenciaCalc} por 100.000 trabajadores (${totalCasosNuevos} casos nuevos / ${promTrabInc} prom. trabajadores)`,
                 porcentajeReal: 0,
                 source: 'auto'
               };
@@ -16856,6 +16925,308 @@ ipcMain.handle('mortalidad:leer-severidad-json', async (event, companyName, year
   } catch (error) {
     console.error('[IndiceMortalidad] Error leyendo severidad-data.json:', error);
     return { success: true, data: { meses: {} } };
+  }
+});
+
+// =============================================================================
+// PREVALENCIA DE ENFERMEDAD LABORAL (Submódulo 3.3.4)
+// =============================================================================
+ipcMain.handle('prevalencia:configurar-rutas', async (event, companyName, year) => {
+  console.log('[Prevalencia][MAIN] ===== HANDLER CALLED =====');
+  console.log('[Prevalencia][MAIN] companyName recibido:', companyName);
+
+  try {
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+
+    const normalizedInput = (companyName || '').toLowerCase();
+    const companyKey = Object.keys(config.companyPaths || {}).find(
+      key => key.toLowerCase() === normalizedInput
+    );
+
+    const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+
+    if (!companyConfig || !companyConfig.root) {
+      return {
+        success: false,
+        error: {
+          code: 'COMPANY_NOT_FOUND',
+          message: `Empresa "${companyName}" no encontrada`
+        }
+      };
+    }
+
+    if (!companyConfig.structure?.structure) {
+      return {
+        success: false,
+        error: {
+          code: 'NO_STRUCTURE',
+          message: `Empresa "${companyName}" no tiene estructura mapeada`
+        }
+      };
+    }
+
+    const rootStructure = companyConfig.structure.structure;
+
+    function findDirFlexible(subdirs, target) {
+      if (!subdirs) return null;
+      const normalizedTarget = target
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      for (const [key, value] of Object.entries(subdirs)) {
+        const normalizedKey = key
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+        if (normalizedKey === normalizedTarget) {
+          return value;
+        }
+      }
+      return null;
+    }
+
+    var prevalenciaPath = null;
+    var ubicacionesAPrueba = [
+      { modulo: "3. Gestion de la Salud", submodulo: "3.3.4 Prevalencia de enfermedad laboral" },
+      { modulo: "3. Gestion de la Salud", submodulo: "3.3.4 Medicion de la prevalencia de enfermedades laborales" },
+      { modulo: "3. Gestion de la Salud", submodulo: "3.3.4 Prevalencia de Enfermedad Laboral" },
+    ];
+
+    for (var i = 0; i < ubicacionesAPrueba.length; i++) {
+      var loc = ubicacionesAPrueba[i];
+      var modulo = findDirFlexible(rootStructure.subdirectories, loc.modulo);
+      if (modulo && modulo.subdirectories) {
+        var submodulo = findDirFlexible(modulo.subdirectories, loc.submodulo);
+        if (submodulo) {
+          prevalenciaPath = submodulo;
+          console.log('[Prevalencia][MAIN] ENCONTRADO en:', loc.modulo, '->', loc.submodulo);
+          break;
+        }
+      }
+    }
+
+    if (!prevalenciaPath) {
+      return {
+        success: false,
+        error: {
+          code: 'SUBMODULE_NOT_FOUND',
+          message: 'No se encontró carpeta de indicadores de prevalencia'
+        }
+      };
+    }
+
+    console.log('[Prevalencia][MAIN] prevalenciaPath.path:', prevalenciaPath.path);
+
+    const rutas = excelBridge.configurarRutasConRuta(prevalenciaPath.path, year);
+
+    _setRuta('prevalencia', rutas.indicadores, null, companyConfig.root, year);
+
+    return {
+      success: true,
+      data: {
+        indicadores: rutas.indicadores ? path.basename(rutas.indicadores) : null,
+        selectedFile: rutas.selectedFile,
+        availableFiles: rutas.availableFiles
+      }
+    };
+  } catch (error) {
+    console.error('[Prevalencia][MAIN] EXCEPTION:', error.message);
+    return {
+      success: false,
+      error: {
+        code: 'CONFIG_ERROR',
+        message: error.message
+      }
+    };
+  }
+});
+
+ipcMain.handle('prevalencia:leer-indicadores', async () => {
+  try {
+    var rutas = _getRuta('prevalencia');
+    var result = await excelBridge.leerIndicadoresPrevalencia(rutas && rutas.indicadores);
+    return result;
+  } catch (error) {
+    console.error('[Prevalencia] Error leyendo indicadores:', error);
+    return {
+      success: false,
+      error: {
+        code: 'EXCEL_READ_ERROR',
+        message: error.message
+      }
+    };
+  }
+});
+
+ipcMain.handle('prevalencia:escribir-excel', async (event, mes, campos) => {
+  try {
+    var rutas = _getRuta('prevalencia');
+    return await excelBridge.escribirEnExcelPrevalencia(mes, campos, rutas && rutas.indicadores);
+  } catch (error) {
+    console.error('[Prevalencia] Error escribiendo en Excel:', error);
+    return {
+      success: false,
+      error: {
+        code: 'EXCEL_WRITE_ERROR',
+        message: error.message
+      }
+    };
+  }
+});
+
+// =============================================================================
+// INCIDENCIA DE ENFERMEDAD LABORAL (Submódulo 3.3.5)
+// =============================================================================
+ipcMain.handle('incidencia:configurar-rutas', async (event, companyName, year) => {
+  console.log('[Incidencia][MAIN] ===== HANDLER CALLED =====');
+  console.log('[Incidencia][MAIN] companyName recibido:', companyName);
+
+  try {
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+
+    const normalizedInput = (companyName || '').toLowerCase();
+    const companyKey = Object.keys(config.companyPaths || {}).find(
+      key => key.toLowerCase() === normalizedInput
+    );
+
+    const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+
+    if (!companyConfig || !companyConfig.root) {
+      return {
+        success: false,
+        error: {
+          code: 'COMPANY_NOT_FOUND',
+          message: `Empresa "${companyName}" no encontrada`
+        }
+      };
+    }
+
+    if (!companyConfig.structure?.structure) {
+      return {
+        success: false,
+        error: {
+          code: 'NO_STRUCTURE',
+          message: `Empresa "${companyName}" no tiene estructura mapeada`
+        }
+      };
+    }
+
+    const rootStructure = companyConfig.structure.structure;
+
+    function findDirFlexible(subdirs, target) {
+      if (!subdirs) return null;
+      const normalizedTarget = target
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      for (const [key, value] of Object.entries(subdirs)) {
+        const normalizedKey = key
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+        if (normalizedKey === normalizedTarget) {
+          return value;
+        }
+      }
+      return null;
+    }
+
+    var incidenciaPath = null;
+    var ubicacionesAPrueba = [
+      { modulo: "3. Gestion de la Salud", submodulo: "3.3.5 Incidencia de enfermedad laboral" },
+      { modulo: "3. Gestion de la Salud", submodulo: "3.3.5 Medicion de la incidencia de enfermedades laborales" },
+      { modulo: "3. Gestion de la Salud", submodulo: "3.3.5 Incidencia de Enfermedad Laboral" },
+    ];
+
+    for (var i = 0; i < ubicacionesAPrueba.length; i++) {
+      var loc = ubicacionesAPrueba[i];
+      var modulo = findDirFlexible(rootStructure.subdirectories, loc.modulo);
+      if (modulo && modulo.subdirectories) {
+        var submodulo = findDirFlexible(modulo.subdirectories, loc.submodulo);
+        if (submodulo) {
+          incidenciaPath = submodulo;
+          console.log('[Incidencia][MAIN] ENCONTRADO en:', loc.modulo, '->', loc.submodulo);
+          break;
+        }
+      }
+    }
+
+    if (!incidenciaPath) {
+      return {
+        success: false,
+        error: {
+          code: 'SUBMODULE_NOT_FOUND',
+          message: 'No se encontró carpeta de indicadores de incidencia'
+        }
+      };
+    }
+
+    console.log('[Incidencia][MAIN] incidenciaPath.path:', incidenciaPath.path);
+
+    const rutas = excelBridge.configurarRutasConRuta(incidenciaPath.path, year);
+
+    _setRuta('incidencia', rutas.indicadores, null, companyConfig.root, year);
+
+    return {
+      success: true,
+      data: {
+        indicadores: rutas.indicadores ? path.basename(rutas.indicadores) : null,
+        selectedFile: rutas.selectedFile,
+        availableFiles: rutas.availableFiles
+      }
+    };
+  } catch (error) {
+    console.error('[Incidencia][MAIN] EXCEPTION:', error.message);
+    return {
+      success: false,
+      error: {
+        code: 'CONFIG_ERROR',
+        message: error.message
+      }
+    };
+  }
+});
+
+ipcMain.handle('incidencia:leer-indicadores', async () => {
+  try {
+    var rutas = _getRuta('incidencia');
+    var result = await excelBridge.leerIndicadoresIncidencia(rutas && rutas.indicadores);
+    return result;
+  } catch (error) {
+    console.error('[Incidencia] Error leyendo indicadores:', error);
+    return {
+      success: false,
+      error: {
+        code: 'EXCEL_READ_ERROR',
+        message: error.message
+      }
+    };
+  }
+});
+
+ipcMain.handle('incidencia:escribir-excel', async (event, mes, campos) => {
+  try {
+    var rutas = _getRuta('incidencia');
+    return await excelBridge.escribirEnExcelIncidencia(mes, campos, rutas && rutas.indicadores);
+  } catch (error) {
+    console.error('[Incidencia] Error escribiendo en Excel:', error);
+    return {
+      success: false,
+      error: {
+        code: 'EXCEL_WRITE_ERROR',
+        message: error.message
+      }
+    };
   }
 });
 

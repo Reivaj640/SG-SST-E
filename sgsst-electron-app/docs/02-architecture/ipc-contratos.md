@@ -1,8 +1,8 @@
 # 📡 Contratos IPC K+AIR
 
-**Versión:** 4.0
-**Actualizado:** 9 de junio de 2026
-**Estado:** ✅ COMPLETO — 137/137 contratos documentados
+**Versión:** 4.1
+**Actualizado:** 14 de junio de 2026
+**Estado:** ✅ COMPLETO — 143/143 contratos documentados
 
 ---
 
@@ -50,14 +50,14 @@
 
 | Archivo | Líneas | Propósito |
 |---------|--------|-----------|
-| `preload.js` | 420 | Expone 137 contratos vía `contextBridge` |
-| `main.js` | 15809 | Implementa 133 `ipcMain.handle` + 4 `ipcMain.on` |
+| `preload.js` | 431 | Expone 143 contratos vía `contextBridge` |
+| `main.js` | 17254 | Implementa 139 `ipcMain.handle` + 4 `ipcMain.on` |
 
 ---
 
 ## 2. Resumen de Handlers
 
-**Total:** 133 handlers `ipcMain.handle()` + 4 listeners `ipcMain.on()` = 137 total
+**Total:** 139 handlers `ipcMain.handle()` + 4 listeners `ipcMain.on()` = 143 total
 
 | Categoría | Handlers | Descripción |
 |-----------|----------|-------------|
@@ -92,6 +92,8 @@
 | Frecuencia Accidentalidad | 4 | Rutas, indicadores, caracterización, Excel |
 | Severidad Accidentalidad | 3 | Rutas, indicadores, Excel |
 | Mortalidad | 3 | Rutas, indicadores, Excel |
+| Prevalencia EL | 3 | Rutas, indicadores, Excel |
+| Incidencia EL | 3 | Rutas, indicadores, Excel |
 | Indicadores Archivos | 2 | Listar, duplicar por año |
 | Inspecciones | 17 | CRUD, schedule, Excel, metadatos |
 | Mantenimiento | 10 | CRUD, toggle, evidencias, stats |
@@ -815,7 +817,59 @@ Accesos vía namespace `mortalidad.*`:
 
 ---
 
-### 2.38 Indicadores — Archivos y Duplicación (2 contratos)
+### 2.38 Indicadores — Prevalencia de Enfermedad Laboral (3 contratos)
+
+Accesos vía namespace `prevalencia.*`:
+
+| Método Frontend | Handler Backend | Parámetros | Retorno | Descripción |
+|-----------------|-----------------|------------|---------|-------------|
+| `prevalencia.configurarRutas(company, year)` | `prevalencia:configurar-rutas` | `companyName: string`, `year: number` | `{ success, error? }` | Configurar rutas del indicador |
+| `prevalencia.leerIndicadores()` | `prevalencia:leer-indicadores` | - | `{ success, data? }` | Leer 12 meses de prevalencia EL |
+| `prevalencia.escribirEnExcel(mes, campos)` | `prevalencia:escribir-excel` | `mes: number`, `campos: object` | `{ success, error? }` | Escribir datos del mes en Excel |
+
+**Data retorno `leerIndicadores`:**
+```javascript
+{
+  success: true,
+  data: {
+    prevalenciaMensual: [{ mes, mesLabel, prevalenciaEL, trabajadores }],
+    meta: number,
+    totalCasosEL: number,
+    totalTrabajadores: number,
+    promedioTrabajadores: number
+  }
+}
+```
+
+---
+
+### 2.39 Indicadores — Incidencia de Enfermedad Laboral (3 contratos)
+
+Accesos vía namespace `incidencia.*`:
+
+| Método Frontend | Handler Backend | Parámetros | Retorno | Descripción |
+|-----------------|-----------------|------------|---------|-------------|
+| `incidencia.configurarRutas(company, year)` | `incidencia:configurar-rutas` | `companyName: string`, `year: number` | `{ success, error? }` | Configurar rutas del indicador |
+| `incidencia.leerIndicadores()` | `incidencia:leer-indicadores` | - | `{ success, data? }` | Leer 12 meses de incidencia EL |
+| `incidencia.escribirEnExcel(mes, campos)` | `incidencia:escribir-excel` | `mes: number`, `campos: object` | `{ success, error? }` | Escribir datos del mes en Excel |
+
+**Data retorno `leerIndicadores`:**
+```javascript
+{
+  success: true,
+  data: {
+    incidenciaMensual: [{ mes, mesLabel, incidenciaEL, trabajadores }],
+    meta: number,
+    totalCasosNuevosEL: number,
+    totalTrabajadores: number,
+    promedioTrabajadores: number
+  }
+}
+```
+
+---
+
+### 2.40 Indicadores — Archivos y Duplicación (2 contratos)
 
 | Método Frontend | Handler Backend | Parámetros | Retorno | Descripción |
 |-----------------|-----------------|------------|---------|-------------|

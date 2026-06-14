@@ -346,6 +346,20 @@ mortalidad: {
   leerSeveridadJson: (companyName, year) => ipcRenderer.invoke('mortalidad:leer-severidad-json', companyName, year),
 },
 
+// --- Prevalencia de Enfermedad Laboral (3.3.4) ---
+prevalencia: {
+  configurarRutas: (companyName, year) => ipcRenderer.invoke('prevalencia:configurar-rutas', companyName, year),
+  leerIndicadores: () => ipcRenderer.invoke('prevalencia:leer-indicadores'),
+  escribirEnExcel: (mes, campos) => ipcRenderer.invoke('prevalencia:escribir-excel', mes, campos),
+},
+
+// --- Incidencia de Enfermedad Laboral (3.3.5) ---
+incidencia: {
+  configurarRutas: (companyName, year) => ipcRenderer.invoke('incidencia:configurar-rutas', companyName, year),
+  leerIndicadores: () => ipcRenderer.invoke('incidencia:leer-indicadores'),
+  escribirEnExcel: (mes, campos) => ipcRenderer.invoke('incidencia:escribir-excel', mes, campos),
+},
+
 getIndicadoresFiles: ({ companyName, submodule }) => ipcRenderer.invoke('get-indicadores-files', { companyName, submodule }),
 duplicateIndicadoresFile: ({ currentFilePath, newYear }) => ipcRenderer.invoke('duplicate-indicadores-file', { currentFilePath, newYear }),
 

@@ -5,6 +5,53 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.101] - 2026-06-14
+
+### Added
+- **📊 Submódulo 3.3.4 Prevalencia de Enfermedad Laboral** 🆕
+- Componente completo con tabla editable, gráfico Chart.js, 5 KPIs
+- Fórmula: (Casos nuevos y antiguos de EL / Promedio de Trabajadores) × 100,000
+- Backend: `leerIndicadoresPrevalencia()`, `escribirEnExcelPrevalencia()`
+- IPC Handlers: `prevalencia:configurar-rutas`, `prevalencia:leer-indicadores`, `prevalencia:escribir-excel`
+- Namespace preload: `window.electronAPI.prevalencia`
+- CSS Scope: `.prevalencia-container` (124 selectores)
+
+- **📊 Submódulo 3.3.5 Incidencia de Enfermedad Laboral** 🆕
+- Componente completo con tabla editable, gráfico Chart.js, 5 KPIs
+- Fórmula: (Casos nuevos de EL / Promedio de Trabajadores) × 100,000
+- Meta: <5 por 100,000 trabajadores (Coordinador SST)
+- Backend: `leerIndicadoresIncidencia()`, `escribirEnExcelIncidencia()`
+- IPC Handlers: `incidencia:configurar-rutas`, `incidencia:leer-indicadores`, `incidencia:escribir-excel`
+- Namespace preload: `window.electronAPI.incidencia`
+- CSS Scope: `.incidencia-container` (124 selectores)
+
+- **🔗 Integración Automática con Objetivos SST**
+- Keywords `'prevalencia'` e `'incidencia'` se crean siempre en `calculateAutoResultados()`
+- Viewer muestra resultado calculado automáticamente (sin necesidad de "Agregar")
+
+### Changed
+- **`excel-bridge.js`** — `leerIndicadores()` ahora suma los 12 meses para `prevalenciaEL` e `incidenciaEL` (antes solo leía enero)
+- **`main.js`** — `calculateAutoResultados()` crea keywords `'prevalencia'` e `'incidencia'` sin condición `> 0`
+- **`preload.js`** — Agregados namespaces `prevalencia` e `incidencia`
+- **`renderer.js`** — Agregadas funciones `showPrevalenciaContent()` e `showIncidenciaContent()` con routing
+- **`prevalencia-enfermedad-laboral.js`** — API cambiada de `frecuenciaAccidentalidad` a `prevalencia`, estructura de datos actualizada
+
+### Technical Details
+- **Archivos creados (8):**
+  - `modules/gestion-salud/prevalencia-enfermedad-laboral/index.js`
+  - `modules/gestion-salud/prevalencia-enfermedad-laboral/prevalencia-enfermedad-laboral.{html,js,css}`
+  - `modules/gestion-salud/incidencia-enfermedad-laboral/index.js`
+  - `modules/gestion-salud/incidencia-enfermedad-laboral/incidencia-enfermedad-laboral.{html,js,css}`
+
+- **Archivos modificados (5):**
+  - `main/excel-bridge.js` — +4 funciones, +incidenciaEL en leerIndicadores, +exports
+  - `main.js` — +6 handlers IPC, mejorar calculateAutoResultados
+  - `preload.js` — +2 namespaces (prevalencia, incidencia)
+  - `renderer.js` — +showIncidenciaContent, +routing case 3.3.5
+  - `modules/gestion-salud/prevalencia-enfermedad-laboral/prevalencia-enfermedad-laboral.js` — API namespace fix
+
+---
+
 ## [0.1.100] - 2026-06-11
 
 ### Added
