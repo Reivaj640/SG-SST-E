@@ -343,6 +343,7 @@ mortalidad: {
   configurarRutas: (companyName, year) => ipcRenderer.invoke('mortalidad:configurar-rutas', companyName, year),
   leerIndicadores: () => ipcRenderer.invoke('mortalidad:leer-indicadores'),
   escribirExcel: (mes, campos) => ipcRenderer.invoke('mortalidad:escribir-excel', mes, campos),
+  leerSeveridadJson: (companyName, year) => ipcRenderer.invoke('mortalidad:leer-severidad-json', companyName, year),
 },
 
 getIndicadoresFiles: ({ companyName, submodule }) => ipcRenderer.invoke('get-indicadores-files', { companyName, submodule }),

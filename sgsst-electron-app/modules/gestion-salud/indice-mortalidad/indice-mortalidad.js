@@ -15,7 +15,6 @@ var indicadores;
 var companyName;
 var currentYear = null;
 var availableFiles = [];
-var pendingChanges = new Map();
 var chartInstance = null;
 
   var MESES = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
@@ -128,7 +127,7 @@ function updateHeaderContext() {
   }
 
   // ==================== CHART ====================
-  function renderChart(meses, valores, meta) {
+  function renderChart(meses, valores, meta, proporcionAnual) {
     var ctx = getElement('mortalityChart');
     if (!ctx) return;
 
@@ -138,12 +137,11 @@ function updateHeaderContext() {
       chartInstance.destroy();
     }
 
-    // Coloreado condicional por barra
+    // Coloreado condicional por barra (proporción)
     var colores = valores.map(function(v) {
       v = toNum(v);
-      if (v > meta && meta > 0) return '#dc2626';
-      if (v === 0) return '#dcfce7';
-      return '#f59e0b';
+      if (v > 0) return '#dc2626';
+      return '#16a34a';
     });
 
     // Intentar cargar Chart.js dinámicamente
@@ -153,7 +151,7 @@ function updateHeaderContext() {
         data: {
           labels: meses,
           datasets: [{
-            label: 'Índice',
+            label: 'Proporción %',
             data: valores,
             backgroundColor: colores,
             borderRadius: 3,
@@ -171,7 +169,8 @@ function updateHeaderContext() {
               bodyColor: '#374151',
               borderColor: '#e5e7eb',
               borderWidth: 1,
-              cornerRadius: 4
+              cornerRadius: 4,
+              callbacks: { label: function(ctx) { return ctx.parsed.y.toFixed(2) + '%'; } }
             }
           },
           scales: {
@@ -181,21 +180,45 @@ function updateHeaderContext() {
             },
             y: {
               grid: { color: '#e5e7eb' },
-              ticks: { font: { size: 11 }, color: '#6b7280' }
+              ticks: { font: { size: 11 }, color: '#6b7280', callback: function(v) { return v + '%'; } }
             }
           }
         }
       });
 
-      // Línea de referencia para la meta
+      // Líneas de referencia: proporción anual (violeta) + meta (azul)
+      var plugins = [];
+
+      if (proporcionAnual > 0) {
+        plugins.push({
+          id: 'proporcionAnualLine',
+          afterDraw: function(chart) {
+            var yScale = chart.scales.y;
+            var y = yScale.getPixelForValue(proporcionAnual);
+            var ctx = chart.ctx;
+            ctx.save();
+            ctx.strokeStyle = '#7c3aed';
+            ctx.setLineDash([8, 4]);
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(chart.chartArea.left, y);
+            ctx.lineTo(chart.chartArea.right, y);
+            ctx.stroke();
+            ctx.fillStyle = '#7c3aed';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.fillText('Anual: ' + proporcionAnual + '%', chart.chartArea.right - 95, y - 6);
+            ctx.restore();
+          }
+        });
+      }
+
       if (meta > 0) {
-        var plugin = {
+        plugins.push({
           id: 'metaLine',
           afterDraw: function(chart) {
             var yScale = chart.scales.y;
             var y = yScale.getPixelForValue(meta);
             var ctx = chart.ctx;
-
             ctx.save();
             ctx.strokeStyle = '#2563eb';
             ctx.setLineDash([6, 4]);
@@ -206,17 +229,20 @@ function updateHeaderContext() {
             ctx.stroke();
             ctx.restore();
           }
-        };
-        chartInstance.config.plugins = [plugin];
+        });
+      }
+
+      if (plugins.length > 0) {
+        chartInstance.config.plugins = plugins;
         chartInstance.update();
       }
     } else {
       // Fallback: Simple SVG si Chart.js no está disponible
-      renderFallbackChart(ctx, meses, valores, meta);
+      renderFallbackChart(ctx, meses, valores, meta, proporcionAnual);
     }
   }
 
-  function renderFallbackChart(canvas, meses, valores, meta) {
+  function renderFallbackChart(canvas, meses, valores, meta, proporcionAnual) {
     canvas.style.display = 'none';
     var container = canvas.parentNode;
 
@@ -233,7 +259,7 @@ function updateHeaderContext() {
     var chartWidth = width - padding.left - padding.right;
     var chartHeight = height - padding.top - padding.bottom;
 
-    var maxVal = Math.max.apply(null, valores.concat([meta])) || 10;
+    var maxVal = Math.max.apply(null, valores.concat([meta, proporcionAnual || 0])) || 10;
 
     // Grid lines
     for (var i = 0; i <= 4; i++) {
@@ -269,7 +295,7 @@ function updateHeaderContext() {
       var x = padding.left + barWidth * idx + barWidth * 0.1;
       var barW = barWidth * 0.8;
 
-      var color = valNum > meta && meta > 0 ? '#dc2626' : valNum === 0 ? '#dcfce7' : '#f59e0b';
+      var color = valNum > 0 ? '#dc2626' : '#16a34a';
 
       var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
       rect.setAttribute('x', x);
@@ -291,7 +317,31 @@ function updateHeaderContext() {
       svg.appendChild(label);
     });
 
-    // Línea de meta
+    // Línea de proporción anual (violeta)
+    if (proporcionAnual > 0) {
+      var anualY = padding.top + chartHeight * (1 - proporcionAnual / maxVal);
+      var anualLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      anualLine.setAttribute('x1', padding.left);
+      anualLine.setAttribute('y1', anualY);
+      anualLine.setAttribute('x2', width - padding.right);
+      anualLine.setAttribute('y2', anualY);
+      anualLine.setAttribute('stroke', '#7c3aed');
+      anualLine.setAttribute('stroke-width', '2');
+      anualLine.setAttribute('stroke-dasharray', '8,4');
+      svg.appendChild(anualLine);
+
+      var anualLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      anualLabel.setAttribute('x', width - padding.right - 5);
+      anualLabel.setAttribute('y', anualY - 6);
+      anualLabel.setAttribute('text-anchor', 'end');
+      anualLabel.setAttribute('fill', '#7c3aed');
+      anualLabel.setAttribute('font-size', '11');
+      anualLabel.setAttribute('font-weight', 'bold');
+      anualLabel.textContent = 'Anual: ' + proporcionAnual + '%';
+      svg.appendChild(anualLabel);
+    }
+
+    // Línea de meta (azul)
     if (meta > 0) {
       var metaLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
       metaLine.setAttribute('x1', padding.left);
@@ -378,9 +428,6 @@ function updateYearLabels(fileName) {
   var year = yearMatch ? yearMatch[1] : String(new Date().getFullYear());
   currentYear = parseInt(year) || null;
 
-  var kpiYearEl = getElement('kpiYearLabel');
-  if (kpiYearEl) kpiYearEl.textContent = year;
-
   var methodFileEl = getElement('methodFileName');
   if (methodFileEl) methodFileEl.textContent = fileName;
 
@@ -446,14 +493,12 @@ function renderEmptyState() {
   var metaSection = document.querySelector('.kair-meta-section') || getElement('metaSection');
   var chartSection = document.querySelector('.kair-chart-section') || getElement('chartSection');
   var tableSection = document.querySelector('.kair-table-section') || getElement('tableSection');
-  var editHint = document.querySelector('.kair-edit-hint') || getElement('editHint');
   var methodologySection = document.querySelector('.kair-methodology-section') || getElement('methodologySection');
 
   if (kpiSection) kpiSection.style.display = 'none';
   if (metaSection) metaSection.style.display = 'none';
   if (chartSection) chartSection.style.display = 'none';
   if (tableSection) tableSection.style.display = 'none';
-  if (editHint) editHint.style.display = 'none';
   if (methodologySection) methodologySection.style.display = 'none';
 
   var errorSection = getElement('errorSection');
@@ -473,44 +518,46 @@ function renderizar() {
 
     showLoading(false);
 
-    var eventos = indicadores.eventos || [];
-    var trabajadores = toNum(indicadores.trabajadores) || 150;
+    var mortalMensual = indicadores.eventosMortalesMensual || [];
     var meta = toNum(indicadores.meta) || 0;
+    var totalAT = toNum(indicadores.totalAT) || 0;
 
-    // Calcular métricas
-    var totalEventos = 0;
-    eventos.forEach(function(v) { totalEventos += toNum(v); });
-    var tasa = trabajadores > 0 ? ((totalEventos / trabajadores) * 1000).toFixed(2) : '0.00';
-    var resultado = totalEventos;
+    // Calcular métricas desde eventosMortalesMensual (fuente de verdad)
+    var totalMortal = 0;
+    mortalMensual.forEach(function(row) { totalMortal += toNum(row.eventosMortales); });
+    var proporcion = totalAT > 0 ? ((totalMortal / totalAT) * 100).toFixed(2) : '0.00';
+    var resultado = parseFloat(proporcion);
     var estado = getStatusBadge(resultado, meta);
 
     // Actualizar KPIs
+    var kpiTotalAT = getElement('kpiTotalAT');
     var kpiEventos = getElement('kpiEventos');
     var kpiTasa = getElement('kpiTasa');
-    var kpiTrabajadores = getElement('kpiTrabajadores');
     var kpiMeta = getElement('kpiMeta');
-    var kpiResultado = getElement('kpiResultado');
     var kpiEstado = getElement('kpiEstado');
     var metaDisplay = getElement('metaDisplay');
     var promedioBadge = getElement('promedioBadge');
 
+    if (kpiTotalAT) {
+      kpiTotalAT.textContent = totalAT;
+      kpiTotalAT.style.color = '#2563eb';
+    }
     if (kpiEventos) {
-      kpiEventos.textContent = totalEventos;
-      kpiEventos.style.color = totalEventos > 0 ? '#dc2626' : '#16a34a';
-      kpiEventos.className = 'kair-kpi-value ' + (totalEventos > 0 ? 'danger' : 'success');
+      kpiEventos.textContent = totalMortal;
+      kpiEventos.style.color = totalMortal > 0 ? '#dc2626' : '#16a34a';
+      kpiEventos.className = 'kair-kpi-value ' + (totalMortal > 0 ? 'danger' : 'success');
+    }
+    // Subtítulo del KPI: fuente de datos
+    var kpiEventosSev = getElement('kpiEventosSev');
+    if (kpiEventosSev) {
+      kpiEventosSev.textContent = 'Fuente: Severidad (días cargados = 6000)';
+      kpiEventosSev.style.color = '#6c757d';
     }
     if (kpiTasa) {
-      kpiTasa.textContent = tasa;
-    }
-    if (kpiTrabajadores) {
-      kpiTrabajadores.textContent = trabajadores;
+      kpiTasa.textContent = proporcion + '%';
     }
     if (kpiMeta) {
       kpiMeta.textContent = meta;
-    }
-    if (kpiResultado) {
-      kpiResultado.textContent = resultado;
-      kpiResultado.style.color = getValueColor(resultado, meta);
     }
     if (kpiEstado) {
       kpiEstado.textContent = estado.label;
@@ -520,7 +567,7 @@ function renderizar() {
       metaDisplay.textContent = meta;
     }
     if (promedioBadge) {
-      promedioBadge.textContent = 'Promedio: ' + resultado;
+      promedioBadge.textContent = 'Proporción: ' + proporcion + '%';
       var isOk = getValueColor(resultado, meta) !== '#dc2626';
       promedioBadge.style.background = isOk ? '#dcfce7' : '#fee2e2';
       promedioBadge.style.color = isOk ? '#16a34a' : '#dc2626';
@@ -532,255 +579,106 @@ function renderizar() {
       metFrecuencia.textContent = indicadores.frecuencia || 'Anual';
     }
 
-    // Renderizar tabla
-    renderizarTabla(eventos, trabajadores, meta);
-
-    // Renderizar gráfico
-    var valores = eventos.map(function(v) { return toNum(v); });
-    renderChart(MESES, valores, meta);
-
-    // Actualizar totales
-    var totalEventosEl = getElement('totalEventos');
-    var totalResultadoEl = getElement('totalResultado');
-    if (totalEventosEl) totalEventosEl.textContent = totalEventos;
-    if (totalResultadoEl) totalResultadoEl.textContent = resultado;
-
-    // Mostrar secciones
+    // Mostrar secciones PRIMERO para que siempre sean visibles
     var kpiSection = document.querySelector('.kair-kpis') || getElement('kpiSection');
     var metaSection = document.querySelector('.kair-meta-section') || getElement('metaSection');
     var chartSection = document.querySelector('.kair-chart-section') || getElement('chartSection');
     var tableSection = document.querySelector('.kair-table-section') || getElement('tableSection');
-    var editHint = document.querySelector('.kair-edit-hint') || getElement('editHint');
     var methodologySection = document.querySelector('.kair-methodology-section') || getElement('methodologySection');
-    
+
     if (kpiSection) kpiSection.style.display = 'grid';
     if (metaSection) metaSection.style.display = 'flex';
     if (chartSection) chartSection.style.display = 'block';
-    if (tableSection) {
-      tableSection.style.display = 'block';
-      console.log('[IndiceMortalidad] ✓ tableSection mostrada');
-    } else {
-      console.error('[IndiceMortalidad] ❌ tableSection NO ENCONTRADA para mostrar');
-    }
-    if (editHint) editHint.style.display = 'block';
+    if (tableSection) tableSection.style.display = 'block';
     if (methodologySection) methodologySection.style.display = 'block';
+
+    // Renderizar tabla (con try-catch para no bloquear el resto)
+    try {
+      renderizarTabla();
+    } catch (e) {
+      console.error('[IndiceMortalidad] Error renderizando tabla:', e);
+    }
+
+    // Renderizar gráfico: proporción mensual + línea de proporción anual
+    try {
+      var valores = mortalMensual.map(function(row) {
+        var totalATMes = toNum(row.totalATMes);
+        return totalATMes > 0
+          ? Math.round((toNum(row.eventosMortales) / totalATMes) * 100 * 100) / 100
+          : 0;
+      });
+      var totalMortalGraf = 0;
+      var totalATAnual = 0;
+      mortalMensual.forEach(function(row) {
+        totalMortalGraf += toNum(row.eventosMortales);
+        totalATAnual += toNum(row.totalATMes);
+      });
+      var proporcionAnual = totalATAnual > 0
+        ? Math.round((totalMortalGraf / totalATAnual) * 100 * 100) / 100
+        : 0;
+      renderChart(MESES, valores, meta, proporcionAnual);
+
+      // Texto resumen del gráfico
+      var chartSummary = getElement('chartSummary');
+      if (chartSummary) {
+        chartSummary.textContent = 'En el año, el ' + proporcionAnual.toFixed(2) + '% de accidentes de trabajo fueron mortales.';
+        chartSummary.style.display = 'block';
+      }
+    } catch (e) {
+      console.error('[IndiceMortalidad] Error renderizando chart:', e);
+    }
   }
 
   // ==================== RENDERIZAR TABLA ====================
-  function renderizarTabla(eventos, trabajadores, meta) {
-    console.log('[IndiceMortalidad] 🎯 renderizarTabla INICIADO');
-    
-    // Buscar la tabla dentro del contenedor del módulo
-    var tablaSection = document.querySelector('.kair-table-section');
-    console.log('[IndiceMortalidad] tablaSection encontrada:', !!tablaSection);
-    
-    if (!tablaSection) {
-      // Intentar otras formas de buscar
-      tablaSection = document.getElementById('tableSection') || 
-                 document.querySelector('#tableSection') ||
-                 document.querySelector('[id*="table"]');
-      console.log('[IndiceMortalidad] tablaSection (búsqueda alterna):', !!tablaSection);
-    }
-    
-    if (!tablaSection) {
-      console.error('[IndiceMortalidad] ❌ tablaSection NO ENCONTRADA');
-      return;
-    }
-    
-    var tbody = tablaSection.querySelector('tbody') || tablaSection.querySelector('#tableBody');
-    if (!tbody) {
-      // Buscar el tbody dentro de tableSection
-      var tables = tablaSection.querySelectorAll('table');
-      if (tables.length > 0) {
-        tbody = tables[0].querySelector('tbody');
-      }
-    }
-    console.log('[IndiceMortalidad] tbody encontrado:', !!tbody);
-    
-    if (!tbody) {
-      console.error('[IndiceMortalidad] ❌ tbody NO ENCONTRADO');
-      return;
-    }
+  function renderizarTabla() {
+    var tbody = document.querySelector('.kair-table-section tbody') || getElement('tableBody');
+    var tfoot = document.querySelector('.kair-table-section tfoot') || getElement('tableFoot');
+    if (!tbody) return;
 
-    tbody.innerHTML = '';
+    var mortalMensual = indicadores.eventosMortalesMensual || [];
+    var meta = toNum(indicadores.meta) || 0;
+    var totalAT = toNum(indicadores.totalAT) || 0;
 
-    var valores = eventos.map(function(v) { return toNum(v); });
+    var html = '';
+    var totalMortal = 0;
 
-    MESES.forEach(function(mes, idx) {
-      var val = valores[idx];
-      var resultado = val;
+    mortalMensual.forEach(function(row) {
+      totalMortal += toNum(row.eventosMortales);
+      var proporcion = toNum(row.totalATMes) > 0
+        ? ((toNum(row.eventosMortales) / toNum(row.totalATMes)) * 100).toFixed(2)
+        : '0.00';
+      var resultado = parseFloat(proporcion);
       var estado = getStatusBadge(resultado, meta);
+      var diasCargados = toNum(row.diasCargados);
+      var esMortal = diasCargados === 6000;
+      var rowClass = esMortal ? ' class="kair-row-mortal"' : '';
 
-      var tr = document.createElement('tr');
-      tr.className = 'kair-data-row';
-
-      // Mes
-      var tdMes = document.createElement('td');
-      tdMes.textContent = mes;
-      tr.appendChild(tdMes);
-
-      // Eventos Mortales (editable)
-      var tdEventos = document.createElement('td');
-      tdEventos.className = 'kair-cell-editable';
-      tdEventos.dataset.row = 'eventos';
-      tdEventos.dataset.mes = mes;
-      tdEventos.dataset.original = val;
-      tdEventos.innerHTML = '<span class="kair-cell-value">' + display(val) + '</span>';
-      tdEventos.onclick = function() { startEdit(this); };
-      tr.appendChild(tdEventos);
-
-      // Trabajadores (referencia)
-      var tdTrab = document.createElement('td');
-      tdTrab.textContent = trabajadores;
-      tr.appendChild(tdTrab);
-
-      // Meta
-      var tdMeta = document.createElement('td');
-      tdMeta.innerHTML = '<span class="kair-cell-value" style="color:#2563eb">' + meta + '</span>';
-      tr.appendChild(tdMeta);
-
-      // Resultado
-      var tdRes = document.createElement('td');
-      tdRes.textContent = resultado;
-      tdRes.style.color = getValueColor(resultado, meta);
-      tr.appendChild(tdRes);
-
-      // Estado
-      var tdEstado = document.createElement('td');
-      tdEstado.innerHTML = '<span class="kair-status-badge" style="background:' + estado.color + '">' + estado.label + '</span>';
-      tr.appendChild(tdEstado);
-
-      tbody.appendChild(tr);
-    });
-  }
-
-  // ==================== EDITAR CELDA ====================
-  var currentEdit = null;
-
-  function startEdit(td) {
-    if (currentEdit) {
-      cancelEdit();
-    }
-
-    var span = td.querySelector('.kair-cell-value');
-    var original = td.dataset.original;
-
-    span.style.display = 'none';
-
-    var input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'kair-edit-input';
-    input.value = original;
-
-    td.appendChild(input);
-    input.focus();
-    input.select();
-
-    currentEdit = {
-      td: td,
-      span: span,
-      input: input,
-      row: td.dataset.row,
-      mes: td.dataset.mes,
-      original: original
-    };
-
-    input.onkeydown = function(e) {
-      if (e.key === 'Enter') {
-        commitEdit();
-      } else if (e.key === 'Escape') {
-        cancelEdit();
-      }
-    };
-
-    input.onblur = function() {
-      // Demorar para evitar焦点 perdidas
-      setTimeout(function() {
-        if (currentEdit && currentEdit.input === input) {
-          commitEdit();
-        }
-      }, 100);
-    };
-  }
-
-  function commitEdit() {
-    if (!currentEdit) return;
-
-    var val = currentEdit.input.value.trim();
-    var parsed = val === '' ? '' : (isNaN(Number(val)) ? val : Number(val));
-
-    // Guardar en cambios pendientes
-    var key = 'eventos-' + currentEdit.mes;
-    pendingChanges.set(key, {
-      mes: currentEdit.mes,
-      value: parsed
+      html += '<tr' + rowClass + '>';
+      html += '<td>' + row.mesLabel + '</td>';
+      html += '<td><span class="kair-cell-value" style="color:#2563eb;font-weight:600">' + toNum(row.totalATMes) + '</span></td>';
+      html += '<td><span class="kair-cell-value" style="color:' + (toNum(row.eventosMortales) > 0 ? '#dc2626' : '#16a34a') + ';font-weight:600">' + toNum(row.eventosMortales) + '</span></td>';
+      html += '<td><span style="color:' + (esMortal ? '#dc2626' : '#6c757d') + ';font-weight:' + (esMortal ? '700' : '400') + '">' + diasCargados + (esMortal ? ' <span class="kair-badge-mortal">MORTAL</span>' : '') + '</span></td>';
+      html += '<td style="font-weight:700;color:' + getValueColor(resultado, meta) + '">' + proporcion + '%</td>';
+      html += '<td style="color:#6c757d">' + meta + '</td>';
+      html += '<td><span class="kair-status-badge" style="background:' + estado.color + '">' + estado.label + '</span></td>';
+      html += '</tr>';
     });
 
-    // Actualizar visual
-    currentEdit.span.textContent = val === '' ? '—' : val;
-    currentEdit.span.style.display = '';
-    currentEdit.span.classList.add('pending');
-    currentEdit.input.remove();
-    currentEdit = null;
+    tbody.innerHTML = html;
 
-    // Actualizar botón guardar
-    updateSaveButton();
-  }
-
-  function cancelEdit() {
-    if (!currentEdit) return;
-
-    currentEdit.span.style.display = '';
-    currentEdit.input.remove();
-    currentEdit = null;
-  }
-
-  function updateSaveButton() {
-    var btn = getElement('btnGuardar');
-    var label = getElement('save-label');
-    var count = pendingChanges.size;
-
-    if (count > 0) {
-      btn.style.display = 'inline-flex';
-      label.textContent = 'Guardar (' + count + ')';
-    } else {
-      btn.style.display = 'none';
+    // Footer con totales acumulados
+    if (tfoot) {
+      var proporcionTotal = totalAT > 0 ? ((totalMortal / totalAT) * 100).toFixed(2) : '0.00';
+      tfoot.innerHTML = '<tr class="kair-table-total">'
+        + '<td>TOTAL</td>'
+        + '<td style="color:#2563eb;font-weight:700">' + totalAT + '</td>'
+        + '<td style="color:' + (totalMortal > 0 ? '#dc2626' : '#16a34a') + ';font-weight:700">' + totalMortal + '</td>'
+        + '<td style="color:#6c757d">—</td>'
+        + '<td style="color:#174ea6;font-weight:700">' + proporcionTotal + '%</td>'
+        + '<td>' + meta + '</td>'
+        + '<td>-</td>'
+        + '</tr>';
     }
-  }
-
-  // ==================== GUARDAR ====================
-  function guardarCambios() {
-    if (pendingChanges.size === 0) return;
-
-    var btn = getElement('btnGuardar');
-    btn.disabled = true;
-
-    var promises = [];
-  pendingChanges.forEach(function(change, key) {
-    if (mortalidadApi && mortalidadApi.escribirExcel) {
-      promises.push(
-        mortalidadApi.escribirExcel(change.mes, { eventos: change.value })
-      );
-    }
-  });
-
-    Promise.all(promises).then(function(results) {
-      btn.disabled = false;
-
-      var ok = results.filter(function(r) { return r.success; }).length;
-
-      if (ok === pendingChanges.size) {
-        showToast('Guardado exitoso', 'success');
-        pendingChanges.clear();
-        updateSaveButton();
-        cargarDatos();
-      } else {
-        showToast('Error parcial: ' + ok + '/' + pendingChanges.size + ' guardados', 'warning');
-      }
-    })['catch'](function(e) {
-      btn.disabled = false;
-      showToast('Error al guardar: ' + e.message, 'error');
-    });
   }
 
   // ==================== SHOW/HIDE ====================
@@ -809,6 +707,9 @@ function init() {
   var btnRefrescar = getElement('btnRefrescar');
   var btnGuardar = getElement('btnGuardar');
 
+  // Ocultar botón guardar (edición inmediata, sin batch)
+  if (btnGuardar) btnGuardar.style.display = 'none';
+
   if (btnBack) {
     btnBack.onclick = function() {
       if (window.parent && window.parent.postMessage) {
@@ -821,15 +722,7 @@ function init() {
 
   if (btnRefrescar) {
     btnRefrescar.onclick = function() {
-      pendingChanges.clear();
-      updateSaveButton();
       cargarDatos();
-    };
-  }
-
-  if (btnGuardar) {
-    btnGuardar.onclick = function() {
-      guardarCambios();
     };
   }
 

@@ -74,36 +74,31 @@ Vinculado a Excel de origen
 <!-- ==================== KPIs ==================== -->
 <section class="kair-kpis" id="kpiSection" style="display:none">
 <div class="kair-kpi">
-  <div class="kair-kpi-label">EVENTOS MORTALES <span id="kpiYearLabel" style="font-weight:400;color:var(--kair-text-sec);"></span></div>
-          <div class="kair-kpi-value" id="kpiEventos">-</div>
-          <div class="kair-kpi-sub">Período actual</div>
+  <div class="kair-kpi-label">TOTAL AT (AÑO)</div>
+  <div class="kair-kpi-value" id="kpiTotalAT">-</div>
+  <div class="kair-kpi-sub">Accidentes de trabajo</div>
 </div>
 <div class="kair-kpi">
-<div class="kair-kpi-label">TASA MORTALIDAD</div>
-<div class="kair-kpi-value primary" id="kpiTasa">-</div>
-<div class="kair-kpi-sub">x 1000 trab.</div>
+  <div class="kair-kpi-label">AT MORTALES (AÑO)</div>
+  <div class="kair-kpi-value danger" id="kpiEventos">-</div>
+  <div class="kair-kpi-sub" id="kpiEventosSev">Verificando...</div>
 </div>
 <div class="kair-kpi">
-<div class="kair-kpi-label">TRABAJADORES</div>
-<div class="kair-kpi-value" id="kpiTrabajadores">-</div>
-<div class="kair-kpi-sub">Período base</div>
+  <div class="kair-kpi-label">PROPORCIÓN MORTALIDAD</div>
+  <div class="kair-kpi-value primary" id="kpiTasa">-</div>
+  <div class="kair-kpi-sub">(AT mortales / Total AT) × 100</div>
 </div>
 <div class="kair-kpi">
-<div class="kair-kpi-label">META</div>
-<div class="kair-kpi-value primary" id="kpiMeta">-</div>
-<div class="kair-kpi-sub">Meta del indicador</div>
+  <div class="kair-kpi-label">META</div>
+  <div class="kair-kpi-value primary" id="kpiMeta">-</div>
+  <div class="kair-kpi-sub">Meta del indicador</div>
 </div>
 <div class="kair-kpi">
-<div class="kair-kpi-label">RESULTADO</div>
-<div class="kair-kpi-value" id="kpiResultado">-</div>
-<div class="kair-kpi-sub">Resultado obtenido</div>
-</div>
-<div class="kair-kpi">
-<div class="kair-kpi-label">ESTADO</div>
-<div class="kair-kpi-value">
-<span class="kair-status-badge" id="kpiEstado">-</span>
-</div>
-<div class="kair-kpi-sub">Evaluación</div>
+  <div class="kair-kpi-label">ESTADO</div>
+  <div class="kair-kpi-value">
+    <span class="kair-status-badge" id="kpiEstado">-</span>
+  </div>
+  <div class="kair-kpi-sub">Evaluación</div>
 </div>
 </section>
 
@@ -115,12 +110,12 @@ Vinculado a Excel de origen
 </svg>
 </div>
 <div class="kair-meta-info">
-<div class="kair-meta-title">Meta del Indicador (Índice de Mortalidad)</div>
+<div class="kair-meta-title">Meta del Indicador (Proporción de Mortalidad)</div>
 <div class="kair-meta-subtitle">Objetivo anual definido para el indicador</div>
 </div>
 <div class="kair-meta-value-container">
 <div class="kair-meta-value" id="metaDisplay">-</div>
-<span class="kair-promedio-badge" id="promedioBadge">Promedio: -</span>
+<span class="kair-promedio-badge" id="promedioBadge">Proporción: -</span>
 </div>
 </section>
 
@@ -128,58 +123,66 @@ Vinculado a Excel de origen
 <section class="kair-chart-section" id="chartSection" style="display:none">
 <div class="kair-chart-header">
 <div>
-<h3 class="kair-chart-title">Índice de Mortalidad Mensual</h3>
-<p class="kair-chart-subtitle">Evolución por mes del índice</p>
+<h3 class="kair-chart-title">Proporción de Mortalidad Mensual</h3>
+<p class="kair-chart-subtitle">Evolución mensual de la proporción (AT mortales / Total AT) × 100</p>
 </div>
 <div class="kair-chart-legend">
 <span class="kair-legend-item">
-<span class="kair-legend-color" style="background:#dc2626"></span> Índice
+<span class="kair-legend-color" style="background:#dc2626"></span> Mortal %
 </span>
 <span class="kair-legend-item">
-<span class="kair-legend-line"></span> Meta
+<span class="kair-legend-line" style="border-color:#7c3aed"></span> Anual
+</span>
+<span class="kair-legend-item">
+<span class="kair-legend-line" style="border-color:#2563eb"></span> Meta
 </span>
 </div>
 </div>
 <div class="kair-chart-container">
 <canvas id="mortalityChart"></canvas>
 </div>
+<div class="kair-chart-summary" id="chartSummary" style="display:none"></div>
 </section>
 
 <!-- ==================== TABLE ==================== -->
 <section class="kair-table-section" id="tableSection" style="display:none">
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+  <div style="display:flex; align-items:center; gap:0.5rem;">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+      <polyline points="14 2 14 8 20 8"></polyline>
+      <line x1="16" y1="13" x2="8" y2="13"></line>
+      <line x1="16" y1="17" x2="8" y2="17"></line>
+    </svg>
+    <span style="font-size:0.875rem; font-weight:600; color:#1E293B;">Tabla de Mortalidad</span>
+  </div>
+  <span class="kair-edit-hint" style="font-size:0.75rem;color:#6c757d;">AT Mortales derivado de Severidad (días cargados = 6000)</span>
+</div>
 <div class="kair-table-wrapper">
 <table class="kair-data-table" id="dataTable">
 <thead>
 <tr class="kair-table-header">
-<th>Mes</th>
-<th>Eventos Mortales</th>
-<th>Trabajadores</th>
-<th>Meta</th>
-<th>Resultado</th>
-<th>Estado</th>
+  <th>Mes</th>
+  <th>Total AT</th>
+  <th>AT Mortales</th>
+  <th>Días Cargados</th>
+  <th>Proporción %</th>
+  <th>Meta</th>
+  <th>Estado</th>
 </tr>
 </thead>
 <tbody id="tableBody">
 <!-- Generated by JavaScript -->
 </tbody>
-<tfoot>
-<tr class="kair-table-total">
-<td>TOTAL</td>
-<td id="totalEventos">-</td>
-<td>-</td>
-<td>-</td>
-<td id="totalResultado">-</td>
-<td>-</td>
-</tr>
+<tfoot id="tableFoot">
+<!-- Generated by JavaScript -->
 </tfoot>
 </table>
 </div>
+<div class="kair-table-footer-note">
+  <strong>Fórmula:</strong> (AT mortales / Total AT) × 100
+</div>
 </section>
-
-<!-- ==================== HINT ==================== -->
-<p class="kair-edit-hint" id="editHint" style="display:none">
-Click en una celda para editar. Presione <strong>Enter</strong> para confirmar o <strong>Escape</strong> para cancelar.
-</p>
 
 <!-- ==================== METHODOLOGY ==================== -->
 <section class="kair-methodology-section" id="methodologySection" style="display:none">
@@ -195,8 +198,8 @@ Click en una celda para editar. Presione <strong>Enter</strong> para confirmar o
 <p><strong>Fuente:</strong> <span id="methodSources">SST / ARL y Gestión Humana</span></p>
         <p><strong>Responsable:</strong> <span id="metResponsable">Responsable SGSST</span></p>
         <p><strong>Frecuencia:</strong> <span id="metFrecuencia">-</span></p>
-        <p><strong>Definición:</strong> Accidentes mortales presentados en un período determinado</p>
-        <p><strong>Interpretación:</strong> Accidentes mortales presentados en un período determinado — <span id="methodFileName">—</span></p>
+        <p><strong>Definición:</strong> (AT mortales / Total AT) × 100</p>
+        <p><strong>Interpretación:</strong> Proporción de accidentes mortales respecto al total de accidentes de trabajo — <span id="methodFileName">—</span></p>
 </div>
 </section>
 

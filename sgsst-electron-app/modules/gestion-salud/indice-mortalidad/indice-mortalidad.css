@@ -441,7 +441,8 @@ border-color: var(--blue);
 }
 
 .indice-mortalidad-container .kair-chart-container {
-height: 220px;
+min-height: 250px;
+height: auto;
 }
 
 /* =========================================
@@ -544,6 +545,99 @@ font-weight: 700;
 color: var(--k-text-main);
 }
 
+.indice-mortalidad-container .kair-table-footer-note {
+padding: 0.75rem 1rem;
+font-size: 0.8125rem;
+color: #64748B;
+border-top: 1px solid #e5e7eb;
+}
+
+/* =========================================
+8.1 EDITABLE CELLS (patrón 3.3.1/3.3.2)
+========================================= */
+
+.indice-mortalidad-container .kair-editable {
+color: var(--k-primary);
+font-weight: 600;
+cursor: pointer;
+text-decoration: underline dotted var(--k-primary);
+padding: 0.25rem 0.5rem;
+border-radius: 4px;
+transition: background 0.2s;
+display: inline-block;
+min-width: 40px;
+}
+
+.indice-mortalidad-container .kair-editable:hover {
+background: rgba(23, 78, 166, 0.08);
+}
+
+.indice-mortalidad-container .kair-input {
+width: 70px;
+height: 32px;
+text-align: center;
+font-size: 0.875rem;
+font-weight: 600;
+border: 2px solid var(--k-primary);
+border-radius: var(--k-radius-md);
+outline: none;
+font-family: var(--k-font-family);
+color: var(--k-text-main);
+background: #ffffff;
+}
+
+.indice-mortalidad-container .kair-input:focus {
+box-shadow: 0 0 0 2px rgba(23, 78, 166, 0.2);
+}
+
+/* =========================================
+8.2 SEVERITY INDICATORS & DISCORDANCE
+========================================= */
+
+.indice-mortalidad-container .kair-sev-indicator {
+display: inline-flex;
+align-items: center;
+justify-content: center;
+width: 24px;
+height: 24px;
+border-radius: 50%;
+font-size: 0.75rem;
+font-weight: 700;
+}
+
+.indice-mortalidad-container .kair-sev-ok {
+background: #dcfce7;
+color: #16a34a;
+}
+
+.indice-mortalidad-container .kair-sev-warn {
+background: #fef3c7;
+color: #d97706;
+animation: kair-pulse-warn 2s ease-in-out infinite;
+}
+
+.indice-mortalidad-container .kair-sev-none {
+background: #f3f4f6;
+color: #9ca3af;
+}
+
+@keyframes kair-pulse-warn {
+0%, 100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.3); }
+50% { box-shadow: 0 0 0 4px rgba(217, 119, 6, 0); }
+}
+
+.indice-mortalidad-container .kair-discordancia-badge {
+display: inline-block;
+padding: 0.0625rem 0.375rem;
+border-radius: 9999px;
+font-size: 0.625rem;
+font-weight: 700;
+background: #fef3c7;
+color: #d97706;
+margin-left: 0.25rem;
+vertical-align: middle;
+}
+
 /* =========================================
 9. EDIT HINT
 ========================================= */
@@ -552,6 +646,48 @@ color: var(--k-text-main);
 font-size: 0.6875rem;
 color: var(--k-text-muted);
 margin-bottom: 1.25rem;
+}
+
+/* =========================================
+9.1 MORTAL ROW HIGHLIGHT
+========================================= */
+
+.indice-mortalidad-container .kair-row-mortal {
+background: #fef2f2 !important;
+border-left: 3px solid #dc2626;
+}
+
+.indice-mortalidad-container .kair-row-mortal:hover {
+background: #fee2e2 !important;
+}
+
+.indice-mortalidad-container .kair-badge-mortal {
+display: inline-block;
+padding: 0.0625rem 0.375rem;
+border-radius: 9999px;
+font-size: 0.5625rem;
+font-weight: 700;
+background: #dc2626;
+color: #fff;
+margin-left: 0.25rem;
+vertical-align: middle;
+letter-spacing: 0.025em;
+}
+
+/* =========================================
+9.2 CHART SUMMARY
+========================================= */
+
+.indice-mortalidad-container .kair-chart-summary {
+text-align: center;
+font-size: 0.8125rem;
+color: var(--k-text-sec);
+margin-top: 0.75rem;
+padding: 0.625rem 1rem;
+background: var(--k-border-light);
+border-radius: var(--k-radius-md);
+border: 1px solid var(--k-border);
+font-weight: 500;
 }
 
 /* =========================================
@@ -716,4 +852,80 @@ font-family: var(--k-font-family);
 background: var(--k-bg-app);
 color: var(--k-text-main);
 line-height: 1.5;
+}
+
+/* =========================================
+15. RESPONSIVE BREAKPOINTS
+========================================= */
+
+@media (max-width: 768px) {
+.indice-mortalidad-container .kair-kpis {
+  grid-template-columns: repeat(2, 1fr);
+}
+.indice-mortalidad-container .k-section-card > div:first-child {
+  flex-wrap: wrap;
+  padding: 1rem !important;
+}
+.indice-mortalidad-container .k-section-card__company {
+  display: none;
+}
+.indice-mortalidad-container .kair-table-wrapper {
+  font-size: 0.75rem;
+}
+.indice-mortalidad-container .kair-chart-container {
+  min-height: 200px;
+}
+}
+
+@media (max-width: 480px) {
+.indice-mortalidad-container .kair-kpis {
+  grid-template-columns: 1fr;
+}
+.indice-mortalidad-container .kair-container {
+  padding: 0.75rem;
+}
+.indice-mortalidad-container .kair-chart-container {
+  min-height: 180px;
+}
+}
+
+@media (min-width: 1920px) {
+.indice-mortalidad-container .kair-container {
+  max-width: 1800px;
+  padding: 1.5rem 3rem;
+}
+.indice-mortalidad-container .kair-chart-container {
+  min-height: 350px;
+}
+.indice-mortalidad-container .kair-data-table {
+  font-size: 0.9rem;
+}
+.indice-mortalidad-container .kair-kpi-value {
+  font-size: 2rem;
+}
+.indice-mortalidad-container .kair-kpi-label {
+  font-size: 0.85rem;
+}
+}
+
+@media (min-width: 2560px) {
+.indice-mortalidad-container .kair-container {
+  max-width: 2400px;
+  padding: 2rem 4rem;
+}
+.indice-mortalidad-container .kair-kpis {
+  grid-template-columns: repeat(6, 1fr);
+}
+.indice-mortalidad-container .kair-chart-container {
+  min-height: 450px;
+}
+.indice-mortalidad-container .kair-data-table {
+  font-size: 0.95rem;
+}
+.indice-mortalidad-container .kair-kpi-value {
+  font-size: 2.25rem;
+}
+.indice-mortalidad-container .kair-kpi-label {
+  font-size: 0.9rem;
+}
 }

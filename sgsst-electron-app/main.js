@@ -5363,6 +5363,7 @@ async function calculateAutoResultados(companyName) {
               porcentajeReal: ind.config.metaMortalidad > 0 ? (totalMortal <= ind.config.metaMortalidad ? 100 : 0) : 0,
               source: 'auto'
             };
+            resultado['mortal'] = resultado['mortalidad'];
 
             // ── Ausentismo ──
             const promAusentismo = ind.ausentismoMensual.length > 0
@@ -16672,7 +16673,7 @@ var ubicacionesAPrueba = [
 
 const rutas = excelBridge.configurarRutasConRuta(mortalidadPath.path, year);
 
-_setRuta('mortalidad', rutas.indicadores, null);
+_setRuta('mortalidad', rutas.indicadores, null, companyConfig.root, year);
 
 return {
         success: true,
@@ -16698,7 +16699,94 @@ return {
 ipcMain.handle('mortalidad:leer-indicadores', async () => {
 try {
 var rutas = _getRuta('mortalidad');
-return await excelBridge.leerIndicadoresMortalidad(rutas && rutas.indicadores);
+var result = await excelBridge.leerIndicadoresMortalidad(rutas && rutas.indicadores);
+
+// Enriquecer con datos de severidad-data.json
+// REGLA: diasCargados === 6000 → 1 evento mortal en ese mes
+// Total AT Mortales = conteo de meses con 6000 días cargados
+if (result.success && result.data && result.data.eventosMortalesMensual) {
+  var companyRoot = rutas && rutas.companyRoot;
+  var year = rutas && rutas.year || new Date().getFullYear();
+  if (companyRoot) {
+    var jsonPath = path.join(companyRoot, 'severidad-data.json');
+    if (fs.existsSync(jsonPath)) {
+      try {
+        var rawData = await fsp.readFile(jsonPath, 'utf8');
+        var allSevData = JSON.parse(rawData);
+        var yearSevData = allSevData[String(year)] || {};
+        var totalATMortales = 0;
+
+        result.data.eventosMortalesMensual.forEach(function(row) {
+          var mesData = yearSevData[String(row.mes)] || {};
+          var diasCargados = mesData.diasCargados || 0;
+          var esMortal = diasCargados === 6000;
+
+          row.diasCargados = diasCargados;
+          row.eventosMortales = esMortal ? 1 : 0;
+
+          if (esMortal) totalATMortales++;
+        });
+
+        result.data.totalATMortales = totalATMortales;
+        result.data.eventos = result.data.eventosMortalesMensual.map(function(r) { return r.eventosMortales; });
+        console.log('[IndiceMortalidad] AT mortales desde severidad:', totalATMortales);
+      } catch (jsonErr) {
+        console.error('[IndiceMortalidad] Error leyendo severidad-data.json:', jsonErr);
+        result.data.totalATMortales = 0;
+      }
+    } else {
+      result.data.totalATMortales = 0;
+    }
+  } else {
+    result.data.totalATMortales = 0;
+  }
+
+  // ── Auto-fill Total AT desde Registro Estadístico 3.2.3 ──
+  // Misma lógica que Frecuencia (3.3.1): contarATPorMes()
+  if (companyRoot) {
+    try {
+      var gsDir = path.join(companyRoot, '3. Gestión de la Salud');
+      var rutaRegistro = null;
+      if (fs.existsSync(gsDir)) {
+        var gsEntries = await fsp.readdir(gsDir);
+        var folder323 = gsEntries.find(function(f) { return f.startsWith('3.2.3'); });
+        if (folder323) {
+          var subDir = path.join(gsDir, folder323);
+          var subEntries = await fsp.readdir(subDir);
+          var xlsxFile = subEntries.find(function(f) {
+            return f.toLowerCase().endsWith('.xlsx') && !f.startsWith('~$');
+          });
+          if (xlsxFile) rutaRegistro = path.join(subDir, xlsxFile);
+        }
+      }
+
+      if (rutaRegistro) {
+        var resAT = await excelBridge.contarATPorMes(year, rutaRegistro);
+        if (resAT.success && resAT.data && resAT.data.mensual) {
+          var autoAT = resAT.data.mensual;
+          var totalAT = 0;
+
+          result.data.eventosMortalesMensual.forEach(function(row) {
+            var autoCount = autoAT[row.mes] || 0;
+            if (autoCount > 0) {
+              row.totalATMes = autoCount;
+            }
+            totalAT += row.totalATMes;
+          });
+
+          result.data.totalAT = totalAT;
+          console.log('[IndiceMortalidad] Total AT desde 3.2.3:', totalAT);
+        }
+      } else {
+        console.warn('[IndiceMortalidad] Carpeta 3.2.3 no encontrada, usando AT del Excel');
+      }
+    } catch (autoErr) {
+      console.warn('[IndiceMortalidad] Error auto-fill AT desde 3.2.3:', autoErr.message);
+    }
+  }
+}
+
+return result;
   } catch (error) {
     console.error('[IndiceMortalidad] Error leyendo indicadores:', error);
     return {
@@ -16725,6 +16813,49 @@ return await excelBridge.escribirEnExcelMortalidad(mes, campos, rutas && rutas.i
         message: error.message
       }
     };
+  }
+});
+
+// =============================================================================
+// Leer severidad-data.json desde mortalidad (validación cruzada)
+// =============================================================================
+ipcMain.handle('mortalidad:leer-severidad-json', async (event, companyName, year) => {
+  try {
+    var companyRoot = null;
+    var configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    var config = JSON.parse(configData);
+    var normalizedInput = (companyName || '').toLowerCase();
+    var companyKey = Object.keys(config.companyPaths || {}).find(
+      function(k) { return k.toLowerCase() === normalizedInput; }
+    );
+    var companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+    if (companyConfig && companyConfig.root) {
+      companyRoot = companyConfig.root;
+    }
+
+    if (!companyRoot) {
+      return { success: true, data: { meses: {} } };
+    }
+
+    var jsonPath = path.join(companyRoot, 'severidad-data.json');
+    if (!fs.existsSync(jsonPath)) {
+      return { success: true, data: { meses: {} } };
+    }
+
+    var rawData = await fsp.readFile(jsonPath, 'utf8');
+    var allData = JSON.parse(rawData);
+    var yearData = allData[String(year)] || {};
+
+    var meses = {};
+    for (var m = 1; m <= 12; m++) {
+      var mesData = yearData[String(m)] || {};
+      meses[m] = { diasCargados: mesData.diasCargados || 0 };
+    }
+
+    return { success: true, data: { meses: meses } };
+  } catch (error) {
+    console.error('[IndiceMortalidad] Error leyendo severidad-data.json:', error);
+    return { success: true, data: { meses: {} } };
   }
 });
 

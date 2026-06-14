@@ -1071,13 +1071,17 @@ if (el('stat-security')) el('stat-security').textContent = securityCount;
     }
 
     matchIndicatorToAutoData(indicator) {
-        const text = `${indicator.indicator} ${indicator.formula} ${indicator.goal}`.toLowerCase();
+        const nameText = indicator.indicator.toLowerCase();
+        const fullText = `${indicator.indicator} ${indicator.formula} ${indicator.goal}`.toLowerCase();
         const best = { keyword: null, resultado: null, score: 0 };
 
         for (const [keyword, data] of Object.entries(this.autoResultados)) {
             if (!data || !data.resultado) continue;
-            const score = keyword.length;
-            if (text.includes(keyword.toLowerCase()) && score > best.score) {
+            const kw = keyword.toLowerCase();
+            const nameScore = nameText.includes(kw) ? keyword.length * 2 : 0;
+            const fullScore = fullText.includes(kw) ? keyword.length : 0;
+            const score = Math.max(nameScore, fullScore);
+            if (score > best.score) {
                 best.keyword = keyword;
                 best.resultado = data;
                 best.score = score;

@@ -571,13 +571,20 @@ const FILAS_MORTALIDAD = {
 
 async function leerIndicadoresMortalidad(rutaOverride) {
 var ruta = rutaOverride || EXCEL_INDICADORES;
+var eventosDefault = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+var emptyMonthly = eventosDefault.map(function(v, i) {
+  return { mes: i + 1, mesLabel: MESES_LABELS[i], eventosMortales: 0, totalATMes: 0, trabajadores: 0 };
+});
+
 if (!ruta) {
 return {
 success: true,
 data: {
-eventos: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-trabajadores: 150,
+eventos: eventosDefault,
 meta: 0,
+totalAT: 0,
+totalATMortales: 0,
+eventosMortalesMensual: emptyMonthly,
 frecuencia: 'Anual'
 }
 };
@@ -587,9 +594,11 @@ if (!fs.existsSync(ruta)) {
 return {
 success: true,
 data: {
-eventos: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-trabajadores: 150,
+eventos: eventosDefault,
 meta: 0,
+totalAT: 0,
+totalATMortales: 0,
+eventosMortalesMensual: emptyMonthly,
 frecuencia: 'Anual'
 }
 };
@@ -621,23 +630,38 @@ await workbook.xlsx.readFile(ruta);
 	const filas = detectarFilas(ws);
 
 	const meta = obtenerValor(ws, filas.eventosMortales, COLUMNA_META);
-	const trabajadores = obtenerValor(ws, filas.trabajadoresMortalidad, 5) || 150;
 
 	const eventos = [];
+	const eventosMortalesMensual = [];
+	let totalAT = 0;
+	let totalATMortales = 0;
 	for (let mes = 1; mes <= 12; mes++) {
 		const col = mesAColumna(mes);
 		const valor = obtenerValor(ws, filas.eventosMortales, col);
+		const atMes = obtenerValor(ws, filas.accidentesAT, col);
+		const trabMes = obtenerValor(ws, filas.trabajadoresFreq, col);
 		eventos.push(valor);
+		totalAT += atMes;
+		totalATMortales += valor;
+		eventosMortalesMensual.push({
+			mes: mes,
+			mesLabel: MESES_LABELS[mes - 1],
+			eventosMortales: valor,
+			totalATMes: atMes,
+			trabajadores: trabMes
+		});
 	}
 
-  console.log('[EXCEL-BRIDGE Mortalidad] meta:', meta, 'trabajadores:', trabajadores, 'eventos:', eventos);
+  console.log('[EXCEL-BRIDGE Mortalidad] meta:', meta, 'eventos:', eventos, 'totalAT:', totalAT, 'totalATMortales:', totalATMortales);
 
   return {
     success: true,
     data: {
       eventos: eventos,
-      trabajadores: trabajadores,
       meta: meta,
+      totalAT: totalAT,
+      totalATMortales: totalATMortales,
+      eventosMortalesMensual: eventosMortalesMensual,
       frecuencia: 'Anual'
     }
   };
@@ -682,7 +706,7 @@ await workbook.xlsx.readFile(ruta);
 
 	if (campos.trabajadores !== undefined) {
 		const col = mes ? mesAColumna(mes) : 5;
-		ws.getCell(filas.trabajadoresMortalidad, col).value = campos.trabajadores;
+		ws.getCell(filas.trabajadoresMortalidad || filas.trabajadores, col).value = campos.trabajadores;
 	}
 
   // Guardar IN-PLACE
