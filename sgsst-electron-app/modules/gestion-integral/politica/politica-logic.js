@@ -33,9 +33,8 @@ if (event.data.type.endsWith('-request')) {
 const action = event.data.type.replace('-request', '');
 if (action === 'back-to-module') {
 window.removeEventListener('message', this.handleIframeMessage);
-if (this.onBackToModuleHome) {
-this.onBackToModuleHome();
-}
+// No llamar onBackToModuleHome() — el renderer main handler (renderer.js:869)
+// ya se encarga de la navegación. Llamarlo aquí causa instancia duplicada.
 } else {
 this.handleStandardRequest(event, this.getApiMap()[action]);
 }

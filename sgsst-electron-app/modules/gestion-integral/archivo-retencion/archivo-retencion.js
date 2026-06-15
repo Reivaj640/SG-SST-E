@@ -118,9 +118,8 @@ class ArchivoRetencionComponent {
         break;
 
       case 'back-to-module-request':
-        if (this.onBackToModuleHome) {
-          this.onBackToModuleHome();
-        }
+        // No llamar onBackToModuleHome() — el renderer main handler (renderer.js:869)
+        // ya se encarga de la navegación. Llamarlo aquí causa instancia duplicada.
         break;
 
       default:

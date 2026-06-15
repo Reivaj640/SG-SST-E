@@ -1190,24 +1190,6 @@ case 'investigacion-accidentes-read-directory-request':
                   // Volver al home principal
                   showHomePage();
                   return;
-      case 'back-to-module-request':
-        if (window.copasstPortalComponent) {
-          console.log('[RENDERER] Delegando back-to-module al portal COPASST');
-          return;
-        }
-        if (window.comiteConvivenciaPortalComponent) {
-          console.log('[RENDERER] Delegando back-to-module al portal Comité de Convivencia');
-          return;
-        }
-            if (window.planPortalComponent) {
-              console.log('[RENDERER] Delegando back-to-module al portal Plan de Trabajo');
-              window.planPortalComponent.goBackToHome();
-              return;
-            }
-            // Volver al home del módulo actual (ej. Gestión de la Salud)
-        console.log(`[RENDERER] Solicitud de regreso al módulo: ${currentModule || 'Gestión de la Salud'}`);
-        showModuleContent(currentModule || 'Gestión de la Salud');
-        return;
               case 'ausentismo-home-action':
                   // Acción desde home de ausentismo - ya se maneja internamente en el módulo
                   console.log('[RENDERER] Ausentismo home action recibida, procesando...');
@@ -3486,7 +3468,17 @@ function getTagTextColor(priority) {
 }
 
 
+let _showModuleContentLock = false;
+
 function showModuleContent(moduleName) {
+// ✅ GUARD: Prevenir llamadas duplicadas desde handlers de mensajes solapados
+if (_showModuleContentLock) {
+console.warn(`[showModuleContent] BLOCKED duplicate call for "${moduleName}" (lock active)`);
+return;
+}
+_showModuleContentLock = true;
+Promise.resolve().then(() => { _showModuleContentLock = false; });
+
 console.log(`Showing content for module: ${moduleName}`);
 // ✅ SOLUCIÓN TEMPORAL: No cambiar módulo si estamos en un submódulo
 if (currentSubmodule) {
@@ -3663,6 +3655,10 @@ function showModuleHome(container, moduleName) { // 'container' ya es el <div cl
     // (Este código permanece igual, solo se asegura de usar moduleContentContainer)
     if (moduleName === "Gestión Integral") {
         if (window.GestionIntegralHome) {
+            if (window.currentGestionIntegralHome?._removeFullscreenListener) {
+                console.log(`[CHART-DIAG] ═══ NAVIGATE AWAY — destroying old instance ═══`);
+                window.currentGestionIntegralHome._removeFullscreenListener();
+            }
             const gestionIntegralHome = new window.GestionIntegralHome(moduleContentContainer, moduleName, submodules);
             window.currentGestionIntegralHome = gestionIntegralHome; // Referencia global para filtros
             gestionIntegralHome.render();

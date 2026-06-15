@@ -46,6 +46,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('fullscreen-changed', listener);
     return () => ipcRenderer.removeListener('fullscreen-changed', listener);
   },
+  isMaximized: () => ipcRenderer.invoke('get-maximized-state'),
 
   // --- Manejo de archivos y directorios ---
   selectDirectory: () => ipcRenderer.invoke('select-directory'),

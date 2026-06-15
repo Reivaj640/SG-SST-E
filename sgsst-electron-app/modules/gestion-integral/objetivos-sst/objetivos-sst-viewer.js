@@ -1213,7 +1213,7 @@ function openResultadoModal(gIdx, iIdx)    { if (objetivosSSTViewer) objetivosSS
 function closeResultadoModal()          { if (objetivosSSTViewer) objetivosSSTViewer.closeResultadoModal(); }
 function saveResultadoModal()           { if (objetivosSSTViewer) objetivosSSTViewer.saveResultadoModal(); }
 function refreshAutoResultados()        { if (objetivosSSTViewer) objetivosSSTViewer.refreshAutoResultados(); }
-function backToModule()                 { window.parent.postMessage({ action: 'backToModule' }, '*'); }
+function backToModule()                 { window.parent.postMessage({ type: 'back-to-module-request' }, '*'); }
 function resetToAutoFromUI()            { if (objetivosSSTViewer) objetivosSSTViewer.resetToAuto(objetivosSSTViewer.activePopoverGroupIdx); }
 
 // Función auxiliar para manejar errores de forma más robusta

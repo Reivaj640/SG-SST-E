@@ -39,19 +39,21 @@ class ObjetivosSSTComponent {
     }
 
     handleIframeMessage(event) {
-        // Por seguridad, podrías verificar event.origin aquí si supieras el origen exacto del iframe
-        if (!event.data || !event.data.action) {
-            return; // Ignorar mensajes sin acción definida
+        if (!event.data) {
+            return;
+        }
+
+        // Normalizar clave: aceptar tanto `type` (estándar) como `action` (legacy viewer)
+        const messageKey = event.data.type || event.data.action;
+        if (!messageKey) {
+            return;
         }
 
         console.log(`[objetivos-sst-logic.js][handleIframeMessage] Mensaje recibido del iframe:`, event.data);
 
-        switch (event.data.action) {
-            case 'backToModule':
-                console.log('[objetivos-sst-logic.js][handleIframeMessage] Acción: backToModule');
-                if (this.onBackToModuleHome) {
-                    this.onBackToModuleHome();
-                }
+        switch (messageKey) {
+            case 'back-to-module-request':
+                console.log('[objetivos-sst-logic.js][handleIframeMessage] Acción: back-to-module-request');
                 break;
             case 'get-excel-path-request':
                 console.log('[objetivos-sst-logic.js][handleIframeMessage] Acción: get-excel-path-request');
@@ -77,9 +79,8 @@ class ObjetivosSSTComponent {
                 console.log('[objetivos-sst-logic.js][handleIframeMessage] Acción: load-auto-resultados-request');
                 this.handleLoadAutoResultadosRequest(event);
                 break;
-            // Puedes añadir más casos para otras funcionalidades si es necesario
             default:
-                console.warn('[objetivos-sst-logic.js][handleIframeMessage] Mensaje no reconocido:', event.data.action);
+                console.warn('[objetivos-sst-logic.js][handleIframeMessage] Mensaje no reconocido:', messageKey);
                 break;
         }
     }

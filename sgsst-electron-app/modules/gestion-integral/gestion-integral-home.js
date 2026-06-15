@@ -59,7 +59,7 @@ class GestionIntegralHome {
         mainArea.className = 'main-area';
         mainArea.style.flex = '1';
 
-        this.renderMainArea(mainArea);
+        await this.renderMainArea(mainArea);
 
         contentContainer.appendChild(mainArea);
         layout.appendChild(contentContainer);
@@ -68,12 +68,15 @@ class GestionIntegralHome {
         // Listen for fullscreen changes to update chart texts
         if (window.electronAPI?.onFullscreenChanged) {
             this._removeFullscreenListener = window.electronAPI.onFullscreenChanged((isFullscreen) => {
+                console.log(`[CHART-DIAG] IPC fullscreen-changed received: ${isFullscreen}`);
                 this.updateChartTexts(isFullscreen);
             });
         }
 
-        // Set initial text state (windowed = abbreviated)
-        this.updateChartTexts(false);
+        // Set initial text state based on actual window state
+        const isMaximized = await window.electronAPI?.isMaximized() ?? false;
+        this._isMaximized = isMaximized;
+        this.updateChartTexts(isMaximized);
     }
 
     injectStyles() {
@@ -357,7 +360,7 @@ overflow-y: auto;
                 border-radius: var(--k-radius-lg);
                 padding: 1.5rem;
                 box-shadow: var(--k-shadow-sm);
-                min-height: 350px;
+                min-height: auto;
                 display: flex;
                 flex-direction: column;
             }
@@ -430,12 +433,64 @@ overflow-y: auto;
                 align-items: center;
             }
             
+            /* Fullscreen: donut auto / tarjetas max 420px centradas */
+            .chart-content.chart-fullscreen {
+                gap: 2rem;
+                min-height: 320px;
+                justify-content: center;
+            }
+            .chart-content.chart-fullscreen .donut-chart-wrapper {
+                flex: 0 0 auto;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+            .chart-content.chart-fullscreen .donut-chart-svg {
+                width: 240px;
+                height: 240px;
+            }
+            .chart-content.chart-fullscreen .donut-percentage {
+                font-size: 3.5rem;
+            }
+            .chart-content.chart-fullscreen .donut-label {
+                font-size: 1rem;
+            }
+            .chart-content.chart-fullscreen .chart-legend {
+                flex: 1;
+                min-width: 0;
+                max-width: 420px;
+                gap: 0.5rem;
+                align-items: center;
+            }
+            .chart-content.chart-fullscreen .legend-item {
+                padding: 0.6rem 1rem;
+                gap: 0.6rem;
+                max-width: 360px;
+                width: 100%;
+            }
+            .chart-content.chart-fullscreen .legend-title {
+                font-size: 0.7rem;
+            }
+            .chart-content.chart-fullscreen .legend-description {
+                font-size: 0.6rem;
+            }
+            .chart-content.chart-fullscreen .legend-value {
+                font-size: 0.85rem;
+                min-width: 25px;
+            }
+            .chart-content.chart-fullscreen .legend-dot {
+                width: 10px;
+                height: 10px;
+            }
+            
             .donut-chart-wrapper {
                 position: relative;
                 flex-shrink: 0;
             }
             
             .donut-chart-svg {
+                width: 160px;
+                height: 160px;
                 transform: rotate(-90deg);
                 filter: drop-shadow(0 4px 8px rgba(0,0,0,0.1));
             }
@@ -495,7 +550,7 @@ overflow-y: auto;
                 border: 1px solid var(--k-border);
                 transition: all 0.2s ease;
                 cursor: pointer;
-                min-width: 0;  /* Prevenir desbordamiento */
+                min-width: 0;
             }
             
             .legend-item:hover {
@@ -514,7 +569,7 @@ overflow-y: auto;
             
             .legend-info {
                 flex: 1;
-                min-width: 0;  /* Permitir text truncation */
+                min-width: 0;
             }
             
             .legend-title {
@@ -956,7 +1011,8 @@ gap: 1rem;
         chartsGrid.appendChild(chartContainer);
 
         // === GRÁFICA DE OBJETIVOS SST POR PRINCIPIO ===
-        const objetivosChartContainer = this.createObjetivosChart(objetivos);
+        const principiosAutoResultados = this.gestionIntegralStats?.principiosAutoResultados || null;
+        const objetivosChartContainer = this.createObjetivosChart(objetivos, principiosAutoResultados);
         chartsGrid.appendChild(objetivosChartContainer);
 
         container.appendChild(chartsGrid);
@@ -978,8 +1034,11 @@ gap: 1rem;
         
         submodulesContainer.appendChild(submodulesList);
         container.appendChild(submodulesContainer);
+
+        this._logChartDiagnostics(`RENDER — DOM ready (isMaximized=${this._isMaximized ?? 'pending'})`);
+        this.updateChartTexts(this._isMaximized ?? false);
     }
-    
+
     createWidget(title, value, description) {
         const widget = document.createElement('div');
         widget.className = 'widget k-budget-card';
@@ -1338,7 +1397,7 @@ gap: 1rem;
             
             <div class="chart-content" id="plan-chart-content">
                 <div class="donut-chart-wrapper">
-                    <svg class="donut-chart-svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+                    <svg class="donut-chart-svg" viewBox="0 0 ${size} ${size}">
                         <circle 
                             class="donut-segment donut-segment-bg"
                             cx="${size/2}" 
@@ -1422,7 +1481,7 @@ gap: 1rem;
     /**
      * Crea la gráfica de barras horizontales para Objetivos SST por principio
      */
-    createObjetivosChart(objetivos) {
+    createObjetivosChart(objetivos, principiosAutoResultados) {
         const porPrincipio = objetivos.porPrincipio || {
             1: { total: 0, cumplidos: 0, porcentaje: 0 },
             2: { total: 0, cumplidos: 0, porcentaje: 0 },
@@ -1462,7 +1521,7 @@ gap: 1rem;
 
         // Renderizar Chart.js después de insertar en DOM
         setTimeout(() => {
-            this._renderObjetivosBarChart(porPrincipio, objetivos);
+            this._renderObjetivosBarChart(porPrincipio, objetivos, principiosAutoResultados);
         }, 100);
 
         return container;
@@ -1471,7 +1530,7 @@ gap: 1rem;
     /**
      * Renderiza la gráfica de barras horizontales con Chart.js
      */
-    _renderObjetivosBarChart(porPrincipio, objetivos) {
+    _renderObjetivosBarChart(porPrincipio, objetivos, principiosAutoResultados) {
         if (typeof Chart === 'undefined') return;
         const canvas = document.getElementById('objetivosChart');
         if (!canvas) return;
@@ -1483,29 +1542,52 @@ gap: 1rem;
         const cumplidos = [1, 2, 3, 4].map(pid => porPrincipio[pid].cumplidos);
         const pendientes = [1, 2, 3, 4].map(pid => porPrincipio[pid].total - porPrincipio[pid].cumplidos);
 
+        // Auto-resultados: promedio de avance por principio (0-100)
+        const autoAvance = [1, 2, 3, 4].map(pid => {
+            if (principiosAutoResultados && principiosAutoResultados[pid]) {
+                return principiosAutoResultados[pid].porcentajePromedio || 0;
+            }
+            return 0;
+        });
+
+        const hasAutoData = autoAvance.some(v => v > 0);
+
+        const datasets = [
+            {
+                label: 'Cumplidos',
+                data: cumplidos,
+                backgroundColor: 'rgba(23, 78, 166, 0.8)',
+                borderColor: '#174ea6',
+                borderWidth: 1,
+                borderRadius: 3,
+                stack: 'objetivos'
+            },
+            {
+                label: 'Pendientes',
+                data: pendientes,
+                backgroundColor: 'rgba(200, 200, 200, 0.4)',
+                borderColor: '#c8c8c8',
+                borderWidth: 1,
+                borderRadius: 3,
+                stack: 'objetivos'
+            }
+        ];
+
+        if (hasAutoData) {
+            datasets.push({
+                label: 'Indicadores (%)',
+                data: autoAvance,
+                backgroundColor: 'rgba(40, 167, 69, 0.7)',
+                borderColor: '#28a745',
+                borderWidth: 1,
+                borderRadius: 3,
+                stack: 'indicadores'
+            });
+        }
+
         new Chart(canvas, {
             type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: 'Cumplidos',
-                        data: cumplidos,
-                        backgroundColor: 'rgba(23, 78, 166, 0.8)',
-                        borderColor: '#174ea6',
-                        borderWidth: 1,
-                        borderRadius: 3
-                    },
-                    {
-                        label: 'Pendientes',
-                        data: pendientes,
-                        backgroundColor: 'rgba(200, 200, 200, 0.4)',
-                        borderColor: '#c8c8c8',
-                        borderWidth: 1,
-                        borderRadius: 3
-                    }
-                ]
-            },
+            data: { labels, datasets },
             options: {
                 indexAxis: 'y',
                 responsive: true,
@@ -1515,7 +1597,7 @@ gap: 1rem;
                         stacked: true,
                         beginAtZero: true,
                         ticks: { stepSize: 1, precision: 0, font: { size: 11 } },
-                        title: { display: true, text: 'Cantidad', font: { size: 10 } }
+                        title: { display: true, text: hasAutoData ? 'Cantidad / % Avance' : 'Cantidad', font: { size: 10 } }
                     },
                     y: {
                         stacked: true,
@@ -1532,12 +1614,25 @@ gap: 1rem;
                             label: (ctx) => {
                                 const pid = ctx.dataIndex + 1;
                                 const p = porPrincipio[pid];
+                                if (ctx.dataset.label === 'Indicadores (%)') {
+                                    const auto = principiosAutoResultados?.[pid];
+                                    const total = auto?.totalKeywords || 0;
+                                    return ` Indicadores: ${ctx.raw}% promedio (${total} indicadores)`;
+                                }
                                 return ` ${ctx.dataset.label}: ${ctx.raw} (${p.total > 0 ? Math.round((ctx.raw / p.total) * 100) : 0}%)`;
                             },
                             afterBody: (tooltipItems) => {
                                 const pid = tooltipItems[0].dataIndex + 1;
                                 const p = porPrincipio[pid];
-                                return `Total: ${p.cumplidos}/${p.total} (${p.porcentaje}%)`;
+                                const lines = [`Total: ${p.cumplidos}/${p.total} (${p.porcentaje}%)`];
+                                if (hasAutoData && principiosAutoResultados?.[pid]) {
+                                    const auto = principiosAutoResultados[pid];
+                                    const kws = Object.keys(auto.keywords || {}).slice(0, 5);
+                                    if (kws.length > 0) {
+                                        lines.push(`Indicadores: ${kws.join(', ')}${auto.totalKeywords > 5 ? '...' : ''}`);
+                                    }
+                                }
+                                return lines;
                             }
                         }
                     }
@@ -1552,6 +1647,12 @@ gap: 1rem;
     updateChartTexts(isFullscreen) {
         const meta = this._chartMeta;
         if (!meta) return;
+
+        // Toggle layout fullscreen en el chart de plan de trabajo
+        const chartContent = document.getElementById('plan-chart-content');
+        if (chartContent) {
+            chartContent.classList.toggle('chart-fullscreen', isFullscreen);
+        }
 
         const title = document.getElementById('chart-title');
         const subtitle = document.getElementById('chart-subtitle');
@@ -1590,6 +1691,43 @@ gap: 1rem;
         if (legend1) legend1.textContent = isFullscreen ? 'Actividades Ejecutadas' : 'Act. Ejec.';
         if (legend2) legend2.textContent = isFullscreen ? 'Actividades Pendientes' : 'Act. Pend.';
         if (legend3) legend3.textContent = isFullscreen ? 'Total Programadas' : 'Total Prog.';
+
+        this._logChartDiagnostics(`updateChartTexts(isFullscreen=${isFullscreen})`);
+    }
+
+    /**
+     * Diagnóstico visual: mide dimensiones, posición y proporciones del donut vs tarjetas
+     */
+    _logChartDiagnostics(context) {
+        const chartContent = document.getElementById('plan-chart-content');
+        if (!chartContent) { console.log(`[CHART-DIAG] ${context} — chart-content NOT FOUND`); return; }
+
+        const cc = chartContent.getBoundingClientRect();
+        const donut = chartContent.querySelector('.donut-chart-wrapper');
+        const legend = chartContent.querySelector('.chart-legend');
+        const svg = chartContent.querySelector('.donut-chart-svg');
+        const container = chartContent.closest('.chart-container');
+
+        const d = donut?.getBoundingClientRect();
+        const l = legend?.getBoundingClientRect();
+        const c = container?.getBoundingClientRect();
+
+        console.log(`[CHART-DIAG] ═══ ${context} ═══`);
+        console.log(`[CHART-DIAG] State: classList = "${chartContent.className}"`);
+        console.log(`[CHART-DIAG] Window: ${Math.round(window.innerWidth)}×${Math.round(window.innerHeight)}`);
+        console.log(`[CHART-DIAG] Container (.chart-container): ${c ? Math.round(c.width)+'×'+Math.round(c.height) : 'N/A'}`);
+        console.log(`[CHART-DIAG] Flex row (.chart-content): ${Math.round(cc.width)}×${Math.round(cc.height)}`);
+        console.log(`[CHART-DIAG] Donut: ${d ? Math.round(d.width)+'×'+Math.round(d.height) : 'N/A'} → ${d ? Math.round(d.width/cc.width*100)+'%' : 'N/A'} del flex`);
+        console.log(`[CHART-DIAG] Legend: ${l ? Math.round(l.width)+'×'+Math.round(l.height) : 'N/A'} → ${l ? Math.round(l.width/cc.width*100)+'%' : 'N/A'} del flex`);
+        console.log(`[CHART-DIAG] SVG size: ${svg ? getComputedStyle(svg).width : 'N/A'}`);
+        console.log(`[CHART-DIAG] Gap: ${getComputedStyle(chartContent).gap}`);
+
+        const items = chartContent.querySelectorAll('.legend-item');
+        items.forEach((item, i) => {
+            const r = item.getBoundingClientRect();
+            console.log(`[CHART-DIAG]   Card ${i+1}: ${Math.round(r.width)}×${Math.round(r.height)}`);
+        });
+        console.log(`[CHART-DIAG] ══════════════════════`);
     }
 
     /**

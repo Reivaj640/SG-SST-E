@@ -74,14 +74,6 @@ function setupEventListeners() {
     window.finalizeReport = finalizeReport;
     window.loadExcelData = loadExcelData;
     window.saveExcelData = saveExcelData;
-
-    // Evento para volver al módulo
-    document.getElementById('backBtn')?.addEventListener('click', () => {
-        if (window.parent && window.parent.postMessage) {
-            // Use a standardized message format for all communications
-            window.parent.postMessage({ type: 'back-to-module-request' }, '*');
-        }
-    });
 }
 
 // Inicializar la rendición de cuentas

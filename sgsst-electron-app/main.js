@@ -689,6 +689,11 @@ const createWindow = () => {
     }
   });
 
+  // Consulta de estado maximizado (para inicialización de componentes)
+  ipcMain.handle('get-maximized-state', () => {
+    return mainWindow && !mainWindow.isDestroyed() ? mainWindow.isMaximized() : false;
+  });
+
   // Cargar el archivo HTML principal
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
 
@@ -13161,12 +13166,13 @@ ipcMain.handle('get-gestion-integral-stats', async (event, companyName) => {
     const currentYear = new Date().getFullYear();
 
     // Calcular estadísticas en paralelo (incluyendo evaluación inicial)
-    const [politica, objetivos, plan_trabajo, rendicion, evaluacion_inicial] = await Promise.all([
+    const [politica, objetivos, plan_trabajo, rendicion, evaluacion_inicial, principiosAutoResultados] = await Promise.all([
         calculatePoliticaStats(rootPath),
         calculateObjetivosStats(rootPath),
         calculatePlanTrabajoStats(rootPath, currentYear),
         calculateRendicionCuentasStats(rootPath),
-        calculateEvaluacionInicialStats(rootPath)
+        calculateEvaluacionInicialStats(rootPath),
+        calculatePrincipiosAutoResultados(rootPath, companyName)
     ]);
 
     const stats = {
@@ -13174,7 +13180,8 @@ ipcMain.handle('get-gestion-integral-stats', async (event, companyName) => {
         objetivos,
         plan_trabajo,
         rendicion_cuentas: rendicion,
-        evaluacion_inicial
+        evaluacion_inicial,
+        principiosAutoResultados
     };
 
     sendLog(`[MAIN] Estadísticas Gestión Integral calculadas: ${JSON.stringify(stats)}`, 'DEBUG');
@@ -13360,6 +13367,70 @@ async function calculateObjetivosStats(basePath) {
   }
 
   return stats;
+}
+
+/**
+ * Calcular auto-resultados agrupados por principio
+ * Mapea keywords de calculateAutoResultados() a los 4 principios del SG-SST
+ */
+async function calculatePrincipiosAutoResultados(rootPath, companyName) {
+  const empty = {
+    1: { nombre: 'Prevención', keywords: {}, porcentajePromedio: 0, totalKeywords: 0 },
+    2: { nombre: 'Requisitos Legales', keywords: {}, porcentajePromedio: 0, totalKeywords: 0 },
+    3: { nombre: 'Satisfacción Cliente', keywords: {}, porcentajePromedio: 0, totalKeywords: 0 },
+    4: { nombre: 'Recursos y Mejora', keywords: {}, porcentajePromedio: 0, totalKeywords: 0 }
+  };
+
+  try {
+    const autoResultados = await calculateAutoResultados(companyName);
+
+    const KEYWORD_TO_PRINCIPIO = {
+      // Principio 1: Prevención
+      1: ['frecuencia', 'severidad', 'mortalidad', 'mortal', 'accidente', 'at',
+          'accidentalidad', 'peligro', 'riesgo', 'nr', 'peligros', 'riesgos',
+          'ausentismo', 'incapacidad', 'investigacion', 'inspeccion', 'inspecciones',
+          'ifa', 'prevalencia', 'incidencia'],
+      // Principio 2: Requisitos Legales
+      2: ['evaluacion', 'hallazgo', 'hallazgos', 'politica'],
+      // Principio 3: Satisfacción Cliente
+      3: ['copasst', 'comite'],
+      // Principio 4: Recursos y Mejora
+      4: ['capacitacion', 'capacitaciones', 'induccion', 'reinduccion',
+          'presupuesto', 'recurso', 'recursos', 'asignacion',
+          'plan', 'trabajo', 'actividad', 'plan de trabajo']
+    };
+
+    for (const [principioId, keywords] of Object.entries(KEYWORD_TO_PRINCIPIO)) {
+      const pid = parseInt(principioId);
+      const matched = {};
+
+      for (const kw of keywords) {
+        if (autoResultados[kw] && autoResultados[kw].resultado) {
+          const data = autoResultados[kw];
+          matched[kw] = {
+            resultado: data.resultado,
+            porcentajeReal: data.porcentajeReal || 0
+          };
+        }
+      }
+
+      const values = Object.values(matched).map(m => m.porcentajeReal).filter(v => v > 0);
+      const promedio = values.length > 0
+        ? Math.round(values.reduce((s, v) => s + v, 0) / values.length)
+        : 0;
+
+      empty[pid] = {
+        nombre: empty[pid].nombre,
+        keywords: matched,
+        porcentajePromedio: promedio,
+        totalKeywords: Object.keys(matched).length
+      };
+    }
+  } catch (e) {
+    sendLog(`[MAIN] Error calculando principios auto-resultados: ${e.message}`, 'WARN');
+  }
+
+  return empty;
 }
 
 /**

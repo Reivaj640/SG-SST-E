@@ -1,7 +1,7 @@
 // ============================================================
-// K+AIR SG-SST - prevalencia-enfermedad-laboral.js
+// K+AIR SG-SST - incidencia-enfermedad-laboral.js
 // Lógica del renderer para Incidencia de Enfermedad Laboral
-// Submódulo 3.3.4
+// Submódulo 3.3.5
 // ============================================================
 
 (function() {
@@ -230,7 +230,7 @@ function updateHeaderContext() {
         data: {
           labels: meses,
           datasets: [{
-            label: 'Prevalencia (x100.000)',
+            label: 'Incidencia (x100.000)',
             data: valores,
             backgroundColor: colores,
             borderRadius: 4,
@@ -268,7 +268,7 @@ function updateHeaderContext() {
                 },
                 label: function(ctx) {
                   var val = ctx.parsed.y;
-                  return 'Prevalencia: ' + val.toFixed(2) + ' (x100.000)';
+                  return 'Incidencia: ' + val.toFixed(2) + ' (x100.000)';
                 }
               }
             }
@@ -597,7 +597,7 @@ function renderizar() {
       }
     });
 
-    // Si tenemos datos mensuales de prevalencia del Excel, usarlos directamente
+    // Si tenemos datos mensuales de incidencia del Excel, usarlos directamente
     // De lo contrario, calcular desde los datos disponibles
     var incidenciaPromedio = countMeses > 0 ? (totalCasosEL / (totalTrab / countMeses)) * 100000 : 0;
     incidenciaPromedio = Math.round(incidenciaPromedio * 100) / 100;
@@ -638,7 +638,7 @@ function renderizar() {
       metaDisplay.textContent = meta;
     }
     if (promedioBadge) {
-      promedioBadge.textContent = 'Prevalencia: ' + fmt(incidenciaPromedio, 2);
+      promedioBadge.textContent = 'Incidencia: ' + fmt(incidenciaPromedio, 2);
       var isOk = getValueColor(incidenciaPromedio, meta) !== '#dc2626';
       promedioBadge.style.background = isOk ? '#dcfce7' : '#fee2e2';
       promedioBadge.style.color = isOk ? '#16a34a' : '#dc2626';
@@ -677,7 +677,7 @@ function renderizar() {
 
       var chartSummary = getElement('chartSummary');
       if (chartSummary) {
-        chartSummary.textContent = 'Prevalencia promedio anual: ' + fmt(incidenciaPromedio, 2) + ' por 100.000 trabajadores.';
+        chartSummary.textContent = 'Incidencia promedio anual: ' + fmt(incidenciaPromedio, 2) + ' por 100.000 trabajadores.';
         chartSummary.style.display = 'block';
       }
     } catch (e) {
@@ -694,7 +694,7 @@ function renderizar() {
     var html = '';
     var totalCasosEL = 0;
     var totalTrab = 0;
-    var totalPrevalencia = 0;
+    var totalIncidencia = 0;
     var countMeses = 0;
 
     incidenciaMensual.forEach(function(row) {
