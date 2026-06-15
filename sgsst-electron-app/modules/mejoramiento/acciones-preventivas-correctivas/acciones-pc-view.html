@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>K+AIR | Acciones Preventivas y Correctivas</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="acciones-pc-view.css">
+</head>
+<body>
+
+  <!-- HEADER — k-section-card -->
+  <div class="k-section-card" style="padding:0; margin-bottom:1rem; flex-shrink:0; flex-grow:0;">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
+      <div style="display:flex; align-items:center; gap:0.75rem;">
+        <i class="bi bi-shield-check" style="color:#174ea6; font-size:1.25rem;"></i>
+        <div>
+          <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">7.1.1 Acciones Preventivas y Correctivas</h3>
+          <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Acciones derivadas de no conformidades, auditorías, quejas y observaciones</p>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+        <span style="display:flex; align-items:center; gap:0.375rem; font-size:0.8125rem; color:#64748B;">
+          <i class="bi bi-building" style="font-size:0.875rem;"></i>
+          <span id="header-company-text">—</span>
+        </span>
+        <div style="width:1px; height:24px; background:#dee2e6;"></div>
+        <button class="header-back-btn" onclick="window.parent.postMessage({type:'back-to-module-request'},'*')" title="Volver al módulo Mejoramiento">
+          <i class="bi bi-arrow-left"></i> Volver
+        </button>
+        <button class="header-action--secondary" onclick="openForm()" title="Crear nueva acción">
+          <i class="bi bi-plus-circle"></i> Nueva acción
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI STRIP -->
+  <div class="kair-kpi-strip" id="kpiStrip"></div>
+
+  <!-- TABLE -->
+  <div class="kair-table-wrap">
+    <div class="kair-table-toolbar">
+      <div class="kair-search">
+        <i class="bi bi-search kair-search__icon"></i>
+        <input type="text" id="searchInput" placeholder="Buscar por código, descripción o responsable..." oninput="renderTable()">
+      </div>
+      <select class="kair-select" id="filterStatus" onchange="renderTable()">
+        <option value="">Todos los estados</option>
+        <option value="pendiente">Pendiente</option>
+        <option value="en-proceso">En Proceso</option>
+        <option value="implementada">Implementada</option>
+        <option value="verificada">Verificada</option>
+        <option value="cerrada">Cerrada</option>
+        <option value="vencida">Vencida</option>
+      </select>
+    </div>
+    <div class="kair-table-container">
+      <table class="kair-table">
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Tipo</th>
+            <th>Origen</th>
+            <th>Descripción</th>
+            <th>Responsable</th>
+            <th>Riesgo</th>
+            <th>Prioridad</th>
+            <th>Estado</th>
+            <th>Fecha Compromiso</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+      <div class="kair-pagination" id="pagination"></div>
+    </div>
+  </div>
+
+  <!-- FORM DIALOG -->
+  <div class="kair-overlay" id="formOverlay">
+    <div class="kair-dialog">
+      <div class="kair-dialog__header">
+        <div class="kair-dialog__title" id="formTitle">Nueva Acción</div>
+        <button class="k-btn k-btn--ghost k-btn--icon" onclick="closeForm()"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="kair-dialog__body">
+        <div class="kair-form" id="formFields"></div>
+      </div>
+      <div class="kair-dialog__footer">
+        <button class="k-btn k-btn--ghost" onclick="closeForm()">Cancelar</button>
+        <button class="k-btn k-btn--primary" onclick="submitForm()">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DETAIL SHEET -->
+  <div class="kair-sheet-overlay" id="detailOverlay">
+    <div class="kair-sheet">
+      <div class="kair-sheet__header">
+        <div class="kair-sheet__title" id="detailTitle">Detalle de Acción</div>
+        <button class="k-btn k-btn--ghost k-btn--icon" onclick="closeDetail()"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="kair-sheet__body" id="detailBody"></div>
+      <div class="kair-sheet__footer" id="detailFooter"></div>
+    </div>
+  </div>
+
+  <!-- DELETE CONFIRMATION -->
+  <div class="kair-overlay" id="deleteOverlay">
+    <div class="kair-alert">
+      <div class="kair-alert__icon"><i class="bi bi-trash"></i></div>
+      <div class="kair-alert__title">Eliminar acción</div>
+      <div class="kair-alert__desc" id="deleteDesc">¿Está seguro que desea eliminar esta acción? Esta acción no se puede deshacer.</div>
+      <div class="kair-alert__actions">
+        <button class="k-btn k-btn--ghost" onclick="closeDelete()">Cancelar</button>
+        <button class="k-btn k-btn--primary" style="background:var(--kair-danger);border-color:var(--kair-danger);" onclick="confirmDelete()">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div class="k-toast-container" id="toastContainer"></div>
+
+  <script src="acciones-pc-viewer.js"></script>
+</body>
+</html>

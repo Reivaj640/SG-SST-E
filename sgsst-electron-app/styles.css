@@ -774,26 +774,7 @@ select.form-control {
   height: 100vh;
 }
 
-/* Estilos específicos para el submódulo Responsable del SG */
-.submodule-header {
-  display: flex;
-  align-items: center;
-  margin-bottom: var(--spacer);
-  background-color: var(--widget-bg-color);
-  padding: var(--spacer) var(--spacer);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-md);
-  box-shadow: var(--box-shadow);
-  min-height: 80px; /* Increased height */
-}
-
-.submodule-header h3 {
-  margin: 0 var(--spacer) 0 0;
-  color: var(--text-color); /* Changed from heading-color to text-color (black) */
-  font-size: 1.5rem;
-  flex-grow: 1;
-  text-align: center;
-}
+/* submodule-header base: definido en línea 686 */
 
 .btn-back {
   background-color: var(--light-color);

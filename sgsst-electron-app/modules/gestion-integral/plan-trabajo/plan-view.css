@@ -76,14 +76,14 @@ body {
     width: 100vw; 
 }
 
-/* HEADER — Card k-section-card */
-.k-section-card {
+/* HEADER — Card k-section-card (scoped to .app-container) */
+.app-container .k-section-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 0.5rem;
     box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
-.header-back-btn {
+.app-container .header-back-btn {
     display: inline-flex;
     align-items: center;
     gap: 0.375rem;

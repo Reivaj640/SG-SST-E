@@ -62,37 +62,37 @@ Patrón 4 Constructor: (container, currentCompany, moduleName, submoduleTitle, b
   var self = this;
 
  var tabsHtml = VIEWS.map(function (v) {
-  return '<button class="kair-header__tab' + (v.key === 'cronograma' ? ' active' : '') + '" data-view="' + v.key + '">' +
+  return '<button class="k-mnt-tab' + (v.key === 'cronograma' ? ' k-mnt-tab--active' : '') + '" data-view="' + v.key + '">' +
   '<i class="bi ' + v.icon + '"></i> ' + v.label +
   '</button>';
  }).join('');
 
  var headerHtml =
-  '<header class="kair-header">' +
-  '<div class="kair-header__bar">' +
-  '<div class="kair-header__left">' +
-  '<button class="kair-header__back" id="kair-mnt-btn-back" title="Volver">' +
-  '<i class="bi bi-arrow-left"></i>' +
-  '</button>' +
-  '<div class="kair-header__divider"></div>' +
-  '</div>' +
-  '<div class="kair-header__center">' +
-  '<h1 class="kair-header__title"><i class="bi bi-gear"></i> Mantenimiento Periódico</h1>' +
-  '<ol class="kair-header__breadcrumb">' +
+  '<div class="k-section-card k-mnt-header-card">' +
+  '<div class="k-mnt-header-row">' +
+  '<div class="k-mnt-header-left">' +
+  '<i class="bi bi-gear k-mnt-header-icon"></i>' +
+  '<div>' +
+  '<h3 class="k-mnt-header-title">Mantenimiento Periódico</h3>' +
+  '<ol class="k-mnt-header-breadcrumb">' +
   '<li>Gestión de Peligros</li>' +
   '<li>4.2.5</li>' +
-  '<li class="kair-header__breadcrumb--active" id="kair-mnt-breadcrumb-active">Cronograma</li>' +
+  '<li class="k-mnt-header-breadcrumb--active" id="kair-mnt-breadcrumb-active">Cronograma</li>' +
   '</ol>' +
   '</div>' +
-  '<div class="kair-header__right">' +
-  '<span class="kair-header__pill--section">4.2.5</span>' +
-  '<span class="kair-header__company" id="kair-mnt-header-company"><i class="bi bi-building"></i> <span></span></span>' +
+  '</div>' +
+  '<div class="k-mnt-header-actions">' +
+  '<span class="k-mnt-header-company" id="kair-mnt-header-company"><i class="bi bi-building"></i> <span></span></span>' +
+  '<div class="k-mnt-header-divider"></div>' +
+  '<button id="kair-mnt-btn-back" class="header-back-btn" title="Volver al módulo">' +
+  '<i class="bi bi-arrow-left"></i> Volver' +
+  '</button>' +
   '</div>' +
   '</div>' +
-  '<div class="kair-header__tabs" id="kair-mnt-tabs">' +
+  '<div class="k-mnt-tabs" id="kair-mnt-tabs">' +
   tabsHtml +
   '</div>' +
-  '</header>';
+  '</div>';
 
   var viewsHtml = VIEWS.map(function (v) {
    return '<div class="kair-mnt-view' + (v.key === 'cronograma' ? ' kair-mnt-view--active' : '') + '" id="kair-mnt-view-' + v.key + '">' +
@@ -156,13 +156,13 @@ Patrón 4 Constructor: (container, currentCompany, moduleName, submoduleTitle, b
    });
   }
 
-  var tabs = wrapper.querySelectorAll('.kair-header__tab');
-  tabs.forEach(function (tab) {
-   tab.addEventListener('click', function () {
-    var viewKey = tab.getAttribute('data-view');
-    if (viewKey) self._navigate(viewKey);
+   var tabs = wrapper.querySelectorAll('.k-mnt-tab');
+   tabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+     var viewKey = tab.getAttribute('data-view');
+     if (viewKey) self._navigate(viewKey);
+    });
    });
-  });
  };
 
  MantenimientoComponent.prototype._navigate = function (viewKey) {
@@ -171,14 +171,14 @@ Patrón 4 Constructor: (container, currentCompany, moduleName, submoduleTitle, b
   var wrapper = this.container.querySelector('.kair-mnt-wrapper');
   if (!wrapper) return;
 
-  var tabs = wrapper.querySelectorAll('.kair-header__tab');
-  tabs.forEach(function (tab) {
-   if (tab.getAttribute('data-view') === viewKey) {
-    tab.classList.add('active');
-   } else {
-    tab.classList.remove('active');
-   }
-  });
+   var tabs = wrapper.querySelectorAll('.k-mnt-tab');
+   tabs.forEach(function (tab) {
+    if (tab.getAttribute('data-view') === viewKey) {
+     tab.classList.add('k-mnt-tab--active');
+    } else {
+     tab.classList.remove('k-mnt-tab--active');
+    }
+   });
 
   var views = wrapper.querySelectorAll('.kair-mnt-view');
   views.forEach(function (view) {

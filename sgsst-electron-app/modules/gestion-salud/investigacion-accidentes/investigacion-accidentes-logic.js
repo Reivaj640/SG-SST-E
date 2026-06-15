@@ -562,7 +562,7 @@ InvestigacionAccidentesComponent.prototype.showNewDocumentViewer = function() {
     header.style.display = 'flex';
     header.style.alignItems = 'center';
     header.style.padding = '10px';
-    header.style.backgroundColor = '#f8f9fa';
+    header.style.backgroundColor = '#ffffff';
     header.style.borderBottom = '1px solid #dee2e6';
     header.style.marginBottom = '20px';
 

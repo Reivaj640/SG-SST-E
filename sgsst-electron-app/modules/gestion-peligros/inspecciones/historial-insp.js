@@ -185,7 +185,7 @@ var HistorialInsp = {
       FormularioInsp.openFile(type, filePath);
     }
     if (typeof InspeccionesComponent !== 'undefined') {
-      var tabBtn = document.querySelector('.kair-header__tab[data-view="formulario"]');
+      var tabBtn = document.querySelector('.k-insp-tab[data-view="formulario"]');
       if (tabBtn) tabBtn.click();
     }
   },
@@ -237,7 +237,7 @@ var HistorialInsp = {
       FormularioInsp.showNewInspectionModal();
     }
     if (typeof InspeccionesComponent !== 'undefined') {
-      var tabBtn = document.querySelector('.kair-header__tab[data-view="formulario"]');
+      var tabBtn = document.querySelector('.k-insp-tab[data-view="formulario"]');
       if (tabBtn) tabBtn.click();
     }
   }

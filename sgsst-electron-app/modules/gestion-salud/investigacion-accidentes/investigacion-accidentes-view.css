@@ -70,14 +70,14 @@
   --inv-shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.5);
 }
 
-/* ── Reset & Base ─────────────────────────────────────────────── */
-* {
+/* ── Reset & Base (scoped to .inv-layout) ──────────────────────── */
+.inv-layout * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-body {
+.inv-layout {
   font-family: var(--inv-font-body);
   background-color: var(--inv-surface);
   color: var(--inv-text-primary);
@@ -105,7 +105,7 @@ body {
   background-color: #4a5568;
 }
 
-.hidden {
+.inv-layout .hidden {
   display: none !important;
 }
 
@@ -131,11 +131,11 @@ body {
 }
 
 /* ================================================================
-   HEADER — Card Pattern (k-section-card)
+   HEADER — Card Pattern (k-section-card) — scoped to .inv-layout
    ================================================================ */
 
 /* Card container */
-body .k-section-card {
+.inv-layout .k-section-card {
   background: #ffffff;
   border: 1px solid #dee2e6;
   border-radius: 0.375rem;
@@ -144,7 +144,7 @@ body .k-section-card {
 }
 
 /* Back button */
-body .header-back-btn {
+.inv-layout .header-back-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
@@ -160,13 +160,13 @@ body .header-back-btn {
   font-family: inherit;
 }
 
-body .header-back-btn:hover {
+.inv-layout .header-back-btn:hover {
   background: #e8f0fe;
   color: #174ea6;
 }
 
 /* Ghost action buttons */
-body .header-action--ghost {
+.inv-layout .header-action--ghost {
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
@@ -182,18 +182,18 @@ body .header-action--ghost {
   font-family: inherit;
 }
 
-body .header-action--ghost:hover:not(:disabled) {
+.inv-layout .header-action--ghost:hover:not(:disabled) {
   background: #f0f2f5;
   color: #1a1a2e;
 }
 
-body .header-action--ghost:disabled {
+.inv-layout .header-action--ghost:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 
 /* Company & divider inside card */
-body .k-section-card__company {
+.inv-layout .k-section-card__company {
   display: flex;
   align-items: center;
   gap: 0.375rem;
@@ -203,11 +203,11 @@ body .k-section-card__company {
   white-space: nowrap;
 }
 
-body .k-section-card__company i {
+.inv-layout .k-section-card__company i {
   font-size: 0.875rem;
 }
 
-body .k-section-card__divider {
+.inv-layout .k-section-card__divider {
   width: 1px;
   height: 24px;
   background: #dee2e6;
@@ -215,8 +215,8 @@ body .k-section-card__divider {
 }
 
 /* Dark Theme */
-[data-theme="dark"] body .k-section-card { background: #1e1e2f; border-color: #3a3a4d; }
-[data-theme="dark"] body .k-section-card h3 { color: #e0e0e0; }
+[data-theme="dark"] .inv-layout .k-section-card { background: #1e1e2f; border-color: #3a3a4d; }
+[data-theme="dark"] .inv-layout .k-section-card h3 { color: #e0e0e0; }
 [data-theme="dark"] body .k-section-card p { color: #9e9e9e; }
 [data-theme="dark"] body .k-section-card__company { color: #9e9e9e; }
 [data-theme="dark"] body .k-section-card__divider { background: #3a3a4d; }

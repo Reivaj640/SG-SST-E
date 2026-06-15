@@ -862,7 +862,7 @@ var FormularioInsp = {
   },
 
   _navigateToHistorial: function () {
-    var tabBtn = document.querySelector('.kair-header__tab[data-view="historial"]');
+    var tabBtn = document.querySelector('.k-insp-tab[data-view="historial"]');
     if (tabBtn) tabBtn.click();
   },
 

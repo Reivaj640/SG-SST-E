@@ -68,35 +68,162 @@ Sistema Visual K+AIR v2.0 — BEM aislado con prefijo kair-mnt-
 .kair-mnt-wrapper ::-webkit-scrollbar-thumb { background: var(--kair-mnt-border); border-radius: 3px; }
 .kair-mnt-wrapper ::-webkit-scrollbar-thumb:hover { background: var(--kair-mnt-text-light); }
 
-/* HEADER — Scoped under .kair-mnt-wrapper to match kair-header global pattern */
-.kair-mnt-wrapper .kair-header { background: var(--kair-mnt-bg-card); border-bottom: 1px solid var(--kair-mnt-border-light); box-shadow: var(--kair-mnt-shadow-sm); flex-shrink: 0; position: sticky; top: 0; z-index: 100; }
-.kair-mnt-wrapper .kair-header__bar { display: flex; align-items: center; justify-content: flex-start; gap: 0.75rem; min-height: 52px; padding: 0 1.5rem; }
-.kair-mnt-wrapper .kair-header__left { display: flex; align-items: center; gap: 0.5rem; }
-.kair-mnt-wrapper .kair-header__back { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; color: var(--kair-mnt-text-secondary); border-radius: 0.375rem; cursor: pointer; transition: background 0.15s ease; font-size: 1rem; }
-.kair-mnt-wrapper .kair-header__back:hover { background: var(--kair-mnt-primary-light); color: var(--kair-mnt-primary); }
-.kair-mnt-wrapper .kair-header__divider { width: 1px; height: 24px; background: var(--kair-mnt-border-light); flex-shrink: 0; }
-.kair-mnt-wrapper .kair-header__center { display: flex; flex-direction: column; gap: 0.125rem; }
-.kair-mnt-wrapper .kair-header__title { font-size: 1.25rem; font-weight: 600; color: var(--kair-mnt-text); margin: 0; display: flex; align-items: center; gap: 0.5rem; }
-.kair-mnt-wrapper .kair-header__title i { color: var(--kair-mnt-primary); }
-.kair-mnt-wrapper .kair-header__breadcrumb { display: flex; align-items: center; gap: 0.375rem; list-style: none; margin: 0; padding: 0; font-size: 0.8125rem; font-weight: 400; color: var(--kair-mnt-text-secondary); }
-.kair-mnt-wrapper .kair-header__breadcrumb li + li::before { content: '\203A'; margin-right: 0.375rem; color: var(--kair-mnt-text-muted); }
-.kair-mnt-wrapper .kair-header__breadcrumb--active { color: var(--kair-mnt-primary); font-weight: 500; }
-.kair-mnt-wrapper .kair-header__right { margin-left: auto; display: flex; align-items: center; gap: 0.75rem; }
-.kair-mnt-wrapper .kair-header__pill--section { background: var(--kair-mnt-primary-light); color: var(--kair-mnt-primary); font-size: 0.75rem; padding: 0.125rem 0.5rem; border-radius: 12px; font-weight: 600; white-space: nowrap; }
-.kair-mnt-wrapper .kair-header__company { display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem; color: var(--kair-mnt-text-secondary); white-space: nowrap; }
-.kair-mnt-wrapper .kair-header__company i { font-size: 0.875rem; }
-.kair-mnt-wrapper .kair-header__action--ghost { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.75rem; background: transparent; color: var(--kair-mnt-text-secondary); border: 1px solid var(--kair-mnt-border); border-radius: 0.375rem; font-family: var(--kair-mnt-font-family); font-size: 0.8125rem; font-weight: 500; cursor: pointer; transition: all 0.15s ease; white-space: nowrap; }
-.kair-mnt-wrapper .kair-header__action--ghost:hover { background: var(--kair-mnt-bg-hover); color: var(--kair-mnt-primary); border-color: var(--kair-mnt-primary); }
-.kair-mnt-wrapper .kair-header__action--primary { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.75rem; background: var(--kair-mnt-primary); color: #ffffff; border: none; border-radius: 0.375rem; font-family: var(--kair-mnt-font-family); font-size: 0.8125rem; font-weight: 500; cursor: pointer; transition: background 0.15s ease; white-space: nowrap; }
-.kair-mnt-wrapper .kair-header__action--primary:hover { background: var(--kair-mnt-primary-hover); }
+/* ==========================================================================
+HEADER K+AIR v3.0 — Card + Tabs (estandarizado como capacitaciones)
+========================================================================== */
 
-/* Tabs integradas en header */
-.kair-mnt-wrapper .kair-header__tabs { display: flex; align-items: center; gap: 0; background: var(--kair-mnt-bg-card); padding: 0 1.5rem; border-top: 1px solid var(--kair-mnt-border-light); flex-shrink: 0; }
-.kair-mnt-wrapper .kair-header__tab { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.25rem; border: none; background: transparent; font-family: var(--kair-mnt-font-family); font-size: 0.8125rem; font-weight: 500; color: var(--kair-mnt-text-secondary); cursor: pointer; position: relative; white-space: nowrap; transition: color 0.15s ease; }
-.kair-mnt-wrapper .kair-header__tab:hover { color: var(--kair-mnt-primary); background: rgba(var(--kair-mnt-primary-rgb), 0.04); }
-.kair-mnt-wrapper .kair-header__tab.active { color: var(--kair-mnt-primary); font-weight: 600; }
-.kair-mnt-wrapper .kair-header__tab.active::after { content: ''; position: absolute; bottom: 0; left: 1.25rem; right: 1.25rem; height: 2px; background: var(--kair-mnt-primary); border-radius: 2px 2px 0 0; }
-.kair-mnt-wrapper .kair-header__tab-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 1.25rem; height: 1.25rem; padding: 0 0.375rem; border-radius: 0.625rem; font-size: 0.625rem; font-weight: 700; background: var(--kair-mnt-danger); color: #ffffff; }
+/* Card container */
+.kair-mnt-wrapper .k-section-card {
+  background: var(--kair-mnt-bg-card);
+  border: 1px solid var(--kair-mnt-border-light);
+  border-radius: 0.5rem;
+  box-shadow: var(--kair-mnt-shadow-sm);
+  flex-shrink: 0;
+}
+
+/* Fila 1: contenido principal */
+.kair-mnt-wrapper .k-mnt-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+}
+
+.kair-mnt-wrapper .k-mnt-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.kair-mnt-wrapper .k-mnt-header-icon {
+  color: var(--kair-mnt-primary);
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.kair-mnt-wrapper .k-mnt-header-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--kair-mnt-text);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Breadcrumb */
+.kair-mnt-wrapper .k-mnt-header-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  list-style: none;
+  margin: 0.25rem 0 0 0;
+  padding: 0;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--kair-mnt-text-secondary);
+}
+
+.kair-mnt-wrapper .k-mnt-header-breadcrumb li + li::before {
+  content: '\203A';
+  margin-right: 0.375rem;
+  color: var(--kair-mnt-text-muted);
+}
+
+.kair-mnt-wrapper .k-mnt-header-breadcrumb--active {
+  color: var(--kair-mnt-primary);
+  font-weight: 500;
+}
+
+/* Fila 1: zona derecha acciones */
+.kair-mnt-wrapper .k-mnt-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+/* Company chip */
+.kair-mnt-wrapper .k-mnt-header-company {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  color: var(--kair-mnt-text-secondary);
+  white-space: nowrap;
+}
+
+/* Divider vertical */
+.kair-mnt-wrapper .k-mnt-header-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--kair-mnt-border-light);
+}
+
+/* Back button */
+.kair-mnt-wrapper .header-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--kair-mnt-text-secondary);
+  background: transparent;
+  border: 1px solid var(--kair-mnt-border);
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: var(--kair-mnt-font-family);
+  white-space: nowrap;
+}
+
+.kair-mnt-wrapper .header-back-btn:hover {
+  background: var(--kair-mnt-primary-light);
+  color: var(--kair-mnt-primary);
+  border-color: var(--kair-mnt-primary);
+}
+
+/* Fila 2: tabs dentro del card */
+.kair-mnt-wrapper .k-mnt-tabs {
+  display: flex;
+  gap: 0;
+  margin: 0 -1.5rem;
+  padding: 0 1.5rem;
+  border-top: 1px solid var(--kair-mnt-border-light);
+  overflow-x: auto;
+}
+
+.kair-mnt-wrapper .k-mnt-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--kair-mnt-text-secondary);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+  font-family: var(--kair-mnt-font-family);
+  position: relative;
+  white-space: nowrap;
+}
+
+.kair-mnt-wrapper .k-mnt-tab:hover {
+  color: var(--kair-mnt-primary);
+}
+
+.kair-mnt-wrapper .k-mnt-tab--active {
+  color: var(--kair-mnt-primary);
+  font-weight: 600;
+  border-bottom-color: var(--kair-mnt-primary);
+}
 
 /* VIEWS */
 .kair-mnt-views-container {

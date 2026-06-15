@@ -65,40 +65,42 @@ InspeccionesComponent.prototype._loadCSS = function (callback) {
     var tabsHtml = VIEWS.map(function (v) {
     var badgeHtml = '';
     if (v.key === 'programa') {
-      badgeHtml = '<span class="kair-header__tab-badge" id="kair-insp-tab-badge-' + v.key + '" style="display:none;">0</span>';
+      badgeHtml = '<span class="k-insp-tab-badge" id="kair-insp-tab-badge-' + v.key + '" style="display:none;">0</span>';
     }
-      return '<button class="kair-header__tab' + (v.key === 'historial' ? ' active' : '') + '" data-view="' + v.key + '">' +
+      return '<button class="k-insp-tab' + (v.key === 'historial' ? ' k-insp-tab--active' : '') + '" data-view="' + v.key + '">' +
         '<i class="bi ' + v.icon + '"></i> ' + v.label + ' ' + badgeHtml +
       '</button>';
     }).join('');
 
     var headerHtml =
-      '<header class="kair-header">' +
-        '<div class="kair-header__bar">' +
-          '<div class="kair-header__left">' +
-            '<button class="kair-header__back" id="kair-insp-btn-back" title="Volver">' +
-              '<i class="bi bi-arrow-left"></i>' +
+      '<div class="k-section-card k-insp-header-card">' +
+        '<div class="k-insp-header-row">' +
+          '<div class="k-insp-header-left">' +
+            '<i class="bi bi-clipboard-check k-insp-header-icon"></i>' +
+            '<div>' +
+              '<h3 class="k-insp-header-title">Inspecciones Sistemáticas</h3>' +
+              '<ol class="k-insp-header-breadcrumb">' +
+                '<li>Gestión de Peligros</li>' +
+                '<li>4.2.4</li>' +
+                '<li class="k-insp-header-breadcrumb--active" id="kair-insp-breadcrumb-active">Inspecciones</li>' +
+              '</ol>' +
+            '</div>' +
+          '</div>' +
+          '<div class="k-insp-header-actions">' +
+            '<span class="k-insp-header-company" id="kair-insp-header-company"><i class="bi bi-building"></i> <span></span></span>' +
+            '<div class="k-insp-header-divider"></div>' +
+            '<button id="kair-insp-btn-back" class="header-back-btn" title="Volver al módulo">' +
+              '<i class="bi bi-arrow-left"></i> Volver' +
             '</button>' +
-            '<div class="kair-header__divider"></div>' +
-          '</div>' +
-          '<div class="kair-header__center">' +
-            '<h1 class="kair-header__title"><i class="bi bi-clipboard-check"></i> Inspecciones Sistemáticas</h1>' +
-            '<ol class="kair-header__breadcrumb">' +
-              '<li>Gestión de Peligros</li>' +
-              '<li>4.2.4</li>' +
-              '<li class="kair-header__breadcrumb--active" id="kair-insp-breadcrumb-active">Inspecciones</li>' +
-            '</ol>' +
-          '</div>' +
-          '<div class="kair-header__right">' +
-            '<span class="kair-header__pill--section">4.2.4</span>' +
-            '<span class="kair-header__company" id="kair-insp-header-company"><i class="bi bi-building"></i> <span></span></span>' +
-'<button class="kair-header__action--ghost" id="kair-insp-btn-export" style="display:none;"><i class="bi bi-download"></i> Exportar</button>' +
+            '<button id="kair-insp-btn-export" class="header-action--ghost" style="display:none;">' +
+              '<i class="bi bi-download"></i> Exportar' +
+            '</button>' +
           '</div>' +
         '</div>' +
-        '<div class="kair-header__tabs" id="kair-insp-tabs">' +
+        '<div class="k-insp-tabs" id="kair-insp-tabs">' +
           tabsHtml +
         '</div>' +
-      '</header>';
+      '</div>';
 
     var viewsHtml = VIEWS.map(function (v) {
       return '<div class="kair-insp-view' + (v.key === 'historial' ? ' kair-insp-view--active' : '') + '" id="kair-insp-view-' + v.key + '">' +
@@ -169,7 +171,7 @@ InspeccionesComponent.prototype._loadCSS = function (callback) {
       });
     }
 
-    var tabs = wrapper.querySelectorAll('.kair-header__tab');
+    var tabs = wrapper.querySelectorAll('.k-insp-tab');
     tabs.forEach(function (tab) {
       tab.addEventListener('click', function () {
         var viewKey = tab.getAttribute('data-view');
@@ -183,12 +185,12 @@ InspeccionesComponent.prototype._loadCSS = function (callback) {
     var wrapper = this.container.querySelector('.kair-insp-wrapper');
     if (!wrapper) return;
 
-    var tabs = wrapper.querySelectorAll('.kair-header__tab');
+    var tabs = wrapper.querySelectorAll('.k-insp-tab');
     tabs.forEach(function (tab) {
       if (tab.getAttribute('data-view') === viewKey) {
-        tab.classList.add('active');
+        tab.classList.add('k-insp-tab--active');
       } else {
-        tab.classList.remove('active');
+        tab.classList.remove('k-insp-tab--active');
       }
     });
 

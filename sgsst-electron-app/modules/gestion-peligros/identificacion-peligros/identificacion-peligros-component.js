@@ -66,28 +66,36 @@ IdentificacionPeligrosComponent.prototype._renderUI = function () {
   var self = this;
 
   var tabsHtml = VIEWS.map(function (v) {
-    return '<button class="kair-header__tab' + (v.key === 'matriz' ? ' kair-header__tab--active' : '') + '" data-view="' + v.key + '">' +
+    return '<button class="kair-mp-tab' + (v.key === 'matriz' ? ' kair-mp-tab--active' : '') + '" data-view="' + v.key + '">' +
       '<i class="bi ' + v.icon + '"></i> ' + v.label +
       '</button>';
   }).join('');
 
   var headerHtml =
-    '<header class="kair-header">' +
-    '<div class="kair-header__bar">' +
-    '<button class="kair-header__back" id="kair-mp-btn-back" title="Volver">' +
-    '<i class="bi bi-arrow-left"></i>' +
+    '<div class="k-section-card" style="padding:0; margin-bottom:1.5rem; flex-shrink:0; flex-grow:0;">' +
+    '<div class="kair-mp-header-row">' +
+    '<div class="kair-mp-header-left">' +
+    '<i class="bi bi-exclamation-triangle kair-mp-header-icon"></i>' +
+    '<div>' +
+    '<h3 class="kair-mp-header-title">Identificación de Peligros</h3>' +
+    '<p class="kair-mp-header-subtitle">Matriz de peligros, priorización e indicadores SG-SST.</p>' +
+    '</div>' +
+    '</div>' +
+    '<div class="kair-mp-header-actions">' +
+    '<span class="kair-mp-header-company" id="kair-mp-header-company"><i class="bi bi-building"></i> <span></span></span>' +
+    '<div class="kair-mp-header-divider"></div>' +
+    '<button id="kair-mp-btn-back" class="header-back-btn" title="Volver al módulo">' +
+    '<i class="bi bi-arrow-left"></i> Volver' +
     '</button>' +
-    '<h1 class="kair-header__title"><i class="bi bi-exclamation-triangle"></i> Identificación de Peligros</h1>' +
-    '<div class="kair-header__right">' +
-    '<button class="kair-header__action-btn" id="kair-mp-btn-import-xlsx" title="Importar matriz desde archivo Excel"><i class="bi bi-file-earmark-spreadsheet"></i> Importar XLSX</button>' +
-    '<span class="kair-header__pill--section">4.1.2</span>' +
-    '<span class="kair-header__company" id="kair-mp-header-company"><i class="bi bi-building"></i> <span></span></span>' +
+    '<button id="kair-mp-btn-import-xlsx" class="header-action--ghost" title="Importar matriz desde archivo Excel">' +
+    '<i class="bi bi-file-earmark-spreadsheet"></i> Importar XLSX' +
+    '</button>' +
     '</div>' +
     '</div>' +
-    '<div class="kair-header__tabs" id="kair-mp-tabs">' +
+    '<div class="kair-mp-tabs" id="kair-mp-tabs">' +
     tabsHtml +
     '</div>' +
-    '</header>';
+    '</div>';
 
   var viewsHtml = VIEWS.map(function (v) {
     var isActive = v.key === 'matriz';
@@ -167,7 +175,7 @@ IdentificacionPeligrosComponent.prototype._initNavigation = function () {
     });
   }
 
-  var tabs = wrapper.querySelectorAll('.kair-header__tab');
+  var tabs = wrapper.querySelectorAll('.kair-mp-tab');
   tabs.forEach(function (tab) {
     tab.addEventListener('click', function () {
       var viewKey = tab.getAttribute('data-view');
@@ -181,12 +189,12 @@ IdentificacionPeligrosComponent.prototype._navigate = function (viewKey) {
   var wrapper = this.container.querySelector('.kair-mp-wrapper');
   if (!wrapper) return;
 
-  var tabs = wrapper.querySelectorAll('.kair-header__tab');
+  var tabs = wrapper.querySelectorAll('.kair-mp-tab');
   tabs.forEach(function (tab) {
     if (tab.getAttribute('data-view') === viewKey) {
-      tab.classList.add('kair-header__tab--active');
+      tab.classList.add('kair-mp-tab--active');
     } else {
-      tab.classList.remove('kair-header__tab--active');
+      tab.classList.remove('kair-mp-tab--active');
     }
   });
 
@@ -221,12 +229,12 @@ IdentificacionPeligrosComponent.prototype._navigate = function (viewKey) {
 IdentificacionPeligrosComponent.prototype._handleImportXlsx = function () {
   var self = this;
   var btn = this.container.querySelector('#kair-mp-btn-import-xlsx');
-  if (btn) { btn.disabled = true; btn.classList.add('kair-header__action-btn--loading'); }
+  if (btn) { btn.disabled = true; btn.classList.add('header-action--ghost--loading'); }
 
   IdentificacionPeligrosService.discoverXlsx(this.currentCompany).then(function (result) {
     if (!result.success) {
       self._showImportError(result.error ? result.error.message : 'Error al buscar archivo');
-      if (btn) { btn.disabled = false; btn.classList.remove('kair-header__action-btn--loading'); }
+      if (btn) { btn.disabled = false; btn.classList.remove('header-action--ghost--loading'); }
       return;
     }
     if (!result.data.found) {
@@ -235,7 +243,7 @@ IdentificacionPeligrosComponent.prototype._handleImportXlsx = function () {
         '<div class="kair-mp-import-msg"><i class="bi bi-info-circle"></i><p>No se encontró archivo .xlsx en la carpeta <strong>4.1.2</strong> de la empresa.</p><p class="kair-mp-import-msg__hint">Asegúrese de que el archivo esté en la carpeta <em>4.1.2 Identificación de Peligros</em> dentro de los datos de la empresa.</p></div>',
         null
       );
-      if (btn) { btn.disabled = false; btn.classList.remove('kair-header__action-btn--loading'); }
+      if (btn) { btn.disabled = false; btn.classList.remove('header-action--ghost--loading'); }
       return;
     }
     var fileName = result.data.fileName || 'archivo.xlsx';
@@ -247,10 +255,10 @@ IdentificacionPeligrosComponent.prototype._handleImportXlsx = function () {
         self._executeImport(filePath, btn);
       }
     );
-    if (btn) { btn.disabled = false; btn.classList.remove('kair-header__action-btn--loading'); }
+    if (btn) { btn.disabled = false; btn.classList.remove('header-action--ghost--loading'); }
   }).catch(function (e) {
     self._showImportError(e.message || 'Error inesperado');
-    if (btn) { btn.disabled = false; btn.classList.remove('kair-header__action-btn--loading'); }
+    if (btn) { btn.disabled = false; btn.classList.remove('header-action--ghost--loading'); }
   });
 };
 
@@ -260,10 +268,10 @@ IdentificacionPeligrosComponent.prototype._executeImport = function (filePath, b
   var modal = wrapper ? wrapper.querySelector('#kair-mp-modal') : null;
   if (modal) modal.classList.remove('visible');
 
-  if (btn) { btn.disabled = true; btn.classList.add('kair-header__action-btn--loading'); }
+  if (btn) { btn.disabled = true; btn.classList.add('header-action--ghost--loading'); }
 
   IdentificacionPeligrosService.importXlsx(this.currentCompany, filePath).then(function (result) {
-    if (btn) { btn.disabled = false; btn.classList.remove('kair-header__action-btn--loading'); }
+    if (btn) { btn.disabled = false; btn.classList.remove('header-action--ghost--loading'); }
     if (!result.success) {
       self._showImportError(result.error ? result.error.message : 'Error al importar');
       return;
@@ -276,7 +284,7 @@ IdentificacionPeligrosComponent.prototype._executeImport = function (filePath, b
     IdentificacionPeligrosService.toast(msg, 'success');
     self._refreshAllViews();
   }).catch(function (e) {
-    if (btn) { btn.disabled = false; btn.classList.remove('kair-header__action-btn--loading'); }
+    if (btn) { btn.disabled = false; btn.classList.remove('header-action--ghost--loading'); }
     self._showImportError(e.message || 'Error inesperado');
   });
 };

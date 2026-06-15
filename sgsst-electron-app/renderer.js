@@ -1755,9 +1755,24 @@ class KairLoadingController {
   setProgress(value) {
     const { progressFill, progressPercent } = this._getElements();
     if (progressFill) {
-      this.progress = Math.max(0, Math.min(100, value));
-      progressFill.style.width = `${this.progress}%`;
-      if (progressPercent) progressPercent.textContent = `${this.progress}%`;
+      const target = Math.max(0, Math.min(100, Math.round(value)));
+      const startVal = parseInt(progressPercent?.textContent) || 0;
+      this.progress = target;
+      progressFill.style.width = `${target}%`;
+      if (progressPercent && startVal !== target) {
+        const startTime = performance.now();
+        const duration = 400;
+        const animate = (now) => {
+          const elapsed = now - startTime;
+          const t = Math.min(elapsed / duration, 1);
+          const displayed = Math.round(startVal + (target - startVal) * t);
+          progressPercent.textContent = `${displayed}%`;
+          if (t < 1) requestAnimationFrame(animate);
+        };
+        requestAnimationFrame(animate);
+      } else if (progressPercent) {
+        progressPercent.textContent = `${target}%`;
+      }
     }
   }
 
@@ -4297,7 +4312,85 @@ if (!window.MantenimientoComponent) {
 }
 
 } else if (submoduleName === "1.1.3 Asignación de Recursos") {
- showAsignacionRecursosContent(submoduleContentDiv);
+  showAsignacionRecursosContent(submoduleContentDiv);
+
+} else if (submoduleName === "5.1.1 Plan de Prevención de Emergencias") {
+      createComponentSafely(window.PlanPrevencionComponent,
+        submoduleContentDiv,
+        currentCompany,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback
+      );
+      if (!window.PlanPrevencionComponent) {
+        console.error('❌ PlanPrevencionComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
+} else if (submoduleName === "5.1.2 Examenes Medicos Brigadista") {
+      createComponentSafely(window.ExamenesBrigadistaComponent,
+        submoduleContentDiv,
+        currentCompany,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback
+      );
+      if (!window.ExamenesBrigadistaComponent) {
+        console.error('❌ ExamenesBrigadistaComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
+} else if (submoduleName === "7.1.1 Acciones Preventivas y Correctivas") {
+      createComponentSafely(window.AccionesPcComponent,
+        submoduleContentDiv,
+        currentCompany,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback
+      );
+      if (!window.AccionesPcComponent) {
+        console.error('❌ AccionesPcComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
+} else if (submoduleName === "7.1.2 Acciones de Mejora conforme a revisiones de la alta gerencia") {
+      createComponentSafely(window.AccionesMgComponent,
+        submoduleContentDiv,
+        currentCompany,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback
+      );
+      if (!window.AccionesMgComponent) {
+        console.error('❌ AccionesMgComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
+} else if (submoduleName === "7.1.3 Acciones de Mejora con base en investigaciones de AT y EL") {
+      createComponentSafely(window.AccionesMaComponent,
+        submoduleContentDiv,
+        currentCompany,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback
+      );
+      if (!window.AccionesMaComponent) {
+        console.error('❌ AccionesMaComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
+} else if (submoduleName === "7.1.4 Elaboración de Planes de Mejoramiento de medidas y acciones correctivas por autoridades y ARL") {
+      createComponentSafely(window.PlanesComponent,
+        submoduleContentDiv,
+        currentCompany,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback
+      );
+      if (!window.PlanesComponent) {
+        console.error('❌ PlanesComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
 
     } else {
       // ------------------ Submódulos genéricos ------------------ //
