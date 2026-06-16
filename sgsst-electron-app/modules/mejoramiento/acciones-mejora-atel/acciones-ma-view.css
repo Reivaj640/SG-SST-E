@@ -41,14 +41,20 @@ body {
 .kair-header__subtitle { font-size: 0.75rem; color: var(--kair-text-muted); margin-top: 1px; }
 .kair-header__actions { display: flex; align-items: center; gap: 8px; margin-left: 16px; }
 
-.kair-kpi-strip { display: flex; gap: 12px; padding: 16px 24px; overflow-x: auto; }
-.kair-kpi { background: var(--kair-surface); border: 1px solid var(--kair-border); border-radius: var(--kair-radius); padding: 12px 16px; min-width: 150px; flex: 1; }
-.kair-kpi__label { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--kair-text-muted); margin-bottom: 4px; }
-.kair-kpi__value { font-size: 1.5rem; font-weight: 700; color: var(--kair-text); }
-.kair-kpi__value--accent { color: var(--kair-primary); }
-.kair-kpi__value--warning { color: var(--kair-warning); }
-.kair-kpi__value--danger { color: var(--kair-danger); }
-.kair-kpi__value--success { color: var(--kair-success); }
+/* ── Stats Ribbon ── */
+.k-stats-ribbon { display: flex; align-items: center; gap: 0; background: var(--kair-surface); border: 1px solid var(--kair-border); border-radius: 0.5rem; padding: 0; box-shadow: var(--kair-shadow-sm); margin: 0 24px 16px; }
+.k-stats-ribbon__item { display: flex; align-items: center; gap: 0.625rem; padding: 0.75rem 1.25rem; flex: 1; min-width: 0; }
+.k-stats-ribbon__icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.875rem; flex-shrink: 0; }
+.k-stats-ribbon__icon.primary { background: #e8f0fe; color: var(--kair-primary); }
+.k-stats-ribbon__icon.success { background: #d1e7dd; color: var(--kair-success); }
+.k-stats-ribbon__icon.warning { background: #fff3cd; color: #856404; }
+.k-stats-ribbon__icon.danger { background: #fde8ea; color: var(--kair-danger); }
+.k-stats-ribbon__icon.muted { background: #f0f2f5; color: var(--kair-text-muted); }
+.k-stats-ribbon__data { display: flex; flex-direction: column; min-width: 0; }
+.k-stats-ribbon__value { font-size: 1.25rem; font-weight: 700; color: var(--kair-text); line-height: 1.2; }
+.k-stats-ribbon__label { font-size: 0.6875rem; color: var(--kair-text-muted); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+.k-stats-ribbon__pct { margin-left: auto; font-size: 0.75rem; font-weight: 600; color: var(--kair-primary); background: #e8f0fe; padding: 0.125rem 0.5rem; border-radius: 10px; white-space: nowrap; flex-shrink: 0; }
+.k-stats-ribbon__divider { width: 1px; height: 32px; background: var(--kair-border); flex-shrink: 0; }
 
 /* ── Section Card (k-section-card) ── */
 .k-section-card { background: #ffffff; border: 1px solid #dee2e6; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
@@ -180,7 +186,9 @@ body {
 @media (max-width: 768px) {
   .kair-header { padding: 0 16px; }
   .kair-header__subtitle { display: none; }
-  .kair-kpi-strip { padding: 12px 16px; }
+  .k-stats-ribbon { margin: 0 16px 12px; flex-wrap: wrap; }
+  .k-stats-ribbon__item { flex: 1 1 45%; padding: 0.625rem 1rem; }
+  .k-stats-ribbon__divider { display: none; }
   .kair-table-wrap { padding: 0 16px 16px; }
   .kair-dialog { max-width: 100%; margin: 0 16px; }
   .kair-sheet { width: 100%; }

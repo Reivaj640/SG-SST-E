@@ -13,6 +13,10 @@ const ORIGEN_OPTIONS = {
 
 const state = { editingId: null, deleteTarget: null, data: [] };
 
+function syncStore() {
+  if (window.MejoramientoStore) window.MejoramientoStore.update('713', state.data);
+}
+
 function fmtDate(d) {
   if (!d) return '—';
   const date = new Date(d + 'T00:00:00');
@@ -31,11 +35,51 @@ function renderKpis() {
   const pendientes = state.data.filter(d => d.estado === 'pendiente').length;
   const enProceso = state.data.filter(d => d.estado === 'en-proceso').length;
   const implementadas = state.data.filter(d => d.estado === 'implementada').length;
+  const vencidas = state.data.filter(d => d.estado === 'vencida').length;
+  const pct = total > 0 ? Math.round((implementadas / total) * 100) : 0;
+
   document.getElementById('kpiStrip').innerHTML = `
-    <div class="kair-kpi"><div class="kair-kpi__label">Total</div><div class="kair-kpi__value">${total}</div></div>
-    <div class="kair-kpi"><div class="kair-kpi__label">Pendientes</div><div class="kair-kpi__value kair-kpi__value--warning">${pendientes}</div></div>
-    <div class="kair-kpi"><div class="kair-kpi__label">En Proceso</div><div class="kair-kpi__value kair-kpi__value--accent">${enProceso}</div></div>
-    <div class="kair-kpi"><div class="kair-kpi__label">Implementadas</div><div class="kair-kpi__value kair-kpi__value--success">${implementadas}</div></div>`;
+    <div class="k-stats-ribbon__item">
+      <span class="k-stats-ribbon__icon primary"><i class="bi bi-clipboard-check"></i></span>
+      <div class="k-stats-ribbon__data">
+        <span class="k-stats-ribbon__value">${total}</span>
+        <span class="k-stats-ribbon__label">Total</span>
+      </div>
+      <span class="k-stats-ribbon__pct">${pct}%</span>
+    </div>
+    <div class="k-stats-ribbon__divider"></div>
+    <div class="k-stats-ribbon__item">
+      <span class="k-stats-ribbon__icon warning"><i class="bi bi-clock-history"></i></span>
+      <div class="k-stats-ribbon__data">
+        <span class="k-stats-ribbon__value">${pendientes}</span>
+        <span class="k-stats-ribbon__label">Pendientes</span>
+      </div>
+    </div>
+    <div class="k-stats-ribbon__divider"></div>
+    <div class="k-stats-ribbon__item">
+      <span class="k-stats-ribbon__icon primary"><i class="bi bi-arrow-repeat"></i></span>
+      <div class="k-stats-ribbon__data">
+        <span class="k-stats-ribbon__value">${enProceso}</span>
+        <span class="k-stats-ribbon__label">En Proceso</span>
+      </div>
+    </div>
+    <div class="k-stats-ribbon__divider"></div>
+    <div class="k-stats-ribbon__item">
+      <span class="k-stats-ribbon__icon success"><i class="bi bi-check-circle"></i></span>
+      <div class="k-stats-ribbon__data">
+        <span class="k-stats-ribbon__value">${implementadas}</span>
+        <span class="k-stats-ribbon__label">Implementadas</span>
+      </div>
+    </div>
+    <div class="k-stats-ribbon__divider"></div>
+    <div class="k-stats-ribbon__item">
+      <span class="k-stats-ribbon__icon danger"><i class="bi bi-exclamation-triangle"></i></span>
+      <div class="k-stats-ribbon__data">
+        <span class="k-stats-ribbon__value">${vencidas}</span>
+        <span class="k-stats-ribbon__label">Vencidas</span>
+      </div>
+    </div>
+  `;
 }
 
 function getFiltered() {
@@ -114,7 +158,7 @@ function submitForm() {
     state.data.unshift({ id: newId, codigo, submodulo: SUBMODULO, empresa: COMPANY, tipo: document.getElementById('fTipo').value, origen: document.getElementById('fOrigen').value, nivelRiesgo: document.getElementById('fRiesgo').value, prioridad: document.getElementById('fPrioridad').value, estado: 'pendiente', descripcion: desc, hallazgo, observaciones: document.getElementById('fObservaciones').value, responsable, area: document.getElementById('fArea').value, fechaHallazgo: document.getElementById('fFechaHallazgo').value, fechaCompromiso, fechaImplementacion: null, fechaVerificacion: null, fechaActualizacion: now, requisitoLegal: '', normaCircular: '', evidencia: '', resultadoVerificacion: '', historial: [{ fecha: now, usuario: 'Sistema', accion: 'Creación', detalle: 'Acción creada' }] });
     showToast('Acción creada', `Código: ${codigo}`, 'success');
   }
-  closeForm(); renderKpis(); renderTable();
+  closeForm(); renderKpis(); renderTable(); syncStore();
 }
 
 function openDetail(id) {
@@ -169,7 +213,7 @@ function changeStatus(id, ns) {
   d.fechaActualizacion = now;
   d.historial.push({ fecha: now, usuario: 'Sistema', accion: 'Cambio de estado', detalle: `Estado cambiado a ${ns.replace(/-/g, ' ')}` });
   showToast('Estado actualizado', `Nuevo estado: ${ns.replace(/-/g, ' ')}`, 'success');
-  closeDetail(); renderKpis(); renderTable();
+  closeDetail(); renderKpis(); renderTable(); syncStore();
 }
 
 function deleteAction(id) {
@@ -185,7 +229,7 @@ function confirmDelete() {
   if (!state.deleteTarget) return;
   state.data = state.data.filter(d => d.id !== state.deleteTarget);
   showToast('Acción eliminada', 'Eliminada correctamente.', 'success');
-  closeDelete(); renderKpis(); renderTable();
+  closeDelete(); renderKpis(); renderTable(); syncStore();
 }
 
 function showToast(title, desc, type) {
@@ -202,4 +246,5 @@ document.addEventListener('DOMContentLoaded', () => {
   if (companyEl) companyEl.textContent = COMPANY;
   renderKpis();
   renderTable();
+  syncStore();
 });

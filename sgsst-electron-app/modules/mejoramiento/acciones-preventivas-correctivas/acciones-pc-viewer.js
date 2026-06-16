@@ -18,6 +18,10 @@ const state = {
   data: []
 };
 
+function syncStore() {
+  if (window.MejoramientoStore) window.MejoramientoStore.update('711', state.data);
+}
+
 // ── Utils ──
 function fmtDate(d) {
   if (!d) return '—';
@@ -57,27 +61,48 @@ function renderKpis() {
   const enProceso = state.data.filter(d => d.estado === 'en-proceso').length;
   const implementadas = state.data.filter(d => d.estado === 'implementada').length;
   const vencidas = state.data.filter(d => d.estado === 'vencida').length;
+  const pct = total > 0 ? Math.round((implementadas / total) * 100) : 0;
 
   document.getElementById('kpiStrip').innerHTML = `
-    <div class="kair-kpi">
-      <div class="kair-kpi__label">Total Acciones</div>
-      <div class="kair-kpi__value">${total}</div>
+    <div class="k-stats-ribbon__item">
+      <span class="k-stats-ribbon__icon primary"><i class="bi bi-clipboard-check"></i></span>
+      <div class="k-stats-ribbon__data">
+        <span class="k-stats-ribbon__value">${total}</span>
+        <span class="k-stats-ribbon__label">Total Acciones</span>
+      </div>
+      <span class="k-stats-ribbon__pct">${pct}%</span>
     </div>
-    <div class="kair-kpi">
-      <div class="kair-kpi__label">Pendientes</div>
-      <div class="kair-kpi__value kair-kpi__value--warning">${pendientes}</div>
+    <div class="k-stats-ribbon__divider"></div>
+    <div class="k-stats-ribbon__item">
+      <span class="k-stats-ribbon__icon warning"><i class="bi bi-clock-history"></i></span>
+      <div class="k-stats-ribbon__data">
+        <span class="k-stats-ribbon__value">${pendientes}</span>
+        <span class="k-stats-ribbon__label">Pendientes</span>
+      </div>
     </div>
-    <div class="kair-kpi">
-      <div class="kair-kpi__label">En Proceso</div>
-      <div class="kair-kpi__value kair-kpi__value--accent">${enProceso}</div>
+    <div class="k-stats-ribbon__divider"></div>
+    <div class="k-stats-ribbon__item">
+      <span class="k-stats-ribbon__icon primary"><i class="bi bi-arrow-repeat"></i></span>
+      <div class="k-stats-ribbon__data">
+        <span class="k-stats-ribbon__value">${enProceso}</span>
+        <span class="k-stats-ribbon__label">En Proceso</span>
+      </div>
     </div>
-    <div class="kair-kpi">
-      <div class="kair-kpi__label">Implementadas</div>
-      <div class="kair-kpi__value kair-kpi__value--success">${implementadas}</div>
+    <div class="k-stats-ribbon__divider"></div>
+    <div class="k-stats-ribbon__item">
+      <span class="k-stats-ribbon__icon success"><i class="bi bi-check-circle"></i></span>
+      <div class="k-stats-ribbon__data">
+        <span class="k-stats-ribbon__value">${implementadas}</span>
+        <span class="k-stats-ribbon__label">Implementadas</span>
+      </div>
     </div>
-    <div class="kair-kpi">
-      <div class="kair-kpi__label">Vencidas</div>
-      <div class="kair-kpi__value kair-kpi__value--danger">${vencidas}</div>
+    <div class="k-stats-ribbon__divider"></div>
+    <div class="k-stats-ribbon__item">
+      <span class="k-stats-ribbon__icon danger"><i class="bi bi-exclamation-triangle"></i></span>
+      <div class="k-stats-ribbon__data">
+        <span class="k-stats-ribbon__value">${vencidas}</span>
+        <span class="k-stats-ribbon__label">Vencidas</span>
+      </div>
     </div>
   `;
 }
@@ -276,6 +301,7 @@ function submitForm() {
   closeForm();
   renderKpis();
   renderTable();
+  syncStore();
 }
 
 // ── Detail ──
@@ -363,6 +389,7 @@ function changeStatus(id, newStatus) {
   closeDetail();
   renderKpis();
   renderTable();
+  syncStore();
 }
 
 // ── Delete ──
@@ -385,6 +412,7 @@ function confirmDelete() {
   closeDelete();
   renderKpis();
   renderTable();
+  syncStore();
 }
 
 // ── Toast ──
@@ -405,4 +433,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   renderKpis();
   renderTable();
+  syncStore();
 });
+

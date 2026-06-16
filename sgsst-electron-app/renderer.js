@@ -4392,6 +4392,34 @@ if (!window.MantenimientoComponent) {
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 
+    } else if (submoduleName === "6.1.1 Definición de indicadores") {
+      createComponentSafely(
+        window.DefinicionIndicadoresComponent,
+        submoduleContentDiv,
+        currentCompany,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback
+      );
+      if (!window.DefinicionIndicadoresComponent) {
+        console.error('❌ DefinicionIndicadoresComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
+    } else if (submoduleName === "6.1.2 Auditoria Anual") {
+      createComponentSafely(
+        window.AuditoriaAnualComponent,
+        submoduleContentDiv,
+        currentCompany,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback
+      );
+      if (!window.AuditoriaAnualComponent) {
+        console.error('❌ AuditoriaAnualComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
     } else {
       // ------------------ Submódulos genéricos ------------------ //
       showGenericSubmoduleContent(submoduleContentDiv, moduleName, submoduleName);
