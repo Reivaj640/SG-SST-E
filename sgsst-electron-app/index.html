@@ -55,12 +55,25 @@
           <button id="calendar-button" class="header-btn" title="Calendario">
             <span id="calendar-icon-placeholder" class="icon-placeholder">📅</span>
           </button>
+          <button id="header-update-btn" class="header-btn header-update-btn" style="display:none" title="Actualización disponible">
+            <span class="icon-placeholder">🔄</span>
+            <span id="header-update-text" class="header-update-text"></span>
+          </button>
           <button id="config-button" class="header-btn" title="Configuraciones">
             <span id="config-icon-placeholder" class="icon-placeholder">⚙️</span>
           </button>
           <button id="llm-button" class="header-btn" title="Chat LLM">
             <span id="llm-icon-placeholder" class="icon-placeholder">💬</span>
           </button>
+        </div>
+        <div id="header-update-panel" class="header-update-panel" style="display:none">
+          <div class="update-progress-container">
+            <div class="update-progress-bar">
+              <div id="update-progress-fill" class="update-progress-fill"></div>
+            </div>
+            <span id="update-progress-text" class="update-progress-text">Descargando...</span>
+          </div>
+          <button id="update-install-btn" class="update-install-btn" style="display:none">Actualizar</button>
         </div>
       </div>
     </header>

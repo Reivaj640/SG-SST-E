@@ -1394,6 +1394,102 @@ if (appHeader) {
     console.log('[UPDATER] onUpdateAvailable disponible:', typeof window.electronAPI?.onUpdateAvailable);
     console.log('[UPDATER] updateNotifier disponible:', typeof window.updateNotifier);
     
+    // --- Header Update Button Elements ---
+    const headerUpdateBtn = document.getElementById('header-update-btn');
+    const headerUpdatePanel = document.getElementById('header-update-panel');
+    const headerUpdateText = document.getElementById('header-update-text');
+    const updateProgressFill = document.getElementById('update-progress-fill');
+    const updateProgressText = document.getElementById('update-progress-text');
+    const updateInstallBtn = document.getElementById('update-install-btn');
+
+    let headerUpdatePanelVisible = false;
+
+    // Toggle update panel when clicking the update button
+    if (headerUpdateBtn) {
+      headerUpdateBtn.addEventListener('click', () => {
+        headerUpdatePanelVisible = !headerUpdatePanelVisible;
+        if (headerUpdatePanel) {
+          headerUpdatePanel.style.display = headerUpdatePanelVisible ? 'flex' : 'none';
+        }
+      });
+    }
+
+    // Install button triggers restart
+    if (updateInstallBtn) {
+      updateInstallBtn.addEventListener('click', () => {
+        logMessage('Usuario solicitó reiniciar para instalar actualización', 'INFO');
+        window.electronAPI.restartApp && window.electronAPI.restartApp();
+      });
+    }
+
+    // Helper: Show update available in header
+    function showHeaderUpdateAvailable(version) {
+      if (headerUpdateBtn) {
+        headerUpdateBtn.style.display = 'flex';
+        headerUpdateBtn.classList.add('header-update-available');
+        headerUpdateBtn.title = `Actualización v${version} disponible`;
+      }
+      if (headerUpdateText) {
+        headerUpdateText.textContent = `v${version}`;
+      }
+      if (headerUpdatePanel) {
+        headerUpdatePanel.style.display = 'flex';
+        headerUpdatePanelVisible = true;
+      }
+      if (updateProgressFill) {
+        updateProgressFill.style.width = '0%';
+      }
+      if (updateProgressText) {
+        updateProgressText.textContent = 'Descargando...';
+      }
+      if (updateInstallBtn) {
+        updateInstallBtn.style.display = 'none';
+      }
+    }
+
+    // Helper: Update progress in header
+    function updateHeaderProgress(percent, speed) {
+      if (updateProgressFill) {
+        updateProgressFill.style.width = `${percent}%`;
+      }
+      if (updateProgressText) {
+        updateProgressText.textContent = `${percent}%${speed ? ' - ' + speed : ''}`;
+      }
+    }
+
+    // Helper: Show download complete in header
+    function showHeaderUpdateReady(version) {
+      if (headerUpdateBtn) {
+        headerUpdateBtn.classList.remove('header-update-available');
+        headerUpdateBtn.classList.add('header-update-ready');
+        headerUpdateBtn.title = `Actualización v${version} lista para instalar`;
+      }
+      if (headerUpdateText) {
+        headerUpdateText.textContent = `v${version}`;
+      }
+      if (updateProgressFill) {
+        updateProgressFill.style.width = '100%';
+      }
+      if (updateProgressText) {
+        updateProgressText.textContent = 'Descarga completa';
+      }
+      if (updateInstallBtn) {
+        updateInstallBtn.style.display = 'block';
+      }
+    }
+
+    // Helper: Hide update panel
+    function hideHeaderUpdatePanel() {
+      if (headerUpdateBtn) {
+        headerUpdateBtn.style.display = 'none';
+        headerUpdateBtn.classList.remove('header-update-available', 'header-update-ready');
+      }
+      if (headerUpdatePanel) {
+        headerUpdatePanel.style.display = 'none';
+        headerUpdatePanelVisible = false;
+      }
+    }
+
     // Cuando comienza a buscar actualizaciones
     window.electronAPI?.onUpdateChecking && window.electronAPI.onUpdateChecking(() => {
       console.log('[UPDATER] Evento recibido: update_checking');
@@ -1410,6 +1506,10 @@ if (appHeader) {
       if (window.updateNotifier && info && info.version) {
         window.updateNotifier.notifyAvailable(info.version);
       }
+      // Update header UI
+      if (info && info.version) {
+        showHeaderUpdateAvailable(info.version);
+      }
     });
 
     // Cuando NO hay actualizaciones disponibles
@@ -1419,6 +1519,8 @@ if (appHeader) {
       if (window.updateNotifier) {
         window.updateNotifier.notifyNotAvailable();
       }
+      // Hide header update panel
+      hideHeaderUpdatePanel();
     });
 
     // Progreso de descarga
@@ -1426,6 +1528,10 @@ if (appHeader) {
       console.log('[UPDATER] Evento recibido: update_progress', data);
       if (window.updateNotifier && data) {
         window.updateNotifier.updateProgress(data.percent, data.speed);
+      }
+      // Update header progress
+      if (data && data.percent !== undefined) {
+        updateHeaderProgress(data.percent, data.speed);
       }
     });
 
@@ -1450,6 +1556,8 @@ if (appHeader) {
           window.electronAPI.restartApp && window.electronAPI.restartApp();
         }
       }
+      // Update header UI
+      showHeaderUpdateReady(version);
     });
 
     // Error en la actualización
@@ -1459,6 +1567,8 @@ if (appHeader) {
       if (window.updateNotifier && data) {
         window.updateNotifier.notifyError(data.message);
       }
+      // Ocultar panel de actualización en header
+      hideHeaderUpdatePanel();
     });
 
   } else {

@@ -7674,6 +7674,14 @@ try {
     checkForUpdatesSafe();
   }, 5000);  // Esperar 5 segundos después de cargar la ventana para evitar conflictos
 
+  // Verificación periódica de actualizaciones cada 8 horas
+  setInterval(() => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      sendLog('[UPDATER] Verificación periódica de actualizaciones (cada 8 horas)', 'INFO');
+      checkForUpdatesSafe();
+    }
+  }, 8 * 60 * 60 * 1000); // 8 horas en milisegundos
+
   app.on('activate', () => {
     // En macOS, es común volver a crear una ventana en la aplicación cuando
     // se hace clic en el ícono del dock y no hay otras ventanas abiertas.
