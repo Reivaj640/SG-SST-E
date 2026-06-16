@@ -443,4 +443,5 @@ renameCargo: (companyName, cargoId, nombre) => ipcRenderer.invoke('matriz-peligr
   onUpdateProgress: (callback) => ipcRenderer.on('update_progress', (event, ...args) => callback(...args)),
   onUpdateError: (callback) => ipcRenderer.on('update_error', (event, ...args) => callback(...args)),
   restartApp: () => ipcRenderer.send('restart_app'),
+  checkForUpdatesManual: () => ipcRenderer.invoke('check-for-updates-manual'),
 });

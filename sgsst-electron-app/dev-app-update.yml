@@ -1,0 +1,5 @@
+provider: github
+owner: Reivaj640
+repo: SG-SST-E
+private: false
+releaseType: release

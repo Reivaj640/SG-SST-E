@@ -70,6 +70,13 @@ autoUpdater.autoRunAppAfterInstall = true;
 autoUpdater.requestHeaders = {
   'Cache-Control': 'no-cache'
 };
+autoUpdater.timeout = 30000; // 30 segundos máximo de espera para respuesta de GitHub API
+
+// En modo desarrollo, forzar uso de dev-app-update.yml para que el updater funcione
+if (!app.isPackaged) {
+  autoUpdater.forceDevUpdateConfig = true;
+  console.log('[UPDATER] Modo desarrollo: forceDevUpdateConfig activado');
+}
 // ------------------------------------
 
 const execPromise = promisify(exec);
@@ -541,17 +548,43 @@ autoUpdater.on('error', (err) => {
     shouldRetry = true;
   }
   
-  // Detectar errores de red (HTTP2, conexión, etc.)
+  // Detectar timeout (30 segundos sin respuesta)
   if (err.message && (
-    err.message.includes('ERR_HTTP2_SERVER_REFUSED_STREAM') ||
-    err.message.includes('ERR_INTERNET_DISCONNECTED') ||
-    err.message.includes('ERR_NAME_NOT_RESOLVED') ||
+    err.message.includes('Timeout') ||
+    err.message.includes('timeout') ||
+    err.message.includes('ETIMEDOUT') ||
+    err.message.includes('ESOCKETTIMEDOUT')
+  )) {
+    sendLog('[UPDATER] Timeout detectado: el servidor no respondió a tiempo.', 'WARN');
+    errorMessage = 'Tiempo de espera agotado. El servidor de actualizaciones no respondió. Verifique su conexión a internet e intente de nuevo.';
+    shouldRetry = false;
+  }
+  
+  // Detectar errores de red (sin conexión, DNS, etc.)
+  if (err.message && (
+    err.message.includes('ERR_INTERNET_DISCONNECTED')
+  )) {
+    sendLog('[UPDATER] Sin conexión a internet detectada.', 'WARN');
+    errorMessage = 'No tiene conexión a internet. Verifique su red e intente de nuevo.';
+    shouldRetry = false;
+  }
+
+  if (err.message && (
+    err.message.includes('ERR_NAME_NOT_RESOLVED')
+  )) {
+    sendLog('[UPDATER] Error de DNS: no se pudo resolver el nombre del servidor.', 'WARN');
+    errorMessage = 'No se pudo resolver la dirección del servidor. Verifique su conexión DNS.';
+    shouldRetry = false;
+  }
+
+  if (err.message && (
     err.message.includes('ERR_CONNECTION_FAILED') ||
+    err.message.includes('ERR_CONNECTION_REFUSED') ||
     err.message.includes('net::ERR_')
   )) {
     sendLog('[UPDATER] Error de red detectado. No es crítico, la app funcionará normalmente.', 'WARN');
-    errorMessage = 'No se pudo verificar actualizaciones. La aplicación funcionará normalmente. Se reintentará más tarde.';
-    shouldRetry = false; // No reintentar inmediatamente para no saturar
+    errorMessage = 'No se pudo conectar con el servidor de actualizaciones. Verifique su conexión a internet.';
+    shouldRetry = false;
   }
   
   // Detectar errores de rate limiting de GitHub API
@@ -560,7 +593,7 @@ autoUpdater.on('error', (err) => {
     err.message.includes('rate limit')
   )) {
     sendLog('[UPDATER] Rate limit de GitHub API alcanzado. Se reintentará más tarde.', 'WARN');
-    errorMessage = 'Límite de verificaciones alcanzado. Se reintentará más tarde.';
+    errorMessage = 'Límite de verificaciones alcanzado. Espere unos minutos e intente de nuevo.';
     shouldRetry = false;
   }
 
@@ -581,6 +614,12 @@ autoUpdater.on('error', (err) => {
 function checkForUpdatesSafe() {
   try {
     sendLog('[UPDATER] checkForUpdatesSafe: Iniciando verificación...', 'INFO');
+    
+    // Enviar evento de verificación manualmente para asegurar que la UI responda
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update_checking');
+    }
+    
     const result = autoUpdater.checkForUpdates();
     
     // Manejar la promesa para evitar unhandled rejections
@@ -590,6 +629,14 @@ function checkForUpdatesSafe() {
         // El error ya será manejado por el event listener 'error'
       });
     }
+    
+    // Fallback: Si no se recibe ningún evento en 5 segundos, asumir que el check fue skipeado
+    setTimeout(() => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        sendLog('[UPDATER] Timeout de seguridad: verificando si el check fue completado...', 'DEBUG');
+        // El evento ya habría sido enviado por los listeners si el check fue exitoso
+      }
+    }, 5000);
   } catch (err) {
     sendLog(`[UPDATER] checkForUpdatesSafe: Error síncrono capturado: ${err.message}`, 'ERROR');
     // El error ya será manejado por el event listener 'error'
@@ -1226,6 +1273,18 @@ ipcMain.handle('get-app-version', async () => {
   } catch (error) {
     console.error('Error getting app version:', error);
     return '1.0.0'; // Valor por defecto en caso de error
+  }
+});
+
+// Manejar la verificación manual de actualizaciones desde configuraciones
+ipcMain.handle('check-for-updates-manual', async () => {
+  try {
+    sendLog('[UPDATER] Solicitud manual de verificación de actualizaciones desde Configuraciones', 'INFO');
+    checkForUpdatesSafe();
+    return { success: true };
+  } catch (error) {
+    sendLog(`[UPDATER] Error en verificación manual: ${error.message}`, 'ERROR');
+    return { success: false, error: { code: 'UPDATE_CHECK_FAILED', message: error.message } };
   }
 });
 

@@ -68,3 +68,30 @@ Se activan con `skill({ name: "superpowers/<nombre>" })`. El plugin inyecta boot
 - No usar frameworks frontend (React, Vue, etc.)
 - Para UI usar: html-tailwind guidelines del skill ui-ux-pro-max
 - Cumplir Resolucion 0312 de 2019 (Colombia)
+
+### Regla de Comunicación - Explicación Simple
+
+Cuando diagnostiques un error o propongas una corrección, SIEMPRE debes incluir al final de tu respuesta una sección explicativa en lenguaje sencillo (sin jerga técnica) que contenga:
+
+1. **Qué está pasando** - Explicar el problema como si le hablaras a alguien que no programa
+2. **Qué hace la propuesta** - Explicar en términos simples qué corrige tu solución
+3. **Antes vs Después** - Mostrar visualmente el cambio con un ejemplo claro
+
+Formato recomendado:
+
+```
+## Explicación Simple
+
+### El problema
+[Explicar qué pasa actualmente en lenguaje cotidiano]
+
+### La solución
+[Explicar qué hace la corrección de forma sencilla]
+
+### Antes vs Después
+ANTES (con bug): [Descripción simple]
+DESPUÉS (corregido): [Descripción simple]
+```
+
+NO usar términos como: callback, listener, async, await, variable, función, línea, código, archivo, etc.
+SI usar términos como: sistema, mensaje, ventana, tema, preferencia, configuración, resultado, etc.
