@@ -40,6 +40,9 @@ const { registerMantenimientoHandlers } = require('./main/mantenimiento-bridge')
 // Importar handlers de Identificación de Peligros (Submódulo 4.1.2)
 const { registerIdentificacionPeligrosHandlers } = require('./main/identificacion-peligros-bridge');
 
+// Importar handlers de Revisión por la Alta Dirección (Submódulo 6.1.3)
+const { registerRevisionAltaDireccionHandlers } = require('./main/revision-alta-direccion-bridge');
+
 // Capturar promesas no manejadas globalmente
 process.on('unhandledRejection', (reason, promise) => {
   const errorMessage = `
@@ -7657,6 +7660,14 @@ try {
   sendLog('[MAIN] Handlers de Identificación de Peligros (4.1.2) registrados correctamente', 'INFO');
 } catch (err) {
   sendLog(`[MAIN] Error registrando handlers de Identificación de Peligros: ${err.message}`, 'ERROR');
+}
+
+// Registrar handlers de Revisión por la Alta Dirección (Submódulo 6.1.3)
+try {
+  registerRevisionAltaDireccionHandlers(app, { getCompanyRootPath });
+  sendLog('[MAIN] Handlers de Revisión por la Alta Dirección (6.1.3) registrados correctamente', 'INFO');
+} catch (err) {
+  sendLog(`[MAIN] Error registrando handlers de Revisión por la Alta Dirección: ${err.message}`, 'ERROR');
 }
 
  // Registrar handlers de FURAT - Reportes de Accidentes (Submódulo 3.2.1)

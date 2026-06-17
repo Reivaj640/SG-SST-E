@@ -4530,6 +4530,20 @@ if (!window.MantenimientoComponent) {
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 
+    } else if (submoduleName === "6.1.3 Revisión de la alta Dirección") {
+      createComponentSafely(
+        window.RevisionAltaDireccionComponent,
+        submoduleContentDiv,
+        currentCompany,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback
+      );
+      if (!window.RevisionAltaDireccionComponent) {
+        console.error('❌ RevisionAltaDireccionComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
     } else {
       // ------------------ Submódulos genéricos ------------------ //
       showGenericSubmoduleContent(submoduleContentDiv, moduleName, submoduleName);

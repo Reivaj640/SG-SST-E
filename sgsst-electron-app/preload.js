@@ -315,6 +315,26 @@ ipcRenderer.invoke('get-indicadores-salud-stats', companyName),
     eliminar: (companyName, numero) => ipcRenderer.invoke('archivo-retencion:eliminar', companyName, { numero }),
   },
 
+  // --- Revisión por la Alta Dirección (Submódulo 6.1.3) ---
+  revisionAltaDireccion: {
+    cargarTodo: (empresaId) => ipcRenderer.invoke('revisionAltaDireccion:cargarTodo', { empresaId }),
+    listarRevisiones: (empresaId, filtros) => ipcRenderer.invoke('revisionAltaDireccion:listarRevisiones', { empresaId, filtros }),
+    obtenerRevision: (empresaId, id) => ipcRenderer.invoke('revisionAltaDireccion:obtenerRevision', { empresaId, id }),
+    crearRevision: (empresaId, data) => ipcRenderer.invoke('revisionAltaDireccion:crearRevision', { empresaId, data }),
+    actualizarRevision: (empresaId, id, cambios) => ipcRenderer.invoke('revisionAltaDireccion:actualizarRevision', { empresaId, id, cambios }),
+    cambiarEstadoRevision: (empresaId, id, nuevoEstado) => ipcRenderer.invoke('revisionAltaDireccion:cambiarEstadoRevision', { empresaId, id, nuevoEstado }),
+    eliminarRevision: (empresaId, id) => ipcRenderer.invoke('revisionAltaDireccion:eliminarRevision', { empresaId, id }),
+    listarActas: (empresaId, filtros) => ipcRenderer.invoke('revisionAltaDireccion:listarActas', { empresaId, filtros }),
+    guardarActa: (empresaId, acta) => ipcRenderer.invoke('revisionAltaDireccion:guardarActa', { empresaId, acta }),
+    listarIndicadores: (empresaId) => ipcRenderer.invoke('revisionAltaDireccion:listarIndicadores', { empresaId }),
+    guardarIndicador: (empresaId, indicador) => ipcRenderer.invoke('revisionAltaDireccion:guardarIndicador', { empresaId, indicador }),
+    importarXlsx: (empresaId, archivoPath, tipoPlantilla) => ipcRenderer.invoke('revisionAltaDireccion:importarXlsx', { empresaId, archivoPath, tipoPlantilla }),
+    exportarXlsx: (empresaId, tipoPlantilla, id) => ipcRenderer.invoke('revisionAltaDireccion:exportarXlsx', { empresaId, tipoPlantilla, id }),
+    subirDocumento: (empresaId, buffer, metadata) => ipcRenderer.invoke('revisionAltaDireccion:subirDocumento', { empresaId, buffer, metadata }),
+    obtenerProcedimiento: (empresaId) => ipcRenderer.invoke('revisionAltaDireccion:obtenerProcedimiento', { empresaId }),
+    abrirProcedimiento: (empresaId) => ipcRenderer.invoke('revisionAltaDireccion:abrirProcedimiento', { empresaId }),
+  },
+
   // --- Gestión del Cambio (2.11.1) ---
   loadGestionCambioData: (companyName) => ipcRenderer.invoke('gestion-cambio-load-data', companyName),
   saveGestionCambioData: (companyName, changeData) => ipcRenderer.invoke('gestion-cambio-save-data', companyName, changeData),
