@@ -46,24 +46,71 @@ var RevisionViewerView = (function() {
       return empty;
     }
 
-    var SECCIONES = (window.RevisionEditorView && window.RevisionEditorView.SECCIONES) || [];
+    /* Normalizar formato de secciones: el editor guarda {lectura: {contenido}} (objeto por key),
+       pero el viewer/parser produce [{numero, contenido}] (array). Detectamos y normalizamos. */
+    (function _normalizarSecciones() {
+      if (Array.isArray(revision.secciones)) return; // ya es array
+      if (revision.secciones && typeof revision.secciones === 'object') {
+        /* Mapear key → numero (1-12) */
+        var KEY_TO_NUM = {
+          lectura: 1, componentes: 2, auditorias: 3, requisitos: 4,
+          participacion: 5, incidentes: 6, acciones: 7, cambios: 8,
+          supervision: 9, evaluacion: 10, preventivas: 11, conclusiones: 12
+        };
+        var TITULOS = {
+          lectura: 'Lectura del acta anterior',
+          componentes: 'Revisión de componentes organizacionales',
+          auditorias: 'Auditorías internas',
+          requisitos: 'Requisitos legales',
+          participacion: 'Participación y consulta',
+          incidentes: 'Investigación de incidentes',
+          acciones: 'Acciones del acta anterior',
+          cambios: 'Cambios que pueden afectar el SG-SST',
+          supervision: 'Recursos',
+          evaluacion: 'Gestión de riesgos',
+          preventivas: 'Actividades pendientes',
+          conclusiones: 'Conclusiones, recomendaciones y acciones tomadas'
+        };
+        var arr = [];
+        Object.keys(revision.secciones).forEach(function(key) {
+          var sec = revision.secciones[key];
+          if (!sec) return;
+          arr.push({
+            numero: KEY_TO_NUM[key] || 0,
+            titulo: TITULOS[key] || key,
+            contenido: (sec.contenido || ''),
+            subTemas: []
+          });
+        });
+        arr.sort(function(a, b) { return a.numero - b.numero; });
+        revision.secciones = arr;
+      }
+      if (!revision.secciones) revision.secciones = [];
+    })();
+
+var SECCIONES = (window.RevisionEditorView && window.RevisionEditorView.SECCIONES) || [];
     var editorState = (ctx.state && ctx.state.editor) || { secciones: {}, completed: {} };
 
-    /* 12 secciones con contenido mock (para vista) */
-    var contenidoSeccion = {
-      'lectura': 'Se realiza la lectura integral del acta de revisión gerencial anterior (RG-2024-01) verificando el cumplimiento de los compromisos y acciones derivados. Se confirma el cierre efectivo del 87% de las acciones propuestas en el periodo anterior.',
-      'componentes': 'La política SST se encuentra vigente y aprobada por la gerencia general con fecha 15 de marzo de 2024. Se mantienen asignados los responsables del SG-SST con sus roles claramente definidos. El presupuesto asignado para el periodo 2025-2026 alcanza los $850 millones.',
-      'auditorias': 'Se ejecutaron 2 auditorías internas durante el periodo: la primera al componente de gestión de peligros (junio 2025) y la segunda al componente de gestión de salud (septiembre 2025). Se identificaron 4 hallazgos menores, todos con plan de acción en ejecución.',
-      'requisitos': 'La matriz legal se mantiene actualizada al 100% con corte a 30 de noviembre de 2025. Se verificó el cumplimiento del Decreto 1072 de 2015 y la Resolución 0312 de 2019. No se identificaron incumplimientos materiales durante el periodo.',
-      'participacion': 'El COPASST se reunió mensualmente con quórum completo (10 sesiones en el año). Se ejecutaron 28 actividades de capacitación con participación del 92% de los trabajadores. Las actas reposan en el repositorio documental.',
-      'incidentes': 'Se presentaron 3 accidentes de trabajo leves durante el periodo, todos investigados y cerrados. La tasa de accidentalidad se mantuvo en 1.8 accidentes por cada 200.000 horas trabajadas, dentro de la meta establecida (≤ 2.0).',
-      'acciones': 'De las 8 acciones resultantes de la revisión anterior, 7 se cerraron efectivamente y 1 se encuentra en ejecución con avance del 65% (Implementación del sistema de gestión de EPP digital).',
-      'cambios': 'Se identificaron tres cambios significativos: (1) actualización de la normatividad sobre riesgo psicosocial, (2) apertura de nueva sede operativa en Barranquilla, (3) renovación del software de gestión SST. Todos cuentan con plan de adaptación.',
-      'supervision': 'Se ejecutaron 12 inspecciones planeadas de las 12 programadas (100%). Se realizaron 24 inspecciones no planeadas. Se generaron 18 hallazgos, todos con plan de cierre.',
-      'evaluacion': 'La evaluación inicial del SG-SST fue actualizada en marzo de 2025. Se identificaron 23 oportunidades de mejora, de las cuales 18 ya están implementadas.',
-      'preventivas': 'Se ejecutaron 22 acciones preventivas y 5 acciones correctivas durante el periodo. La eficacia medida al cierre es del 87%, superior a la meta del 85%.',
-      'conclusiones': 'El SG-SST de TEMPOSUM S.A.S. se mantiene en operación conforme a los requisitos normativos. Los indicadores principales muestran tendencia favorable. Se recomienda mantener el ritmo de implementación de acciones y fortalecer los mecanismos de participación.'
-    };
+    /* Empresa: priorizar revision.empresa, luego state.empresaActiva, luego fallback genérico */
+    var empresaNombre = revision.empresa
+      || (ctx.data && ctx.data.empresaActiva)
+      || (ctx.state && ctx.state.empresaActiva)
+      || 'EMPRESA';
+
+    /* Mapear secciones del parser (numero 1-12) a keys del editor para lookup.
+       El parser guarda secciones como { numero, titulo, contenido, subTemas[] }. */
+    function _getSeccionDelRevision(numero) {
+      var secs = (revision.secciones || []);
+      return secs.find(function(s) { return s.numero === numero; }) || null;
+    }
+    function _getContenidoSeccion(numero) {
+      var sec = _getSeccionDelRevision(numero);
+      return sec && sec.contenido ? sec.contenido : '';
+    }
+    function _getSubTemasSeccion(numero) {
+      var sec = _getSeccionDelRevision(numero);
+      return (sec && sec.subTemas && sec.subTemas.length) ? sec.subTemas : [];
+    }
 
     /* View wrapper */
     var wrap = document.createElement('div');
@@ -84,13 +131,13 @@ var RevisionViewerView = (function() {
       '<div class="kair-rad-acta__head-l">' +
         '<div class="kair-rad-acta__logo">T+</div>' +
         '<div>' +
-          '<p class="kair-rad-acta__company">' + _esc(revision.empresa || 'TEMPOSUM S.A.S.') + '</p>' +
+          '<p class="kair-rad-acta__company">' + _esc(empresaNombre) + '</p>' +
           '<p class="kair-rad-acta__doc">Sistema de Gestión de Seguridad y Salud en el Trabajo</p>' +
         '</div>' +
       '</div>' +
       '<div class="kair-rad-acta__head-r">' +
         '<span class="kair-rad-acta__code">G-FO-006</span>' +
-        '<p class="kair-rad-acta__rev">Rev. 03 · ' + formatDate('2025-11-30') + '</p>' +
+        '<p class="kair-rad-acta__rev">Rev. 03 · ' + formatDate(revision.fecha || revision.fechaProgramada || '2025-11-30') + '</p>' +
       '</div>';
     acta.appendChild(head);
 
@@ -113,58 +160,63 @@ var RevisionViewerView = (function() {
         _field('Consecutivo', revision.id) +
         _field('Período', revision.periodo) +
         _field('Fecha realizada', formatDate(revision.fecha || revision.fechaProgramada)) +
-        _field('Lugar', 'Sede Administrativa TEMPOSUM S.A.S.') +
-        _field('Preside', revision.preside || 'Sergina Orozco Hincapié') +
-        _field('Elabora', revision.elabora || 'Javier Robles Fontalvo') +
+        _field('Lugar', revision.lugar) +
+        _field('Preside', revision.preside) +
+        _field('Elabora', revision.elabora) +
       '</div>';
     acta.appendChild(genSection);
 
-    /* Sección: Participantes */
+    /* Sección: Participantes (desde revision.porEmpresa / invitados del parser) */
+    var porEmpresa = revision.porEmpresa || [];
+    var invitados = revision.invitados || [];
     var partSection = document.createElement('section');
     partSection.className = 'kair-rad-acta__section';
-    partSection.innerHTML =
-      '<h2 class="kair-rad-acta__section-title">2. Participantes</h2>' +
+    var partHtml = '<h2 class="kair-rad-acta__section-title">2. Participantes</h2>' +
       '<div class="kair-rad-acta__participants">' +
         '<div class="kair-rad-acta__participant-block">' +
-          '<h4>Por la empresa</h4>' +
-          _participantRow('Sergina Orozco Hincapié', 'Representante Legal / Gerente General') +
-          _participantRow('Javier Robles Fontalvo', 'Coordinador SG-SST') +
-          _participantRow('Berkis Romero Mercado', 'Profesional SG-SST') +
-        '</div>' +
-        '<div class="kair-rad-acta__participant-block">' +
-          '<h4>Invitados</h4>' +
-          _participantRow('Bernardo Ortiz Galindo', 'Presidente COPASST') +
-          _participantRow('Lic. María Rodríguez', 'Coordinadora de Recursos Humanos') +
-        '</div>' +
-      '</div>';
+          '<h4>Por la empresa</h4>';
+    if (porEmpresa.length === 0) {
+      partHtml += '<p class="kair-rad-acta__empty">Sin participantes registrados por la empresa.</p>';
+    } else {
+      porEmpresa.forEach(function(p) {
+        partHtml += _participantRow(p.nombre, p.cargo);
+      });
+    }
+    partHtml += '</div><div class="kair-rad-acta__participant-block"><h4>Invitados</h4>';
+    if (invitados.length === 0) {
+      partHtml += '<p class="kair-rad-acta__empty">Sin invitados registrados.</p>';
+    } else {
+      invitados.forEach(function(p) {
+        partHtml += _participantRow(p.nombre, p.cargo);
+      });
+    }
+    partHtml += '</div></div>';
+    partSection.innerHTML = partHtml;
     acta.appendChild(partSection);
 
-    /* Secciones 3-14 (las 12 secciones canónicas) */
-    SECCIONES.filter(function(s) { return !s.isMeta; }).forEach(function(s) {
+    /* Secciones 3-14 (las 12 secciones canónicas) — contenido desde el JSON real.
+       Itera sobre revision.secciones[] (orden del XLSX importado) en vez de SECCIONES
+       del editor, porque el orden y títulos pueden diferir entre la plantilla del
+       Ministerio y el editor. Así respetamos exactamente lo que tiene cada archivo. */
+    (revision.secciones || []).forEach(function(sec) {
+      if (!sec.numero) return;
       var sectionEl = document.createElement('section');
       sectionEl.className = 'kair-rad-acta__section';
 
-      var titleText = (s.num + 2) + '. ' + s.title; /* +2 porque 1=Generalidades, 2=Participantes */
-      sectionEl.innerHTML = '<h2 class="kair-rad-acta__section-title">' + _esc(titleText) + '</h2>' +
-        '<div class="kair-rad-acta__content">' + _esc(contenidoSeccion[s.key] || 'Sin contenido registrado en esta sección.') + '</div>';
+      var titleText = (sec.numero + 2) + '. ' + (sec.titulo || ('Sección ' + sec.numero));
+      var contenidoReal = sec.contenido || '';
+      var subTemasReales = (sec.subTemas && sec.subTemas.length) ? sec.subTemas : [];
 
-      /* Sub-puntos si los hay */
-      var subs = (window.RevisionEditorView && window.RevisionEditorView._subPuntosForSeccion(s.key)) || [];
-      if (subs.length > 0) {
+      var contentHtml = contenidoReal
+        ? '<div class="kair-rad-acta__content">' + _esc(contenidoReal).replace(/\n/g, '<br>') + '</div>'
+        : '<div class="kair-rad-acta__content"><em>Sin contenido registrado en esta sección.</em></div>';
+
+      sectionEl.innerHTML = '<h2 class="kair-rad-acta__section-title">' + _esc(titleText) + '</h2>' + contentHtml;
+
+      if (subTemasReales.length > 0) {
         var subHtml = '<ul class="kair-rad-acta__subpoints">';
-        subs.forEach(function(sp, i) {
-          var subKey = s.key + '-sub-' + i;
-          var estado = (editorState.secciones[s.key] &&
-                       editorState.secciones[s.key].subpuntos &&
-                       editorState.secciones[s.key].subpuntos[subKey] &&
-                       editorState.secciones[s.key].subpuntos[subKey].estado) || 'Cumple';
-          var stateCls = {
-            'Cumple': 'state--success',
-            'Parcial': 'state--warning',
-            'No cumple': 'state--danger',
-            'Pendiente': 'state--pending'
-          }[estado] || 'state--pending';
-          subHtml += '<li>' + _esc(sp) + '<span class="state ' + stateCls + '">' + _esc(estado) + '</span></li>';
+        subTemasReales.forEach(function(st) {
+          subHtml += '<li><strong>' + _esc(st.titulo || '') + ':</strong> ' + _esc(st.contenido || '') + '</li>';
         });
         subHtml += '</ul>';
         sectionEl.innerHTML += subHtml;
@@ -173,49 +225,37 @@ var RevisionViewerView = (function() {
       acta.appendChild(sectionEl);
     });
 
-    /* Sección: Conclusiones y recomendaciones */
-    var conclSection = document.createElement('section');
-    conclSection.className = 'kair-rad-acta__section';
-    conclSection.innerHTML =
-      '<h2 class="kair-rad-acta__section-title">15. Conclusiones y recomendaciones</h2>' +
-      '<div class="kair-rad-acta__content">' +
-        'El Sistema de Gestión de Seguridad y Salud en el Trabajo de TEMPOSUM S.A.S. demuestra un nivel de madurez avanzado, con cumplimiento superior al 90% en los indicadores estructurales y de proceso. La participación de los trabajadores, la asignación de recursos y el seguimiento a la gestión son consistentes con la política SST vigente. Se recomienda a la gerencia: (1) mantener el ritmo de inversión en programas preventivos, (2) fortalecer los mecanismos de evaluación de eficacia de acciones, (3) ampliar la cobertura del sistema a la nueva sede operativa, (4) actualizar la matriz de riesgos con la nueva normatividad sobre riesgo psicosocial.' +
-      '</div>';
-    acta.appendChild(conclSection);
+    /* Sección: Acciones tomadas (de §7) y Conclusiones (de §12) ya están en las 12 secciones.
+       Aquí solo mostramos el bloque de acciones detalladas si hay sub-temas con compromisos. */
 
-    /* Sección: Acciones tomadas */
-    var actSection = document.createElement('section');
-    actSection.className = 'kair-rad-acta__section';
-    actSection.innerHTML =
-      '<h2 class="kair-rad-acta__section-title">16. Acciones tomadas</h2>' +
-      '<table class="kair-rad-table" style="margin-top:var(--rad-s2)">' +
-        '<thead><tr><th>#</th><th>Acción</th><th>Responsable</th><th>Fecha límite</th><th>Estado</th></tr></thead>' +
-        '<tbody>' +
-          '<tr><td>1</td><td>Implementación del sistema de gestión de EPP digital</td><td>Ing. Carlos López</td><td>30 jun 2026</td><td><span class="kair-rad-badge kair-rad-badge--warning"><span class="dot"></span>En proceso</span></td></tr>' +
-          '<tr><td>2</td><td>Actualización matriz de riesgo psicosocial</td><td>Lic. María Rodríguez</td><td>31 mar 2026</td><td><span class="kair-rad-badge kair-rad-badge--info"><span class="dot"></span>Pendiente</span></td></tr>' +
-          '<tr><td>3</td><td>Programa de seguridad vial para conductores</td><td>Ing. Luis Torres</td><td>30 mar 2026</td><td><span class="kair-rad-badge kair-rad-badge--warning"><span class="dot"></span>En proceso</span></td></tr>' +
-          '<tr><td>4</td><td>Capacitación en manejo de cargas críticas</td><td>Lic. María Rodríguez</td><td>30 abr 2026</td><td><span class="kair-rad-badge kair-rad-badge--success"><span class="dot"></span>Cumplido</span></td></tr>' +
-        '</tbody>' +
-      '</table>';
-    acta.appendChild(actSection);
-
-    /* Firmas */
-    var sigs = document.createElement('div');
-    sigs.className = 'kair-rad-acta__signatures';
-    sigs.innerHTML =
-      '<div class="kair-rad-acta__signature">' +
-        '<div class="kair-rad-acta__signature-line">' +
-          '<p class="kair-rad-acta__signature-name">Sergina Orozco Hincapié</p>' +
-          '<p class="kair-rad-acta__signature-role">Gerente General · Representante Legal</p>' +
-        '</div>' +
-      '</div>' +
-      '<div class="kair-rad-acta__signature">' +
-        '<div class="kair-rad-acta__signature-line">' +
-          '<p class="kair-rad-acta__signature-name">Javier Robles Fontalvo</p>' +
-          '<p class="kair-rad-acta__signature-role">Coordinador SG-SST · Elaboró</p>' +
-        '</div>' +
-      '</div>';
-    acta.appendChild(sigs);
+    /* Firmas — solo si hay datos reales; si no, ocultar */
+    var hayFirmantes = (revision.porEmpresa && revision.porEmpresa.length > 0)
+      || revision.preside || revision.elabora;
+    if (hayFirmantes) {
+      var sigs = document.createElement('div');
+      sigs.className = 'kair-rad-acta__signatures';
+      var sigsHtml = '';
+      // Primera firma: quien preside
+      if (revision.preside) {
+        sigsHtml += '<div class="kair-rad-acta__signature">' +
+          '<div class="kair-rad-acta__signature-line">' +
+            '<p class="kair-rad-acta__signature-name">' + _esc(revision.preside) + '</p>' +
+            '<p class="kair-rad-acta__signature-role">Preside</p>' +
+          '</div>' +
+        '</div>';
+      }
+      // Segunda firma: quien elabora
+      if (revision.elabora) {
+        sigsHtml += '<div class="kair-rad-acta__signature">' +
+          '<div class="kair-rad-acta__signature-line">' +
+            '<p class="kair-rad-acta__signature-name">' + _esc(revision.elabora) + '</p>' +
+            '<p class="kair-rad-acta__signature-role">Elaboró</p>' +
+          '</div>' +
+        '</div>';
+      }
+      sigs.innerHTML = sigsHtml;
+      acta.appendChild(sigs);
+    }
 
     viewer.appendChild(acta);
 

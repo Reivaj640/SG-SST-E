@@ -582,6 +582,14 @@
   overflow: hidden;
 }
 
+/* Variante con separación del header · usado dentro de vistas (list, editor)
+   donde el wrap padre no agrega su propio padding top.
+   Margen top = var(--rad-s6) para coincidir con la separación que tiene
+   el KPI strip del HUB respecto al header. */
+.kair-rad-kpi-strip--flush {
+  margin: var(--rad-s6) 0 var(--rad-s4) 0;
+}
+
 .kair-rad-kpi {
   flex: 1;
   display: flex;
@@ -768,9 +776,16 @@
 
 .kair-rad-card-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--rad-s4);
   padding: 0 var(--rad-s6);
+}
+
+.kair-rad-card-grid > * {
+  /* Permite que los items se encojan más allá de su min-content,
+     evitando que se desborden fuera del grid cuando el contenedor
+     es estrecho (ej. columna wide del hub a 2/3 del ancho). */
+  min-width: 0;
 }
 
 .kair-rad-card-grid--cycle {
@@ -829,6 +844,8 @@
   font: 600 0.9375rem/1.3 var(--rad-font);
   color: var(--rad-text-strong);
   flex: 1;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .kair-rad-submodule-card__chev {
@@ -842,6 +859,8 @@
   letter-spacing: 0.04em;
   color: var(--rad-text-muted);
   margin-bottom: 2px;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .kair-rad-submodule-card__desc {
@@ -850,6 +869,8 @@
   color: var(--rad-text-muted);
   line-height: 1.5;
   flex: 1;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .kair-rad-submodule-card__divider {
@@ -1342,6 +1363,9 @@
   gap: var(--rad-s4);
   padding: 0 var(--rad-s6);
   margin-top: var(--rad-s4);
+  align-items: flex-start; /* Las columnas NO se estiran para igualar altura;
+                              así la tabla no se infla con espacio vacío
+                              cuando hay pocas filas. */
 }
 
 .kair-rad-hub-row--2col {
@@ -1360,10 +1384,14 @@
   margin-right: 0;
 }
 
-/* El cycle-card y la tabla se estiran para igualar alturas en su fila */
-.kair-rad-hub-row__col .kair-rad-cycle-card,
-.kair-rad-hub-row__col .kair-rad-table-card {
+/* El cycle-card se estira para igualar altura con la columna de cards.
+   El table-card NO se estira (queda con su altura natural según filas). */
+.kair-rad-hub-row__col .kair-rad-cycle-card {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.kair-rad-hub-row__col .kair-rad-table-card {
   display: flex;
   flex-direction: column;
 }
@@ -1375,7 +1403,7 @@
 /* En la columna ancha, los componentes usan 3 columnas (no 4) para
    mejor proporción con la tabla de la columna derecha */
 .kair-rad-hub-row__col--wide .kair-rad-card-grid {
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   padding: 0;
 }
 
@@ -1431,26 +1459,33 @@
 
 /* ════════════════════════════════════════════════════════════════════════════
    9C. MODAL DE CONFIRMACIÓN · Mismo patrón que capacitaciones
+   NOTA: Estas clases NO están scoped a .kair-rad-module porque el modal
+   se inserta en el container del módulo pero el CSS debe funcionar
+   en cualquier contexto (incluyendo z-index global).
    ════════════════════════════════════════════════════════════════════════════ */
 
-.kair-rad-module .k-modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+/* Garantizar que el modal funcione globalmente · override de cualquier scoping */
+#kair-rad-confirm-modal.k-modal-overlay,
+.k-modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
   background: rgba(45, 48, 55, 0.72);
   display: none;
   justify-content: center;
   align-items: center;
-  z-index: 2000;
+  z-index: 9999 !important;
 }
 
-.kair-rad-module .k-modal-overlay.open {
-  display: flex;
+#kair-rad-confirm-modal.k-modal-overlay.open,
+.k-modal-overlay.open {
+  display: flex !important;
 }
 
-.kair-rad-module .k-modal {
+#kair-rad-confirm-modal .k-modal,
+.k-modal {
   background: var(--k-bg-card, #ffffff);
   width: 92%;
   max-width: 620px;
@@ -1463,7 +1498,7 @@
   max-height: 80vh;
 }
 
-.kair-rad-module .k-modal.k-modal-sm {
+.k-modal.k-modal-sm {
   max-width: 440px;
 }
 
@@ -1472,113 +1507,113 @@
   to   { transform: translateY(0); opacity: 1; }
 }
 
-.kair-rad-module .k-modal-header {
+.k-modal-header {
   padding: 0.95rem 1.25rem;
-  background: var(--rad-bg);
-  border-bottom: 1px solid var(--rad-border);
+  background: var(--rad-bg, #f8f9fa);
+  border-bottom: 1px solid var(--rad-border, #dee2e6);
   display: flex;
   align-items: center;
   justify-content: space-between;
   border-radius: 12px 12px 0 0;
 }
 
-.kair-rad-module .k-modal-title {
+.k-modal-title {
   font-size: 1.02rem;
   font-weight: 600;
-  color: var(--rad-text);
+  color: var(--rad-text, #1a1a2e);
   margin: 0;
   display: flex;
   align-items: center;
   gap: 0.625rem;
 }
 
-.kair-rad-module .k-modal-title i {
+.k-modal-title i {
   color: var(--rad-primary, #174ea6);
   font-size: 1.125rem;
 }
 
-.kair-rad-module .k-modal-header .btn-close-modal {
+.k-modal-header .btn-close-modal {
   width: 32px;
   height: 32px;
-  border: 1px solid var(--rad-border);
-  background: var(--rad-surface);
-  border-radius: var(--rad-radius-sm);
+  border: 1px solid var(--rad-border, #dee2e6);
+  background: var(--rad-surface, #ffffff);
+  border-radius: var(--rad-radius-sm, 0.375rem);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--rad-text-muted);
+  color: var(--rad-text-muted, #6c757d);
   transition: all 0.2s;
   padding: 0;
 }
 
-.kair-rad-module .k-modal-header .btn-close-modal:hover {
-  background: var(--rad-danger-soft);
-  border-color: var(--rad-danger);
-  color: var(--rad-danger);
+.k-modal-header .btn-close-modal:hover {
+  background: var(--rad-danger-soft, rgba(220, 53, 69, 0.1));
+  border-color: var(--rad-danger, #dc3545);
+  color: var(--rad-danger, #dc3545);
 }
 
-.kair-rad-module .k-modal-body {
+.k-modal-body {
   padding: 1.25rem;
-  background: var(--rad-surface);
+  background: var(--rad-surface, #ffffff);
   overflow-y: auto;
 }
 
-.kair-rad-module .k-modal-body p {
+.k-modal-body p {
   margin: 0;
-  font: var(--rad-body);
-  color: var(--rad-text);
+  font: var(--rad-body, 0.95rem/1.5 "Segoe UI");
+  color: var(--rad-text, #1a1a2e);
   line-height: 1.5;
 }
 
-.kair-rad-module .k-modal-warning {
+.k-modal-warning {
   display: block;
   margin-top: 0.75rem;
   padding: 0.625rem 0.875rem;
-  font: 500 0.8125rem/1.4 var(--rad-font);
+  font: 500 0.8125rem/1.4 var(--rad-font, "Segoe UI");
   color: #856404;
-  background: var(--rad-warning-soft);
-  border-left: 3px solid var(--rad-warning);
+  background: var(--rad-warning-soft, rgba(255, 193, 7, 0.1));
+  border-left: 3px solid var(--rad-warning, #ffc107);
   border-radius: 0 4px 4px 0;
 }
 
-.kair-rad-module .k-modal-footer {
+.k-modal-footer {
   padding: 0.85rem 1.25rem;
-  background: var(--rad-bg);
-  border-top: 1px solid var(--rad-border);
+  background: var(--rad-bg, #f8f9fa);
+  border-top: 1px solid var(--rad-border, #dee2e6);
   display: flex;
   justify-content: flex-end;
   gap: 0.625rem;
   border-radius: 0 0 12px 12px;
 }
 
-.kair-rad-module .k-modal-footer .btn-close-modal {
+.k-modal-footer .btn-close-modal {
   width: auto;
   height: 38px;
   padding: 0 1.125rem;
-  font: 500 0.8125rem var(--rad-font);
+  font: 500 0.8125rem var(--rad-font, "Segoe UI");
 }
 
-.kair-rad-module .k-btn-outline {
+.k-btn-outline {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background: transparent;
-  color: var(--rad-text);
-  border: 1px solid var(--rad-border);
-  border-radius: var(--rad-radius-sm);
+  color: var(--rad-text, #1a1a2e);
+  border: 1px solid var(--rad-border, #dee2e6);
+  border-radius: var(--rad-radius-sm, 0.375rem);
   padding: 8px 16px;
-  font: 500 0.8125rem var(--rad-font);
+  font: 500 0.8125rem var(--rad-font, "Segoe UI");
   cursor: pointer;
   transition: all 0.15s;
 }
 
-.kair-rad-module .k-btn-outline:hover {
-  background: var(--rad-bg);
-  border-color: var(--rad-border-strong);
+.k-btn-outline:hover {
+  background: var(--rad-bg, #f8f9fa);
+  border-color: var(--rad-border-strong, #adb5bd);
 }
 
-.kair-rad-module .k-btn-danger {
+.k-btn-danger {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1586,30 +1621,39 @@
   background-color: var(--rad-danger, #dc3545);
   color: #ffffff;
   border: none;
-  border-radius: var(--rad-radius-sm);
+  border-radius: var(--rad-radius-sm, 0.375rem);
   padding: 8px 16px;
-  font: 500 0.8125rem var(--rad-font);
+  font: 500 0.8125rem var(--rad-font, "Segoe UI");
   cursor: pointer;
   box-shadow: 0 2px 4px rgba(220, 53, 69, 0.2);
   transition: all 0.15s;
 }
 
-.kair-rad-module .k-btn-danger:hover {
+.k-btn-danger:hover {
   background-color: #c82333;
   box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3);
   transform: translateY(-1px);
 }
 
 /* Icon button danger variant · para botón de eliminar */
-.kair-rad-module .kair-rad-icon-btn--danger:hover {
-  background: var(--rad-danger-soft);
-  border-color: var(--rad-danger);
-  color: var(--rad-danger);
+.kair-rad-icon-btn--danger:hover {
+  background: var(--rad-danger-soft, rgba(220, 53, 69, 0.1));
+  border-color: var(--rad-danger, #dc3545);
+  color: var(--rad-danger, #dc3545);
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
    10. RESPONSIVE · Tablet / Mobile
    ════════════════════════════════════════════════════════════════════════════ */
+
+/* Ventana media (~1100-1500px) · cards del hub a 2 columnas
+   para que cada card tenga espacio suficiente y no se desborde
+   sobre la tabla de la columna derecha. El hub-row sigue en 2 cols. */
+@media (max-width: 1500px) {
+  .kair-rad-hub-row__col--wide .kair-rad-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 
 @media (max-width: 1100px) {
   .kair-rad-kpi-strip {
@@ -1628,10 +1672,10 @@
     grid-template-columns: 1fr;
   }
   .kair-rad-hub-row__col--wide .kair-rad-card-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .kair-rad-card-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .kair-rad-card-grid--cycle {
     grid-template-columns: 1fr;

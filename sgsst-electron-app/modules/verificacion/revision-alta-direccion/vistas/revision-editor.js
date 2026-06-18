@@ -107,6 +107,63 @@ var RevisionEditorView = (function() {
     return String(d);
   }
 
+  /**
+   * Recopila los datos del formulario del editor.
+   * Lee primero del DOM (si la sección está activa), luego completa con
+   * editorState.formData (capturado en tiempo real por delegación de eventos).
+   * Esto garantiza que los datos persistan aunque el usuario navegue a
+   * otra sección antes de guardar.
+   * @param {HTMLElement} wrap - contenedor del editor
+   * @param {Object} revision - revisión original (para campos no editados)
+   * @returns {Object} data listo para enviar al backend
+   */
+  function _collectFormData(wrap, revision) {
+    var data = {
+      id: revision.id,
+      periodo: revision.periodo,
+      fecha: revision.fecha,
+      fechaProgramada: revision.fechaProgramada,
+      preside: revision.preside,
+      elabora: revision.elabora,
+      empresa: revision.empresa,
+      participantes: revision.participantes || 0,
+      estado: revision.estado || 'Borrador',
+      progreso: revision.progreso || 0,
+      secciones: {}
+    };
+
+    var captured = {};
+    if (wrap) {
+      wrap.querySelectorAll('[data-field]').forEach(function(inp) {
+        var key = inp.getAttribute('data-field');
+        if (!key) return;
+        var val = inp.value;
+        if (inp.type === 'number') val = Number(val) || 0;
+        else if (inp.type === 'date') val = val || revision[key] || '';
+        data[key] = val;
+        captured[key] = true;
+      });
+    }
+
+    /* Completar con datos capturados en tiempo real (form ya no visible) */
+    var stored = (wrap && wrap._editorState && wrap._editorState.formData) || {};
+    Object.keys(stored).forEach(function(k) {
+      if (!captured[k]) data[k] = stored[k];
+    });
+
+    /* Calcular progreso y secciones completadas desde editorState */
+    if (wrap && wrap._editorState) {
+      data.secciones = wrap._editorState.secciones || {};
+      data.completedSections = Object.keys(wrap._editorState.completed || {}).filter(function(k) {
+        return wrap._editorState.completed[k];
+      });
+      /* 12 secciones canónicas del G-FO-006 */
+      data.progreso = Math.round((data.completedSections.length / 12) * 100);
+    }
+
+    return data;
+  }
+
   /* Vista principal del editor */
   function render(ctx) {
     var id = ctx.params && ctx.params.id;
@@ -134,7 +191,8 @@ var RevisionEditorView = (function() {
     var editorState = ctx.state.editor || {
       activeKey: 'generalidades',
       secciones: {}, // { key: { contenido: '', subpuntos: [{label, estado, observacion}] } }
-      completed: {}  // { key: true }
+      completed: {}, // { key: true }
+      formData: {}   // valores del form de Generalidades (preservados entre navegaciones)
     };
 
     /* Si la revisión es nueva (no hay estado guardado), inicializar */
@@ -143,9 +201,45 @@ var RevisionEditorView = (function() {
         _revisionId: revision.id,
         activeKey: 'generalidades',
         secciones: {},
-        completed: {}
+        completed: {},
+        formData: {}
       };
       ctx.state.editor = editorState;
+
+      /* Cargar datos desde el JSON importado (revision.secciones[]) al editorState.
+         El parser del bridge devuelve secciones por NUMERO (1-12) según el orden de la
+         plantilla G-FO-006 del Ministerio. El editor las referencia por KEY (lectura,
+         componentes, etc.) con un ORDEN distinto. Mapeamos numero → key del editor. */
+      var NUM_TO_KEY = {
+        1: 'lectura',
+        2: 'componentes',
+        3: 'auditorias',
+        4: 'requisitos',
+        5: 'participacion',
+        6: 'incidentes',
+        7: 'acciones',
+        8: 'cambios',
+        9: 'supervision',
+        10: 'evaluacion',
+        11: 'preventivas',
+        12: 'conclusiones'
+      };
+      (revision.secciones || []).forEach(function(sec) {
+        var key = NUM_TO_KEY[sec.numero];
+        if (!key) return;
+        editorState.secciones[key] = {
+          contenido: sec.contenido || '',
+          subpuntos: {} // el editor usa subpuntos por key-sub-N; el parser trae subTemas pero
+                        // no se mapean 1:1 a subpuntos del editor — quedan vacíos para edición
+        };
+      });
+
+      /* Cargar datos de cabecera (formData) desde la revisión */
+      if (revision.preside) editorState.formData.preside = revision.preside;
+      if (revision.elabora) editorState.formData.elabora = revision.elabora;
+      if (revision.lugar) editorState.formData.lugar = revision.lugar;
+      if (revision.fecha) editorState.formData.fecha = revision.fecha;
+      if (revision.fechaProgramada) editorState.formData.fecha = revision.fechaProgramada;
     }
 
     var wrap = document.createElement('div');
@@ -320,6 +414,25 @@ var RevisionEditorView = (function() {
       '</div>';
     wrap.appendChild(footer);
 
+    /* Exponer el editorState en el wrap para que _collectFormData pueda leerlo
+       desde los handlers de Guardar/Finalizar (que se bindean con setTimeout). */
+    wrap._editorState = editorState;
+    wrap._revision = revision;
+
+    /* Capturar cambios del form en tiempo real (delegación).
+       Cuando el usuario está en Generalidades y digita un campo, lo guardamos
+       en editorState.formData. Así, si navega a otra sección y luego hace click
+       en "Guardar borrador", los datos siguen disponibles aunque el form ya
+       no esté en el DOM. */
+    if (!editorState.formData) editorState.formData = {};
+    wrap.addEventListener('input', function(e) {
+      var inp = e.target;
+      if (!inp || !inp.matches || !inp.matches('[data-field]')) return;
+      var key = inp.getAttribute('data-field');
+      if (!key) return;
+      editorState.formData[key] = inp.value;
+    });
+
     /* Bind footer buttons */
     setTimeout(function() {
       var btnCancel = wrap.querySelector('[data-footer="cancel"]');
@@ -332,23 +445,69 @@ var RevisionEditorView = (function() {
         });
       }
       if (btnSave) {
-        btnSave.addEventListener('click', function() {
-          if (typeof ctx.toast === 'function') {
-            ctx.toast('Borrador guardado', 'Cambios preservados localmente', 'success');
+        btnSave.addEventListener('click', async function() {
+          /* Guard contra doble-click · deshabilitar mientras se procesa */
+          if (btnSave.disabled) return;
+          btnSave.disabled = true;
+          try {
+            var formData = _collectFormData(wrap, revision);
+            var exists = (ctx.data.revisiones || []).some(function(r) { return r.id === revision.id; });
+            if (typeof ctx.guardarRevision !== 'function') {
+              if (typeof ctx.toast === 'function') {
+                ctx.toast('Función no disponible', 'No se puede guardar en este momento', 'error');
+              }
+              return;
+            }
+            var result = await ctx.guardarRevision(formData, !exists);
+            if (result && result.success && result.revision && !exists) {
+              ctx.state.editor = null;
+              ctx.refresh();
+              setTimeout(function() {
+                if (typeof ctx.navigate === 'function') ctx.navigate('revisiones-list');
+              }, 600);
+            }
+          } catch (e) {
+            if (typeof ctx.toast === 'function') {
+              ctx.toast('Error al guardar', e && e.message ? e.message : 'Intente de nuevo', 'error');
+            }
+          } finally {
+            btnSave.disabled = false;
           }
         });
       }
       if (btnFinalize) {
-        btnFinalize.addEventListener('click', function() {
-          /* Marcar todas como completas y navegar al viewer */
-          SECCIONES.forEach(function(s) {
-            editorState.completed[s.key] = true;
-          });
-          ctx.state.editor = editorState;
-          if (typeof ctx.toast === 'function') {
-            ctx.toast('Revisión finalizada', 'Generando acta G-FO-006', 'success');
+        btnFinalize.addEventListener('click', async function() {
+          if (btnFinalize.disabled) return;
+          btnFinalize.disabled = true;
+          try {
+            SECCIONES.forEach(function(s) { editorState.completed[s.key] = true; });
+            ctx.state.editor = editorState;
+            var formData = _collectFormData(wrap, revision);
+            formData.estado = 'Finalizada';
+            formData.progreso = 100;
+            var exists = (ctx.data.revisiones || []).some(function(r) { return r.id === revision.id; });
+            if (typeof ctx.guardarRevision !== 'function') {
+              if (typeof ctx.toast === 'function') {
+                ctx.toast('Función no disponible', 'No se puede finalizar en este momento', 'error');
+              }
+              return;
+            }
+            var result = await ctx.guardarRevision(formData, !exists);
+            if (result && result.success) {
+              if (typeof ctx.toast === 'function') {
+                ctx.toast('Revisión finalizada', 'Generando acta G-FO-006', 'success');
+              }
+              if (typeof ctx.navigate === 'function') {
+                ctx.navigate('revisiones-viewer', { id: result.revision.id });
+              }
+            }
+          } catch (e) {
+            if (typeof ctx.toast === 'function') {
+              ctx.toast('Error al finalizar', e && e.message ? e.message : 'Intente de nuevo', 'error');
+            }
+          } finally {
+            btnFinalize.disabled = false;
           }
-          if (typeof ctx.navigate === 'function') ctx.navigate('revisiones-viewer', { id: revision.id });
         });
       }
     }, 0);
@@ -362,6 +521,13 @@ var RevisionEditorView = (function() {
     card.className = 'kair-rad-section-card';
 
     if (seccion.isMeta) {
+      /* Helper: preferir valor capturado en formData (cambios sin guardar)
+         sobre el de revision, para preservar ediciones entre navegaciones.
+         Defensivo: si formData no existe, devuelve el fallback. */
+      function _formValue(key, fallback) {
+        return (editorState.formData && editorState.formData[key]) || fallback;
+      }
+
       /* Generalidades · Form de encabezado */
       var head = document.createElement('div');
       head.className = 'kair-rad-section-card__head';
@@ -379,29 +545,46 @@ var RevisionEditorView = (function() {
       var formRow1 = document.createElement('div');
       formRow1.className = 'kair-rad-form-row';
       formRow1.innerHTML =
-        _field('consecutivo', 'Consecutivo', revision.id, 'text', true) +
-        _field('periodo', 'Período', revision.periodo, 'text', true) +
-        _field('fechaProgramada', 'Fecha Programada', revision.fechaProgramada || revision.fecha || '', 'date', true);
+        _field('consecutivo', 'Consecutivo', _formValue('consecutivo', revision.id), 'text', true) +
+        _field('periodo', 'Período', _formValue('periodo', revision.periodo), 'text', true) +
+        _field('fechaProgramada', 'Fecha Programada', _formValue('fechaProgramada', revision.fechaProgramada || revision.fecha || ''), 'date', true);
       card.appendChild(formRow1);
 
       var formRow2 = document.createElement('div');
       formRow2.className = 'kair-rad-form-row';
       formRow2.innerHTML =
-        _field('fechaRealizada', 'Fecha Realizada', '', 'date', false) +
-        _field('lugar', 'Lugar', 'Sede Administrativa TEMPOSUM S.A.S.', 'text', false);
+        _field('fechaRealizada', 'Fecha Realizada', _formValue('fechaRealizada', ''), 'date', false) +
+        _field('lugar', 'Lugar', _formValue('lugar', revision.lugar || ''), 'text', false) +
+        _field('empresa', 'Empresa', _formValue('empresa', revision.empresa || ctx.data.empresaActiva || 'EMPRESA ACTIVA'), 'text', true);
       card.appendChild(formRow2);
 
       var formRow3 = document.createElement('div');
       formRow3.className = 'kair-rad-form-row';
       formRow3.innerHTML =
-        _field('preside', 'Preside', revision.preside || 'Sergina Orozco Hincapié', 'text', true) +
-        _field('elabora', 'Elabora', revision.elabora || 'Javier Robles Fontalvo', 'text', true);
+        _field('preside', 'Preside', _formValue('preside', revision.preside || ''), 'text', true) +
+        _field('elabora', 'Elabora', _formValue('elabora', revision.elabora || ''), 'text', true);
       card.appendChild(formRow3);
 
-      var counter = document.createElement('div');
-      counter.className = 'kair-rad-inline-counter';
-      counter.innerHTML = '<i class="bi bi-people"></i> <strong>' + (revision.participantes || 0) + '</strong> participantes registrados (por la empresa e invitados)';
-      card.appendChild(counter);
+      /* Participantes · input editable (no solo counter display) */
+      var partRow = document.createElement('div');
+      partRow.className = 'kair-rad-form-row';
+      partRow.innerHTML =
+        '<div class="kair-rad-field" style="flex:1">' +
+          '<label><i class="bi bi-people"></i> Participantes registrados (por la empresa e invitados)</label>' +
+          '<input type="number" min="0" step="1" value="' + (_formValue('participantes', revision.participantes || 0)) + '" data-field="participantes" id="kair-rad-edit-participantes" style="max-width:200px">' +
+        '</div>';
+      card.appendChild(partRow);
+
+      /* Poblar formData con los valores actuales del form (recién renderizado)
+         Esto garantiza que siempre haya un valor en formData para todos los
+         campos, incluso si el usuario no los ha editado todavía. */
+      if (!editorState.formData) editorState.formData = {};
+      card.querySelectorAll('[data-field]').forEach(function(inp) {
+        var key = inp.getAttribute('data-field');
+        if (key && editorState.formData[key] === undefined) {
+          editorState.formData[key] = inp.value;
+        }
+      });
 
       /* Footer de navegación · Generalidades solo tiene "Siguiente"
          (es la primera sección, no hay anterior) */
@@ -481,10 +664,28 @@ var RevisionEditorView = (function() {
     /* Contenido (textarea principal) */
     var contenidoGroup = document.createElement('div');
     contenidoGroup.style.marginTop = 'var(--rad-s4)';
+    /* Leer el contenido desde editorState.secciones[key].contenido (poblado por el parser del XLSX).
+       Fallback a revision.secciones[] directo si editorState aún no fue inicializado. */
+    var contenidoInicial = '';
+    if (editorState.secciones[seccion.key] && editorState.secciones[seccion.key].contenido) {
+      contenidoInicial = editorState.secciones[seccion.key].contenido;
+    } else if (revision.secciones && Array.isArray(revision.secciones)) {
+      /* Mapear key → numero (1-12) según SECCIONES del editor para buscar en revision.secciones[] */
+      var KEY_TO_NUM = {
+        lectura: 1, componentes: 2, auditorias: 3, requisitos: 4,
+        participacion: 5, incidentes: 6, acciones: 7, cambios: 8,
+        supervision: 9, evaluacion: 10, preventivas: 11, conclusiones: 12
+      };
+      var num = KEY_TO_NUM[seccion.key];
+      if (num) {
+        var sec = revision.secciones.find(function(s) { return s.numero === num; });
+        if (sec && sec.contenido) contenidoInicial = sec.contenido;
+      }
+    }
     contenidoGroup.innerHTML =
       '<div class="kair-rad-field">' +
         '<label>Contenido de la sección</label>' +
-        '<textarea placeholder="Describe los hallazgos, análisis y conclusiones de la sección &quot;' + _esc(seccion.title) + '&quot;…" rows="4"></textarea>' +
+        '<textarea placeholder="Describe los hallazgos, análisis y conclusiones de la sección &quot;' + _esc(seccion.title) + '&quot;…" rows="4">' + _esc(contenidoInicial) + '</textarea>' +
         '<span class="kair-rad-field-note">Este texto se exportará al campo correspondiente del formato G-FO-006.</span>' +
       '</div>';
     card.appendChild(contenidoGroup);
@@ -620,7 +821,7 @@ var RevisionEditorView = (function() {
     var req = required ? ' <span style="color:var(--rad-danger)">*</span>' : '';
     return '<div class="kair-rad-field">' +
       '<label>' + _esc(label) + req + '</label>' +
-      '<input type="' + (type || 'text') + '" value="' + _esc(value || '') + '"' + (required ? ' required' : '') + '>' +
+      '<input type="' + (type || 'text') + '" value="' + _esc(value || '') + '" data-field="' + _esc(name) + '" id="kair-rad-edit-' + _esc(name) + '"' + (required ? ' required' : '') + '>' +
     '</div>';
   }
 

@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.102] - 2026-06-17
+
+### Fixed
+- **🎬 Pantalla de carga de login — barra inicia en 0% y se anima continuo**
+  - Eliminada regla CSS conflictiva `.progress-fill { width: 50%; animation: progressAnimation 2s infinite; }` que anulaba el control por JavaScript sobre la barra de progreso del overlay
+  - `KairLoadingController.animateToProgress()` migrado a `requestAnimationFrame` con `this.progress` continuo (la siguiente llamada continúa desde el valor actual en vez de reiniciar a 0)
+  - `executeLoginTransition()` con secuencia sincronizada 0→25→55→80→100% — sin "saltos" entre fases
+  - `button.disabled = true` en submit del login (restaurado en `finally`) — anti double-click / double-submit
+  - `logBuffer` con eviction FIFO a 500 entradas (antes crecía sin tope → fuga de memoria)
+  - Cache de `logTextarea` en variable local (antes hacía `getElementById` en cada log)
+
+### Technical Details
+- **Archivos modificados (2):**
+  - `styles.css` — eliminada regla duplicada `.progress-fill` y keyframe `progressAnimation`
+  - `renderer.js` — `KairLoadingController.animateToProgress` con `requestAnimationFrame`, `executeLoginTransition` sincronizada, submit con `button.disabled`, `logBuffer` con FIFO
+
 ## [0.1.101] - 2026-06-14
 
 ### Added

@@ -278,6 +278,9 @@ var RevisionAltaDireccionComponent = (function() {
      ═══════════════════════════════════════════════════════════════════════ */
 
   function _ensureConfirmModal() {
+    /* DEBUG: trace de creación del modal */
+    try { console.log('[K+AIRSST][6.1.3][DELETE-MODAL] _ensureConfirmModal()'); } catch (e) {}
+
     var existing = document.getElementById('kair-rad-confirm-modal');
     if (existing) return existing;
 
@@ -308,10 +311,11 @@ var RevisionAltaDireccionComponent = (function() {
         '</div>' +
       '</div>';
 
-    /* IMPORTANTE: appendear dentro del container del módulo (no en document.body)
-       para que los estilos CSS scoped a .kair-rad-module apliquen. */
-    var hostContainer = (typeof container !== 'undefined' && container) || document.body;
-    hostContainer.appendChild(overlay);
+    /* IMPORTANTE: appendear a document.body (no al container del módulo)
+       para que el modal NO sea destruido cuando renderAll() limpie el
+       container al re-renderizar la vista (ej. al confirmar una eliminación).
+       El CSS del modal es GLOBAL (no scoped), por lo que funciona aquí. */
+    document.body.appendChild(overlay);
     return overlay;
   }
 
@@ -327,6 +331,9 @@ var RevisionAltaDireccionComponent = (function() {
    * @returns {Promise<boolean>}    - true si el usuario aceptó, false si canceló
    */
   function _showConfirmDialog(opts) {
+    /* DEBUG: trace del showConfirmDialog */
+    try { console.log('[K+AIRSST][6.1.3][DELETE-MODAL] _showConfirmDialog() opts:', opts); } catch (e) {}
+
     return new Promise(function(resolve) {
       var overlay = _ensureConfirmModal();
 
@@ -377,6 +384,98 @@ var RevisionAltaDireccionComponent = (function() {
   }
 
   /**
+   * Crea o actualiza una revisión (borrador o finalizada)
+   * Conecta con IPC `revisionAltaDireccion.crearRevision` / `actualizarRevision`
+   * @param {Object} data - Datos de la revisión (id opcional, periodo, fecha, preside, etc.)
+   * @param {boolean} [esNuevo] - Si true, fuerza crear nueva; si false, actualiza existente
+   * @returns {Promise<Object|null>} - {success, revision} o null en error
+   */
+  async function guardarRevision(data, esNuevo) {
+    console.log('[K+AIRSST][6.1.3][SAVE] guardarRevision() data.id=' + (data && data.id) + ' esNuevo=' + !!esNuevo);
+
+    if (!data || typeof data !== 'object') {
+      toast('Datos inválidos', 'No se puede guardar la revisión', 'error');
+      log('SAVE', 'ERROR', 'data inválido');
+      return null;
+    }
+
+    /* Inserta o reemplaza en state.revisiones (top), y actualiza cicloActivo si coincide. */
+    function _upsertRevision(r) {
+      if (!Array.isArray(state.revisiones)) state.revisiones = [];
+      state.revisiones = state.revisiones.filter(function(x) { return x.id !== r.id; });
+      state.revisiones.unshift(r);
+      if (!state.cicloActivo || state.cicloActivo.id === r.id) state.cicloActivo = r;
+    }
+
+    var empresaId = state.empresaActiva || state.empresaId || '';
+    var resp = null;
+    var isMock = false;
+
+    try {
+      if (esNuevo || !data.id) {
+        /* CREAR nueva revisión */
+        if (window.RevisionAltaDireccionService && window.RevisionAltaDireccionService.crearRevision) {
+          resp = await window.RevisionAltaDireccionService.crearRevision(empresaId, data);
+        }
+        var nueva = null;
+        if (resp && resp.success && resp.data) {
+          nueva = resp.data;
+        } else if (resp && resp.error) {
+          toast('Error al guardar', resp.error.message || 'No se pudo crear la revisión', 'error');
+          log('SAVE', 'ERROR', resp.error.message);
+          return null;
+        } else {
+          /* Fallback mock · id determinístico sin colisiones */
+          isMock = true;
+          var year = new Date().getFullYear();
+          var maxNum = (state.revisiones || []).reduce(function(m, r) {
+            var n = parseInt(String(r.id || '').split('-').pop(), 10);
+            return isNaN(n) ? m : Math.max(m, n);
+          }, 0);
+          nueva = Object.assign({}, data, {
+            id: data.id || ('RG-' + year + '-' + String(maxNum + 1).padStart(2, '0')),
+            estado: data.estado || 'Borrador',
+            fecha: data.fecha || new Date().toISOString().split('T')[0],
+            periodo: data.periodo || String(year),
+            participantes: data.participantes || 0,
+            progreso: data.progreso || 0
+          });
+        }
+        _upsertRevision(nueva);
+        toast('Borrador guardado' + (isMock ? ' (demo)' : ''), nueva.id + ' se guardó correctamente', 'success');
+        log('SAVE', isMock ? 'INFO' : 'SUCCESS', nueva.id + (isMock ? ' (mock sin backend)' : ' (nuevo)'));
+        return { success: true, revision: nueva };
+      } else {
+        /* ACTUALIZAR revisión existente */
+        if (window.RevisionAltaDireccionService && window.RevisionAltaDireccionService.actualizarRevision) {
+          resp = await window.RevisionAltaDireccionService.actualizarRevision(empresaId, data.id, data);
+        }
+        if (resp && resp.success) {
+          var updated = Object.assign({}, data);
+          _upsertRevision(updated);
+          toast('Cambios guardados' + (isMock ? ' (demo)' : ''), data.id + ' actualizado correctamente', 'success');
+          log('SAVE', 'SUCCESS', data.id + ' (update)');
+          return { success: true, revision: updated };
+        } else if (resp && resp.error) {
+          toast('Error al actualizar', resp.error.message || 'No se pudo actualizar la revisión', 'error');
+          log('SAVE', 'ERROR', resp.error.message);
+          return null;
+        } else {
+          isMock = true;
+          _upsertRevision(Object.assign({}, data));
+          toast('Cambios guardados (demo)', data.id + ' actualizado localmente', 'success');
+          log('SAVE', 'INFO', data.id + ' (mock update)');
+          return { success: true, revision: data };
+        }
+      }
+    } catch (e) {
+      toast('Error al guardar', e && e.message ? e.message : 'Error inesperado', 'error');
+      log('SAVE', 'ERROR', e && e.message ? e.message : String(e));
+      return null;
+    }
+  }
+
+  /**
    * Elimina una revisión gerencial (borrador o cualquiera)
    * Conecta con IPC `revisionAltaDireccion.eliminarRevision`
    * @param {string} id - Consecutivo de la revisión (ej: 'RG-2025-01')
@@ -384,6 +483,9 @@ var RevisionAltaDireccionComponent = (function() {
    * @returns {Promise<boolean>} true si se eliminó, false si el usuario canceló
    */
   async function eliminarRevision(id, isBorrador) {
+    /* DEBUG: trace del eliminarRevision */
+    try { console.log('[K+AIRSST][6.1.3][DELETE] eliminarRevision() id=' + id + ' isBorrador=' + isBorrador); } catch (e) {}
+
     if (!id) return false;
 
     var msg = isBorrador
@@ -411,7 +513,7 @@ var RevisionAltaDireccionComponent = (function() {
 
     /* Llamada al backend vía service */
     try {
-      var empresaId = state.empresaId || '';
+      var empresaId = state.empresaActiva || state.empresaId || '';
       var resp = null;
       if (window.RevisionAltaDireccionService && window.RevisionAltaDireccionService.eliminarRevision) {
         resp = await window.RevisionAltaDireccionService.eliminarRevision(empresaId, id);
@@ -547,7 +649,12 @@ var RevisionAltaDireccionComponent = (function() {
     var loaded = false;
     if (window.RevisionAltaDireccionService && typeof window.RevisionAltaDireccionService.cargarTodo === 'function') {
       try {
-        var resp = await window.RevisionAltaDireccionService.cargarTodo(state.empresaId);
+        /* IMPORTANTE: pasamos empresaActiva (nombre legible) en vez de
+           empresaId (ID/UUID). El bridge usa getCompanyRootPath que busca
+           por nombre en config.companyPaths. Si pasáramos el ID, no lo
+           encontraría y caería al fallback de userData.
+           Mismo patrón que inspecciones-bridge, mantenimiento-bridge, etc. */
+        var resp = await window.RevisionAltaDireccionService.cargarTodo(state.empresaActiva || state.empresaId);
         if (resp && resp.success && resp.data) {
           /* Detectar si viene en estructura nueva o legacy */
           if (resp.data.revisiones || resp.data.cicloActivo) {
@@ -1233,11 +1340,13 @@ var RevisionAltaDireccionComponent = (function() {
     var thead = '<thead><tr>' +
       '<th>Consecutivo</th>' +
       '<th>Período</th>' +
+      '<th>Empresa</th>' +
       '<th>Fecha</th>' +
       '<th>Preside</th>' +
+      '<th>Elabora</th>' +
       '<th>Estado</th>' +
-      '<th style="min-width:160px">Progreso</th>' +
-      '<th style="width:80px; text-align:right">Acciones</th>' +
+      '<th style="min-width:140px">Progreso</th>' +
+      '<th style="width:110px; text-align:right">Acciones</th>' +
     '</tr></thead>';
     table.innerHTML = thead;
 
@@ -1250,8 +1359,10 @@ var RevisionAltaDireccionComponent = (function() {
       tr.innerHTML =
         '<td class="cell-mono">' + _esc(r.id || '') + '</td>' +
         '<td>' + _esc(r.periodo || '') + '</td>' +
+        '<td>' + _esc(r.empresa || '—') + '</td>' +
         '<td>' + _esc(formatDate(r.fecha || r.fechaProgramada || '')) + '</td>' +
-        '<td>' + _esc(r.preside || '') + '</td>' +
+        '<td>' + _esc(r.preside || '—') + '</td>' +
+        '<td>' + _esc(r.elabora || '—') + '</td>' +
         '<td>' + badgeFor(r.estado || 'Borrador') + '</td>' +
         '<td>' +
           '<div class="kair-rad-table-progress">' +
@@ -1262,10 +1373,13 @@ var RevisionAltaDireccionComponent = (function() {
           '</div>' +
         '</td>' +
         '<td><div class="cell-actions">' +
-          '<button class="kair-rad-icon-btn" title="Ver acta" data-row-action="view" data-row-id="' + _esc(r.id || '') + '">' +
+          '<button class="kair-rad-icon-btn" title="Ver acta" data-hub-action="view" data-row-id="' + _esc(r.id || '') + '">' +
             '<i class="bi bi-eye"></i>' +
           '</button>' +
-          '<button class="kair-rad-icon-btn kair-rad-icon-btn--danger" title="Eliminar borrador" data-row-action="delete" data-row-id="' + _esc(r.id || '') + '" data-row-estado="' + _esc(r.estado || '') + '">' +
+          '<button class="kair-rad-icon-btn" title="Editar" data-hub-action="edit" data-row-id="' + _esc(r.id || '') + '">' +
+            '<i class="bi bi-pencil"></i>' +
+          '</button>' +
+          '<button class="kair-rad-icon-btn kair-rad-icon-btn--danger" title="Eliminar borrador" data-hub-action="delete" data-row-id="' + _esc(r.id || '') + '" data-row-estado="' + _esc(r.estado || '') + '">' +
             '<i class="bi bi-trash"></i>' +
           '</button>' +
         '</div></td>';
@@ -1297,6 +1411,7 @@ var RevisionAltaDireccionComponent = (function() {
       toast: toast,
       confirm: _showConfirmDialog,
       eliminarRevision: eliminarRevision,
+      guardarRevision: guardarRevision,
       refresh: function() {
         /* Forzar re-render preservando la vista actual */
         renderAll();
@@ -1541,11 +1656,15 @@ var RevisionAltaDireccionComponent = (function() {
       });
     }
 
-    /* Tabla acciones del hub → navega a la vista de detalle o elimina */
-    document.querySelectorAll('[data-row-action]').forEach(function(btn) {
+    /* Tabla acciones del hub → navega a la vista de detalle, edita o elimina
+       NOTA: usa [data-hub-action] (específico del hub) para NO interferir
+       con los handlers de las vistas revisiones-list/revisiones-editor que
+       usan [data-row-action]. Antes del fix, este handler global capturaba
+       también los botones de las vistas y causaba doble-binding. */
+    document.querySelectorAll('[data-hub-action]').forEach(function(btn) {
       btn.addEventListener('click', async function() {
         var id = btn.getAttribute('data-row-id');
-        var action = btn.getAttribute('data-row-action');
+        var action = btn.getAttribute('data-hub-action');
         if (action === 'view') {
           navigate('revisiones-viewer', { id: id });
         } else if (action === 'edit') {

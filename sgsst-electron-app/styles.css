@@ -1348,19 +1348,11 @@ select.form-control {
   margin-bottom: 15px;
 }
 
-.progress-fill {
-  height: 100%;
-  background-color: var(--primary-color);
-  width: 50%;
-  border-radius: 5px;
-  animation: progressAnimation 2s infinite;
-}
-
-@keyframes progressAnimation {
-  0% { width: 0%; }
-  50% { width: 70%; }
-  100% { width: 100%; }
-}
+/* NOTA: la regla original .progress-fill con width:50% + animation:progressAnimation
+   fue removida. Era código legacy que sobrescribía el width seteado por JS en
+   animateToProgress(), haciendo que la barra de carga del overlay de login
+   arrancara en 50% en vez de 0%. El .progress-fill del overlay y de loading.html
+   ahora usan exclusivamente la regla de la línea ~5004 que pone width: 0%. */
 
 .progress-status {
   font-style: italic;
@@ -5006,7 +4998,10 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
   width: 0%;
   background: linear-gradient(90deg, #174ea6, #185abd);
   border-radius: 3px;
-  transition: width 0.4s ease;
+  /* NOTA: sin transition CSS. La animación se hace por JS en
+     KairLoadingController.animateToProgress() usando requestAnimationFrame,
+     lo que garantiza que cada paso complete visualmente antes del siguiente
+     y evita el efecto de "barra reiniciándose" que el usuario veía. */
   position: relative;
   overflow: hidden;
 }

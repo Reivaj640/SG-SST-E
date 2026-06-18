@@ -74,30 +74,38 @@ var RevisionesListView = (function() {
       return r.estado === 'Vencida' || r.estado === 'Cancelada';
     }).length;
 
-    /* 1. Summary cards */
+    /* 1. KPI strip · Mismo patrón que el HUB (kair-rad-kpi-strip + kair-rad-kpi)
+       para mantener consistencia visual entre submódulo y vistas internas. */
     var summary = document.createElement('div');
-    summary.className = 'kair-rad-summary-grid';
-    summary.innerHTML =
-      '<div class="kair-rad-summary-card">' +
-        '<div class="kair-rad-summary-card__label">Total</div>' +
-        '<div class="kair-rad-summary-card__value">' + total + '</div>' +
-        '<div class="kair-rad-summary-card__sub">revisiones registradas</div>' +
-      '</div>' +
-      '<div class="kair-rad-summary-card kair-rad-summary-card--success">' +
-        '<div class="kair-rad-summary-card__label">Realizadas</div>' +
-        '<div class="kair-rad-summary-card__value">' + realizadas + '</div>' +
-        '<div class="kair-rad-summary-card__sub kair-rad-summary-card__sub--success">actas cerradas</div>' +
-      '</div>' +
-      '<div class="kair-rad-summary-card kair-rad-summary-card--warning">' +
-        '<div class="kair-rad-summary-card__label">En borrador</div>' +
-        '<div class="kair-rad-summary-card__value">' + borrador + '</div>' +
-        '<div class="kair-rad-summary-card__sub kair-rad-summary-card__sub--warning">en preparación</div>' +
-      '</div>' +
-      '<div class="kair-rad-summary-card kair-rad-summary-card--danger">' +
-        '<div class="kair-rad-summary-card__label">Vencidas</div>' +
-        '<div class="kair-rad-summary-card__value">' + vencidas + '</div>' +
-        '<div class="kair-rad-summary-card__sub kair-rad-summary-card__sub--danger">requieren atención</div>' +
-      '</div>';
+    summary.className = 'kair-rad-kpi-strip kair-rad-kpi-strip--flush';
+
+    var kpis = [
+      { value: total,     label: 'Revisiones Registradas', icon: 'bi-collection', color: 'primary',
+        sub: total + ' en el sistema' },
+      { value: realizadas, label: 'Realizadas',            icon: 'bi-clipboard-check', color: 'success',
+        sub: realizadas > 0 ? 'Histórico cerrado' : 'Sin histórico aún',
+        subClass: realizadas > 0 ? 'kair-rad-kpi__sub--success' : '' },
+      { value: borrador,   label: 'En Borrador',            icon: 'bi-clock-history',   color: 'warning',
+        sub: 'En preparación', subClass: 'kair-rad-kpi__sub--warning' },
+      { value: vencidas,   label: 'Vencidas',               icon: 'bi-exclamation-triangle', color: vencidas > 0 ? 'danger' : 'success',
+        sub: vencidas > 0 ? 'Requieren atención' : 'Sin alertas',
+        subClass: vencidas > 0 ? 'kair-rad-kpi__sub--danger' : 'kair-rad-kpi__sub--success' }
+    ];
+
+    kpis.forEach(function(kpi) {
+      var item = document.createElement('div');
+      item.className = 'kair-rad-kpi';
+      item.innerHTML =
+        '<div class="kair-rad-kpi__icon kair-rad-kpi__icon--' + kpi.color + '">' +
+          '<i class="bi ' + kpi.icon + '" style="font-size:1.125rem"></i>' +
+        '</div>' +
+        '<div class="kair-rad-kpi__content">' +
+          '<div class="kair-rad-kpi__value">' + kpi.value + '</div>' +
+          '<div class="kair-rad-kpi__label">' + kpi.label + '</div>' +
+          '<div class="kair-rad-kpi__sub ' + (kpi.subClass || '') + '">' + kpi.sub + '</div>' +
+        '</div>';
+      summary.appendChild(item);
+    });
     wrap.appendChild(summary);
 
     /* 2. Tabs bar */
@@ -137,6 +145,19 @@ var RevisionesListView = (function() {
     count.className = 'kair-rad-search-count';
     count.id = 'kair-rad-search-count';
     searchRow.appendChild(count);
+    /* Botón "Nueva Revisión" · siempre visible para crear borrador desde la lista */
+    var btnNew = document.createElement('button');
+    btnNew.className = 'kair-rad-header__action kair-rad-header__action--primary';
+    btnNew.setAttribute('data-list-new', '1');
+    btnNew.innerHTML = '<i class="bi bi-plus-circle"></i> Nueva Revisión';
+    btnNew.style.marginLeft = 'auto';
+    searchRow.appendChild(btnNew);
+    /* Bind del botón "Nueva Revisión" */
+    btnNew.addEventListener('click', function() {
+      if (typeof ctx.navigate === 'function') {
+        ctx.navigate('revisiones-editor', { id: null });
+      }
+    });
     wrap.appendChild(searchRow);
 
     /* 4. Tabla */
@@ -277,6 +298,9 @@ var RevisionesListView = (function() {
     /* Eliminar revisión (con confirmación via ctx.eliminarRevision) */
     card.querySelectorAll('[data-row-action="delete"]').forEach(function(btn) {
       btn.addEventListener('click', async function() {
+        /* DEBUG: confirmar que el click llega al handler */
+        try { console.log('[K+AIRSST][6.1.3][DELETE-CLICK] handler disparado', btn); } catch (e) {}
+
         var id = btn.getAttribute('data-row-id');
         var estado = btn.getAttribute('data-row-estado') || '';
         var isBorrador = estado === 'Borrador' || estado === 'En Proceso' || estado === 'Programada';
@@ -289,6 +313,7 @@ var RevisionesListView = (function() {
             _renderTable(card, refreshed, ctx);
           }
         } else {
+          try { console.error('[K+AIRSST][6.1.3][DELETE-CLICK] ctx.eliminarRevision no es función'); } catch (e) {}
           if (typeof ctx.toast === 'function') {
             ctx.toast('Función no disponible', 'No se puede eliminar en este momento', 'error');
           }

@@ -450,7 +450,9 @@ let currentUser = null;
 let assignedCompanies = [];
 let companyRoleByKey = {};
 const AUTH_TOKEN_KEY = 'kair-auth-token';
+const LOG_BUFFER_MAX_SIZE = 500; // Límite para evitar memory leak en sesiones largas
 let logBuffer = []; // Búfer para almacenar los logs
+let logTextareaCached = null; // Cache del textarea para evitar querySelector en cada log
 let currentCalendarInstance = null; // Para mantener una referencia a la instancia del calendario
 let currentActiveComponent = null; // Para mantener una referencia al componente activo y poder destruirlo adecuadamente
 
@@ -580,14 +582,20 @@ function logMessage(message, level = 'INFO') {
   const timestamp = new Date().toLocaleTimeString();
   const formattedMessage = `[${timestamp}] [${level}] ${message}`;
 
-  // Guardar siempre en el búfer
+  // Guardar en búfer con eviction FIFO para evitar memory leak
   logBuffer.push(formattedMessage);
+  if (logBuffer.length > LOG_BUFFER_MAX_SIZE) {
+    logBuffer.splice(0, logBuffer.length - LOG_BUFFER_MAX_SIZE);
+  }
 
-  // Si el área de logs está visible, actualizarla en tiempo real
-  const logTextarea = document.querySelector('.log-area textarea');
-  if (logTextarea) {
-    logTextarea.value = logBuffer.join('\n');
-    logTextarea.scrollTop = logTextarea.scrollHeight; // Auto-scroll al final
+  // Solo actualizar el DOM si el textarea ya fue cacheado Y está visible.
+  // Evita querySelector + re-render completo en cada log cuando el panel no está abierto.
+  if (!logTextareaCached) {
+    logTextareaCached = document.querySelector('.log-area textarea');
+  }
+  if (logTextareaCached && logTextareaCached.offsetParent !== null) {
+    logTextareaCached.value = logBuffer.join('\n');
+    logTextareaCached.scrollTop = logTextareaCached.scrollHeight;
   }
 }
 
@@ -1886,6 +1894,44 @@ class KairLoadingController {
     }
   }
 
+  /**
+   * Versión SINCRONIZADA: hace que la barra y el texto avancen juntos
+   * con requestAnimationFrame, evitando el solapamiento de transiciones CSS.
+   * Se llama desde executeLoginTransition para que cada paso complete
+   * visualmente antes del siguiente.
+   * @param {number} target - valor objetivo 0-100
+   * @param {number} duration - duración en ms de la animación
+   * @returns {Promise<void>}
+   */
+  animateToProgress(target, duration = 600) {
+    const { progressFill, progressPercent } = this._getElements();
+    if (!progressFill) return Promise.resolve();
+    const startVal = this.progress || 0;
+    const endVal = Math.max(0, Math.min(100, Math.round(target)));
+    if (startVal === endVal) return Promise.resolve();
+    return new Promise(function(resolve) {
+      const startTime = performance.now();
+      const animate = function(now) {
+        const elapsed = now - startTime;
+        const t = Math.min(elapsed / duration, 1);
+        // Ease-out cubic para sensación profesional
+        const eased = 1 - Math.pow(1 - t, 3);
+        const current = Math.round(startVal + (endVal - startVal) * eased);
+        progressFill.style.width = current + '%';
+        if (progressPercent) progressPercent.textContent = current + '%';
+        if (t < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          // CRÍTICO: actualizar this.progress para que la siguiente llamada
+          // empiece desde donde terminamos, no desde 0.
+          this.progress = endVal;
+          resolve();
+        }
+      }.bind(this);
+      requestAnimationFrame(animate);
+    }.bind(this));
+  }
+
   setMessage(main, sub) {
     const { messageEl, submessageEl } = this._getElements();
     setTimeout(() => {
@@ -2106,84 +2152,82 @@ async function executeLoginTransition(userName) {
   const overlay = createTransitionOverlay();
   document.body.appendChild(overlay);
 
-  // Resetear controlador para reutilizar
-  window.kairLoading.reset();
-
-  // Forzar reflow
+  // Forzar reflow para que los estilos iniciales se apliquen antes de animar
   overlay.offsetHeight;
 
-  // 1. Fade out del login
-  if (authScreen) {
-    authScreen.style.transition = 'opacity 0.5s ease, transform 0.5s ease, filter 0.5s ease';
-    authScreen.style.opacity = '0';
-    authScreen.style.transform = 'translateY(-40px) scale(0.95)';
-    authScreen.style.filter = 'blur(4px)';
+  try {
+    // 1. Fade out del login
+    if (authScreen) {
+      authScreen.style.transition = 'opacity 0.5s ease, transform 0.5s ease, filter 0.5s ease';
+      authScreen.style.opacity = '0';
+      authScreen.style.transform = 'translateY(-40px) scale(0.95)';
+      authScreen.style.filter = 'blur(4px)';
+    }
+    await wait(500);
+
+    // 2. Ocultar login y mostrar overlay
+    if (authScreen) {
+      authScreen.style.display = 'none';
+    }
+    overlay.classList.remove('hidden');
+    await wait(150);
+
+    // 3. Secuencia SINCRONIZADA: cada paso espera a que la barra y el texto
+    // lleguen visualmente al target antes del siguiente. Sin solapamiento.
+    await window.kairLoading.animateToProgress(25, 600);
+    window.kairLoading.setMessage('Verificando credenciales', 'Validando permisos...');
+
+    await window.kairLoading.animateToProgress(55, 600);
+    window.kairLoading.setMessage('Cargando configuración', 'Sincronizando datos...');
+
+    await window.kairLoading.animateToProgress(80, 500);
+    window.kairLoading.setMessage('Preparando interfaz', 'Cargando módulos...');
+
+    await window.kairLoading.animateToProgress(100, 500);
+
+    // 4. Mostrar checkmark inmediatamente al llegar a 100%
+    const spinner = document.querySelector('.loading-spinner-section');
+    const progressSection = document.querySelector('.loading-progress-section');
+    const messageSection = document.querySelector('.loading-message-section');
+
+    if (spinner) spinner.style.display = 'none';
+    if (progressSection) progressSection.style.display = 'none';
+    if (messageSection) messageSection.style.display = 'none';
+
+    const welcomeUser = document.getElementById('loading-welcome-user');
+    if (welcomeUser) {
+      welcomeUser.textContent = userName || 'Usuario';
+    }
+    const successContainer = document.getElementById('loading-success');
+    if (successContainer) {
+      successContainer.style.display = 'flex';
+      successContainer.style.flexDirection = 'column';
+      successContainer.style.alignItems = 'center';
+    }
+
+    await wait(700);
+
+    // 5. Listener de completitud y limpieza del overlay
+    window.addEventListener('kair-loading-complete', function onComplete() {
+      window.removeEventListener('kair-loading-complete', onComplete);
+      overlay.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+      overlay.style.opacity = '0';
+      overlay.style.transform = 'scale(0.98)';
+      setTimeout(() => {
+        overlay.remove();
+        console.log('✅ Transición completada');
+      }, 400);
+    });
+
+    // 6. Ejecutar complete() para disparar evento
+    window.kairLoading.complete();
+  } catch (e) {
+    console.error('[LOGIN] Error durante la transición:', e);
+    if (overlay && overlay.parentNode) overlay.remove();
+    if (typeof window.kairLoading.showError === 'function') {
+      window.kairLoading.showError('Error durante la carga. Reintente.');
+    }
   }
-  await wait(500);
-
-  // 2. Ocultar login y mostrar overlay
-  if (authScreen) {
-    authScreen.style.display = 'none';
-  }
-  overlay.classList.remove('hidden');
-  await wait(300);
-
-  // 3. Usar controlador para secuencia de mensajes y progreso
-  window.kairLoading.setProgress(25);
-  window.kairLoading.setMessage('Verificando credenciales', 'Validando permisos...');
-  await wait(600);
-
-  window.kairLoading.setProgress(50);
-  window.kairLoading.setMessage('Cargando configuración', 'Sincronizando datos...');
-  await wait(500);
-
-  window.kairLoading.setProgress(75);
-  window.kairLoading.setMessage('Preparando interfaz', 'Cargando módulos...');
-  await wait(500);
-
-  window.kairLoading.setProgress(95);
-  window.kairLoading.setMessage('Completando', 'Verificando acceso...');
-  await wait(400);
-
-  window.kairLoading.setProgress(100);
-  await wait(200);
-
-  // 4. Mostrar éxito (checkmark) - Ocultar spinner y progreso, mostrar éxito
-  const spinner = document.querySelector('.loading-spinner-section');
-  const progressSection = document.querySelector('.loading-progress-section');
-  const messageSection = document.querySelector('.loading-message-section');
-
-  if (spinner) spinner.style.display = 'none';
-  if (progressSection) progressSection.style.display = 'none';
-  if (messageSection) messageSection.style.display = 'none';
-
-  const welcomeUser = document.getElementById('loading-welcome-user');
-  if (welcomeUser) {
-    welcomeUser.textContent = userName || 'Usuario';
-  }
-  const successContainer = document.getElementById('loading-success');
-  if (successContainer) {
-    successContainer.style.display = 'flex';
-    successContainer.style.flexDirection = 'column';
-    successContainer.style.alignItems = 'center';
-  }
-
-  await wait(1200);
-
-  // 5. Escuchar evento de completitud y limpiar overlay
-  window.addEventListener('kair-loading-complete', function onComplete() {
-    window.removeEventListener('kair-loading-complete', onComplete);
-    overlay.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
-    overlay.style.opacity = '0';
-    overlay.style.transform = 'scale(0.98)';
-    setTimeout(() => {
-overlay.remove();
-      console.log('✅ Transición completada');
-    }, 500);
-  });
-
-  // 6. Ejecutar complete() para disparar evento
-  window.kairLoading.complete();
 }
 
 // --- Fin Funciones de Transición ---
@@ -2339,8 +2383,14 @@ contentArea.innerHTML = '';
     emailInput.classList.remove('kair-auth-input-error');
     passwordInput.classList.remove('kair-auth-input-error');
 
+    // Guard contra doble-submit: si ya hay un login en curso, ignorar
+    // clics/Enter adicionales. Esto evita que el IPC authLoginV1 se
+    // dispare múltiples veces y cause la "doble carga" que el usuario veía.
+    if (button.disabled) return;
+
     try {
       button.classList.add('kair-auth-button-loading');
+      button.disabled = true; // ← FIX: deshabilitar botón mientras login está en vuelo
 
       const result = await window.electronAPI.authLoginV1({ email, password });
 
@@ -2390,6 +2440,11 @@ contentArea.innerHTML = '';
       emailInput.classList.add('kair-auth-input-error');
       passwordInput.classList.add('kair-auth-input-error');
       console.error('Login error:', err);
+    } finally {
+      // Re-habilitar el botón siempre (éxito, error, o doble click).
+      // Si el login fue exitoso, el form se destruye durante la transición
+      // y este re-habilitar no tiene efecto visible.
+      button.disabled = false;
     }
   });
 
@@ -5839,6 +5894,8 @@ ${error.stack}
   const logTextarea = logArea.querySelector('textarea');
   logTextarea.value = logBuffer.join('\n');
   logTextarea.scrollTop = logTextarea.scrollHeight;
+  // Actualizar cache para que logMessage() use este nuevo textarea
+  logTextareaCached = logTextarea;
 
   // Botón para asegurar configuración
   const saveButton = document.createElement('button');

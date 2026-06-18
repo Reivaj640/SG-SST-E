@@ -387,6 +387,9 @@
         this.progressFill = document.querySelector('.progress-fill');
         this.messageEl    = document.querySelector('.message-primary');
         this.submessageEl = document.querySelector('.message-secondary');
+        // La pantalla azul de carga muestra una barra 0→100% sincronizada
+        // con mensajes de inicio. Al completar, dispara loading-complete IPC
+        // que cierra esta ventana y muestra la principal con login.
         this.startSimulation();
       }
 

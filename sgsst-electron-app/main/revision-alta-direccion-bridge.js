@@ -10,15 +10,172 @@ const { ipcMain, app, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
+// ─── Dependencia inyectada en registerHandlers ──────────────────────
+var _getCompanyRootPath = null;
+
 // ─── Helpers de filesystem ──────────────────────────────────────────
 
+/**
+ * Resuelve la ruta del módulo 6.1.3 dentro de la carpeta de la empresa
+ * (Google Drive / OneDrive / local). Misma estrategia inteligente que
+ * identificacion-peligros-bridge.js:
+ *   1. Buscar "6. Verificación" / "6. Verificacion"
+ *   2. Buscar subcarpeta que empiece con "6.1.3"
+ *   3. Si no existe ninguna, devolver la ruta esperada (se creará al guardar)
+ *
+ * FALLBACK: Si la empresa no está configurada (no se encuentra en
+ * config.companyPaths), usa la ruta local en userData como antes.
+ * @param {string} empresaId - Identificador o nombre de la empresa
+ * @returns {string|null} Ruta absoluta al directorio del módulo 6.1.3
+ */
 function _getEmpresaDir(empresaId) {
-  const userData = app.getPath('userData');
-  return path.join(userData, 'empresas', empresaId, '6.1.3');
+  if (!empresaId) {
+    // Fallback a userData si no hay empresa
+    const userData = app.getPath('userData');
+    return path.join(userData, 'empresas', 'default', '6.1.3');
+  }
+
+  var companyRoot = null;
+  // Resolver companyRoot síncronamente leyendo config.json directamente.
+  // getCompanyRootPath (inyectado vía deps) es async; como esta función
+  // es llamada desde parsers y generadores síncronos, leemos el config
+  // local con fs.readFileSync — archivo local, milisegundos.
+  try {
+    var configPath = path.join(app.getPath('userData'), 'config.json');
+    if (fs.existsSync(configPath)) {
+      var cfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      var normalized = String(empresaId).toLowerCase().trim();
+      var companyKey = Object.keys(cfg.companyPaths || {}).find(function(k) {
+        return String(k).toLowerCase().trim() === normalized;
+      });
+      if (companyKey) {
+        companyRoot = cfg.companyPaths[companyKey].root || cfg.companyPaths[companyKey].ruta_base || null;
+      }
+    }
+  } catch (e) { /* ignore */ }
+
+  // Fallback a userData si no se pudo resolver la ruta de la empresa
+  if (!companyRoot || !fs.existsSync(companyRoot)) {
+    const userData = app.getPath('userData');
+    return path.join(userData, 'empresas', empresaId, '6.1.3');
+  }
+
+  // Variantes con/sin tildes del nombre de la carpeta "6. Verificación"
+  var verifVariants = ['6. Verificación', '6. Verificacion'];
+  for (var i = 0; i < verifVariants.length; i++) {
+    var verifDir = path.join(companyRoot, verifVariants[i]);
+    if (fs.existsSync(verifDir)) {
+      try {
+        var entries = fs.readdirSync(verifDir);
+        // Buscar subcarpeta que empiece con "6.1.3" (puede tener sufijos)
+        var subfolder = entries.find(function(f) {
+          return f.indexOf('6.1.3') === 0 && fs.statSync(path.join(verifDir, f)).isDirectory();
+        });
+        if (subfolder) return path.join(verifDir, subfolder);
+        // Si no hay subcarpeta 6.1.3 pero existe "6. Verificación", usar esa raíz
+        return verifDir;
+      } catch (e) { /* ignore */ }
+    }
+  }
+
+  // Búsqueda alternativa: scan recursivo de cualquier carpeta que contenga "6.1.3"
+  try {
+    var rootEntries = fs.readdirSync(companyRoot);
+    var verifFolder = rootEntries.find(function(f) {
+      return /^6\.\s*Verific/i.test(f) && fs.statSync(path.join(companyRoot, f)).isDirectory();
+    });
+    if (verifFolder) {
+      var folder = path.join(companyRoot, verifFolder);
+      var subEntries = fs.readdirSync(folder);
+      var sub = subEntries.find(function(f) { return f.indexOf('6.1.3') === 0; });
+      if (sub) return path.join(folder, sub);
+      return folder;
+    }
+  } catch (e) { /* ignore */ }
+
+  // Fallback: devolver la ruta esperada (se creará al guardar)
+  return path.join(companyRoot, '6. Verificación', '6.1.3 Revisión del alta Dirección');
 }
 
 function _ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+}
+
+/**
+ * Auto-import desde XLSX oficiales cuando los JSON locales no existen.
+ * Escanea la carpeta del módulo 6.1.3 buscando archivos que empiecen
+ * con los prefijos G-FO-006, G-FO-009, G-FO-001, GG-FO-005 y los
+ * parsea a JSON usando los parsers existentes. Solo se ejecuta si
+ * el JSON correspondiente no existe (no sobreescribe datos del usuario).
+ * @param {string} dir - Carpeta del módulo 6.1.3 dentro de la empresa
+ * @returns {Object} Resumen: { gfo006: N, gfo009: N, gfo001: N, ggfo005: N }
+ */
+function _autoImportXlsx(dir) {
+  var result = { gfo006: 0, gfo009: 0, gfo001: 0, ggfo005: 0 };
+  if (!XLSX || !dir || !fs.existsSync(dir)) return result;
+
+  try {
+    var entries = fs.readdirSync(dir);
+
+    /* Genera IDs a partir del nombre de archivo (e.g. "G-FO-006 ... 2024.xlsx" → RG-2024-NN).
+       Usado solo para G-FO-006; los demás formatos conservan el ID que devuelve su parser. */
+    function _inferIdFromFilename(currentResults, filename) {
+      var yearMatch = filename.match(/(\d{4})/);
+      var year = yearMatch ? yearMatch[1] : String(new Date().getFullYear());
+      var num = String(currentResults.length + 1).padStart(2, '0');
+      return { id: 'RG-' + year + '-' + num, periodo: year };
+    }
+
+    /* Procesa un formato: filtra archivos por prefijo, los parsea y los guarda en JSON. */
+    function _processTemplate(opts) {
+      var files = entries.filter(function(f) {
+        return new RegExp('^' + opts.prefix, 'i').test(f) && /\.(xlsx|xls)$/i.test(f);
+      });
+      // jsonName puede ser distinto del prefix: los archivos en Drive usan
+      // "GG-FO-006" pero el JSON local se llama "G-FO-006.json" para
+      // mantener compatibilidad con los handlers existentes.
+      var jsonPath = path.join(dir, opts.jsonName || (opts.prefix + '.json'));
+      if (files.length === 0 || fs.existsSync(jsonPath)) return 0;
+
+      var results = [];
+      files.forEach(function(f) {
+        try {
+          var wb = XLSX.readFile(path.join(dir, f), { cellDates: true });
+          var parsed = opts.parser(wb);
+          if (Array.isArray(parsed)) {
+            results = results.concat(parsed);
+          } else {
+            if (opts.prefix === 'GG-FO-006') {
+              /* Caso especial: G-FO-006 produce una revisión por archivo,
+                 con ID inferido del nombre del archivo */
+              var meta = _inferIdFromFilename(results, f);
+              parsed.id = meta.id;
+              parsed.periodo = meta.periodo;
+              parsed.estado = 'Realizada';
+              parsed.fecha = parsed.fecha || new Date().toISOString().split('T')[0];
+              parsed.progreso = 100;
+            }
+            results.push(parsed);
+          }
+        } catch (e) {
+          console.error('[K+AIRSST][6.1.3][AUTO_IMPORT][' + opts.prefix + ']', f, e.message);
+        }
+      });
+      if (results.length > 0) {
+        _writeJson(jsonPath, results);
+        console.log('[K+AIRSST][6.1.3][AUTO_IMPORT] ' + opts.prefix + ': ' + results.length + ' ' + opts.label + ' importados');
+      }
+      return results.length;
+    }
+
+    result.gfo006 = _processTemplate({ prefix: 'GG-FO-006', jsonName: 'G-FO-006.json', parser: _parserGFO006, label: 'revisiones' });
+    result.gfo009 = _processTemplate({ prefix: 'GG-FO-009', jsonName: 'G-FO-009.json', parser: _parserGFO009, label: 'actas' });
+    result.gfo001 = _processTemplate({ prefix: 'GG-FO-001', jsonName: 'G-FO-001.json', parser: _parserGFO001, label: 'indicadores' });
+    result.ggfo005 = _processTemplate({ prefix: 'GG-FO-005', jsonName: 'GG-FO-005.json', parser: _parserGGFO005, label: 'documentos' });
+  } catch (e) {
+    console.error('[K+AIRSST][6.1.3][AUTO_IMPORT][ERROR]', e.message);
+  }
+  return result;
 }
 
 function _readJson(filePath) {
@@ -225,40 +382,88 @@ function _parserGFO001(workbook) {
 //   R82: §11 ACTIVIDADES PENDIENTES → contenido R83-R84
 //   R85: §12 CONCLUSIONES FINALES → contenido R86-R99
 
-var GFO006_SECCION_MAP = [
-  { numero: 1, titulo: 'Lectura del acta anterior', titleRow: 29, contentStart: 30, contentEnd: 30 },
-  { numero: 2, titulo: 'Revisión de componentes organizacionales', titleRow: 31, contentStart: 32, contentEnd: 36, hasSubTemas: true },
-  { numero: 3, titulo: 'Auditorías internas', titleRow: 37, contentStart: 38, contentEnd: 42 },
-  { numero: 4, titulo: 'Requisitos legales', titleRow: 43, contentStart: 44, contentEnd: 46 },
-  { numero: 5, titulo: 'Participación y consulta', titleRow: 47, contentStart: 48, contentEnd: 51, hasSubTemas: true },
-  { numero: 6, titulo: 'Investigación de incidentes', titleRow: 52, contentStart: 53, contentEnd: 57 },
-  { numero: 7, titulo: 'Acciones del acta anterior', titleRow: 58, contentStart: 59, contentEnd: 60 },
-  { numero: 8, titulo: 'Cambios que pueden afectar el SG-SST', titleRow: 61, contentStart: 62, contentEnd: 63 },
-  { numero: 9, titulo: 'Recursos', titleRow: 64, contentStart: 65, contentEnd: 68 },
-  { numero: 10, titulo: 'Gestión de riesgos', titleRow: 80, contentStart: 81, contentEnd: 81 },
-  { numero: 11, titulo: 'Actividades pendientes', titleRow: 82, contentStart: 83, contentEnd: 84 },
-  { numero: 12, titulo: 'Conclusiones, recomendaciones y acciones tomadas', titleRow: 85, contentStart: 86, contentEnd: 99 }
+// ─── Marcadores dinámicos para detectar las 12 secciones canónicas ───
+// En vez de hardcodear filas (que cambian entre versiones de la plantilla),
+// buscamos cada sección por su texto característico. Tolerante a mayúsculas,
+// acentos y variaciones menores en el título.
+//
+// Estructura típica: "1. LECTURA DEL ACTA ANTERIOR" ocupa una fila merged
+// completa; el contenido va desde la fila siguiente hasta el próximo título.
+
+var GFO006_SECCIONES_MARCADORES = [
+  { numero: 1, titulo: 'Lectura del acta anterior', patron: /^1\.\s*LECTURA\s+DEL\s+ACTA\s+ANTERIOR/i },
+  { numero: 2, titulo: 'Revisión de componentes organizacionales', patron: /^2\.\s*REVISI[ÓO]N\s+DE\s+COMPONENTES\s+ORGANIZACIONALES/i },
+  { numero: 3, titulo: 'Auditorías internas', patron: /^3\.\s*AUDITOR[IÍ]AS?\s+INTERNAS?/i },
+  { numero: 4, titulo: 'Requisitos legales', patron: /^4\.\s*REQUISITOS?\s+LEGALES?/i },
+  { numero: 5, titulo: 'Participación y consulta', patron: /^5\.\s*PARTICIPACI[ÓO]N\s+Y\s+CONSULTA/i },
+  { numero: 6, titulo: 'Investigación de incidentes', patron: /^6\.\s*INVESTIGACI[ÓO]N\s+DE\s+INCIDENTES/i },
+  { numero: 7, titulo: 'Acciones del acta anterior', patron: /^7\.\s*ACCIONES?\s+(DEL\s+)?ACTA/i },
+  { numero: 8, titulo: 'Cambios que pueden afectar el SG-SST', patron: /^8\.\s*CAMBIOS\s+QUE\s+PUEDAN\s+AFECTAR/i },
+  { numero: 9, titulo: 'Recursos', patron: /^9\.\s*RECURSOS/i },
+  { numero: 10, titulo: 'Gestión de riesgos', patron: /^10\.\s*GESTI[ÓO]N\s+DE\s+RIESGOS/i },
+  { numero: 11, titulo: 'Actividades pendientes', patron: /^11\.\s*ACTIVIDADES?\s+PENDIENTES?/i },
+  { numero: 12, titulo: 'Conclusiones, recomendaciones y acciones tomadas', patron: /^12\.\s*CONCLUSIONES/i }
 ];
 
-var GFO006_SUBTEMAS_MAP = {
+// Sub-temas dentro de cada sección (se detectan por patrón en el texto de la fila)
+var GFO006_SUBTEMAS_PATRONES = {
   2: [
-    { numero: 1, titulo: 'Objetivos', row: 32 },
-    { numero: 2, titulo: 'Política SST', row: 33 },
-    { numero: 3, titulo: 'Política alcohol y drogas', row: 34 },
-    { numero: 4, titulo: 'Reglamento de higiene y seguridad', row: 35 },
-    { numero: 5, titulo: 'Misión, visión y valores', row: 36 }
+    { patron: /^OBJETIVOS?:/i, titulo: 'Objetivos' },
+    { patron: /^POLI[ÍI]TICA\s+SST:/i, titulo: 'Política SST' },
+    { patron: /^POLI[ÍI]TICA\s+ALCOHOL\s+Y\s+DROGAS?:/i, titulo: 'Política alcohol y drogas' },
+    { patron: /^REGLAMENTO\s+DE\s+HIGIENE\s+Y\s+SEGURIDAD:/i, titulo: 'Reglamento de higiene y seguridad' },
+    { patron: /^MISI[ÓO]N,\s*VISI[ÓO]N\s+Y\s+VALORES:/i, titulo: 'Misión, visión y valores' }
   ],
   5: [
-    { numero: 1, titulo: 'Quejas, reclamos y sugerencias', row: 48 },
-    { numero: 2, titulo: 'COPASST', row: 50 }
+    { patron: /^QUEJAS,\s*RECLAMOS\s+Y\s+SUGERENCIAS/i, titulo: 'Quejas, reclamos y sugerencias' },
+    { patron: /^COPASST:?/i, titulo: 'COPASST' }
   ]
 };
 
+/**
+ * Busca todas las apariciones de los marcadores de sección en la hoja.
+ * @returns {Array<{row:number, numero:number, titulo:string}>} ordenado por fila
+ */
+function _detectarSeccionesGFO006(sheet) {
+  var matches = [];
+  if (!sheet['!ref']) return matches;
+  var range = XLSX.utils.decode_range(sheet['!ref']);
+
+  for (var r = 0; r <= range.e.r; r++) {
+    // Solo revisar las primeras 6 columnas (la sección siempre está merged en A:F)
+    var rowText = '';
+    for (var c = 0; c < 6; c++) {
+      var addr = XLSX.utils.encode_cell({ r: r, c: c });
+      var cell = sheet[addr];
+      if (cell && cell.v != null) {
+        rowText += (rowText ? ' ' : '') + String(cell.v);
+      }
+    }
+    if (!rowText) continue;
+
+    for (var i = 0; i < GFO006_SECCIONES_MARCADORES.length; i++) {
+      var m = GFO006_SECCIONES_MARCADORES[i];
+      if (m.patron.test(rowText.trim())) {
+        // Evitar duplicados en la misma fila
+        var dup = matches.find(function(x) { return x.row === r + 1; });
+        if (!dup) {
+          matches.push({ row: r + 1, numero: m.numero, titulo: m.titulo });
+        }
+        break;
+      }
+    }
+  }
+
+  matches.sort(function(a, b) { return a.row - b.row; });
+  return matches;
+}
+
 function _parserGFO006(workbook) {
   var sheetName = workbook.SheetNames.find(function(n) {
-    return n.indexOf('Acta') !== -1 || n.indexOf('Revisión') !== -1 || n.indexOf('Acta') !== -1;
+    return n.indexOf('Acta') !== -1 || n.indexOf('Revisi') !== -1;
   }) || workbook.SheetNames[0];
   var sheet = workbook.Sheets[sheetName];
+  if (!sheet) return { secciones: _createSeccionesVacias(), porEmpresa: [], invitados: [] };
 
   var revision = {
     secciones: _createSeccionesVacias(),
@@ -266,44 +471,96 @@ function _parserGFO006(workbook) {
     invitados: []
   };
 
-  // Parsear participantes
-  // G-FO-006: A10="POR LA EMPRESA", C10="INVITADOS"
-  // R12+: A-B = participantes por la empresa, C-E = invitados
+  // ─── 1. PARTICIPANTES (filas 12-28): A-B = por empresa, C-E = invitados ───
+  // Filtrar bogus: celdas merged de títulos de sección pueden contaminar.
+  // Un participante válido tiene nombre y cargo DISTINTOS.
   for (var p = 12; p <= 28; p++) {
     var nombreEmpresa = _getMergedCellValue(sheet, p, 0);
     var cargoEmpresa = _getMergedCellValue(sheet, p, 1);
     var nombreInvitado = _getMergedCellValue(sheet, p, 2);
     var cargoInvitado = _getMergedCellValue(sheet, p, 4);
-    if (nombreEmpresa) {
+
+    if (nombreEmpresa && cargoEmpresa && nombreEmpresa !== cargoEmpresa) {
       revision.porEmpresa.push({ nombre: nombreEmpresa, cargo: cargoEmpresa, empresa: '', correo: '', telefono: '', presente: true });
     }
-    if (nombreInvitado) {
+    if (nombreInvitado && cargoInvitado && nombreInvitado !== cargoInvitado) {
       revision.invitados.push({ nombre: nombreInvitado, cargo: cargoInvitado, empresa: '', correo: '', telefono: '', presente: true });
     }
   }
 
-  // Parsear las 12 secciones canónicas
-  GFO006_SECCION_MAP.forEach(function(map, idx) {
-    var seccion = revision.secciones[idx];
+  // ─── 2. SECCIONES — parsing dinámico ───
+  var secciones = _detectarSeccionesGFO006(sheet);
+  if (secciones.length === 0) {
+    console.warn('[K+AIRSST][6.1.3][PARSER_GFO006] No se detectaron secciones en la hoja');
+    return revision;
+  }
 
-    // Extraer contenido de las filas de la sección
+  var totalRows = sheet['!ref'] ? XLSX.utils.decode_range(sheet['!ref']).e.r + 1 : 200;
+
+  secciones.forEach(function(sec, idx) {
+    var nextSec = secciones[idx + 1];
+    var seccionIdx = sec.numero - 1;
+    var seccion = revision.secciones[seccionIdx];
+    if (!seccion) return;
+
+    // Override título canónico (puede diferir del texto crudo de la plantilla)
+    seccion.titulo = sec.titulo;
+
+    // Contenido va desde la fila siguiente al título hasta la fila anterior
+    // al siguiente título (o hasta el final de la hoja).
+    var contentStart = sec.row + 1;
+    var contentEnd = nextSec ? nextSec.row - 1 : Math.min(sec.row + 30, totalRows);
+
     var contentParts = [];
-    for (var r = map.contentStart; r <= map.contentEnd; r++) {
+    for (var r = contentStart; r <= contentEnd; r++) {
       var text = _getMergedRangeText(sheet, r, 0, 5);
-      if (text) contentParts.push(text);
+      if (text && String(text).trim()) {
+        contentParts.push(String(text).trim());
+      }
     }
     seccion.contenido = contentParts.join('\n');
 
-    // Extraer sub-temas si existen
-    if (map.hasSubTemas && GFO006_SUBTEMAS_MAP[map.numero]) {
-      seccion.subTemas = GFO006_SUBTEMAS_MAP[map.numero].map(function(st) {
-        var stContent = _getMergedRangeText(sheet, st.row, 0, 5);
-        return { numero: st.numero, titulo: st.titulo, contenido: stContent };
-      });
+    // ─── 3. SUB-TEMAS (para §2 y §5) ───
+    var patronesSubtema = GFO006_SUBTEMAS_PATRONES[sec.numero];
+    if (patronesSubtema && contentParts.length > 0) {
+      seccion.subTemas = _extraerSubtemasDinamicos(contentParts, patronesSubtema);
     }
   });
 
   return revision;
+}
+
+/**
+ * Divide el contenido de una sección en sub-temas detectando patrones
+ * en cada línea/segmento. Si no hay matches, devuelve array vacío.
+ */
+function _extraerSubtemasDinamicos(contentParts, patrones) {
+  // El contenido viene como un array de strings (filas). Cada fila puede
+  // comenzar con un patrón de sub-tema (e.g. "OBJETIVOS: ...").
+  var subTemas = [];
+  var num = 1;
+  var actual = null;
+
+  for (var i = 0; i < contentParts.length; i++) {
+    var part = contentParts[i];
+    // Buscar el primer patrón que matchee al INICIO de esta línea
+    var matched = patrones.find(function(p) { return p.patron.test(part); });
+    if (matched) {
+      if (actual) subTemas.push(actual);
+      // Quitar el prefijo "TITULO:" del contenido
+      var sinPrefijo = part.replace(matched.patron, '').trim();
+      actual = {
+        numero: num++,
+        titulo: matched.titulo,
+        contenido: sinPrefijo
+      };
+    } else if (actual) {
+      actual.contenido += (actual.contenido ? '\n' : '') + part;
+    }
+    // Si no hay match y no hay actual → contenido introductorio, se ignora
+  }
+  if (actual) subTemas.push(actual);
+  return subTemas;
 }
 
 // ─── Parser G-FO-009: Acta de Reunión Gerencial (43×8) ────────────
@@ -527,7 +784,7 @@ function _exportarGGFO005(documentos) {
 // ─── Handlers IPC ───────────────────────────────────────────────────
 
 function registerRevisionAltaDireccionHandlers(app, deps) {
-  var getCompanyRootPath = deps.getCompanyRootPath;
+  _getCompanyRootPath = deps && deps.getCompanyRootPath ? deps.getCompanyRootPath : null;
 
   console.log('[K+AIRSST][6.1.3][INIT][INFO] Registrando handlers de Revisión por la Alta Dirección...');
 
@@ -536,7 +793,13 @@ function registerRevisionAltaDireccionHandlers(app, deps) {
     try {
       var empresaId = params.empresaId;
       var dir = _getEmpresaDir(empresaId);
+      if (!dir) {
+        return { success: false, error: { code: 'NO_COMPANY', message: 'Empresa no encontrada o sin ruta: ' + empresaId } };
+      }
       _ensureDir(dir);
+
+      /* Auto-import desde XLSX oficiales si los JSON no existen */
+      var importResult = _autoImportXlsx(dir);
 
       var revisiones = _readJson(path.join(dir, 'G-FO-006.json')) || [];
       var actas = _readJson(path.join(dir, 'G-FO-009.json')) || [];
@@ -545,7 +808,13 @@ function registerRevisionAltaDireccionHandlers(app, deps) {
 
       return {
         success: true,
-        data: { revisiones: revisiones, actas: actas, indicadores: indicadores, documentos: documentos }
+        data: {
+          revisiones: revisiones,
+          actas: actas,
+          indicadores: indicadores,
+          documentos: documentos,
+          autoImport: importResult
+        }
       };
     } catch (e) {
       console.error('[K+AIRSST][6.1.3][CARGAR_TODO][ERROR]', e);
