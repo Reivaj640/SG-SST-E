@@ -938,15 +938,39 @@ select.form-control {
   white-space: nowrap;
 }
 
+/* Estado 1: Al día (verde sutil, siempre visible) */
+.header-update-uptodate {
+  background-color: transparent !important;
+  border-color: var(--border-color, #e0e0e0) !important;
+  color: var(--text-muted, #6c757d) !important;
+  opacity: 0.75;
+  transition: opacity 0.2s ease;
+}
+
+.header-update-uptodate:hover {
+  opacity: 1;
+  background-color: var(--bg-hover, #f8f9fa) !important;
+}
+
+/* Estado 2: Buscando (azul info, con pulso) */
+.header-update-checking {
+  background-color: var(--info-color, #17a2b8) !important;
+  border-color: var(--info-color, #17a2b8) !important;
+  color: var(--white-color, #fff) !important;
+  animation: pulse-update 2s infinite;
+}
+
 .header-update-available {
   background-color: var(--warning-color, #ffc107) !important;
   border-color: var(--warning-color, #ffc107) !important;
+  color: var(--dark-color, #212529) !important;
   animation: pulse-update 2s infinite;
 }
 
 .header-update-ready {
   background-color: var(--success-color, #28a745) !important;
   border-color: var(--success-color, #28a745) !important;
+  color: var(--white-color, #fff) !important;
 }
 
 @keyframes pulse-update {
@@ -1019,6 +1043,17 @@ select.form-control {
 [data-theme="dark-legacy"] .header-update-panel {
   background: var(--dark-bg, #1e1e1e);
   border-color: var(--border-dark, #404040);
+}
+
+[data-theme="dark"] .header-update-uptodate,
+[data-theme="dark-legacy"] .header-update-uptodate {
+  border-color: var(--border-dark, #404040);
+  color: var(--text-muted-dark, #adb5bd) !important;
+}
+
+[data-theme="dark"] .header-update-uptodate:hover,
+[data-theme="dark-legacy"] .header-update-uptodate:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
 }
 
 [data-theme="dark"] .update-progress-bar,

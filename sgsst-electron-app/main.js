@@ -534,6 +534,16 @@ autoUpdater.on('update-downloaded', (info) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('update_downloaded', info);
   }
+
+  // Re-check 60s después: cubre el caso de releases encadenadas
+  // (ej: publicaste v0.1.103 mientras la app actualizaba a v0.1.102)
+  // Si encuentra una más nueva, se descargará sobre la pendiente antes del reinicio
+  setTimeout(() => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      sendLog('[UPDATER] Re-check post-install (60s) para detectar releases encadenadas', 'INFO');
+      checkForUpdatesSafe();
+    }
+  }, 60 * 1000);
 });
 
 // Errores
@@ -617,14 +627,14 @@ autoUpdater.on('error', (err) => {
 function checkForUpdatesSafe() {
   try {
     sendLog('[UPDATER] checkForUpdatesSafe: Iniciando verificación...', 'INFO');
-    
+
     // Enviar evento de verificación manualmente para asegurar que la UI responda
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('update_checking');
     }
-    
+
     const result = autoUpdater.checkForUpdates();
-    
+
     // Manejar la promesa para evitar unhandled rejections
     if (result && typeof result.then === 'function') {
       result.catch((err) => {
@@ -632,7 +642,7 @@ function checkForUpdatesSafe() {
         // El error ya será manejado por el event listener 'error'
       });
     }
-    
+
     // Fallback: Si no se recibe ningún evento en 5 segundos, asumir que el check fue skipeado
     setTimeout(() => {
       if (mainWindow && !mainWindow.isDestroyed()) {
@@ -644,6 +654,36 @@ function checkForUpdatesSafe() {
     sendLog(`[UPDATER] checkForUpdatesSafe: Error síncrono capturado: ${err.message}`, 'ERROR');
     // El error ya será manejado por el event listener 'error'
   }
+}
+
+// Smart polling: staggered checks para cubrir gaps entre releases
+// - Check inicial (al abrir la app)
+// - Re-check 1 min después (cubre releases publicadas durante el último check)
+// - Re-check 5 min después (cubre red lenta o rate limit en check inicial)
+// - Cada 6 horas (responsivo sin castigar la GitHub API: 60 req/h sin auth)
+function scheduleUpdateChecks() {
+  // Check 1: Inmediato
+  checkForUpdatesSafe();
+
+  // Check 2: 1 minuto después
+  setTimeout(() => {
+    sendLog('[UPDATER] Smart polling: re-check a 1 minuto', 'INFO');
+    checkForUpdatesSafe();
+  }, 60 * 1000);
+
+  // Check 3: 5 minutos después
+  setTimeout(() => {
+    sendLog('[UPDATER] Smart polling: re-check a 5 minutos', 'INFO');
+    checkForUpdatesSafe();
+  }, 5 * 60 * 1000);
+
+  // Check periódico: cada 6 horas
+  setInterval(() => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      sendLog('[UPDATER] Smart polling: verificación periódica cada 6h', 'INFO');
+      checkForUpdatesSafe();
+    }
+  }, 6 * 60 * 60 * 1000);
 }
 
 // Verificar si se está ejecutando con squirrel (instalador de Windows)
@@ -659,7 +699,7 @@ const createLoadingWindow = () => {
     frame: false,
     resizable: false,
     center: true,
-    icon: path.join(__dirname, 'assets', 'KIAR256.ico'),
+    icon: path.join(__dirname, 'assets', 'K+AIR-multires.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'loading', 'preload-loading.js'),
       nodeIntegration: false,
@@ -699,7 +739,7 @@ const createWindow = () => {
     minWidth: 1024, // Mínimo razonable para UI funcional
     minHeight: 650, // Permite uso en pantallas 1366x768
     show: false, // Oculta hasta que loading screen complete
-    icon: path.join(__dirname, 'assets', 'KIAR256.ico'),
+    icon: path.join(__dirname, 'assets', 'K+AIR-multires.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -1299,6 +1339,78 @@ ipcMain.handle('get-app-path', async () => {
   } catch (error) {
     console.error('Error getting app path:', error);
     return __dirname; // Valor por defecto en caso de error
+  }
+});
+
+// Crear acceso directo en el escritorio del usuario (Windows)
+// Nota: autoUpdater.quitAndInstall() NO recrea shortcuts, por eso este IPC existe
+ipcMain.handle('create-desktop-shortcut', async () => {
+  try {
+    if (process.platform !== 'win32') {
+      return { success: false, error: 'Esta función solo está disponible en Windows actualmente.' };
+    }
+
+    const desktopPath = app.getPath('desktop');
+    const shortcutPath = path.join(desktopPath, 'K+AIR.lnk');
+
+    // En producción: apunta al .exe instalado (C:\Program Files\K+AIR\K+AIR.exe)
+    // En desarrollo: apunta a electron.exe + ruta del proyecto
+    const target = process.execPath;
+    const args = app.isPackaged ? '' : `"${app.getAppPath()}"`;
+    const cwd = app.isPackaged ? path.dirname(target) : __dirname;
+
+    // Buscar icono multi-res: prod junto al .exe, dev en assets/
+    // Prioriza el multi-res porque se ve nítido a cualquier tamaño (16-256px)
+    let iconPath;
+    if (app.isPackaged) {
+      const candidates = [
+        path.join(path.dirname(process.execPath), 'resources', 'assets', 'K+AIR-multires.ico'),
+        path.join(path.dirname(process.execPath), 'assets', 'K+AIR-multires.ico'),
+        path.join(path.dirname(process.execPath), 'K+AIR-multires.ico'),
+        path.join(path.dirname(process.execPath), 'resources', 'assets', 'KIAR256.ico'),
+        path.join(path.dirname(process.execPath), 'assets', 'KIAR256.ico'),
+        path.join(path.dirname(process.execPath), 'KIAR256.ico'),
+        path.join(path.dirname(process.execPath), 'K+AIR.ico')
+      ];
+      iconPath = candidates.find(p => fs.existsSync(p)) || candidates[0];
+    } else {
+      const devCandidates = [
+        path.join(__dirname, 'assets', 'K+AIR-multires.ico'),
+        path.join(__dirname, 'assets', 'KIAR256.ico')
+      ];
+      iconPath = devCandidates.find(p => fs.existsSync(p)) || devCandidates[0];
+    }
+
+    // 'replace' sobreescribe si ya existe
+    shell.writeShortcutLink(shortcutPath, 'replace', {
+      target,
+      args,
+      cwd,
+      icon: iconPath,
+      iconIndex: 0,
+      description: 'K+AIR - Sistema de Gestión de Seguridad y Salud en el Trabajo',
+      appUserModelId: 'com.jrfsoluciones.sgsst'
+    });
+
+    sendLog(`[SHORTCUT] Acceso directo creado/actualizado: ${shortcutPath}`, 'INFO');
+    return { success: true, path: shortcutPath };
+  } catch (error) {
+    sendLog(`[SHORTCUT] Error creando acceso directo: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// Verificar si ya existe el acceso directo en el escritorio
+ipcMain.handle('check-desktop-shortcut', async () => {
+  try {
+    if (process.platform !== 'win32') {
+      return { exists: false, path: null };
+    }
+    const shortcutPath = path.join(app.getPath('desktop'), 'K+AIR.lnk');
+    const exists = fs.existsSync(shortcutPath);
+    return { exists, path: exists ? shortcutPath : null };
+  } catch (error) {
+    return { exists: false, path: null, error: error.message };
   }
 });
 
@@ -7678,20 +7790,12 @@ try {
     sendLog(`[MAIN] Error registrando handlers de FURAT: ${err.message}`, 'ERROR');
   }
 
-  // Iniciar la búsqueda de actualizaciones una vez que la app esté lista
-  // Usar función segura con manejo de errores
+  // Iniciar smart polling de actualizaciones una vez que la app esté lista
+  // Esperar 5 segundos para evitar conflictos con la inicialización
   setTimeout(() => {
-    sendLog('Iniciando verificación de actualizaciones...', 'INFO');
-    checkForUpdatesSafe();
-  }, 5000);  // Esperar 5 segundos después de cargar la ventana para evitar conflictos
-
-  // Verificación periódica de actualizaciones cada 8 horas
-  setInterval(() => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      sendLog('[UPDATER] Verificación periódica de actualizaciones (cada 8 horas)', 'INFO');
-      checkForUpdatesSafe();
-    }
-  }, 8 * 60 * 60 * 1000); // 8 horas en milisegundos
+    sendLog('Iniciando verificación de actualizaciones (smart polling)...', 'INFO');
+    scheduleUpdateChecks();
+  }, 5000);
 
   app.on('activate', () => {
     // En macOS, es común volver a crear una ventana en la aplicación cuando

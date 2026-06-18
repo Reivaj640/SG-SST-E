@@ -1411,14 +1411,26 @@ if (appHeader) {
     const updateInstallBtn = document.getElementById('update-install-btn');
 
     let headerUpdatePanelVisible = false;
+    let currentAppVersion = null;
 
-    // Toggle update panel when clicking the update button
+    // Toggle update panel when clicking the update button (smart: solo si hay update)
     if (headerUpdateBtn) {
       headerUpdateBtn.addEventListener('click', () => {
-        headerUpdatePanelVisible = !headerUpdatePanelVisible;
-        if (headerUpdatePanel) {
-          headerUpdatePanel.style.display = headerUpdatePanelVisible ? 'flex' : 'none';
+        const hasUpdate = headerUpdateBtn.classList.contains('header-update-available')
+                       || headerUpdateBtn.classList.contains('header-update-ready');
+
+        if (hasUpdate) {
+          // Hay update: toggle del panel de descarga/instalación
+          headerUpdatePanelVisible = !headerUpdatePanelVisible;
+          if (headerUpdatePanel) {
+            headerUpdatePanel.style.display = headerUpdatePanelVisible ? 'flex' : 'none';
+          }
+        } else if (headerUpdateBtn.classList.contains('header-update-uptodate')) {
+          // Está al día: forzar check manual
+          updateHeaderStatus('checking');
+          window.electronAPI.checkForUpdatesManual && window.electronAPI.checkForUpdatesManual();
         }
+        // Si está 'checking', no hacer nada (ignorar clicks durante el check)
       });
     }
 
@@ -1430,32 +1442,69 @@ if (appHeader) {
       });
     }
 
-    // Helper: Show update available in header
-    function showHeaderUpdateAvailable(version) {
-      if (headerUpdateBtn) {
-        headerUpdateBtn.style.display = 'flex';
-        headerUpdateBtn.classList.add('header-update-available');
-        headerUpdateBtn.title = `Actualización v${version} disponible`;
-      }
-      if (headerUpdateText) {
-        headerUpdateText.textContent = `v${version}`;
-      }
-      if (headerUpdatePanel) {
-        headerUpdatePanel.style.display = 'flex';
-        headerUpdatePanelVisible = true;
-      }
-      if (updateProgressFill) {
-        updateProgressFill.style.width = '0%';
-      }
-      if (updateProgressText) {
-        updateProgressText.textContent = 'Descargando...';
-      }
-      if (updateInstallBtn) {
-        updateInstallBtn.style.display = 'none';
+    // Helper: Update header status (unifica los 4 estados visuales del botón)
+    // Estados: 'uptodate' | 'checking' | 'available' | 'ready'
+    function updateHeaderStatus(state, options = {}) {
+      if (!headerUpdateBtn || !headerUpdateText) return;
+
+      // Limpiar todas las clases de estado
+      headerUpdateBtn.classList.remove(
+        'header-update-uptodate',
+        'header-update-checking',
+        'header-update-available',
+        'header-update-ready'
+      );
+
+      switch (state) {
+        case 'uptodate':
+          headerUpdateBtn.classList.add('header-update-uptodate');
+          headerUpdateText.textContent = options.version ? `Al día v${options.version}` : 'Al día';
+          headerUpdateBtn.title = options.version
+            ? `Versión ${options.version} - Sin actualizaciones pendientes (click para re-verificar)`
+            : 'Sin actualizaciones pendientes';
+          // Ocultar panel si estaba abierto de un update anterior
+          if (headerUpdatePanel) {
+            headerUpdatePanel.style.display = 'none';
+            headerUpdatePanelVisible = false;
+          }
+          break;
+
+        case 'checking':
+          headerUpdateBtn.classList.add('header-update-checking');
+          headerUpdateText.textContent = 'Buscando...';
+          headerUpdateBtn.title = 'Buscando actualizaciones...';
+          break;
+
+        case 'available':
+          headerUpdateBtn.classList.add('header-update-available');
+          headerUpdateText.textContent = options.version ? `v${options.version}` : 'Update';
+          headerUpdateBtn.title = options.version
+            ? `Actualización v${options.version} disponible - Descargando...`
+            : 'Actualización disponible';
+          // Auto-abrir panel de descarga
+          if (headerUpdatePanel) {
+            headerUpdatePanel.style.display = 'flex';
+            headerUpdatePanelVisible = true;
+          }
+          if (updateProgressFill) updateProgressFill.style.width = '0%';
+          if (updateProgressText) updateProgressText.textContent = 'Descargando...';
+          if (updateInstallBtn) updateInstallBtn.style.display = 'none';
+          break;
+
+        case 'ready':
+          headerUpdateBtn.classList.add('header-update-ready');
+          headerUpdateText.textContent = options.version ? `v${options.version}` : 'Listo';
+          headerUpdateBtn.title = options.version
+            ? `Actualización v${options.version} lista para instalar`
+            : 'Actualización lista';
+          if (updateProgressFill) updateProgressFill.style.width = '100%';
+          if (updateProgressText) updateProgressText.textContent = 'Descarga completa';
+          if (updateInstallBtn) updateInstallBtn.style.display = 'block';
+          break;
       }
     }
 
-    // Helper: Update progress in header
+    // Helper: Update progress in header (usado durante descarga)
     function updateHeaderProgress(percent, speed) {
       if (updateProgressFill) {
         updateProgressFill.style.width = `${percent}%`;
@@ -1465,43 +1514,16 @@ if (appHeader) {
       }
     }
 
-    // Helper: Show download complete in header
-    function showHeaderUpdateReady(version) {
-      if (headerUpdateBtn) {
-        headerUpdateBtn.classList.remove('header-update-available');
-        headerUpdateBtn.classList.add('header-update-ready');
-        headerUpdateBtn.title = `Actualización v${version} lista para instalar`;
-      }
-      if (headerUpdateText) {
-        headerUpdateText.textContent = `v${version}`;
-      }
-      if (updateProgressFill) {
-        updateProgressFill.style.width = '100%';
-      }
-      if (updateProgressText) {
-        updateProgressText.textContent = 'Descarga completa';
-      }
-      if (updateInstallBtn) {
-        updateInstallBtn.style.display = 'block';
-      }
-    }
-
-    // Helper: Hide update panel
-    function hideHeaderUpdatePanel() {
-      if (headerUpdateBtn) {
-        headerUpdateBtn.style.display = 'none';
-        headerUpdateBtn.classList.remove('header-update-available', 'header-update-ready');
-      }
-      if (headerUpdatePanel) {
-        headerUpdatePanel.style.display = 'none';
-        headerUpdatePanelVisible = false;
-      }
-    }
+    // Wrappers de compatibilidad (para no romper otros call sites)
+    function showHeaderUpdateAvailable(version) { updateHeaderStatus('available', { version }); }
+    function showHeaderUpdateReady(version) { updateHeaderStatus('ready', { version }); }
+    function hideHeaderUpdatePanel() { updateHeaderStatus('uptodate'); }
 
     // Cuando comienza a buscar actualizaciones
     window.electronAPI?.onUpdateChecking && window.electronAPI.onUpdateChecking(() => {
       console.log('[UPDATER] Evento recibido: update_checking');
       logMessage('Buscando actualizaciones...', 'INFO');
+      updateHeaderStatus('checking');
       if (window.updateNotifier) {
         window.updateNotifier.notifyChecking();
       }
@@ -1511,12 +1533,11 @@ if (appHeader) {
     window.electronAPI?.onUpdateAvailable && window.electronAPI.onUpdateAvailable((info) => {
       console.log('[UPDATER] Evento recibido: update_available', info);
       logMessage(`Actualización disponible: ${info ? info.version : 'nueva versión'}`, 'INFO');
+      if (info && info.version) {
+        updateHeaderStatus('available', { version: info.version });
+      }
       if (window.updateNotifier && info && info.version) {
         window.updateNotifier.notifyAvailable(info.version);
-      }
-      // Update header UI
-      if (info && info.version) {
-        showHeaderUpdateAvailable(info.version);
       }
     });
 
@@ -1524,11 +1545,11 @@ if (appHeader) {
     window.electronAPI?.onUpdateNotAvailable && window.electronAPI.onUpdateNotAvailable((info) => {
       console.log('[UPDATER] Evento recibido: update_not_available', info);
       logMessage('No hay actualizaciones disponibles', 'INFO');
+      // Volver al estado "al día" con la versión actual (info.version = versión local)
+      updateHeaderStatus('uptodate', { version: info?.version || currentAppVersion });
       if (window.updateNotifier) {
         window.updateNotifier.notifyNotAvailable();
       }
-      // Hide header update panel
-      hideHeaderUpdatePanel();
     });
 
     // Progreso de descarga
@@ -1537,7 +1558,7 @@ if (appHeader) {
       if (window.updateNotifier && data) {
         window.updateNotifier.updateProgress(data.percent, data.speed);
       }
-      // Update header progress
+      // Update header progress (la barra dentro del panel)
       if (data && data.percent !== undefined) {
         updateHeaderProgress(data.percent, data.speed);
       }
@@ -1547,10 +1568,10 @@ if (appHeader) {
     window.electronAPI?.onUpdateDownloaded && window.electronAPI.onUpdateDownloaded((info) => {
       console.log('[UPDATER] Evento recibido: update_downloaded', info);
       logMessage('Actualización descargada y lista para instalar', 'INFO');
-      
+
       // Mostrar notificación moderna con botón de reinicio
       const version = info ? info.version : 'más reciente';
-      
+
       if (window.updateNotifier) {
         window.updateNotifier.notifyDownloaded(version, () => {
           // Reiniciar la aplicación cuando el usuario hace clic en el botón
@@ -1564,8 +1585,8 @@ if (appHeader) {
           window.electronAPI.restartApp && window.electronAPI.restartApp();
         }
       }
-      // Update header UI
-      showHeaderUpdateReady(version);
+      // Update header UI → estado "ready"
+      updateHeaderStatus('ready', { version });
     });
 
     // Error en la actualización
@@ -1575,9 +1596,25 @@ if (appHeader) {
       if (window.updateNotifier && data) {
         window.updateNotifier.notifyError(data.message);
       }
-      // Ocultar panel de actualización en header
-      hideHeaderUpdatePanel();
+      // Volver a "al día" pero mostrar el error por toast (no en header)
+      updateHeaderStatus('uptodate', { version: currentAppVersion });
     });
+
+    // Inicializar header con la versión actual (estado "al día" hasta que llegue el primer check)
+    // Se hace DESPUÉS de definir updateHeaderStatus para evitar issues de hoisting en strict mode
+    if (window.electronAPI && window.electronAPI.getAppVersion) {
+      window.electronAPI.getAppVersion()
+        .then(version => {
+          currentAppVersion = version;
+          updateHeaderStatus('uptodate', { version });
+        })
+        .catch(err => {
+          console.warn('[UPDATER] No se pudo obtener la versión inicial:', err);
+          updateHeaderStatus('uptodate', {});
+        });
+    } else {
+      updateHeaderStatus('uptodate', {});
+    }
 
   } else {
     console.error('API de logging no disponible en window.electronAPI');

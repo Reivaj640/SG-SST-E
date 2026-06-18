@@ -1326,6 +1326,18 @@
                             <div class="system-diag-row"><span>Node</span> <strong>v18.16.0</strong></div>
                         </div>
 
+                        <!-- Sección de acceso directo en escritorio -->
+                        <div id="shortcut-section" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
+                            <h4 style="margin-top: 0; margin-bottom: 0.5rem;">Acceso Directo</h4>
+                            <p style="color: var(--text-muted, #6c757d); font-size: 0.9rem; margin: 0 0 0.75rem 0;">
+                                Crea un acceso directo en el escritorio para abrir K+AIR rápidamente.
+                            </p>
+                            <button id="btn-create-shortcut" class="btn btn-outline" style="width: 100%;">
+                                <i class="fas fa-link"></i> <span id="btn-shortcut-text">Crear acceso directo en escritorio</span>
+                            </button>
+                            <p id="shortcut-status" style="font-size: 0.85rem; margin-top: 0.5rem; margin-bottom: 0; display: none;"></p>
+                        </div>
+
                         <!-- Sección de actualizaciones -->
                         <div id="update-section" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
                             <div id="update-idle" class="update-state">
@@ -3127,6 +3139,75 @@
             });
         }
     }
+
+    /* ================= GESTIÓN DE ACCESO DIRECTO EN ESCRITORIO ================= */
+
+    // Crear acceso directo en el escritorio (autoUpdater no lo recrea tras updates)
+    async function createDesktopShortcut() {
+        const btn = document.getElementById('btn-create-shortcut');
+        const status = document.getElementById('shortcut-status');
+        const btnText = document.getElementById('btn-shortcut-text');
+
+        if (!electronAPI || typeof electronAPI.createDesktopShortcut !== 'function') {
+            if (status) {
+                status.textContent = 'Función no disponible en esta versión de la app.';
+                status.style.color = 'var(--danger-color, #dc3545)';
+                status.style.display = 'block';
+            }
+            return;
+        }
+
+        const originalText = btnText.textContent;
+        btn.disabled = true;
+        btnText.textContent = 'Creando...';
+
+        try {
+            const result = await electronAPI.createDesktopShortcut();
+            if (result.success) {
+                btnText.textContent = '✓ Acceso directo creado';
+                status.textContent = `Listo: ${result.path}`;
+                status.style.color = 'var(--success-color, #28a745)';
+                status.style.display = 'block';
+                setTimeout(() => {
+                    btnText.textContent = 'Re-crear acceso directo en escritorio';
+                    btn.disabled = false;
+                }, 3000);
+            } else {
+                throw new Error(result.error || 'Error desconocido');
+            }
+        } catch (error) {
+            btnText.textContent = originalText;
+            status.textContent = `Error: ${error.message}`;
+            status.style.color = 'var(--danger-color, #dc3545)';
+            status.style.display = 'block';
+            btn.disabled = false;
+        }
+    }
+
+    // Detectar si ya existe el shortcut al abrir el tab
+    async function detectExistingShortcut() {
+        if (!electronAPI || typeof electronAPI.checkDesktopShortcut !== 'function') return;
+
+        try {
+            const result = await electronAPI.checkDesktopShortcut();
+            if (result && result.exists) {
+                const btnText = document.getElementById('btn-shortcut-text');
+                const status = document.getElementById('shortcut-status');
+                if (btnText) btnText.textContent = 'Re-crear acceso directo en escritorio';
+                if (status) {
+                    status.textContent = `Acceso directo existente: ${result.path}`;
+                    status.style.color = 'var(--text-muted, #6c757d)';
+                    status.style.display = 'block';
+                }
+            }
+        } catch (err) {
+            // Silenciar errores de detección (no es crítico)
+        }
+    }
+
+    // Inicializar cuando se carga la sección
+    document.getElementById('btn-create-shortcut')?.addEventListener('click', createDesktopShortcut);
+    detectExistingShortcut();
 
     /* ================= GESTIÓN DE ACTUALIZACIONES ================= */
 

@@ -464,4 +464,7 @@ renameCargo: (companyName, cargoId, nombre) => ipcRenderer.invoke('matriz-peligr
   onUpdateError: (callback) => ipcRenderer.on('update_error', (event, ...args) => callback(...args)),
   restartApp: () => ipcRenderer.send('restart_app'),
   checkForUpdatesManual: () => ipcRenderer.invoke('check-for-updates-manual'),
+  // Acceso directo en escritorio (autoUpdater no lo recrea tras update)
+  createDesktopShortcut: () => ipcRenderer.invoke('create-desktop-shortcut'),
+  checkDesktopShortcut: () => ipcRenderer.invoke('check-desktop-shortcut'),
 });
