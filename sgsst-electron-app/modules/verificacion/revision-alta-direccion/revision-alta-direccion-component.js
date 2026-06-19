@@ -1715,8 +1715,54 @@ var RevisionAltaDireccionComponent = (function() {
     }
     var ctaExport = document.getElementById('kair-rad-cta-export');
     if (ctaExport) {
-      ctaExport.addEventListener('click', function() {
-        toast('Exportación', 'Generando XLSX (próximamente conectado al backend)', 'info');
+      ctaExport.addEventListener('click', async function() {
+        if (ctaExport.disabled) return;
+        ctaExport.disabled = true;
+        try {
+          var empresaId = state.empresaActiva || state.empresaId || '';
+          /* Determinar el tipo de plantilla según la vista actual */
+          var tipoPlantilla = 'G-FO-009';
+          var itemId = null;
+          if (state.currentView === 'revisiones-viewer' && state.viewParams && state.viewParams.id) {
+            tipoPlantilla = 'G-FO-006';
+            itemId = state.viewParams.id;
+          } else if (state.currentView === 'actas' && state.actas && state.actas.length > 0) {
+            /* Si hay un acta activa seleccionada, exportar esa; sino exportar la primera */
+            var actaActiva = state.viewParams && state.viewParams.id
+              ? state.actas.filter(function(a) { return a.id === state.viewParams.id; })[0]
+              : state.actas[0];
+            if (actaActiva) itemId = actaActiva.id;
+          } else if (state.currentView === 'despliegue' && state.indicadores && state.indicadores.length > 0) {
+            tipoPlantilla = 'G-FO-001';
+            itemId = state.indicadores[0].id;
+          } else if (state.currentView === 'registro' && state.documentos && state.documentos.length > 0) {
+            tipoPlantilla = 'GG-FO-005';
+            itemId = state.documentos[0].id;
+          }
+
+          if (!itemId) {
+            toast('Sin datos', 'No hay un ' + tipoPlantilla + ' seleccionado para exportar', 'warning');
+            ctaExport.disabled = false;
+            return;
+          }
+
+          if (window.RevisionAltaDireccionService && window.RevisionAltaDireccionService.exportarXlsx) {
+            toast('Exportación', 'Generando XLSX (' + tipoPlantilla + ') para ' + itemId, 'info');
+            var resp = await window.RevisionAltaDireccionService.exportarXlsx(empresaId, tipoPlantilla, itemId);
+            if (resp && resp.success) {
+              var ruta = (resp.data && (resp.data.path || resp.data.ruta)) || '';
+              toast('Exportación completa', ruta ? ('Guardado en: ' + ruta) : ('XLSX generado para ' + itemId), 'success');
+            } else {
+              toast('Error al exportar', (resp && resp.error && resp.error.message) || 'No se pudo generar el XLSX', 'error');
+            }
+          } else {
+            toast('Función no disponible', 'No se puede exportar en este momento', 'error');
+          }
+        } catch (e) {
+          toast('Error al exportar', e && e.message ? e.message : 'Error inesperado', 'error');
+        } finally {
+          ctaExport.disabled = false;
+        }
       });
     }
     var ctaPrint = document.getElementById('kair-rad-cta-print');

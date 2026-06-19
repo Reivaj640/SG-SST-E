@@ -733,27 +733,18 @@ var ActasEditorView = (function() {
     helpText.textContent = 'Registre los temas tratados, los compromisos adquiridos, responsables y fechas límite.';
     wrap.appendChild(helpText);
 
-    var table = document.createElement('table');
-    table.className = 'kair-rad-table';
-    table.style.marginTop = 'var(--rad-s3)';
-    table.innerHTML =
-      '<thead><tr>' +
-        '<th style="width:40px">N°</th>' +
-        '<th>Tema tratado</th>' +
-        '<th>Compromiso</th>' +
-        '<th>Responsable</th>' +
-        '<th style="width:140px">Fecha límite</th>' +
-        '<th style="width:140px">Estado</th>' +
-        '<th style="width:50px"></th>' +
-      '</tr></thead><tbody id="kair-rad-acta-desarrollo-tbody">';
-
-    var tbody = table.querySelector('tbody');
+    /* Contenedor scrollable: limita la altura máxima para evitar overflow en modo ventana.
+       El cálculo deja espacio para el header (~80px), tabs (~50px), section header (~80px),
+       section footer (~70px), sticky footer global (~70px) y márgenes (~30px). */
+    var listWrap = document.createElement('div');
+    listWrap.style.cssText = 'max-height:calc(100vh - 380px); overflow-y:auto; padding:4px 6px 4px 2px; display:flex; flex-direction:column; gap:var(--rad-s3)';
+    listWrap.id = 'kair-rad-acta-desarrollo-list';
 
     editorState.desarrollo.forEach(function(c, idx) {
-      tbody.appendChild(_renderDesarrolloRow(c, idx, editorState, ctx));
+      listWrap.appendChild(_renderDesarrolloRow(c, idx, editorState, ctx));
     });
 
-    wrap.appendChild(table);
+    wrap.appendChild(listWrap);
 
     var btnAdd = document.createElement('button');
     btnAdd.className = 'kair-rad-header__action kair-rad-header__action--secondary';
@@ -777,23 +768,67 @@ var ActasEditorView = (function() {
     return wrap;
   }
 
+  /**
+   * Render de un compromiso individual como CARD (no celda de tabla).
+   * Layout vertical apilado — sin bordes visibles, sin cuadrículas.
+   * Mantiene data-dev-field / data-dev-idx para que los handlers existentes sigan funcionando.
+   */
   function _renderDesarrolloRow(compromiso, idx, editorState, ctx) {
-    var tr = document.createElement('tr');
-    tr.innerHTML =
-      '<td class="cell-mono">' + (idx + 1) + '</td>' +
-      '<td><input type="text" value="' + _esc(compromiso.temaTratado) + '" data-dev-field="temaTratado" data-dev-idx="' + idx + '" placeholder="Tema tratado"></td>' +
-      '<td><input type="text" value="' + _esc(compromiso.compromiso) + '" data-dev-field="compromiso" data-dev-idx="' + idx + '" placeholder="Compromiso"></td>' +
-      '<td><input type="text" value="' + _esc(compromiso.responsable) + '" data-dev-field="responsable" data-dev-idx="' + idx + '" placeholder="Responsable"></td>' +
-      '<td><input type="date" value="' + _esc(compromiso.fecha) + '" data-dev-field="fecha" data-dev-idx="' + idx + '"></td>' +
-      '<td><select data-dev-field="estado" data-dev-idx="' + idx + '">' +
-        ESTADOS_COMPROMISO.map(function(e) {
-          var sel = (e === compromiso.estado) ? ' selected' : '';
-          return '<option value="' + e + '"' + sel + '>' + e + '</option>';
-        }).join('') +
-      '</select></td>' +
-      '<td class="cell-actions"><button class="kair-rad-header__action kair-rad-header__action--ghost" data-dev-remove="' + idx + '" title="Eliminar"><i class="bi bi-trash"></i></button></td>';
+    var card = document.createElement('div');
+    card.className = 'kair-rad-acta-compromiso-card';
+    card.style.cssText = 'background:var(--rad-bg-card); border:1px solid var(--rad-border-soft); border-radius:var(--rad-radius-md); padding:var(--rad-s4); display:flex; flex-direction:column; gap:var(--rad-s3)';
 
-    tr.querySelectorAll('[data-dev-field]').forEach(function(inp) {
+    /* Header de la card: número + botón eliminar */
+    var head = document.createElement('div');
+    head.style.cssText = 'display:flex; align-items:center; justify-content:space-between';
+    head.innerHTML =
+      '<span style="font:600 0.75rem var(--rad-font); color:var(--rad-text-muted); text-transform:uppercase; letter-spacing:0.05em">Compromiso N° ' + (idx + 1) + '</span>' +
+      '<button class="kair-rad-header__action kair-rad-header__action--ghost" data-dev-remove="' + idx + '" title="Eliminar" style="padding:4px 8px">' +
+        '<i class="bi bi-trash"></i>' +
+      '</button>';
+    card.appendChild(head);
+
+    /* Campo: Tema tratado (full width) */
+    var fieldTema = document.createElement('div');
+    fieldTema.style.cssText = 'display:flex; flex-direction:column; gap:4px';
+    fieldTema.innerHTML =
+      '<label style="font:500 0.75rem var(--rad-font); color:var(--rad-text-muted); text-transform:uppercase; letter-spacing:0.04em">Tema tratado</label>' +
+      '<input type="text" value="' + _esc(compromiso.temaTratado) + '" data-dev-field="temaTratado" data-dev-idx="' + idx + '" placeholder="Ej: Cierre de hallazgos auditoría Q3" style="width:100%">';
+    card.appendChild(fieldTema);
+
+    /* Campo: Compromiso (full width) */
+    var fieldComp = document.createElement('div');
+    fieldComp.style.cssText = 'display:flex; flex-direction:column; gap:4px';
+    fieldComp.innerHTML =
+      '<label style="font:500 0.75rem var(--rad-font); color:var(--rad-text-muted); text-transform:uppercase; letter-spacing:0.04em">Compromiso</label>' +
+      '<input type="text" value="' + _esc(compromiso.compromiso) + '" data-dev-field="compromiso" data-dev-idx="' + idx + '" placeholder="Ej: Documentar evidencia de cierre" style="width:100%">';
+    card.appendChild(fieldComp);
+
+    /* Fila: Responsable + Fecha + Estado (3 columnas en pantallas anchas, apilables en angostas) */
+    var rowMeta = document.createElement('div');
+    rowMeta.style.cssText = 'display:grid; grid-template-columns: 2fr 1fr 1fr; gap:var(--rad-s3); align-items:end';
+    rowMeta.innerHTML =
+      '<div style="display:flex; flex-direction:column; gap:4px">' +
+        '<label style="font:500 0.75rem var(--rad-font); color:var(--rad-text-muted); text-transform:uppercase; letter-spacing:0.04em">Responsable</label>' +
+        '<input type="text" value="' + _esc(compromiso.responsable) + '" data-dev-field="responsable" data-dev-idx="' + idx + '" placeholder="Nombre">' +
+      '</div>' +
+      '<div style="display:flex; flex-direction:column; gap:4px">' +
+        '<label style="font:500 0.75rem var(--rad-font); color:var(--rad-text-muted); text-transform:uppercase; letter-spacing:0.04em">Fecha límite</label>' +
+        '<input type="date" value="' + _esc(compromiso.fecha) + '" data-dev-field="fecha" data-dev-idx="' + idx + '">' +
+      '</div>' +
+      '<div style="display:flex; flex-direction:column; gap:4px">' +
+        '<label style="font:500 0.75rem var(--rad-font); color:var(--rad-text-muted); text-transform:uppercase; letter-spacing:0.04em">Estado</label>' +
+        '<select data-dev-field="estado" data-dev-idx="' + idx + '">' +
+          ESTADOS_COMPROMISO.map(function(e) {
+            var sel = (e === compromiso.estado) ? ' selected' : '';
+            return '<option value="' + e + '"' + sel + '>' + e + '</option>';
+          }).join('') +
+        '</select>' +
+      '</div>';
+    card.appendChild(rowMeta);
+
+    /* Bind input changes (mismo patrón que antes) */
+    card.querySelectorAll('[data-dev-field]').forEach(function(inp) {
       var field = inp.getAttribute('data-dev-field');
       var index = parseInt(inp.getAttribute('data-dev-idx'), 10);
       var handler = function() {
@@ -805,7 +840,7 @@ var ActasEditorView = (function() {
     });
 
     setTimeout(function() {
-      var btn = tr.querySelector('[data-dev-remove="' + idx + '"]');
+      var btn = card.querySelector('[data-dev-remove="' + idx + '"]');
       if (btn) {
         btn.addEventListener('click', function() {
           editorState.desarrollo.splice(idx, 1);
@@ -816,7 +851,7 @@ var ActasEditorView = (function() {
       }
     }, 0);
 
-    return tr;
+    return card;
   }
 
   /* ═══════════════════════════════════════════════════════════════════════

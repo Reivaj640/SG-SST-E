@@ -295,9 +295,39 @@ var ActasReunionView = (function() {
       var btnEdit = wrap.querySelector('[data-acta="edit"]');
       var btnNew = wrap.querySelector('[data-acta="new"]');
 
-      if (btnExport && typeof ctx.toast === 'function') {
-        btnExport.addEventListener('click', function() {
-          ctx.toast('Exportación', 'Generando XLSX del acta ' + acta.id, 'info');
+      if (btnExport) {
+        btnExport.addEventListener('click', async function() {
+          if (btnExport.disabled) return;
+          btnExport.disabled = true;
+          try {
+            var empresaId = ctx.data.empresaActiva || '';
+            if (window.RevisionAltaDireccionService && window.RevisionAltaDireccionService.exportarXlsx) {
+              if (typeof ctx.toast === 'function') {
+                ctx.toast('Exportación', 'Generando XLSX del acta ' + acta.id + ' (G-FO-009)', 'info');
+              }
+              var resp = await window.RevisionAltaDireccionService.exportarXlsx(empresaId, 'G-FO-009', acta.id);
+              if (resp && resp.success) {
+                var ruta = (resp.data && (resp.data.path || resp.data.ruta)) || '';
+                if (typeof ctx.toast === 'function') {
+                  ctx.toast('Exportación completa', ruta ? ('Guardado en: ' + ruta) : ('XLSX generado para ' + acta.id), 'success');
+                }
+              } else {
+                if (typeof ctx.toast === 'function') {
+                  ctx.toast('Error al exportar', (resp && resp.error && resp.error.message) || 'No se pudo generar el XLSX', 'error');
+                }
+              }
+            } else {
+              if (typeof ctx.toast === 'function') {
+                ctx.toast('Función no disponible', 'No se puede exportar en este momento', 'error');
+              }
+            }
+          } catch (e) {
+            if (typeof ctx.toast === 'function') {
+              ctx.toast('Error al exportar', e && e.message ? e.message : 'Error inesperado', 'error');
+            }
+          } finally {
+            btnExport.disabled = false;
+          }
         });
       }
       if (btnEdit && typeof ctx.navigate === 'function') {
