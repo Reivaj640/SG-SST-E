@@ -168,7 +168,7 @@ var RevisionAltaDireccionComponent = (function() {
 
   var state = {
     /* View router */
-    currentView: 'hub',         // hub | revisiones | revisiones-list | revisiones-editor | revisiones-viewer | actas | despliegue | procedimiento | registro
+    currentView: 'hub',         // hub | revisiones | revisiones-list | revisiones-editor | revisiones-viewer | actas | actas-editor | despliegue | procedimiento | registro
     viewParams: {},
 
     /* Data (estructura NUEVA alineada al spec 6.1.3) */
@@ -476,6 +476,105 @@ var RevisionAltaDireccionComponent = (function() {
   }
 
   /**
+   * Crea o actualiza un acta de reunión (G-FO-009) conforme al modelo semestral.
+   * Conecta con IPC `revisionAltaDireccion.guardarActa` vía service.
+   * - Si esNuevo=true y data no tiene id, genera `ACT-YYYY-S1` (Principal) o `ACT-YYYY-S2-SEG` (Seguimiento)
+   * - Valida unicidad: no permite 2 actas del mismo tipo+año
+   * @param {Object} data - Datos del acta (id opcional, fecha, estado, metadata con tipo/año/semestre)
+   * @param {boolean} [esNuevo] - Si true, fuerza crear nueva; si false, actualiza
+   * @returns {Promise<Object|null>} - {success, acta} o null en error
+   */
+  async function guardarActa(data, esNuevo) {
+    console.log('[K+AIRSST][6.1.3][SAVE_ACTA] guardarActa() data.id=' + (data && data.id) +
+      ' tipo=' + (data && data.metadata && data.metadata.tipo) +
+      ' año=' + (data && data.metadata && data.metadata.año) +
+      ' esNuevo=' + !!esNuevo);
+
+    if (!data || typeof data !== 'object') {
+      toast('Datos inválidos', 'No se puede guardar el acta', 'error');
+      log('SAVE_ACTA', 'ERROR', 'data inválido');
+      return null;
+    }
+
+    var meta = data.metadata || {};
+    var tipo = meta.tipo || 'Principal';
+    var año = meta.año || new Date().getFullYear();
+
+    /* Generar ID si es nuevo y no trae uno */
+    if (esNuevo && !data.id) {
+      if (tipo === 'Seguimiento') {
+        data.id = 'ACT-' + año + '-S2-SEG';
+      } else {
+        data.id = 'ACT-' + año + '-S1';
+      }
+      data.numero = (tipo === 'Seguimiento') ? 2 : 1;
+    }
+
+    /* Validación de unicidad (defensa adicional — el editor ya validó,
+       pero verificamos aquí también por si llega data inconsistente) */
+    if (esNuevo && Array.isArray(state.actas)) {
+      var dup = state.actas.find(function(a) {
+        var m = a.metadata || {};
+        return m.tipo === tipo && m.año === año;
+      });
+      if (dup) {
+        toast('Duplicado', 'Ya existe ' + dup.id + ' (' + tipo + ' ' + año + ')', 'error');
+        log('SAVE_ACTA', 'ERROR', 'duplicado: ' + dup.id);
+        return null;
+      }
+    }
+
+    /* Inserta o reemplaza en state.actas (top) */
+    function _upsertActa(a) {
+      if (!Array.isArray(state.actas)) state.actas = [];
+      state.actas = state.actas.filter(function(x) { return x.id !== a.id; });
+      state.actas.unshift(a);
+    }
+
+    var empresaId = state.empresaActiva || state.empresaId || '';
+    var resp = null;
+    var isMock = false;
+
+    try {
+      if (window.RevisionAltaDireccionService && window.RevisionAltaDireccionService.guardarActa) {
+        resp = await window.RevisionAltaDireccionService.guardarActa(empresaId, data);
+      }
+
+      if (resp && resp.success && resp.data) {
+        var actaCompleta = Object.assign({}, data, {
+          id: resp.data.id || data.id,
+          numero: resp.data.numero || data.numero
+        });
+        _upsertActa(actaCompleta);
+        toast(esNuevo ? 'Acta creada' : 'Acta actualizada', actaCompleta.id, 'success');
+        log('SAVE_ACTA', 'SUCCESS', actaCompleta.id);
+        return { success: true, acta: actaCompleta };
+      } else if (resp && resp.error) {
+        toast('Error al guardar', resp.error.message || 'No se pudo guardar el acta', 'error');
+        log('SAVE_ACTA', 'ERROR', resp.error.message);
+        return null;
+      } else {
+        /* Fallback mock · usar ID calculado */
+        isMock = true;
+        var actaMock = Object.assign({}, data, {
+          id: data.id,
+          numero: data.numero,
+          creado_en: new Date().toISOString(),
+          actualizado_en: new Date().toISOString()
+        });
+        _upsertActa(actaMock);
+        toast('Acta guardada (demo)', actaMock.id, 'success');
+        log('SAVE_ACTA', 'INFO', actaMock.id + ' (mock)');
+        return { success: true, acta: actaMock };
+      }
+    } catch (e) {
+      toast('Error al guardar', e && e.message ? e.message : 'Error inesperado', 'error');
+      log('SAVE_ACTA', 'ERROR', e && e.message ? e.message : String(e));
+      return null;
+    }
+  }
+
+  /**
    * Elimina una revisión gerencial (borrador o cualquiera)
    * Conecta con IPC `revisionAltaDireccion.eliminarRevision`
    * @param {string} id - Consecutivo de la revisión (ej: 'RG-2025-01')
@@ -755,6 +854,7 @@ var RevisionAltaDireccionComponent = (function() {
         case 'revisiones-editor': viewHost.appendChild(_renderRevisionEditorView()); break;
         case 'revisiones-viewer': viewHost.appendChild(_renderRevisionViewerView()); break;
         case 'actas':           viewHost.appendChild(_renderActasReunionView()); break;
+        case 'actas-editor':    viewHost.appendChild(_renderActasEditorView()); break;
         case 'despliegue':      viewHost.appendChild(_renderDespliegueView()); break;
         case 'procedimiento':   viewHost.appendChild(_renderProcedimientoView()); break;
         case 'registro':        viewHost.appendChild(_renderRegistroDocumentalView()); break;
@@ -903,6 +1003,15 @@ var RevisionAltaDireccionComponent = (function() {
       ctaOpenDoc.id = 'kair-rad-cta-open-doc';
       ctaOpenDoc.innerHTML = '<i class="bi bi-file-earmark-word"></i> Abrir .doc original';
       right.appendChild(ctaOpenDoc);
+    } else if (state.currentView === 'actas-editor') {
+      /* En el editor de actas, mostramos "Volver al listado" en el header.
+         Los botones específicos (Guardar borrador / Guardar y cerrar / Cancelar)
+         viven en el sticky footer del editor. */
+      var ctaBackEditor = document.createElement('button');
+      ctaBackEditor.className = 'k-btn k-btn-ghost k-btn-sm';
+      ctaBackEditor.id = 'kair-rad-cta-back-editor';
+      ctaBackEditor.innerHTML = '<i class="bi bi-arrow-left"></i> Volver al listado';
+      right.appendChild(ctaBackEditor);
     } else if (state.currentView === 'despliegue' || state.currentView === 'registro' || state.currentView === 'actas') {
       var ctaExport2 = document.createElement('button');
       ctaExport2.className = 'k-btn k-btn-ghost k-btn-sm';
@@ -924,10 +1033,10 @@ var RevisionAltaDireccionComponent = (function() {
   function _getBackTarget(view) {
     /* Lógica de navegación "Volver":
        - Si view === 'hub'  → null (lo maneja el botón con backToModuleCallback)
-       - Si view !== 'hub'  → 'hub' (pantalla principal del submódulo)
-       Cualquier sub-vista (editor, viewer, list, actas, etc.) lleva al hub.
-       Desde el hub, el mismo botón sube al módulo padre (Verificación). */
+       - Si view === 'actas-editor' → 'actas' (volver al listado de actas)
+       - Otros → 'hub' (pantalla principal del submódulo) */
     if (view === 'hub') return null;
+    if (view === 'actas-editor') return 'actas';
     return 'hub';
   }
 
@@ -939,6 +1048,7 @@ var RevisionAltaDireccionComponent = (function() {
       'revisiones-editor': 'Volver al listado',
       'revisiones-viewer': 'Volver al listado',
       'actas':             'Volver al hub del submódulo',
+      'actas-editor':      'Volver al listado de actas',
       'despliegue':        'Volver al hub del submódulo',
       'procedimiento':     'Volver al hub del submódulo',
       'registro':          'Volver al hub del submódulo'
@@ -957,6 +1067,9 @@ var RevisionAltaDireccionComponent = (function() {
         ? 'Acta ' + state.viewParams.id
         : 'Acta de Revisión Gerencial',
       actas:         'Actas de Reunión Gerencial',
+      'actas-editor': state.viewParams && state.viewParams.id
+        ? 'Editar Acta ' + state.viewParams.id
+        : 'Nueva Acta de Reunión',
       despliegue:    'Despliegue Estratégico',
       procedimiento: 'Procedimiento G-PR-001',
       registro:      'Registro Documental'
@@ -971,6 +1084,7 @@ var RevisionAltaDireccionComponent = (function() {
       'revisiones-editor':  'Editor del acta conforme al formato G-FO-006 Rev. 03',
       'revisiones-viewer':  'Acta imprimible conforme a G-FO-006 Rev. 03',
       actas:         'Reuniones de seguimiento G-FO-009 con agenda y compromisos',
+      'actas-editor': 'Editor del acta conforme al formato G-FO-009',
       despliegue:    'Objetivos estratégicos e indicadores G-FO-001',
       procedimiento: 'Documento normativo de referencia',
       registro:      'Correspondencia interna/externa GG-FO-005'
@@ -1412,6 +1526,7 @@ var RevisionAltaDireccionComponent = (function() {
       confirm: _showConfirmDialog,
       eliminarRevision: eliminarRevision,
       guardarRevision: guardarRevision,
+      guardarActa: guardarActa,
       refresh: function() {
         /* Forzar re-render preservando la vista actual */
         renderAll();
@@ -1445,6 +1560,13 @@ var RevisionAltaDireccionComponent = (function() {
       return _renderErrorView('Vista de actas no disponible. Recargue la página.');
     }
     return window.ActasReunionView.render(_buildViewCtx());
+  }
+
+  function _renderActasEditorView() {
+    if (!window.ActasEditorView) {
+      return _renderErrorView('Vista de editor de actas no disponible. Recargue la página.');
+    }
+    return window.ActasEditorView.render(_buildViewCtx());
   }
 
   function _renderDespliegueView() {
@@ -1607,6 +1729,13 @@ var RevisionAltaDireccionComponent = (function() {
     if (ctaOpenDoc) {
       ctaOpenDoc.addEventListener('click', function() {
         toast('Abriendo documento', 'G-PR-001 Rev. 01 Nov 2016 (Word)', 'info');
+      });
+    }
+    /* CTA "Volver al listado" del editor de actas (header) */
+    var ctaBackEditor = document.getElementById('kair-rad-cta-back-editor');
+    if (ctaBackEditor) {
+      ctaBackEditor.addEventListener('click', function() {
+        navigate('actas');
       });
     }
 
