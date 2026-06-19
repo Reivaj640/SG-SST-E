@@ -67,6 +67,22 @@ Se activan con `skill({ name: "superpowers/<nombre>" })`. El plugin inyecta boot
 - Stack: Electron + vanilla JS + Python 3.11.9
 - No usar frameworks frontend (React, Vue, etc.)
 - Para UI usar: html-tailwind guidelines del skill ui-ux-pro-max
+
+### Convencion de Commits (OBLIGATORIO)
+
+El usuario usa su propio formato de commits con versionado incremental. **NO usar conventional commits (`feat:`, `fix:`, `docs:`, `style:`)** — usar SIEMPRE:
+
+```
+📦<numero> # <descripcion en espanol, tono casual>
+```
+
+- El emoji 📦 es literal (no es un placeholder).
+- `<numero>` es secuencial e incremental (último conocido: 399 → siguiente 400).
+- La descripción es en español, sin punto final obligatorio, tono directo (ej: "Fix y Update sistema actualizacion e iconos y accesos directos del escritorio").
+- Para work-in-progress / doc-only / refactor sin cambio funcional visible, mantener el mismo formato 📦n #.
+- Ejemplos reales del repo: `📦396 #`, `📦397 #`, `📦398 #`, `📦399 #`.
+
+**Antes de cada commit, verificar el último `📦<n>` en `git log` para usar el siguiente número correcto.**
 - Cumplir Resolucion 0312 de 2019 (Colombia)
 
 ### Regla de Comunicación - Explicación Simple
