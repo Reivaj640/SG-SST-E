@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Reemplazar la vista mock de Actas de Reunión (`actas-reunion.js`) por datos reales de SQLite + crear un editor funcional que cree/edite actas conforme al formato G-FO-009.
+**Goal:** Reemplazar la vista mock de Actas de Reunión (`actas-reunion.js`) por datos reales de SQLite + crear un editor funcional que cree/edite actas conforme al formato G-FO-009, siguiendo el modelo semestral de **2 actas por año** (1 Principal + 1 Seguimiento) con el mismo periodo que las revisiones gerenciales.
 
-**Architecture:** Vista master-detail con datos del backend. Botones "Nueva acta"/"Editar acta" navegan a un editor dedicado (`actas-editor.js`) que sigue el patrón de `revision-editor.js` (sidebar + secciones + sticky footer). El editor llama a `RevisionAltaDireccionService.guardarActa(empresaId, acta)` que ya existe y persiste a SQLite.
+**Architecture:** Vista master-detail con datos del backend, agrupada por año y semestre. Botones "Nueva acta"/"Editar acta" navegan a un editor dedicado (`actas-editor.js`) que sigue el patrón de `revision-editor.js` (sidebar + secciones + sticky footer). El editor llama a `RevisionAltaDireccionService.guardarActa(empresaId, acta)` que ya existe y persiste a SQLite. Las validaciones de unicidad (1 Principal + 1 Seguimiento por año) se hacen en el componente antes de invocar el bridge.
 
 **Tech Stack:** Electron + vanilla JS (sin frameworks). IPC pre-existente: `revisionAltaDireccion:guardarActa`. CSS pre-existente: `revision-alta-direccion-v2.css`.
 
@@ -13,13 +13,21 @@
 ## Global Constraints
 
 - **Stack:** vanilla JS, sin React/Vue. Globales (`window.Foo = Foo`), IIFE wrappers.
+- **Modelo semestral:** 2 actas por año, mismo periodo que las revisiones:
+  - `ACT-YYYY-S1` = Principal (revisión del periodo anterior)
+  - `ACT-YYYY-S2-SEG` = Seguimiento (primer seguimiento a mitad de año)
 - **CSS:** Reusar SOLO clases `.kair-rad-*` ya existentes en `revision-alta-direccion-v2.css`. No agregar nuevas reglas.
 - **IPC:** Usar SIEMPRE `window.RevisionAltaDireccionService.guardarActa(...)` (nunca llamar `electronAPI` directo desde vistas).
 - **Patrón editor:** Sidebar de navegación + main content + sticky footer (igual que `revision-editor.js:286-456`).
 - **Escaping:** SIEMPRE `_esc(str)` antes de insertar texto en HTML.
 - **Estado:** `ctx.state.editorActa` con la misma forma que `ctx.state.editor` (preservar entre navegaciones).
-- **Forma payload:** `acta = { id, empresaId, numero, fecha, estado, archivo, metadata: { tema, preside, ciudad, horaInicio, horaFin, participantes, ordenDia, desarrollo } }`.
-- **Validación mínima:** fecha no vacía + preside no vacío + ≥1 participante.
+- **Forma payload:** `acta = { id, empresaId, numero, fecha, estado, tipo, año, semestre, revisionId, archivo, metadata: { tema, preside, ciudad, horaInicio, horaFin, participantes, ordenDia, desarrollo } }`.
+- **Validaciones de unicidad (en el componente antes de invocar bridge):**
+  - 1 sola acta Principal por año → si ya existe `ACT-YYYY-S1`, bloquear creación de otra Principal.
+  - 1 sola acta Seguimiento por año → mismo principio.
+  - Seguimiento sin Principal → warning pero permite continuar.
+  - Si `tipo=Principal` → `revisionId` obligatorio y debe ser revisión del año anterior.
+- **Validación mínima (en el editor antes de guardar):** fecha no vacía + preside no vacío + ≥1 participante.
 - **No romper** lo existente: `RevisionEditorView`, `RevisionesListView`, etc., deben seguir funcionando.
 - **No agregar** placeholder/tareas "implementar después". Cada paso entrega código ejecutable.
 - **Commits** después de cada tarea con mensaje `feat(actas): ...` o `fix(actas): ...`.
@@ -30,9 +38,9 @@
 
 | Archivo | Estado | Responsabilidad |
 |---|---|---|
-| `modules/.../vistas/actas-reunion.js` | **MODIFICAR** | Quitar `ACTAS_MOCK`, leer `ctx.data.actas`, transformar DB→view, empty state, navegación a editor |
-| `modules/.../vistas/actas-editor.js` | **CREAR** | Formulario completo (generalidades, participantes, orden del día, desarrollo) |
-| `modules/.../revision-alta-direccion-component.js` | **MODIFICAR** | Routing, header CTA, `guardarActa()` |
+| `modules/.../vistas/actas-reunion.js` | **MODIFICAR** | Quitar `ACTAS_MOCK`, leer `ctx.data.actas`, transformar DB→view, agrupar por año/semestre, empty state actualizado, navegación a editor |
+| `modules/.../vistas/actas-editor.js` | **CREAR** | Formulario con tipo + revisionId + secciones (generalidades, participantes, orden del día, desarrollo) |
+| `modules/.../revision-alta-direccion-component.js` | **MODIFICAR** | Routing, header CTA, `guardarActa()` con validaciones de unicidad semestral |
 | `index.html` | **MODIFICAR** | Cargar `actas-editor.js` antes de `revision-alta-direccion-component.js` |
 
 ---
@@ -49,9 +57,9 @@
 - Consumes: `ctx.refresh()` para forzar re-render tras cambio de activeId
 - Produces: DOM con vista master-detail de actas reales
 
-### Step 1: Reemplazar `ACTAS_MOCK` por transformación DB→view y vacío
+### Step 1: Reemplazar `ACTAS_MOCK` por transformación DB→view y agrupar por año/semestre
 
-En `actas-reunion.js`, **eliminar** la variable `ACTAS_MOCK` completa (líneas 27-59) y reemplazar con función de transformación.
+En `actas-reunion.js`, **eliminar** la variable `ACTAS_MOCK` completa (líneas 27-59) y reemplazar con función de transformación + agrupación.
 
 Buscar y borrar:
 
@@ -77,17 +85,28 @@ Reemplazar por:
 /**
  * Transforma un acta del shape DB ({id, numero, fecha, estado, metadata})
  * al shape que espera la vista master-detail.
+ * IMPORTANTE: extrae tipo/año/semestre/revisionId de metadata para el modelo semestral.
  * @param {Object} dbActa - Acta cruda desde SQLite
  * @returns {Object} Acta en shape de vista
  */
 function _mapDbActaToView(dbActa) {
   var meta = dbActa.metadata || {};
+  /* Si metadata no tiene año/semestre, derivarlos de la fecha */
+  var fecha = dbActa.fecha || '';
+  var año = meta.año || (fecha ? parseInt(fecha.substring(0, 4), 10) : new Date().getFullYear());
+  var semestre = meta.semestre || (fecha ? (parseInt(fecha.substring(5, 7), 10) <= 6 ? 1 : 2) : 1);
+
   return {
     id: dbActa.id,
     numero: dbActa.numero,
-    fecha: dbActa.fecha || '',
+    fecha: fecha,
     estado: dbActa.estado || 'Abierta',
     archivo: dbActa.archivo || '',
+    /* Campos del modelo semestral */
+    tipo: meta.tipo || 'Principal',
+    año: año,
+    semestre: semestre,
+    revisionId: meta.revisionId || null,
     /* Campos derivados de metadata */
     hora: (meta.horaInicio && meta.horaFin) ? (meta.horaInicio + ' - ' + meta.horaFin) : '—',
     lugar: meta.ciudad || '—',
@@ -106,9 +125,33 @@ function _mapDbActaToView(dbActa) {
     }) : []
   };
 }
+
+/**
+ * Agrupa las actas por año y semestre para mostrar la lista master-detail.
+ * Devuelve un array ordenado: [{ año, semestres: [{ semestre, actas: [...] }] }, ...]
+ * @param {Array} actas - Actas en shape de vista
+ * @returns {Array} Estructura agrupada por año → semestre
+ */
+function _agruparPorAñoSemestre(actas) {
+  var grupos = {};
+  actas.forEach(function(a) {
+    var key = a.año + '-' + a.semestre;
+    if (!grupos[key]) {
+      grupos[key] = { año: a.año, semestre: a.semestre, actas: [] };
+    }
+    grupos[key].actas.push(a);
+  });
+  /* Convertir a array y ordenar por año DESC, semestre DESC */
+  return Object.keys(grupos)
+    .map(function(k) { return grupos[k]; })
+    .sort(function(a, b) {
+      if (a.año !== b.año) return b.año - a.año;
+      return b.semestre - a.semestre;
+    });
+}
 ```
 
-Y al inicio de `render(ctx)`, después de definir `wrap`, agregar la transformación ANTES del bloque de empty state:
+Y al inicio de `render(ctx)`, después de definir `wrap`, agregar la transformación + agrupación ANTES del bloque de empty state:
 
 ```javascript
 function render(ctx) {
@@ -119,6 +162,9 @@ function render(ctx) {
   if (actas.length === 0) {
     return _renderEmptyState(ctx);
   }
+
+  /* Agrupar por año y semestre para mostrar estructura jerárquica */
+  var grupos = _agruparPorAñoSemestre(actas);
 
   /* Estado local */
   var viewState = ctx.state.actasReunion || { activeId: actas[0] ? actas[0].id : null };
@@ -132,14 +178,14 @@ function render(ctx) {
 
 Verificar que el bloque nuevo arriba (lines de transformación + empty state) reemplazó completamente las líneas 26-63 originales. Las líneas desde `var viewState = ctx.state.actasReunion ...` en adelante (líneas 65+) se mantienen idénticas.
 
-### Step 3: Agregar función `_renderEmptyState()` al final del módulo
+### Step 3: Agregar función `_renderEmptyState()` con mensaje del modelo semestral
 
 Antes del `return { render: render };` (línea 271), agregar:
 
 ```javascript
 /**
  * Renderiza el empty state cuando no hay actas registradas.
- * Ofrece un CTA primario para crear la primera acta.
+ * Muestra el contexto del modelo semestral (2 actas/año) para que el usuario entienda.
  * @param {Object} ctx - Contexto de la vista (para navigate/toast)
  * @returns {HTMLElement} Wrap con el empty state
  */
@@ -152,7 +198,11 @@ function _renderEmptyState(ctx) {
       '<i class="bi bi-file-earmark-text" style="font-size:1.75rem"></i>' +
     '</div>' +
     '<h3 class="kair-rad-state__title">Sin actas registradas</h3>' +
-    '<p class="kair-rad-state__desc">Crea la primera acta de reunión conforme al formato G-FO-009.</p>' +
+    '<p class="kair-rad-state__desc">' +
+      'El formato G-FO-009 se usa 2 veces por año para registrar las reuniones gerenciales: ' +
+      '<strong>1 acta principal</strong> (donde se firma la revisión del periodo anterior) y ' +
+      '<strong>1 acta de seguimiento</strong> (primer seguimiento a mitad de año).' +
+    '</p>' +
     '<button class="kair-rad-header__action kair-rad-header__action--primary" id="kair-rad-actas-empty-new" style="margin-top: var(--rad-s4)">' +
       '<i class="bi bi-plus-circle"></i> Crear primera acta' +
     '</button>';
@@ -168,6 +218,62 @@ function _renderEmptyState(ctx) {
 
   return wrap;
 }
+```
+
+### Step 3b: Renderizar la lista agrupada por año/semestre con badge de tipo
+
+Reemplazar el bloque que renderiza la lista master (líneas 91-117 originales, después de `masterHead`) con renderizado jerárquico:
+
+```javascript
+    /* Lista agrupada por año y semestre */
+    var list = document.createElement('div');
+    list.className = 'kair-rad-master__list';
+
+    grupos.forEach(function(grupo) {
+      var añoLabel = grupo.año + (grupo.año === new Date().getFullYear() ? ' (actual)' : '');
+
+      /* Encabezado de año */
+      var añoHead = document.createElement('div');
+      añoHead.className = 'kair-rad-master__group-head';
+      añoHead.style.cssText = 'font:var(--rad-caption); color:var(--rad-text-muted); padding:var(--rad-s2) var(--rad-s3); text-transform:uppercase; letter-spacing:0.05em; margin-top:var(--rad-s3); border-bottom:1px solid var(--rad-border-soft)';
+      añoHead.textContent = 'Año ' + añoLabel;
+      list.appendChild(añoHead);
+
+      grupo.actas.forEach(function(a) {
+        var item = document.createElement('button');
+        item.className = 'kair-rad-master__item' + (a.id === viewState.activeId ? ' is-active' : '');
+        item.setAttribute('data-acta-id', a.id);
+
+        var tipoBadgeCls = a.tipo === 'Principal' ? 'success' : 'info';
+        var semLabel = 'S' + a.semestre + (a.tipo === 'Seguimiento' ? '-SEG' : '');
+
+        item.innerHTML =
+          '<div class="kair-rad-master__item-head">' +
+            '<span class="kair-rad-master__item-id">' + _esc(a.id) + '</span>' +
+            '<span class="kair-rad-badge kair-rad-badge--' + tipoBadgeCls + '">' +
+              '<span class="dot"></span>' + _esc(a.tipo) +
+            '</span>' +
+          '</div>' +
+          '<div class="kair-rad-master__item-date">' +
+            '<i class="bi bi-calendar3"></i> ' + _esc(formatDate(a.fecha)) +
+            ' <span style="color:var(--rad-text-muted); margin-left:var(--rad-s2)">' + semLabel + '</span>' +
+          '</div>' +
+          '<div class="kair-rad-master__item-meta">' +
+            '<i class="bi bi-people"></i> ' + (a.participantes ? a.participantes.length : 0) + ' participantes' +
+            '<span style="margin: 0 4px">·</span>' +
+            '<i class="bi bi-clock"></i> ' + _esc(a.hora || '—') +
+          '</div>';
+        item.addEventListener('click', function() {
+          viewState.activeId = a.id;
+          ctx.state.actasReunion = viewState;
+          ctx.refresh();
+        });
+        list.appendChild(item);
+      });
+    });
+
+    master.appendChild(list);
+    layout.appendChild(master);
 ```
 
 ### Step 4: Cambiar botón "Editar acta" para navegar al editor (en vez de toast)
@@ -194,23 +300,59 @@ if (btnNew && typeof ctx.navigate === 'function') {
 }
 ```
 
-### Step 6: Verificar visualmente
+### Step 6: Agregar badge de tipo al detail header
+
+En el bloque que renderiza `dHead` (líneas 136-149 originales), después del badge existente, agregar el badge de tipo:
+
+Buscar el bloque:
+```javascript
+    var dHead = document.createElement('div');
+    dHead.className = 'kair-rad-detail__head';
+    dHead.innerHTML =
+      '<div class="kair-rad-detail__head-row">' +
+        '<span class="kair-rad-badge kair-rad-badge--primary"><span class="dot"></span>G-FO-009 · Acta de Reunión</span>' +
+        '<span class="kair-rad-badge kair-rad-badge--' + (acta.estado === 'Cerrada' ? 'success' : 'warning') + '"><span class="dot"></span>' + _esc(acta.estado) + '</span>' +
+      '</div>' +
+```
+
+Reemplazar por:
+```javascript
+    var dHead = document.createElement('div');
+    dHead.className = 'kair-rad-detail__head';
+    var tipoBadgeCls = acta.tipo === 'Principal' ? 'success' : 'info';
+    dHead.innerHTML =
+      '<div class="kair-rad-detail__head-row">' +
+        '<span class="kair-rad-badge kair-rad-badge--primary"><span class="dot"></span>G-FO-009 · Acta de Reunión</span>' +
+        '<span class="kair-rad-badge kair-rad-badge--' + tipoBadgeCls + '"><span class="dot"></span>' + _esc(acta.tipo || 'Principal') + '</span>' +
+        '<span class="kair-rad-badge kair-rad-badge--' + (acta.estado === 'Cerrada' ? 'success' : 'warning') + '"><span class="dot"></span>' + _esc(acta.estado) + '</span>' +
+      '</div>' +
+      '<p class="kair-rad-detail__subtitle">Año ' + _esc(String(acta.año)) + ' · Semestre ' + _esc(String(acta.semestre)) +
+        (acta.revisionId ? ' · Rev: ' + _esc(acta.revisionId) : '') +
+        ' · Reunión de ' + _esc(acta.tipo === 'Principal' ? 'revisión gerencial' : 'seguimiento') +
+      '</p>' +
+```
+
+(Eliminamos el `<p class="kair-rad-detail__subtitle">` viejo y lo reemplazamos por uno más informativo con año/semestre/tipo/revisión.)
+
+### Step 7: Verificar visualmente
 
 Pasos de verificación manual:
 
 1. **Sin actas en DB** (estado actual):
    - Recargar app → ir a Verificación → 6.1.3 → Actas de Reunión Gerencial.
-   - Esperado: empty state con título "Sin actas registradas", descripción, y botón "Crear primera acta".
+   - Esperado: empty state con título "Sin actas registradas", descripción explicando el modelo semestral, y botón "Crear primera acta".
    - Click en "Crear primera acta" → debe navegar a la vista `actas-editor` (probablemente error "Vista de editor no disponible" porque aún no existe — eso está OK, lo arreglamos en Task 2).
 
 2. **Con actas en DB** (futuro, tras Task 4):
-   - Las actas transformadas deben mostrar: `id`, `fecha`, `estado` (badge), `participantes.length`, `hora` derivada, `lugar` derivado, etc.
+   - Las actas transformadas deben mostrar: `id` (formato `ACT-YYYY-Sn[-SEG]`), `fecha`, badge de `tipo` (Principal/Seguimiento), badge de `estado`, `participantes.length`, `hora` derivada, `lugar` derivado.
+   - Lista agrupada por año → semestre con encabezados "Año YYYY".
+   - Detail muestra año/semestre/revisión en el subtítulo.
 
-### Step 7: Commit
+### Step 8: Commit
 
 ```bash
 git add sgsst-electron-app/modules/verificacion/revision-alta-direccion/vistas/actas-reunion.js
-git commit -m "feat(actas): usar datos reales del backend + empty state + navegación a editor"
+git commit -m "feat(actas): usar datos reales + modelo semestral (2 actas/año) + agrupación año/semestre"
 ```
 
 ---
@@ -255,8 +397,26 @@ var ActasEditorView = (function() {
     { key: 'desarrollo',     num: 3, title: 'Desarrollo y compromisos', desc: 'Temas tratados y acciones' }
   ];
 
+  /* Tipos de acta (modelo semestral) */
+  var TIPO_ACTA = [
+    { value: 'Principal',    label: 'Principal (revisión del periodo anterior)' },
+    { value: 'Seguimiento',  label: 'Seguimiento (primer seguimiento del año)' }
+  ];
+
   /* Estado de compromiso posibles */
   var ESTADOS_COMPROMISO = ['Pendiente', 'En proceso', 'Cumplido', 'Vencido'];
+
+  /**
+   * Genera el ID esperado para un acta nueva basado en tipo + año.
+   * El bridge hace lo mismo en `_generateActaId`. Se usa solo para mostrar preview en UI.
+   * @param {string} tipo - 'Principal' o 'Seguimiento'
+   * @param {number} año - Año del acta
+   * @returns {string} ID calculado (e.g. 'ACT-2025-S1' o 'ACT-2025-S2-SEG')
+   */
+  function _calcularIdEsperado(tipo, año) {
+    if (tipo === 'Seguimiento') return 'ACT-' + año + '-S2-SEG';
+    return 'ACT-' + año + '-S1';
+  }
 
   /* Helpers de escape y formato (mismo patrón que revision-editor.js) */
   function _esc(str) {
@@ -417,10 +577,14 @@ Dentro del IIFE, antes de `_render`:
    */
   function _initEditorState(acta) {
     return {
-      _actaId: acta.id,
+      _actaId: acta.id || _calcularIdEsperado(acta.tipo, acta.año),
       activeKey: 'generalidades',
       completed: {},
       formData: {
+        tipo: acta.tipo || 'Principal',
+        año: acta.año || new Date().getFullYear(),
+        semestre: acta.semestre || 1,
+        revisionId: acta.revisionId || '',
         fecha: acta.fecha || new Date().toISOString().split('T')[0],
         tema: acta.metadata.tema || '',
         preside: acta.metadata.preside || '',
@@ -437,16 +601,24 @@ Dentro del IIFE, antes de `_render`:
 
   /**
    * Crea el shape inicial de un acta nueva.
+   * Defaults: tipo=Principal, año=actual, semestre=1 (calculado por mes actual).
    * @param {Object} ctx - Contexto de la vista
    * @returns {Object} Acta en shape de editor
    */
   function _nuevaActa(ctx) {
+    var hoy = new Date();
+    var año = hoy.getFullYear();
+    var semestre = (hoy.getMonth() + 1) <= 6 ? 1 : 2;
     return {
       id: null,
       numero: null,
-      fecha: new Date().toISOString().split('T')[0],
+      fecha: hoy.toISOString().split('T')[0],
       estado: 'Abierta',
       archivo: '',
+      tipo: 'Principal',
+      año: año,
+      semestre: semestre,
+      revisionId: '',
       metadata: {
         tema: '',
         preside: '',
@@ -462,17 +634,27 @@ Dentro del IIFE, antes de `_render`:
 
   /**
    * Transforma un acta del shape DB al shape que usa el editor.
+   * Extrae tipo/año/semestre/revisionId de metadata.
    * @param {Object} dbActa - Acta cruda
    * @returns {Object} Acta en shape de editor
    */
   function _dbActaToEditorShape(dbActa) {
     var meta = dbActa.metadata || {};
+    var fecha = dbActa.fecha || '';
+    /* Fallback: derivar año/semestre de fecha si metadata no los trae */
+    var año = meta.año || (fecha ? parseInt(fecha.substring(0, 4), 10) : new Date().getFullYear());
+    var semestre = meta.semestre || (fecha ? (parseInt(fecha.substring(5, 7), 10) <= 6 ? 1 : 2) : 1);
+
     return {
       id: dbActa.id,
       numero: dbActa.numero,
-      fecha: dbActa.fecha || '',
+      fecha: fecha,
       estado: dbActa.estado || 'Abierta',
       archivo: dbActa.archivo || '',
+      tipo: meta.tipo || 'Principal',
+      año: año,
+      semestre: semestre,
+      revisionId: meta.revisionId || '',
       metadata: {
         tema: meta.tema || '',
         preside: meta.preside || '',
@@ -484,6 +666,23 @@ Dentro del IIFE, antes de `_render`:
         desarrollo: Array.isArray(meta.desarrollo) ? meta.desarrollo.slice() : []
       }
     };
+  }
+
+  /**
+   * Obtiene las revisiones del año anterior (para dropdown de vinculación).
+   * Solo se usa si tipo=Principal.
+   * @param {Object} ctx - Contexto
+   * @param {number} año - Año actual del acta
+   * @returns {Array<{id, periodo}>} Lista de revisiones del año anterior
+   */
+  function _revisionesDelAñoAnterior(ctx, año) {
+    var revisiones = (ctx.data.revisiones || []);
+    return revisiones
+      .filter(function(r) {
+        var rAño = parseInt(String(r.periodo || r.id || '').match(/\d{4}/)?.[0] || '0', 10);
+        return rAño === (año - 1);
+      })
+      .map(function(r) { return { id: r.id, periodo: r.periodo || '' }; });
   }
 ```
 
@@ -632,14 +831,26 @@ Dentro del IIFE, después de `_dbActaToEditorShape`:
 
       var data = _collectFormData(wrap, editorState, acta, esNuevo, cerrar);
 
-      /* Validación mínima */
-      var errores = _validate(data);
+      /* Validación: reglas básicas + modelo semestral */
+      var actasExistentes = ctx.data.actas || [];
+      var errores = _validate(data, actasExistentes, esNuevo);
       if (errores.length > 0) {
         if (typeof ctx.toast === 'function') {
           ctx.toast('Datos incompletos', errores[0], 'warning');
         }
         btn.disabled = false;
         return;
+      }
+
+      /* Warning informativo si Seguimiento sin Principal del mismo año */
+      if (data.metadata.tipo === 'Seguimiento' && esNuevo) {
+        var hayPrincipal = actasExistentes.some(function(a) {
+          var m = a.metadata || {};
+          return m.tipo === 'Principal' && m.año === data.metadata.año;
+        });
+        if (!hayPrincipal && typeof ctx.toast === 'function') {
+          ctx.toast('Aviso', 'No hay acta principal de ' + data.metadata.año + '. El seguimiento se creará independiente.', 'info');
+        }
       }
 
       if (typeof ctx.guardarActa !== 'function') {
@@ -777,43 +988,112 @@ Dentro del IIFE, después de `_handleSave`:
 
   /**
    * Render del body de Generalidades (cabecera del acta).
+   * Incluye: tipo, año, semestre, revisionId (si Principal), fecha, tema, preside, lugar, horas.
    */
   function _renderGeneralidadesBody(editorState, ctx) {
     var wrap = document.createElement('div');
     var fd = editorState.formData;
+    var acta = ctx.params && ctx.params.id
+      ? (ctx.data.actas || []).filter(function(a) { return a.id === ctx.params.id; })[0]
+      : null;
 
+    /* Row 1: Tipo + Año + Semestre */
     var row1 = document.createElement('div');
     row1.className = 'kair-rad-form-row';
     row1.innerHTML =
+      _select('tipo', 'Tipo de acta', fd.tipo, TIPO_ACTA, true) +
+      _field('año', 'Año', String(fd.año), 'number', true) +
+      _field('semestre', 'Semestre (1 o 2)', String(fd.semestre), 'number', true);
+    wrap.appendChild(row1);
+
+    /* Row 1.5: RevisionId (solo si tipo=Principal) */
+    var revisionesAnt = _revisionesDelAñoAnterior(ctx, fd.año);
+    var rowRevision = document.createElement('div');
+    rowRevision.className = 'kair-rad-form-row';
+    rowRevision.id = 'kair-rad-acta-revision-row';
+    if (fd.tipo === 'Principal') {
+      var revOptions = [{ value: '', label: '— Seleccionar revisión —' }].concat(
+        revisionesAnt.map(function(r) {
+          return { value: r.id, label: r.id + (r.periodo ? ' (' + r.periodo + ')' : '') };
+        })
+      );
+      rowRevision.innerHTML =
+        _select('revisionId', 'Vinculada a revisión (del año anterior)', fd.revisionId, revOptions, true) +
+        '<div class="kair-rad-field-note">' +
+          (revisionesAnt.length > 0
+            ? 'Revisiones encontradas del año ' + (fd.año - 1) + ': ' + revisionesAnt.length
+            : '⚠️ No hay revisiones registradas para ' + (fd.año - 1) + '. Cree primero la revisión del año anterior.') +
+        '</div>';
+    } else {
+      rowRevision.innerHTML =
+        '<div class="kair-rad-field-note">Las actas de seguimiento no requieren vincularse a una revisión.</div>';
+    }
+    wrap.appendChild(rowRevision);
+
+    /* Row 2: ID esperado (preview) + Fecha + Estado */
+    var idEsperado = _calcularIdEsperado(fd.tipo, fd.año);
+    var row2 = document.createElement('div');
+    row2.className = 'kair-rad-form-row';
+    row2.innerHTML =
+      '<div class="kair-rad-field">' +
+        '<label>ID generado</label>' +
+        '<input type="text" value="' + _esc(idEsperado) + '" disabled style="background:var(--rad-neutral-soft); font-family:monospace">' +
+      '</div>' +
       _field('fecha', 'Fecha', fd.fecha, 'date', true) +
-      _field('tema', 'Tema de la reunión', fd.tema, 'text', true) +
       _select('estado', 'Estado', fd.estado, [
         { value: 'Abierta', label: 'Abierta' },
         { value: 'Cerrada', label: 'Cerrada' }
       ], true);
-    wrap.appendChild(row1);
-
-    var row2 = document.createElement('div');
-    row2.className = 'kair-rad-form-row';
-    row2.innerHTML =
-      _field('preside', 'Preside', fd.preside, 'text', true) +
-      _field('ciudad', 'Lugar / Ciudad', fd.ciudad, 'text', false);
     wrap.appendChild(row2);
 
-    var row3 = document.createElement('div');
-    row3.className = 'kair-rad-form-row';
-    row3.innerHTML =
+    /* Row 3: Tema */
+    var rowTema = document.createElement('div');
+    rowTema.className = 'kair-rad-form-row kair-rad-form-row--full';
+    rowTema.innerHTML = _field('tema', 'Tema de la reunión', fd.tema, 'text', true);
+    wrap.appendChild(rowTema);
+
+    /* Row 4: Preside + Lugar */
+    var row4 = document.createElement('div');
+    row4.className = 'kair-rad-form-row';
+    row4.innerHTML =
+      _field('preside', 'Preside', fd.preside, 'text', true) +
+      _field('ciudad', 'Lugar / Ciudad', fd.ciudad, 'text', false);
+    wrap.appendChild(row4);
+
+    /* Row 5: Horas */
+    var row5 = document.createElement('div');
+    row5.className = 'kair-rad-form-row';
+    row5.innerHTML =
       _field('horaInicio', 'Hora inicio', fd.horaInicio, 'time', false) +
       _field('horaFin', 'Hora fin', fd.horaFin, 'time', false);
-    wrap.appendChild(row3);
+    wrap.appendChild(row5);
 
     /* Poblar formData con valores actuales */
     wrap.querySelectorAll('[data-field]').forEach(function(inp) {
       var key = inp.getAttribute('data-field');
-      if (key && editorState.formData[key] === undefined) {
+      if (key && inp.type !== 'disabled' && editorState.formData[key] === undefined) {
         editorState.formData[key] = inp.value;
       }
     });
+
+    /* Bind cambios de tipo/año → refrescar (cambia el row de revisión y el ID preview) */
+    var tipoSelect = wrap.querySelector('[data-field="tipo"]');
+    var añoInput = wrap.querySelector('[data-field="año"]');
+    if (tipoSelect) {
+      tipoSelect.addEventListener('change', function() {
+        editorState.formData.tipo = tipoSelect.value;
+        if (ctx.refresh) ctx.refresh();
+      });
+    }
+    if (añoInput) {
+      añoInput.addEventListener('input', function() {
+        var v = parseInt(añoInput.value, 10);
+        if (!isNaN(v) && v > 2000 && v < 2100) {
+          editorState.formData.año = v;
+          if (ctx.refresh) ctx.refresh();
+        }
+      });
+    }
 
     return wrap;
   }
@@ -1037,6 +1317,7 @@ Dentro del IIFE, después de `_renderDesarrolloRow`:
 ```javascript
   /**
    * Recopila los datos del formulario del editor y los une con editorState.
+   * Incluye los campos del modelo semestral: tipo, año, semestre, revisionId.
    * @param {HTMLElement} wrap - Contenedor del editor
    * @param {Object} editorState - Estado actual del editor
    * @param {Object} acta - Acta original (para preservar id/numero si edita)
@@ -1049,21 +1330,29 @@ Dentro del IIFE, después de `_renderDesarrolloRow`:
     if (wrap) {
       wrap.querySelectorAll('[data-field]').forEach(function(inp) {
         var key = inp.getAttribute('data-field');
-        if (!key) return;
+        if (!key || inp.disabled) return;
         editorState.formData[key] = inp.value;
       });
     }
 
     var fd = editorState.formData;
+    var tipo = fd.tipo || 'Principal';
+    var año = parseInt(fd.año, 10) || new Date().getFullYear();
+    var semestre = parseInt(fd.semestre, 10) || 1;
+    var idCalculado = acta.id || _calcularIdEsperado(tipo, año);
 
     return {
-      id: acta.id || null,
+      id: acta.id || idCalculado,
       empresaId: acta.empresaId || null,
-      numero: acta.numero || null,
+      numero: acta.numero || (tipo === 'Seguimiento' ? 2 : 1),
       fecha: fd.fecha || '',
       estado: cerrar ? 'Cerrada' : (fd.estado || 'Abierta'),
       archivo: acta.archivo || '',
       metadata: {
+        tipo: tipo,
+        año: año,
+        semestre: semestre,
+        revisionId: tipo === 'Principal' ? (fd.revisionId || '') : '',
         tema: fd.tema || '',
         preside: fd.preside || '',
         ciudad: fd.ciudad || '',
@@ -1099,15 +1388,39 @@ Dentro del IIFE, después de `_renderDesarrolloRow`:
 
   /**
    * Valida el payload antes de enviar.
+   * Reglas de modelo semestral + reglas básicas de datos.
    * @param {Object} data - Payload a validar
+   * @param {Array} actasExistentes - Lista de actas actuales (para unicidad)
+   * @param {boolean} esNuevo - Si es nueva acta
    * @returns {Array<string>} Lista de errores (vacía si OK)
    */
-  function _validate(data) {
+  function _validate(data, actasExistentes, esNuevo) {
     var errores = [];
+    /* Reglas básicas */
     if (!data.fecha) errores.push('La fecha es obligatoria');
     if (!data.metadata.preside || !data.metadata.preside.trim()) errores.push('El campo "Preside" es obligatorio');
     if (!data.metadata.participantes || data.metadata.participantes.length === 0) {
       errores.push('Debe registrar al menos un participante');
+    }
+    /* Reglas del modelo semestral */
+    if (data.metadata.tipo === 'Principal' && !data.metadata.revisionId) {
+      errores.push('Las actas de tipo Principal deben vincularse a una revisión del año anterior');
+    }
+    if (data.metadata.tipo === 'Principal' && data.metadata.revisionId) {
+      var revAño = parseInt(String(data.metadata.revisionId).match(/\d{4}/)?.[0] || '0', 10);
+      if (revAño !== data.metadata.año - 1) {
+        errores.push('La revisión vinculada (' + data.metadata.revisionId + ') no corresponde al año anterior (' + (data.metadata.año - 1) + ')');
+      }
+    }
+    /* Unicidad: solo si es nuevo, no permitir 2 actas del mismo tipo+año */
+    if (esNuevo && Array.isArray(actasExistentes)) {
+      var duplicado = actasExistentes.find(function(a) {
+        var aMeta = a.metadata || {};
+        return aMeta.tipo === data.metadata.tipo && aMeta.año === data.metadata.año;
+      });
+      if (duplicado) {
+        errores.push('Ya existe un acta de tipo ' + data.metadata.tipo + ' para el año ' + data.metadata.año + ' (ID: ' + duplicado.id + ')');
+      }
     }
     return errores;
   }
@@ -1335,25 +1648,58 @@ Después del bloque del `kair-rad-cta-open-doc` (línea 1611), agregar:
     }
 ```
 
-### Step 9: Agregar función `guardarActa(data, esNuevo)` (después de `guardarRevision`, ~línea 476)
+### Step 9: Agregar función `guardarActa(data, esNuevo)` con modelo semestral (después de `guardarRevision`, ~línea 476)
 
 Después del cierre de `guardarRevision` (línea 476), agregar:
 
 ```javascript
   /**
-   * Crea o actualiza un acta de reunión (G-FO-009).
+   * Crea o actualiza un acta de reunión (G-FO-009) conforme al modelo semestral.
    * Conecta con IPC `revisionAltaDireccion.guardarActa` vía service.
-   * @param {Object} data - Datos del acta (id opcional, fecha, estado, metadata)
+   * - Si esNuevo=true y data no tiene id, genera `ACT-YYYY-S1` (Principal) o `ACT-YYYY-S2-SEG` (Seguimiento)
+   * - Valida unicidad: no permite 2 actas del mismo tipo+año
+   * @param {Object} data - Datos del acta (id opcional, fecha, estado, metadata con tipo/año/semestre)
    * @param {boolean} [esNuevo] - Si true, fuerza crear nueva; si false, actualiza
    * @returns {Promise<Object|null>} - {success, acta} o null en error
    */
   async function guardarActa(data, esNuevo) {
-    console.log('[K+AIRSST][6.1.3][SAVE_ACTA] guardarActa() data.id=' + (data && data.id) + ' esNuevo=' + !!esNuevo);
+    console.log('[K+AIRSST][6.1.3][SAVE_ACTA] guardarActa() data.id=' + (data && data.id) +
+      ' tipo=' + (data && data.metadata && data.metadata.tipo) +
+      ' año=' + (data && data.metadata && data.metadata.año) +
+      ' esNuevo=' + !!esNuevo);
 
     if (!data || typeof data !== 'object') {
       toast('Datos inválidos', 'No se puede guardar el acta', 'error');
       log('SAVE_ACTA', 'ERROR', 'data inválido');
       return null;
+    }
+
+    var meta = data.metadata || {};
+    var tipo = meta.tipo || 'Principal';
+    var año = meta.año || new Date().getFullYear();
+
+    /* Generar ID si es nuevo y no trae uno */
+    if (esNuevo && !data.id) {
+      if (tipo === 'Seguimiento') {
+        data.id = 'ACT-' + año + '-S2-SEG';
+      } else {
+        data.id = 'ACT-' + año + '-S1';
+      }
+      data.numero = (tipo === 'Seguimiento') ? 2 : 1;
+    }
+
+    /* Validación de unicidad (defensa adicional — el editor ya validó,
+       pero verificamos aquí también por si llega data inconsistente) */
+    if (esNuevo && Array.isArray(state.actas)) {
+      var dup = state.actas.find(function(a) {
+        var m = a.metadata || {};
+        return m.tipo === tipo && m.año === año;
+      });
+      if (dup) {
+        toast('Duplicado', 'Ya existe ' + dup.id + ' (' + tipo + ' ' + año + ')', 'error');
+        log('SAVE_ACTA', 'ERROR', 'duplicado: ' + dup.id);
+        return null;
+      }
     }
 
     /* Inserta o reemplaza en state.actas (top) */
@@ -1373,7 +1719,6 @@ Después del cierre de `guardarRevision` (línea 476), agregar:
       }
 
       if (resp && resp.success && resp.data) {
-        /* El bridge devuelve {id, numero}. Combinar con data para tener el shape completo */
         var actaCompleta = Object.assign({}, data, {
           id: resp.data.id || data.id,
           numero: resp.data.numero || data.numero
@@ -1387,16 +1732,11 @@ Después del cierre de `guardarRevision` (línea 476), agregar:
         log('SAVE_ACTA', 'ERROR', resp.error.message);
         return null;
       } else {
-        /* Fallback mock · generar id determinístico */
+        /* Fallback mock · usar ID calculado */
         isMock = true;
-        var year = new Date().getFullYear();
-        var maxNum = (state.actas || []).reduce(function(m, a) {
-          var n = parseInt(String(a.numero || 0), 10);
-          return isNaN(n) ? m : Math.max(m, n);
-        }, 0);
         var actaMock = Object.assign({}, data, {
-          id: data.id || ('ACT-' + year + '-' + String(maxNum + 1).padStart(3, '0')),
-          numero: data.numero || (maxNum + 1),
+          id: data.id,
+          numero: data.numero,
           creado_en: new Date().toISOString(),
           actualizado_en: new Date().toISOString()
         });
@@ -1503,69 +1843,112 @@ Si existe el archivo `GG-FO-009 ACTA DE REUNION GERENCIAL.xlsx` (2017) en la car
 1. Eliminar (o renombrar) `G-FO-009.json` si existe.
 2. Reiniciar la app.
 3. Verificar en logs: `[K+AIRSST][6.1.3][AUTO_IMPORT] GG-FO-009: 1 actas importadas`.
-4. Si el parser falla (XLSX con layout distinto), ajustar `_parserGFO009` en `revision-alta-direccion-bridge.js`.
+4. Verificar que el acta importada queda con `tipo=Principal`, `año=2017`, `semestre=1` (derivados de la fecha).
+5. Si el parser falla (XLSX con layout distinto), ajustar `_parserGFO009` en `revision-alta-direccion-bridge.js`.
 
-### Paso 2: Verificar vista con datos importados
+### Paso 2: Verificar vista agrupada con datos importados
 
 1. Reiniciar app → Verificación → 6.1.3 → "Actas de Reunión Gerencial".
-2. Esperado: lista master con el acta importada del XLSX 2017.
-3. Click en el item → detalle muestra campos: fecha, hora (rango), lugar, responsable, tema, participantes, orden del día, tabla de compromisos.
+2. Esperado: lista agrupada por año → semestre. Encabezado "Año 2017" + item "ACT-2017-S1" con badge "Principal".
+3. Click en el item → detalle muestra campos: id, badge Principal, badge estado, año/semestre en subtítulo, fecha, hora (rango), lugar, responsable, tema, participantes, orden del día, tabla de compromisos.
 
-### Paso 3: Verificar empty state
+### Paso 3: Verificar empty state actualizado
 
 Si NO hay actas en DB:
 
-1. Ir a la vista → empty state con "Sin actas registradas" + botón "Crear primera acta".
+1. Ir a la vista → empty state con:
+   - "Sin actas registradas"
+   - Descripción: "El formato G-FO-009 se usa 2 veces por año para registrar las reuniones gerenciales: 1 acta principal (donde se firma la revisión del periodo anterior) y 1 acta de seguimiento (primer seguimiento a mitad de año)."
+   - Botón "Crear primera acta"
 2. Click → navega al editor (`actas-editor`).
 
-### Paso 4: Crear acta nueva
+### Paso 4: Crear acta Principal (caso feliz)
 
-1. Click "Crear primera acta" (o "Nueva acta" del header).
-2. Navega al editor con `esNuevo=true`.
-3. Sección Generalidades: completar fecha (obligatoria), tema, preside, lugar, horas.
-4. Sección Participantes: click "Agregar participante" → llenar nombre (obligatorio), cargo, empresa.
-5. Sección Orden del día: escribir texto (opcional).
-6. Sección Desarrollo: click "Agregar compromiso" → llenar tema, responsable, fecha, estado.
-7. Sticky footer → click "Guardar y cerrar acta".
-8. Esperado: toast "Acta creada" / "Acta guardada (demo)" + navega a vista de actas.
-9. La nueva acta aparece en la lista master.
+1. Click "Nueva acta" → abre editor con `esNuevo=true`.
+2. Sección Generalidades:
+   - Tipo: Principal (default)
+   - Año: 2025 (default)
+   - Semestre: 1 (default)
+   - Vinculada a revisión: dropdown muestra revisiones de 2024 → seleccionar una
+   - ID generado: muestra preview "ACT-2025-S1"
+   - Fecha: completar (obligatoria)
+   - Tema, Preside, Lugar, Horas: completar
+3. Sección Participantes: agregar al menos 1 (obligatorio).
+4. Sección Orden del día: opcional.
+5. Sección Desarrollo: opcional pero recomendado.
+6. Sticky footer → click "Guardar y cerrar acta".
+7. Esperado: toast "Acta creada" / "Acta guardada (demo)" + navega a vista de actas.
+8. La nueva acta aparece en el grupo "Año 2025 → Semestre 1" con badge "Principal".
 
-### Paso 5: Editar acta existente
+### Paso 5: Bloqueo de 2 Principales (regla de unicidad)
+
+1. En la vista de actas, click "Nueva acta" otra vez.
+2. Tipo: Principal (default), Año: 2025 (mismo año).
+3. Esperado al hacer click "Guardar": toast "Ya existe un acta de tipo Principal para el año 2025 (ID: ACT-2025-S1)".
+4. La operación NO debe proceder (queda en el editor).
+
+### Paso 6: Crear acta Seguimiento (caso feliz)
+
+1. Click "Nueva acta" → cambiar Tipo a "Seguimiento".
+2. Esperado: el campo "Vinculada a revisión" desaparece, el ID preview cambia a "ACT-2025-S2-SEG".
+3. Completar fecha, preside, participantes.
+4. Guardar → toast "Acta creada" + aparece en "Año 2025 → Semestre 2" con badge "Seguimiento".
+
+### Paso 7: Seguimiento sin Principal (warning permitido)
+
+1. Eliminar el acta Principal del 2025 (o simular borrándola de SQLite para test).
+2. Crear un Seguimiento para 2025.
+3. Esperado: toast informativo "No hay acta principal de 2025. El seguimiento se creará independiente" + el guardado SÍ procede.
+
+### Paso 8: Editar acta existente
 
 1. Click en un acta de la lista → click "Editar acta".
 2. Modificar un campo (ej: cambiar tema).
 3. Click "Guardar borrador" (sin cerrar).
 4. Toast "Acta actualizada" + vuelve a la lista.
-5. Verificar que el cambio persiste: el nuevo tema aparece en el detalle.
+5. Verificar que el cambio persiste.
 
-### Paso 6: Persistencia tras reload
+### Paso 9: Persistencia tras reload
 
 1. Cerrar la app.
 2. Abrir de nuevo.
-3. Ir a Actas → las actas creadas siguen ahí.
+3. Ir a Actas → las actas creadas siguen ahí con su tipo/semestre/año correctos.
 
 ---
 
 ## Self-Review Checklist
 
-- [x] **Spec coverage:**
-  - DB→view mapping (Task 1, Step 1) ✓
-  - Empty state con CTA (Task 1, Step 3) ✓
-  - Editor con secciones (Task 2, Step 5) ✓
-  - Form data collection (Task 2, Step 6) ✓
-  - Validación mínima fecha/preside/participante (Task 2, Step 6) ✓
+- [x] **Spec coverage (modelo semestral):**
+  - DB→view mapping con tipo/año/semestre/revisionId (Task 1, Step 1) ✓
+  - Empty state con explicación semestral (Task 1, Step 3) ✓
+  - Lista agrupada por año → semestre (Task 1, Step 3b) ✓
+  - Detail header con badge tipo + subtítulo año/semestre (Task 1, Step 6) ✓
+  - Editor con dropdown tipo + revisionId filtrado por año anterior (Task 2, Step 5) ✓
+  - Validación unicidad (1 Principal + 1 Seguimiento por año) en editor + componente (Task 2 Step 6 + Task 3 Step 9) ✓
+  - Warning Seguimiento sin Principal permitido (Task 2, _handleSave) ✓
+  - ID generation `ACT-YYYY-Sn[-SEG]` (Task 2 _calcularIdEsperado + Task 3 guardarActa) ✓
   - Routing `'actas-editor'` (Task 3, Step 1-3) ✓
-  - `guardarActa` con IPC + fallback mock (Task 3, Step 9) ✓
-  - Navegación desde/hacia editor (Task 1, Step 4-5 + Task 3, Step 4) ✓
-  - Auto-import XLSX (no requiere cambios, ya existe) ✓
+  - Auto-import XLSX mapea a Principal S1 (no requiere cambios) ✓
 
 - [x] **Placeholder scan:** No hay "TODO" / "TBD" / "implementar después". Cada step entrega código ejecutable.
 
 - [x] **Type consistency:**
   - `ctx.guardarActa(data, esNuevo)` definido en Task 3 Step 9, expuesto en Step 10, usado en Task 2 Step 4 (`_handleSave`) — match.
   - `ctx.state.editorActa` inicializado en Task 2 Step 2, preservado en Task 2 Step 3, limpiado en Task 2 Step 4 (`_handleSave`) — match.
-  - `SECCIONES` exportado en Task 2 Step 1 — match.
+  - `SECCIONES`, `TIPO_ACTA`, `ESTADOS_COMPROMISO` exportados en Task 2 Step 1 — match.
+  - `TIPO_ACTA` usado en `_renderGeneralidadesBody` (Task 2 Step 5) y validado en `_validate` (Task 2 Step 6) — match.
+  - `_calcularIdEsperado(tipo, año)` usado en `_renderGeneralidadesBody` (preview), `_collectFormData` (asignación), y `guardarActa` (generación) — match.
 
-- [x] **CSS classes:** Todos los estilos usan `.kair-rad-*` preexistentes (`kair-rad-editor`, `kair-rad-section-card`, `kair-rad-form-row`, `kair-rad-field`, `kair-rad-sticky-footer`, `kair-rad-side-card`, `kair-rad-table`). No se requieren nuevas reglas CSS.
+- [x] **CSS classes:** Todos los estilos usan `.kair-rad-*` preexistentes (`kair-rad-editor`, `kair-rad-section-card`, `kair-rad-form-row`, `kair-rad-field`, `kair-rad-sticky-footer`, `kair-rad-side-card`, `kair-rad-table`, `kair-rad-master__group-head` inline style). No se requieren nuevas reglas CSS.
 
 - [x] **Sin breaking changes:** `RevisionEditorView`, `RevisionesListView`, etc., no se tocan. La variable `currentView` solo se AGREGA al enum (no se elimina ningún valor).
+
+- [x] **Edge cases cubiertos:**
+  - 2 Principales mismo año → bloqueado ✓
+  - 2 Seguimientos mismo año → bloqueado ✓
+  - Seguimiento sin Principal → warning pero permite ✓
+  - Principal sin revisionId → bloqueado ✓
+  - Principal con revisión de año incorrecto → bloqueado ✓
+  - Acta sin fecha → bloqueado ✓
+  - Acta sin preside → bloqueado ✓
+  - Acta sin participantes → bloqueado ✓
