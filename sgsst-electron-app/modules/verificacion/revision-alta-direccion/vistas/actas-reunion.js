@@ -23,44 +23,84 @@ var ActasReunionView = (function() {
     return String(d);
   }
 
-  /* Mock data de actas (basado en formato G-FO-009) */
-  var ACTAS_MOCK = [
-    {
-      id: 'AR-2025-11',
-      fecha: '2025-11-20',
-      hora: '09:00 - 11:30',
-      lugar: 'Sala de Juntas TEMPOSUM',
-      responsable: 'Sergina Orozco Hincapié',
-      tipo: 'Seguimiento',
-      estado: 'Cerrada',
-      participantes: ['Sergina Orozco Hincapié', 'Javier Robles Fontalvo', 'Berkis Romero Mercado', 'Lic. María Rodríguez'],
-      ordenDelDia: '1. Revisión de cumplimiento de acuerdos del acta anterior\n2. Estado del plan de capacitaciones Q4\n3. Avance del sistema de gestión de EPP\n4. Próximos pasos y cierre',
-      compromisos: [
-        { id: 'CO-001', tema: 'Cierre de hallazgos auditoría interna Q3', responsable: 'Ing. Carlos López', fechaLimite: '2025-12-15', estado: 'En proceso' },
-        { id: 'CO-002', tema: 'Implementación del sistema de EPP digital', responsable: 'Ing. Luis Torres', fechaLimite: '2026-03-30', estado: 'Pendiente' },
-        { id: 'CO-003', tema: 'Capacitación en manejo de cargas críticas', responsable: 'Lic. María Rodríguez', fechaLimite: '2025-12-20', estado: 'Cumplido' }
-      ]
-    },
-    {
-      id: 'AR-2025-10',
-      fecha: '2025-10-15',
-      hora: '14:00 - 16:00',
-      lugar: 'Sala de Juntas TEMPOSUM',
-      responsable: 'Sergina Orozco Hincapié',
-      tipo: 'Ordinaria',
-      estado: 'Cerrada',
-      participantes: ['Sergina Orozco Hincapié', 'Javier Robles Fontalvo', 'Bernardo Ortiz Galindo'],
-      ordenDelDia: '1. Lectura del acta anterior\n2. Informe de accidentalidad del periodo\n3. Estado de implementación del SG-SST\n4. Proposiciones y varios',
-      compromisos: [
-        { id: 'CO-004', tema: 'Actualización matriz de riesgo psicosocial', responsable: 'Lic. María Rodríguez', fechaLimite: '2025-11-30', estado: 'Cumplido' },
-        { id: 'CO-005', tema: 'Programa de seguridad vial para conductores', responsable: 'Ing. Luis Torres', fechaLimite: '2026-03-30', estado: 'En proceso' }
-      ]
-    }
-  ];
+  /**
+   * Transforma un acta del shape DB ({id, numero, fecha, estado, metadata})
+   * al shape que espera la vista master-detail.
+   * IMPORTANTE: extrae tipo/año/semestre/revisionId de metadata para el modelo semestral.
+   * @param {Object} dbActa - Acta cruda desde SQLite
+   * @returns {Object} Acta en shape de vista
+   */
+  function _mapDbActaToView(dbActa) {
+    var meta = dbActa.metadata || {};
+    /* Si metadata no tiene año/semestre, derivarlos de la fecha */
+    var fecha = dbActa.fecha || '';
+    var año = meta.año || (fecha ? parseInt(fecha.substring(0, 4), 10) : new Date().getFullYear());
+    var semestre = meta.semestre || (fecha ? (parseInt(fecha.substring(5, 7), 10) <= 6 ? 1 : 2) : 1);
+
+    return {
+      id: dbActa.id,
+      numero: dbActa.numero,
+      fecha: fecha,
+      estado: dbActa.estado || 'Abierta',
+      archivo: dbActa.archivo || '',
+      /* Campos del modelo semestral */
+      tipo: meta.tipo || 'Principal',
+      año: año,
+      semestre: semestre,
+      revisionId: meta.revisionId || null,
+      /* Campos derivados de metadata */
+      hora: (meta.horaInicio && meta.horaFin) ? (meta.horaInicio + ' - ' + meta.horaFin) : '—',
+      lugar: meta.ciudad || '—',
+      responsable: meta.preside || '—',
+      tema: meta.tema || '',
+      participantes: Array.isArray(meta.participantes) ? meta.participantes.map(function(p) { return p.nombre || ''; }) : [],
+      ordenDelDia: meta.ordenDia || '',
+      compromisos: Array.isArray(meta.desarrollo) ? meta.desarrollo.map(function(c, i) {
+        return {
+          id: c.id || ('CO-' + String(i + 1).padStart(3, '0')),
+          tema: c.temaTratado || '',
+          responsable: c.responsable || '—',
+          fechaLimite: c.fecha || '',
+          estado: c.estado || 'Pendiente'
+        };
+      }) : []
+    };
+  }
+
+  /**
+   * Agrupa las actas por año y semestre para mostrar la lista master-detail.
+   * @param {Array} actas - Actas en shape de vista
+   * @returns {Array} Estructura agrupada [{ año, semestre, actas: [...] }, ...]
+   */
+  function _agruparPorAñoSemestre(actas) {
+    var grupos = {};
+    actas.forEach(function(a) {
+      var key = a.año + '-' + a.semestre;
+      if (!grupos[key]) {
+        grupos[key] = { año: a.año, semestre: a.semestre, actas: [] };
+      }
+      grupos[key].actas.push(a);
+    });
+    /* Ordenar por año DESC, semestre DESC */
+    return Object.keys(grupos)
+      .map(function(k) { return grupos[k]; })
+      .sort(function(a, b) {
+        if (a.año !== b.año) return b.año - a.año;
+        return b.semestre - a.semestre;
+      });
+  }
 
   function render(ctx) {
-    /* Si el backend trae actas reales, las usamos; sino mocks */
-    var actas = (ctx.data.actas && ctx.data.actas.length > 0) ? ctx.data.actas : ACTAS_MOCK;
+    /* Transformar actas del backend al shape de vista */
+    var actas = (ctx.data.actas || []).map(_mapDbActaToView);
+
+    /* Si no hay actas, mostrar empty state con CTA para crear primera */
+    if (actas.length === 0) {
+      return _renderEmptyState(ctx);
+    }
+
+    /* Agrupar por año y semestre para mostrar estructura jerárquica */
+    var grupos = _agruparPorAñoSemestre(actas);
 
     /* Estado local */
     var viewState = ctx.state.actasReunion || { activeId: actas[0] ? actas[0].id : null };
@@ -90,30 +130,51 @@ var ActasReunionView = (function() {
 
     var list = document.createElement('div');
     list.className = 'kair-rad-master__list';
-    actas.forEach(function(a) {
-      var item = document.createElement('button');
-      item.className = 'kair-rad-master__item' + (a.id === viewState.activeId ? ' is-active' : '');
-      item.setAttribute('data-acta-id', a.id);
-      item.innerHTML =
-        '<div class="kair-rad-master__item-head">' +
-          '<span class="kair-rad-master__item-id">' + _esc(a.id) + '</span>' +
-          '<span class="kair-rad-badge kair-rad-badge--' + (a.estado === 'Cerrada' ? 'success' : a.estado === 'En proceso' ? 'warning' : 'info') + '">' +
-            '<span class="dot"></span>' + _esc(a.estado) +
-          '</span>' +
-        '</div>' +
-        '<div class="kair-rad-master__item-date">' + _esc(formatDate(a.fecha)) + '</div>' +
-        '<div class="kair-rad-master__item-meta">' +
-          '<i class="bi bi-people"></i> ' + (a.participantes ? a.participantes.length : 0) + ' participantes' +
-          '<span style="margin: 0 4px">·</span>' +
-          '<i class="bi bi-clock"></i> ' + _esc(a.hora || '—') +
-        '</div>';
-      item.addEventListener('click', function() {
-        viewState.activeId = a.id;
-        ctx.state.actasReunion = viewState;
-        ctx.refresh();
+
+    /* Lista agrupada por año y semestre */
+    grupos.forEach(function(grupo) {
+      var añoLabel = grupo.año + (grupo.año === new Date().getFullYear() ? ' (actual)' : '');
+
+      /* Encabezado de año */
+      var añoHead = document.createElement('div');
+      añoHead.className = 'kair-rad-master__group-head';
+      añoHead.style.cssText = 'font:var(--rad-caption); color:var(--rad-text-muted); padding:var(--rad-s2) var(--rad-s3); text-transform:uppercase; letter-spacing:0.05em; margin-top:var(--rad-s3); border-bottom:1px solid var(--rad-border-soft)';
+      añoHead.textContent = 'Año ' + añoLabel;
+      list.appendChild(añoHead);
+
+      grupo.actas.forEach(function(a) {
+        var item = document.createElement('button');
+        item.className = 'kair-rad-master__item' + (a.id === viewState.activeId ? ' is-active' : '');
+        item.setAttribute('data-acta-id', a.id);
+
+        var tipoBadgeCls = a.tipo === 'Principal' ? 'success' : 'info';
+        var semLabel = 'S' + a.semestre + (a.tipo === 'Seguimiento' ? '-SEG' : '');
+
+        item.innerHTML =
+          '<div class="kair-rad-master__item-head">' +
+            '<span class="kair-rad-master__item-id">' + _esc(a.id) + '</span>' +
+            '<span class="kair-rad-badge kair-rad-badge--' + tipoBadgeCls + '">' +
+              '<span class="dot"></span>' + _esc(a.tipo) +
+            '</span>' +
+          '</div>' +
+          '<div class="kair-rad-master__item-date">' +
+            '<i class="bi bi-calendar3"></i> ' + _esc(formatDate(a.fecha)) +
+            ' <span style="color:var(--rad-text-muted); margin-left:var(--rad-s2)">' + semLabel + '</span>' +
+          '</div>' +
+          '<div class="kair-rad-master__item-meta">' +
+            '<i class="bi bi-people"></i> ' + (a.participantes ? a.participantes.length : 0) + ' participantes' +
+            '<span style="margin: 0 4px">·</span>' +
+            '<i class="bi bi-clock"></i> ' + _esc(a.hora || '—') +
+          '</div>';
+        item.addEventListener('click', function() {
+          viewState.activeId = a.id;
+          ctx.state.actasReunion = viewState;
+          ctx.refresh();
+        });
+        list.appendChild(item);
       });
-      list.appendChild(item);
     });
+
     master.appendChild(list);
     layout.appendChild(master);
 
@@ -135,13 +196,18 @@ var ActasReunionView = (function() {
     /* Header del detalle */
     var dHead = document.createElement('div');
     dHead.className = 'kair-rad-detail__head';
+    var tipoBadgeCls = acta.tipo === 'Principal' ? 'success' : 'info';
     dHead.innerHTML =
       '<div class="kair-rad-detail__head-row">' +
         '<span class="kair-rad-badge kair-rad-badge--primary"><span class="dot"></span>G-FO-009 · Acta de Reunión</span>' +
+        '<span class="kair-rad-badge kair-rad-badge--' + tipoBadgeCls + '"><span class="dot"></span>' + _esc(acta.tipo || 'Principal') + '</span>' +
         '<span class="kair-rad-badge kair-rad-badge--' + (acta.estado === 'Cerrada' ? 'success' : 'warning') + '"><span class="dot"></span>' + _esc(acta.estado) + '</span>' +
       '</div>' +
       '<h2 class="kair-rad-detail__title">Acta ' + _esc(acta.id) + '</h2>' +
-      '<p class="kair-rad-detail__subtitle">Reunión de ' + _esc(acta.tipo || 'seguimiento') + ' · ' + _esc(formatDate(acta.fecha)) + '</p>' +
+      '<p class="kair-rad-detail__subtitle">Año ' + _esc(String(acta.año)) + ' · Semestre ' + _esc(String(acta.semestre)) +
+        (acta.revisionId ? ' · Rev: ' + _esc(acta.revisionId) : '') +
+        ' · Reunión de ' + _esc(acta.tipo === 'Principal' ? 'revisión gerencial' : 'seguimiento') +
+      '</p>' +
       '<div class="kair-rad-detail__actions">' +
         '<button class="kair-rad-header__action kair-rad-header__action--secondary" data-acta="export"><i class="bi bi-download"></i> Exportar</button>' +
         '<button class="kair-rad-header__action kair-rad-header__action--primary" data-acta="edit"><i class="bi bi-pencil"></i> Editar acta</button>' +
@@ -234,14 +300,14 @@ var ActasReunionView = (function() {
           ctx.toast('Exportación', 'Generando XLSX del acta ' + acta.id, 'info');
         });
       }
-      if (btnEdit && typeof ctx.toast === 'function') {
+      if (btnEdit && typeof ctx.navigate === 'function') {
         btnEdit.addEventListener('click', function() {
-          ctx.toast('Editor de actas', 'Próximamente en OLA 4', 'info');
+          ctx.navigate('actas-editor', { id: acta.id });
         });
       }
-      if (btnNew && typeof ctx.toast === 'function') {
+      if (btnNew && typeof ctx.navigate === 'function') {
         btnNew.addEventListener('click', function() {
-          ctx.toast('Nueva acta', 'Iniciando conforme a G-FO-009', 'info');
+          ctx.navigate('actas-editor');
         });
       }
     }, 0);
@@ -265,6 +331,42 @@ var ActasReunionView = (function() {
       '</div>' +
       '<h3 class="kair-rad-state__title">Sin acta seleccionada</h3>' +
       '<p class="kair-rad-state__desc">Crea una nueva acta de reunión para iniciar el seguimiento conforme a G-FO-009.</p>';
+    return wrap;
+  }
+
+  /**
+   * Renderiza el empty state cuando no hay actas registradas.
+   * Muestra el contexto del modelo semestral (2 actas/año) para que el usuario entienda.
+   * @param {Object} ctx - Contexto de la vista (para navigate/toast)
+   * @returns {HTMLElement} Wrap con el empty state
+   */
+  function _renderEmptyState(ctx) {
+    var wrap = document.createElement('div');
+    wrap.className = 'kair-rad-state';
+    wrap.style.padding = 'var(--rad-s8) var(--rad-s6)';
+    wrap.innerHTML =
+      '<div class="kair-rad-state__icon kair-rad-state__icon--muted">' +
+        '<i class="bi bi-file-earmark-text" style="font-size:1.75rem"></i>' +
+      '</div>' +
+      '<h3 class="kair-rad-state__title">Sin actas registradas</h3>' +
+      '<p class="kair-rad-state__desc">' +
+        'El formato G-FO-009 se usa 2 veces por año para registrar las reuniones gerenciales: ' +
+        '<strong>1 acta principal</strong> (donde se firma la revisión del periodo anterior) y ' +
+        '<strong>1 acta de seguimiento</strong> (primer seguimiento a mitad de año).' +
+      '</p>' +
+      '<button class="kair-rad-header__action kair-rad-header__action--primary" id="kair-rad-actas-empty-new" style="margin-top: var(--rad-s4)">' +
+        '<i class="bi bi-plus-circle"></i> Crear primera acta' +
+      '</button>';
+
+    setTimeout(function() {
+      var btn = document.getElementById('kair-rad-actas-empty-new');
+      if (btn && typeof ctx.navigate === 'function') {
+        btn.addEventListener('click', function() {
+          ctx.navigate('actas-editor');
+        });
+      }
+    }, 0);
+
     return wrap;
   }
 
