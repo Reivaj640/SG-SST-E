@@ -1413,24 +1413,14 @@ if (appHeader) {
     let headerUpdatePanelVisible = false;
     let currentAppVersion = null;
 
-    // Toggle update panel when clicking the update button (smart: solo si hay update)
+    // Toggle update panel when clicking the update button
+    // El botón solo es visible cuando hay update, así que el click siempre toggle del panel
     if (headerUpdateBtn) {
       headerUpdateBtn.addEventListener('click', () => {
-        const hasUpdate = headerUpdateBtn.classList.contains('header-update-available')
-                       || headerUpdateBtn.classList.contains('header-update-ready');
-
-        if (hasUpdate) {
-          // Hay update: toggle del panel de descarga/instalación
-          headerUpdatePanelVisible = !headerUpdatePanelVisible;
-          if (headerUpdatePanel) {
-            headerUpdatePanel.style.display = headerUpdatePanelVisible ? 'flex' : 'none';
-          }
-        } else if (headerUpdateBtn.classList.contains('header-update-uptodate')) {
-          // Está al día: forzar check manual
-          updateHeaderStatus('checking');
-          window.electronAPI.checkForUpdatesManual && window.electronAPI.checkForUpdatesManual();
+        headerUpdatePanelVisible = !headerUpdatePanelVisible;
+        if (headerUpdatePanel) {
+          headerUpdatePanel.style.display = headerUpdatePanelVisible ? 'flex' : 'none';
         }
-        // Si está 'checking', no hacer nada (ignorar clicks durante el check)
       });
     }
 
@@ -1444,6 +1434,8 @@ if (appHeader) {
 
     // Helper: Update header status (unifica los 4 estados visuales del botón)
     // Estados: 'uptodate' | 'checking' | 'available' | 'ready'
+    // Comportamiento: el botón SOLO se muestra cuando hay update real (available/ready).
+    // Cuando está al día o buscando, queda oculto — sin indicador permanente.
     function updateHeaderStatus(state, options = {}) {
       if (!headerUpdateBtn || !headerUpdateText) return;
 
@@ -1457,12 +1449,8 @@ if (appHeader) {
 
       switch (state) {
         case 'uptodate':
-          headerUpdateBtn.classList.add('header-update-uptodate');
-          headerUpdateText.textContent = options.version ? `Al día v${options.version}` : 'Al día';
-          headerUpdateBtn.title = options.version
-            ? `Versión ${options.version} - Sin actualizaciones pendientes (click para re-verificar)`
-            : 'Sin actualizaciones pendientes';
-          // Ocultar panel si estaba abierto de un update anterior
+          // OCULTO: no hay update, no se muestra nada en el header
+          headerUpdateBtn.style.display = 'none';
           if (headerUpdatePanel) {
             headerUpdatePanel.style.display = 'none';
             headerUpdatePanelVisible = false;
@@ -1470,12 +1458,13 @@ if (appHeader) {
           break;
 
         case 'checking':
-          headerUpdateBtn.classList.add('header-update-checking');
-          headerUpdateText.textContent = 'Buscando...';
-          headerUpdateBtn.title = 'Buscando actualizaciones...';
+          // OCULTO durante la búsqueda (solo se ve el botón si hay update real)
+          headerUpdateBtn.style.display = 'none';
           break;
 
         case 'available':
+          // VISIBLE: hay update, botón amarillo pulsante con versión
+          headerUpdateBtn.style.display = 'flex';
           headerUpdateBtn.classList.add('header-update-available');
           headerUpdateText.textContent = options.version ? `v${options.version}` : 'Update';
           headerUpdateBtn.title = options.version
@@ -1492,6 +1481,8 @@ if (appHeader) {
           break;
 
         case 'ready':
+          // VISIBLE: update listo, botón verde con botón "Actualizar"
+          headerUpdateBtn.style.display = 'flex';
           headerUpdateBtn.classList.add('header-update-ready');
           headerUpdateText.textContent = options.version ? `v${options.version}` : 'Listo';
           headerUpdateBtn.title = options.version
@@ -1520,13 +1511,11 @@ if (appHeader) {
     function hideHeaderUpdatePanel() { updateHeaderStatus('uptodate'); }
 
     // Cuando comienza a buscar actualizaciones
+    // (Sin toast — solo actualizamos estado interno del header)
     window.electronAPI?.onUpdateChecking && window.electronAPI.onUpdateChecking(() => {
       console.log('[UPDATER] Evento recibido: update_checking');
       logMessage('Buscando actualizaciones...', 'INFO');
       updateHeaderStatus('checking');
-      if (window.updateNotifier) {
-        window.updateNotifier.notifyChecking();
-      }
     });
 
     // Cuando hay una actualización disponible (comienza la descarga)
@@ -1536,28 +1525,19 @@ if (appHeader) {
       if (info && info.version) {
         updateHeaderStatus('available', { version: info.version });
       }
-      if (window.updateNotifier && info && info.version) {
-        window.updateNotifier.notifyAvailable(info.version);
-      }
     });
 
     // Cuando NO hay actualizaciones disponibles
     window.electronAPI?.onUpdateNotAvailable && window.electronAPI.onUpdateNotAvailable((info) => {
       console.log('[UPDATER] Evento recibido: update_not_available', info);
       logMessage('No hay actualizaciones disponibles', 'INFO');
-      // Volver al estado "al día" con la versión actual (info.version = versión local)
+      // Volver al estado "al día" (oculta el botón)
       updateHeaderStatus('uptodate', { version: info?.version || currentAppVersion });
-      if (window.updateNotifier) {
-        window.updateNotifier.notifyNotAvailable();
-      }
     });
 
     // Progreso de descarga
     window.electronAPI?.onUpdateProgress && window.electronAPI.onUpdateProgress((data) => {
       console.log('[UPDATER] Evento recibido: update_progress', data);
-      if (window.updateNotifier && data) {
-        window.updateNotifier.updateProgress(data.percent, data.speed);
-      }
       // Update header progress (la barra dentro del panel)
       if (data && data.percent !== undefined) {
         updateHeaderProgress(data.percent, data.speed);
@@ -1568,24 +1548,8 @@ if (appHeader) {
     window.electronAPI?.onUpdateDownloaded && window.electronAPI.onUpdateDownloaded((info) => {
       console.log('[UPDATER] Evento recibido: update_downloaded', info);
       logMessage('Actualización descargada y lista para instalar', 'INFO');
-
-      // Mostrar notificación moderna con botón de reinicio
       const version = info ? info.version : 'más reciente';
-
-      if (window.updateNotifier) {
-        window.updateNotifier.notifyDownloaded(version, () => {
-          // Reiniciar la aplicación cuando el usuario hace clic en el botón
-          logMessage('Usuario solicitó reiniciar para instalar actualización', 'INFO');
-          window.electronAPI.restartApp && window.electronAPI.restartApp();
-        });
-      } else {
-        // Fallback a confirmación tradicional si el sistema de notificaciones no está disponible
-        const userResponse = confirm(`¡Actualización ${version} descargada! ¿Desea reiniciar la aplicación ahora para instalarla?`);
-        if (userResponse) {
-          window.electronAPI.restartApp && window.electronAPI.restartApp();
-        }
-      }
-      // Update header UI → estado "ready"
+      // Update header UI → estado "ready" (botón verde con botón Actualizar en panel)
       updateHeaderStatus('ready', { version });
     });
 
@@ -1593,10 +1557,7 @@ if (appHeader) {
     window.electronAPI?.onUpdateError && window.electronAPI.onUpdateError((data) => {
       console.log('[UPDATER] Evento recibido: update_error', data);
       logMessage(`Error de actualización: ${data ? data.message : 'error desconocido'}`, 'ERROR');
-      if (window.updateNotifier && data) {
-        window.updateNotifier.notifyError(data.message);
-      }
-      // Volver a "al día" pero mostrar el error por toast (no en header)
+      // Volver a estado oculto
       updateHeaderStatus('uptodate', { version: currentAppVersion });
     });
 
@@ -2566,7 +2527,9 @@ function createSidebarButtons(activeModules = null) {
     li.className = 'sidebar-menu-item';
 
     const button = document.createElement('button');
-    button.className = 'sidebar-menu-button';
+    /* "Gestión de Peligros y Riesgos" tiene la clase extra para permitir texto centrado
+       (es el único módulo cuyo nombre es demasiado largo para el layout lineal). */
+    button.className = 'sidebar-menu-button' + (item.name === 'Gestión de Peligros y Riesgos' ? ' sidebar-long-label' : '');
     button.textContent = item.name;
 
     button.addEventListener('click', () => {
