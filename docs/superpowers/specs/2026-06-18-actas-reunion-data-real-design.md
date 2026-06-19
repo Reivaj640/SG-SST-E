@@ -1,6 +1,6 @@
 # Diseño: Actas de Reunión (G-FO-009) — Datos reales + Editor
 
-**Fecha:** 2026-06-18
+**Fecha:** 2026-06-18 (actualizado 2026-06-19 con modelo semestral)
 **Estado:** Pendiente revisión del usuario
 **Módulo:** 6.1.3 — Revisión por la Alta Dirección
 **Subsección:** Actas de Reunión Gerencial (G-FO-009)
@@ -17,6 +17,33 @@ Ya existen en el código:
 
 Archivo real presente en la carpeta de la empresa:
 - `GG-FO-009 ACTA DE REUNION GERENCIAL.xlsx` (24.9 KB, enero 2017)
+
+## Modelo de negocio (2 actas por año, mismo periodo que las revisiones)
+
+El usuario aclaró que las actas NO son mensuales ni independientes, sino que siguen el **mismo periodo semestral que las revisiones gerenciales**. Por cada año se generan exactamente **2 actas**:
+
+| Tipo | Cuándo se crea | Vincular con |
+|---|---|---|
+| **Principal** | Semestre 1 (Ene-Jun): reunión donde se firma la revisión gerencial del **periodo anterior** | Revisión G-FO-006 del año anterior |
+| **Seguimiento** | Semestre 2 (Jul-Dic): primer seguimiento a mitad de año (~junio) | (Opcional) Acta principal del mismo año |
+
+**Resultado:** 2 actas/año × N años = 2N actas.
+
+### IDs generados
+
+```
+ACT-2025-S1       ← Principal 2025 (revisión del periodo 2024)
+ACT-2025-S2-SEG   ← Seguimiento 2025
+ACT-2026-S1       ← Principal 2026 (revisión del periodo 2025)
+ACT-2026-S2-SEG   ← Seguimiento 2026
+```
+
+### Reglas de validación
+
+1. **Una sola acta Principal por año** — si ya existe `ACT-YYYY-S1`, bloquear creación de otra Principal ese año.
+2. **Una sola acta Seguimiento por año** — mismo principio.
+3. **Seguimiento sin Principal** — permitido pero con warning (toast informativo).
+4. **Si `tipo=Principal`, `revisionId` es obligatorio** y debe corresponder a una revisión del **año anterior**.
 
 ## Decisión
 
@@ -72,9 +99,13 @@ hub
 | Vista pide              | DB tiene (en `metadata_json` salvo id/fecha/estado) | Transformación                          |
 |-------------------------|-----------------------------------------------------|------------------------------------------|
 | `id`                    | `actas.id`                                          | directo                                  |
+| `numero`                | `actas.numero`                                      | directo                                  |
 | `fecha`                 | `actas.fecha`                                       | directo                                  |
 | `estado`                | `actas.estado`                                      | directo                                  |
-| `numero`                | `actas.numero`                                      | directo                                  |
+| `tipo`                  | `metadata.tipo`                                     | directo (`'Principal'` \| `'Seguimiento'`) |
+| `año`                   | `metadata.año`                                      | directo (calculado de fecha si falta)    |
+| `semestre`              | `metadata.semestre`                                 | directo (`1` \| `2`)                     |
+| `revisionId`            | `metadata.revisionId`                               | directo (vínculo a revisión)             |
 | `hora` (rango)          | `metadata.horaInicio` + `metadata.horaFin`          | `${horaInicio} - ${horaFin}` o `—`       |
 | `lugar`                 | `metadata.ciudad`                                   | directo                                  |
 | `responsable`           | `metadata.preside`                                  | directo                                  |
@@ -87,14 +118,18 @@ hub
 
 ```javascript
 {
-  id: 'ACT-2025-12',  // generado si es nuevo
+  id: 'ACT-2025-S1',          // generado si es nuevo: ACT-YYYY-S1 o ACT-YYYY-S2-SEG
   empresaId: 'tempoactiva',
-  numero: 11,
-  fecha: '2025-12-01',
+  numero: 1,                  // 1 para Principal, 2 para Seguimiento
+  fecha: '2025-06-15',
   estado: 'Cerrada',
-  archivo: null,  // opcional
+  archivo: null,              // opcional
   metadata: {
-    tema: 'Reunión de Seguimiento',
+    tipo: 'Principal',        // 'Principal' | 'Seguimiento'
+    año: 2025,
+    semestre: 1,              // 1 | 2
+    revisionId: 'RG-2024-01', // solo si tipo=Principal
+    tema: 'Revisión gerencial del periodo anterior',
     preside: 'Sergina Orozco',
     ciudad: 'Sala de Juntas TEMPOSUM',
     horaInicio: '09:00',
@@ -121,19 +156,26 @@ Ya existe. `_autoImportXlsx()` corre al inicio si NO existe `G-FO-009.json`. Fil
 ## Empty state (sin actas)
 
 ```
-🗒️  Sin actas registradas
-Crea la primera acta de reunión conforme al formato G-FO-009.
+📄  Sin actas registradas
+
+El formato G-FO-009 se usa 2 veces por año para registrar las
+reuniones gerenciales: 1 acta principal (con la revisión) y
+1 acta de seguimiento.
+
 [+ Crear primera acta]
 ```
 
 ## Plan de prueba
 
-1. **Import:** renombrar/eliminar cualquier `G-FO-009.json`, reiniciar app, verificar que aparece 1 acta importada del XLSX de 2017.
-2. **Vista:** confirmar que lista y detalle muestran los campos del XLSX real (no los del mock).
-3. **Crear:** click "Nueva acta" → llenar formulario → guardar → aparece en la lista.
-4. **Editar:** click "Editar acta" → modificar un campo → guardar → cambio persiste tras recargar.
-5. **Empty state:** con tabla `actas` vacía y sin XLSX, verificar que se muestra el empty state.
-6. **Persistencia:** reiniciar app y verificar que las actas creadas siguen ahí.
+1. **Import XLSX:** renombrar/eliminar cualquier `G-FO-009.json`, reiniciar app, verificar que aparece 1 acta importada del XLSX de 2017 (tipo: Principal, año: 2017, semestre: 1).
+2. **Vista agrupada:** confirmar que la lista agrupa por año y semestre (no por mes), y muestra el badge de tipo (`Principal` / `Seguimiento`).
+3. **Crear Principal:** click "Nueva acta" → tipo Principal (default) → llenar formulario → vincular con revisión del año anterior → guardar → aparece en Semestre 1.
+4. **Bloqueo de 2 Principales:** intentar crear otra Principal para el mismo año → toast de error "Ya existe el acta principal de YYYY".
+5. **Crear Seguimiento:** cambiar tipo a Seguimiento → llenar formulario → guardar → aparece en Semestre 2.
+6. **Seguimiento sin Principal:** eliminar la Principal → intentar crear Seguimiento → warning informativo "No hay acta principal de este año" pero permite continuar.
+7. **Editar:** click "Editar acta" → modificar un campo → guardar → cambio persiste tras recargar.
+8. **Persistencia:** reiniciar app y verificar que las actas creadas siguen ahí con su tipo/semestre correctos.
+9. **Empty state:** con tabla `actas` vacía y sin XLSX, verificar que se muestra el empty state actualizado con la explicación semestral.
 
 ## Fuera de alcance
 
@@ -141,9 +183,11 @@ Crea la primera acta de reunión conforme al formato G-FO-009.
 - Edición de campos de archivos adjuntos.
 - Versionado / historial de cambios.
 - Permisos por usuario sobre actas específicas.
+- Múltiples actas de seguimiento por semestre (modelo actual: máximo 1 por semestre).
 
 ## Riesgos
 
-1. **Layout del XLSX 2017 puede no coincidir con el parser.** Mitigación: probar al primer import y ajustar `_parserGFO009` si es necesario.
+1. **Layout del XLSX 2017 puede no coincidir con el parser.** Mitigación: probar al primer import y ajustar `_parserGFO009` si es necesario. Como el XLSX es de 2017, debería mapear a `ACT-2017-S1` (Principal).
 2. **Forma de la tabla `desarrollo` es fija en el parser (10 filas).** El editor debe permitir agregar/quitar filas dinámicamente sin depender del parser.
 3. **Botón "Exportar"** sigue mostrando toast hasta que se implemente la exportación G-FO-009 (fuera de alcance).
+4. **El XLSX de 2017 no tiene campo `tipo`** — al importarlo, asumir Principal (es la única que existía en ese modelo mental). Si el usuario después crea Seguimientos, coexistirán.
