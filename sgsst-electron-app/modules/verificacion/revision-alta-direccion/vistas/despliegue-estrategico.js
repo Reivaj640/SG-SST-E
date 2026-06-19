@@ -144,36 +144,77 @@ var DespliegueEstrategicoView = (function() {
     var wrap = document.createElement('div');
     wrap.className = 'kair-rad-view-despliegue';
 
-    /* Summary cards */
+    /* KPIs · mismo patrón visual que el HUB de 6.1.3 (kair-rad-kpi-strip).
+       4 tarjetas: Total | Cumplen | Parcial | No cumplen.
+       Cada una con icono en círculo de color, valor grande, label uppercase,
+       y sub-línea con ícono contextual (check, alerta, reloj). */
     var total = indicadores.length;
     var cumple = indicadores.filter(function(i) { return i.estado === 'Cumple'; }).length;
     var parcial = indicadores.filter(function(i) { return i.estado === 'Parcial'; }).length;
     var noCumple = indicadores.filter(function(i) { return i.estado === 'No cumple'; }).length;
+    var sinMedicion = indicadores.filter(function(i) { return i.estado === 'Sin medición'; }).length;
 
-    var summary = document.createElement('div');
-    summary.className = 'kair-rad-summary-grid';
-    summary.innerHTML =
-      '<div class="kair-rad-summary-card">' +
-        '<div class="kair-rad-summary-card__label">Total indicadores</div>' +
-        '<div class="kair-rad-summary-card__value">' + total + '</div>' +
-        '<div class="kair-rad-summary-card__sub">del despliegue estratégico</div>' +
-      '</div>' +
-      '<div class="kair-rad-summary-card kair-rad-summary-card--success">' +
-        '<div class="kair-rad-summary-card__label">Cumplen</div>' +
-        '<div class="kair-rad-summary-card__value">' + cumple + '</div>' +
-        '<div class="kair-rad-summary-card__sub kair-rad-summary-card__sub--success">en meta</div>' +
-      '</div>' +
-      '<div class="kair-rad-summary-card kair-rad-summary-card--warning">' +
-        '<div class="kair-rad-summary-card__label">Parcial</div>' +
-        '<div class="kair-rad-summary-card__value">' + parcial + '</div>' +
-        '<div class="kair-rad-summary-card__sub kair-rad-summary-card__sub--warning">requieren atención</div>' +
-      '</div>' +
-      '<div class="kair-rad-summary-card kair-rad-summary-card--danger">' +
-        '<div class="kair-rad-summary-card__label">No cumplen</div>' +
-        '<div class="kair-rad-summary-card__value">' + noCumple + '</div>' +
-        '<div class="kair-rad-summary-card__sub kair-rad-summary-card__sub--danger">críticos</div>' +
-      '</div>';
-    wrap.appendChild(summary);
+    var kpis = [
+      {
+        value: String(total),
+        label: 'Total indicadores',
+        icon: 'bi-bullseye',
+        color: 'primary',
+        sub: sinMedicion > 0
+          ? sinMedicion + ' sin medición registrada'
+          : 'del despliegue estratégico',
+        subClass: sinMedicion > 0 ? '' : ''
+      },
+      {
+        value: String(cumple),
+        label: 'Cumplen',
+        icon: 'bi-check2-circle',
+        color: 'success',
+        sub: cumple > 0
+          ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> En meta'
+          : 'Sin indicadores en meta',
+        subClass: cumple > 0 ? 'kair-rad-kpi__sub--success' : ''
+      },
+      {
+        value: String(parcial),
+        label: 'Parcial',
+        icon: 'bi-exclamation-circle',
+        color: 'warning',
+        sub: parcial > 0
+          ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Requieren atención'
+          : 'Sin indicadores parciales',
+        subClass: parcial > 0 ? 'kair-rad-kpi__sub--warning' : ''
+      },
+      {
+        value: String(noCumple),
+        label: 'No cumplen',
+        icon: 'bi-x-octagon',
+        color: 'danger',
+        sub: noCumple > 0
+          ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Críticos'
+          : 'Sin indicadores críticos',
+        subClass: noCumple > 0 ? 'kair-rad-kpi__sub--danger' : ''
+      }
+    ];
+
+    var kpiStrip = document.createElement('div');
+    kpiStrip.className = 'kair-rad-kpi-strip kair-rad-kpi-strip--flush';
+
+    kpis.forEach(function(kpi) {
+      var item = document.createElement('div');
+      item.className = 'kair-rad-kpi';
+      item.innerHTML =
+        '<div class="kair-rad-kpi__icon kair-rad-kpi__icon--' + kpi.color + '">' +
+          '<i class="bi ' + kpi.icon + '" style="font-size:1.125rem"></i>' +
+        '</div>' +
+        '<div class="kair-rad-kpi__content">' +
+          '<div class="kair-rad-kpi__value">' + _esc(kpi.value) + '</div>' +
+          '<div class="kair-rad-kpi__label">' + _esc(kpi.label) + '</div>' +
+          '<div class="kair-rad-kpi__sub ' + (kpi.subClass || '') + '">' + kpi.sub + '</div>' +
+        '</div>';
+      kpiStrip.appendChild(item);
+    });
+    wrap.appendChild(kpiStrip);
 
     /* Search + filter row */
     var searchRow = document.createElement('div');
@@ -188,6 +229,7 @@ var DespliegueEstrategicoView = (function() {
         _filterChip('Cumple', 'Cumple', viewState.filter) +
         _filterChip('Parcial', 'Parcial', viewState.filter) +
         _filterChip('No cumple', 'No cumple', viewState.filter) +
+        _filterChip('Sin medición', 'Sin medición', viewState.filter) +
       '</div>';
     wrap.appendChild(searchRow);
 
@@ -245,8 +287,7 @@ var DespliegueEstrategicoView = (function() {
         return (i.objetivo || '').toLowerCase().indexOf(s) >= 0 ||
                (i.indicador || '').toLowerCase().indexOf(s) >= 0 ||
                (i.formula || '').toLowerCase().indexOf(s) >= 0 ||
-               (i.responsable || '').toLowerCase().indexOf(s) >= 0 ||
-               (i.politica || '').toLowerCase().indexOf(s) >= 0;
+               (i.responsable || '').toLowerCase().indexOf(s) >= 0;
       });
     }
     return r;
@@ -265,8 +306,7 @@ var DespliegueEstrategicoView = (function() {
       return;
     }
 
-    var html = '<table class="kair-rad-table kair-rad-table--10col"><thead><tr>' +
-      '<th>Política</th>' +
+    var html = '<table class="kair-rad-table"><thead><tr>' +
       '<th>Objetivo estratégico</th>' +
       '<th>Indicador</th>' +
       '<th style="min-width: 180px">Fórmula</th>' +
@@ -279,13 +319,16 @@ var DespliegueEstrategicoView = (function() {
     '</tr></thead><tbody>';
 
     rows.forEach(function(i) {
-      var estadoCls = i.estado === 'Cumple' ? 'success' : (i.estado === 'Parcial' ? 'warning' : 'danger');
-      var trendIcon = i.tendencia === 'up' ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="color: var(--rad-success)"><polyline points="6 15 12 9 18 15"/></svg>' :
+      var estadoCls = i.estado === 'Cumple' ? 'success'
+        : i.estado === 'Parcial' ? 'warning'
+        : i.estado === 'Sin medición' ? 'info'
+        : 'danger';
+      var trendIcon = i.ultimoValor === '—' || !i.ultimoValor ? '' :
+                       i.tendencia === 'up' ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="color: var(--rad-success)"><polyline points="6 15 12 9 18 15"/></svg>' :
                        i.tendencia === 'down' ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="color: var(--rad-success)"><polyline points="6 9 12 15 18 9"/></svg>' :
                        '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="color: var(--rad-text-muted)"><line x1="5" y1="12" x2="19" y2="12"/></svg>';
 
       html += '<tr>' +
-        '<td style="font: var(--rad-caption); color: var(--rad-text-muted)">' + _esc(i.politica) + '</td>' +
         '<td style="font: var(--rad-body-sm)">' + _esc(i.objetivo) + '</td>' +
         '<td><strong>' + _esc(i.indicador) + '</strong></td>' +
         '<td style="font: var(--rad-caption); color: var(--rad-text-muted); white-space: normal; line-height: 1.4">' + _esc(i.formula) + '</td>' +

@@ -737,7 +737,7 @@ var ActasEditorView = (function() {
        El cálculo deja espacio para el header (~80px), tabs (~50px), section header (~80px),
        section footer (~70px), sticky footer global (~70px) y márgenes (~30px). */
     var listWrap = document.createElement('div');
-    listWrap.style.cssText = 'max-height:calc(100vh - 380px); overflow-y:auto; padding:4px 6px 4px 2px; display:flex; flex-direction:column; gap:var(--rad-s3)';
+    listWrap.style.cssText = 'max-height:calc(100vh - 380px); overflow-y:auto; padding:2px 6px 2px 2px; display:flex; flex-direction:column; gap:var(--rad-s4)';
     listWrap.id = 'kair-rad-acta-desarrollo-list';
 
     editorState.desarrollo.forEach(function(c, idx) {
@@ -769,55 +769,64 @@ var ActasEditorView = (function() {
   }
 
   /**
-   * Render de un compromiso individual como CARD (no celda de tabla).
-   * Layout vertical apilado — sin bordes visibles, sin cuadrículas.
-   * Mantiene data-dev-field / data-dev-idx para que los handlers existentes sigan funcionando.
+   * Render de un compromiso individual como BLOQUE LIMPIO (sin tarjeta).
+   * Mismo lenguaje visual que Participantes: usa `.kair-rad-form-row` y
+   * `.kair-rad-field` para que se vea consistente con el resto del editor.
+   * No tiene background, ni border, ni border-radius — la separación entre
+   * compromisos la da el `gap` del contenedor padre.
+   * Mantiene data-dev-field / data-dev-idx para que los handlers existentes
+   * sigan funcionando.
    */
   function _renderDesarrolloRow(compromiso, idx, editorState, ctx) {
-    var card = document.createElement('div');
-    card.className = 'kair-rad-acta-compromiso-card';
-    card.style.cssText = 'background:var(--rad-bg-card); border:1px solid var(--rad-border-soft); border-radius:var(--rad-radius-md); padding:var(--rad-s4); display:flex; flex-direction:column; gap:var(--rad-s3)';
+    var row = document.createElement('div');
+    row.className = 'kair-rad-acta-compromiso-row';
 
-    /* Header de la card: número + botón eliminar */
+    /* Encabezado sutil: número a la izquierda, botón eliminar a la derecha.
+       Sin fondo ni borde — es solo un rótulo discreto para identificar el compromiso. */
     var head = document.createElement('div');
-    head.style.cssText = 'display:flex; align-items:center; justify-content:space-between';
+    head.style.cssText = 'display:flex; align-items:center; justify-content:space-between; margin-bottom:var(--rad-s2)';
     head.innerHTML =
-      '<span style="font:600 0.75rem var(--rad-font); color:var(--rad-text-muted); text-transform:uppercase; letter-spacing:0.05em">Compromiso N° ' + (idx + 1) + '</span>' +
-      '<button class="kair-rad-header__action kair-rad-header__action--ghost" data-dev-remove="' + idx + '" title="Eliminar" style="padding:4px 8px">' +
+      '<span style="font:600 0.6875rem/1 var(--rad-font); color:var(--rad-primary); text-transform:uppercase; letter-spacing:0.06em">Compromiso N° ' + (idx + 1) + '</span>' +
+      '<button class="kair-rad-header__action kair-rad-header__action--ghost" data-dev-remove="' + idx + '" title="Eliminar">' +
         '<i class="bi bi-trash"></i>' +
       '</button>';
-    card.appendChild(head);
+    row.appendChild(head);
 
-    /* Campo: Tema tratado (full width) */
-    var fieldTema = document.createElement('div');
-    fieldTema.style.cssText = 'display:flex; flex-direction:column; gap:4px';
-    fieldTema.innerHTML =
-      '<label style="font:500 0.75rem var(--rad-font); color:var(--rad-text-muted); text-transform:uppercase; letter-spacing:0.04em">Tema tratado</label>' +
-      '<input type="text" value="' + _esc(compromiso.temaTratado) + '" data-dev-field="temaTratado" data-dev-idx="' + idx + '" placeholder="Ej: Cierre de hallazgos auditoría Q3" style="width:100%">';
-    card.appendChild(fieldTema);
+    /* Campo: Tema tratado — fila completa */
+    var rowTema = document.createElement('div');
+    rowTema.className = 'kair-rad-form-row kair-rad-form-row--full';
+    rowTema.style.marginTop = '0';
+    rowTema.innerHTML =
+      '<div class="kair-rad-field">' +
+        '<label>Tema tratado</label>' +
+        '<input type="text" value="' + _esc(compromiso.temaTratado) + '" data-dev-field="temaTratado" data-dev-idx="' + idx + '" placeholder="Ej: Cierre de hallazgos auditoría Q3">' +
+      '</div>';
+    row.appendChild(rowTema);
 
-    /* Campo: Compromiso (full width) */
-    var fieldComp = document.createElement('div');
-    fieldComp.style.cssText = 'display:flex; flex-direction:column; gap:4px';
-    fieldComp.innerHTML =
-      '<label style="font:500 0.75rem var(--rad-font); color:var(--rad-text-muted); text-transform:uppercase; letter-spacing:0.04em">Compromiso</label>' +
-      '<input type="text" value="' + _esc(compromiso.compromiso) + '" data-dev-field="compromiso" data-dev-idx="' + idx + '" placeholder="Ej: Documentar evidencia de cierre" style="width:100%">';
-    card.appendChild(fieldComp);
+    /* Campo: Compromiso — fila completa */
+    var rowComp = document.createElement('div');
+    rowComp.className = 'kair-rad-form-row kair-rad-form-row--full';
+    rowComp.innerHTML =
+      '<div class="kair-rad-field">' +
+        '<label>Compromiso</label>' +
+        '<input type="text" value="' + _esc(compromiso.compromiso) + '" data-dev-field="compromiso" data-dev-idx="' + idx + '" placeholder="Ej: Documentar evidencia de cierre">' +
+      '</div>';
+    row.appendChild(rowComp);
 
-    /* Fila: Responsable + Fecha + Estado (3 columnas en pantallas anchas, apilables en angostas) */
+    /* Fila meta: Responsable + Fecha límite + Estado (mismo grid 3-col que usa Participantes) */
     var rowMeta = document.createElement('div');
-    rowMeta.style.cssText = 'display:grid; grid-template-columns: 2fr 1fr 1fr; gap:var(--rad-s3); align-items:end';
+    rowMeta.className = 'kair-rad-form-row';
     rowMeta.innerHTML =
-      '<div style="display:flex; flex-direction:column; gap:4px">' +
-        '<label style="font:500 0.75rem var(--rad-font); color:var(--rad-text-muted); text-transform:uppercase; letter-spacing:0.04em">Responsable</label>' +
+      '<div class="kair-rad-field">' +
+        '<label>Responsable</label>' +
         '<input type="text" value="' + _esc(compromiso.responsable) + '" data-dev-field="responsable" data-dev-idx="' + idx + '" placeholder="Nombre">' +
       '</div>' +
-      '<div style="display:flex; flex-direction:column; gap:4px">' +
-        '<label style="font:500 0.75rem var(--rad-font); color:var(--rad-text-muted); text-transform:uppercase; letter-spacing:0.04em">Fecha límite</label>' +
+      '<div class="kair-rad-field">' +
+        '<label>Fecha límite</label>' +
         '<input type="date" value="' + _esc(compromiso.fecha) + '" data-dev-field="fecha" data-dev-idx="' + idx + '">' +
       '</div>' +
-      '<div style="display:flex; flex-direction:column; gap:4px">' +
-        '<label style="font:500 0.75rem var(--rad-font); color:var(--rad-text-muted); text-transform:uppercase; letter-spacing:0.04em">Estado</label>' +
+      '<div class="kair-rad-field">' +
+        '<label>Estado</label>' +
         '<select data-dev-field="estado" data-dev-idx="' + idx + '">' +
           ESTADOS_COMPROMISO.map(function(e) {
             var sel = (e === compromiso.estado) ? ' selected' : '';
@@ -825,10 +834,10 @@ var ActasEditorView = (function() {
           }).join('') +
         '</select>' +
       '</div>';
-    card.appendChild(rowMeta);
+    row.appendChild(rowMeta);
 
     /* Bind input changes (mismo patrón que antes) */
-    card.querySelectorAll('[data-dev-field]').forEach(function(inp) {
+    row.querySelectorAll('[data-dev-field]').forEach(function(inp) {
       var field = inp.getAttribute('data-dev-field');
       var index = parseInt(inp.getAttribute('data-dev-idx'), 10);
       var handler = function() {
@@ -840,7 +849,7 @@ var ActasEditorView = (function() {
     });
 
     setTimeout(function() {
-      var btn = card.querySelector('[data-dev-remove="' + idx + '"]');
+      var btn = row.querySelector('[data-dev-remove="' + idx + '"]');
       if (btn) {
         btn.addEventListener('click', function() {
           editorState.desarrollo.splice(idx, 1);
@@ -851,7 +860,7 @@ var ActasEditorView = (function() {
       }
     }, 0);
 
-    return card;
+    return row;
   }
 
   /* ═══════════════════════════════════════════════════════════════════════

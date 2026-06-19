@@ -7776,7 +7776,7 @@ try {
 
 // Registrar handlers de Revisión por la Alta Dirección (Submódulo 6.1.3)
 try {
-  registerRevisionAltaDireccionHandlers(app, { getCompanyRootPath });
+  registerRevisionAltaDireccionHandlers(app, { getCompanyRootPath, getDb });
   sendLog('[MAIN] Handlers de Revisión por la Alta Dirección (6.1.3) registrados correctamente', 'INFO');
 } catch (err) {
   sendLog(`[MAIN] Error registrando handlers de Revisión por la Alta Dirección: ${err.message}`, 'ERROR');

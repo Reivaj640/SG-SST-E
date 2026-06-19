@@ -79,19 +79,6 @@ var RevisionAltaDireccionComponent = (function() {
       chipVariant: 'neutral',
       chipLabel: 'Referencia',
       phase: 3
-    },
-    {
-      key: 'registro',
-      title: 'Registro documental',
-      format: 'GG-FO-005',
-      formatLabel: 'Correspondencia interna/externa',
-      icon: 'bi-archive',
-      iconColor: 'warning',
-      description: 'Registro de documentos internos y externos asociados al proceso: facturas, cuentas de cobro, remisiones, cotizaciones, documentos y cartas, otros.',
-      meta: { registros: 5, tipologias: 7 },
-      chipVariant: 'neutral',
-      chipLabel: '7 tipologías',
-      phase: 3
     }
   ];
 
@@ -168,7 +155,7 @@ var RevisionAltaDireccionComponent = (function() {
 
   var state = {
     /* View router */
-    currentView: 'hub',         // hub | revisiones | revisiones-list | revisiones-editor | revisiones-viewer | actas | actas-editor | despliegue | procedimiento | registro
+    currentView: 'hub',         // hub | revisiones | revisiones-list | revisiones-editor | revisiones-viewer | actas | actas-editor | despliegue | procedimiento
     viewParams: {},
 
     /* Data (estructura NUEVA alineada al spec 6.1.3) */
@@ -755,6 +742,19 @@ var RevisionAltaDireccionComponent = (function() {
            Mismo patrón que inspecciones-bridge, mantenimiento-bridge, etc. */
         var resp = await window.RevisionAltaDireccionService.cargarTodo(state.empresaActiva || state.empresaId);
         if (resp && resp.success && resp.data) {
+          /* Log del seed de indicadores (espejo del backend, ayuda a diagnosticar) */
+          if (resp.data.seedIndicadores) {
+            var s = resp.data.seedIndicadores;
+            console.log('[K+AIRSST][6.1.3][SEED_FRONT] resultado=' +
+              JSON.stringify({
+                seeded: s.seeded,
+                fuente: s.fuente || null,
+                source: s.source || null,
+                reason: s.reason || null,
+                rehidratado: s.rehidratado || false
+              }));
+          }
+
           /* Detectar si viene en estructura nueva o legacy */
           if (resp.data.revisiones || resp.data.cicloActivo) {
             /* Estructura nueva (G-FO-006 alineada) */
@@ -766,6 +766,25 @@ var RevisionAltaDireccionComponent = (function() {
             state.dataSource = 'backend';
             loaded = true;
             log('LOAD_BACKEND', 'SUCCESS', 'estructura nueva');
+
+            /* Enriquecer indicadores con auto-resultados (Último Valor + Estado).
+               Los indicadores recién sembrados tienen resultado=null. Llamamos al
+               mismo handler IPC que usa objetivos-sst-viewer.js para obtener
+               los resultados auto-calculados (frecuencia, severidad, presupuesto,
+               etc.) y enriquecer cada indicador con su mejor match por keyword. */
+            if (window.electronAPI && typeof window.electronAPI.getObjetivosResultadosAuto === 'function') {
+              try {
+                var autoResp = await window.electronAPI.getObjetivosResultadosAuto(state.empresaActiva);
+                if (autoResp && autoResp.success && autoResp.data) {
+                  var autoCount = Object.keys(autoResp.data).length;
+                  var matchedCount = _enrichIndicadoresConAuto(state.indicadores, autoResp.data);
+                  console.log('[K+AIRSST][6.1.3][AUTO_ENRICH] ' + matchedCount + '/' + state.indicadores.length +
+                    ' indicadores enriquecidos desde ' + autoCount + ' keywords auto');
+                }
+              } catch (autoErr) {
+                console.warn('[K+AIRSST][6.1.3][AUTO_ENRICH] Error:', autoErr && autoErr.message);
+              }
+            }
           } else if (resp.data.programacion || resp.data.actas || resp.data.indicadores) {
             /* Estructura legacy → aplicar migración suave */
             var migrated = _migrateFromLegacy(resp.data);
@@ -857,7 +876,6 @@ var RevisionAltaDireccionComponent = (function() {
         case 'actas-editor':    viewHost.appendChild(_renderActasEditorView()); break;
         case 'despliegue':      viewHost.appendChild(_renderDespliegueView()); break;
         case 'procedimiento':   viewHost.appendChild(_renderProcedimientoView()); break;
-        case 'registro':        viewHost.appendChild(_renderRegistroDocumentalView()); break;
         default:                viewHost.appendChild(_renderHubView());
       }
     }
@@ -1012,7 +1030,7 @@ var RevisionAltaDireccionComponent = (function() {
       ctaBackEditor.id = 'kair-rad-cta-back-editor';
       ctaBackEditor.innerHTML = '<i class="bi bi-arrow-left"></i> Volver al listado';
       right.appendChild(ctaBackEditor);
-    } else if (state.currentView === 'despliegue' || state.currentView === 'registro' || state.currentView === 'actas') {
+    } else if (state.currentView === 'despliegue' || state.currentView === 'actas') {
       var ctaExport2 = document.createElement('button');
       ctaExport2.className = 'k-btn k-btn-ghost k-btn-sm';
       ctaExport2.id = 'kair-rad-cta-export';
@@ -1050,8 +1068,7 @@ var RevisionAltaDireccionComponent = (function() {
       'actas':             'Volver al hub del submódulo',
       'actas-editor':      'Volver al listado de actas',
       'despliegue':        'Volver al hub del submódulo',
-      'procedimiento':     'Volver al hub del submódulo',
-      'registro':          'Volver al hub del submódulo'
+      'procedimiento':     'Volver al hub del submódulo'
     };
     return map[view] || 'Volver';
   }
@@ -1071,8 +1088,7 @@ var RevisionAltaDireccionComponent = (function() {
         ? 'Editar Acta ' + state.viewParams.id
         : 'Nueva Acta de Reunión',
       despliegue:    'Despliegue Estratégico',
-      procedimiento: 'Procedimiento G-PR-001',
-      registro:      'Registro Documental'
+      procedimiento: 'Procedimiento G-PR-001'
     };
     return map[view] || MODULO.NOMBRE;
   }
@@ -1086,8 +1102,7 @@ var RevisionAltaDireccionComponent = (function() {
       actas:         'Reuniones de seguimiento G-FO-009 con agenda y compromisos',
       'actas-editor': 'Editor del acta conforme al formato G-FO-009',
       despliegue:    'Objetivos estratégicos e indicadores G-FO-001',
-      procedimiento: 'Documento normativo de referencia',
-      registro:      'Correspondencia interna/externa GG-FO-005'
+      procedimiento: 'Documento normativo de referencia'
     };
     return map[view] || 'Gestión integral de revisiones gerenciales del SG-SST';
   }
@@ -1243,11 +1258,6 @@ var RevisionAltaDireccionComponent = (function() {
         metaHtml = '<div class="kair-rad-submodule-card__meta">' +
           '<span class="kair-rad-submodule-card__chip">' + c.meta.rev + '</span>' +
           '<span class="kair-rad-submodule-card__chip kair-rad-submodule-card__chip--neutral">' + c.chipLabel + '</span>' +
-        '</div>';
-      } else if (c.key === 'registro') {
-        metaHtml = '<div class="kair-rad-submodule-card__meta">' +
-          '<span class="kair-rad-submodule-card__chip">' + c.meta.registros + ' registros</span>' +
-          '<span class="kair-rad-submodule-card__chip kair-rad-submodule-card__chip--neutral">' + c.meta.tipologias + ' tipologías</span>' +
         '</div>';
       }
 
@@ -1509,6 +1519,78 @@ var RevisionAltaDireccionComponent = (function() {
      RENDER: REVISIONES LIST · Patrón A Dashboard (OLA 2)
      ═══════════════════════════════════════════════════════════════════════ */
 
+  /* ═══════════════════════════════════════════════════════════════════════
+     ENRIQUECIMIENTO DE INDICADORES CON AUTO-RESULTADOS
+     Cuando los indicadores vienen recién sembrados del Excel espejo
+     (resultado=null), los enriquecemos con los resultados auto-calculados
+     que el módulo 2.2.1 también usa. Esto llena las columnas "Último Valor"
+     y "Estado" de la tabla de Despliegue Estratégico.
+
+     Matching por keyword: cada keyword (frecuencia, severidad, presupuesto,
+     etc.) se busca en el nombre del indicador; gana el match más largo y
+     específico. Mismo algoritmo que objetivos-sst-viewer.js.
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  function _matchIndicatorToAutoData(indicador, autoData) {
+    if (!indicador || !autoData) return null;
+    var nameText = (indicador.indicador || '').toLowerCase();
+    var fullText = ((indicador.indicador || '') + ' ' + (indicador.formula || '') + ' ' + (indicador.meta || '')).toLowerCase();
+    var best = { keyword: null, resultado: null, score: 0 };
+
+    Object.keys(autoData).forEach(function(keyword) {
+      var data = autoData[keyword];
+      if (!data || !data.resultado) return;
+      var kw = keyword.toLowerCase();
+      var nameScore = nameText.indexOf(kw) >= 0 ? keyword.length * 2 : 0;
+      var fullScore = fullText.indexOf(kw) >= 0 ? keyword.length : 0;
+      var score = Math.max(nameScore, fullScore);
+      if (score > best.score) {
+        best.keyword = keyword;
+        best.resultado = data;
+        best.score = score;
+      }
+    });
+
+    return best.resultado ? {
+      keyword: best.keyword,
+      resultado: best.resultado.resultado,
+      porcentajeReal: best.resultado.porcentajeReal
+    } : null;
+  }
+
+  /* Estado derivado del porcentaje real (auto-resultado).
+     - porcentajeReal >= 80  → Cumple
+     - 60 <= porcentajeReal < 80 → Parcial
+     - porcentajeReal < 60  → No cumple
+     - null / undefined → Sin medición */
+  function _calcularEstadoDesdePorcentaje(porcentajeReal) {
+    if (porcentajeReal == null || isNaN(porcentajeReal)) return 'Sin medición';
+    if (porcentajeReal >= 80) return 'Cumple';
+    if (porcentajeReal >= 60) return 'Parcial';
+    return 'No cumple';
+  }
+
+  function _enrichIndicadoresConAuto(indicadores, autoData) {
+    if (!Array.isArray(indicadores) || !autoData) return 0;
+    var matched = 0;
+    indicadores.forEach(function(ind) {
+      if (!ind) return;
+      /* Si ya tiene resultado manual, respetarlo */
+      if (ind.ultimoValor && ind.ultimoValor !== '—') return;
+      var match = _matchIndicatorToAutoData(ind, autoData);
+      if (match) {
+        ind.ultimoValor = match.resultado;
+        ind.estado = _calcularEstadoDesdePorcentaje(match.porcentajeReal);
+        ind.keyword = match.keyword;
+        ind.porcentajeReal = match.porcentajeReal;
+        /* Tendiente hacia arriba si cumple, hacia abajo si no */
+        ind.tendencia = match.porcentajeReal >= 80 ? 'up' : match.porcentajeReal >= 60 ? 'flat' : 'down';
+        matched++;
+      }
+    });
+    return matched;
+  }
+
   function _buildViewCtx() {
     return {
       data: {
@@ -1559,7 +1641,8 @@ var RevisionAltaDireccionComponent = (function() {
     if (!window.ActasReunionView) {
       return _renderErrorView('Vista de actas no disponible. Recargue la página.');
     }
-    return window.ActasReunionView.render(_buildViewCtx());
+    var ctx = _buildViewCtx();
+    return window.ActasReunionView.render(ctx);
   }
 
   function _renderActasEditorView() {
@@ -1581,13 +1664,6 @@ var RevisionAltaDireccionComponent = (function() {
       return _renderErrorView('Vista de procedimiento no disponible. Recargue la página.');
     }
     return window.ProcedimientoView.render(_buildViewCtx());
-  }
-
-  function _renderRegistroDocumentalView() {
-    if (!window.RegistroDocumentalView) {
-      return _renderErrorView('Vista de registro documental no disponible. Recargue la página.');
-    }
-    return window.RegistroDocumentalView.render(_buildViewCtx());
   }
 
   /* ═══════════════════════════════════════════════════════════════════════
@@ -1735,9 +1811,6 @@ var RevisionAltaDireccionComponent = (function() {
           } else if (state.currentView === 'despliegue' && state.indicadores && state.indicadores.length > 0) {
             tipoPlantilla = 'G-FO-001';
             itemId = state.indicadores[0].id;
-          } else if (state.currentView === 'registro' && state.documentos && state.documentos.length > 0) {
-            tipoPlantilla = 'GG-FO-005';
-            itemId = state.documentos[0].id;
           }
 
           if (!itemId) {

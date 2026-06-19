@@ -12,6 +12,7 @@ const fs = require('fs');
 
 // ─── Dependencia inyectada en registerHandlers ──────────────────────
 var _getCompanyRootPath = null;
+var _getDb = null;
 
 // ─── Helpers de filesystem ──────────────────────────────────────────
 
@@ -363,6 +364,240 @@ function _parserGFO001(workbook) {
     });
   }
   return indicadores;
+}
+
+// ─── Parser GI-FO-044 OBJETIVOS Y METAS DEL SST ─────────────────────
+// Estructura: Fila 5 encabezados | Fila 6+ datos
+// Columnas: B=Objetivo, C=Indicador, D=Fórmula, E=Meta, F=Frecuencia, G=Responsable
+// (Sin columna Política — la política vive en su propia vista)
+//
+// Esta es la fuente de verdad real: el módulo 2.2.1 Objetivos SST escribe
+// en este archivo desde el editor visual. Reutilizar el mismo archivo en
+// 6.1.3 garantiza que ambas vistas estén sincronizadas.
+
+function _parserGFO044ObjetivosSST(workbook) {
+  var sheetName = workbook.SheetNames[0];
+  var sheet = workbook.Sheets[sheetName];
+  if (!sheet || !sheet['!ref']) return [];
+  var range = XLSX.utils.decode_range(sheet['!ref']);
+
+  var indicadores = [];
+  /* Iterar desde fila 6 (1-based) hasta el final — sin límite fijo. */
+  for (var r = 5; r <= range.e.r; r++) {
+    var rowIdx = r + 1; /* 0-based → 1-based */
+    var objetivoCell = XLSX.utils.encode_cell({ r: r, c: 1 });
+    var indicadorCell = XLSX.utils.encode_cell({ r: r, c: 2 });
+    var formulaCell   = XLSX.utils.encode_cell({ r: r, c: 3 });
+    var metaCell      = XLSX.utils.encode_cell({ r: r, c: 4 });
+    var frecCell      = XLSX.utils.encode_cell({ r: r, c: 5 });
+    var respCell      = XLSX.utils.encode_cell({ r: r, c: 6 });
+
+    var objetivoCellObj = sheet[objetivoCell];
+    var objetivo = objetivoCellObj && objetivoCellObj.v != null ? String(objetivoCellObj.v).trim() : '';
+    if (!objetivo) continue;
+
+    function _val(cellRef) {
+      var c = sheet[cellRef];
+      return c && c.v != null ? String(c.v).trim() : '';
+    }
+
+    indicadores.push({
+      objetivoEstrategico: objetivo,
+      indicador: _val(indicadorCell),
+      formula: _val(formulaCell),
+      meta: _val(metaCell),
+      frecuencia: _val(frecCell),
+      responsable: _val(respCell),
+      /* Sin política — la vista 6.1.3 ya no la refleja */
+      /* Fila de origen, útil para diagnóstico */
+      _origenFila: rowIdx
+    });
+  }
+  return indicadores;
+}
+
+/**
+ * Busca el Excel "GI-FO-044 OBJETIVOS Y METAS DEL SST" dentro de la carpeta
+ * raíz de la empresa.
+ *
+ * Estrategia robusta (dos pasadas + ruta directa al submódulo):
+ *   0. Ruta directa: prefiere la carpeta "2.2.1 Objetivos SST" si existe.
+ *      Esta es la fuente ÚNICA que edita el módulo 2.2.1 — más confiable
+ *      que buscar por nombre de archivo.
+ *   1. Pasada completa del árbol buscando SOLO matches EXACTOS del nombre
+ *      "GI-FO-044 OBJETIVOS Y METAS DEL SST". Entre múltiples matches, gana
+ *      el de fecha de modificación más reciente.
+ *   2. Si no hay exacto, pasada completa buscando matches FLEXIBLES
+ *      (excluyendo explícitamente archivos tipo "anexo"/"modelo"/"guía"
+ *      que son plantillas ministeriales viejas, no fuentes vivas).
+ *
+ * NOTA: Hacemos dos pasadas separadas porque la primera pasada de un DFS
+ * puede encontrar un match flexible ("ANEXO 21 MODELO OBJETIVOS_Y_METAS")
+ * en una carpeta hermana antes de llegar al match exacto en la carpeta
+ * destino. El bug original era exactamente ese.
+ *
+ * @param {string} companyRoot - Ruta raíz de la empresa (Drive local)
+ * @returns {string|null} Ruta absoluta al Excel o null si no existe
+ */
+function _resolverExcelObjetivosSST(companyRoot) {
+  if (!companyRoot || !fs.existsSync(companyRoot)) {
+    console.warn('[K+AIRSST][6.1.3][SEED_INDICADORES] companyRoot inválido o no existe:', companyRoot);
+    return null;
+  }
+
+  var MAX_DEPTH = 5;
+  var SKIP_DIRS = new Set(['.git', 'node_modules', '.cache', '.tmp', '__pycache__',
+    'venv', '.venv', '.idea', '.vscode', 'dist', 'build']);
+
+  function _isExactObjetivosFile(name) {
+    if (name.startsWith('~$')) return false;
+    if (!/\.(xlsx|xls)$/i.test(name)) return false;
+    var upper = name.toUpperCase();
+    return upper.indexOf('GI-FO-044 OBJETIVOS Y METAS DEL SST') !== -1;
+  }
+
+  function _isFlexibleObjetivosFile(name) {
+    if (name.startsWith('~$')) return false;
+    if (!/\.(xlsx|xls)$/i.test(name)) return false;
+    var lower = name.toLowerCase();
+    if (lower.indexOf('objetivos') === -1) return false;
+    /* Excluir plantillas ministeriales viejas (tienen estructura distinta) */
+    if (lower.indexOf('anexo') !== -1) return false;
+    if (lower.indexOf('modelo') !== -1) return false;
+    if (lower.indexOf('guia') !== -1) return false;
+    return (lower.indexOf('metas') !== -1) || (lower.indexOf('sst') !== -1);
+  }
+
+  /**
+   * Recorre TODO el árbol (max depth) aplicando visit(name, fullPath) a
+   * cada archivo .xls/.xlsx que pase el filtro. No corta al primer match.
+   */
+  function _walkTree(dir, depth, visit) {
+    if (depth > MAX_DEPTH) return;
+    var entries;
+    try { entries = fs.readdirSync(dir); } catch (e) { return; }
+    for (var i = 0; i < entries.length; i++) {
+      var f = entries[i];
+      var full = path.join(dir, f);
+      if (!f.startsWith('~$') && /\.(xlsx|xls)$/i.test(f)) {
+        try { visit(f, full); } catch (e) { /* ignore */ }
+      }
+      if (!f.startsWith('.') && !SKIP_DIRS.has(f)) {
+        try {
+          if (fs.statSync(full).isDirectory()) _walkTree(full, depth + 1, visit);
+        } catch (e) { /* ignore */ }
+      }
+    }
+  }
+
+  /* ─── PASO 0: ruta directa al submódulo 2.2.1 ─── */
+  var submoduleFolder = _findSubmoduleFolder(companyRoot, '2.2.1');
+  if (submoduleFolder) {
+    try {
+      var smEntries = fs.readdirSync(submoduleFolder);
+      for (var s = 0; s < smEntries.length; s++) {
+        if (_isExactObjetivosFile(smEntries[s])) {
+          var directPath = path.join(submoduleFolder, smEntries[s]);
+          console.log('[K+AIRSST][6.1.3][SEED_INDICADORES] GI-FO-044 desde submódulo 2.2.1:', directPath);
+          return directPath;
+        }
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  /* ─── PASO 1: pasada completa solo EXACTO, desempatando por mtime ─── */
+  var exactCandidates = [];
+  _walkTree(companyRoot, 0, function(name, full) {
+    if (_isExactObjetivosFile(name)) exactCandidates.push(full);
+  });
+  if (exactCandidates.length > 0) {
+    /* Preferir el archivo modificado más recientemente */
+    exactCandidates.sort(function(a, b) {
+      try {
+        var ma = fs.statSync(a).mtime.getTime();
+        var mb = fs.statSync(b).mtime.getTime();
+        return mb - ma;
+      } catch (e) { return 0; }
+    });
+    console.log('[K+AIRSST][6.1.3][SEED_INDICADORES] GI-FO-044 EXACTO ('
+      + exactCandidates.length + ' candidatos, el más reciente): ' + exactCandidates[0]);
+    return exactCandidates[0];
+  }
+
+  /* ─── PASO 2: pasada completa FLEXIBLE (excluyendo plantillas) ─── */
+  var flexibleCandidates = [];
+  _walkTree(companyRoot, 0, function(name, full) {
+    if (_isFlexibleObjetivosFile(name)) flexibleCandidates.push(full);
+  });
+  if (flexibleCandidates.length > 0) {
+    /* Preferir el más reciente */
+    flexibleCandidates.sort(function(a, b) {
+      try {
+        var ma = fs.statSync(a).mtime.getTime();
+        var mb = fs.statSync(b).mtime.getTime();
+        return mb - ma;
+      } catch (e) { return 0; }
+    });
+    console.warn('[K+AIRSST][6.1.3][SEED_INDICADORES] GI-FO-044 NO encontrado como exacto; usando FLEXIBLE:',
+      flexibleCandidates[0]);
+    return flexibleCandidates[0];
+  }
+
+  console.warn('[K+AIRSST][6.1.3][SEED_INDICADORES] GI-FO-044 NO encontrado bajo:', companyRoot);
+  return null;
+}
+
+/**
+ * Busca la carpeta de un submódulo (p. ej. "2.2.1 Objetivos SST") dentro de
+ * la raíz de la empresa. Útil cuando queremos evitar depender del nombre del
+ * archivo y leer directamente desde donde el submódulo guarda sus datos.
+ *
+ * Búsqueda recursiva (max 4 niveles): empieza en el nivel inmediato y
+ * desciende. Devuelve la primera carpeta cuyo nombre empieza con el prefijo
+ * (p. ej. "2.2.1" → "2.2.1 Objetivos SST/").
+ *
+ * Tolerante a mayúsculas, acentos y sufijos ("2.2.1 OBJETIVOS DEL SG-SST",
+ * "2.2.1 Objetivos SST (Copia)", etc.).
+ */
+function _findSubmoduleFolder(companyRoot, submodulePrefix) {
+  if (!companyRoot || !fs.existsSync(companyRoot)) return null;
+  var MAX_DEPTH = 4;
+  var SKIP_DIRS = new Set(['.git', 'node_modules', '.cache', '.tmp', '__pycache__',
+    'venv', '.venv', '.idea', '.vscode', 'dist', 'build']);
+  var prefixLower = submodulePrefix.toLowerCase();
+
+  function _search(dir, depth) {
+    if (depth > MAX_DEPTH) return null;
+    var entries;
+    try { entries = fs.readdirSync(dir); } catch (e) { return null; }
+
+    /* Coincidencia exacta del prefijo al inicio del nombre */
+    for (var i = 0; i < entries.length; i++) {
+      var name = entries[i];
+      if (name.toLowerCase().indexOf(prefixLower) === 0) {
+        var full = path.join(dir, name);
+        try {
+          if (fs.statSync(full).isDirectory()) return full;
+        } catch (e) { /* ignore */ }
+      }
+    }
+
+    /* Descender */
+    for (var j = 0; j < entries.length; j++) {
+      var fk = entries[j];
+      if (fk.startsWith('.') || SKIP_DIRS.has(fk)) continue;
+      var fullPath = path.join(dir, fk);
+      try {
+        if (fs.statSync(fullPath).isDirectory()) {
+          var found = _search(fullPath, depth + 1);
+          if (found) return found;
+        }
+      } catch (e) { /* ignore */ }
+    }
+    return null;
+  }
+
+  return _search(companyRoot, 0);
 }
 
 // ─── Parser G-FO-006: Acta de Revisión Gerencial (123×98) ─────────
@@ -781,10 +1016,409 @@ function _exportarGGFO005(documentos) {
   return { workbook: wb, sheetName: wb.SheetNames[0] };
 }
 
+// ─── Helpers de SQLite (fuente de verdad post-migración 2026-06-18) ──
+// La migración "rev-alta-direccion-json-to-sqlite-v1" movió revisiones,
+// secciones y subpuntos a SQLite. Las actas y los indicadores ya estaban
+// allí. Los JSON locales quedan como fallback sólo si SQLite no responde.
+
+function _loadActasFromDb(empresaId) {
+  if (!_getDb) return null;
+  try {
+    var db = _getDb();
+    var rows = db.prepare('SELECT id, numero, fecha, estado, archivo_path, metadata_json, creado_en, actualizado_en FROM actas WHERE empresa_id = ? ORDER BY fecha DESC, creado_en DESC').all(empresaId);
+    return rows.map(function(r) {
+      var metadata = {};
+      try { if (r.metadata_json) metadata = JSON.parse(r.metadata_json); } catch (e) { metadata = {}; }
+      return {
+        id: r.id,
+        numero: r.numero,
+        fecha: r.fecha,
+        estado: r.estado || 'Abierta',
+        archivo: r.archivo_path || '',
+        metadata: metadata,
+        creado_en: r.creado_en,
+        actualizado_en: r.actualizado_en
+      };
+    });
+  } catch (e) {
+    console.error('[K+AIRSST][6.1.3][DB_LOAD_ACTAS]', e.message);
+    return null;
+  }
+}
+
+function _loadRevisionesFromDb(empresaId) {
+  if (!_getDb) return null;
+  try {
+    var db = _getDb();
+    var revs = db.prepare('SELECT * FROM revisiones WHERE empresa_id = ? ORDER BY fecha DESC, creado_en DESC').all(empresaId);
+
+    /* Cargar secciones y subpuntos para cada revisión en bulk */
+    var secciones = db.prepare('SELECT revision_id, seccion_key, numero, titulo, contenido FROM revision_secciones').all();
+    var subpuntos = db.prepare('SELECT revision_id, seccion_key, sub_key, sub_numero, label, estado, observacion FROM revision_subpuntos').all();
+
+    var seccionesByRev = {};
+    var subpuntosBySec = {};
+    secciones.forEach(function(s) {
+      if (!seccionesByRev[s.revision_id]) seccionesByRev[s.revision_id] = [];
+      seccionesByRev[s.revision_id].push({
+        seccion_key: s.seccion_key,
+        numero: s.numero,
+        titulo: s.titulo,
+        contenido: s.contenido || ''
+      });
+    });
+    subpuntos.forEach(function(p) {
+      var k = p.revision_id + '||' + p.seccion_key;
+      if (!subpuntosBySec[k]) subpuntosBySec[k] = [];
+      subpuntosBySec[k].push({
+        sub_key: p.sub_key,
+        sub_numero: p.sub_numero,
+        label: p.label || '',
+        estado: p.estado || 'Pendiente',
+        observacion: p.observacion || ''
+      });
+    });
+
+    return revs.map(function(r) {
+      var secs = seccionesByRev[r.id] || [];
+      secs.forEach(function(sec) {
+        var k = r.id + '||' + sec.seccion_key;
+        sec.subpuntos = subpuntosBySec[k] || [];
+      });
+      return {
+        id: r.id,
+        periodo: r.periodo,
+        fecha: r.fecha,
+        fechaProgramada: r.fecha_programada,
+        fechaRealizacion: r.fecha_realizacion,
+        tipo: r.tipo,
+        estado: r.estado,
+        lugar: r.lugar,
+        preside: r.preside,
+        elabora: r.elabora,
+        participantes: r.participantes || 0,
+        proximaRevision: r.proxima_revision,
+        archivoOriginal: r.archivo_original,
+        progreso: r.progreso || 0,
+        secciones: secs,
+        creado_en: r.creado_en,
+        actualizado_en: r.actualizado_en
+      };
+    });
+  } catch (e) {
+    console.error('[K+AIRSST][6.1.3][DB_LOAD_REVISIONES]', e.message);
+    return null;
+  }
+}
+
+function _loadIndicadoresFromDb(empresaId) {
+  if (!_getDb) return null;
+  try {
+    var db = _getDb();
+    var rows = db.prepare('SELECT id, nombre, meta, resultado, unidad, periodo, responsable, metadata_json, creado_en, actualizado_en FROM indicadores_revision WHERE empresa_id = ? ORDER BY creado_en ASC').all(empresaId);
+    return rows.map(function(r, idx) {
+      var metadata = {};
+      try { if (r.metadata_json) metadata = JSON.parse(r.metadata_json); } catch (e) { metadata = {}; }
+
+      /* Mapear DB → shape de la vista DespliegueEstrategicoView:
+         - DB.nombre  → vista.indicador
+         - DB.meta    → vista.meta
+         - DB.resultado → vista.ultimoValor (o '—' si vacío)
+         - DB.periodo → vista.frecuencia
+         - DB.responsable → vista.responsable
+         - metadata.politica/objetivo/formula → vista.politica/objetivo/formula
+         - metadata.mediciones → vista.tendencia y vista.estado (computados)
+      */
+      var mediciones = Array.isArray(metadata.mediciones) ? metadata.mediciones : [];
+      var ultimoValor = r.resultado || (mediciones.length > 0 ? mediciones[mediciones.length - 1].valor : '—');
+      var tendencia = _calcularTendencia(mediciones);
+      var estado = _calcularEstadoIndicador(ultimoValor, r.meta, mediciones);
+
+      return {
+        id: r.id,
+        /* Campos que la vista espera */
+        politica: metadata.politica || metadata.politicaIntegral || '',
+        objetivo: metadata.objetivo || metadata.objetivoEstrategico || '',
+        indicador: r.nombre || metadata.indicador || '',
+        formula: metadata.formula || '',
+        meta: r.meta || '',
+        ultimoValor: ultimoValor,
+        tendencia: tendencia,
+        frecuencia: r.periodo || metadata.frecuencia || '',
+        responsable: r.responsable || '',
+        estado: estado,
+        /* Campos crudos para diagnóstico */
+        unidad: r.unidad,
+        metadata: metadata,
+        creado_en: r.creado_en,
+        actualizado_en: r.actualizado_en
+      };
+    });
+  } catch (e) {
+    console.error('[K+AIRSST][6.1.3][DB_LOAD_INDICADORES]', e.message);
+    return null;
+  }
+}
+
+/* Calcula tendencia (up/down/flat) a partir del historial de mediciones */
+function _calcularTendencia(mediciones) {
+  if (!Array.isArray(mediciones) || mediciones.length < 2) return 'flat';
+  var ultimas = mediciones.slice(-2);
+  var a = parseFloat(ultimas[0].valor);
+  var b = parseFloat(ultimas[1].valor);
+  if (isNaN(a) || isNaN(b)) return 'flat';
+  if (b > a) return 'up';
+  if (b < a) return 'down';
+  return 'flat';
+}
+
+/* Calcula estado del indicador (Cumple / Parcial / No cumple / Sin medición) */
+function _calcularEstadoIndicador(ultimoValor, meta, mediciones) {
+  if (!ultimoValor || ultimoValor === '—' || mediciones.length === 0) return 'Sin medición';
+  if (!meta) return 'Sin meta';
+
+  var valor = parseFloat(String(ultimoValor).replace(/[^0-9.\-]/g, ''));
+  if (isNaN(valor)) return 'Sin medición';
+
+  /* Soportar metas tipo "< 1", "> 50", "≥ 0.8", "<= 100", ">= 80", etc. */
+  var metaStr = String(meta).trim();
+  var match = metaStr.match(/^(<=|>=|<|>|≤|≥|=|)\s*([0-9.]+)/);
+  if (!match) return 'Sin meta';
+  var op = match[1] || '=';
+  var metaNum = parseFloat(match[2]);
+
+  var cumple;
+  switch (op) {
+    case '<': case '≤': cumple = valor < metaNum; break;
+    case '>': case '≥': cumple = valor > metaNum; break;
+    case '<=': cumple = valor <= metaNum; break;
+    case '>=': cumple = valor >= metaNum; break;
+    default: cumple = Math.abs(valor - metaNum) < 0.01;
+  }
+  if (cumple) return 'Cumple';
+
+  /* Si no cumple, ver si está cerca (parcial) o lejos (no cumple) */
+  var diff = Math.abs(valor - metaNum) / (metaNum || 1);
+  return diff < 0.15 ? 'Parcial' : 'No cumple';
+}
+
+/* Hidrata SQLite con los indicadores parseados del Excel G-FO-001.
+   Solo se ejecuta si la tabla está vacía para esta empresa — no sobreescribe
+   datos ya capturados. Esto resuelve el problema de la vista mostrando
+   una sola fila vacía en lugar del despliegue estratégico completo.
+
+   Fuente priorizada (espejo de Objetivos y Metas 2.2.1):
+     1. GI-FO-044 OBJETIVOS Y METAS DEL SST.xlsx (mismo Excel que edita 2.2.1)
+     2. Fallback → GG-FO-001 DESPLIEGUE ESTRATEGICO.xls (formato histórico)
+
+   Detección robusta de "datos obsoletos":
+     - Sin metadata.fuente              → legacy del parser antiguo G-FO-001
+     - metadata.fuente !== 'GI-FO-044'  → sembrado por fallback flexible (ej. ANEXO 21)
+     - metadata.source !== path_actual  → el archivo resuelto ahora es DIFERENTE al usado antes
+     - metadata.mtime !== mtime_actual  → el archivo Excel fue editado después del último seed
+     En cualquiera de estos casos, limpiar y re-sembrar. */
+function _seedIndicadoresFromXlsx(empresaId, dir) {
+  if (!_getDb) {
+    console.warn('[K+AIRSST][6.1.3][SEED_INDICADORES] _getDb no disponible, saltando seed');
+    return { seeded: 0 };
+  }
+  try {
+    var db = _getDb();
+    var rowsExistentes = db.prepare('SELECT id, metadata_json FROM indicadores_revision WHERE empresa_id = ?').all(empresaId);
+    var count = rowsExistentes.length;
+    console.log('[K+AIRSST][6.1.3][SEED_INDICADORES][DIAG] empresa=' + empresaId + ' count=' + count);
+
+    if (!XLSX || !dir || !fs.existsSync(dir)) {
+      console.warn('[K+AIRSST][6.1.3][SEED_INDICADORES] XLSX o dir no disponible. XLSX=' + !!XLSX + ' dir=' + dir);
+      return { seeded: 0, reason: 'sin-excel' };
+    }
+
+    /* 1) Resolver archivo fuente ACTUAL (paso crítico: se hace ANTES de comparar) */
+    var companyRoot = _getCompanyRootFromConfig(empresaId);
+    console.log('[K+AIRSST][6.1.3][SEED_INDICADORES][DIAG] companyRoot=' + companyRoot);
+    var objetivosFile = companyRoot ? _resolverExcelObjetivosSST(companyRoot) : null;
+    console.log('[K+AIRSST][6.1.3][SEED_INDICADORES][DIAG] objetivosFile=' + objetivosFile);
+
+    var xlsxPath = null;
+    var parser = null;
+    var sourceTag = null;
+
+    if (objetivosFile && fs.existsSync(objetivosFile)) {
+      xlsxPath = objetivosFile;
+      parser = _parserGFO044ObjetivosSST;
+      sourceTag = 'GI-FO-044';
+    } else {
+      /* 2) Fallback: GG-FO-001 en la carpeta del módulo 6.1.3 */
+      var entries = fs.readdirSync(dir);
+      var xlsxFile = entries.find(function(f) {
+        return /^GG-FO-001/i.test(f) && /\.(xlsx|xls)$/i.test(f);
+      });
+      if (!xlsxFile) {
+        console.warn('[K+AIRSST][6.1.3][SEED_INDICADORES] GI-FO-044 no accesible y GG-FO-001 no encontrado en dir');
+        return { seeded: 0, reason: 'archivo-no-encontrado' };
+      }
+      xlsxPath = path.join(dir, xlsxFile);
+      parser = _parserGFO001;
+      sourceTag = 'GG-FO-001';
+    }
+
+    var currentFileMtime = null;
+    try { currentFileMtime = fs.statSync(xlsxPath).mtime.toISOString(); } catch (e) { /* ignore */ }
+
+    /* 3) Parsear archivo fuente para tener count actual */
+    var wb = XLSX.readFile(xlsxPath, { cellDates: true });
+    var parsed = parser(wb);
+    console.log('[K+AIRSST][6.1.3][SEED_INDICADORES][DIAG] parser=' + sourceTag + ' registros=' + parsed.length);
+    if (!Array.isArray(parsed) || parsed.length === 0) return { seeded: 0, reason: 'parser-vacio' };
+
+    /* 4) FORZAR re-seed siempre que el count no coincida con el archivo actual.
+       Heurística pragmática: si el archivo tiene 15 filas pero la BD tiene 3,
+       algo está mal y re-sembramos. Si todo coincide, skip.
+       Esto evita los casos donde metadata guarda "GI-FO-044" pero en realidad
+       vino del Anexo 21 (que también pasó el filtro flexible). */
+    if (count > 0 && count === parsed.length) {
+      console.log('[K+AIRSST][6.1.3][SEED_INDICADORES] Ya hidratado (' + count + ' registros, coinciden con archivo). Saltando.');
+      return { seeded: 0, reason: 'ya-hidratado-desde-gi-fo-044' };
+    }
+
+    if (count > 0) {
+      console.log('[K+AIRSST][6.1.3][SEED_INDICADORES] FORZANDO re-seed: count_en_BD=' + count + ' count_en_archivo=' + parsed.length + ' (no coinciden, datos sospechosos).');
+      db.prepare('DELETE FROM indicadores_revision WHERE empresa_id = ?').run(empresaId);
+      count = 0;
+    }
+
+    var now = new Date().toISOString();
+    var insert = db.prepare(`
+      INSERT INTO indicadores_revision (id, empresa_id, nombre, meta, resultado, unidad, periodo, responsable, metadata_json, creado_en, actualizado_en)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    var inserted = 0;
+    parsed.forEach(function(ind, idx) {
+      var id = 'IND-' + empresaId.replace(/[^a-z0-9]/gi, '').toUpperCase().substring(0, 6) + '-' + String(idx + 1).padStart(3, '0');
+      var nombre = ind.indicador || '';
+      var meta = ind.meta || '';
+      var periodo = ind.frecuencia || '';
+      var responsable = ind.responsable || '';
+      var metadataJson = JSON.stringify({
+        /* GI-FO-044 no tiene columna Política — intencional, el usuario
+           decidió no reflejarla en esta vista espejo. */
+        politica: ind.politicaIntegral || '',
+        objetivo: ind.objetivoEstrategico || '',
+        formula: ind.formula || '',
+        categoria: ind.categoria || 'Cumplimiento',
+        mediciones: ind.mediciones || [],
+        fuente: sourceTag,
+        source: xlsxPath,
+        mtime: currentFileMtime,
+        seededCount: parsed.length,
+        seededAt: now
+      });
+
+      try {
+        insert.run(id, empresaId, nombre, meta, null, null, periodo, responsable, metadataJson, now, now);
+        inserted++;
+      } catch (e) {
+        console.error('[K+AIRSST][6.1.3][SEED_INDICADORES][' + id + ']', e.message);
+      }
+    });
+
+    console.log('[K+AIRSST][6.1.3][SEED_INDICADORES] ' + inserted + ' indicadores hidratados desde ' +
+      path.basename(xlsxPath) + ' (fuente=' + sourceTag + ', mtime=' + currentFileMtime + ')');
+    return { seeded: inserted, source: path.basename(xlsxPath), fuente: sourceTag, rehidratado: false };
+  } catch (e) {
+    console.error('[K+AIRSST][6.1.3][SEED_INDICADORES][ERROR]', e.message);
+    return { seeded: 0, error: e.message };
+  }
+}
+
+/**
+ * Lee config.json y devuelve la ruta raíz de la empresa.
+ * Helper extraído de _getEmpresaDir para usos donde solo se necesita la raíz
+ * (p. ej. buscar el Excel de objetivos en toda la carpeta de la empresa).
+ */
+function _getCompanyRootFromConfig(empresaId) {
+  if (!empresaId) return null;
+  try {
+    var configPath = path.join(app.getPath('userData'), 'config.json');
+    if (!fs.existsSync(configPath)) return null;
+    var cfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    var normalized = String(empresaId).toLowerCase().trim();
+    var companyKey = Object.keys(cfg.companyPaths || {}).find(function(k) {
+      return String(k).toLowerCase().trim() === normalized;
+    });
+    if (companyKey) {
+      return cfg.companyPaths[companyKey].root || cfg.companyPaths[companyKey].ruta_base || null;
+    }
+  } catch (e) { /* ignore */ }
+  return null;
+}
+
+function _saveActaToDb(empresaId, acta) {
+  if (!_getDb) return { success: false, error: { code: 'NO_DB', message: 'Base de datos no disponible' } };
+  try {
+    var db = _getDb();
+    var id = acta.id || ('ACT-' + empresaId + '-' + Date.now());
+    var numero = acta.numero || ('1.' + (Math.floor(Math.random() * 9) + 1));
+    var fecha = acta.fecha || new Date().toISOString().split('T')[0];
+    var estado = acta.estado || 'Abierta';
+    var archivo = acta.archivo || null;
+    var metadataJson = JSON.stringify(acta.metadata || {});
+    var now = new Date().toISOString();
+
+    db.prepare(`
+      INSERT INTO actas (id, empresa_id, numero, fecha, estado, archivo_path, metadata_json, creado_en, actualizado_en)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        numero = excluded.numero,
+        fecha = excluded.fecha,
+        estado = excluded.estado,
+        archivo_path = excluded.archivo_path,
+        metadata_json = excluded.metadata_json,
+        actualizado_en = excluded.actualizado_en
+    `).run(id, empresaId, numero, fecha, estado, archivo, metadataJson, now, now);
+
+    return { success: true, data: { id: id, numero: numero } };
+  } catch (e) {
+    console.error('[K+AIRSST][6.1.3][DB_SAVE_ACTA]', e.message);
+    return { success: false, error: { code: 'DB_ERROR', message: e.message } };
+  }
+}
+
+function _saveIndicadorToDb(empresaId, ind) {
+  if (!_getDb) return { success: false, error: { code: 'NO_DB', message: 'Base de datos no disponible' } };
+  try {
+    var db = _getDb();
+    var id = ind.id || ('IND-' + Date.now());
+    var metadataJson = ind.metadata ? JSON.stringify(ind.metadata) : null;
+    var now = new Date().toISOString();
+
+    db.prepare(`
+      INSERT INTO indicadores_revision (id, empresa_id, nombre, meta, resultado, unidad, periodo, responsable, metadata_json, creado_en, actualizado_en)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        nombre = excluded.nombre,
+        meta = excluded.meta,
+        resultado = excluded.resultado,
+        unidad = excluded.unidad,
+        periodo = excluded.periodo,
+        responsable = excluded.responsable,
+        metadata_json = excluded.metadata_json,
+        actualizado_en = excluded.actualizado_en
+    `).run(id, empresaId, ind.nombre, ind.meta, ind.resultado, ind.unidad, ind.periodo, ind.responsable, metadataJson, now, now);
+
+    return { success: true, data: { id: id } };
+  } catch (e) {
+    console.error('[K+AIRSST][6.1.3][DB_SAVE_INDICADOR]', e.message);
+    return { success: false, error: { code: 'DB_ERROR', message: e.message } };
+  }
+}
+
 // ─── Handlers IPC ───────────────────────────────────────────────────
 
 function registerRevisionAltaDireccionHandlers(app, deps) {
   _getCompanyRootPath = deps && deps.getCompanyRootPath ? deps.getCompanyRootPath : null;
+  _getDb = deps && deps.getDb ? deps.getDb : null;
 
   console.log('[K+AIRSST][6.1.3][INIT][INFO] Registrando handlers de Revisión por la Alta Dirección...');
 
@@ -801,10 +1435,37 @@ function registerRevisionAltaDireccionHandlers(app, deps) {
       /* Auto-import desde XLSX oficiales si los JSON no existen */
       var importResult = _autoImportXlsx(dir);
 
-      var revisiones = _readJson(path.join(dir, 'G-FO-006.json')) || [];
-      var actas = _readJson(path.join(dir, 'G-FO-009.json')) || [];
-      var indicadores = _readJson(path.join(dir, 'G-FO-001.json')) || [];
+      /* Fuente de verdad: SQLite (post-migración 2026-06-18).
+         Si SQLite no responde, fallback al JSON local. */
+      var dbActas = _loadActasFromDb(empresaId);
+var dbRevs = _loadRevisionesFromDb(empresaId);
+      var dbInds = _loadIndicadoresFromDb(empresaId);
+
+      /* Hidratación de indicadores desde el Excel espejo.
+         La función _seedIndicadoresFromXlsx es idempotente y maneja tres casos:
+           (a) BD vacía → siembra desde GI-FO-044 (o fallback GG-FO-001)
+           (b) BD con datos legacy (parser antiguo sin fuente=GI-FO-044) → limpia y re-siembra
+           (c) BD ya hidratada desde GI-FO-044 → no hace nada
+         Por eso la condición ya no exige BD vacía — el seed decide internamente. */
+      var seedResult = { seeded: 0 };
+      if (_getDb) {
+        seedResult = _seedIndicadoresFromXlsx(empresaId, dir);
+        if (seedResult.seeded > 0) {
+          dbInds = _loadIndicadoresFromDb(empresaId);
+        }
+      }
+
+      var actas = (dbActas !== null) ? dbActas : (_readJson(path.join(dir, 'G-FO-009.json')) || []);
+      var revisiones = (dbRevs !== null) ? dbRevs : (_readJson(path.join(dir, 'G-FO-006.json')) || []);
+      var indicadores = (dbInds !== null && dbInds.length > 0)
+        ? dbInds
+        : (_readJson(path.join(dir, 'G-FO-001.json')) || []);
       var documentos = _readJson(path.join(dir, 'GG-FO-005.json')) || [];
+
+      var fuente = (dbActas !== null || dbRevs !== null || (dbInds !== null && dbInds.length > 0)) ? 'sqlite' : 'json';
+      console.log('[K+AIRSST][6.1.3][CARGAR_TODO] empresa=' + empresaId + ' fuente=' + fuente +
+        ' actas=' + actas.length + ' revisiones=' + revisiones.length + ' indicadores=' + indicadores.length +
+        (seedResult.seeded > 0 ? ' SEEDED_INDICADORES=' + seedResult.seeded : ''));
 
       return {
         success: true,
@@ -813,7 +1474,9 @@ function registerRevisionAltaDireccionHandlers(app, deps) {
           actas: actas,
           indicadores: indicadores,
           documentos: documentos,
-          autoImport: importResult
+          autoImport: importResult,
+          fuente: fuente,
+          seedIndicadores: seedResult
         }
       };
     } catch (e) {
@@ -827,8 +1490,14 @@ function registerRevisionAltaDireccionHandlers(app, deps) {
     try {
       var empresaId = params.empresaId;
       var filtros = params.filtros || {};
-      var dir = _getEmpresaDir(empresaId);
-      var items = _readJson(path.join(dir, 'G-FO-006.json')) || [];
+      var dbItems = _loadRevisionesFromDb(empresaId);
+      var items;
+      if (dbItems !== null) {
+        items = dbItems;
+      } else {
+        var dir = _getEmpresaDir(empresaId);
+        items = _readJson(path.join(dir, 'G-FO-006.json')) || [];
+      }
 
       if (filtros.ano) {
         items = items.filter(function(r) { return r.id && r.id.indexOf('RG-' + filtros.ano) !== -1; });
@@ -843,8 +1512,7 @@ function registerRevisionAltaDireccionHandlers(app, deps) {
         var busq = filtros.buscar.toLowerCase();
         items = items.filter(function(r) {
           return (r.id && r.id.toLowerCase().indexOf(busq) !== -1) ||
-                 (r.lugar && r.lugar.toLowerCase().indexOf(busq) !== -1) ||
-                 (r.porEmpresa && r.porEmpresa.some(function(p) { return p.nombre && p.nombre.toLowerCase().indexOf(busq) !== -1; }));
+                 (r.lugar && r.lugar.toLowerCase().indexOf(busq) !== -1);
         });
       }
 
@@ -984,8 +1652,14 @@ function registerRevisionAltaDireccionHandlers(app, deps) {
     try {
       var empresaId = params.empresaId;
       var filtros = params.filtros || {};
-      var dir = _getEmpresaDir(empresaId);
-      var items = _readJson(path.join(dir, 'G-FO-009.json')) || [];
+      var dbItems = _loadActasFromDb(empresaId);
+      var items;
+      if (dbItems !== null) {
+        items = dbItems;
+      } else {
+        var dir = _getEmpresaDir(empresaId);
+        items = _readJson(path.join(dir, 'G-FO-009.json')) || [];
+      }
 
       if (filtros.estado) {
         items = items.filter(function(a) { return a.estado === filtros.estado; });
@@ -993,7 +1667,8 @@ function registerRevisionAltaDireccionHandlers(app, deps) {
       if (filtros.buscar) {
         var busq = filtros.buscar.toLowerCase();
         items = items.filter(function(a) {
-          return (a.tema && a.tema.toLowerCase().indexOf(busq) !== -1) ||
+          var tema = a.metadata && a.metadata.tema ? a.metadata.tema : (a.tema || '');
+          return (tema && tema.toLowerCase().indexOf(busq) !== -1) ||
                  (String(a.numero).indexOf(busq) !== -1);
         });
       }
@@ -1009,6 +1684,27 @@ function registerRevisionAltaDireccionHandlers(app, deps) {
     try {
       var empresaId = params.empresaId;
       var acta = params.acta;
+      if (!acta) return { success: false, error: { code: 'NO_ACTA', message: 'Datos del acta requeridos' } };
+
+      /* Si el acta tiene campos a nivel raíz (tema, preside, etc.) que no
+         están en metadata, moverlos a metadata para mantener un único shape. */
+      if (!acta.metadata) acta.metadata = {};
+      var rootFields = ['tema', 'preside', 'ciudad', 'horaInicio', 'horaFin', 'participantes', 'ordenDia', 'desarrollo', 'agenda'];
+      rootFields.forEach(function(f) {
+        if (acta[f] !== undefined && acta.metadata[f] === undefined) {
+          acta.metadata[f] = acta[f];
+        }
+      });
+
+      /* SQLite primero; si no hay DB, fallback a JSON */
+      if (_getDb) {
+        var dbResult = _saveActaToDb(empresaId, acta);
+        if (dbResult.success) {
+          return { success: true, data: { id: dbResult.data.id, numero: dbResult.data.numero, fuente: 'sqlite' } };
+        }
+        console.warn('[K+AIRSST][6.1.3][GUARDAR_ACTA] SQLite falló, usando JSON:', dbResult.error && dbResult.error.message);
+      }
+
       var dir = _getEmpresaDir(empresaId);
       var filePath = path.join(dir, 'G-FO-009.json');
       var items = _readJson(filePath) || [];
@@ -1024,8 +1720,9 @@ function registerRevisionAltaDireccionHandlers(app, deps) {
       }
 
       _writeJson(filePath, items);
-      return { success: true, data: { id: acta.id, numero: acta.numero } };
+      return { success: true, data: { id: acta.id, numero: acta.numero, fuente: 'json' } };
     } catch (e) {
+      console.error('[K+AIRSST][6.1.3][GUARDAR_ACTA][ERROR]', e);
       return { success: false, error: { code: 'INTERNAL', message: e.message } };
     }
   });
@@ -1034,8 +1731,14 @@ function registerRevisionAltaDireccionHandlers(app, deps) {
   ipcMain.handle('revisionAltaDireccion:listarIndicadores', async function(event, params) {
     try {
       var empresaId = params.empresaId;
-      var dir = _getEmpresaDir(empresaId);
-      var items = _readJson(path.join(dir, 'G-FO-001.json')) || [];
+      var dbItems = _loadIndicadoresFromDb(empresaId);
+      var items;
+      if (dbItems !== null) {
+        items = dbItems;
+      } else {
+        var dir = _getEmpresaDir(empresaId);
+        items = _readJson(path.join(dir, 'G-FO-001.json')) || [];
+      }
       return { success: true, data: items };
     } catch (e) {
       return { success: false, error: { code: 'INTERNAL', message: e.message } };
@@ -1047,6 +1750,16 @@ function registerRevisionAltaDireccionHandlers(app, deps) {
     try {
       var empresaId = params.empresaId;
       var indicador = params.indicador;
+      if (!indicador) return { success: false, error: { code: 'NO_INDICADOR', message: 'Datos del indicador requeridos' } };
+
+      if (_getDb) {
+        var dbResult = _saveIndicadorToDb(empresaId, indicador);
+        if (dbResult.success) {
+          return { success: true, data: { id: dbResult.data.id, fuente: 'sqlite' } };
+        }
+        console.warn('[K+AIRSST][6.1.3][GUARDAR_INDICADOR] SQLite falló, usando JSON:', dbResult.error && dbResult.error.message);
+      }
+
       var dir = _getEmpresaDir(empresaId);
       var filePath = path.join(dir, 'G-FO-001.json');
       var items = _readJson(filePath) || [];
@@ -1061,8 +1774,9 @@ function registerRevisionAltaDireccionHandlers(app, deps) {
       }
 
       _writeJson(filePath, items);
-      return { success: true, data: { id: indicador.id } };
+      return { success: true, data: { id: indicador.id, fuente: 'json' } };
     } catch (e) {
+      console.error('[K+AIRSST][6.1.3][GUARDAR_INDICADOR][ERROR]', e);
       return { success: false, error: { code: 'INTERNAL', message: e.message } };
     }
   });
