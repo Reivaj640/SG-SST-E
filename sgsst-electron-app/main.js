@@ -42,6 +42,8 @@ const { registerIdentificacionPeligrosHandlers } = require('./main/identificacio
 
 // Importar handlers de Revisión por la Alta Dirección (Submódulo 6.1.3)
 const { registerRevisionAltaDireccionHandlers } = require('./main/revision-alta-direccion-bridge');
+// Importar handlers de Auditoría Anual (Submódulo 6.1.2) — F1 (2026-06-19)
+const { registerAuditoriaAnualHandlers } = require('./main/auditoria-anual-bridge');
 
 // Capturar promesas no manejadas globalmente
 process.on('unhandledRejection', (reason, promise) => {
@@ -7780,6 +7782,14 @@ try {
   sendLog('[MAIN] Handlers de Revisión por la Alta Dirección (6.1.3) registrados correctamente', 'INFO');
 } catch (err) {
   sendLog(`[MAIN] Error registrando handlers de Revisión por la Alta Dirección: ${err.message}`, 'ERROR');
+}
+
+// Registrar handlers de Auditoría Anual (Submódulo 6.1.2) — F1 (2026-06-19)
+try {
+  registerAuditoriaAnualHandlers(app, { getCompanyRootPath, getDb });
+  sendLog('[MAIN] Handlers de Auditoría Anual (6.1.2) registrados correctamente', 'INFO');
+} catch (err) {
+  sendLog(`[MAIN] Error registrando handlers de Auditoría Anual: ${err.message}`, 'ERROR');
 }
 
  // Registrar handlers de FURAT - Reportes de Accidentes (Submódulo 3.2.1)

@@ -335,6 +335,18 @@ ipcRenderer.invoke('get-indicadores-salud-stats', companyName),
     abrirProcedimiento: (empresaId) => ipcRenderer.invoke('revisionAltaDireccion:abrirProcedimiento', { empresaId }),
   },
 
+  // --- Auditoría Anual (Submódulo 6.1.2) — F1 (2026-06-19) ---
+  auditoriaAnual: {
+    cargarTodo: (empresaId) => ipcRenderer.invoke('auditoriaAnual:cargarTodo', { empresaId }),
+    guardarAuditoria: (empresaId, auditoria) => ipcRenderer.invoke('auditoriaAnual:guardarAuditoria', { empresaId, auditoria }),
+    eliminarAuditoria: (empresaId, id) => ipcRenderer.invoke('auditoriaAnual:eliminarAuditoria', { empresaId, id }),
+    guardarHallazgo: (empresaId, hallazgo) => ipcRenderer.invoke('auditoriaAnual:guardarHallazgo', { empresaId, hallazgo }),
+    eliminarHallazgo: (empresaId, id) => ipcRenderer.invoke('auditoriaAnual:eliminarHallazgo', { empresaId, id }),
+    exportarXlsx: (empresaId) => ipcRenderer.invoke('auditoriaAnual:exportarXlsx', { empresaId }),
+    importarXlsx: (empresaId, archivoPath) => ipcRenderer.invoke('auditoriaAnual:importarXlsx', { empresaId, archivoPath }),
+    seleccionarArchivoImportar: () => ipcRenderer.invoke('auditoriaAnual:seleccionarArchivoImportar'),
+  },
+
   // --- Gestión del Cambio (2.11.1) ---
   loadGestionCambioData: (companyName) => ipcRenderer.invoke('gestion-cambio-load-data', companyName),
   saveGestionCambioData: (companyName, changeData) => ipcRenderer.invoke('gestion-cambio-save-data', companyName, changeData),

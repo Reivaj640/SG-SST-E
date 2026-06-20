@@ -1,0 +1,1556 @@
+/* ==========================================================================
+   K+AIR · Módulo 6.1.2 — Auditoría Anual
+   Diseño v2.0 · Replica Patrón 6.1.3 (Hub + Patrón B + header k-*)
+   Prefijo aislado: .kair-aud-*
+   Header estandarizado con clases .k-* (idéntico a 6.1.3 / capacitaciones)
+   ========================================================================== */
+
+/* ─────────────────────────────────────────────────────────────────────────
+   0. HEADER ESTÁNDAR K+AIR — Mismo patrón de 6.1.3, capacitaciones, indicadores
+   (Reutiliza las clases globales del sistema visual oficial)
+   ───────────────────────────────────────────────────────────────────────── */
+
+.kair-aud-module .k-module-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 1.5rem;
+  height: var(--k-header-height, 64px);
+  background: var(--k-bg-card, #ffffff);
+  border-bottom: 1px solid var(--k-border, #dee2e6);
+  box-shadow: var(--k-shadow-sm, 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05));
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  flex-shrink: 0;
+  backdrop-filter: saturate(180%) blur(8px);
+  -webkit-backdrop-filter: saturate(180%) blur(8px);
+  background-color: rgba(255, 255, 255, 0.98);
+  isolation: isolate;
+}
+
+.kair-aud-module .k-header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.kair-aud-module .k-back-btn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--k-border, #dee2e6);
+  border-radius: var(--k-radius-md, 0.375rem);
+  background: var(--k-bg-card, #ffffff);
+  color: var(--k-text-muted, #6c757d);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 160ms ease;
+}
+
+.kair-aud-module .k-back-btn:hover {
+  background: #e8eef9;
+  color: #174ea6;
+  border-color: #174ea6;
+}
+
+.kair-aud-module .k-header-title-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.kair-aud-module .k-header-main-title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--k-text-strong, #0f1020);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kair-aud-module .k-header-breadcrumb {
+  font-size: 0.75rem;
+  color: var(--k-text-muted, #6c757d);
+  margin-top: 2px;
+}
+
+.kair-aud-module .k-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.kair-aud-module .k-sync-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 4px 10px;
+  background: #e6f4ea;
+  color: #1e7e34;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 999px;
+}
+
+.kair-aud-module .k-sync-badge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #28a745;
+  display: inline-block;
+  box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+  animation: kair-aud-pulse 2s infinite;
+}
+
+@keyframes kair-aud-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
+  70%  { box-shadow: 0 0 0 6px rgba(40, 167, 69, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+}
+
+/* Botones del header — k-btn global */
+.kair-aud-module .k-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: var(--k-radius-md, 0.375rem);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 160ms ease;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.kair-aud-module .k-btn-primary {
+  background: #174ea6;
+  color: #fff;
+  border-color: #174ea6;
+}
+.kair-aud-module .k-btn-primary:hover {
+  background: #185abd;
+  border-color: #185abd;
+}
+
+.kair-aud-module .k-btn-success {
+  background: #28a745;
+  color: #fff;
+  border-color: #28a745;
+}
+.kair-aud-module .k-btn-success:hover {
+  background: #218838;
+  border-color: #218838;
+}
+
+.kair-aud-module .k-btn-secondary {
+  background: transparent;
+  color: #174ea6;
+  border-color: #174ea6;
+}
+.kair-aud-module .k-btn-secondary:hover {
+  background: #e8eef9;
+}
+
+.kair-aud-module .k-btn-ghost {
+  background: transparent;
+  color: #5a6378;
+  border-color: transparent;
+}
+.kair-aud-module .k-btn-ghost:hover {
+  background: #f1f3f5;
+  color: #1a1a2e;
+}
+
+.kair-aud-module .k-btn-danger {
+  background: #dc3545;
+  color: #fff;
+  border-color: #dc3545;
+}
+.kair-aud-module .k-btn-danger:hover {
+  background: #c82333;
+}
+
+.kair-aud-module .k-btn-sm {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.kair-aud-module .k-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   1. MÓDULO — Root, tokens y reset
+   ───────────────────────────────────────────────────────────────────────── */
+
+.kair-aud-module {
+  /* Paleta oficial K+AIR */
+  --aud-primary: #174ea6;
+  --aud-primary-hover: #185abd;
+  --aud-primary-soft: #e8eef9;
+  --aud-success: #28a745;
+  --aud-success-soft: #e6f4ea;
+  --aud-warning: #ffc107;
+  --aud-warning-soft: #fff8e1;
+  --aud-danger: #dc3545;
+  --aud-danger-soft: #fdecee;
+  --aud-info: #17a2b8;
+  --aud-info-soft: #e3f6f9;
+  --aud-neutral: #6c757d;
+  --aud-neutral-soft: #f1f3f5;
+
+  /* Fondos y bordes */
+  --aud-bg: #f8f9fa;
+  --aud-surface: #ffffff;
+  --aud-border: #dee2e6;
+  --aud-border-strong: #adb5bd;
+
+  /* Texto */
+  --aud-text: #1a1a2e;
+  --aud-text-muted: #5a6378;
+  --aud-text-strong: #0f1020;
+
+  /* Tipografía */
+  --aud-font: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --aud-title-xl: 600 1.5rem/1.2 var(--aud-font);
+  --aud-title-lg: 600 1.25rem/1.3 var(--aud-font);
+  --aud-title-md: 600 1rem/1.3 var(--aud-font);
+  --aud-body: 400 0.9375rem/1.5 var(--aud-font);
+  --aud-body-sm: 400 0.875rem/1.5 var(--aud-font);
+  --aud-caption: 400 0.8125rem/1.4 var(--aud-font);
+  --aud-label: 500 0.75rem/1.3 var(--aud-font);
+
+  /* Spacing scale (4-8-12-16-20-24-32) */
+  --aud-s1: 4px;
+  --aud-s2: 8px;
+  --aud-s3: 12px;
+  --aud-s4: 16px;
+  --aud-s5: 20px;
+  --aud-s6: 24px;
+  --aud-s8: 32px;
+
+  /* Radius */
+  --aud-radius-sm: 6px;
+  --aud-radius-md: 10px;
+  --aud-radius-lg: 14px;
+  --aud-radius-pill: 999px;
+
+  /* Sombras sutiles (oficial) */
+  --aud-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --aud-shadow: 0 1px 3px rgba(16, 24, 40, 0.06), 0 1px 2px rgba(16, 24, 40, 0.04);
+  --aud-shadow-md: 0 4px 8px -2px rgba(16, 24, 40, 0.1), 0 2px 4px -2px rgba(16, 24, 40, 0.06);
+
+  /* Transición estándar */
+  --aud-transition: 160ms ease;
+
+  font-family: var(--aud-font);
+  font-size: 14px;
+  color: var(--aud-text);
+  background: var(--aud-bg);
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow-x: hidden;
+  isolation: isolate;
+}
+
+.kair-aud-module::-webkit-scrollbar { width: 10px; height: 10px; }
+.kair-aud-module::-webkit-scrollbar-track { background: var(--aud-bg); }
+.kair-aud-module::-webkit-scrollbar-thumb {
+  background: var(--aud-border-strong);
+  border-radius: var(--aud-radius-sm);
+  border: 2px solid var(--aud-bg);
+}
+.kair-aud-module::-webkit-scrollbar-thumb:hover { background: var(--aud-text-muted); }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   2. TABS — Patrón 3-4 (segmented)
+   ───────────────────────────────────────────────────────────────────────── */
+
+.kair-aud-tabs {
+  display: flex;
+  align-items: center;
+  padding: 0 1.5rem;
+  background: var(--aud-surface);
+  border-bottom: 1px solid var(--aud-border);
+  gap: 0;
+  overflow-x: auto;
+  flex-shrink: 0;
+  scrollbar-width: thin;
+}
+
+.kair-aud-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 12px 16px;
+  font: 500 0.875rem/1 var(--aud-font);
+  color: var(--aud-text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color var(--aud-transition), border-color var(--aud-transition);
+  white-space: nowrap;
+  position: relative;
+}
+
+.kair-aud-tab i { font-size: 1rem; }
+
+.kair-aud-tab:hover {
+  color: var(--aud-primary);
+  background: var(--aud-primary-soft);
+  border-radius: var(--aud-radius-sm) var(--aud-radius-sm) 0 0;
+}
+
+.kair-aud-tab--active {
+  color: var(--aud-primary);
+  border-bottom-color: var(--aud-primary);
+  font-weight: 600;
+}
+
+.kair-aud-tab--active:hover {
+  background: transparent;
+  color: var(--aud-primary-hover);
+}
+
+.kair-aud-tab__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--aud-primary);
+  border-radius: var(--aud-radius-pill);
+  margin-left: 4px;
+}
+
+.kair-aud-tab__badge--success { background: var(--aud-success); }
+.kair-aud-tab__badge--warning { background: var(--aud-warning); color: #5a4500; }
+.kair-aud-tab__badge--danger  { background: var(--aud-danger); }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   3. MAIN LAYOUT
+   ───────────────────────────────────────────────────────────────────────── */
+
+.kair-aud-main {
+  flex: 1;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   4. KPI STRIP — Tarjetas de métricas globales
+   ───────────────────────────────────────────────────────────────────────── */
+
+.kair-aud-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0;
+  background: var(--aud-surface);
+  border: 1px solid var(--aud-border);
+  border-radius: var(--aud-radius-md);
+  box-shadow: var(--aud-shadow-sm);
+  overflow: hidden;
+}
+
+.kair-aud-kpi {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  position: relative;
+  min-width: 0;
+}
+
+.kair-aud-kpi + .kair-aud-kpi {
+  border-left: 1px solid var(--aud-border);
+}
+
+.kair-aud-kpi__icon {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--aud-radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 1.05rem;
+}
+
+.kair-aud-kpi__icon--primary { background: var(--aud-primary-soft);  color: var(--aud-primary); }
+.kair-aud-kpi__icon--success { background: var(--aud-success-soft);  color: var(--aud-success); }
+.kair-aud-kpi__icon--warning { background: var(--aud-warning-soft);  color: #b08500; }
+.kair-aud-kpi__icon--danger  { background: var(--aud-danger-soft);   color: var(--aud-danger); }
+.kair-aud-kpi__icon--info    { background: var(--aud-info-soft);     color: var(--aud-info); }
+.kair-aud-kpi__icon--neutral { background: var(--aud-neutral-soft);  color: var(--aud-neutral); }
+
+.kair-aud-kpi__content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.kair-aud-kpi__value {
+  font: 700 1.5rem/1.1 var(--aud-font);
+  color: var(--aud-text-strong);
+  letter-spacing: -0.02em;
+}
+
+.kair-aud-kpi__label {
+  font: 500 0.75rem/1.2 var(--aud-font);
+  color: var(--aud-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 4px;
+}
+
+.kair-aud-kpi__sub {
+  font: 400 0.75rem/1.3 var(--aud-font);
+  margin-top: 2px;
+  color: var(--aud-text-muted);
+}
+
+.kair-aud-kpi__sub--success { color: var(--aud-success); font-weight: 600; }
+.kair-aud-kpi__sub--warning { color: #b08500; font-weight: 600; }
+.kair-aud-kpi__sub--danger  { color: var(--aud-danger); font-weight: 600; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   5. HERO — Pills + título + descripción + CTAs
+   ───────────────────────────────────────────────────────────────────────── */
+
+.kair-aud-hero {
+  background: linear-gradient(135deg, #e8eef9 0%, #f1f5fc 100%);
+  border: 1px solid var(--aud-primary-soft);
+  border-radius: var(--aud-radius-md);
+  padding: 1.5rem 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.kair-aud-hero::before {
+  content: '';
+  position: absolute;
+  top: -30px;
+  right: -30px;
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle, rgba(23, 78, 166, 0.06) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.kair-aud-hero__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.kair-aud-hero__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  font: 500 0.75rem/1.2 var(--aud-font);
+  background: var(--aud-surface);
+  color: var(--aud-text-muted);
+  border: 1px solid var(--aud-border);
+  border-radius: var(--aud-radius-pill);
+}
+
+.kair-aud-hero__pill .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--aud-text-muted);
+  display: inline-block;
+}
+
+.kair-aud-hero__pill--active {
+  background: var(--aud-primary-soft);
+  color: var(--aud-primary);
+  border-color: var(--aud-primary-soft);
+  font-weight: 600;
+}
+.kair-aud-hero__pill--active .dot { background: var(--aud-primary); }
+
+.kair-aud-hero__pill--meta {
+  background: transparent;
+  border-color: var(--aud-border);
+  color: var(--aud-text-muted);
+}
+
+.kair-aud-hero__title {
+  margin: 0;
+  font: var(--aud-title-xl);
+  color: var(--aud-text-strong);
+  letter-spacing: -0.02em;
+  position: relative;
+  z-index: 1;
+}
+
+.kair-aud-hero__desc {
+  margin: 0;
+  font: var(--aud-body);
+  color: var(--aud-text-muted);
+  max-width: 75ch;
+  line-height: 1.6;
+  position: relative;
+  z-index: 1;
+}
+
+.kair-aud-hero__desc strong {
+  color: var(--aud-text-strong);
+  font-weight: 600;
+}
+
+.kair-aud-hero__cta {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 1;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   6. SECTION TITLE
+   ───────────────────────────────────────────────────────────────────────── */
+
+.kair-aud-section-title {
+  margin: 0 0 1rem 0;
+  font: var(--aud-title-md);
+  color: var(--aud-text-strong);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  letter-spacing: -0.01em;
+}
+
+.kair-aud-section-title::before {
+  content: '';
+  width: 4px;
+  height: 18px;
+  background: var(--aud-primary);
+  border-radius: var(--aud-radius-pill);
+  display: inline-block;
+}
+
+.kair-aud-section-title small {
+  font: 400 0.8125rem/1 var(--aud-font);
+  color: var(--aud-text-muted);
+  font-weight: 400;
+  margin-left: 0.5rem;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   7. SUBMODULE CARDS — Patrón B (Cronograma)
+   ───────────────────────────────────────────────────────────────────────── */
+
+.kair-aud-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1rem;
+}
+
+.kair-aud-submodule-card {
+  background: var(--aud-surface);
+  border: 1px solid var(--aud-border);
+  border-radius: var(--aud-radius-md);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  cursor: pointer;
+  transition: transform var(--aud-transition), box-shadow var(--aud-transition), border-color var(--aud-transition);
+  position: relative;
+  min-width: 0;
+}
+
+.kair-aud-submodule-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--aud-shadow-md);
+  border-color: var(--aud-primary-soft);
+}
+
+.kair-aud-submodule-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.kair-aud-submodule-card__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--aud-radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  flex-shrink: 0;
+}
+
+.kair-aud-submodule-card__icon--primary { background: var(--aud-primary-soft); color: var(--aud-primary); }
+.kair-aud-submodule-card__icon--success { background: var(--aud-success-soft); color: var(--aud-success); }
+.kair-aud-submodule-card__icon--warning { background: var(--aud-warning-soft); color: #b08500; }
+.kair-aud-submodule-card__icon--info    { background: var(--aud-info-soft);    color: var(--aud-info); }
+.kair-aud-submodule-card__icon--danger  { background: var(--aud-danger-soft);  color: var(--aud-danger); }
+.kair-aud-submodule-card__icon--neutral { background: var(--aud-neutral-soft); color: var(--aud-neutral); }
+
+.kair-aud-submodule-card__title-block {
+  flex: 1;
+  min-width: 0;
+}
+
+.kair-aud-submodule-card__format {
+  font: var(--aud-label);
+  color: var(--aud-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+
+.kair-aud-submodule-card__title {
+  margin: 0;
+  font: var(--aud-title-md);
+  color: var(--aud-text-strong);
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.kair-aud-submodule-card__chev {
+  color: var(--aud-text-muted);
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  transition: transform var(--aud-transition), color var(--aud-transition);
+}
+
+.kair-aud-submodule-card:hover .kair-aud-submodule-card__chev {
+  color: var(--aud-primary);
+  transform: translateX(2px);
+}
+
+.kair-aud-submodule-card__desc {
+  margin: 0;
+  font: var(--aud-body-sm);
+  color: var(--aud-text-muted);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.kair-aud-submodule-card__divider {
+  height: 1px;
+  background: var(--aud-border);
+  margin: 0.25rem 0;
+}
+
+.kair-aud-submodule-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.kair-aud-submodule-card__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  font: 500 0.75rem/1.2 var(--aud-font);
+  background: var(--aud-neutral-soft);
+  color: var(--aud-text);
+  border-radius: var(--aud-radius-pill);
+  white-space: nowrap;
+}
+
+.kair-aud-submodule-card__chip--success { background: var(--aud-success-soft); color: var(--aud-success); }
+.kair-aud-submodule-card__chip--warning { background: var(--aud-warning-soft); color: #b08500; }
+.kair-aud-submodule-card__chip--info    { background: var(--aud-info-soft);    color: var(--aud-info); }
+.kair-aud-submodule-card__chip--danger  { background: var(--aud-danger-soft);  color: var(--aud-danger); }
+.kair-aud-submodule-card__chip--primary { background: var(--aud-primary-soft); color: var(--aud-primary); }
+.kair-aud-submodule-card__chip--neutral { background: var(--aud-neutral-soft); color: var(--aud-text-muted); }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   8. PROGRESS BAR
+   ───────────────────────────────────────────────────────────────────────── */
+
+.kair-aud-progress {
+  width: 100%;
+  height: 6px;
+  background: var(--aud-neutral-soft);
+  border-radius: var(--aud-radius-pill);
+  overflow: hidden;
+  position: relative;
+}
+
+.kair-aud-progress__bar {
+  height: 100%;
+  background: var(--aud-primary);
+  border-radius: var(--aud-radius-pill);
+  transition: width 320ms ease;
+}
+
+.kair-aud-progress__bar--success { background: var(--aud-success); }
+.kair-aud-progress__bar--warning { background: var(--aud-warning); }
+.kair-aud-progress__bar--danger  { background: var(--aud-danger); }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   9. BADGES
+   ───────────────────────────────────────────────────────────────────────── */
+
+.kair-aud-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  font: 500 0.75rem/1.2 var(--aud-font);
+  border-radius: var(--aud-radius-pill);
+  white-space: nowrap;
+  background: var(--aud-neutral-soft);
+  color: var(--aud-text);
+}
+
+.kair-aud-badge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  display: inline-block;
+}
+
+.kair-aud-badge--success { background: var(--aud-success-soft); color: var(--aud-success); }
+.kair-aud-badge--warning { background: var(--aud-warning-soft); color: #b08500; }
+.kair-aud-badge--danger  { background: var(--aud-danger-soft);  color: var(--aud-danger); }
+.kair-aud-badge--info    { background: var(--aud-info-soft);    color: var(--aud-info); }
+.kair-aud-badge--primary { background: var(--aud-primary-soft); color: var(--aud-primary); }
+.kair-aud-badge--neutral { background: var(--aud-neutral-soft); color: var(--aud-text-muted); }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   10. ICON BUTTONS
+   ───────────────────────────────────────────────────────────────────────── */
+
+.kair-aud-icon-btn {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--aud-border);
+  background: var(--aud-surface);
+  color: var(--aud-text-muted);
+  border-radius: var(--aud-radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all var(--aud-transition);
+}
+
+.kair-aud-icon-btn:hover {
+  background: var(--aud-primary-soft);
+  color: var(--aud-primary);
+  border-color: var(--aud-primary);
+}
+
+.kair-aud-icon-btn--danger:hover {
+  background: var(--aud-danger-soft);
+  color: var(--aud-danger);
+  border-color: var(--aud-danger);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   11. TABLE CARD
+   ───────────────────────────────────────────────────────────────────────── */
+
+.kair-aud-table-card {
+  background: var(--aud-surface);
+  border: 1px solid var(--aud-border);
+  border-radius: var(--aud-radius-md);
+  box-shadow: var(--aud-shadow-sm);
+  overflow: hidden;
+}
+
+.kair-aud-table-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--aud-border);
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.kair-aud-table-card__title {
+  margin: 0;
+  font: var(--aud-title-md);
+  color: var(--aud-text-strong);
+}
+
+.kair-aud-table-card__filters {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.kair-aud-table-card__filter {
+  padding: 6px 10px;
+  font: 500 0.8125rem/1 var(--aud-font);
+  background: transparent;
+  border: 1px solid var(--aud-border);
+  border-radius: var(--aud-radius-pill);
+  color: var(--aud-text-muted);
+  cursor: pointer;
+  transition: all var(--aud-transition);
+}
+
+.kair-aud-table-card__filter:hover {
+  background: var(--aud-primary-soft);
+  color: var(--aud-primary);
+  border-color: var(--aud-primary-soft);
+}
+
+.kair-aud-table-card__filter--active {
+  background: var(--aud-primary-soft);
+  color: var(--aud-primary);
+  border-color: var(--aud-primary);
+  font-weight: 600;
+}
+
+.kair-aud-table {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--aud-body-sm);
+}
+
+.kair-aud-table thead th {
+  background: var(--aud-neutral-soft);
+  color: var(--aud-text-muted);
+  font: 600 0.75rem/1.3 var(--aud-font);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: left;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--aud-border);
+  white-space: nowrap;
+}
+
+.kair-aud-table tbody td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--aud-border);
+  color: var(--aud-text);
+  vertical-align: middle;
+}
+
+.kair-aud-table tbody tr {
+  transition: background var(--aud-transition);
+}
+
+.kair-aud-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.kair-aud-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.kair-aud-table__id {
+  font: 500 0.75rem/1 var(--aud-font);
+  color: var(--aud-text-muted);
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+}
+
+.kair-aud-table__title {
+  font-weight: 600;
+  color: var(--aud-text-strong);
+}
+
+.kair-aud-table__actions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.kair-aud-table__empty {
+  padding: 3rem 1.5rem !important;
+  text-align: center !important;
+  color: var(--aud-text-muted);
+  vertical-align: middle;
+}
+
+.kair-aud-table__empty > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.kair-aud-table__empty i {
+  font-size: 2.25rem;
+  margin-bottom: 0.25rem;
+  display: block;
+  opacity: 0.55;
+  color: var(--aud-text-muted);
+}
+
+.kair-aud-table__empty-title {
+  font: 600 1rem/1.3 var(--aud-font);
+  color: var(--aud-text);
+  margin: 0;
+}
+
+.kair-aud-table__empty-desc {
+  font: var(--aud-body-sm);
+  color: var(--aud-text-muted);
+  margin: 0;
+  max-width: 42ch;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   12. HALLAZGO CARD (Hallazgos view)
+   ───────────────────────────────────────────────────────────────────────── */
+
+.kair-aud-hallazgo-card {
+  background: var(--aud-surface);
+  border: 1px solid var(--aud-border);
+  border-radius: var(--aud-radius-md);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  transition: transform var(--aud-transition), box-shadow var(--aud-transition);
+  position: relative;
+  border-left: 4px solid var(--aud-neutral);
+}
+
+.kair-aud-hallazgo-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--aud-shadow-md);
+}
+
+.kair-aud-hallazgo-card--critico { border-left-color: var(--aud-danger); }
+.kair-aud-hallazgo-card--mayor   { border-left-color: var(--aud-warning); }
+.kair-aud-hallazgo-card--menor   { border-left-color: var(--aud-info); }
+
+.kair-aud-hallazgo-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.kair-aud-hallazgo-card__title-block {
+  flex: 1;
+  min-width: 0;
+}
+
+.kair-aud-hallazgo-card__codigo {
+  font: 500 0.75rem/1 var(--aud-font);
+  color: var(--aud-text-muted);
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.kair-aud-hallazgo-card__title {
+  margin: 4px 0 0 0;
+  font: var(--aud-title-md);
+  color: var(--aud-text-strong);
+  line-height: 1.3;
+}
+
+.kair-aud-hallazgo-card__badges {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.kair-aud-hallazgo-card__desc {
+  margin: 0;
+  font: var(--aud-body-sm);
+  color: var(--aud-text-muted);
+  line-height: 1.5;
+}
+
+.kair-aud-hallazgo-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font: var(--aud-caption);
+  color: var(--aud-text-muted);
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--aud-border);
+}
+
+.kair-aud-hallazgo-card__meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.kair-aud-hallazgo-card__actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   13. MODAL — Sistema de modales (compatible con .k-modal-* si existe)
+   ───────────────────────────────────────────────────────────────────────── */
+
+.kair-aud-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.kair-aud-modal--open {
+  display: flex;
+}
+
+.kair-aud-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 16, 32, 0.55);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  animation: kair-aud-fade-in 200ms ease;
+}
+
+.kair-aud-modal__panel {
+  position: relative;
+  background: var(--aud-surface);
+  border-radius: var(--aud-radius-lg);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.08);
+  width: 100%;
+  max-width: 640px;
+  max-height: calc(100vh - 2rem);
+  display: flex;
+  flex-direction: column;
+  animation: kair-aud-scale-in 200ms ease;
+  overflow: hidden;
+}
+
+.kair-aud-modal__panel--lg { max-width: 800px; }
+
+@keyframes kair-aud-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes kair-aud-scale-in {
+  from { transform: scale(0.95); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+
+.kair-aud-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--aud-border);
+  background: var(--aud-surface);
+  flex-shrink: 0;
+}
+
+.kair-aud-modal__head h3 {
+  margin: 0;
+  font: var(--aud-title-lg);
+  color: var(--aud-text-strong);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  letter-spacing: -0.01em;
+}
+
+.kair-aud-modal__head h3 i {
+  color: var(--aud-primary);
+  font-size: 1.25rem;
+}
+
+.kair-aud-modal__close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--aud-text-muted);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: var(--aud-radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--aud-transition);
+}
+
+.kair-aud-modal__close:hover {
+  background: var(--aud-danger-soft);
+  color: var(--aud-danger);
+}
+
+.kair-aud-modal__body {
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.kair-aud-modal__body label {
+  display: block;
+  font: 500 0.8125rem/1.2 var(--aud-font);
+  color: var(--aud-text);
+  margin-bottom: 1rem;
+}
+
+.kair-aud-modal__body label > input,
+.kair-aud-modal__body label > select,
+.kair-aud-modal__body label > textarea {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px 12px;
+  font: var(--aud-body);
+  color: var(--aud-text);
+  background: var(--aud-surface);
+  border: 1px solid var(--aud-border);
+  border-radius: var(--aud-radius-sm);
+  transition: border-color var(--aud-transition), box-shadow var(--aud-transition);
+  font-family: inherit;
+}
+
+.kair-aud-modal__body label > input:focus,
+.kair-aud-modal__body label > select:focus,
+.kair-aud-modal__body label > textarea:focus {
+  outline: none;
+  border-color: var(--aud-primary);
+  box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.12);
+}
+
+.kair-aud-modal__body label > textarea {
+  resize: vertical;
+  min-height: 70px;
+  font-family: inherit;
+}
+
+.kair-aud-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.kair-aud-form-row label { margin-bottom: 1rem; }
+
+.kair-aud-modal__error {
+  display: none;
+  padding: 10px 12px;
+  background: var(--aud-danger-soft);
+  color: var(--aud-danger);
+  border: 1px solid var(--aud-danger);
+  border-radius: var(--aud-radius-sm);
+  font: 500 0.8125rem/1.4 var(--aud-font);
+  margin-top: 0.5rem;
+  border-left-width: 3px;
+}
+
+.kair-aud-modal__error::before {
+  content: '\F33A'; /* bi-exclamation-triangle-fill */
+  font-family: 'bootstrap-icons';
+  margin-right: 6px;
+  font-size: 1rem;
+  vertical-align: middle;
+}
+
+.kair-aud-modal__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--aud-border);
+  background: #f8f9fa;
+  flex-shrink: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   14. TOAST — Notificaciones apilables
+   ───────────────────────────────────────────────────────────────────────── */
+
+.kair-aud-toast-stack {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+  max-width: 380px;
+}
+
+.kair-aud-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 12px 16px;
+  background: var(--aud-surface);
+  border: 1px solid var(--aud-border);
+  border-left: 4px solid var(--aud-info);
+  border-radius: var(--aud-radius-md);
+  box-shadow: var(--aud-shadow-md);
+  font: var(--aud-body-sm);
+  color: var(--aud-text);
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateX(20px);
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+
+.kair-aud-toast--show {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.kair-aud-toast i {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.kair-aud-toast__title {
+  font-weight: 600;
+  color: var(--aud-text-strong);
+  margin-bottom: 2px;
+}
+
+.kair-aud-toast__msg {
+  color: var(--aud-text-muted);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.kair-aud-toast--success { border-left-color: var(--aud-success); }
+.kair-aud-toast--success i { color: var(--aud-success); }
+
+.kair-aud-toast--error { border-left-color: var(--aud-danger); }
+.kair-aud-toast--error i { color: var(--aud-danger); }
+
+.kair-aud-toast--warning { border-left-color: var(--aud-warning); }
+.kair-aud-toast--warning i { color: #b08500; }
+
+.kair-aud-toast--info { border-left-color: var(--aud-info); }
+.kair-aud-toast--info i { color: var(--aud-info); }
+
+/* Legacy single-toast compatibility */
+.kair-aud-toast:not(.kair-aud-toast-stack .kair-aud-toast) {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1100;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   15. CONFIRM MODAL — Confirmación in-app (reemplaza window.confirm)
+   ───────────────────────────────────────────────────────────────────────── */
+
+.kair-aud-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 16, 32, 0.55);
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: kair-aud-fade-in 160ms ease;
+}
+
+.kair-aud-confirm-modal {
+  background: var(--aud-surface);
+  border-radius: var(--aud-radius-lg);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15);
+  max-width: 420px;
+  width: calc(100% - 2rem);
+  padding: 1.5rem;
+  animation: kair-aud-scale-in 200ms ease;
+}
+
+.kair-aud-confirm-modal__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--aud-warning-soft);
+  color: #b08500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.kair-aud-confirm-modal__icon--danger { background: var(--aud-danger-soft); color: var(--aud-danger); }
+
+.kair-aud-confirm-modal__title {
+  margin: 0 0 0.5rem 0;
+  font: var(--aud-title-md);
+  color: var(--aud-text-strong);
+}
+
+.kair-aud-confirm-modal__msg {
+  margin: 0 0 1.5rem 0;
+  font: var(--aud-body);
+  color: var(--aud-text-muted);
+  line-height: 1.5;
+}
+
+.kair-aud-confirm-modal__actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   16. EMPTY STATE / PLACEHOLDER
+   ───────────────────────────────────────────────────────────────────────── */
+
+.kair-aud-placeholder {
+  background: var(--aud-surface);
+  border: 2px dashed var(--aud-border);
+  border-radius: var(--aud-radius-md);
+  padding: 3rem 2rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.kair-aud-placeholder__icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--aud-primary-soft);
+  color: var(--aud-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.kair-aud-placeholder__title {
+  margin: 0;
+  font: var(--aud-title-md);
+  color: var(--aud-text-strong);
+}
+
+.kair-aud-placeholder__desc {
+  margin: 0;
+  font: var(--aud-body);
+  color: var(--aud-text-muted);
+  max-width: 50ch;
+}
+
+.kair-aud-placeholder__phase {
+  font: var(--aud-label);
+  color: var(--aud-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 0.5rem;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   17. UTILIDADES · VIEWS
+   ───────────────────────────────────────────────────────────────────────── */
+
+.kair-aud-view {
+  display: none;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 0;
+  animation: kair-aud-fade-in 200ms ease;
+}
+
+.kair-aud-view--active {
+  display: flex;
+}
+
+.kair-aud-view__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.kair-aud-view__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   18. FORMULARIO EN MODAL — Reutilizable
+   ───────────────────────────────────────────────────────────────────────── */
+
+.kair-aud-form-field { display: block; margin-bottom: 1rem; }
+
+.kair-aud-form-field__label {
+  display: block;
+  font: 500 0.8125rem/1.3 var(--aud-font);
+  color: var(--aud-text);
+  margin-bottom: 6px;
+}
+
+.kair-aud-form-field__label .req { color: var(--aud-danger); margin-left: 2px; }
+
+.kair-aud-form-field__control {
+  width: 100%;
+  padding: 8px 12px;
+  font: var(--aud-body);
+  color: var(--aud-text);
+  background: var(--aud-surface);
+  border: 1px solid var(--aud-border);
+  border-radius: var(--aud-radius-sm);
+  font-family: inherit;
+  transition: border-color var(--aud-transition), box-shadow var(--aud-transition);
+}
+
+.kair-aud-form-field__control:focus {
+  outline: none;
+  border-color: var(--aud-primary);
+  box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.12);
+}
+
+.kair-aud-form-field__hint {
+  display: block;
+  font: var(--aud-caption);
+  color: var(--aud-text-muted);
+  margin-top: 4px;
+}
+
+.kair-aud-form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 640px) {
+  .kair-aud-form-grid-2 { grid-template-columns: 1fr; }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   19. DARK MODE (opcional, sigue tokens)
+   ───────────────────────────────────────────────────────────────────────── */
+
+@media (prefers-color-scheme: dark) {
+  .kair-aud-module {
+    --aud-bg: #0f1117;
+    --aud-surface: #181c25;
+    --aud-border: #2a2f3a;
+    --aud-border-strong: #4a5060;
+    --aud-text: #e4e6eb;
+    --aud-text-muted: #9ca3af;
+    --aud-text-strong: #f5f6f8;
+    --aud-neutral-soft: #21262f;
+    --aud-primary-soft: rgba(23, 78, 166, 0.18);
+    --aud-success-soft: rgba(40, 167, 69, 0.18);
+    --aud-warning-soft: rgba(255, 193, 7, 0.18);
+    --aud-danger-soft:  rgba(220, 53, 69, 0.18);
+    --aud-info-soft:    rgba(23, 162, 184, 0.18);
+
+    /* Header: también oscuro */
+    --k-bg-card: #181c25;
+    --k-border: #2a2f3a;
+    --k-text-muted: #9ca3af;
+    --k-text-strong: #f5f6f8;
+  }
+  .kair-aud-module .k-module-header {
+    background-color: rgba(24, 28, 37, 0.98);
+  }
+  .kair-aud-module .k-back-btn {
+    background: #181c25;
+    color: #9ca3af;
+  }
+  .kair-aud-table tbody tr:hover { background: rgba(255, 255, 255, 0.03); }
+  .kair-aud-modal__foot { background: #14171f; }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   20. RESPONSIVE — Mobile-first refinamientos
+   ───────────────────────────────────────────────────────────────────────── */
+
+@media (max-width: 1024px) {
+  .kair-aud-kpi-strip { grid-template-columns: repeat(3, 1fr); }
+  .kair-aud-kpi:nth-child(3n) { border-left: none; }
+  .kair-aud-kpi:nth-child(n+4) { border-top: 1px solid var(--aud-border); }
+}
+
+@media (max-width: 768px) {
+  .kair-aud-module .k-module-header { padding: 0 0.75rem; }
+  .kair-aud-tabs { padding: 0 0.75rem; }
+  .kair-aud-main { padding: 1rem; gap: 1rem; }
+  .kair-aud-kpi-strip { grid-template-columns: repeat(2, 1fr); }
+  .kair-aud-kpi { border-left: none !important; }
+  .kair-aud-kpi:nth-child(odd) { border-right: 1px solid var(--aud-border); }
+  .kair-aud-kpi:nth-child(n+3) { border-top: 1px solid var(--aud-border); }
+  .kair-aud-card-grid { grid-template-columns: 1fr; }
+  .kair-aud-hero { padding: 1.25rem; }
+  .kair-aud-form-row { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+  .kair-aud-kpi-strip { grid-template-columns: 1fr; }
+  .kair-aud-kpi { border: none !important; border-bottom: 1px solid var(--aud-border) !important; }
+  .kair-aud-kpi:last-child { border-bottom: none !important; }
+  .kair-aud-table-card__head { flex-direction: column; align-items: flex-start; }
+  .kair-aud-modal__panel { max-width: 100%; }
+  .kair-aud-modal__head, .kair-aud-modal__body, .kair-aud-modal__foot { padding: 1rem; }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   21. ANIMATIONS — Reposicionadas
+   ───────────────────────────────────────────────────────────────────────── */
+
+@keyframes kair-aud-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Print-friendly */
+@media print {
+  .kair-aud-module .k-module-header,
+  .kair-aud-tabs,
+  .kair-aud-table-card__filters,
+  .kair-aud-icon-btn,
+  .kair-aud-view__actions,
+  .kair-aud-modal,
+  .kair-aud-toast-stack { display: none !important; }
+}

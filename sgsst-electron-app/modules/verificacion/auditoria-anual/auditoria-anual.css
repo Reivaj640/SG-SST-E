@@ -760,3 +760,228 @@
   background: var(--kair-aud-bg);
   color: var(--kair-aud-primary);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   F3 (2026-06-19) — Estilos para CRUD (modales, toasts, botones acción)
+   Scope aislado vía .kair-aud- para no chocar con otros submódulos.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Botones de acción por fila ── */
+.kair-aud-btn--danger {
+  background: #dc3545;
+  color: #ffffff;
+  border-color: #dc3545;
+}
+.kair-aud-btn--danger:hover {
+  background: #c82333;
+  border-color: #c82333;
+}
+.kair-aud-btn--icon {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+/* ── Toolbar: filtros + botón primario ── */
+.kair-aud-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+/* ── Acciones en card de hallazgo ── */
+.kair-aud-hallazgo-card__actions {
+  display: flex;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+  justify-content: flex-end;
+}
+.kair-aud-hallazgo-card__aud {
+  font-size: 0.7rem;
+  color: var(--kair-aud-text-muted, #6c757d);
+  margin-left: 0.5rem;
+}
+
+/* ── Modal ── */
+.kair-aud-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.kair-aud-modal.kair-aud-modal--open {
+  display: flex;
+}
+.kair-aud-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(2px);
+}
+.kair-aud-modal__panel {
+  position: relative;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25);
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.kair-aud-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+.kair-aud-modal__head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #111827;
+}
+.kair-aud-modal__close {
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0 0.5rem;
+}
+.kair-aud-modal__close:hover {
+  color: #111827;
+}
+.kair-aud-modal__body {
+  padding: 1.25rem;
+  overflow-y: auto;
+}
+.kair-aud-modal__body label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.kair-aud-modal__body input,
+.kair-aud-modal__body select,
+.kair-aud-modal__body textarea {
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  color: #111827;
+  background: #ffffff;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+}
+.kair-aud-modal__body input:focus,
+.kair-aud-modal__body select:focus,
+.kair-aud-modal__body textarea:focus {
+  outline: 2px solid #174ea6;
+  outline-offset: -1px;
+  border-color: #174ea6;
+}
+.kair-aud-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.875rem;
+  margin-bottom: 0;
+}
+.kair-aud-form-row > label {
+  margin-bottom: 0.75rem;
+}
+.kair-aud-modal__error {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 6px;
+  color: #856404;
+  font-size: 0.82rem;
+  display: none;
+}
+.kair-aud-modal__error:not(:empty) {
+  display: block;
+}
+.kair-aud-modal__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.875rem 1.25rem;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+/* ── Toast ── */
+.kair-aud-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 10000;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: #ffffff;
+  border-left: 4px solid #174ea6;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.18);
+  font-size: 0.875rem;
+  color: #111827;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.25s, transform 0.25s;
+  max-width: 360px;
+}
+.kair-aud-toast--show {
+  opacity: 1;
+  transform: translateY(0);
+}
+.kair-aud-toast--success {
+  border-left-color: #16a34a;
+}
+.kair-aud-toast--error {
+  border-left-color: #dc3545;
+}
+.kair-aud-toast--info {
+  border-left-color: #0d6efd;
+}
+.kair-aud-toast i {
+  font-size: 1.1rem;
+}
+.kair-aud-toast--success i { color: #16a34a; }
+.kair-aud-toast--error i { color: #dc3545; }
+.kair-aud-toast--info i { color: #0d6efd; }
+
+/* ── Responsive modal ── */
+@media (max-width: 640px) {
+  .kair-aud-form-row {
+    grid-template-columns: 1fr;
+  }
+  .kair-aud-modal__panel {
+    width: 100vw;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+  .kair-aud-toast {
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    max-width: none;
+  }
+}
