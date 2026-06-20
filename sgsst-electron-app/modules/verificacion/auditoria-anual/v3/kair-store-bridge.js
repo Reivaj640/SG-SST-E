@@ -146,7 +146,7 @@
     }
 
     console.log('[K+AIRSST][6.1.2][BRIDGE] Hidratando desde AuditoriaService...');
-    return AuditoriaService.cargarTodo().then(function (resp) {
+    return AuditoriaService.cargarTodo(_getEmpresaId()).then(function (resp) {
       if (!resp || !resp.success || !resp.data) {
         console.log('[K+AIRSST][6.1.2][BRIDGE] cargarTodo no devolvió datos · usando mockData');
         _useService = false;
